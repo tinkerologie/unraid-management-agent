@@ -9,7 +9,6 @@ Complete documentation for the Unraid Management Agent plugin and API.
 ### API Documentation
 
 - **[API Reference](api/API_REFERENCE.md)** - Complete API endpoint reference (46 endpoints)
-- **[API Coverage Analysis](api/API_COVERAGE_ANALYSIS.md)** - Comprehensive analysis of API coverage compared to Unraid Web UI
 - **[WebSocket Events Documentation](WEBSOCKET_EVENTS_DOCUMENTATION.md)** - Complete guide to WebSocket event system
 - **[WebSocket Event Structure](WEBSOCKET_EVENT_STRUCTURE.md)** - Technical details of WebSocket event structure
 
