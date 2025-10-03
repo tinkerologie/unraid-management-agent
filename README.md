@@ -354,12 +354,23 @@ Contributions are welcome! Please:
 
 MIT License - see LICENSE file for details
 
+## Documentation
+
+Comprehensive documentation is available in the `docs/` directory:
+
+- **[Documentation Index](docs/README.md)** - Complete documentation overview
+- **[API Reference](docs/api/API_REFERENCE.md)** - Detailed API endpoint reference
+- **[API Coverage Analysis](docs/api/API_COVERAGE_ANALYSIS.md)** - API coverage vs Unraid Web UI
+- **[WebSocket Events](docs/WEBSOCKET_EVENTS_DOCUMENTATION.md)** - WebSocket event system guide
+- **[Implementation Reports](docs/implementation/)** - Phase 1 & 2 implementation details
+- **[Deployment Guides](docs/deployment/)** - Deployment and icon fix guides
+
 ## Support
 
 For issues, questions, or feature requests:
 - Open an issue on GitHub
 - Check existing documentation in the `docs/` directory
-- Review the WARP.md file for architectural details
+- Review the [Documentation Index](docs/README.md) for comprehensive guides
 
 ## Roadmap
 
@@ -374,12 +385,29 @@ For issues, questions, or feature requests:
 
 ## Changelog
 
-### Version 1.0.0 (2025-10-02)
-- Initial release
+### Version 1.0.0 (2025-10-03)
+
+**Phase 1 & 2 API Enhancements**:
+- Array control operations (start/stop, parity check control)
+- Parity check history endpoint
+- Single resource endpoints (disks/{id}, docker/{id}, vm/{id})
+- Enhanced disk details (role, spin_state, serial_number, model)
+- Configuration read endpoints (system, docker, vm, shares, network)
+- Configuration write endpoints with automatic backups
+- Disk settings endpoint with spindown delay
+
+**Core Features**:
 - Comprehensive monitoring for system, array, disks, shares
 - Network interface collector with bandwidth statistics
-- Docker and VM monitoring
+- Docker and VM monitoring and control
 - UPS and GPU support
-- REST API and WebSocket support
+- REST API (46 endpoints) and WebSocket support (9 event types)
 - Event-driven architecture with pubsub
 - Graceful shutdown and panic recovery
+
+**Documentation**:
+- Complete API reference guide
+- API coverage analysis
+- WebSocket events documentation
+- Implementation reports
+- Deployment guides
