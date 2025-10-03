@@ -14,8 +14,7 @@ import (
 func setupTestServer() (*Server, *domain.Context) {
 	ctx := &domain.Context{
 		Config: domain.Config{
-			Port:     8080,
-			MockMode: true,
+			Port: 8080,
 		},
 	}
 
@@ -25,7 +24,7 @@ func setupTestServer() (*Server, *domain.Context) {
 
 func TestHealthEndpoint(t *testing.T) {
 	server, _ := setupTestServer()
-	
+
 	req, err := http.NewRequest("GET", "/api/v1/health", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -50,7 +49,7 @@ func TestHealthEndpoint(t *testing.T) {
 
 func TestSystemEndpoint(t *testing.T) {
 	server, _ := setupTestServer()
-	
+
 	req, err := http.NewRequest("GET", "/api/v1/system", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -77,7 +76,7 @@ func TestSystemEndpoint(t *testing.T) {
 
 func TestArrayEndpoint(t *testing.T) {
 	server, _ := setupTestServer()
-	
+
 	req, err := http.NewRequest("GET", "/api/v1/array", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -99,7 +98,7 @@ func TestArrayEndpoint(t *testing.T) {
 
 func TestDisksEndpoint(t *testing.T) {
 	server, _ := setupTestServer()
-	
+
 	req, err := http.NewRequest("GET", "/api/v1/disks", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -121,7 +120,7 @@ func TestDisksEndpoint(t *testing.T) {
 
 func TestDockerEndpoint(t *testing.T) {
 	server, _ := setupTestServer()
-	
+
 	req, err := http.NewRequest("GET", "/api/v1/docker", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -143,7 +142,7 @@ func TestDockerEndpoint(t *testing.T) {
 
 func TestVMEndpoint(t *testing.T) {
 	server, _ := setupTestServer()
-	
+
 	req, err := http.NewRequest("GET", "/api/v1/vm", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -165,7 +164,7 @@ func TestVMEndpoint(t *testing.T) {
 
 func TestUPSEndpoint(t *testing.T) {
 	server, _ := setupTestServer()
-	
+
 	req, err := http.NewRequest("GET", "/api/v1/ups", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -187,7 +186,7 @@ func TestUPSEndpoint(t *testing.T) {
 
 func TestGPUEndpoint(t *testing.T) {
 	server, _ := setupTestServer()
-	
+
 	req, err := http.NewRequest("GET", "/api/v1/gpu", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -209,7 +208,7 @@ func TestGPUEndpoint(t *testing.T) {
 
 func TestDockerControlEndpoint(t *testing.T) {
 	server, _ := setupTestServer()
-	
+
 	// Test start operation
 	body := strings.NewReader(`{"container_id":"test123","operation":"start"}`)
 	req, err := http.NewRequest("POST", "/api/v1/docker/control", body)
@@ -238,7 +237,7 @@ func TestDockerControlEndpoint(t *testing.T) {
 
 func TestDockerControlInvalidOperation(t *testing.T) {
 	server, _ := setupTestServer()
-	
+
 	body := strings.NewReader(`{"container_id":"test123","operation":"invalid"}`)
 	req, err := http.NewRequest("POST", "/api/v1/docker/control", body)
 	if err != nil {
@@ -257,7 +256,7 @@ func TestDockerControlInvalidOperation(t *testing.T) {
 
 func TestVMControlEndpoint(t *testing.T) {
 	server, _ := setupTestServer()
-	
+
 	// Test start operation
 	body := strings.NewReader(`{"vm_name":"testvm","operation":"start"}`)
 	req, err := http.NewRequest("POST", "/api/v1/vm/control", body)
@@ -286,7 +285,7 @@ func TestVMControlEndpoint(t *testing.T) {
 
 func TestCORS(t *testing.T) {
 	server, _ := setupTestServer()
-	
+
 	req, err := http.NewRequest("OPTIONS", "/api/v1/health", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -308,7 +307,7 @@ func TestCORS(t *testing.T) {
 
 func TestNotFoundRoute(t *testing.T) {
 	server, _ := setupTestServer()
-	
+
 	req, err := http.NewRequest("GET", "/api/v1/nonexistent", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -325,7 +324,7 @@ func TestNotFoundRoute(t *testing.T) {
 
 func TestJSONContentType(t *testing.T) {
 	server, _ := setupTestServer()
-	
+
 	req, err := http.NewRequest("GET", "/api/v1/health", nil)
 	if err != nil {
 		t.Fatal(err)

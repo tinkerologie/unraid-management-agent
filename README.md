@@ -113,9 +113,6 @@ make package
 
 # Custom port
 ./unraid-management-agent boot --port 8043
-
-# Mock mode (for development on non-Unraid systems)
-./unraid-management-agent boot --mock
 ```
 
 ### REST API Endpoints
@@ -226,20 +223,6 @@ go test -v ./daemon/services/api/handlers_test.go
 # Clean build artifacts
 make clean
 ```
-
-### Mock Mode
-
-For development on non-Unraid systems:
-
-```bash
-# Using flag
-./unraid-management-agent boot --mock
-
-# Using environment variable
-MOCK_MODE=true ./unraid-management-agent boot
-```
-
-In mock mode, collectors skip real data collection, allowing you to develop and test the API structure without requiring Unraid-specific system files.
 
 ## Configuration
 

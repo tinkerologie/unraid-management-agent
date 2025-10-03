@@ -10,7 +10,6 @@ killall unraid-management-agent >/dev/null 2>&1
 
 # Prepare environment
 export PORT="${PORT:-8043}"
-export MOCK_MODE="${MOCK_MODE:-false}"
 
 # Run the application
 nohup sudo -H bash -c "$PROG --logs-dir $LOGS_DIR --port $PORT" >/dev/null 2>&1 &
