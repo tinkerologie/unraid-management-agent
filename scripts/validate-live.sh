@@ -5,10 +5,19 @@
 
 set -e
 
-UNRAID_IP="192.168.20.21"
-API_PORT="8043"
-API_BASE="http://${UNRAID_IP}:${API_PORT}/api/v1"
-SSH_CMD="sshpass -p 'REMOVED_EXPOSED_CREDENTIAL' ssh -o StrictHostKeyChecking=no root@${UNRAID_IP}"
+# Load configuration from config.sh
+SCRIPT_DIR="$(dirname "$0")"
+if [ -f "$SCRIPT_DIR/config.sh" ]; then
+    source "$SCRIPT_DIR/config.sh"
+else
+    echo "ERROR: Configuration file not found!"
+    echo "Please create scripts/config.sh from scripts/config.sh.example"
+    echo ""
+    echo "  cp scripts/config.sh.example scripts/config.sh"
+    echo "  # Edit config.sh with your server details"
+    echo ""
+    exit 1
+fi
 
 # Colors for output
 RED='\033[0;31m'

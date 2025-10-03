@@ -5,10 +5,30 @@
 
 set -e
 
-UNRAID_IP="${1:-192.168.20.21}"
-UNRAID_PASSWORD="${2:-REMOVED_EXPOSED_CREDENTIAL}"
+# Load configuration from config.sh
+SCRIPT_DIR="$(dirname "$0")"
+if [ -f "$SCRIPT_DIR/config.sh" ]; then
+    source "$SCRIPT_DIR/config.sh"
+else
+    echo "ERROR: Configuration file not found!"
+    echo "Please create scripts/config.sh from scripts/config.sh.example"
+    echo ""
+    echo "  cp scripts/config.sh.example scripts/config.sh"
+    echo "  # Edit config.sh with your server details"
+    echo ""
+    exit 1
+fi
+
+# Allow command-line overrides
+UNRAID_IP="${1:-$UNRAID_IP}"
+UNRAID_PASSWORD="${2:-$UNRAID_PASSWORD}"
 CREATE_BACKUP="${3:-no}"  # Set to "yes" to create backup, default is "no"
-PLUGIN_NAME="unraid-management-agent"
+
+# Update SSH command if password was overridden
+if [ -n "$2" ]; then
+    SSH_CMD="sshpass -p '$UNRAID_PASSWORD' ssh -o StrictHostKeyChecking=no root@$UNRAID_IP"
+fi
+
 VERSION=$(cat VERSION)
 BUILD_DIR="build"
 PLUGIN_BUNDLE="${BUILD_DIR}/${PLUGIN_NAME}-${VERSION}.tgz"

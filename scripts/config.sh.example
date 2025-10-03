@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# Unraid Server Configuration Template
+# Copy this file to config.sh and update with your server details
+# 
+# IMPORTANT: config.sh is in .gitignore and will NOT be committed to git
+#
+# Usage:
+#   cp scripts/config.sh.example scripts/config.sh
+#   # Edit config.sh with your actual server details
+#   # Source it in your scripts: source "$(dirname "$0")/config.sh"
+
+# Unraid server IP address
+UNRAID_IP="192.168.1.100"
+
+# Unraid root password
+UNRAID_PASSWORD="your-password-here"
+
+# API port (default: 8043)
+API_PORT="8043"
+
+# SSH command wrapper (uses sshpass for automated authentication)
+SSH_CMD="sshpass -p '$UNRAID_PASSWORD' ssh -o StrictHostKeyChecking=no root@$UNRAID_IP"
+
+# API base URL
+API_BASE="http://${UNRAID_IP}:${API_PORT}/api/v1"
+
+# Plugin name
+PLUGIN_NAME="unraid-management-agent"
+
