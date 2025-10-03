@@ -120,7 +120,7 @@ make package
 
 ### REST API Endpoints
 
-Base URL: `http://localhost:8080/api/v1`
+Base URL: `http://localhost:8043/api/v1`
 
 #### Monitoring Endpoints
 - `GET /health` - Health check
@@ -153,10 +153,10 @@ Base URL: `http://localhost:8080/api/v1`
 
 ### WebSocket Connection
 
-Connect to `ws://localhost:8080/api/v1/ws` to receive real-time events:
+Connect to `ws://localhost:8043/api/v1/ws` to receive real-time events:
 
 ```javascript
-const ws = new WebSocket('ws://localhost:8080/api/v1/ws');
+const ws = new WebSocket('ws://localhost:8043/api/v1/ws');
 
 ws.onmessage = (event) => {
   const data = JSON.parse(event.data);
@@ -168,19 +168,19 @@ ws.onmessage = (event) => {
 
 ```bash
 # Get system information
-curl http://localhost:8080/api/v1/system
+curl http://localhost:8043/api/v1/system
 
 # Get network interfaces
-curl http://localhost:8080/api/v1/network
+curl http://localhost:8043/api/v1/network
 
 # List all disks
-curl http://localhost:8080/api/v1/disks
+curl http://localhost:8043/api/v1/disks
 
 # Start a Docker container
-curl -X POST http://localhost:8080/api/v1/docker/nginx/start
+curl -X POST http://localhost:8043/api/v1/docker/nginx/start
 
 # Stop a VM
-curl -X POST http://localhost:8080/api/v1/vm/Ubuntu/stop
+curl -X POST http://localhost:8043/api/v1/vm/Ubuntu/stop
 ```
 
 ## Development
@@ -359,11 +359,10 @@ MIT License - see LICENSE file for details
 Comprehensive documentation is available in the `docs/` directory:
 
 - **[Documentation Index](docs/README.md)** - Complete documentation overview
-- **[API Reference](docs/api/API_REFERENCE.md)** - Detailed API endpoint reference
+- **[API Reference](docs/api/API_REFERENCE.md)** - Detailed API endpoint reference (46 endpoints)
 - **[API Coverage Analysis](docs/api/API_COVERAGE_ANALYSIS.md)** - API coverage vs Unraid Web UI
 - **[WebSocket Events](docs/WEBSOCKET_EVENTS_DOCUMENTATION.md)** - WebSocket event system guide
-- **[Implementation Reports](docs/implementation/)** - Phase 1 & 2 implementation details
-- **[Deployment Guides](docs/deployment/)** - Deployment and icon fix guides
+- **[Changelog](CHANGELOG.md)** - Version history and release notes
 
 ## Support
 
@@ -376,38 +375,13 @@ For issues, questions, or feature requests:
 
 ### Planned Enhancements
 - Enhanced system info collector (CPU model, BIOS info, per-core usage)
-- Detailed disk metrics (SMART attributes, I/O statistics)
-- Array operation controls (start/stop array, parity checks)
+- Detailed disk metrics (I/O statistics, per-disk performance metrics)
 - User management collector
 - Network statistics trending
 - Alerting and notification system
 - Historical data storage
+- Plugin management endpoints
 
 ## Changelog
 
-### Version 1.0.0 (2025-10-03)
-
-**Phase 1 & 2 API Enhancements**:
-- Array control operations (start/stop, parity check control)
-- Parity check history endpoint
-- Single resource endpoints (disks/{id}, docker/{id}, vm/{id})
-- Enhanced disk details (role, spin_state, serial_number, model)
-- Configuration read endpoints (system, docker, vm, shares, network)
-- Configuration write endpoints with automatic backups
-- Disk settings endpoint with spindown delay
-
-**Core Features**:
-- Comprehensive monitoring for system, array, disks, shares
-- Network interface collector with bandwidth statistics
-- Docker and VM monitoring and control
-- UPS and GPU support
-- REST API (46 endpoints) and WebSocket support (9 event types)
-- Event-driven architecture with pubsub
-- Graceful shutdown and panic recovery
-
-**Documentation**:
-- Complete API reference guide
-- API coverage analysis
-- WebSocket events documentation
-- Implementation reports
-- Deployment guides
+See [CHANGELOG.md](CHANGELOG.md) for detailed version history and release notes.

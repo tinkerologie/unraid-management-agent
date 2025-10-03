@@ -8,24 +8,18 @@ Complete documentation for the Unraid Management Agent plugin and API.
 
 ### API Documentation
 
+- **[API Reference](api/API_REFERENCE.md)** - Complete API endpoint reference (46 endpoints)
 - **[API Coverage Analysis](api/API_COVERAGE_ANALYSIS.md)** - Comprehensive analysis of API coverage compared to Unraid Web UI
 - **[WebSocket Events Documentation](WEBSOCKET_EVENTS_DOCUMENTATION.md)** - Complete guide to WebSocket event system
 - **[WebSocket Event Structure](WEBSOCKET_EVENT_STRUCTURE.md)** - Technical details of WebSocket event structure
-- **[API Endpoints Reference](#api-endpoints-reference)** - Quick reference for all API endpoints
-
-### Implementation Reports
-
-- **[Phase 1 & 2 Implementation Report](implementation/PHASE_1_2_IMPLEMENTATION_REPORT.md)** - Complete implementation details for Phase 1 & 2 API enhancements
-- **[Disk Settings Implementation](implementation/DISK_SETTINGS_IMPLEMENTATION.md)** - Implementation of global disk settings endpoint
-
-### Deployment Guides
-
-- **[Deployment Summary - Icon Fix](deployment/DEPLOYMENT_SUMMARY_ICON_FIX.md)** - Icon fix deployment guide
-- **[Unraid Plugin Icon Fix](deployment/UNRAID_PLUGIN_ICON_FIX.md)** - Technical details of icon fix implementation
 
 ### Development
 
 - **[WARP](WARP.md)** - Development workflow and architecture reference
+
+### Version History
+
+- **[CHANGELOG](../CHANGELOG.md)** - Detailed version history and release notes
 
 ---
 
