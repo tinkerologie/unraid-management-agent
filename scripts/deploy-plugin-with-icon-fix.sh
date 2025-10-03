@@ -143,7 +143,7 @@ echo ""
 # Step 11: Start the service
 echo "Step 11: Starting service..."
 eval "$SSH_CMD '
-nohup /usr/local/emhttp/plugins/${PLUGIN_NAME}/${PLUGIN_NAME} boot > /dev/null 2>&1 &
+nohup /usr/local/emhttp/plugins/${PLUGIN_NAME}/${PLUGIN_NAME} --port 8043 boot > /dev/null 2>&1 &
 '"
 sleep 3
 echo "✅ Service started"
@@ -225,7 +225,7 @@ echo "Stop service:"
 echo "  ssh root@$UNRAID_IP 'killall ${PLUGIN_NAME}'"
 echo ""
 echo "Restart service:"
-echo "  ssh root@$UNRAID_IP 'killall ${PLUGIN_NAME} && nohup /usr/local/emhttp/plugins/${PLUGIN_NAME}/${PLUGIN_NAME} boot > /dev/null 2>&1 &'"
+echo "  ssh root@$UNRAID_IP 'killall ${PLUGIN_NAME} && nohup /usr/local/emhttp/plugins/${PLUGIN_NAME}/${PLUGIN_NAME} --port 8043 boot > /dev/null 2>&1 &'"
 echo ""
 echo "Test API:"
 echo "  curl -s http://$UNRAID_IP:8043/api/v1/health | jq"

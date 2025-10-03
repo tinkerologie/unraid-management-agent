@@ -32,10 +32,6 @@ func (c *VMCollector) Start(interval time.Duration) {
 }
 
 func (c *VMCollector) Collect() {
-	if c.ctx.MockMode {
-		logger.Debug("Mock mode: vm collection skipped")
-		return
-	}
 
 	logger.Debug("Collecting vm data...")
 

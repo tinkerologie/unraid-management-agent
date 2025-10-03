@@ -24,20 +24,33 @@ func NewSystemCollector(ctx *domain.Context) *SystemCollector {
 
 func (c *SystemCollector) Start(interval time.Duration) {
 	logger.Info("Starting system collector (interval: %v)", interval)
+	
+	// Run once immediately with panic recovery
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("System collector PANIC on startup: %v", r)
+			}
+		}()
+		c.Collect()
+	}()
+	
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		c.Collect()
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Error("System collector PANIC in loop: %v", r)
+				}
+			}()
+			c.Collect()
+		}()
 	}
 }
 
 func (c *SystemCollector) Collect() {
-	if c.ctx.MockMode {
-		logger.Debug("Mock mode: system collection skipped")
-		return
-	}
-
 	logger.Debug("Collecting system data...")
 
 	// Collect system info
@@ -79,19 +92,42 @@ func (c *SystemCollector) collectSystemInfo() (*dto.SystemInfo, error) {
 	} else {
 		info.CPUUsage = cpuPercent
 	}
+	
+	// Get CPU model and specs
+	cpuModel, cpuCores, cpuThreads, cpuMHz := c.getCPUSpecs()
+	info.CPUModel = cpuModel
+	info.CPUCores = cpuCores
+	info.CPUThreads = cpuThreads
+	info.CPUMHz = cpuMHz
+	
+	// Get per-core CPU usage
+	perCoreUsage, err := c.getPerCoreCPUUsage()
+	if err != nil {
+		logger.Debug("Failed to get per-core CPU usage: %v", err)
+	} else {
+		info.CPUPerCore = perCoreUsage
+	}
 
 	// Get memory info
-	memUsed, memTotal, memFree, err := c.getMemoryInfo()
+	memUsed, memTotal, memFree, memBuffers, memCached, err := c.getMemoryInfo()
 	if err != nil {
 		logger.Warning("Failed to get memory info", "error", err)
 	} else {
 		info.RAMUsed = memUsed
 		info.RAMTotal = memTotal
 		info.RAMFree = memFree
+		info.RAMBuffers = memBuffers
+		info.RAMCached = memCached
 		if memTotal > 0 {
 			info.RAMUsage = float64(memUsed) / float64(memTotal) * 100
 		}
 	}
+	
+	// Get server model and BIOS info
+	serverModel, biosVersion, biosDate := c.getSystemHardwareInfo()
+	info.ServerModel = serverModel
+	info.BIOSVersion = biosVersion
+	info.BIOSDate = biosDate
 
 	// Get temperatures
 	temperatures, err := c.getTemperatures()
@@ -100,12 +136,20 @@ func (c *SystemCollector) collectSystemInfo() (*dto.SystemInfo, error) {
 	} else {
 		// Extract CPU and motherboard temps if available
 		for name, temp := range temperatures {
-			if strings.Contains(strings.ToLower(name), "cpu") || strings.Contains(strings.ToLower(name), "core") {
+			nameLower := strings.ToLower(name)
+			// CPU temperature - look for Core temps, Package, or CPUTIN
+			if strings.Contains(nameLower, "core") || strings.Contains(nameLower, "package") || strings.Contains(nameLower, "cputin") {
 				if info.CPUTemp == 0 || temp > info.CPUTemp {
 					info.CPUTemp = temp
 				}
-			} else if strings.Contains(strings.ToLower(name), "motherboard") || strings.Contains(strings.ToLower(name), "mb") {
-				info.MotherboardTemp = temp
+			}
+			// Motherboard temperature - look for "MB Temp" specifically from coretemp
+			// Ignore SYSTIN and AUXTIN as they often have bogus readings
+			if strings.Contains(nameLower, "mb_temp") || strings.Contains(name, "MB Temp") {
+				// Sanity check: temperature should be reasonable (0-100°C)
+				if temp > 0 && temp < 100 {
+					info.MotherboardTemp = temp
+				}
 			}
 		}
 	}
@@ -221,10 +265,10 @@ func (c *SystemCollector) readCPUStat() (map[string]uint64, error) {
 	return nil, fmt.Errorf("cpu line not found in /proc/stat")
 }
 
-func (c *SystemCollector) getMemoryInfo() (uint64, uint64, uint64, error) {
+func (c *SystemCollector) getMemoryInfo() (uint64, uint64, uint64, uint64, uint64, error) {
 	file, err := os.Open("/proc/meminfo")
 	if err != nil {
-		return 0, 0, 0, err
+		return 0, 0, 0, 0, 0, err
 	}
 	defer file.Close()
 
@@ -255,7 +299,7 @@ func (c *SystemCollector) getMemoryInfo() (uint64, uint64, uint64, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return 0, 0, 0, err
+		return 0, 0, 0, 0, 0, err
 	}
 
 	// Calculate used memory (excluding buffers and cache)
@@ -263,7 +307,7 @@ func (c *SystemCollector) getMemoryInfo() (uint64, uint64, uint64, error) {
 	// Calculate actual free (including buffers and cache)
 	memActualFree := memFree + memBuffers + memCached
 
-	return memUsed, memTotal, memActualFree, nil
+	return memUsed, memTotal, memActualFree, memBuffers, memCached, nil
 }
 
 func (c *SystemCollector) getTemperatures() (map[string]float64, error) {
@@ -314,7 +358,8 @@ func (c *SystemCollector) parseSensorsOutput(output string) map[string]float64 {
 					// Create a friendly name
 					name := fmt.Sprintf("%s_%s", currentChip, key)
 					name = strings.ReplaceAll(name, " ", "_")
-					temperatures[name] = value / 1000.0 // Convert from millidegrees
+					// sensors -u already outputs in degrees, no need to divide
+					temperatures[name] = value
 				}
 			}
 		}
@@ -457,4 +502,169 @@ func (c *SystemCollector) readHwmonFanSpeeds() (map[string]int, error) {
 	}
 
 	return fanSpeeds, nil
+}
+
+// getCPUSpecs reads CPU model, cores, threads, and frequency from /proc/cpuinfo
+func (c *SystemCollector) getCPUSpecs() (string, int, int, float64) {
+	file, err := os.Open("/proc/cpuinfo")
+	if err != nil {
+		return "Unknown", 0, 0, 0.0
+	}
+	defer file.Close()
+
+	var cpuModel string
+	var cpuMHz float64
+	physicalIDs := make(map[string]bool)
+	processors := 0
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+
+		switch key {
+		case "model name":
+			if cpuModel == "" {
+				cpuModel = value
+			}
+		case "cpu MHz":
+			if mhz, err := strconv.ParseFloat(value, 64); err == nil && cpuMHz == 0 {
+				cpuMHz = mhz
+			}
+		case "physical id":
+			physicalIDs[value] = true
+		case "processor":
+			processors++
+		}
+	}
+
+	cpuCores := len(physicalIDs)
+	if cpuCores == 0 {
+		cpuCores = 1 // Fallback to at least 1 core
+	}
+
+	return cpuModel, cpuCores, processors, cpuMHz
+}
+
+// getSystemHardwareInfo uses dmidecode to get server model and BIOS info
+func (c *SystemCollector) getSystemHardwareInfo() (string, string, string) {
+	var serverModel, biosVersion, biosDate string
+
+	// Get system product name (server model)
+	if output, err := lib.ExecCommandOutput("dmidecode", "-s", "system-product-name"); err == nil {
+		serverModel = strings.TrimSpace(output)
+	}
+
+	// Get BIOS version
+	if output, err := lib.ExecCommandOutput("dmidecode", "-s", "bios-version"); err == nil {
+		biosVersion = strings.TrimSpace(output)
+	}
+
+	// Get BIOS release date
+	if output, err := lib.ExecCommandOutput("dmidecode", "-s", "bios-release-date"); err == nil {
+		biosDate = strings.TrimSpace(output)
+	}
+
+	return serverModel, biosVersion, biosDate
+}
+
+// getPerCoreCPUUsage calculates per-core CPU usage
+func (c *SystemCollector) getPerCoreCPUUsage() (map[string]float64, error) {
+	// Read first snapshot
+	stat1, err := c.readPerCoreCPUStat()
+	if err != nil {
+		return nil, err
+	}
+
+	// Wait a short time
+	time.Sleep(100 * time.Millisecond)
+
+	// Read second snapshot
+	stat2, err := c.readPerCoreCPUStat()
+	if err != nil {
+		return nil, err
+	}
+
+	// Calculate usage per core
+	perCoreUsage := make(map[string]float64)
+	for core, values1 := range stat1 {
+		if values2, exists := stat2[core]; exists {
+			total1 := values1["user"] + values1["nice"] + values1["system"] + values1["idle"] + values1["iowait"] + values1["irq"] + values1["softirq"] + values1["steal"]
+			total2 := values2["user"] + values2["nice"] + values2["system"] + values2["idle"] + values2["iowait"] + values2["irq"] + values2["softirq"] + values2["steal"]
+
+			idle1 := values1["idle"] + values1["iowait"]
+			idle2 := values2["idle"] + values2["iowait"]
+
+			totalDelta := total2 - total1
+			idleDelta := idle2 - idle1
+
+			if totalDelta > 0 {
+				usage := (float64(totalDelta-idleDelta) / float64(totalDelta)) * 100
+				perCoreUsage[core] = usage
+			}
+		}
+	}
+
+	return perCoreUsage, nil
+}
+
+// readPerCoreCPUStat reads CPU statistics for each core from /proc/stat
+func (c *SystemCollector) readPerCoreCPUStat() (map[string]map[string]uint64, error) {
+	file, err := os.Open("/proc/stat")
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	coreStats := make(map[string]map[string]uint64)
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		// Look for lines starting with "cpu" followed by a number (cpu0, cpu1, etc.)
+		if strings.HasPrefix(line, "cpu") && len(line) > 3 {
+			fields := strings.Fields(line)
+			if len(fields) < 9 {
+				continue
+			}
+
+			coreName := fields[0]
+			// Skip the aggregate "cpu" line
+			if coreName == "cpu" {
+				continue
+			}
+
+			stat := make(map[string]uint64)
+			stat["user"], _ = strconv.ParseUint(fields[1], 10, 64)
+			stat["nice"], _ = strconv.ParseUint(fields[2], 10, 64)
+			stat["system"], _ = strconv.ParseUint(fields[3], 10, 64)
+			stat["idle"], _ = strconv.ParseUint(fields[4], 10, 64)
+			stat["iowait"], _ = strconv.ParseUint(fields[5], 10, 64)
+			stat["irq"], _ = strconv.ParseUint(fields[6], 10, 64)
+			stat["softirq"], _ = strconv.ParseUint(fields[7], 10, 64)
+			stat["steal"], _ = strconv.ParseUint(fields[8], 10, 64)
+
+			coreStats[coreName] = stat
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	if len(coreStats) == 0 {
+		return nil, fmt.Errorf("no per-core CPU stats found")
+	}
+
+	return coreStats, nil
 }

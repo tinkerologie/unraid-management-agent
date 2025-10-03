@@ -1,217 +1,97 @@
 # Unraid Management Agent
 
-A Go-based Unraid plugin that exposes comprehensive system monitoring and control via REST API and WebSockets, designed specifically for Home Assistant integration.
-
-[![License](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](LICENSE)
-[![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go)](https://go.dev/)
-[![Unraid](https://img.shields.io/badge/Unraid-6.12+-orange)](https://unraid.net/)
+A Go-based plugin for Unraid that exposes comprehensive system monitoring and control via REST API and WebSockets.
 
 ## Features
 
-### 🔍 Monitoring
-- **System Metrics**: CPU usage, RAM usage, temperatures, fan speeds, uptime
-- **Array Status**: Array state, parity status, space usage
-- **Disk Information**: Individual disk metrics, SMART data, temperatures
-- **Docker Containers**: Container status, resource usage, ports
-- **Virtual Machines**: VM status, resource allocation, state
-- **UPS Status**: Battery level, load, runtime (if connected)
-- **GPU Metrics**: NVIDIA GPU utilization and temperature (if available)
-- **Shares**: User share space usage
+### Real-time Monitoring
+- **System Information**: CPU usage, RAM, temperatures, uptime, hostname
+- **Array Status**: Array state, parity status, disk counts
+- **Disk Information**: Per-disk metrics, SMART data, temperatures, space usage
+- **Network Interfaces**: Interface status, bandwidth, IP addresses, MAC addresses
+- **Docker Containers**: Container list, status, resource usage
+- **Virtual Machines**: VM list, state, resource allocation
+- **UPS Status**: Battery level, runtime, power state
+- **GPU Metrics**: GPU utilization, memory, temperature
+- **User Shares**: Share list, space usage, paths
 
-### 🎛️ Control Operations
+### Control Operations
 - **Docker**: Start, stop, restart, pause, unpause containers
-- **VMs**: Start, stop, restart, pause, resume, hibernate, force-stop
+- **Virtual Machines**: Start, stop, restart, pause, resume, hibernate VMs
 
-### 🌐 API
-- **REST API**: Full RESTful API with all monitoring and control endpoints
-- **WebSocket**: Real-time event streaming for instant updates
-- **CORS Enabled**: Works seamlessly with Home Assistant and web clients
+### Communication Protocols
+- **REST API**: HTTP endpoints for synchronous queries
+- **WebSocket**: Real-time event streaming for live updates
+
+## Architecture
+
+### Event-Driven Design
+The agent uses a pubsub event bus for decoupled, real-time data flow:
+
+```
+Collectors → Event Bus → API Server Cache → REST Endpoints
+                        ↓
+                 WebSocket Hub → Connected Clients
+```
+
+### Components
+
+#### Collectors
+Data collectors run independently at fixed intervals:
+- **System Collector** (5s): CPU, RAM, temps, uptime
+- **Array Collector** (10s): Array state and parity info
+- **Disk Collector** (30s): Per-disk metrics
+- **Network Collector** (15s): Interface status and statistics
+- **Docker Collector** (10s): Container information
+- **VM Collector** (10s): Virtual machine data
+- **UPS Collector** (10s): UPS status
+- **GPU Collector** (10s): GPU metrics
+- **Share Collector** (60s): User share information
+
+#### API Server
+- Maintains in-memory cache of latest collector data
+- Serves REST endpoints for instant responses
+- Broadcasts events to WebSocket clients
+- Implements CORS, logging, and recovery middleware
+
+#### Orchestrator
+Coordinates the entire application lifecycle:
+- Initializes all collectors
+- Starts API server subscriptions before collectors
+- Manages graceful shutdown
 
 ## Installation
 
-### Requirements
-- Unraid 6.10 or later
-- Go 1.23+ (for building from source)
+### Prerequisites
+- Unraid 6.x or later
+- Go 1.21+ (for building from source)
 
-### Via Community Applications (Recommended)
-1. Open Unraid web UI
-2. Go to **Apps** tab
-3. Search for "Unraid Management Agent"
-4. Click **Install**
+### From Release Package
 
-### Manual Installation
-```bash
-# Download the plugin file
-wget https://github.com/ruaandeysel/unraid-management-agent/releases/latest/download/unraid-management-agent.plg
+1. Download the latest release package:
+   ```bash
+   wget https://github.com/ruaandeysel/unraid-management-agent/releases/latest/unraid-management-agent-1.0.0.tgz
+   ```
 
-# Install via Plugins tab
-# Paste the URL in the "Install Plugin" field
-```
+2. Extract and install:
+   ```bash
+   tar xzf unraid-management-agent-1.0.0.tgz -C /
+   ```
 
-### From Source
+3. Start the service:
+   ```bash
+   /usr/local/emhttp/plugins/unraid-management-agent/unraid-management-agent boot
+   ```
+
+### Building from Source
+
 ```bash
 # Clone the repository
 git clone https://github.com/ruaandeysel/unraid-management-agent.git
 cd unraid-management-agent
 
-# Build for Unraid (Linux/amd64)
-make release
-
-# Package the plugin
-make package
-
-# The plugin will be in build/unraid-management-agent-<version>.tgz
-```
-
-## Configuration
-
-The plugin can be configured via the Unraid web UI or by editing the configuration file.
-
-### Configuration File
-Located at `/boot/config/plugins/unraid-management-agent/config.cfg`:
-
-```ini
-# Service configuration
-SERVICE="enable"
-
-# API configuration
-PORT="8080"
-ENABLE_CORS="yes"
-
-# Feature toggles
-ENABLE_UPS="yes"
-ENABLE_GPU="yes"
-
-# Collection intervals (seconds)
-INTERVAL_SYSTEM="5"
-INTERVAL_DISK="30"
-INTERVAL_ARRAY="10"
-INTERVAL_DOCKER="10"
-INTERVAL_VM="10"
-INTERVAL_UPS="10"
-INTERVAL_SHARES="60"
-```
-
-## API Documentation
-
-### Base URL
-```
-http://<unraid-ip>:8043/api/v1
-```
-
-### REST Endpoints
-
-#### Monitoring (GET)
-| Endpoint | Description |
-|----------|-------------|
-| `/health` | Health check |
-| `/system` | System metrics (CPU, RAM, temps, uptime) |
-| `/array` | Array status and parity info |
-| `/disks` | All disk information |
-| `/disks/{id}` | Single disk information |
-| `/shares` | User share information |
-| `/docker` | Docker container list |
-| `/docker/{id}` | Single container info |
-| `/vm` | Virtual machine list |
-| `/vm/{id}` | Single VM info |
-| `/ups` | UPS status |
-| `/gpu` | GPU metrics |
-
-#### Control (POST)
-| Endpoint | Description |
-|----------|-------------|
-| `/docker/{id}/start` | Start container |
-| `/docker/{id}/stop` | Stop container |
-| `/docker/{id}/restart` | Restart container |
-| `/docker/{id}/pause` | Pause container |
-| `/docker/{id}/unpause` | Unpause container |
-| `/vm/{id}/start` | Start VM |
-| `/vm/{id}/stop` | Stop VM (graceful) |
-| `/vm/{id}/restart` | Restart VM |
-| `/vm/{id}/pause` | Pause VM |
-| `/vm/{id}/resume` | Resume VM |
-| `/vm/{id}/hibernate` | Hibernate VM |
-| `/vm/{id}/force-stop` | Force stop VM |
-
-### WebSocket
-Connect to `ws://<unraid-ip>:8043/api/v1/ws` for real-time event updates.
-
-**Event Format:**
-```json
-{
-  "event": "system_update",
-  "timestamp": "2025-10-01T04:00:00Z",
-  "data": {
-    // Event-specific payload
-  }
-}
-```
-
-## Home Assistant Integration
-
-### REST Sensors
-```yaml
-# configuration.yaml
-sensor:
-  - platform: rest
-    name: "Unraid CPU Usage"
-    resource: "http://unraid-ip:8043/api/v1/system"
-    value_template: "{{ value_json.cpu_usage_percent }}"
-    unit_of_measurement: "%"
-    scan_interval: 5
-    
-  - platform: rest
-    name: "Unraid Array Status"
-    resource: "http://unraid-ip:8043/api/v1/array"
-    value_template: "{{ value_json.state }}"
-    scan_interval: 10
-```
-
-### Control Services
-```yaml
-# configuration.yaml
-rest_command:
-  unraid_restart_container:
-    url: "http://unraid-ip:8043/api/v1/docker/{{ container_id }}/restart"
-    method: POST
-
-# scripts.yaml
-restart_plex:
-  alias: "Restart Plex"
-  sequence:
-    - service: rest_command.unraid_restart_container
-      data:
-        container_id: "plex"
-```
-
-### Dashboard Card
-```yaml
-type: entities
-title: Unraid System
-entities:
-  - entity: sensor.unraid_cpu_usage
-    name: CPU Usage
-  - entity: sensor.unraid_array_status
-    name: Array Status
-```
-
-## Development
-
-### Prerequisites
-- Go 1.23+
-- Make
-- Git
-
-### Building
-```bash
 # Install dependencies
 make deps
-
-# Build for current platform
-make local
-
-# Run tests
-make test
 
 # Build for Unraid (Linux/amd64)
 make release
@@ -220,88 +100,286 @@ make release
 make package
 ```
 
-### Mock Mode
-For development on non-Unraid systems:
-```bash
-# Enable mock mode
-export MOCK_MODE=true
+## Usage
 
-# Run with mock data
-./unraid-management-agent --mock
+### Starting the Agent
+
+```bash
+# Standard mode
+./unraid-management-agent boot
+
+# Debug mode (stdout logging)
+./unraid-management-agent boot --debug
+
+# Custom port
+./unraid-management-agent boot --port 8043
+
+# Mock mode (for development on non-Unraid systems)
+./unraid-management-agent boot --mock
 ```
+
+### REST API Endpoints
+
+Base URL: `http://localhost:8080/api/v1`
+
+#### Monitoring Endpoints
+- `GET /health` - Health check
+- `GET /system` - System information
+- `GET /array` - Array status
+- `GET /disks` - List all disks
+- `GET /disks/{id}` - Get specific disk info
+- `GET /network` - Network interface list
+- `GET /shares` - List user shares
+- `GET /docker` - List Docker containers
+- `GET /docker/{id}` - Get container details
+- `GET /vm` - List virtual machines
+- `GET /vm/{id}` - Get VM details
+- `GET /ups` - UPS status
+- `GET /gpu` - GPU metrics
+
+#### Control Endpoints
+- `POST /docker/{id}/start` - Start container
+- `POST /docker/{id}/stop` - Stop container
+- `POST /docker/{id}/restart` - Restart container
+- `POST /docker/{id}/pause` - Pause container
+- `POST /docker/{id}/unpause` - Unpause container
+- `POST /vm/{id}/start` - Start VM
+- `POST /vm/{id}/stop` - Stop VM
+- `POST /vm/{id}/restart` - Restart VM
+- `POST /vm/{id}/pause` - Pause VM
+- `POST /vm/{id}/resume` - Resume VM
+- `POST /vm/{id}/hibernate` - Hibernate VM
+- `POST /vm/{id}/force-stop` - Force stop VM
+
+### WebSocket Connection
+
+Connect to `ws://localhost:8080/api/v1/ws` to receive real-time events:
+
+```javascript
+const ws = new WebSocket('ws://localhost:8080/api/v1/ws');
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  console.log('Event received:', data);
+};
+```
+
+### Example API Usage
+
+```bash
+# Get system information
+curl http://localhost:8080/api/v1/system
+
+# Get network interfaces
+curl http://localhost:8080/api/v1/network
+
+# List all disks
+curl http://localhost:8080/api/v1/disks
+
+# Start a Docker container
+curl -X POST http://localhost:8080/api/v1/docker/nginx/start
+
+# Stop a VM
+curl -X POST http://localhost:8080/api/v1/vm/Ubuntu/stop
+```
+
+## Development
 
 ### Project Structure
+
 ```
-unraid-management-agent/
-├── main.go                    # Application entry point
-├── daemon/
-│   ├── cmd/                   # Commands
-│   ├── common/                # Constants
-│   ├── domain/                # Domain models
-│   ├── dto/                   # Data transfer objects
-│   ├── lib/                   # Utility libraries
-│   ├── logger/                # Logging
-│   └── services/
-│       ├── api/               # HTTP/WebSocket server
-│       ├── collectors/        # Data collectors
-│       └── controllers/       # Control operations
-├── meta/                      # Unraid plugin files
-└── docs/                      # Documentation
+daemon/
+├── cmd/              # CLI commands
+├── common/           # Constants (intervals, paths)
+├── domain/           # Core types (Context, Config)
+├── dto/              # Data transfer objects
+├── lib/              # Utilities (shell execution)
+├── logger/           # Logging wrapper
+└── services/
+    ├── api/          # HTTP server, handlers, WebSocket
+    ├── collectors/   # Data collection subsystems
+    └── controllers/  # Control operations
+
+meta/                 # Unraid plugin metadata
+scripts/              # Test and deployment scripts
+tests/                # Unit and integration tests
 ```
+
+### Building and Testing
+
+```bash
+# Install dependencies
+make deps
+
+# Build for local development
+make local
+
+# Run tests
+make test
+
+# Generate coverage report
+make test-coverage
+
+# Run specific test
+go test -v ./daemon/services/api/handlers_test.go
+
+# Clean build artifacts
+make clean
+```
+
+### Mock Mode
+
+For development on non-Unraid systems:
+
+```bash
+# Using flag
+./unraid-management-agent boot --mock
+
+# Using environment variable
+MOCK_MODE=true ./unraid-management-agent boot
+```
+
+In mock mode, collectors skip real data collection, allowing you to develop and test the API structure without requiring Unraid-specific system files.
+
+## Configuration
+
+### Collection Intervals
+
+Defined in `daemon/common/const.go`:
+
+- System: 5 seconds
+- Array: 10 seconds
+- Disk: 30 seconds
+- Network: 15 seconds
+- Docker: 10 seconds
+- VM: 10 seconds
+- UPS: 10 seconds
+- GPU: 10 seconds
+- Shares: 60 seconds
+
+### Logging
+
+The agent uses structured logging with automatic log rotation:
+
+- **Location**: `/var/log/unraid-management-agent.log`
+- **Max Size**: 10 MB per file
+- **Retention**: 10 backup files
+- **Max Age**: 28 days
+
+In debug mode (`--debug`), logs are written to stdout for immediate visibility.
 
 ## Troubleshooting
 
-### Plugin Won't Start
-1. Check logs: `/var/log/unraid-management-agent.log`
-2. Verify port 8080 is not in use: `netstat -tlnp | grep 8080`
-3. Restart the plugin from Unraid UI
+### No Data Returned
 
-### API Returns Empty Data
-- Ensure you're running on Unraid (or use mock mode for testing)
-- Check that required system commands are available
-- Review logs for specific error messages
+If endpoints return empty or default data:
 
-### WebSocket Connection Fails
-- Verify CORS is enabled in configuration
-- Check firewall settings
-- Ensure WebSocket protocol is allowed by your client
+1. Check that the agent is running: `ps aux | grep unraid-management-agent`
+2. Review logs: `tail -f /var/log/unraid-management-agent.log`
+3. Verify collection intervals haven't expired
+4. Ensure proper permissions for system file access
+
+### Collectors Not Running
+
+1. Enable debug mode: `./unraid-management-agent boot --debug`
+2. Check for panic recovery messages in logs
+3. Verify event bus subscriptions are initialized before collectors start
+
+### WebSocket Connection Issues
+
+1. Verify WebSocket hub is running: check logs for "API server subscriptions started"
+2. Test REST endpoints first to isolate API vs WebSocket issues
+3. Check browser console for connection errors
+
+## API Response Examples
+
+### System Information
+```json
+{
+  "hostname": "Tower",
+  "version": "1.0.0",
+  "cpu_usage": 12.5,
+  "ram_usage": 45.2,
+  "temperature": 42.0,
+  "uptime": 86400,
+  "timestamp": "2025-10-02T08:00:00Z"
+}
+```
+
+### Network Interfaces
+```json
+[
+  {
+    "name": "eth0",
+    "mac_address": "00:11:22:33:44:55",
+    "ip_address": "192.168.1.100",
+    "speed_mbps": 1000,
+    "state": "up",
+    "bytes_received": 1234567890,
+    "bytes_sent": 987654321,
+    "packets_received": 5000000,
+    "packets_sent": 4500000,
+    "errors_received": 0,
+    "errors_sent": 0,
+    "timestamp": "2025-10-02T08:00:00Z"
+  }
+]
+```
+
+### Array Status
+```json
+{
+  "state": "STARTED",
+  "num_disks": 8,
+  "num_data_disks": 6,
+  "num_parity_disks": 2,
+  "sync_percent": 100.0,
+  "parity_valid": true,
+  "timestamp": "2025-10-02T08:00:00Z"
+}
+```
 
 ## Contributing
 
 Contributions are welcome! Please:
+
 1. Fork the repository
 2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+3. Commit your changes with descriptive messages
+4. Add tests for new functionality
+5. Ensure all tests pass: `make test`
+6. Submit a pull request
 
 ## License
 
-This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Inspired by [ControlR](https://github.com/jbrodriguez/controlrd)
-- Built with [Gorilla Mux](https://github.com/gorilla/mux) and [Gorilla WebSocket](https://github.com/gorilla/websocket)
-- Designed for [Home Assistant](https://www.home-assistant.io/) integration
+MIT License - see LICENSE file for details
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/ruaandeysel/unraid-management-agent/issues)
-- **Forum**: [Unraid Forums](https://forums.unraid.net/)
-- **Discord**: Unraid Community Discord
+For issues, questions, or feature requests:
+- Open an issue on GitHub
+- Check existing documentation in the `docs/` directory
+- Review the WARP.md file for architectural details
 
 ## Roadmap
 
-- [ ] Complete real data collection implementations
-- [ ] Add authentication support
-- [ ] MQTT integration
-- [ ] Historical data storage
-- [ ] Web UI dashboard
-- [ ] Mobile app
-- [ ] Prometheus exporter
-- [ ] Grafana dashboard templates
+### Planned Enhancements
+- Enhanced system info collector (CPU model, BIOS info, per-core usage)
+- Detailed disk metrics (SMART attributes, I/O statistics)
+- Array operation controls (start/stop array, parity checks)
+- User management collector
+- Network statistics trending
+- Alerting and notification system
+- Historical data storage
 
----
+## Changelog
 
-**Made with ❤️ for the Unraid community**
+### Version 1.0.0 (2025-10-02)
+- Initial release
+- Comprehensive monitoring for system, array, disks, shares
+- Network interface collector with bandwidth statistics
+- Docker and VM monitoring
+- UPS and GPU support
+- REST API and WebSocket support
+- Event-driven architecture with pubsub
+- Graceful shutdown and panic recovery

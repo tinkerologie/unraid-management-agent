@@ -38,6 +38,7 @@ const (
 	IntervalUPS     = 10
 	IntervalGPU     = 10
 	IntervalShares  = 60
+	IntervalNetwork = 15
 
 	// WebSocket settings
 	WSPingInterval = 30

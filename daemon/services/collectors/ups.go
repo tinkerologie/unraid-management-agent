@@ -31,10 +31,6 @@ func (c *UPSCollector) Start(interval time.Duration) {
 }
 
 func (c *UPSCollector) Collect() {
-	if c.ctx.MockMode {
-		logger.Debug("Mock mode: ups collection skipped")
-		return
-	}
 
 	logger.Debug("Collecting ups data...")
 

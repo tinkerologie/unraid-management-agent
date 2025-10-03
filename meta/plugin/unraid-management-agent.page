@@ -1,6 +1,6 @@
 Menu="Utilities"
 Title="Management Agent"
-Icon="icon-server"
+Icon="/plugins/unraid-management-agent/images/unraid-management-agent.png"
 ---
 <?PHP
 /* Copyright 2025, Home Assistant Unraid Management Agent.
@@ -16,7 +16,6 @@ Icon="icon-server"
 $plugin = "unraid-management-agent";
 $config_file = "/boot/config/plugins/$plugin/config.cfg";
 $service_name = "unraid-management-agent";
-$pid_file = "/var/run/$service_name.pid";
 
 // Load current configuration
 $config = [];
@@ -25,25 +24,17 @@ if (file_exists($config_file)) {
 }
 
 // Default values
-$port = $config['PORT'] ?? '8080';
+$port = $config['PORT'] ?? '8043';
 $log_level = $config['LOG_LEVEL'] ?? 'info';
 $autostart = $config['AUTOSTART'] ?? 'yes';
 
 // Check if service is running
-function isServiceRunning($pid_file) {
-    if (!file_exists($pid_file)) {
-        return false;
-    }
-    $pid = trim(file_get_contents($pid_file));
-    if (empty($pid)) {
-        return false;
-    }
-    // Check if process exists
-    exec("ps -p $pid", $output, $return);
-    return $return === 0;
+function isServiceRunning() {
+    exec("pgrep -f 'unraid-management-agent --logs-dir' 2>&1", $output, $return);
+    return $return === 0 && !empty($output);
 }
 
-$running = isServiceRunning($pid_file);
+$running = isServiceRunning();
 $status_text = $running ? "<span style='color:green;'>RUNNING</span>" : "<span style='color:red;'>STOPPED</span>";
 
 // Handle form submission
@@ -75,7 +66,7 @@ if ($_POST) {
         }
     } elseif (isset($_POST['default'])) {
         // Reset to defaults
-        $default_config = "PORT=8080\nLOG_LEVEL=info\nAUTOSTART=yes\n";
+        $default_config = "PORT=8043\nLOG_LEVEL=info\nAUTOSTART=yes\n";
         file_put_contents($config_file, $default_config);
         
         // Restart service if running
@@ -164,14 +155,14 @@ if ($_POST) {
 
 <div class="agent-container">
     <h1>Unraid Management Agent</h1>
-    <p>Home Assistant integration for Unraid server monitoring and control</p>
+    <p>REST API and WebSocket integration for Unraid server monitoring and control</p>
 
     <div class="status-box">
         <h3>Service Status</h3>
         <p><strong>Status:</strong> <?= $status_text ?></p>
         <?php if ($running): ?>
             <p><strong>API Endpoint:</strong> http://<?= $_SERVER['SERVER_ADDR'] ?>:<?= $port ?>/api/v1</p>
-            <p><strong>WebSocket:</strong> ws://<?= $_SERVER['SERVER_ADDR'] ?>:<?= $port ?>/ws</p>
+            <p><strong>WebSocket:</strong> ws://<?= $_SERVER['SERVER_ADDR'] ?>:<?= $port ?>/api/v1/ws</p>
         <?php endif; ?>
         
         <form method="post" style="margin-top: 15px;">
@@ -191,7 +182,7 @@ if ($_POST) {
             <div class="form-row">
                 <label class="form-label">API Port:</label>
                 <input type="number" name="port" value="<?= htmlspecialchars($port) ?>" class="form-input" min="1024" max="65535">
-                <div class="help-text">Port number for the API server (default: 8080)</div>
+                <div class="help-text">Port number for the API server (default: 8043)</div>
             </div>
 
             <div class="form-row">
@@ -222,43 +213,4 @@ if ($_POST) {
         </div>
     </form>
 
-    <div class="config-box" style="margin-top: 20px;">
-        <h3>API Endpoints</h3>
-        <p>Once started, the following REST endpoints are available:</p>
-        <ul>
-            <li><code>GET /api/v1/health</code> - Health check</li>
-            <li><code>GET /api/v1/system</code> - System metrics</li>
-            <li><code>GET /api/v1/array</code> - Array status</li>
-            <li><code>GET /api/v1/disks</code> - Disk information</li>
-            <li><code>GET /api/v1/docker</code> - Container list</li>
-            <li><code>GET /api/v1/vm</code> - Virtual machine list</li>
-            <li><code>GET /api/v1/ups</code> - UPS status (if available)</li>
-            <li><code>GET /api/v1/gpu</code> - GPU metrics (if available)</li>
-            <li><code>POST /api/v1/docker/control</code> - Docker control operations</li>
-            <li><code>POST /api/v1/vm/control</code> - VM control operations</li>
-        </ul>
-        <p><strong>WebSocket:</strong> Connect to <code>/ws</code> for real-time event updates</p>
-    </div>
-
-    <div class="config-box" style="margin-top: 20px;">
-        <h3>Home Assistant Integration</h3>
-        <p>To integrate with Home Assistant, add the following to your <code>configuration.yaml</code>:</p>
-        <pre style="background-color: #f0f0f0; padding: 10px; border-radius: 3px; overflow-x: auto;">
-sensor:
-  - platform: rest
-    name: "Unraid CPU Usage"
-    resource: "http://<?= $_SERVER['SERVER_ADDR'] ?>:<?= $port ?>/api/v1/system"
-    value_template: "{{ value_json.cpu_usage_percent | round(1) }}"
-    unit_of_measurement: "%"
-    scan_interval: 30
-    
-  - platform: rest
-    name: "Unraid RAM Usage"
-    resource: "http://<?= $_SERVER['SERVER_ADDR'] ?>:<?= $port ?>/api/v1/system"
-    value_template: "{{ value_json.ram_usage_percent | round(1) }}"
-    unit_of_measurement: "%"
-    scan_interval: 30
-        </pre>
-        <p>See the <a href="https://github.com/yourusername/unraid-management-agent/blob/main/docs/HOME_ASSISTANT.md" target="_blank">full integration guide</a> for more examples.</p>
-    </div>
 </div>

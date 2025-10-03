@@ -24,6 +24,16 @@ func CreateOrchestrator(ctx *domain.Context) *Orchestrator {
 func (o *Orchestrator) Run() error {
 	logger.Info("Starting Unraid Management Agent v%s", o.ctx.Version)
 
+	// Initialize API server FIRST so subscriptions are ready
+	apiServer := api.NewServer(o.ctx)
+	
+	// Start API server subscriptions and WebSocket hub
+	apiServer.StartSubscriptions()
+	logger.Success("API server subscriptions ready")
+	
+	// Small delay to ensure subscriptions are fully set up
+	time.Sleep(100 * time.Millisecond)
+
 	// Initialize collectors
 	systemCollector := collectors.NewSystemCollector(o.ctx)
 	arrayCollector := collectors.NewArrayCollector(o.ctx)
@@ -33,6 +43,7 @@ func (o *Orchestrator) Run() error {
 	upsCollector := collectors.NewUPSCollector(o.ctx)
 	gpuCollector := collectors.NewGPUCollector(o.ctx)
 	shareCollector := collectors.NewShareCollector(o.ctx)
+	networkCollector := collectors.NewNetworkCollector(o.ctx)
 
 	// Start collectors
 	go systemCollector.Start(time.Duration(common.IntervalSystem) * time.Second)
@@ -43,13 +54,13 @@ func (o *Orchestrator) Run() error {
 	go upsCollector.Start(time.Duration(common.IntervalUPS) * time.Second)
 	go gpuCollector.Start(time.Duration(common.IntervalGPU) * time.Second)
 	go shareCollector.Start(time.Duration(common.IntervalShares) * time.Second)
+	go networkCollector.Start(time.Duration(common.IntervalNetwork) * time.Second)
 
 	logger.Success("All collectors started")
 
-	// Start API server
-	apiServer := api.NewServer(o.ctx)
+	// Start HTTP server
 	go func() {
-		if err := apiServer.Start(); err != nil {
+		if err := apiServer.StartHTTP(); err != nil {
 			logger.Error("API server error: %v", err)
 		}
 	}()

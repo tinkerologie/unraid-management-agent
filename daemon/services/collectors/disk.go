@@ -1,9 +1,15 @@
 package collectors
 
 import (
+	"bufio"
+	"os"
+	"strconv"
+	"strings"
 	"time"
 
+	"github.com/ruaandeysel/unraid-management-agent/daemon/common"
 	"github.com/ruaandeysel/unraid-management-agent/daemon/domain"
+	"github.com/ruaandeysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaandeysel/unraid-management-agent/daemon/logger"
 )
 
@@ -17,18 +23,308 @@ func NewDiskCollector(ctx *domain.Context) *DiskCollector {
 
 func (c *DiskCollector) Start(interval time.Duration) {
 	logger.Info("Starting disk collector (interval: %v)", interval)
+
+	// Run once immediately with panic recovery
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("Disk collector PANIC on startup: %v", r)
+			}
+		}()
+		c.Collect()
+	}()
+
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		c.Collect()
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Error("Disk collector PANIC in loop: %v", r)
+				}
+			}()
+			c.Collect()
+		}()
 	}
 }
 
 func (c *DiskCollector) Collect() {
-	if c.ctx.MockMode {
-		logger.Debug("Mock mode: disk collection skipped")
+	logger.Debug("Collecting disk data...")
+
+	// Collect disk information
+	disks, err := c.collectDisks()
+	if err != nil {
+		logger.Error("Disk: Failed to collect disk data: %v", err)
 		return
 	}
-	logger.Debug("Collecting disk data...")
+
+	logger.Debug("Disk: Successfully collected %d disks, publishing event", len(disks))
+	// Publish event
+	c.ctx.Hub.Pub(disks, "disk_list_update")
+	logger.Debug("Disk: Published disk_list_update event with %d disks", len(disks))
+}
+
+func (c *DiskCollector) collectDisks() ([]dto.DiskInfo, error) {
+	logger.Debug("Disk: Starting collection from %s", common.DisksIni)
+	var disks []dto.DiskInfo
+
+	// Parse disks.ini
+	file, err := os.Open(common.DisksIni)
+	if err != nil {
+		logger.Error("Disk: Failed to open file: %v", err)
+		return nil, err
+	}
+	defer file.Close()
+	logger.Debug("Disk: File opened successfully")
+
+	scanner := bufio.NewScanner(file)
+	var currentDisk *dto.DiskInfo
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+
+		// Check for section header: ["diskname"]
+		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
+			// Save previous disk if exists
+			if currentDisk != nil {
+				disks = append(disks, *currentDisk)
+			}
+
+			// Start new disk
+			currentDisk = &dto.DiskInfo{
+				Timestamp: time.Now(),
+			}
+			continue
+		}
+
+		// Parse key=value pairs
+		if currentDisk != nil && strings.Contains(line, "=") {
+			parts := strings.SplitN(line, "=", 2)
+			if len(parts) != 2 {
+				continue
+			}
+
+			key := strings.TrimSpace(parts[0])
+			value := strings.Trim(strings.TrimSpace(parts[1]), `"`)
+
+			switch key {
+			case "name":
+				currentDisk.Name = value
+			case "device":
+				currentDisk.Device = value
+			case "id":
+				currentDisk.ID = value
+			case "status":
+				currentDisk.Status = value
+			case "size":
+				if size, err := strconv.ParseUint(value, 10, 64); err == nil {
+					currentDisk.Size = size * 512 // Convert sectors to bytes
+				}
+			case "temp":
+				// Temperature might be "*" if spun down
+				if value != "*" && value != "" {
+					if temp, err := strconv.ParseFloat(value, 64); err == nil {
+						currentDisk.Temperature = temp
+					}
+				}
+			case "numErrors":
+				if errors, err := strconv.Atoi(value); err == nil {
+					currentDisk.SMARTErrors = errors
+				}
+			case "spindownDelay":
+				if delay, err := strconv.Atoi(value); err == nil {
+					currentDisk.SpindownDelay = delay
+				}
+			case "format":
+				currentDisk.FileSystem = value
+			}
+		}
+	}
+
+	// Save last disk
+	if currentDisk != nil {
+		disks = append(disks, *currentDisk)
+	}
+
+	if err := scanner.Err(); err != nil {
+		logger.Error("Disk: Scanner error: %v", err)
+		return disks, err
+	}
+
+	// Enhance each disk with additional stats
+	for i := range disks {
+		// Get I/O statistics
+		c.enrichWithIOStats(&disks[i])
+
+		// Get SMART attributes (if device is available)
+		if disks[i].Device != "" {
+			c.enrichWithSMARTData(&disks[i])
+		}
+
+		// Get mount information
+		c.enrichWithMountInfo(&disks[i])
+
+		// Get disk role
+		c.enrichWithRole(&disks[i])
+
+		// Get spin state
+		if disks[i].Device != "" {
+			c.enrichWithSpinState(&disks[i])
+		}
+	}
+
+	logger.Debug("Disk: Parsed %d disks successfully", len(disks))
+	return disks, nil
+}
+
+// enrichWithIOStats adds I/O statistics from /sys/block
+func (c *DiskCollector) enrichWithIOStats(disk *dto.DiskInfo) {
+	if disk.Device == "" {
+		return
+	}
+
+	// Read from /sys/block/{device}/stat
+	statPath := "/sys/block/" + disk.Device + "/stat"
+	data, err := os.ReadFile(statPath)
+	if err != nil {
+		return // Device might be spun down or not available
+	}
+
+	fields := strings.Fields(string(data))
+	if len(fields) < 11 {
+		return
+	}
+
+	// Parse fields (see Documentation/block/stat.txt in Linux kernel)
+	// read I/Os, read merges, read sectors, read ticks,
+	// write I/Os, write merges, write sectors, write ticks,
+	// in_flight, io_ticks, time_in_queue
+	if readOps, err := strconv.ParseUint(fields[0], 10, 64); err == nil {
+		disk.ReadOps = readOps
+	}
+	if readSectors, err := strconv.ParseUint(fields[2], 10, 64); err == nil {
+		disk.ReadBytes = readSectors * 512 // Sectors to bytes
+	}
+	if writeOps, err := strconv.ParseUint(fields[4], 10, 64); err == nil {
+		disk.WriteOps = writeOps
+	}
+	if writeSectors, err := strconv.ParseUint(fields[6], 10, 64); err == nil {
+		disk.WriteBytes = writeSectors * 512 // Sectors to bytes
+	}
+	if ioTicks, err := strconv.ParseUint(fields[9], 10, 64); err == nil {
+		// io_ticks is in milliseconds, calculate utilization
+		// This is a cumulative value, would need previous sample for rate
+		disk.IOUtilization = float64(ioTicks) / 10.0 // Rough estimate
+	}
+}
+
+// enrichWithSMARTData adds SMART attributes using smartctl
+func (c *DiskCollector) enrichWithSMARTData(disk *dto.DiskInfo) {
+	devicePath := "/dev/" + disk.Device
+
+	// Check if device exists
+	if _, err := os.Stat(devicePath); err != nil {
+		return
+	}
+
+	// Get basic SMART health
+	disk.SMARTStatus = "UNKNOWN"
+
+	// Try to get serial number and model from smartctl -i
+	data, err := os.ReadFile("/var/local/emhttp/smart/" + disk.Device)
+	if err == nil {
+		lines := strings.Split(string(data), "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "Serial Number:") {
+				disk.SerialNumber = strings.TrimSpace(strings.TrimPrefix(line, "Serial Number:"))
+			} else if strings.HasPrefix(line, "Device Model:") || strings.HasPrefix(line, "Model Number:") {
+				disk.Model = strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(line, "Device Model:"), "Model Number:"))
+			}
+		}
+	}
+
+	// Note: Full SMART parsing would require smartctl execution
+	// For now, we'll keep the existing SMART error count from disks.ini
+	// Future enhancement: Parse smartctl -a output for detailed attributes
+}
+
+// enrichWithMountInfo adds mount point and usage information
+func (c *DiskCollector) enrichWithMountInfo(disk *dto.DiskInfo) {
+	if disk.Device == "" {
+		return
+	}
+
+	// Read /proc/mounts to find mount point
+	data, err := os.ReadFile("/proc/mounts")
+	if err != nil {
+		return
+	}
+
+	devicePath := "/dev/" + disk.Device
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+
+		if fields[0] == devicePath || strings.HasPrefix(fields[0], devicePath) {
+			disk.MountPoint = fields[1]
+
+			// Calculate usage percentage if size is known
+			if disk.Size > 0 && disk.Used > 0 {
+				disk.UsagePercent = float64(disk.Used) / float64(disk.Size) * 100
+			}
+			break
+		}
+	}
+}
+
+// enrichWithRole determines the disk role (parity, parity2, data, cache, pool)
+func (c *DiskCollector) enrichWithRole(disk *dto.DiskInfo) {
+	// Determine role based on disk name/ID
+	name := strings.ToLower(disk.Name)
+	id := strings.ToLower(disk.ID)
+
+	if strings.Contains(name, "parity") || strings.Contains(id, "parity") {
+		if strings.Contains(name, "parity2") || strings.Contains(id, "parity2") {
+			disk.Role = "parity2"
+		} else {
+			disk.Role = "parity"
+		}
+	} else if strings.Contains(name, "cache") || strings.Contains(id, "cache") {
+		disk.Role = "cache"
+	} else if strings.Contains(name, "pool") || strings.Contains(id, "pool") {
+		disk.Role = "pool"
+	} else if strings.Contains(name, "disk") || strings.Contains(id, "disk") {
+		disk.Role = "data"
+	} else {
+		disk.Role = "unknown"
+	}
+}
+
+// enrichWithSpinState checks the current spin state of the disk
+func (c *DiskCollector) enrichWithSpinState(disk *dto.DiskInfo) {
+	devicePath := "/dev/" + disk.Device
+
+	// Check if device exists
+	if _, err := os.Stat(devicePath); err != nil {
+		disk.SpinState = "unknown"
+		return
+	}
+
+	// Read spin state from /var/local/emhttp/var.ini or check temperature
+	// If temperature is "*", disk is spun down
+	if disk.Temperature == 0 {
+		// Try to read from sysfs or use hdparm
+		// For now, use a simple heuristic: if temp is 0, likely spun down
+		disk.SpinState = "standby"
+	} else {
+		disk.SpinState = "active"
+	}
+
+	// Alternative: Could execute hdparm -C /dev/sdX to get actual state
+	// But that requires executing external command which we want to minimize
 }

@@ -32,10 +32,6 @@ func (c *DockerCollector) Start(interval time.Duration) {
 }
 
 func (c *DockerCollector) Collect() {
-	if c.ctx.MockMode {
-		logger.Debug("Mock mode: docker collection skipped")
-		return
-	}
 
 	logger.Debug("Collecting docker data...")
 

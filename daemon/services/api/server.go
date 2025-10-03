@@ -18,7 +18,7 @@ type Server struct {
 	httpServer *http.Server
 	router     *mux.Router
 	wsHub      *WSHub
-	
+
 	// Cache for latest data from collectors
 	cacheMutex   sync.RWMutex
 	systemCache  *dto.SystemInfo
@@ -90,6 +90,18 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/array/parity-check/stop", s.handleParityCheckStop).Methods("POST")
 	api.HandleFunc("/array/parity-check/pause", s.handleParityCheckPause).Methods("POST")
 	api.HandleFunc("/array/parity-check/resume", s.handleParityCheckResume).Methods("POST")
+	api.HandleFunc("/array/parity-check/history", s.handleParityCheckHistory).Methods("GET")
+
+	// Configuration endpoints (read-only)
+	api.HandleFunc("/shares/{name}/config", s.handleShareConfig).Methods("GET")
+	api.HandleFunc("/network/{interface}/config", s.handleNetworkConfig).Methods("GET")
+	api.HandleFunc("/settings/system", s.handleSystemSettings).Methods("GET")
+	api.HandleFunc("/settings/docker", s.handleDockerSettings).Methods("GET")
+	api.HandleFunc("/settings/vm", s.handleVMSettings).Methods("GET")
+
+	// Configuration endpoints (write)
+	api.HandleFunc("/shares/{name}/config", s.handleUpdateShareConfig).Methods("POST")
+	api.HandleFunc("/settings/system", s.handleUpdateSystemSettings).Methods("POST")
 
 	// WebSocket endpoint
 	api.HandleFunc("/ws", s.handleWebSocket)
@@ -99,16 +111,16 @@ func (s *Server) setupRoutes() {
 // This should be called before collectors start to avoid race conditions
 func (s *Server) StartSubscriptions() {
 	logger.Info("Starting API server subscriptions...")
-	
+
 	// Start WebSocket hub
 	go s.wsHub.Run()
 
 	// Subscribe to events and update cache
 	go s.subscribeToEvents()
-	
+
 	// Broadcast events to WebSocket clients
 	go s.broadcastEvents()
-	
+
 	logger.Info("API server subscriptions started")
 }
 

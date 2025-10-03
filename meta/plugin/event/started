@@ -1,5 +1,5 @@
 #!/bin/bash
 source /boot/config/plugins/unraid-management-agent/config.cfg
-if [ "$SERVICE" = "enable" ]; then
+if [ "$AUTOSTART" = "yes" ]; then
   /usr/local/emhttp/plugins/unraid-management-agent/scripts/start
 fi

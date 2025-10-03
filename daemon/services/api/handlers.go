@@ -10,6 +10,7 @@ import (
 	"github.com/ruaandeysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaandeysel/unraid-management-agent/daemon/lib"
 	"github.com/ruaandeysel/unraid-management-agent/daemon/logger"
+	"github.com/ruaandeysel/unraid-management-agent/daemon/services/collectors"
 	"github.com/ruaandeysel/unraid-management-agent/daemon/services/controllers"
 )
 
@@ -66,9 +67,26 @@ func (s *Server) handleDisks(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDisk(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	diskID := vars["id"]
-	logger.Debug("Getting disk info for %s", diskID)
-	// TODO: Implement single disk lookup
-	respondJSON(w, http.StatusNotFound, map[string]string{"error": "not implemented"})
+	logger.Debug("API: Getting disk info for %s", diskID)
+
+	s.cacheMutex.RLock()
+	disks := s.disksCache
+	s.cacheMutex.RUnlock()
+
+	// Find disk by ID
+	for _, disk := range disks {
+		if disk.ID == diskID || disk.Device == diskID || disk.Name == diskID {
+			respondJSON(w, http.StatusOK, disk)
+			return
+		}
+	}
+
+	// Disk not found
+	respondJSON(w, http.StatusNotFound, dto.Response{
+		Success:   false,
+		Message:   fmt.Sprintf("Disk not found: %s", diskID),
+		Timestamp: time.Now(),
+	})
 }
 
 func (s *Server) handleShares(w http.ResponseWriter, r *http.Request) {
@@ -100,9 +118,26 @@ func (s *Server) handleDockerList(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDockerInfo(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	containerID := vars["id"]
-	logger.Debug("Getting container info for %s", containerID)
-	// TODO: Implement single container lookup
-	respondJSON(w, http.StatusNotFound, map[string]string{"error": "not implemented"})
+	logger.Debug("API: Getting container info for %s", containerID)
+
+	s.cacheMutex.RLock()
+	containers := s.dockerCache
+	s.cacheMutex.RUnlock()
+
+	// Find container by ID or name
+	for _, container := range containers {
+		if container.ID == containerID || container.Name == containerID {
+			respondJSON(w, http.StatusOK, container)
+			return
+		}
+	}
+
+	// Container not found
+	respondJSON(w, http.StatusNotFound, dto.Response{
+		Success:   false,
+		Message:   fmt.Sprintf("Container not found: %s", containerID),
+		Timestamp: time.Now(),
+	})
 }
 
 func (s *Server) handleVMList(w http.ResponseWriter, r *http.Request) {
@@ -121,9 +156,26 @@ func (s *Server) handleVMList(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleVMInfo(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	vmID := vars["id"]
-	logger.Debug("Getting VM info for %s", vmID)
-	// TODO: Implement single VM lookup
-	respondJSON(w, http.StatusNotFound, map[string]string{"error": "not implemented"})
+	logger.Debug("API: Getting VM info for %s", vmID)
+
+	s.cacheMutex.RLock()
+	vms := s.vmsCache
+	s.cacheMutex.RUnlock()
+
+	// Find VM by ID or name
+	for _, vm := range vms {
+		if vm.ID == vmID || vm.Name == vmID {
+			respondJSON(w, http.StatusOK, vm)
+			return
+		}
+	}
+
+	// VM not found
+	respondJSON(w, http.StatusNotFound, dto.Response{
+		Success:   false,
+		Message:   fmt.Sprintf("VM not found: %s", vmID),
+		Timestamp: time.Now(),
+	})
 }
 
 func (s *Server) handleUPS(w http.ResponseWriter, r *http.Request) {
@@ -592,21 +644,47 @@ func (s *Server) handleVMForceStop(w http.ResponseWriter, r *http.Request) {
 
 // Array control handlers
 func (s *Server) handleArrayStart(w http.ResponseWriter, r *http.Request) {
-	logger.Info("Starting array")
-	// TODO: Implement array start
+	logger.Info("API: Starting array")
+
+	arrayCtrl := controllers.NewArrayController(s.ctx)
+	err := arrayCtrl.StartArray()
+
+	if err != nil {
+		logger.Error("API: Failed to start array: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to start array: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
 	respondJSON(w, http.StatusOK, dto.Response{
 		Success:   true,
-		Message:   "Array start initiated",
+		Message:   "Array started successfully",
 		Timestamp: time.Now(),
 	})
 }
 
 func (s *Server) handleArrayStop(w http.ResponseWriter, r *http.Request) {
-	logger.Info("Stopping array")
-	// TODO: Implement array stop
+	logger.Info("API: Stopping array")
+
+	arrayCtrl := controllers.NewArrayController(s.ctx)
+	err := arrayCtrl.StopArray()
+
+	if err != nil {
+		logger.Error("API: Failed to stop array: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to stop array: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
 	respondJSON(w, http.StatusOK, dto.Response{
 		Success:   true,
-		Message:   "Array stop initiated",
+		Message:   "Array stopped successfully",
 		Timestamp: time.Now(),
 	})
 }
@@ -614,41 +692,279 @@ func (s *Server) handleArrayStop(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleParityCheckStart(w http.ResponseWriter, r *http.Request) {
 	// Read optional 'correcting' parameter from query
 	correcting := r.URL.Query().Get("correcting") == "true"
-	logger.Info("Starting parity check (correcting: %v)", correcting)
-	// TODO: Implement parity check start
+	logger.Info("API: Starting parity check (correcting: %v)", correcting)
+
+	arrayCtrl := controllers.NewArrayController(s.ctx)
+	err := arrayCtrl.StartParityCheck(correcting)
+
+	if err != nil {
+		logger.Error("API: Failed to start parity check: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to start parity check: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
 	respondJSON(w, http.StatusOK, dto.Response{
 		Success:   true,
-		Message:   "Parity check started",
+		Message:   "Parity check started successfully",
 		Timestamp: time.Now(),
 	})
 }
 
 func (s *Server) handleParityCheckStop(w http.ResponseWriter, r *http.Request) {
-	logger.Info("Stopping parity check")
-	// TODO: Implement parity check stop
+	logger.Info("API: Stopping parity check")
+
+	arrayCtrl := controllers.NewArrayController(s.ctx)
+	err := arrayCtrl.StopParityCheck()
+
+	if err != nil {
+		logger.Error("API: Failed to stop parity check: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to stop parity check: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
 	respondJSON(w, http.StatusOK, dto.Response{
 		Success:   true,
-		Message:   "Parity check stopped",
+		Message:   "Parity check stopped successfully",
 		Timestamp: time.Now(),
 	})
 }
 
 func (s *Server) handleParityCheckPause(w http.ResponseWriter, r *http.Request) {
-	logger.Info("Pausing parity check")
-	// TODO: Implement parity check pause
+	logger.Info("API: Pausing parity check")
+
+	arrayCtrl := controllers.NewArrayController(s.ctx)
+	err := arrayCtrl.PauseParityCheck()
+
+	if err != nil {
+		logger.Error("API: Failed to pause parity check: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to pause parity check: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
 	respondJSON(w, http.StatusOK, dto.Response{
 		Success:   true,
-		Message:   "Parity check paused",
+		Message:   "Parity check paused successfully",
 		Timestamp: time.Now(),
 	})
 }
 
 func (s *Server) handleParityCheckResume(w http.ResponseWriter, r *http.Request) {
-	logger.Info("Resuming parity check")
-	// TODO: Implement parity check resume
+	logger.Info("API: Resuming parity check")
+
+	arrayCtrl := controllers.NewArrayController(s.ctx)
+	err := arrayCtrl.ResumeParityCheck()
+
+	if err != nil {
+		logger.Error("API: Failed to resume parity check: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to resume parity check: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
 	respondJSON(w, http.StatusOK, dto.Response{
 		Success:   true,
-		Message:   "Parity check resumed",
+		Message:   "Parity check resumed successfully",
+		Timestamp: time.Now(),
+	})
+}
+
+func (s *Server) handleParityCheckHistory(w http.ResponseWriter, r *http.Request) {
+	logger.Debug("API: Getting parity check history")
+
+	parityCollector := collectors.NewParityCollector()
+	history, err := parityCollector.GetParityHistory()
+
+	if err != nil {
+		logger.Error("API: Failed to get parity check history: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to get parity check history: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, history)
+}
+
+// Configuration handlers
+func (s *Server) handleShareConfig(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	shareName := vars["name"]
+	logger.Debug("API: Getting share config for %s", shareName)
+
+	configCollector := collectors.NewConfigCollector()
+	config, err := configCollector.GetShareConfig(shareName)
+
+	if err != nil {
+		logger.Error("API: Failed to get share config: %v", err)
+		respondJSON(w, http.StatusNotFound, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to get share config: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, config)
+}
+
+func (s *Server) handleNetworkConfig(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	interfaceName := vars["interface"]
+	logger.Debug("API: Getting network config for %s", interfaceName)
+
+	configCollector := collectors.NewConfigCollector()
+	config, err := configCollector.GetNetworkConfig(interfaceName)
+
+	if err != nil {
+		logger.Error("API: Failed to get network config: %v", err)
+		respondJSON(w, http.StatusNotFound, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to get network config: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, config)
+}
+
+func (s *Server) handleSystemSettings(w http.ResponseWriter, r *http.Request) {
+	logger.Debug("API: Getting system settings")
+
+	configCollector := collectors.NewConfigCollector()
+	settings, err := configCollector.GetSystemSettings()
+
+	if err != nil {
+		logger.Error("API: Failed to get system settings: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to get system settings: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, settings)
+}
+
+func (s *Server) handleDockerSettings(w http.ResponseWriter, r *http.Request) {
+	logger.Debug("API: Getting Docker settings")
+
+	configCollector := collectors.NewConfigCollector()
+	settings, err := configCollector.GetDockerSettings()
+
+	if err != nil {
+		logger.Error("API: Failed to get Docker settings: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to get Docker settings: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, settings)
+}
+
+func (s *Server) handleVMSettings(w http.ResponseWriter, r *http.Request) {
+	logger.Debug("API: Getting VM settings")
+
+	configCollector := collectors.NewConfigCollector()
+	settings, err := configCollector.GetVMSettings()
+
+	if err != nil {
+		logger.Error("API: Failed to get VM settings: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to get VM settings: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, settings)
+}
+
+func (s *Server) handleUpdateShareConfig(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	shareName := vars["name"]
+	logger.Info("API: Updating share config for %s", shareName)
+
+	var config dto.ShareConfig
+	if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Invalid request body: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	// Ensure name matches URL parameter
+	config.Name = shareName
+
+	configCollector := collectors.NewConfigCollector()
+	if err := configCollector.UpdateShareConfig(&config); err != nil {
+		logger.Error("API: Failed to update share config: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to update share config: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   "Share config updated successfully",
+		Timestamp: time.Now(),
+	})
+}
+
+func (s *Server) handleUpdateSystemSettings(w http.ResponseWriter, r *http.Request) {
+	logger.Info("API: Updating system settings")
+
+	var settings dto.SystemSettings
+	if err := json.NewDecoder(r.Body).Decode(&settings); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Invalid request body: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	configCollector := collectors.NewConfigCollector()
+	if err := configCollector.UpdateSystemSettings(&settings); err != nil {
+		logger.Error("API: Failed to update system settings: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to update system settings: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   "System settings updated successfully",
 		Timestamp: time.Now(),
 	})
 }
