@@ -113,6 +113,14 @@ func (c *UPSCollector) collectAPC() (*dto.UPSStatus, error) {
 			if minutes, err := strconv.ParseFloat(value, 64); err == nil {
 				status.RuntimeLeft = int(minutes * 60) // Convert minutes to seconds
 			}
+		case "NOMPOWER":
+			// Parse nominal power (e.g., "800 Watts")
+			if strings.HasSuffix(value, "Watts") {
+				value = strings.TrimSuffix(value, " Watts")
+			}
+			if power, err := strconv.ParseFloat(value, 64); err == nil {
+				status.NominalPower = power
+			}
 		case "LINEV":
 			if strings.HasSuffix(value, "Volts") {
 				value = strings.TrimSuffix(value, " Volts")
@@ -130,6 +138,11 @@ func (c *UPSCollector) collectAPC() (*dto.UPSStatus, error) {
 		case "UPSNAME":
 			status.Model = value
 		}
+	}
+
+	// Calculate actual power consumption from load percentage and nominal power
+	if status.NominalPower > 0 && status.LoadPercent > 0 {
+		status.PowerWatts = status.NominalPower * status.LoadPercent / 100.0
 	}
 
 	return status, nil
@@ -191,6 +204,11 @@ func (c *UPSCollector) collectNUT() (*dto.UPSStatus, error) {
 			if seconds, err := strconv.ParseFloat(value, 64); err == nil {
 				status.RuntimeLeft = int(seconds) // Already in seconds
 			}
+		case "ups.power.nominal", "ups.realpower.nominal":
+			// Parse nominal power (usually in Watts)
+			if power, err := strconv.ParseFloat(value, 64); err == nil {
+				status.NominalPower = power
+			}
 		case "input.voltage":
 			if _, err := strconv.ParseFloat(value, 64); err == nil {
 				// status.InputVoltage (not in DTO) = volts
@@ -202,6 +220,11 @@ func (c *UPSCollector) collectNUT() (*dto.UPSStatus, error) {
 		case "device.model", "ups.model":
 			status.Model = value
 		}
+	}
+
+	// Calculate actual power consumption from load percentage and nominal power
+	if status.NominalPower > 0 && status.LoadPercent > 0 {
+		status.PowerWatts = status.NominalPower * status.LoadPercent / 100.0
 	}
 
 	return status, nil
