@@ -63,11 +63,71 @@ Currently, the API does not require authentication. All endpoints are accessible
 - `200 OK` - Request successful
 - `400 Bad Request` - Invalid request parameters
 - `404 Not Found` - Resource not found
+- `409 Conflict` - Resource state conflict (e.g., starting already-started array)
 - `500 Internal Server Error` - Server error
 
-### Error Messages
+### Error Response Format
 
-All errors include a descriptive message in the response body.
+All errors follow this structure:
+
+```json
+{
+  "success": false,
+  "error_code": "ERROR_CODE_NAME",
+  "message": "Human-readable error description",
+  "details": {
+    "additional": "context"
+  },
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+### Common Error Codes
+
+| Error Code | HTTP Status | Description | Resolution |
+|------------|-------------|-------------|------------|
+| `ARRAY_ALREADY_STARTED` | 409 | Array is already running | Check array status before starting |
+| `ARRAY_ALREADY_STOPPED` | 409 | Array is already stopped | Check array status before stopping |
+| `ARRAY_NOT_STARTED` | 400 | Array must be started for this operation | Start the array first |
+| `PARITY_CHECK_RUNNING` | 409 | Parity check is already running | Stop current check before starting new one |
+| `PARITY_CHECK_NOT_RUNNING` | 400 | No parity check is running | Start a parity check first |
+| `DISK_NOT_FOUND` | 404 | Disk ID/name not found | Verify disk exists using GET /disks |
+| `CONTAINER_NOT_FOUND` | 404 | Docker container not found | Verify container name/ID using GET /docker |
+| `CONTAINER_ALREADY_RUNNING` | 409 | Container is already running | Check container state first |
+| `CONTAINER_ALREADY_STOPPED` | 409 | Container is already stopped | Check container state first |
+| `VM_NOT_FOUND` | 404 | Virtual machine not found | Verify VM name/ID using GET /vm |
+| `VM_ALREADY_RUNNING` | 409 | VM is already running | Check VM state first |
+| `VM_ALREADY_STOPPED` | 409 | VM is already stopped | Check VM state first |
+| `SHARE_NOT_FOUND` | 404 | Share not found | Verify share exists using GET /shares |
+| `NETWORK_INTERFACE_NOT_FOUND` | 404 | Network interface not found | Verify interface using GET /network |
+| `VALIDATION_ERROR` | 400 | Invalid request parameters | Check request body format and values |
+| `INTERNAL_ERROR` | 500 | Server error | Check server logs for details |
+
+### Validation Error Example
+
+```json
+{
+  "success": false,
+  "error_code": "VALIDATION_ERROR",
+  "message": "Invalid request parameters",
+  "errors": [
+    {
+      "field": "allocator",
+      "message": "Must be one of: highwater, mostfree, fillup",
+      "received": "invalid_value"
+    }
+  ],
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+### Error Handling Best Practices
+
+1. **Always check HTTP status code** - Don't rely solely on response body
+2. **Handle specific error codes** - Different errors require different actions
+3. **Implement retry logic** - For 500 errors, retry with exponential backoff
+4. **Log error details** - Include error_code and timestamp for debugging
+5. **Validate before sending** - Check parameters client-side to avoid validation errors
 
 ---
 
@@ -164,13 +224,31 @@ curl -X POST http://192.168.20.21:8043/api/v1/array/start
 
 Stop the Unraid array.
 
-**Response**:
+**Response (Success)**:
 ```json
 {
   "success": true,
   "message": "Array stopped successfully",
   "timestamp": "2025-10-03T13:41:13+10:00"
 }
+```
+
+**Response (Error - Array Already Stopped)**:
+```json
+{
+  "success": false,
+  "error_code": "ARRAY_ALREADY_STOPPED",
+  "message": "Cannot stop array: array is already in STOPPED state",
+  "details": {
+    "current_state": "STOPPED"
+  },
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Example**:
+```bash
+curl -X POST http://192.168.20.21:8043/api/v1/array/stop
 ```
 
 ---
@@ -180,7 +258,35 @@ Stop the Unraid array.
 Start a parity check.
 
 **Query Parameters**:
-- `correcting` (optional) - Set to `true` for correcting parity check, `false` for read-only check
+
+| Parameter | Type | Required | Description | Valid Values | Default |
+|-----------|------|----------|-------------|--------------|---------|
+| `correcting` | boolean | No | Whether to perform correcting parity check | `true`, `false` | `false` |
+
+**Response (Success)**:
+```json
+{
+  "success": true,
+  "message": "Parity check started successfully",
+  "details": {
+    "correcting": false
+  },
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Response (Error - Parity Check Already Running)**:
+```json
+{
+  "success": false,
+  "error_code": "PARITY_CHECK_RUNNING",
+  "message": "Cannot start parity check: a parity check is already running",
+  "details": {
+    "current_progress": 45.2
+  },
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
 
 **Example**:
 ```bash
@@ -197,17 +303,89 @@ curl -X POST "http://192.168.20.21:8043/api/v1/array/parity-check/start?correcti
 
 Stop the current parity check.
 
+**Response (Success)**:
+```json
+{
+  "success": true,
+  "message": "Parity check stopped successfully",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Response (Error - No Parity Check Running)**:
+```json
+{
+  "success": false,
+  "error_code": "PARITY_CHECK_NOT_RUNNING",
+  "message": "Cannot stop parity check: no parity check is running",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Example**:
+```bash
+curl -X POST http://192.168.20.21:8043/api/v1/array/parity-check/stop
+```
+
 ---
 
 ### POST /array/parity-check/pause
 
 Pause the current parity check.
 
+**Response (Success)**:
+```json
+{
+  "success": true,
+  "message": "Parity check paused successfully",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Response (Error - No Parity Check Running)**:
+```json
+{
+  "success": false,
+  "error_code": "PARITY_CHECK_NOT_RUNNING",
+  "message": "Cannot pause parity check: no parity check is running",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Example**:
+```bash
+curl -X POST http://192.168.20.21:8043/api/v1/array/parity-check/pause
+```
+
 ---
 
 ### POST /array/parity-check/resume
 
 Resume a paused parity check.
+
+**Response (Success)**:
+```json
+{
+  "success": true,
+  "message": "Parity check resumed successfully",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Response (Error - No Paused Parity Check)**:
+```json
+{
+  "success": false,
+  "error_code": "PARITY_CHECK_NOT_PAUSED",
+  "message": "Cannot resume parity check: no paused parity check found",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Example**:
+```bash
+curl -X POST http://192.168.20.21:8043/api/v1/array/parity-check/resume
+```
 
 ---
 
@@ -270,7 +448,45 @@ List all disks in the system.
 Get a single disk by ID, device name, or disk name.
 
 **Path Parameters**:
-- `id` - Disk ID, device (e.g., `sdb`), or name (e.g., `parity`, `disk1`, `cache`)
+
+| Parameter | Type | Required | Description | Examples |
+|-----------|------|----------|-------------|----------|
+| `id` | string | Yes | Disk identifier | `sdb`, `parity`, `disk1`, `cache`, `WUH721816ALE6L4_2CGV0URP` |
+
+**Supported ID Formats**:
+- **Device name**: `sdb`, `sdc`, etc.
+- **Disk name**: `parity`, `disk1`, `disk2`, `cache`, etc.
+- **Disk ID**: Full disk ID like `WUH721816ALE6L4_2CGV0URP`
+
+**Response (Success)**:
+```json
+{
+  "id": "WUH721816ALE6L4_2CGV0URP",
+  "device": "sdb",
+  "name": "parity",
+  "role": "parity",
+  "size_bytes": 16000000000000,
+  "used_bytes": 0,
+  "free_bytes": 16000000000000,
+  "temperature_celsius": 35,
+  "spin_state": "standby",
+  "serial_number": "2CGV0URP",
+  "model": "WDC WUH721816ALE6L4",
+  "filesystem": "xfs",
+  "status": "DISK_OK",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Response (Error - Disk Not Found)**:
+```json
+{
+  "success": false,
+  "error_code": "DISK_NOT_FOUND",
+  "message": "Disk not found: sdb99",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
 
 **Example**:
 ```bash
@@ -283,8 +499,6 @@ curl http://192.168.20.21:8043/api/v1/disks/parity
 # By ID
 curl http://192.168.20.21:8043/api/v1/disks/WUH721816ALE6L4_2CGV0URP
 ```
-
-**Response**: Same as single disk object from `/disks` endpoint
 
 ---
 
@@ -315,9 +529,12 @@ List all user shares.
 Get share configuration.
 
 **Path Parameters**:
-- `name` - Share name
 
-**Response**:
+| Parameter | Type | Required | Description | Examples |
+|-----------|------|----------|-------------|----------|
+| `name` | string | Yes | Share name | `appdata`, `media`, `backups` |
+
+**Response (Success)**:
 ```json
 {
   "name": "appdata",
@@ -330,13 +547,50 @@ Get share configuration.
 }
 ```
 
+**Response (Error - Share Not Found)**:
+```json
+{
+  "success": false,
+  "error_code": "SHARE_NOT_FOUND",
+  "message": "Share not found: invalid_share",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Example**:
+```bash
+curl http://192.168.20.21:8043/api/v1/shares/appdata/config
+```
+
 ---
 
 ### POST /shares/{name}/config
 
 Update share configuration.
 
-**Request Body**:
+**Path Parameters**:
+
+| Parameter | Type | Required | Description | Examples |
+|-----------|------|----------|-------------|----------|
+| `name` | string | Yes | Share name | `appdata`, `media`, `backups` |
+
+**Request Body Parameters**:
+
+| Parameter | Type | Required | Description | Valid Values | Default |
+|-----------|------|----------|-------------|--------------|---------|
+| `allocator` | string | No | Allocation method | `highwater`, `mostfree`, `fillup` | Current value |
+| `floor` | string | No | Minimum free space (bytes) | Numeric string (e.g., `50000000`) | `0` |
+| `use_cache` | string | No | Cache usage policy | `yes`, `no`, `only`, `prefer` | Current value |
+| `export` | string | No | Export protocol | `e` (SMB), `n` (NFS), `-` (none) | Current value |
+| `security` | string | No | Security mode | `public`, `secure`, `private` | Current value |
+
+**Validation Rules**:
+- `allocator`: Must be one of the valid values
+- `floor`: Must be a valid numeric string
+- `use_cache`: Must be one of the valid values
+- At least one parameter must be provided
+
+**Request Body Example**:
 ```json
 {
   "allocator": "highwater",
@@ -345,13 +599,43 @@ Update share configuration.
 }
 ```
 
-**Response**:
+**Response (Success)**:
 ```json
 {
   "success": true,
   "message": "Share configuration updated successfully",
+  "backup_created": "/boot/config/shares/appdata.cfg.bak",
   "timestamp": "2025-10-03T13:41:13+10:00"
 }
+```
+
+**Response (Error - Validation Error)**:
+```json
+{
+  "success": false,
+  "error_code": "VALIDATION_ERROR",
+  "message": "Invalid request parameters",
+  "errors": [
+    {
+      "field": "allocator",
+      "message": "Must be one of: highwater, mostfree, fillup",
+      "received": "invalid_value"
+    }
+  ],
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Example**:
+```bash
+# Update share configuration
+curl -X POST http://192.168.20.21:8043/api/v1/shares/appdata/config \
+  -H "Content-Type: application/json" \
+  -d '{
+    "allocator": "highwater",
+    "floor": "50000000",
+    "use_cache": "only"
+  }'
 ```
 
 ---
@@ -387,7 +671,36 @@ List all Docker containers.
 Get a single container by ID or name.
 
 **Path Parameters**:
-- `id` - Container ID or name
+
+| Parameter | Type | Required | Description | Examples |
+|-----------|------|----------|-------------|----------|
+| `id` | string | Yes | Container ID or name | `jackett`, `plex`, `fedcb3e1ba1f` |
+
+**Response (Success)**:
+```json
+{
+  "id": "fedcb3e1ba1f",
+  "name": "jackett",
+  "image": "linuxserver/jackett:latest",
+  "state": "running",
+  "status": "Up 9 hours",
+  "cpu_usage_percent": 0.5,
+  "memory_usage_bytes": 104857600,
+  "network_rx_bytes": 1000000,
+  "network_tx_bytes": 500000,
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Response (Error - Container Not Found)**:
+```json
+{
+  "success": false,
+  "error_code": "CONTAINER_NOT_FOUND",
+  "message": "Container not found: invalid_container",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
 
 **Example**:
 ```bash
@@ -400,11 +713,75 @@ curl http://192.168.20.21:8043/api/v1/docker/jackett
 
 Start a Docker container.
 
+**Path Parameters**:
+
+| Parameter | Type | Required | Description | Examples |
+|-----------|------|----------|-------------|----------|
+| `id` | string | Yes | Container ID or name | `jackett`, `plex`, `fedcb3e1ba1f` |
+
+**Response (Success)**:
+```json
+{
+  "success": true,
+  "message": "Container started successfully",
+  "container_id": "fedcb3e1ba1f",
+  "container_name": "jackett",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Response (Error - Container Already Running)**:
+```json
+{
+  "success": false,
+  "error_code": "CONTAINER_ALREADY_RUNNING",
+  "message": "Container is already running: jackett",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Example**:
+```bash
+curl -X POST http://192.168.20.21:8043/api/v1/docker/jackett/start
+```
+
 ---
 
 ### POST /docker/{id}/stop
 
 Stop a Docker container.
+
+**Path Parameters**:
+
+| Parameter | Type | Required | Description | Examples |
+|-----------|------|----------|-------------|----------|
+| `id` | string | Yes | Container ID or name | `jackett`, `plex`, `fedcb3e1ba1f` |
+
+**Response (Success)**:
+```json
+{
+  "success": true,
+  "message": "Container stopped successfully",
+  "container_id": "fedcb3e1ba1f",
+  "container_name": "jackett",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Response (Error - Container Already Stopped)**:
+```json
+{
+  "success": false,
+  "error_code": "CONTAINER_ALREADY_STOPPED",
+  "message": "Container is already stopped: jackett",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Example**:
+```bash
+curl -X POST http://192.168.20.21:8043/api/v1/docker/jackett/stop
+```
 
 ---
 
@@ -412,17 +789,83 @@ Stop a Docker container.
 
 Restart a Docker container.
 
+**Path Parameters**:
+
+| Parameter | Type | Required | Description | Examples |
+|-----------|------|----------|-------------|----------|
+| `id` | string | Yes | Container ID or name | `jackett`, `plex`, `fedcb3e1ba1f` |
+
+**Response (Success)**:
+```json
+{
+  "success": true,
+  "message": "Container restarted successfully",
+  "container_id": "fedcb3e1ba1f",
+  "container_name": "jackett",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Example**:
+```bash
+curl -X POST http://192.168.20.21:8043/api/v1/docker/jackett/restart
+```
+
 ---
 
 ### POST /docker/{id}/pause
 
 Pause a Docker container.
 
+**Path Parameters**:
+
+| Parameter | Type | Required | Description | Examples |
+|-----------|------|----------|-------------|----------|
+| `id` | string | Yes | Container ID or name | `jackett`, `plex`, `fedcb3e1ba1f` |
+
+**Response (Success)**:
+```json
+{
+  "success": true,
+  "message": "Container paused successfully",
+  "container_id": "fedcb3e1ba1f",
+  "container_name": "jackett",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Example**:
+```bash
+curl -X POST http://192.168.20.21:8043/api/v1/docker/jackett/pause
+```
+
 ---
 
 ### POST /docker/{id}/unpause
 
 Unpause a Docker container.
+
+**Path Parameters**:
+
+| Parameter | Type | Required | Description | Examples |
+|-----------|------|----------|-------------|----------|
+| `id` | string | Yes | Container ID or name | `jackett`, `plex`, `fedcb3e1ba1f` |
+
+**Response (Success)**:
+```json
+{
+  "success": true,
+  "message": "Container unpaused successfully",
+  "container_id": "fedcb3e1ba1f",
+  "container_name": "jackett",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Example**:
+```bash
+curl -X POST http://192.168.20.21:8043/api/v1/docker/jackett/unpause
+```
 
 ---
 
@@ -452,11 +895,76 @@ List all virtual machines.
 
 Get a single VM by ID or name.
 
+**Path Parameters**:
+
+| Parameter | Type | Required | Description | Examples |
+|-----------|------|----------|-------------|----------|
+| `id` | string | Yes | VM ID or name | `windows-10`, `ubuntu-server` |
+
+**Response (Success)**:
+```json
+{
+  "id": "windows-10",
+  "name": "Windows 10",
+  "state": "running",
+  "cpu_count": 4,
+  "memory_bytes": 8589934592,
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Response (Error - VM Not Found)**:
+```json
+{
+  "success": false,
+  "error_code": "VM_NOT_FOUND",
+  "message": "Virtual machine not found: invalid_vm",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Example**:
+```bash
+curl http://192.168.20.21:8043/api/v1/vm/windows-10
+```
+
 ---
 
 ### POST /vm/{id}/start
 
 Start a virtual machine.
+
+**Path Parameters**:
+
+| Parameter | Type | Required | Description | Examples |
+|-----------|------|----------|-------------|----------|
+| `id` | string | Yes | VM ID or name | `windows-10`, `ubuntu-server` |
+
+**Response (Success)**:
+```json
+{
+  "success": true,
+  "message": "Virtual machine started successfully",
+  "vm_id": "windows-10",
+  "vm_name": "Windows 10",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Response (Error - VM Already Running)**:
+```json
+{
+  "success": false,
+  "error_code": "VM_ALREADY_RUNNING",
+  "message": "Virtual machine is already running: Windows 10",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Example**:
+```bash
+curl -X POST http://192.168.20.21:8043/api/v1/vm/windows-10/start
+```
 
 ---
 
@@ -464,11 +972,65 @@ Start a virtual machine.
 
 Stop a virtual machine (graceful shutdown).
 
+**Path Parameters**:
+
+| Parameter | Type | Required | Description | Examples |
+|-----------|------|----------|-------------|----------|
+| `id` | string | Yes | VM ID or name | `windows-10`, `ubuntu-server` |
+
+**Response (Success)**:
+```json
+{
+  "success": true,
+  "message": "Virtual machine stopped successfully",
+  "vm_id": "windows-10",
+  "vm_name": "Windows 10",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Response (Error - VM Already Stopped)**:
+```json
+{
+  "success": false,
+  "error_code": "VM_ALREADY_STOPPED",
+  "message": "Virtual machine is already stopped: Windows 10",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Example**:
+```bash
+curl -X POST http://192.168.20.21:8043/api/v1/vm/windows-10/stop
+```
+
 ---
 
 ### POST /vm/{id}/restart
 
 Restart a virtual machine.
+
+**Path Parameters**:
+
+| Parameter | Type | Required | Description | Examples |
+|-----------|------|----------|-------------|----------|
+| `id` | string | Yes | VM ID or name | `windows-10`, `ubuntu-server` |
+
+**Response (Success)**:
+```json
+{
+  "success": true,
+  "message": "Virtual machine restarted successfully",
+  "vm_id": "windows-10",
+  "vm_name": "Windows 10",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Example**:
+```bash
+curl -X POST http://192.168.20.21:8043/api/v1/vm/windows-10/restart
+```
 
 ---
 
@@ -476,11 +1038,55 @@ Restart a virtual machine.
 
 Pause a virtual machine.
 
+**Path Parameters**:
+
+| Parameter | Type | Required | Description | Examples |
+|-----------|------|----------|-------------|----------|
+| `id` | string | Yes | VM ID or name | `windows-10`, `ubuntu-server` |
+
+**Response (Success)**:
+```json
+{
+  "success": true,
+  "message": "Virtual machine paused successfully",
+  "vm_id": "windows-10",
+  "vm_name": "Windows 10",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Example**:
+```bash
+curl -X POST http://192.168.20.21:8043/api/v1/vm/windows-10/pause
+```
+
 ---
 
 ### POST /vm/{id}/resume
 
 Resume a paused virtual machine.
+
+**Path Parameters**:
+
+| Parameter | Type | Required | Description | Examples |
+|-----------|------|----------|-------------|----------|
+| `id` | string | Yes | VM ID or name | `windows-10`, `ubuntu-server` |
+
+**Response (Success)**:
+```json
+{
+  "success": true,
+  "message": "Virtual machine resumed successfully",
+  "vm_id": "windows-10",
+  "vm_name": "Windows 10",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Example**:
+```bash
+curl -X POST http://192.168.20.21:8043/api/v1/vm/windows-10/resume
+```
 
 ---
 
@@ -488,11 +1094,57 @@ Resume a paused virtual machine.
 
 Hibernate a virtual machine.
 
+**Path Parameters**:
+
+| Parameter | Type | Required | Description | Examples |
+|-----------|------|----------|-------------|----------|
+| `id` | string | Yes | VM ID or name | `windows-10`, `ubuntu-server` |
+
+**Response (Success)**:
+```json
+{
+  "success": true,
+  "message": "Virtual machine hibernated successfully",
+  "vm_id": "windows-10",
+  "vm_name": "Windows 10",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Example**:
+```bash
+curl -X POST http://192.168.20.21:8043/api/v1/vm/windows-10/hibernate
+```
+
 ---
 
 ### POST /vm/{id}/force-stop
 
 Force stop a virtual machine (immediate shutdown).
+
+**Path Parameters**:
+
+| Parameter | Type | Required | Description | Examples |
+|-----------|------|----------|-------------|----------|
+| `id` | string | Yes | VM ID or name | `windows-10`, `ubuntu-server` |
+
+**Response (Success)**:
+```json
+{
+  "success": true,
+  "message": "Virtual machine force stopped successfully",
+  "vm_id": "windows-10",
+  "vm_name": "Windows 10",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Warning**: Force stop does not allow the guest OS to shut down gracefully. Use regular stop for graceful shutdown.
+
+**Example**:
+```bash
+curl -X POST http://192.168.20.21:8043/api/v1/vm/windows-10/force-stop
+```
 
 ---
 
@@ -583,11 +1235,62 @@ Get system settings.
 
 Update system settings.
 
-**Request Body**:
+**Request Body Parameters**:
+
+| Parameter | Type | Required | Description | Examples |
+|-----------|------|----------|-------------|----------|
+| `description` | string | No | Server description | `Home Server`, `Production Server` |
+| `server_name` | string | No | Server hostname | `Tower`, `Cube` |
+
+**Validation Rules**:
+- At least one parameter must be provided
+- `server_name`: Must be a valid hostname (alphanumeric, hyphens allowed)
+- `description`: Maximum 255 characters
+
+**Request Body Example**:
 ```json
 {
-  "description": "Updated description"
+  "description": "Updated description",
+  "server_name": "Cube"
 }
+```
+
+**Response (Success)**:
+```json
+{
+  "success": true,
+  "message": "System settings updated successfully",
+  "backup_created": "/boot/config/ident.cfg.bak",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Response (Error - Validation Error)**:
+```json
+{
+  "success": false,
+  "error_code": "VALIDATION_ERROR",
+  "message": "Invalid request parameters",
+  "errors": [
+    {
+      "field": "server_name",
+      "message": "Invalid hostname format",
+      "received": "invalid name!"
+    }
+  ],
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Example**:
+```bash
+# Update system settings
+curl -X POST http://192.168.20.21:8043/api/v1/settings/system \
+  -H "Content-Type: application/json" \
+  -d '{
+    "description": "Updated description",
+    "server_name": "Cube"
+  }'
 ```
 
 ---
@@ -649,7 +1352,39 @@ Get disk settings including spindown delay.
 Get network interface configuration.
 
 **Path Parameters**:
-- `interface` - Interface name (e.g., `eth0`, `bond0`)
+
+| Parameter | Type | Required | Description | Examples |
+|-----------|------|----------|-------------|----------|
+| `interface` | string | Yes | Network interface name | `eth0`, `eth1`, `bond0`, `br0` |
+
+**Response (Success)**:
+```json
+{
+  "interface": "eth0",
+  "ip_address": "192.168.20.21",
+  "netmask": "255.255.255.0",
+  "gateway": "192.168.20.1",
+  "dns_servers": ["8.8.8.8", "8.8.4.4"],
+  "dhcp_enabled": false,
+  "mtu": 1500,
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Response (Error - Interface Not Found)**:
+```json
+{
+  "success": false,
+  "error_code": "NETWORK_INTERFACE_NOT_FOUND",
+  "message": "Network interface not found: eth99",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Example**:
+```bash
+curl http://192.168.20.21:8043/api/v1/network/eth0/config
+```
 
 ---
 
