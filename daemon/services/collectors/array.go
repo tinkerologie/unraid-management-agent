@@ -3,6 +3,7 @@ package collectors
 import (
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/ruaandeysel/unraid-management-agent/daemon/common"
@@ -22,7 +23,7 @@ func NewArrayCollector(ctx *domain.Context) *ArrayCollector {
 
 func (c *ArrayCollector) Start(interval time.Duration) {
 	logger.Info("Starting array collector (interval: %v)", interval)
-	
+
 	// Run once immediately with panic recovery
 	func() {
 		defer func() {
@@ -32,7 +33,7 @@ func (c *ArrayCollector) Start(interval time.Duration) {
 		}()
 		c.Collect()
 	}()
-	
+
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -72,7 +73,7 @@ func (c *ArrayCollector) collectArrayStatus() (*dto.ArrayStatus, error) {
 			logger.Error("Array: PANIC during collection: %v", r)
 		}
 	}()
-	
+
 	logger.Debug("Array: Starting collection from %s", common.VarIni)
 	status := &dto.ArrayStatus{
 		Timestamp: time.Now(),
@@ -141,13 +142,37 @@ func (c *ArrayCollector) collectArrayStatus() (*dto.ArrayStatus, error) {
 		status.ParityCheckStatus = strings.Trim(sbSyncAction, `"`)
 	}
 
-	// Array size information
-	if mdNumDisks, ok := file.Get("", "mdNumDisks"); ok {
-		// This would need mdcmd status or reading from disks
-		// For now, just parse what we have
-		_ = mdNumDisks
+	// Get array size information from /mnt/user filesystem
+	// /mnt/user is the shfs (Unraid user share filesystem) that represents the entire array
+	c.enrichWithArraySize(status)
+
+	logger.Debug("Array: Parsed status - state=%s, disks=%d, parity=%v, used=%.1f%%",
+		status.State, status.NumDisks, status.ParityValid, status.UsedPercent)
+	return status, nil
+}
+
+// enrichWithArraySize gets total array size and usage from /mnt/user
+func (c *ArrayCollector) enrichWithArraySize(status *dto.ArrayStatus) {
+	// Use syscall.Statfs to get filesystem statistics for /mnt/user
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs("/mnt/user", &stat); err != nil {
+		logger.Debug("Array: Failed to get /mnt/user stats: %v", err)
+		return
 	}
 
-	logger.Debug("Array: Parsed status - state=%s, disks=%d, parity=%v", status.State, status.NumDisks, status.ParityValid)
-	return status, nil
+	// Calculate sizes in bytes
+	totalBytes := uint64(stat.Blocks) * uint64(stat.Bsize)
+	freeBytes := uint64(stat.Bfree) * uint64(stat.Bsize)
+	usedBytes := totalBytes - freeBytes
+
+	status.TotalBytes = totalBytes
+	status.FreeBytes = freeBytes
+
+	// Calculate usage percentage
+	if totalBytes > 0 {
+		status.UsedPercent = float64(usedBytes) / float64(totalBytes) * 100
+	}
+
+	logger.Debug("Array: Size - total=%d bytes (%.2f TB), used=%.1f%%",
+		totalBytes, float64(totalBytes)/(1024*1024*1024*1024), status.UsedPercent)
 }

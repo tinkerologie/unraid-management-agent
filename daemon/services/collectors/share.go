@@ -23,7 +23,7 @@ func NewShareCollector(ctx *domain.Context) *ShareCollector {
 
 func (c *ShareCollector) Start(interval time.Duration) {
 	logger.Info("Starting share collector (interval: %v)", interval)
-	
+
 	// Run once immediately with panic recovery
 	func() {
 		defer func() {
@@ -33,7 +33,7 @@ func (c *ShareCollector) Start(interval time.Duration) {
 		}()
 		c.Collect()
 	}()
-	
+
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -145,6 +145,22 @@ func (c *ShareCollector) collectShares() ([]dto.ShareInfo, error) {
 	if err := scanner.Err(); err != nil {
 		logger.Error("Share: Scanner error: %v", err)
 		return shares, err
+	}
+
+	// Calculate total and usage percentage for each share
+	for i := range shares {
+		// If total is 0, calculate it from used + free
+		if shares[i].Total == 0 && (shares[i].Used > 0 || shares[i].Free > 0) {
+			shares[i].Total = shares[i].Used + shares[i].Free
+		}
+
+		// Calculate usage percentage
+		if shares[i].Total > 0 {
+			shares[i].UsagePercent = float64(shares[i].Used) / float64(shares[i].Total) * 100
+		}
+
+		// Set timestamp
+		shares[i].Timestamp = time.Now()
 	}
 
 	logger.Debug("Share: Parsed %d shares successfully", len(shares))

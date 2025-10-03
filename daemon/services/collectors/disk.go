@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/ruaandeysel/unraid-management-agent/daemon/common"
@@ -252,7 +253,7 @@ func (c *DiskCollector) enrichWithSMARTData(disk *dto.DiskInfo) {
 
 // enrichWithMountInfo adds mount point and usage information
 func (c *DiskCollector) enrichWithMountInfo(disk *dto.DiskInfo) {
-	if disk.Device == "" {
+	if disk.Name == "" {
 		return
 	}
 
@@ -262,22 +263,56 @@ func (c *DiskCollector) enrichWithMountInfo(disk *dto.DiskInfo) {
 		return
 	}
 
-	devicePath := "/dev/" + disk.Device
+	// For Unraid array disks, the mount point is /mnt/diskN where N is the disk number
+	// The device in /proc/mounts is /dev/mdNp1 (e.g., /dev/md1p1 for disk1)
+	// For cache/flash, it's the actual device (e.g., /dev/nvme0n1p1, /dev/sda1)
+
+	var mountPoint string
 	lines := strings.Split(string(data), "\n")
+
 	for _, line := range lines {
 		fields := strings.Fields(line)
 		if len(fields) < 2 {
 			continue
 		}
 
-		if fields[0] == devicePath || strings.HasPrefix(fields[0], devicePath) {
-			disk.MountPoint = fields[1]
-
-			// Calculate usage percentage if size is known
-			if disk.Size > 0 && disk.Used > 0 {
-				disk.UsagePercent = float64(disk.Used) / float64(disk.Size) * 100
-			}
+		// Check if mount point matches /mnt/{diskname}
+		expectedMountPoint := "/mnt/" + disk.Name
+		if fields[1] == expectedMountPoint {
+			mountPoint = fields[1]
 			break
+		}
+
+		// Also check for direct device match (for cache, flash, etc.)
+		if disk.Device != "" {
+			devicePath := "/dev/" + disk.Device
+			if fields[0] == devicePath || strings.HasPrefix(fields[0], devicePath) {
+				mountPoint = fields[1]
+				break
+			}
+		}
+	}
+
+	if mountPoint == "" {
+		return
+	}
+
+	disk.MountPoint = mountPoint
+
+	// Get filesystem statistics using statfs
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs(disk.MountPoint, &stat); err == nil {
+		// Calculate sizes in bytes
+		totalBytes := uint64(stat.Blocks) * uint64(stat.Bsize)
+		freeBytes := uint64(stat.Bfree) * uint64(stat.Bsize)
+		usedBytes := totalBytes - freeBytes
+
+		disk.Used = usedBytes
+		disk.Free = freeBytes
+
+		// Calculate usage percentage
+		if totalBytes > 0 {
+			disk.UsagePercent = float64(usedBytes) / float64(totalBytes) * 100
 		}
 	}
 }
