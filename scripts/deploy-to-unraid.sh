@@ -98,7 +98,7 @@ echo "----------------------------------------"
 
 # Test health endpoint
 echo -n "Testing /api/v1/health... "
-if ssh root@"$UNRAID_IP" "curl -s http://localhost:8080/api/v1/health" | grep -q "ok"; then
+if ssh root@"$UNRAID_IP" "curl -s http://localhost:8043/api/v1/health" | grep -q "ok"; then
     echo "✅"
 else
     echo "❌"
@@ -106,7 +106,7 @@ fi
 
 # Test network endpoint
 echo -n "Testing /api/v1/network... "
-NETWORK_RESULT=$(ssh root@"$UNRAID_IP" "curl -s http://localhost:8080/api/v1/network")
+NETWORK_RESULT=$(ssh root@"$UNRAID_IP" "curl -s http://localhost:8043/api/v1/network")
 if echo "$NETWORK_RESULT" | grep -q "\["; then
     NETWORK_COUNT=$(echo "$NETWORK_RESULT" | grep -o '"name"' | wc -l | tr -d ' ')
     echo "✅ ($NETWORK_COUNT interfaces found)"
@@ -116,7 +116,7 @@ fi
 
 # Test system endpoint
 echo -n "Testing /api/v1/system... "
-if ssh root@"$UNRAID_IP" "curl -s http://localhost:8080/api/v1/system" | grep -q "hostname"; then
+if ssh root@"$UNRAID_IP" "curl -s http://localhost:8043/api/v1/system" | grep -q "hostname"; then
     echo "✅"
 else
     echo "❌"
@@ -124,7 +124,7 @@ fi
 
 # Test array endpoint
 echo -n "Testing /api/v1/array... "
-if ssh root@"$UNRAID_IP" "curl -s http://localhost:8080/api/v1/array" | grep -q "state"; then
+if ssh root@"$UNRAID_IP" "curl -s http://localhost:8043/api/v1/array" | grep -q "state"; then
     echo "✅"
 else
     echo "❌"
@@ -132,7 +132,7 @@ fi
 
 # Test disks endpoint
 echo -n "Testing /api/v1/disks... "
-DISK_RESULT=$(ssh root@"$UNRAID_IP" "curl -s http://localhost:8080/api/v1/disks")
+DISK_RESULT=$(ssh root@"$UNRAID_IP" "curl -s http://localhost:8043/api/v1/disks")
 if echo "$DISK_RESULT" | grep -q "\["; then
     DISK_COUNT=$(echo "$DISK_RESULT" | grep -o '"name"' | wc -l | tr -d ' ')
     echo "✅ ($DISK_COUNT disks found)"
@@ -142,7 +142,7 @@ fi
 
 # Test shares endpoint
 echo -n "Testing /api/v1/shares... "
-SHARE_RESULT=$(ssh root@"$UNRAID_IP" "curl -s http://localhost:8080/api/v1/shares")
+SHARE_RESULT=$(ssh root@"$UNRAID_IP" "curl -s http://localhost:8043/api/v1/shares")
 if echo "$SHARE_RESULT" | grep -q "\["; then
     SHARE_COUNT=$(echo "$SHARE_RESULT" | grep -o '"name"' | wc -l | tr -d ' ')
     echo "✅ ($SHARE_COUNT shares found)"
@@ -155,7 +155,7 @@ echo "========================================="
 echo "Deployment Complete!"
 echo "========================================="
 echo ""
-echo "API Base URL: http://$UNRAID_IP:8080/api/v1"
+echo "API Base URL: http://$UNRAID_IP:8043/api/v1"
 echo ""
 echo "Quick Commands:"
 echo "  View logs:        ssh root@$UNRAID_IP 'tail -f /var/log/unraid-management-agent.log'"
@@ -165,6 +165,8 @@ fi
 echo "  Stop service:     ssh root@$UNRAID_IP 'killall unraid-management-agent'"
 echo "  Check status:     ssh root@$UNRAID_IP 'ps aux | grep unraid-management-agent | grep -v grep'"
 echo ""
-echo "Test network data:"
-echo "  curl -s http://$UNRAID_IP:8080/api/v1/network | jq"
+echo "Test API endpoints:"
+echo "  curl -s http://$UNRAID_IP:8043/api/v1/health | jq"
+echo "  curl -s http://$UNRAID_IP:8043/api/v1/system | jq"
+echo "  curl -s http://$UNRAID_IP:8043/api/v1/network | jq"
 echo ""

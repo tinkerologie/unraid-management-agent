@@ -18,7 +18,7 @@ var Version string = "dev"
 
 var cli struct {
 	LogsDir string `default:"/var/log" help:"directory to store logs"`
-	Port    int    `default:"8080" help:"HTTP server port"`
+	Port    int    `default:"8043" help:"HTTP server port"`
 	Debug   bool   `default:"false" help:"enable debug mode with stdout logging"`
 
 	Boot cmd.Boot `cmd:"" default:"1" help:"start the management agent"`
