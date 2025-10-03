@@ -902,6 +902,25 @@ func (s *Server) handleVMSettings(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, settings)
 }
 
+func (s *Server) handleDiskSettings(w http.ResponseWriter, r *http.Request) {
+	logger.Debug("API: Getting disk settings")
+
+	configCollector := collectors.NewConfigCollector()
+	settings, err := configCollector.GetDiskSettings()
+
+	if err != nil {
+		logger.Error("API: Failed to get disk settings: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to get disk settings: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, settings)
+}
+
 func (s *Server) handleUpdateShareConfig(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	shareName := vars["name"]

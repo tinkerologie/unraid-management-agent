@@ -98,6 +98,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/settings/system", s.handleSystemSettings).Methods("GET")
 	api.HandleFunc("/settings/docker", s.handleDockerSettings).Methods("GET")
 	api.HandleFunc("/settings/vm", s.handleVMSettings).Methods("GET")
+	api.HandleFunc("/settings/disks", s.handleDiskSettings).Methods("GET")
 
 	// Configuration endpoints (write)
 	api.HandleFunc("/shares/{name}/config", s.handleUpdateShareConfig).Methods("POST")

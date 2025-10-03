@@ -445,3 +445,61 @@ func (c *ConfigCollector) UpdateSystemSettings(settings *dto.SystemSettings) err
 	logger.Info("Config: System settings written successfully")
 	return nil
 }
+
+// GetDiskSettings reads disk settings from /boot/config/disk.cfg
+func (c *ConfigCollector) GetDiskSettings() (*dto.DiskSettings, error) {
+	configPath := "/boot/config/disk.cfg"
+	logger.Debug("Config: Reading disk settings from %s", configPath)
+
+	file, err := os.Open(configPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("disk config not found")
+		}
+		return nil, fmt.Errorf("failed to open disk config: %w", err)
+	}
+	defer file.Close()
+
+	settings := &dto.DiskSettings{
+		Timestamp: time.Now(),
+	}
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		key := strings.TrimSpace(parts[0])
+		value := strings.Trim(strings.TrimSpace(parts[1]), `"`)
+
+		switch key {
+		case "spindownDelay":
+			if delay, err := strconv.Atoi(value); err == nil {
+				settings.SpindownDelay = delay
+			}
+		case "startArray":
+			settings.StartArray = (value == "yes" || value == "true" || value == "1")
+		case "spinupGroups":
+			settings.SpinupGroups = (value == "yes" || value == "true" || value == "1")
+		case "shutdownTimeout":
+			if timeout, err := strconv.Atoi(value); err == nil {
+				settings.ShutdownTimeout = timeout
+			}
+		case "defaultFsType":
+			settings.DefaultFsType = value
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading disk config: %w", err)
+	}
+
+	return settings, nil
+}
