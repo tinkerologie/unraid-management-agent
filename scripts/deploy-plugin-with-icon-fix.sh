@@ -7,6 +7,7 @@ set -e
 
 UNRAID_IP="${1:-192.168.20.21}"
 UNRAID_PASSWORD="${2:-REMOVED_EXPOSED_CREDENTIAL}"
+CREATE_BACKUP="${3:-no}"  # Set to "yes" to create backup, default is "no"
 PLUGIN_NAME="unraid-management-agent"
 VERSION=$(cat VERSION)
 BUILD_DIR="build"
@@ -67,18 +68,22 @@ echo "✅ Service stopped"
 echo ""
 
 # Step 5: Backup existing plugin (if exists)
-echo "Step 5: Backing up existing plugin..."
-BACKUP_DIR="/boot/config/plugins/${PLUGIN_NAME}/backup-$(date +%Y%m%d-%H%M%S)"
-eval "$SSH_CMD '
-if [ -d /usr/local/emhttp/plugins/${PLUGIN_NAME} ]; then
-    mkdir -p $BACKUP_DIR
-    cp -r /usr/local/emhttp/plugins/${PLUGIN_NAME}/* $BACKUP_DIR/ 2>/dev/null || true
-    echo \"Backup created at: $BACKUP_DIR\"
+if [ "$CREATE_BACKUP" = "yes" ]; then
+    echo "Step 5: Backing up existing plugin..."
+    BACKUP_DIR="/boot/config/plugins/${PLUGIN_NAME}/backup-$(date +%Y%m%d-%H%M%S)"
+    eval "$SSH_CMD '
+    if [ -d /usr/local/emhttp/plugins/${PLUGIN_NAME} ]; then
+        mkdir -p $BACKUP_DIR
+        cp -r /usr/local/emhttp/plugins/${PLUGIN_NAME}/* $BACKUP_DIR/ 2>/dev/null || true
+        echo \"Backup created at: $BACKUP_DIR\"
+    else
+        echo \"No existing plugin to backup\"
+    fi
+    '"
+    echo "✅ Backup complete"
 else
-    echo \"No existing plugin to backup\"
+    echo "Step 5: Skipping backup (CREATE_BACKUP=no)"
 fi
-'"
-echo "✅ Backup complete"
 echo ""
 
 # Step 6: Remove old plugin files
