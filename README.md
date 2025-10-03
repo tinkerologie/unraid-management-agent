@@ -70,12 +70,12 @@ Coordinates the entire application lifecycle:
 
 1. Download the latest release package:
    ```bash
-   wget https://github.com/ruaandeysel/unraid-management-agent/releases/latest/unraid-management-agent-1.0.0.tgz
+   wget https://github.com/ruaandeysel/unraid-management-agent/releases/latest/unraid-management-agent-2025.10.03.tgz
    ```
 
 2. Extract and install:
    ```bash
-   tar xzf unraid-management-agent-1.0.0.tgz -C /
+   tar xzf unraid-management-agent-2025.10.03.tgz -C /
    ```
 
 3. Start the service:
@@ -297,7 +297,7 @@ If endpoints return empty or default data:
 ```json
 {
   "hostname": "Tower",
-  "version": "1.0.0",
+  "version": "2025.10.03",
   "cpu_usage": 12.5,
   "ram_usage": 45.2,
   "temperature": 42.0,

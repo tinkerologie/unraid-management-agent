@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.0.0] - 2025-10-03
+## [2025.10.03] - Initial Release
 
 ### Added
 
@@ -260,6 +260,6 @@ This is the initial release. No migration required.
 
 ---
 
-**Last Updated**: 2025-10-03  
-**Current Version**: 1.0.0
+**Last Updated**: 2025-10-03
+**Current Version**: 2025.10.03
 

@@ -3,7 +3,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name        "unraid-management-agent">
 <!ENTITY author      "Ruan de Eysel">
-<!ENTITY version     "1.0.0">
+<!ENTITY version     "2025.10.03">
 <!ENTITY launch      "Settings/&name;">
 <!ENTITY gitURL      "https://github.com/ruaandeysel/&name;">
 <!ENTITY pluginURL   "&gitURL;/releases/latest/download/&name;.plg">
@@ -19,7 +19,7 @@
          icon="server">
 
 <CHANGES>
-###2025.10.01 - v1.0.0
+###2025.10.03
 - Initial release
 - REST API with 20+ endpoints
 - WebSocket support for real-time events
