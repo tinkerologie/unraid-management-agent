@@ -479,14 +479,53 @@ For issues, questions, or feature requests:
 
 ## Roadmap
 
+### Recently Implemented ✅
+
+The following features from the original roadmap have been successfully implemented:
+
+- **Enhanced System Info Collector** (v2025.11.0)
+  - CPU model detection and specifications
+  - BIOS version and release date information
+  - Per-core CPU usage monitoring
+  - Server model identification
+
+- **Detailed Disk Metrics** (v2025.11.0)
+  - I/O statistics (read/write operations and bytes)
+  - Per-disk performance metrics
+  - IO utilization percentage
+  - Disk spin state detection
+
 ### Planned Enhancements
-- Enhanced system info collector (CPU model, BIOS info, per-core usage)
-- Detailed disk metrics (I/O statistics, per-disk performance metrics)
-- User management collector
-- Network statistics trending
-- Alerting and notification system
-- Historical data storage
-- Plugin management endpoints
+
+The following features are planned for future releases:
+
+- **User Management Collector**
+  - User account listing and information
+  - User permissions and group membership
+  - Active user sessions monitoring
+
+- **Network Statistics Trending**
+  - Historical network bandwidth tracking
+  - Time-series data for network metrics
+  - Bandwidth usage trends and analysis
+
+- **Alerting and Notification System**
+  - Configurable alert rules and thresholds
+  - Notification delivery (email, webhook, etc.)
+  - Alert history and acknowledgment
+  - Integration with monitoring platforms
+
+- **Historical Data Storage**
+  - Time-series database integration
+  - Long-term metrics retention
+  - Historical data querying and analysis
+  - Data export capabilities
+
+- **Plugin Management Endpoints**
+  - Plugin installation and removal
+  - Plugin listing and status
+  - Plugin configuration management
+  - Plugin update notifications
 
 ## Changelog
 
