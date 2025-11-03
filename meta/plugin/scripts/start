@@ -1,17 +1,31 @@
 #!/bin/bash
-# Read configuration
-source /boot/config/plugins/unraid-management-agent/config.cfg
-
+CONFIG_FILE="/boot/config/plugins/unraid-management-agent/config.cfg"
 PROG="/usr/local/emhttp/plugins/unraid-management-agent/unraid-management-agent"
 LOGS_DIR="/var/log"
+
+# Create config directory if it doesn't exist
+mkdir -p /boot/config/plugins/unraid-management-agent
+
+# Create default config file if it doesn't exist
+if [ ! -f "$CONFIG_FILE" ]; then
+    cat > "$CONFIG_FILE" << EOF
+PORT=8043
+LOG_LEVEL=info
+AUTOSTART=yes
+EOF
+fi
+
+# Read configuration
+source "$CONFIG_FILE"
 
 # Stop if it's already running
 killall unraid-management-agent >/dev/null 2>&1
 
-# Prepare environment
+# Prepare environment with defaults
 export PORT="${PORT:-8043}"
+export LOG_LEVEL="${LOG_LEVEL:-info}"
 
-# Run the application
-nohup sudo -H bash -c "$PROG --logs-dir $LOGS_DIR --port $PORT" >/dev/null 2>&1 &
+# Run the application with log level
+nohup sudo -H bash -c "$PROG --logs-dir $LOGS_DIR --port $PORT --log-level $LOG_LEVEL boot" >/dev/null 2>&1 &
 
-echo "Unraid Management Agent started on port $PORT"
+echo "Unraid Management Agent started on port $PORT with log level $LOG_LEVEL"

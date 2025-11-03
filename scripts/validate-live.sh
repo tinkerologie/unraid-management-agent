@@ -90,9 +90,9 @@ echo ""
 # Check service is running
 print_header "1. SERVICE STATUS CHECK"
 print_test "Checking if service is running"
-if $SSH_CMD "ps aux | grep -v grep | grep unraid-management-agent" > /dev/null 2>&1; then
+if eval "$SSH_CMD 'ps aux | grep -v grep | grep unraid-management-agent'" > /dev/null 2>&1; then
     print_pass "Service is running"
-    $SSH_CMD "ps aux | grep -v grep | grep unraid-management-agent"
+    eval "$SSH_CMD 'ps aux | grep -v grep | grep unraid-management-agent'"
 else
     print_fail "Service is not running"
     exit 1
@@ -112,15 +112,15 @@ echo "$SYSTEM_DATA" | jq '.' 2>/dev/null || echo "$SYSTEM_DATA"
 
 print_test "Comparing with actual system state"
 print_info "Getting actual system information via SSH"
-$SSH_CMD "uname -a"
-$SSH_CMD "uptime"
-$SSH_CMD "free -h"
-$SSH_CMD "df -h | head -5"
+eval "$SSH_CMD 'uname -a'"
+eval "$SSH_CMD 'uptime'"
+eval "$SSH_CMD 'free -h'"
+eval "$SSH_CMD 'df -h | head -5'"
 
 # Validate system data fields
 if echo "$SYSTEM_DATA" | jq -e '.hostname' > /dev/null 2>&1; then
     HOSTNAME=$(echo "$SYSTEM_DATA" | jq -r '.hostname')
-    ACTUAL_HOSTNAME=$($SSH_CMD "hostname")
+    ACTUAL_HOSTNAME=$(eval "$SSH_CMD 'hostname'")
     if [ "$HOSTNAME" = "$ACTUAL_HOSTNAME" ]; then
         print_pass "Hostname matches: $HOSTNAME"
     else
@@ -137,7 +137,7 @@ ARRAY_DATA=$(curl -s "${API_BASE}/array")
 echo "$ARRAY_DATA" | jq '.' 2>/dev/null || echo "$ARRAY_DATA"
 
 print_test "Comparing with actual array state"
-$SSH_CMD "cat /var/local/emhttp/var.ini | grep -E '(mdState|mdNumDisks|mdNumInvalid)'"
+eval "$SSH_CMD 'cat /var/local/emhttp/var.ini | grep -E \"(mdState|mdNumDisks|mdNumInvalid)\"'"
 
 # Test disks endpoint
 print_header "5. DISK INFORMATION"
@@ -149,8 +149,8 @@ DISK_COUNT=$(echo "$DISK_DATA" | jq '. | length' 2>/dev/null || echo "0")
 print_info "API reports $DISK_COUNT disks"
 
 print_test "Comparing with actual disk state"
-$SSH_CMD "lsblk -o NAME,SIZE,TYPE,MOUNTPOINT"
-$SSH_CMD "df -h | grep -E '(^/dev|Filesystem)'"
+eval "$SSH_CMD 'lsblk -o NAME,SIZE,TYPE,MOUNTPOINT'"
+eval "$SSH_CMD 'df -h | grep -E \"(^/dev|Filesystem)\"'"
 
 # Test Docker endpoint
 print_header "6. DOCKER CONTAINERS"
@@ -162,7 +162,7 @@ CONTAINER_COUNT=$(echo "$DOCKER_DATA" | jq '. | length' 2>/dev/null || echo "0")
 print_info "API reports $CONTAINER_COUNT containers"
 
 print_test "Comparing with actual Docker state"
-$SSH_CMD "docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.State}}'"
+eval "$SSH_CMD 'docker ps -a --format \"table {{.Names}}\t{{.Status}}\t{{.State}}\"'"
 
 # Test VM endpoint
 print_header "7. VIRTUAL MACHINES"
@@ -174,7 +174,7 @@ VM_COUNT=$(echo "$VM_DATA" | jq '. | length' 2>/dev/null || echo "0")
 print_info "API reports $VM_COUNT VMs"
 
 print_test "Comparing with actual VM state"
-$SSH_CMD "virsh list --all 2>/dev/null || echo 'Libvirt not available'"
+eval "$SSH_CMD 'virsh list --all 2>/dev/null || echo \"Libvirt not available\"'"
 
 # Test network endpoint
 print_header "8. NETWORK INTERFACES"
@@ -186,8 +186,8 @@ INTERFACE_COUNT=$(echo "$NETWORK_DATA" | jq '. | length' 2>/dev/null || echo "0"
 print_info "API reports $INTERFACE_COUNT network interfaces"
 
 print_test "Comparing with actual network state"
-$SSH_CMD "ip -br addr"
-$SSH_CMD "ip -s link"
+eval "$SSH_CMD 'ip -br addr'"
+eval "$SSH_CMD 'ip -s link'"
 
 # Test shares endpoint
 print_header "9. USER SHARES"
@@ -199,7 +199,7 @@ SHARE_COUNT=$(echo "$SHARE_DATA" | jq '. | length' 2>/dev/null || echo "0")
 print_info "API reports $SHARE_COUNT shares"
 
 print_test "Comparing with actual share state"
-$SSH_CMD "ls -la /mnt/user/"
+eval "$SSH_CMD 'ls -la /mnt/user/'"
 
 # Test UPS endpoint
 print_header "10. UPS STATUS"
@@ -214,25 +214,25 @@ GPU_DATA=$(curl -s "${API_BASE}/gpu")
 echo "$GPU_DATA" | jq '.' 2>/dev/null || echo "$GPU_DATA"
 
 print_test "Comparing with actual GPU state"
-$SSH_CMD "lspci | grep -i vga"
-$SSH_CMD "nvidia-smi 2>/dev/null || echo 'nvidia-smi not available'"
+eval "$SSH_CMD 'lspci | grep -i vga'"
+eval "$SSH_CMD 'nvidia-smi 2>/dev/null || echo \"nvidia-smi not available\"'"
 
 # Performance monitoring
 print_header "12. PERFORMANCE MONITORING"
 print_test "Monitoring resource usage"
 print_info "Initial resource usage:"
-$SSH_CMD "ps aux | grep unraid-management-agent | grep -v grep | awk '{print \"CPU: \"\$3\"% MEM: \"\$4\"% RSS: \"\$6\" KB\"}'"
+eval "$SSH_CMD 'ps aux | grep unraid-management-agent | grep -v grep | awk '\"'\"'{print \"CPU: \"\$3\"% MEM: \"\$4\"% RSS: \"\$6\" KB\"}'\"'\"''"
 
 print_info "Waiting 10 seconds to check for stability..."
 sleep 10
 
 print_info "Resource usage after 10 seconds:"
-$SSH_CMD "ps aux | grep unraid-management-agent | grep -v grep | awk '{print \"CPU: \"\$3\"% MEM: \"\$4\"% RSS: \"\$6\" KB\"}'"
+eval "$SSH_CMD 'ps aux | grep unraid-management-agent | grep -v grep | awk '\"'\"'{print \"CPU: \"\$3\"% MEM: \"\$4\"% RSS: \"\$6\" KB\"}'\"'\"''"
 
 # Check logs for errors
 print_header "13. LOG ANALYSIS"
 print_test "Checking logs for errors"
-$SSH_CMD "tail -50 /var/log/unraid-management-agent.log" || print_info "Log file not found or empty"
+eval "$SSH_CMD 'tail -50 /var/log/unraid-management-agent.log'" || print_info "Log file not found or empty"
 
 # Summary
 print_header "VALIDATION SUMMARY"

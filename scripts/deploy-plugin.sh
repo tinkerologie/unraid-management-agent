@@ -160,17 +160,34 @@ echo \"Checking required files:\"
 '"
 echo ""
 
-# Step 11: Start the service
-echo "Step 11: Starting service..."
+# Step 11: Create default configuration if needed
+echo "Step 11: Creating default configuration..."
 eval "$SSH_CMD '
-nohup /usr/local/emhttp/plugins/${PLUGIN_NAME}/${PLUGIN_NAME} --port 8043 boot > /dev/null 2>&1 &
+mkdir -p /boot/config/plugins/${PLUGIN_NAME}
+if [ ! -f /boot/config/plugins/${PLUGIN_NAME}/config.cfg ]; then
+    cat > /boot/config/plugins/${PLUGIN_NAME}/config.cfg << EOF
+PORT=8043
+LOG_LEVEL=info
+AUTOSTART=yes
+EOF
+    echo \"✅ Default configuration created\"
+else
+    echo \"✅ Configuration file already exists\"
+fi
+'"
+echo ""
+
+# Step 12: Start the service using the start script
+echo "Step 12: Starting service..."
+eval "$SSH_CMD '
+/usr/local/emhttp/plugins/${PLUGIN_NAME}/scripts/start
 '"
 sleep 3
 echo "✅ Service started"
 echo ""
 
-# Step 12: Verify service is running
-echo "Step 12: Verifying service status..."
+# Step 13: Verify service is running
+echo "Step 13: Verifying service status..."
 if eval "$SSH_CMD 'pidof ${PLUGIN_NAME}'" > /dev/null 2>&1; then
     PID=$(eval "$SSH_CMD 'pidof ${PLUGIN_NAME}'")
     echo "✅ Service is running (PID: $PID)"
@@ -180,8 +197,8 @@ else
 fi
 echo ""
 
-# Step 13: Test API endpoints
-echo "Step 13: Testing API endpoints..."
+# Step 14: Test API endpoints
+echo "Step 14: Testing API endpoints..."
 echo "----------------------------------------"
 
 # Wait a moment for API to be ready
