@@ -70,12 +70,12 @@ Coordinates the entire application lifecycle:
 
 1. Download the latest release package:
    ```bash
-   wget https://github.com/domalab/unraid-management-agent/releases/latest/unraid-management-agent-2025.10.03.tgz
+   wget https://github.com/domalab/unraid-management-agent/releases/latest/unraid-management-agent-2025.11.0.tgz
    ```
 
 2. Extract and install:
    ```bash
-   tar xzf unraid-management-agent-2025.10.03.tgz -C /
+   tar xzf unraid-management-agent-2025.11.0.tgz -C /
    ```
 
 3. Start the service:
@@ -99,6 +99,35 @@ make release
 # Create plugin package
 make package
 ```
+
+## System Compatibility
+
+**Important Notice:** This plugin was developed and tested on a specific Unraid system configuration. While we strive for broad compatibility, **there is a possibility that the plugin may not function correctly on all hardware configurations** due to variations in:
+
+- **CPU Architectures**: Different CPU models, instruction sets, and architectures (Intel vs AMD, different generations)
+- **Disk Controllers and Storage Devices**: Various RAID controllers, HBA cards, SAS/SATA controllers, NVMe configurations
+- **GPU Models and Drivers**: Different GPU vendors (NVIDIA, AMD, Intel), driver versions, and passthrough configurations
+- **Network Interfaces**: Various network cards, bonding configurations, VLANs, and bridge setups
+- **UPS Models and Monitoring Tools**: Different UPS brands, monitoring software (apcupsd, nut), and communication protocols
+- **Docker and VM Configurations**: Different Docker versions, libvirt configurations, and virtualization setups
+
+### What This Means for You
+
+- ✅ **If it works on your system**: Great! The plugin should continue to work reliably.
+- ⚠️ **If you encounter issues**: This is likely due to hardware/configuration differences. See the [Contributing](#contributing) section below for how you can help improve compatibility.
+- 🔧 **Debugging across different hardware**: As a single maintainer, it's challenging to test and debug across all possible hardware configurations. Community contributions are essential for broader compatibility.
+
+### Tested Configuration
+
+This plugin has been developed and tested on the following configuration:
+
+- **Unraid Version**: 6.x
+- **Plugin Version**: 2025.11.0
+- **Test System**: Unraid server "Cube"
+- **Architecture**: Linux/amd64
+- **Primary Testing**: REST API endpoints, WebSocket events, Docker/VM control operations
+
+**Note:** This configuration represents the primary development and testing environment. Your mileage may vary on different hardware setups.
 
 ## Usage
 
@@ -324,14 +353,68 @@ If endpoints return empty or default data:
 
 ## Contributing
 
-Contributions are welcome! Please:
+Contributions are welcome and greatly appreciated! This project benefits from community involvement, especially for improving hardware compatibility across different Unraid configurations.
+
+### How to Contribute
+
+#### General Contributions
 
 1. Fork the repository
-2. Create a feature branch
+2. Create a feature branch (`git checkout -b feature/your-feature-name`)
 3. Commit your changes with descriptive messages
 4. Add tests for new functionality
 5. Ensure all tests pass: `make test`
-6. Submit a pull request
+6. Submit a pull request with a clear description of your changes
+
+#### Hardware Compatibility Contributions
+
+**Encountered compatibility issues on your system?** You can help improve the plugin for everyone!
+
+If the plugin doesn't work correctly on your hardware configuration:
+
+1. **Fork the Repository**: Create your own fork to work on fixes
+2. **Identify the Issue**: Determine which component is failing (disk detection, GPU metrics, UPS monitoring, etc.)
+3. **Make Necessary Changes**: Modify the code to support your hardware configuration
+   - Update collectors in `daemon/services/collectors/` for data collection issues
+   - Update parsers in `daemon/lib/` for command output parsing issues
+   - Add fallback logic for different hardware variations
+4. **Test Thoroughly**: Ensure your changes work on your system and don't break existing functionality
+   - Run the full test suite: `make test`
+   - Test all affected API endpoints
+   - Verify WebSocket events are working correctly
+5. **Document Your Changes**: In your pull request, include:
+   - **Hardware Configuration**: CPU model, disk controllers, GPU model, UPS model, etc.
+   - **Issue Description**: What wasn't working and why
+   - **Solution Implemented**: How your changes fix the issue
+   - **Testing Performed**: What you tested and the results
+   - **Unraid Version**: Your Unraid version number
+
+**Example PR Description:**
+```
+Hardware: AMD Ryzen 9 5950X, LSI 9300-8i HBA, NVIDIA RTX 3080
+Issue: GPU temperature not detected due to different nvidia-smi output format
+Solution: Added parsing for alternative nvidia-smi XML format
+Testing: Verified GPU metrics endpoint returns correct data, all tests pass
+Unraid Version: 6.12.4
+```
+
+### Why Community Contributions Matter
+
+As a single maintainer, it's challenging to:
+- Test across all possible hardware configurations
+- Debug issues on systems I don't have access to
+- Support every variation of disk controllers, GPUs, UPS models, etc.
+
+**Your contributions help make this plugin work for everyone!** Even small fixes for specific hardware configurations are valuable and appreciated.
+
+### Areas Where Contributions Are Especially Helpful
+
+- 🔧 **Hardware-Specific Fixes**: Support for different disk controllers, GPU models, UPS brands
+- 📊 **Data Collection Improvements**: Better parsing of system commands for different hardware
+- 🧪 **Testing**: Testing on different Unraid versions and hardware configurations
+- 📝 **Documentation**: Improving docs, adding examples, documenting edge cases
+- 🐛 **Bug Fixes**: Fixing issues you encounter on your system
+- ✨ **New Features**: Adding support for additional hardware or metrics
 
 ## License
 
