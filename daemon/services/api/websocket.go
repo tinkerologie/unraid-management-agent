@@ -1,14 +1,15 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"sync"
 	"time"
 
+	"github.com/domalab/unraid-management-agent/daemon/common"
+	"github.com/domalab/unraid-management-agent/daemon/dto"
+	"github.com/domalab/unraid-management-agent/daemon/logger"
 	"github.com/gorilla/websocket"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/common"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/dto"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/logger"
 )
 
 var upgrader = websocket.Upgrader{
@@ -40,9 +41,20 @@ func NewWSHub() *WSHub {
 	}
 }
 
-func (h *WSHub) Run() {
+func (h *WSHub) Run(ctx context.Context) {
 	for {
 		select {
+		case <-ctx.Done():
+			logger.Info("WebSocket hub stopping due to context cancellation")
+			// Close all client connections
+			h.mu.Lock()
+			for client := range h.clients {
+				close(client.send)
+				delete(h.clients, client)
+			}
+			h.mu.Unlock()
+			return
+
 		case client := <-h.register:
 			h.mu.Lock()
 			h.clients[client] = true
@@ -105,14 +117,19 @@ func (c *WSClient) writePump() {
 	ticker := time.NewTicker(time.Duration(common.WSPingInterval) * time.Second)
 	defer func() {
 		ticker.Stop()
-		c.conn.Close()
+		if err := c.conn.Close(); err != nil {
+			logger.Debug("Error closing WebSocket connection in writePump: %v", err)
+		}
 	}()
 
 	for {
 		select {
 		case event, ok := <-c.send:
 			if !ok {
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				// Channel closed, send close message
+				if err := c.conn.WriteMessage(websocket.CloseMessage, []byte{}); err != nil {
+					logger.Debug("Error writing close message: %v", err)
+				}
 				return
 			}
 
@@ -131,12 +148,19 @@ func (c *WSClient) writePump() {
 func (c *WSClient) readPump() {
 	defer func() {
 		c.hub.unregister <- c
-		c.conn.Close()
+		if err := c.conn.Close(); err != nil {
+			logger.Debug("Error closing WebSocket connection in readPump: %v", err)
+		}
 	}()
 
-	c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	if err := c.conn.SetReadDeadline(time.Now().Add(60 * time.Second)); err != nil {
+		logger.Warning("Error setting initial read deadline: %v", err)
+		return
+	}
 	c.conn.SetPongHandler(func(string) error {
-		c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		if err := c.conn.SetReadDeadline(time.Now().Add(60 * time.Second)); err != nil {
+			logger.Debug("Error setting read deadline in pong handler: %v", err)
+		}
 		return nil
 	})
 

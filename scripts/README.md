@@ -64,25 +64,25 @@ Deploy the agent binary to your Unraid server.
 
 ---
 
-### `deploy-plugin-with-icon-fix.sh`
+### `deploy-plugin.sh`
 
-Build and deploy the complete plugin package including icon fix.
+Build and deploy the complete plugin package.
 
 **Usage**:
 ```bash
-./scripts/deploy-plugin-with-icon-fix.sh [unraid_ip] [password] [backup]
+./scripts/deploy-plugin.sh [unraid_ip] [password] [backup]
 ```
 
 **Examples**:
 ```bash
 # Use credentials from config.sh
-./scripts/deploy-plugin-with-icon-fix.sh
+./scripts/deploy-plugin.sh
 
 # Override IP and password
-./scripts/deploy-plugin-with-icon-fix.sh 192.168.1.100 mypassword
+./scripts/deploy-plugin.sh 192.168.1.100 mypassword
 
 # Create backup before deployment
-./scripts/deploy-plugin-with-icon-fix.sh 192.168.1.100 mypassword yes
+./scripts/deploy-plugin.sh 192.168.1.100 mypassword yes
 ```
 
 **Features**:

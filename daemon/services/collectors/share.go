@@ -2,15 +2,16 @@ package collectors
 
 import (
 	"bufio"
+	"context"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/ruaandeysel/unraid-management-agent/daemon/common"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/domain"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/dto"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/logger"
+	"github.com/domalab/unraid-management-agent/daemon/common"
+	"github.com/domalab/unraid-management-agent/daemon/domain"
+	"github.com/domalab/unraid-management-agent/daemon/dto"
+	"github.com/domalab/unraid-management-agent/daemon/logger"
 )
 
 type ShareCollector struct {
@@ -21,7 +22,7 @@ func NewShareCollector(ctx *domain.Context) *ShareCollector {
 	return &ShareCollector{ctx: ctx}
 }
 
-func (c *ShareCollector) Start(interval time.Duration) {
+func (c *ShareCollector) Start(ctx context.Context, interval time.Duration) {
 	logger.Info("Starting share collector (interval: %v)", interval)
 
 	// Run once immediately with panic recovery
@@ -37,15 +38,21 @@ func (c *ShareCollector) Start(interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					logger.Error("Share collector PANIC in loop: %v", r)
-				}
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Info("Share collector stopping due to context cancellation")
+			return
+		case <-ticker.C:
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Error("Share collector PANIC in loop: %v", r)
+					}
+				}()
+				c.Collect()
 			}()
-			c.Collect()
-		}()
+		}
 	}
 }
 
@@ -75,7 +82,11 @@ func (c *ShareCollector) collectShares() ([]dto.ShareInfo, error) {
 		logger.Error("Share: Failed to open file: %v", err)
 		return nil, err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			logger.Debug("Error closing share file: %v", err)
+		}
+	}()
 	logger.Debug("Share: File opened successfully")
 
 	scanner := bufio.NewScanner(file)

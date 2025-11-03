@@ -2,16 +2,17 @@ package collectors
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/ruaandeysel/unraid-management-agent/daemon/domain"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/dto"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/lib"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/logger"
+	"github.com/domalab/unraid-management-agent/daemon/domain"
+	"github.com/domalab/unraid-management-agent/daemon/dto"
+	"github.com/domalab/unraid-management-agent/daemon/lib"
+	"github.com/domalab/unraid-management-agent/daemon/logger"
 )
 
 type NetworkCollector struct {
@@ -22,9 +23,9 @@ func NewNetworkCollector(ctx *domain.Context) *NetworkCollector {
 	return &NetworkCollector{ctx: ctx}
 }
 
-func (c *NetworkCollector) Start(interval time.Duration) {
+func (c *NetworkCollector) Start(ctx context.Context, interval time.Duration) {
 	logger.Info("Starting network collector (interval: %v)", interval)
-	
+
 	// Run once immediately with panic recovery
 	func() {
 		defer func() {
@@ -34,19 +35,25 @@ func (c *NetworkCollector) Start(interval time.Duration) {
 		}()
 		c.Collect()
 	}()
-	
+
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					logger.Error("Network collector PANIC in loop: %v", r)
-				}
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Info("Network collector stopping due to context cancellation")
+			return
+		case <-ticker.C:
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Error("Network collector PANIC in loop: %v", r)
+					}
+				}()
+				c.Collect()
 			}()
-			c.Collect()
-		}()
+		}
 	}
 }
 
@@ -128,7 +135,11 @@ func (c *NetworkCollector) parseNetDev() (map[string]netStats, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			logger.Debug("Error closing network stats file: %v", err)
+		}
+	}()
 
 	stats := make(map[string]netStats)
 	scanner := bufio.NewScanner(file)
@@ -166,6 +177,7 @@ func (c *NetworkCollector) parseNetDev() (map[string]netStats, error) {
 
 func (c *NetworkCollector) getMACAddress(ifName string) string {
 	path := fmt.Sprintf("/sys/class/net/%s/address", ifName)
+	//nolint:gosec // G304: Path is constructed from /sys/class/net system directory, ifName from trusted source
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return ""
@@ -197,6 +209,7 @@ func (c *NetworkCollector) getIPAddress(ifName string) string {
 
 func (c *NetworkCollector) getLinkSpeed(ifName string) int {
 	path := fmt.Sprintf("/sys/class/net/%s/speed", ifName)
+	//nolint:gosec // G304: Path is constructed from /sys/class/net system directory, ifName from trusted source
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return 0
@@ -211,6 +224,7 @@ func (c *NetworkCollector) getLinkSpeed(ifName string) int {
 
 func (c *NetworkCollector) getOperState(ifName string) string {
 	path := fmt.Sprintf("/sys/class/net/%s/operstate", ifName)
+	//nolint:gosec // G304: Path is constructed from /sys/class/net system directory, ifName from trusted source
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "unknown"

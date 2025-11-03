@@ -2,16 +2,17 @@ package collectors
 
 import (
 	"bufio"
+	"context"
 	"os"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
-	"github.com/ruaandeysel/unraid-management-agent/daemon/common"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/domain"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/dto"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/logger"
+	"github.com/domalab/unraid-management-agent/daemon/common"
+	"github.com/domalab/unraid-management-agent/daemon/domain"
+	"github.com/domalab/unraid-management-agent/daemon/dto"
+	"github.com/domalab/unraid-management-agent/daemon/logger"
 )
 
 type DiskCollector struct {
@@ -22,7 +23,7 @@ func NewDiskCollector(ctx *domain.Context) *DiskCollector {
 	return &DiskCollector{ctx: ctx}
 }
 
-func (c *DiskCollector) Start(interval time.Duration) {
+func (c *DiskCollector) Start(ctx context.Context, interval time.Duration) {
 	logger.Info("Starting disk collector (interval: %v)", interval)
 
 	// Run once immediately with panic recovery
@@ -38,15 +39,21 @@ func (c *DiskCollector) Start(interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					logger.Error("Disk collector PANIC in loop: %v", r)
-				}
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Info("Disk collector stopping due to context cancellation")
+			return
+		case <-ticker.C:
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Error("Disk collector PANIC in loop: %v", r)
+					}
+				}()
+				c.Collect()
 			}()
-			c.Collect()
-		}()
+		}
 	}
 }
 
@@ -76,7 +83,11 @@ func (c *DiskCollector) collectDisks() ([]dto.DiskInfo, error) {
 		logger.Error("Disk: Failed to open file: %v", err)
 		return nil, err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			logger.Debug("Error closing disk file: %v", err)
+		}
+	}()
 	logger.Debug("Disk: File opened successfully")
 
 	scanner := bufio.NewScanner(file)
@@ -187,6 +198,7 @@ func (c *DiskCollector) enrichWithIOStats(disk *dto.DiskInfo) {
 
 	// Read from /sys/block/{device}/stat
 	statPath := "/sys/block/" + disk.Device + "/stat"
+	//nolint:gosec // G304: Path is constructed from /sys/block system directory, device name from trusted source
 	data, err := os.ReadFile(statPath)
 	if err != nil {
 		return // Device might be spun down or not available

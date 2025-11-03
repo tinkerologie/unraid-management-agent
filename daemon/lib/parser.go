@@ -1,3 +1,4 @@
+// Package lib provides utility functions for parsing, validation, and shell command execution.
 package lib
 
 import (

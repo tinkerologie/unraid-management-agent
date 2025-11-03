@@ -1,6 +1,7 @@
 package collectors
 
 import (
+	"context"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -9,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ruaandeysel/unraid-management-agent/daemon/domain"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/dto"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/lib"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/logger"
+	"github.com/domalab/unraid-management-agent/daemon/domain"
+	"github.com/domalab/unraid-management-agent/daemon/dto"
+	"github.com/domalab/unraid-management-agent/daemon/lib"
+	"github.com/domalab/unraid-management-agent/daemon/logger"
 )
 
 type GPUCollector struct {
@@ -23,13 +24,19 @@ func NewGPUCollector(ctx *domain.Context) *GPUCollector {
 	return &GPUCollector{ctx: ctx}
 }
 
-func (c *GPUCollector) Start(interval time.Duration) {
+func (c *GPUCollector) Start(ctx context.Context, interval time.Duration) {
 	logger.Info("Starting gpu collector (interval: %v)", interval)
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		c.Collect()
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Info("GPU collector stopping due to context cancellation")
+			return
+		case <-ticker.C:
+			c.Collect()
+		}
 	}
 }
 
@@ -76,11 +83,10 @@ func (c *GPUCollector) Collect() {
 	logger.Debug("Published gpu_metrics_update event for %d total GPU(s)", len(gpuMetrics))
 }
 
-
 // Intel GPU collection using intel_gpu_top
 func (c *GPUCollector) collectIntelGPU() ([]*dto.GPUMetrics, error) {
 	logger.Debug("Intel GPU: Starting Intel GPU detection")
-	
+
 	// First check if Intel GPU exists using lspci
 	output, err := lib.ExecCommandOutput("lspci", "-Dmm")
 	if err != nil {
@@ -89,7 +95,7 @@ func (c *GPUCollector) collectIntelGPU() ([]*dto.GPUMetrics, error) {
 	}
 
 	logger.Debug("Intel GPU: Got lspci output, searching for Intel VGA")
-	
+
 	// Look for Intel GPU in lspci output
 	var intelGPUID string
 	var intelGPUModel string
@@ -145,7 +151,7 @@ func (c *GPUCollector) collectIntelGPU() ([]*dto.GPUMetrics, error) {
 		logger.Debug("Intel GPU: intel_gpu_top command not found")
 		return nil, fmt.Errorf("intel_gpu_top not found")
 	}
-	
+
 	logger.Debug("Intel GPU: intel_gpu_top found, checking driver")
 
 	logger.Debug("Intel GPU: Running intel_gpu_top...")
@@ -169,17 +175,17 @@ func (c *GPUCollector) collectIntelGPU() ([]*dto.GPUMetrics, error) {
 	// Just find the first complete JSON object
 	stdout := strings.TrimSpace(cmdOutput)
 	logger.Debug("Intel GPU: Got %d bytes of output", len(stdout))
-	
+
 	// Remove array brackets and clean up newlines/tabs
 	stdout = strings.ReplaceAll(stdout, "\n", "")
 	stdout = strings.ReplaceAll(stdout, "\t", "")
-	
+
 	// Find the first { and match its closing }
 	startIdx := strings.Index(stdout, "{")
 	if startIdx == -1 {
 		return nil, fmt.Errorf("no JSON object found in output")
 	}
-	
+
 	// Simple brace matching to find the complete first JSON object
 	braceCount := 0
 	endIdx := -1
@@ -194,21 +200,21 @@ func (c *GPUCollector) collectIntelGPU() ([]*dto.GPUMetrics, error) {
 			}
 		}
 	}
-	
+
 	if endIdx == -1 {
 		return nil, fmt.Errorf("incomplete JSON object in output")
 	}
-	
+
 	sampleJSON := stdout[startIdx:endIdx]
 	logger.Debug("Intel GPU: Extracted JSON object of %d chars", len(sampleJSON))
-	
+
 	// Parse the sample
 	var intelData map[string]interface{}
 	if err := json.Unmarshal([]byte(sampleJSON), &intelData); err != nil {
 		logger.Debug("Intel GPU: Failed to parse sample: %v", err)
 		return nil, fmt.Errorf("failed to parse intel_gpu_top JSON: %w", err)
 	}
-	
+
 	logger.Debug("Intel GPU: Successfully parsed sample")
 
 	gpu := &dto.GPUMetrics{

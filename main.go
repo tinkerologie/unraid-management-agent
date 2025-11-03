@@ -10,8 +10,8 @@ import (
 	"github.com/cskr/pubsub"
 	"gopkg.in/natefinch/lumberjack.v2"
 
-	"github.com/ruaandeysel/unraid-management-agent/daemon/cmd"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/domain"
+	"github.com/domalab/unraid-management-agent/daemon/cmd"
+	"github.com/domalab/unraid-management-agent/daemon/domain"
 )
 
 var Version string = "dev"

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ruaandeysel/unraid-management-agent/daemon/dto"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/logger"
+	"github.com/domalab/unraid-management-agent/daemon/dto"
+	"github.com/domalab/unraid-management-agent/daemon/logger"
 )
 
 const parityLogPath = "/boot/config/parity-checks.log"
@@ -37,7 +37,11 @@ func (c *ParityCollector) GetParityHistory() (*dto.ParityCheckHistory, error) {
 		}
 		return nil, fmt.Errorf("failed to open parity log: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			logger.Debug("Error closing parity log file: %v", err)
+		}
+	}()
 
 	var records []dto.ParityCheckRecord
 	scanner := bufio.NewScanner(file)

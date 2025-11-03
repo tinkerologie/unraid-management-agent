@@ -95,4 +95,3 @@ func ValidateMaxLength(value, fieldName string, maxLength int) error {
 	}
 	return nil
 }
-

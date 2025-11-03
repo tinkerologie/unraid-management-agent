@@ -1,4 +1,4 @@
-module github.com/ruaandeysel/unraid-management-agent
+module github.com/domalab/unraid-management-agent
 
 go 1.23
 

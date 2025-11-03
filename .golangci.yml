@@ -1,0 +1,77 @@
+version: 2
+
+linters:
+  enable:
+    # Mandatory linters from project rules
+    # Note: gosimple is now part of staticcheck in golangci-lint v2.x
+    - errcheck      # Check for unchecked errors
+    - govet         # Report suspicious constructs
+    - ineffassign   # Detect ineffectual assignments
+    - staticcheck   # Advanced static analysis (includes gosimple)
+    - unused        # Check for unused constants, variables, functions, and types
+    - misspell      # Find commonly misspelled English words
+    - revive        # Fast, configurable, extensible, flexible, and beautiful linter for Go
+
+    # Recommended additional linters
+    - gocritic      # Comprehensive Go source code linter
+    - gocyclo       # Detect cyclomatic complexity
+    - dupl          # Detect code duplication
+    - gosec         # Inspect source code for security problems
+    - unconvert     # Remove unnecessary type conversions
+
+formatters:
+  enable:
+    - gofmt         # Verify code is formatted with gofmt
+    - goimports     # Verify imports are formatted correctly
+
+linters-settings:
+  gocyclo:
+    min-complexity: 15
+  
+  errcheck:
+    check-blank: true
+    check-type-assertions: true
+    exclude-functions:
+      # Allow ignoring Close() errors in defer statements
+      - (io.Closer).Close
+  
+  govet:
+    enable-all: true
+  
+  revive:
+    rules:
+      - name: exported
+        severity: warning
+      - name: package-comments
+        severity: warning
+  
+  gosec:
+    excludes:
+      # G204: Subprocess launched with variable - expected for shell execution lib
+      - G204
+      # G304: File path provided as taint input - expected for config file reading
+      - G304
+
+run:
+  timeout: 5m
+  tests: true
+  skip-dirs:
+    - build
+    - scripts
+    - tests
+  skip-files:
+    - ".*_test\\.go$"
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-use-default: false
+  
+  # Exclude some linters from running on tests files
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+        - dupl
+        - gosec
+

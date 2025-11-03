@@ -1,3 +1,4 @@
+// Package api provides HTTP REST API handlers and WebSocket functionality for the Unraid Management Agent.
 package api
 
 import (
@@ -6,12 +7,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/domalab/unraid-management-agent/daemon/dto"
+	"github.com/domalab/unraid-management-agent/daemon/lib"
+	"github.com/domalab/unraid-management-agent/daemon/logger"
+	"github.com/domalab/unraid-management-agent/daemon/services/collectors"
+	"github.com/domalab/unraid-management-agent/daemon/services/controllers"
 	"github.com/gorilla/mux"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/dto"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/lib"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/logger"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/services/collectors"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/services/controllers"
 )
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -220,14 +221,16 @@ func (s *Server) handleNetwork(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, interfaces)
 }
 
-// Docker control handlers
-func (s *Server) handleDockerStart(w http.ResponseWriter, r *http.Request) {
+// Generic Docker operation handler to reduce code duplication
+//
+//nolint:dupl // Similar to handleVMOperation but serves different purpose (Docker vs VM)
+func (s *Server) handleDockerOperation(w http.ResponseWriter, r *http.Request, operation string, operationFunc func(string) error) {
 	vars := mux.Vars(r)
 	containerID := vars["id"]
 
 	// Validate container ID format
 	if err := lib.ValidateContainerID(containerID); err != nil {
-		logger.Warning("Invalid container ID for start operation: %s - %v", containerID, err)
+		logger.Warning("Invalid container ID for %s operation: %s - %v", operation, containerID, err)
 		respondJSON(w, http.StatusBadRequest, dto.Response{
 			Success:   false,
 			Message:   err.Error(),
@@ -236,14 +239,13 @@ func (s *Server) handleDockerStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger.Info("Starting container %s", containerID)
+	logger.Info("%s container %s", operation, containerID)
 
-	controller := controllers.NewDockerController()
-	if err := controller.Start(containerID); err != nil {
-		logger.Error("Failed to start container %s: %v", containerID, err)
+	if err := operationFunc(containerID); err != nil {
+		logger.Error("Failed to %s container %s: %v", operation, containerID, err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to start container: %v", err),
+			Message:   fmt.Sprintf("Failed to %s container: %v", operation, err),
 			Timestamp: time.Now(),
 		})
 		return
@@ -251,395 +253,108 @@ func (s *Server) handleDockerStart(w http.ResponseWriter, r *http.Request) {
 
 	respondJSON(w, http.StatusOK, dto.Response{
 		Success:   true,
-		Message:   "Container started",
+		Message:   fmt.Sprintf("Container %s", operation),
 		Timestamp: time.Now(),
 	})
+}
+
+// Generic VM operation handler to reduce code duplication
+//
+//nolint:dupl // Similar to handleDockerOperation but serves different purpose (VM vs Docker)
+func (s *Server) handleVMOperation(w http.ResponseWriter, r *http.Request, operation string, operationFunc func(string) error) {
+	vars := mux.Vars(r)
+	vmName := vars["name"]
+
+	// Validate VM name format
+	if err := lib.ValidateVMName(vmName); err != nil {
+		logger.Warning("Invalid VM name for %s operation: %s - %v", operation, vmName, err)
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   err.Error(),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	logger.Info("%s VM %s", operation, vmName)
+
+	if err := operationFunc(vmName); err != nil {
+		logger.Error("Failed to %s VM %s: %v", operation, vmName, err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to %s VM: %v", operation, err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   fmt.Sprintf("VM %s", operation),
+		Timestamp: time.Now(),
+	})
+}
+
+// Docker control handlers
+func (s *Server) handleDockerStart(w http.ResponseWriter, r *http.Request) {
+	controller := controllers.NewDockerController()
+	s.handleDockerOperation(w, r, "started", controller.Start)
 }
 
 func (s *Server) handleDockerStop(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	containerID := vars["id"]
-
-	// Validate container ID format
-	if err := lib.ValidateContainerID(containerID); err != nil {
-		logger.Warning("Invalid container ID for stop operation: %s - %v", containerID, err)
-		respondJSON(w, http.StatusBadRequest, dto.Response{
-			Success:   false,
-			Message:   err.Error(),
-			Timestamp: time.Now(),
-		})
-		return
-	}
-
-	logger.Info("Stopping container %s", containerID)
-
 	controller := controllers.NewDockerController()
-	if err := controller.Stop(containerID); err != nil {
-		logger.Error("Failed to stop container %s: %v", containerID, err)
-		respondJSON(w, http.StatusInternalServerError, dto.Response{
-			Success:   false,
-			Message:   fmt.Sprintf("Failed to stop container: %v", err),
-			Timestamp: time.Now(),
-		})
-		return
-	}
-
-	respondJSON(w, http.StatusOK, dto.Response{
-		Success:   true,
-		Message:   "Container stopped",
-		Timestamp: time.Now(),
-	})
+	s.handleDockerOperation(w, r, "stopped", controller.Stop)
 }
 
 func (s *Server) handleDockerRestart(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	containerID := vars["id"]
-
-	// Validate container ID format
-	if err := lib.ValidateContainerID(containerID); err != nil {
-		logger.Warning("Invalid container ID for restart operation: %s - %v", containerID, err)
-		respondJSON(w, http.StatusBadRequest, dto.Response{
-			Success:   false,
-			Message:   err.Error(),
-			Timestamp: time.Now(),
-		})
-		return
-	}
-
-	logger.Info("Restarting container %s", containerID)
-
 	controller := controllers.NewDockerController()
-	if err := controller.Restart(containerID); err != nil {
-		logger.Error("Failed to restart container %s: %v", containerID, err)
-		respondJSON(w, http.StatusInternalServerError, dto.Response{
-			Success:   false,
-			Message:   fmt.Sprintf("Failed to restart container: %v", err),
-			Timestamp: time.Now(),
-		})
-		return
-	}
-
-	respondJSON(w, http.StatusOK, dto.Response{
-		Success:   true,
-		Message:   "Container restarted",
-		Timestamp: time.Now(),
-	})
+	s.handleDockerOperation(w, r, "restarted", controller.Restart)
 }
 
 func (s *Server) handleDockerPause(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	containerID := vars["id"]
-
-	// Validate container ID format
-	if err := lib.ValidateContainerID(containerID); err != nil {
-		logger.Warning("Invalid container ID for pause operation: %s - %v", containerID, err)
-		respondJSON(w, http.StatusBadRequest, dto.Response{
-			Success:   false,
-			Message:   err.Error(),
-			Timestamp: time.Now(),
-		})
-		return
-	}
-
-	logger.Info("Pausing container %s", containerID)
-
 	controller := controllers.NewDockerController()
-	if err := controller.Pause(containerID); err != nil {
-		logger.Error("Failed to pause container %s: %v", containerID, err)
-		respondJSON(w, http.StatusInternalServerError, dto.Response{
-			Success:   false,
-			Message:   fmt.Sprintf("Failed to pause container: %v", err),
-			Timestamp: time.Now(),
-		})
-		return
-	}
-
-	respondJSON(w, http.StatusOK, dto.Response{
-		Success:   true,
-		Message:   "Container paused",
-		Timestamp: time.Now(),
-	})
+	s.handleDockerOperation(w, r, "paused", controller.Pause)
 }
 
 func (s *Server) handleDockerUnpause(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	containerID := vars["id"]
-
-	// Validate container ID format
-	if err := lib.ValidateContainerID(containerID); err != nil {
-		logger.Warning("Invalid container ID for unpause operation: %s - %v", containerID, err)
-		respondJSON(w, http.StatusBadRequest, dto.Response{
-			Success:   false,
-			Message:   err.Error(),
-			Timestamp: time.Now(),
-		})
-		return
-	}
-
-	logger.Info("Unpausing container %s", containerID)
-
 	controller := controllers.NewDockerController()
-	if err := controller.Unpause(containerID); err != nil {
-		logger.Error("Failed to unpause container %s: %v", containerID, err)
-		respondJSON(w, http.StatusInternalServerError, dto.Response{
-			Success:   false,
-			Message:   fmt.Sprintf("Failed to unpause container: %v", err),
-			Timestamp: time.Now(),
-		})
-		return
-	}
-
-	respondJSON(w, http.StatusOK, dto.Response{
-		Success:   true,
-		Message:   "Container unpaused",
-		Timestamp: time.Now(),
-	})
+	s.handleDockerOperation(w, r, "unpaused", controller.Unpause)
 }
 
 // VM control handlers
 func (s *Server) handleVMStart(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	vmName := vars["id"]
-
-	// Validate VM name format
-	if err := lib.ValidateVMName(vmName); err != nil {
-		logger.Warning("Invalid VM name for start operation: %s - %v", vmName, err)
-		respondJSON(w, http.StatusBadRequest, dto.Response{
-			Success:   false,
-			Message:   err.Error(),
-			Timestamp: time.Now(),
-		})
-		return
-	}
-
-	logger.Info("Starting VM %s", vmName)
-
 	controller := controllers.NewVMController()
-	if err := controller.Start(vmName); err != nil {
-		logger.Error("Failed to start VM %s: %v", vmName, err)
-		respondJSON(w, http.StatusInternalServerError, dto.Response{
-			Success:   false,
-			Message:   fmt.Sprintf("Failed to start VM: %v", err),
-			Timestamp: time.Now(),
-		})
-		return
-	}
-
-	respondJSON(w, http.StatusOK, dto.Response{
-		Success:   true,
-		Message:   "VM started",
-		Timestamp: time.Now(),
-	})
+	s.handleVMOperation(w, r, "started", controller.Start)
 }
 
 func (s *Server) handleVMStop(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	vmName := vars["id"]
-
-	// Validate VM name format
-	if err := lib.ValidateVMName(vmName); err != nil {
-		logger.Warning("Invalid VM name for stop operation: %s - %v", vmName, err)
-		respondJSON(w, http.StatusBadRequest, dto.Response{
-			Success:   false,
-			Message:   err.Error(),
-			Timestamp: time.Now(),
-		})
-		return
-	}
-
-	logger.Info("Stopping VM %s", vmName)
-
 	controller := controllers.NewVMController()
-	if err := controller.Stop(vmName); err != nil {
-		logger.Error("Failed to stop VM %s: %v", vmName, err)
-		respondJSON(w, http.StatusInternalServerError, dto.Response{
-			Success:   false,
-			Message:   fmt.Sprintf("Failed to stop VM: %v", err),
-			Timestamp: time.Now(),
-		})
-		return
-	}
-
-	respondJSON(w, http.StatusOK, dto.Response{
-		Success:   true,
-		Message:   "VM stopped",
-		Timestamp: time.Now(),
-	})
+	s.handleVMOperation(w, r, "stopped", controller.Stop)
 }
 
 func (s *Server) handleVMRestart(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	vmName := vars["id"]
-
-	// Validate VM name format
-	if err := lib.ValidateVMName(vmName); err != nil {
-		logger.Warning("Invalid VM name for restart operation: %s - %v", vmName, err)
-		respondJSON(w, http.StatusBadRequest, dto.Response{
-			Success:   false,
-			Message:   err.Error(),
-			Timestamp: time.Now(),
-		})
-		return
-	}
-
-	logger.Info("Restarting VM %s", vmName)
-
 	controller := controllers.NewVMController()
-	if err := controller.Restart(vmName); err != nil {
-		logger.Error("Failed to restart VM %s: %v", vmName, err)
-		respondJSON(w, http.StatusInternalServerError, dto.Response{
-			Success:   false,
-			Message:   fmt.Sprintf("Failed to restart VM: %v", err),
-			Timestamp: time.Now(),
-		})
-		return
-	}
-
-	respondJSON(w, http.StatusOK, dto.Response{
-		Success:   true,
-		Message:   "VM restarted",
-		Timestamp: time.Now(),
-	})
+	s.handleVMOperation(w, r, "restarted", controller.Restart)
 }
 
 func (s *Server) handleVMPause(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	vmName := vars["id"]
-
-	// Validate VM name format
-	if err := lib.ValidateVMName(vmName); err != nil {
-		logger.Warning("Invalid VM name for pause operation: %s - %v", vmName, err)
-		respondJSON(w, http.StatusBadRequest, dto.Response{
-			Success:   false,
-			Message:   err.Error(),
-			Timestamp: time.Now(),
-		})
-		return
-	}
-
-	logger.Info("Pausing VM %s", vmName)
-
 	controller := controllers.NewVMController()
-	if err := controller.Pause(vmName); err != nil {
-		logger.Error("Failed to pause VM %s: %v", vmName, err)
-		respondJSON(w, http.StatusInternalServerError, dto.Response{
-			Success:   false,
-			Message:   fmt.Sprintf("Failed to pause VM: %v", err),
-			Timestamp: time.Now(),
-		})
-		return
-	}
-
-	respondJSON(w, http.StatusOK, dto.Response{
-		Success:   true,
-		Message:   "VM paused",
-		Timestamp: time.Now(),
-	})
+	s.handleVMOperation(w, r, "paused", controller.Pause)
 }
 
 func (s *Server) handleVMResume(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	vmName := vars["id"]
-
-	// Validate VM name format
-	if err := lib.ValidateVMName(vmName); err != nil {
-		logger.Warning("Invalid VM name for resume operation: %s - %v", vmName, err)
-		respondJSON(w, http.StatusBadRequest, dto.Response{
-			Success:   false,
-			Message:   err.Error(),
-			Timestamp: time.Now(),
-		})
-		return
-	}
-
-	logger.Info("Resuming VM %s", vmName)
-
 	controller := controllers.NewVMController()
-	if err := controller.Resume(vmName); err != nil {
-		logger.Error("Failed to resume VM %s: %v", vmName, err)
-		respondJSON(w, http.StatusInternalServerError, dto.Response{
-			Success:   false,
-			Message:   fmt.Sprintf("Failed to resume VM: %v", err),
-			Timestamp: time.Now(),
-		})
-		return
-	}
-
-	respondJSON(w, http.StatusOK, dto.Response{
-		Success:   true,
-		Message:   "VM resumed",
-		Timestamp: time.Now(),
-	})
+	s.handleVMOperation(w, r, "resumed", controller.Resume)
 }
 
 func (s *Server) handleVMHibernate(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	vmName := vars["id"]
-
-	// Validate VM name format
-	if err := lib.ValidateVMName(vmName); err != nil {
-		logger.Warning("Invalid VM name for hibernate operation: %s - %v", vmName, err)
-		respondJSON(w, http.StatusBadRequest, dto.Response{
-			Success:   false,
-			Message:   err.Error(),
-			Timestamp: time.Now(),
-		})
-		return
-	}
-
-	logger.Info("Hibernating VM %s", vmName)
-
 	controller := controllers.NewVMController()
-	if err := controller.Hibernate(vmName); err != nil {
-		logger.Error("Failed to hibernate VM %s: %v", vmName, err)
-		respondJSON(w, http.StatusInternalServerError, dto.Response{
-			Success:   false,
-			Message:   fmt.Sprintf("Failed to hibernate VM: %v", err),
-			Timestamp: time.Now(),
-		})
-		return
-	}
-
-	respondJSON(w, http.StatusOK, dto.Response{
-		Success:   true,
-		Message:   "VM hibernated",
-		Timestamp: time.Now(),
-	})
+	s.handleVMOperation(w, r, "hibernated", controller.Hibernate)
 }
 
 func (s *Server) handleVMForceStop(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	vmName := vars["id"]
-
-	// Validate VM name format
-	if err := lib.ValidateVMName(vmName); err != nil {
-		logger.Warning("Invalid VM name for force stop operation: %s - %v", vmName, err)
-		respondJSON(w, http.StatusBadRequest, dto.Response{
-			Success:   false,
-			Message:   err.Error(),
-			Timestamp: time.Now(),
-		})
-		return
-	}
-
-	logger.Info("Force stopping VM %s", vmName)
-
 	controller := controllers.NewVMController()
-	if err := controller.ForceStop(vmName); err != nil {
-		logger.Error("Failed to force stop VM %s: %v", vmName, err)
-		respondJSON(w, http.StatusInternalServerError, dto.Response{
-			Success:   false,
-			Message:   fmt.Sprintf("Failed to force stop VM: %v", err),
-			Timestamp: time.Now(),
-		})
-		return
-	}
-
-	respondJSON(w, http.StatusOK, dto.Response{
-		Success:   true,
-		Message:   "VM force stopped",
-		Timestamp: time.Now(),
-	})
+	s.handleVMOperation(w, r, "force stopped", controller.ForceStop)
 }
 
 // Array control handlers

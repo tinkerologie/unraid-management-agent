@@ -1,16 +1,17 @@
 package collectors
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/ruaandeysel/unraid-management-agent/daemon/domain"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/dto"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/lib"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/logger"
+	"github.com/domalab/unraid-management-agent/daemon/domain"
+	"github.com/domalab/unraid-management-agent/daemon/dto"
+	"github.com/domalab/unraid-management-agent/daemon/lib"
+	"github.com/domalab/unraid-management-agent/daemon/logger"
 )
 
 type DockerCollector struct {
@@ -21,13 +22,19 @@ func NewDockerCollector(ctx *domain.Context) *DockerCollector {
 	return &DockerCollector{ctx: ctx}
 }
 
-func (c *DockerCollector) Start(interval time.Duration) {
+func (c *DockerCollector) Start(ctx context.Context, interval time.Duration) {
 	logger.Info("Starting docker collector (interval: %v)", interval)
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		c.Collect()
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Info("Docker collector stopping due to context cancellation")
+			return
+		case <-ticker.C:
+			c.Collect()
+		}
 	}
 }
 
@@ -73,12 +80,12 @@ func (c *DockerCollector) collectContainers() ([]*dto.ContainerInfo, error) {
 		}
 
 		var psOutput struct {
-			ID      string `json:"ID"`
-			Image   string `json:"Image"`
-			Names   string `json:"Names"`
-			State   string `json:"State"`
-			Status  string `json:"Status"`
-			Ports   string `json:"Ports"`
+			ID     string `json:"ID"`
+			Image  string `json:"Image"`
+			Names  string `json:"Names"`
+			State  string `json:"State"`
+			Status string `json:"Status"`
+			Ports  string `json:"Ports"`
 		}
 
 		if err := json.Unmarshal([]byte(line), &psOutput); err != nil {
@@ -129,10 +136,10 @@ func (c *DockerCollector) getContainerStats(containerID string) (*containerStats
 	}
 
 	var statsOutput struct {
-		CPUPerc   string `json:"CPUPerc"`
-		MemUsage  string `json:"MemUsage"`
-		MemPerc   string `json:"MemPerc"`
-		NetIO     string `json:"NetIO"`
+		CPUPerc  string `json:"CPUPerc"`
+		MemUsage string `json:"MemUsage"`
+		MemPerc  string `json:"MemPerc"`
+		NetIO    string `json:"NetIO"`
 	}
 
 	if err := json.Unmarshal([]byte(strings.TrimSpace(output)), &statsOutput); err != nil {

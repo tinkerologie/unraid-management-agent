@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ruaandeysel/unraid-management-agent/daemon/dto"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/logger"
+	"github.com/domalab/unraid-management-agent/daemon/dto"
+	"github.com/domalab/unraid-management-agent/daemon/logger"
 )
 
 // ConfigCollector collects configuration data
@@ -25,6 +25,7 @@ func (c *ConfigCollector) GetShareConfig(shareName string) (*dto.ShareConfig, er
 	configPath := fmt.Sprintf("/boot/config/shares/%s.cfg", shareName)
 	logger.Debug("Config: Reading share config from %s", configPath)
 
+	//nolint:gosec // G304: Path is constructed from Unraid config directory, shareName is validated
 	file, err := os.Open(configPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -32,7 +33,11 @@ func (c *ConfigCollector) GetShareConfig(shareName string) (*dto.ShareConfig, er
 		}
 		return nil, fmt.Errorf("failed to open share config: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			logger.Debug("Error closing share config file: %v", err)
+		}
+	}()
 
 	config := &dto.ShareConfig{
 		Name:      shareName,
@@ -99,7 +104,11 @@ func (c *ConfigCollector) GetNetworkConfig(interfaceName string) (*dto.NetworkCo
 		}
 		return nil, fmt.Errorf("failed to open network config: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			logger.Debug("Error closing network config file: %v", err)
+		}
+	}()
 
 	config := &dto.NetworkConfig{
 		Interface: interfaceName,
@@ -184,7 +193,11 @@ func (c *ConfigCollector) GetSystemSettings() (*dto.SystemSettings, error) {
 		}
 		return nil, fmt.Errorf("failed to open system config: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			logger.Debug("Error closing system config file: %v", err)
+		}
+	}()
 
 	settings := &dto.SystemSettings{
 		Timestamp: time.Now(),
@@ -245,7 +258,11 @@ func (c *ConfigCollector) GetDockerSettings() (*dto.DockerSettings, error) {
 		}
 		return nil, fmt.Errorf("failed to open Docker config: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			logger.Debug("Error closing Docker config file: %v", err)
+		}
+	}()
 
 	settings := &dto.DockerSettings{
 		Timestamp: time.Now(),
@@ -302,7 +319,11 @@ func (c *ConfigCollector) GetVMSettings() (*dto.VMSettings, error) {
 		}
 		return nil, fmt.Errorf("failed to open VM config: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			logger.Debug("Error closing VM config file: %v", err)
+		}
+	}()
 
 	settings := &dto.VMSettings{
 		DefaultSettings: make(map[string]string),
@@ -361,39 +382,62 @@ func (c *ConfigCollector) UpdateShareConfig(config *dto.ShareConfig) error {
 		}
 	}
 
+	//nolint:gosec // G304: Path is constructed from Unraid config directory, shareName is validated
 	file, err := os.Create(configPath)
 	if err != nil {
 		return fmt.Errorf("failed to create share config: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			logger.Debug("Error closing share config file: %v", err)
+		}
+	}()
 
 	// Write configuration
 	if config.Comment != "" {
-		fmt.Fprintf(file, "shareComment=\"%s\"\n", config.Comment)
+		if _, err := fmt.Fprintf(file, "shareComment=\"%s\"\n", config.Comment); err != nil {
+			return fmt.Errorf("failed to write shareComment: %w", err)
+		}
 	}
 	if config.Allocator != "" {
-		fmt.Fprintf(file, "shareAllocator=\"%s\"\n", config.Allocator)
+		if _, err := fmt.Fprintf(file, "shareAllocator=\"%s\"\n", config.Allocator); err != nil {
+			return fmt.Errorf("failed to write shareAllocator: %w", err)
+		}
 	}
 	if config.Floor != "" {
-		fmt.Fprintf(file, "shareFloor=\"%s\"\n", config.Floor)
+		if _, err := fmt.Fprintf(file, "shareFloor=\"%s\"\n", config.Floor); err != nil {
+			return fmt.Errorf("failed to write shareFloor: %w", err)
+		}
 	}
 	if config.SplitLevel != "" {
-		fmt.Fprintf(file, "shareSplitLevel=\"%s\"\n", config.SplitLevel)
+		if _, err := fmt.Fprintf(file, "shareSplitLevel=\"%s\"\n", config.SplitLevel); err != nil {
+			return fmt.Errorf("failed to write shareSplitLevel: %w", err)
+		}
 	}
 	if len(config.IncludeDisks) > 0 {
-		fmt.Fprintf(file, "shareInclude=\"%s\"\n", strings.Join(config.IncludeDisks, ","))
+		if _, err := fmt.Fprintf(file, "shareInclude=\"%s\"\n", strings.Join(config.IncludeDisks, ",")); err != nil {
+			return fmt.Errorf("failed to write shareInclude: %w", err)
+		}
 	}
 	if len(config.ExcludeDisks) > 0 {
-		fmt.Fprintf(file, "shareExclude=\"%s\"\n", strings.Join(config.ExcludeDisks, ","))
+		if _, err := fmt.Fprintf(file, "shareExclude=\"%s\"\n", strings.Join(config.ExcludeDisks, ",")); err != nil {
+			return fmt.Errorf("failed to write shareExclude: %w", err)
+		}
 	}
 	if config.UseCache != "" {
-		fmt.Fprintf(file, "shareUseCache=\"%s\"\n", config.UseCache)
+		if _, err := fmt.Fprintf(file, "shareUseCache=\"%s\"\n", config.UseCache); err != nil {
+			return fmt.Errorf("failed to write shareUseCache: %w", err)
+		}
 	}
 	if config.Export != "" {
-		fmt.Fprintf(file, "shareExport=\"%s\"\n", config.Export)
+		if _, err := fmt.Fprintf(file, "shareExport=\"%s\"\n", config.Export); err != nil {
+			return fmt.Errorf("failed to write shareExport: %w", err)
+		}
 	}
 	if config.Security != "" {
-		fmt.Fprintf(file, "shareSecurity=\"%s\"\n", config.Security)
+		if _, err := fmt.Fprintf(file, "shareSecurity=\"%s\"\n", config.Security); err != nil {
+			return fmt.Errorf("failed to write shareSecurity: %w", err)
+		}
 	}
 
 	logger.Info("Config: Share config written successfully")
@@ -417,29 +461,47 @@ func (c *ConfigCollector) UpdateSystemSettings(settings *dto.SystemSettings) err
 	if err != nil {
 		return fmt.Errorf("failed to create system config: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			logger.Debug("Error closing system config file: %v", err)
+		}
+	}()
 
 	// Write configuration
 	if settings.ServerName != "" {
-		fmt.Fprintf(file, "NAME=\"%s\"\n", settings.ServerName)
+		if _, err := fmt.Fprintf(file, "NAME=\"%s\"\n", settings.ServerName); err != nil {
+			return fmt.Errorf("failed to write NAME: %w", err)
+		}
 	}
 	if settings.Description != "" {
-		fmt.Fprintf(file, "COMMENT=\"%s\"\n", settings.Description)
+		if _, err := fmt.Fprintf(file, "COMMENT=\"%s\"\n", settings.Description); err != nil {
+			return fmt.Errorf("failed to write COMMENT: %w", err)
+		}
 	}
 	if settings.Model != "" {
-		fmt.Fprintf(file, "MODEL=\"%s\"\n", settings.Model)
+		if _, err := fmt.Fprintf(file, "MODEL=\"%s\"\n", settings.Model); err != nil {
+			return fmt.Errorf("failed to write MODEL: %w", err)
+		}
 	}
 	if settings.Timezone != "" {
-		fmt.Fprintf(file, "TIMEZONE=\"%s\"\n", settings.Timezone)
+		if _, err := fmt.Fprintf(file, "TIMEZONE=\"%s\"\n", settings.Timezone); err != nil {
+			return fmt.Errorf("failed to write TIMEZONE: %w", err)
+		}
 	}
 	if settings.DateFormat != "" {
-		fmt.Fprintf(file, "DATE_FORMAT=\"%s\"\n", settings.DateFormat)
+		if _, err := fmt.Fprintf(file, "DATE_FORMAT=\"%s\"\n", settings.DateFormat); err != nil {
+			return fmt.Errorf("failed to write DATE_FORMAT: %w", err)
+		}
 	}
 	if settings.TimeFormat != "" {
-		fmt.Fprintf(file, "TIME_FORMAT=\"%s\"\n", settings.TimeFormat)
+		if _, err := fmt.Fprintf(file, "TIME_FORMAT=\"%s\"\n", settings.TimeFormat); err != nil {
+			return fmt.Errorf("failed to write TIME_FORMAT: %w", err)
+		}
 	}
 	if settings.SecurityMode != "" {
-		fmt.Fprintf(file, "SECURITY=\"%s\"\n", settings.SecurityMode)
+		if _, err := fmt.Fprintf(file, "SECURITY=\"%s\"\n", settings.SecurityMode); err != nil {
+			return fmt.Errorf("failed to write SECURITY: %w", err)
+		}
 	}
 
 	logger.Info("Config: System settings written successfully")
@@ -458,7 +520,11 @@ func (c *ConfigCollector) GetDiskSettings() (*dto.DiskSettings, error) {
 		}
 		return nil, fmt.Errorf("failed to open disk config: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			logger.Debug("Error closing disk config file: %v", err)
+		}
+	}()
 
 	settings := &dto.DiskSettings{
 		Timestamp: time.Now(),

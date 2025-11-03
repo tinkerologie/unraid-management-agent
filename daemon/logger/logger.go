@@ -1,3 +1,4 @@
+// Package logger provides structured logging functionality with color-coded output and log rotation.
 package logger
 
 import (

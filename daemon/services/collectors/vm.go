@@ -1,16 +1,17 @@
 package collectors
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/ruaandeysel/unraid-management-agent/daemon/domain"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/dto"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/lib"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/logger"
+	"github.com/domalab/unraid-management-agent/daemon/domain"
+	"github.com/domalab/unraid-management-agent/daemon/dto"
+	"github.com/domalab/unraid-management-agent/daemon/lib"
+	"github.com/domalab/unraid-management-agent/daemon/logger"
 )
 
 type VMCollector struct {
@@ -21,13 +22,19 @@ func NewVMCollector(ctx *domain.Context) *VMCollector {
 	return &VMCollector{ctx: ctx}
 }
 
-func (c *VMCollector) Start(interval time.Duration) {
+func (c *VMCollector) Start(ctx context.Context, interval time.Duration) {
 	logger.Info("Starting vm collector (interval: %v)", interval)
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		c.Collect()
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Info("VM collector stopping due to context cancellation")
+			return
+		case <-ticker.C:
+			c.Collect()
+		}
 	}
 }
 

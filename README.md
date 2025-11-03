@@ -70,7 +70,7 @@ Coordinates the entire application lifecycle:
 
 1. Download the latest release package:
    ```bash
-   wget https://github.com/ruaandeysel/unraid-management-agent/releases/latest/unraid-management-agent-2025.10.03.tgz
+   wget https://github.com/domalab/unraid-management-agent/releases/latest/unraid-management-agent-2025.10.03.tgz
    ```
 
 2. Extract and install:
@@ -87,7 +87,7 @@ Coordinates the entire application lifecycle:
 
 ```bash
 # Clone the repository
-git clone https://github.com/ruaandeysel/unraid-management-agent.git
+git clone https://github.com/domalab/unraid-management-agent.git
 cd unraid-management-agent
 
 # Install dependencies

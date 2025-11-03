@@ -2,16 +2,17 @@ package collectors
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/ruaandeysel/unraid-management-agent/daemon/domain"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/dto"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/lib"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/logger"
+	"github.com/domalab/unraid-management-agent/daemon/domain"
+	"github.com/domalab/unraid-management-agent/daemon/dto"
+	"github.com/domalab/unraid-management-agent/daemon/lib"
+	"github.com/domalab/unraid-management-agent/daemon/logger"
 )
 
 type SystemCollector struct {
@@ -22,9 +23,9 @@ func NewSystemCollector(ctx *domain.Context) *SystemCollector {
 	return &SystemCollector{ctx: ctx}
 }
 
-func (c *SystemCollector) Start(interval time.Duration) {
+func (c *SystemCollector) Start(ctx context.Context, interval time.Duration) {
 	logger.Info("Starting system collector (interval: %v)", interval)
-	
+
 	// Run once immediately with panic recovery
 	func() {
 		defer func() {
@@ -34,19 +35,25 @@ func (c *SystemCollector) Start(interval time.Duration) {
 		}()
 		c.Collect()
 	}()
-	
+
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					logger.Error("System collector PANIC in loop: %v", r)
-				}
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Info("System collector stopping due to context cancellation")
+			return
+		case <-ticker.C:
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Error("System collector PANIC in loop: %v", r)
+					}
+				}()
+				c.Collect()
 			}()
-			c.Collect()
-		}()
+		}
 	}
 }
 
@@ -92,14 +99,14 @@ func (c *SystemCollector) collectSystemInfo() (*dto.SystemInfo, error) {
 	} else {
 		info.CPUUsage = cpuPercent
 	}
-	
+
 	// Get CPU model and specs
 	cpuModel, cpuCores, cpuThreads, cpuMHz := c.getCPUSpecs()
 	info.CPUModel = cpuModel
 	info.CPUCores = cpuCores
 	info.CPUThreads = cpuThreads
 	info.CPUMHz = cpuMHz
-	
+
 	// Get per-core CPU usage
 	perCoreUsage, err := c.getPerCoreCPUUsage()
 	if err != nil {
@@ -122,7 +129,7 @@ func (c *SystemCollector) collectSystemInfo() (*dto.SystemInfo, error) {
 			info.RAMUsage = float64(memUsed) / float64(memTotal) * 100
 		}
 	}
-	
+
 	// Get server model and BIOS info
 	serverModel, biosVersion, biosDate := c.getSystemHardwareInfo()
 	info.ServerModel = serverModel
@@ -237,7 +244,11 @@ func (c *SystemCollector) readCPUStat() (map[string]uint64, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			logger.Debug("Error closing CPU stat file: %v", err)
+		}
+	}()
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -249,14 +260,31 @@ func (c *SystemCollector) readCPUStat() (map[string]uint64, error) {
 			}
 
 			stat := make(map[string]uint64)
-			stat["user"], _ = strconv.ParseUint(fields[1], 10, 64)
-			stat["nice"], _ = strconv.ParseUint(fields[2], 10, 64)
-			stat["system"], _ = strconv.ParseUint(fields[3], 10, 64)
-			stat["idle"], _ = strconv.ParseUint(fields[4], 10, 64)
-			stat["iowait"], _ = strconv.ParseUint(fields[5], 10, 64)
-			stat["irq"], _ = strconv.ParseUint(fields[6], 10, 64)
-			stat["softirq"], _ = strconv.ParseUint(fields[7], 10, 64)
-			stat["steal"], _ = strconv.ParseUint(fields[8], 10, 64)
+			var err error
+			if stat["user"], err = strconv.ParseUint(fields[1], 10, 64); err != nil {
+				logger.Warning("Failed to parse CPU user stat: %v", err)
+			}
+			if stat["nice"], err = strconv.ParseUint(fields[2], 10, 64); err != nil {
+				logger.Warning("Failed to parse CPU nice stat: %v", err)
+			}
+			if stat["system"], err = strconv.ParseUint(fields[3], 10, 64); err != nil {
+				logger.Warning("Failed to parse CPU system stat: %v", err)
+			}
+			if stat["idle"], err = strconv.ParseUint(fields[4], 10, 64); err != nil {
+				logger.Warning("Failed to parse CPU idle stat: %v", err)
+			}
+			if stat["iowait"], err = strconv.ParseUint(fields[5], 10, 64); err != nil {
+				logger.Warning("Failed to parse CPU iowait stat: %v", err)
+			}
+			if stat["irq"], err = strconv.ParseUint(fields[6], 10, 64); err != nil {
+				logger.Warning("Failed to parse CPU irq stat: %v", err)
+			}
+			if stat["softirq"], err = strconv.ParseUint(fields[7], 10, 64); err != nil {
+				logger.Warning("Failed to parse CPU softirq stat: %v", err)
+			}
+			if stat["steal"], err = strconv.ParseUint(fields[8], 10, 64); err != nil {
+				logger.Warning("Failed to parse CPU steal stat: %v", err)
+			}
 
 			return stat, nil
 		}
@@ -270,7 +298,11 @@ func (c *SystemCollector) getMemoryInfo() (uint64, uint64, uint64, uint64, uint6
 	if err != nil {
 		return 0, 0, 0, 0, 0, err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			logger.Debug("Error closing meminfo file: %v", err)
+		}
+	}()
 
 	var memTotal, memFree, memBuffers, memCached uint64
 
@@ -375,6 +407,7 @@ func (c *SystemCollector) readHwmonTemperatures() (map[string]float64, error) {
 	for i := 0; i < 10; i++ {
 		for j := 1; j < 20; j++ {
 			path := fmt.Sprintf("/sys/class/hwmon/hwmon%d/temp%d_input", i, j)
+			//nolint:gosec // G304: Path is constructed from /sys/class/hwmon system directory with numeric indices
 			data, err := os.ReadFile(path)
 			if err != nil {
 				continue
@@ -387,6 +420,7 @@ func (c *SystemCollector) readHwmonTemperatures() (map[string]float64, error) {
 
 			// Try to get label
 			labelPath := fmt.Sprintf("/sys/class/hwmon/hwmon%d/temp%d_label", i, j)
+			//nolint:gosec // G304: Path is constructed from /sys/class/hwmon system directory with numeric indices
 			labelData, err := os.ReadFile(labelPath)
 			label := fmt.Sprintf("hwmon%d_temp%d", i, j)
 			if err == nil {
@@ -475,6 +509,7 @@ func (c *SystemCollector) readHwmonFanSpeeds() (map[string]int, error) {
 	for i := 0; i < 10; i++ {
 		for j := 1; j < 20; j++ {
 			path := fmt.Sprintf("/sys/class/hwmon/hwmon%d/fan%d_input", i, j)
+			//nolint:gosec // G304: Path is constructed from /sys/class/hwmon system directory with numeric indices
 			data, err := os.ReadFile(path)
 			if err != nil {
 				continue
@@ -487,6 +522,7 @@ func (c *SystemCollector) readHwmonFanSpeeds() (map[string]int, error) {
 
 			// Try to get label
 			labelPath := fmt.Sprintf("/sys/class/hwmon/hwmon%d/fan%d_label", i, j)
+			//nolint:gosec // G304: Path is constructed from /sys/class/hwmon system directory with numeric indices
 			labelData, err := os.ReadFile(labelPath)
 			label := fmt.Sprintf("hwmon%d_fan%d", i, j)
 			if err == nil {
@@ -510,7 +546,11 @@ func (c *SystemCollector) getCPUSpecs() (string, int, int, float64) {
 	if err != nil {
 		return "Unknown", 0, 0, 0.0
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			logger.Debug("Error closing cpuinfo file: %v", err)
+		}
+	}()
 
 	var cpuModel string
 	var cpuMHz float64
@@ -624,7 +664,11 @@ func (c *SystemCollector) readPerCoreCPUStat() (map[string]map[string]uint64, er
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			logger.Debug("Error closing per-core CPU stat file: %v", err)
+		}
+	}()
 
 	coreStats := make(map[string]map[string]uint64)
 	scanner := bufio.NewScanner(file)
@@ -645,14 +689,31 @@ func (c *SystemCollector) readPerCoreCPUStat() (map[string]map[string]uint64, er
 			}
 
 			stat := make(map[string]uint64)
-			stat["user"], _ = strconv.ParseUint(fields[1], 10, 64)
-			stat["nice"], _ = strconv.ParseUint(fields[2], 10, 64)
-			stat["system"], _ = strconv.ParseUint(fields[3], 10, 64)
-			stat["idle"], _ = strconv.ParseUint(fields[4], 10, 64)
-			stat["iowait"], _ = strconv.ParseUint(fields[5], 10, 64)
-			stat["irq"], _ = strconv.ParseUint(fields[6], 10, 64)
-			stat["softirq"], _ = strconv.ParseUint(fields[7], 10, 64)
-			stat["steal"], _ = strconv.ParseUint(fields[8], 10, 64)
+			var parseErr error
+			if stat["user"], parseErr = strconv.ParseUint(fields[1], 10, 64); parseErr != nil {
+				logger.Debug("Failed to parse per-core CPU user stat for %s: %v", coreName, parseErr)
+			}
+			if stat["nice"], parseErr = strconv.ParseUint(fields[2], 10, 64); parseErr != nil {
+				logger.Debug("Failed to parse per-core CPU nice stat for %s: %v", coreName, parseErr)
+			}
+			if stat["system"], parseErr = strconv.ParseUint(fields[3], 10, 64); parseErr != nil {
+				logger.Debug("Failed to parse per-core CPU system stat for %s: %v", coreName, parseErr)
+			}
+			if stat["idle"], parseErr = strconv.ParseUint(fields[4], 10, 64); parseErr != nil {
+				logger.Debug("Failed to parse per-core CPU idle stat for %s: %v", coreName, parseErr)
+			}
+			if stat["iowait"], parseErr = strconv.ParseUint(fields[5], 10, 64); parseErr != nil {
+				logger.Debug("Failed to parse per-core CPU iowait stat for %s: %v", coreName, parseErr)
+			}
+			if stat["irq"], parseErr = strconv.ParseUint(fields[6], 10, 64); parseErr != nil {
+				logger.Debug("Failed to parse per-core CPU irq stat for %s: %v", coreName, parseErr)
+			}
+			if stat["softirq"], parseErr = strconv.ParseUint(fields[7], 10, 64); parseErr != nil {
+				logger.Debug("Failed to parse per-core CPU softirq stat for %s: %v", coreName, parseErr)
+			}
+			if stat["steal"], parseErr = strconv.ParseUint(fields[8], 10, 64); parseErr != nil {
+				logger.Debug("Failed to parse per-core CPU steal stat for %s: %v", coreName, parseErr)
+			}
 
 			coreStats[coreName] = stat
 		}

@@ -1,15 +1,17 @@
+// Package collectors provides data collection services for Unraid system resources.
 package collectors
 
 import (
+	"context"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
-	"github.com/ruaandeysel/unraid-management-agent/daemon/common"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/domain"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/dto"
-	"github.com/ruaandeysel/unraid-management-agent/daemon/logger"
+	"github.com/domalab/unraid-management-agent/daemon/common"
+	"github.com/domalab/unraid-management-agent/daemon/domain"
+	"github.com/domalab/unraid-management-agent/daemon/dto"
+	"github.com/domalab/unraid-management-agent/daemon/logger"
 	"github.com/vaughan0/go-ini"
 )
 
@@ -21,7 +23,7 @@ func NewArrayCollector(ctx *domain.Context) *ArrayCollector {
 	return &ArrayCollector{ctx: ctx}
 }
 
-func (c *ArrayCollector) Start(interval time.Duration) {
+func (c *ArrayCollector) Start(ctx context.Context, interval time.Duration) {
 	logger.Info("Starting array collector (interval: %v)", interval)
 
 	// Run once immediately with panic recovery
@@ -37,15 +39,21 @@ func (c *ArrayCollector) Start(interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					logger.Error("Array collector PANIC in loop: %v", r)
-				}
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Info("Array collector stopping due to context cancellation")
+			return
+		case <-ticker.C:
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Error("Array collector PANIC in loop: %v", r)
+					}
+				}()
+				c.Collect()
 			}()
-			c.Collect()
-		}()
+		}
 	}
 }
 

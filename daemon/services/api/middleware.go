@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ruaandeysel/unraid-management-agent/daemon/logger"
+	"github.com/domalab/unraid-management-agent/daemon/logger"
 )
 
 func corsMiddleware(next http.Handler) http.Handler {

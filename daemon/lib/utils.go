@@ -16,6 +16,7 @@ func FileExists(path string) bool {
 
 // ReadFile reads entire file contents
 func ReadFile(path string) (string, error) {
+	//nolint:gosec // G304: Path is from trusted sources (system files, config files), not user input
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("failed to read file %s: %w", path, err)
