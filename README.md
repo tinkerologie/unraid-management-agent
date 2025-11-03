@@ -473,7 +473,6 @@ Comprehensive documentation is available in the `docs/` directory:
 ## Support
 
 For issues, questions, or feature requests:
-- Open an issue on GitHub
 - Check existing documentation in the `docs/` directory
 - Review the [Documentation Index](docs/README.md) for comprehensive guides
 
