@@ -63,7 +63,7 @@ Coordinates the entire application lifecycle:
 ## Installation
 
 ### Prerequisites
-- Unraid 6.x or later
+- Unraid 7.x or later
 - Go 1.21+ (for building from source)
 
 ### From Release Package
@@ -121,9 +121,8 @@ make package
 
 This plugin has been developed and tested on the following configuration:
 
-- **Unraid Version**: 6.x
+- **Unraid Version**: 7.x
 - **Plugin Version**: 2025.11.0
-- **Test System**: Unraid server "Cube"
 - **Architecture**: Linux/amd64
 - **Primary Testing**: REST API endpoints, WebSocket events, Docker/VM control operations
 
@@ -395,7 +394,7 @@ Hardware: AMD Ryzen 9 5950X, LSI 9300-8i HBA, NVIDIA RTX 3080
 Issue: GPU temperature not detected due to different nvidia-smi output format
 Solution: Added parsing for alternative nvidia-smi XML format
 Testing: Verified GPU metrics endpoint returns correct data, all tests pass
-Unraid Version: 6.12.4
+Unraid Version: 7.2
 ```
 
 ### Why Community Contributions Matter
