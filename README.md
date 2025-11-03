@@ -458,7 +458,7 @@ As a single maintainer, it's challenging to:
 
 ## License
 
-MIT License - see LICENSE file for details
+MIT License - see [LICENSE](LICENSE) file for details
 
 ## Documentation
 
@@ -477,22 +477,6 @@ For issues, questions, or feature requests:
 - Review the [Documentation Index](docs/README.md) for comprehensive guides
 
 ## Roadmap
-
-### Recently Implemented ✅
-
-The following features from the original roadmap have been successfully implemented:
-
-- **Enhanced System Info Collector** (v2025.11.0)
-  - CPU model detection and specifications
-  - BIOS version and release date information
-  - Per-core CPU usage monitoring
-  - Server model identification
-
-- **Detailed Disk Metrics** (v2025.11.0)
-  - I/O statistics (read/write operations and bytes)
-  - Per-disk performance metrics
-  - IO utilization percentage
-  - Disk spin state detection
 
 ### Planned Enhancements
 
