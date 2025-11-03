@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2025.11.0] - 2025-11-03
+
+### Added
+
+#### Enhanced System Information Collector
+- **CPU Model Detection**: Automatic detection of CPU model, cores, threads, and frequency from `/proc/cpuinfo`
+- **BIOS Information**: Server model, BIOS version, and BIOS release date via `dmidecode`
+- **Per-Core CPU Usage**: Individual CPU core usage monitoring with `cpu_per_core_usage` field
+- **Server Model Identification**: Hardware model detection for better system identification
+
+#### Detailed Disk Metrics
+- **I/O Statistics**: Read/write operations and bytes per disk from `/sys/block/{device}/stat`
+  - `read_ops` - Total read operations
+  - `read_bytes` - Total bytes read
+  - `write_ops` - Total write operations
+  - `write_bytes` - Total bytes written
+  - `io_utilization_percent` - Disk I/O utilization percentage
+- **Disk Spin State Detection**: Enhanced spin state detection (active, standby, unknown)
+- **Per-Disk Performance Metrics**: Real-time performance monitoring for each disk
+
+### Changed
+
+#### Documentation Updates
+- **README.md Roadmap Reorganization**:
+  - Added "Recently Implemented ✅" section to highlight completed features
+  - Moved Enhanced System Info Collector and Detailed Disk Metrics from planned to implemented
+  - Updated "Planned Enhancements" to only include outstanding features
+  - Added detailed sub-items for each implemented feature
+- **Third-Party Plugin Notice**: Added prominent disclaimer distinguishing this plugin from official Unraid API
+- **System Compatibility Section**: Added hardware compatibility notice and tested configuration details
+- **Contributing Guidelines**: Expanded contribution workflow for hardware compatibility fixes
+- **Version References**: Updated from Unraid 6.x to 7.x throughout documentation
+
+#### Configuration Management
+- **Log Rotation**: Implemented automatic log rotation with 5 MB max file size (using lumberjack.v2)
+- **Log Level Support**: Added configurable log levels (DEBUG, INFO, WARNING, ERROR) with `--log-level` CLI flag
+- **Default Log Level**: Set to WARNING for production to minimize disk usage
+- **Configuration File Management**: Improved config file creation and synchronization
+- **Auto-Start Behavior**: Service now always starts automatically when Unraid array starts (removed toggle option)
+
+### Fixed
+- **Configuration Synchronization**: Fixed LOG_LEVEL not being read from config file
+- **Start Script**: Now properly creates config directory and default config file
+- **Deployment Script**: Updated to use start script instead of bypassing configuration
+
+### Testing
+- **Test Suite**: All 66 tests passing across 3 packages (100% pass rate)
+- **Deployment Verification**: Successfully deployed and verified on Unraid 7.x server
+
+---
+
 ## [2025.10.03] - Initial Release
 
 ### Added
@@ -231,9 +282,6 @@ None at this time.
 - Alerting and notification system
 - Network statistics trending
 - Enhanced SMART attribute monitoring
-- I/O statistics per disk
-- Per-core CPU usage
-- BIOS information
 
 ---
 
@@ -260,6 +308,6 @@ This is the initial release. No migration required.
 
 ---
 
-**Last Updated**: 2025-10-03
-**Current Version**: 2025.10.03
+**Last Updated**: 2025-11-03
+**Current Version**: 2025.11.0
 
