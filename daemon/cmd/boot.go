@@ -2,8 +2,8 @@
 package cmd
 
 import (
-	"github.com/domalab/unraid-management-agent/daemon/domain"
-	"github.com/domalab/unraid-management-agent/daemon/services"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services"
 )
 
 // Boot represents the boot command that starts the Unraid Management Agent.

@@ -9,11 +9,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/domalab/unraid-management-agent/daemon/common"
-	"github.com/domalab/unraid-management-agent/daemon/domain"
-	"github.com/domalab/unraid-management-agent/daemon/logger"
-	"github.com/domalab/unraid-management-agent/daemon/services/api"
-	"github.com/domalab/unraid-management-agent/daemon/services/collectors"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/common"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/api"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/collectors"
 )
 
 type Orchestrator struct {

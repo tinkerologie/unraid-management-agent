@@ -1,9 +1,9 @@
 package controllers
 
 import (
-	"github.com/domalab/unraid-management-agent/daemon/common"
-	"github.com/domalab/unraid-management-agent/daemon/lib"
-	"github.com/domalab/unraid-management-agent/daemon/logger"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/common"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
 type VMController struct{}

@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/domalab/unraid-management-agent/daemon/domain"
-	"github.com/domalab/unraid-management-agent/daemon/dto"
-	"github.com/domalab/unraid-management-agent/daemon/lib"
-	"github.com/domalab/unraid-management-agent/daemon/logger"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
 type UPSCollector struct {

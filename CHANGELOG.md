@@ -295,16 +295,16 @@ This is the initial release. No migration required.
 
 ## Contributors
 
-- Ruaan Deysel (@domalab)
+- Ruaan Deysel (@ruaan-deysel)
 
 ---
 
 ## Links
 
-- **GitHub Repository**: https://github.com/domalab/unraid-management-agent
+- **GitHub Repository**: https://github.com/ruaan-deysel/unraid-management-agent
 - **Documentation**: [docs/README.md](docs/README.md)
 - **API Reference**: [docs/api/API_REFERENCE.md](docs/api/API_REFERENCE.md)
-- **Issues**: https://github.com/domalab/unraid-management-agent/issues
+- **Issues**: https://github.com/ruaan-deysel/unraid-management-agent/issues
 
 ---
 

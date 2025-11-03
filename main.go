@@ -11,9 +11,9 @@ import (
 	"github.com/cskr/pubsub"
 	"gopkg.in/natefinch/lumberjack.v2"
 
-	"github.com/domalab/unraid-management-agent/daemon/cmd"
-	"github.com/domalab/unraid-management-agent/daemon/domain"
-	"github.com/domalab/unraid-management-agent/daemon/logger"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/cmd"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
 var Version string = "dev"

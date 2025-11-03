@@ -7,11 +7,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/domalab/unraid-management-agent/daemon/dto"
-	"github.com/domalab/unraid-management-agent/daemon/lib"
-	"github.com/domalab/unraid-management-agent/daemon/logger"
-	"github.com/domalab/unraid-management-agent/daemon/services/collectors"
-	"github.com/domalab/unraid-management-agent/daemon/services/controllers"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/collectors"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/controllers"
 	"github.com/gorilla/mux"
 )
 

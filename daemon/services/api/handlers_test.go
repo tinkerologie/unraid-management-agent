@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/domalab/unraid-management-agent/daemon/domain"
-	"github.com/domalab/unraid-management-agent/daemon/dto"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 )
 
 func setupTestServer() (*Server, *domain.Context) {

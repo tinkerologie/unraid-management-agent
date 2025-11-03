@@ -297,7 +297,7 @@ See LICENSE file for details.
 
 ## 🔗 Links
 
-- **GitHub Repository**: [unraid-management-agent](https://github.com/domalab/unraid-management-agent)
+- **GitHub Repository**: [unraid-management-agent](https://github.com/ruaan-deysel/unraid-management-agent)
 - **Unraid Forums**: [Plugin Discussion](https://forums.unraid.net/)
 - **Home Assistant Integration**: Coming soon
 

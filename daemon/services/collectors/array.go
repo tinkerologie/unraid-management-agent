@@ -8,10 +8,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/domalab/unraid-management-agent/daemon/common"
-	"github.com/domalab/unraid-management-agent/daemon/domain"
-	"github.com/domalab/unraid-management-agent/daemon/dto"
-	"github.com/domalab/unraid-management-agent/daemon/logger"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/common"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 	"github.com/vaughan0/go-ini"
 )
 

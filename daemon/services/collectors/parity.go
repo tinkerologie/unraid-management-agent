@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/domalab/unraid-management-agent/daemon/dto"
-	"github.com/domalab/unraid-management-agent/daemon/logger"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
 const parityLogPath = "/boot/config/parity-checks.log"
