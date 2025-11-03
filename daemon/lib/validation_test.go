@@ -264,6 +264,142 @@ func TestValidateDiskID(t *testing.T) {
 	}
 }
 
+func TestValidateShareName(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name:    "valid share name lowercase",
+			input:   "appdata",
+			wantErr: false,
+		},
+		{
+			name:    "valid share name uppercase",
+			input:   "MEDIA",
+			wantErr: false,
+		},
+		{
+			name:    "valid share name mixed case",
+			input:   "MyShare",
+			wantErr: false,
+		},
+		{
+			name:    "valid share name with underscore",
+			input:   "app_data",
+			wantErr: false,
+		},
+		{
+			name:    "valid share name with hyphen",
+			input:   "app-data",
+			wantErr: false,
+		},
+		{
+			name:    "valid share name with numbers",
+			input:   "share123",
+			wantErr: false,
+		},
+		{
+			name:    "empty share name",
+			input:   "",
+			wantErr: true,
+			errMsg:  "cannot be empty",
+		},
+		{
+			name:    "path traversal with ../",
+			input:   "../etc/passwd",
+			wantErr: true,
+			errMsg:  "cannot contain parent directory references",
+		},
+		{
+			name:    "path traversal with ..",
+			input:   "..",
+			wantErr: true,
+			errMsg:  "cannot contain parent directory references",
+		},
+		{
+			name:    "absolute path",
+			input:   "/etc/passwd",
+			wantErr: true,
+			errMsg:  "cannot contain path separators",
+		},
+		{
+			name:    "forward slash in name",
+			input:   "app/data",
+			wantErr: true,
+			errMsg:  "cannot contain path separators",
+		},
+		{
+			name:    "backslash in name",
+			input:   "app\\data",
+			wantErr: true,
+			errMsg:  "cannot contain path separators",
+		},
+		{
+			name:    "starts with hyphen",
+			input:   "-appdata",
+			wantErr: true,
+			errMsg:  "cannot start or end with hyphen",
+		},
+		{
+			name:    "ends with hyphen",
+			input:   "appdata-",
+			wantErr: true,
+			errMsg:  "cannot start or end with hyphen",
+		},
+		{
+			name:    "contains special characters",
+			input:   "app@data",
+			wantErr: true,
+			errMsg:  "invalid share name format",
+		},
+		{
+			name:    "contains spaces",
+			input:   "app data",
+			wantErr: true,
+			errMsg:  "invalid share name format",
+		},
+		{
+			name:    "too long (256 chars)",
+			input:   strings.Repeat("a", 256),
+			wantErr: true,
+			errMsg:  "too long",
+		},
+		{
+			name:    "max length (255 chars)",
+			input:   strings.Repeat("a", 255),
+			wantErr: false,
+		},
+		{
+			name:    "SQL injection attempt",
+			input:   "'; DROP TABLE shares--",
+			wantErr: true,
+			errMsg:  "invalid share name format",
+		},
+		{
+			name:    "command injection attempt",
+			input:   "share; rm -rf /",
+			wantErr: true,
+			errMsg:  "cannot contain path separators", // Contains "/" which is caught first
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateShareName(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateShareName() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr && tt.errMsg != "" && !strings.Contains(err.Error(), tt.errMsg) {
+				t.Errorf("ValidateShareName() error = %v, expected to contain %q", err, tt.errMsg)
+			}
+		})
+	}
+}
+
 func TestValidateNonEmpty(t *testing.T) {
 	tests := []struct {
 		name      string

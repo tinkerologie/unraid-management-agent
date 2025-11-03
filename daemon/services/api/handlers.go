@@ -7,12 +7,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/collectors"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/controllers"
-	"github.com/gorilla/mux"
 )
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -523,6 +523,17 @@ func (s *Server) handleShareConfig(w http.ResponseWriter, r *http.Request) {
 	shareName := vars["name"]
 	logger.Debug("API: Getting share config for %s", shareName)
 
+	// Validate share name to prevent path traversal attacks
+	if err := lib.ValidateShareName(shareName); err != nil {
+		logger.Error("API: Invalid share name: %v", err)
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Invalid share name: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
 	configCollector := collectors.NewConfigCollector()
 	config, err := configCollector.GetShareConfig(shareName)
 
@@ -640,6 +651,17 @@ func (s *Server) handleUpdateShareConfig(w http.ResponseWriter, r *http.Request)
 	vars := mux.Vars(r)
 	shareName := vars["name"]
 	logger.Info("API: Updating share config for %s", shareName)
+
+	// Validate share name to prevent path traversal attacks
+	if err := lib.ValidateShareName(shareName); err != nil {
+		logger.Error("API: Invalid share name: %v", err)
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Invalid share name: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
 
 	var config dto.ShareConfig
 	if err := json.NewDecoder(r.Body).Decode(&config); err != nil {

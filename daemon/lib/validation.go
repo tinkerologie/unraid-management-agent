@@ -18,6 +18,10 @@ var (
 	// Disk IDs: common Linux disk naming patterns
 	// Examples: sda, sdb1, nvme0n1, nvme0n1p1, md0, loop0
 	diskIDRegex = regexp.MustCompile(`^(sd[a-z]|nvme[0-9]+n[0-9]+|md[0-9]+|loop[0-9]+)(p?[0-9]+)?$`)
+
+	// Share names: alphanumeric, hyphens, underscores (max 255 chars)
+	// Must not contain path separators or parent directory references
+	shareNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,255}$`)
 )
 
 // ValidateContainerID validates a Docker container ID format
@@ -75,6 +79,41 @@ func ValidateDiskID(id string) error {
 
 	if !diskIDRegex.MatchString(id) {
 		return fmt.Errorf("invalid disk ID format: must match Linux disk naming pattern (e.g., sda, nvme0n1, md0)")
+	}
+
+	return nil
+}
+
+// ValidateShareName validates an Unraid share name
+// Prevents path traversal attacks by ensuring the name contains only safe characters
+// and does not contain path separators or parent directory references
+func ValidateShareName(name string) error {
+	if name == "" {
+		return fmt.Errorf("share name cannot be empty")
+	}
+
+	if len(name) > 255 {
+		return fmt.Errorf("share name too long: maximum 255 characters, got %d", len(name))
+	}
+
+	// Check for parent directory references first (more specific check)
+	if strings.Contains(name, "..") {
+		return fmt.Errorf("invalid share name: cannot contain parent directory references")
+	}
+
+	// Check for path separators
+	if strings.Contains(name, "/") || strings.Contains(name, "\\") {
+		return fmt.Errorf("invalid share name: cannot contain path separators")
+	}
+
+	// Validate against regex pattern (alphanumeric, hyphens, underscores only)
+	if !shareNameRegex.MatchString(name) {
+		return fmt.Errorf("invalid share name format: must contain only alphanumeric characters, hyphens, and underscores")
+	}
+
+	// Additional checks for common issues
+	if strings.HasPrefix(name, "-") || strings.HasSuffix(name, "-") {
+		return fmt.Errorf("invalid share name: cannot start or end with hyphen")
 	}
 
 	return nil
