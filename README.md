@@ -2,6 +2,47 @@
 
 A Go-based plugin for Unraid that exposes comprehensive system monitoring and control via REST API and WebSockets.
 
+## ⚠️ Important: Third-Party Plugin Notice
+
+**This is a community-developed third-party plugin and is NOT an official Unraid product.**
+
+### Relationship to Official Unraid API
+
+- **Official Unraid API**: Unraid OS 7.2+ includes an official **GraphQL-based API** as part of the core operating system. This is the official API provided and supported by Lime Technology (the creators of Unraid).
+
+- **This Plugin**: The Unraid Management Agent is a **separate, independent third-party plugin** that provides a **REST API and WebSocket interface** for system monitoring and control. It is developed and maintained by the community, not by Lime Technology.
+
+### Key Differences
+
+| Feature | Official Unraid API | This Plugin (Unraid Management Agent) |
+|---------|---------------------|----------------------------------------|
+| **Developer** | Lime Technology (Official) | Community (Third-Party) |
+| **API Type** | GraphQL | REST API + WebSocket |
+| **Availability** | Built into Unraid OS 7.2+ | Separate plugin installation required |
+| **Support** | Official Unraid support | Community support |
+| **Purpose** | Official system API | Alternative/complementary monitoring solution |
+
+### When to Use This Plugin
+
+You might choose this plugin if you:
+
+- ✅ **Prefer REST API**: You want a traditional REST API instead of GraphQL
+- ✅ **Need WebSocket Support**: You require real-time event streaming via WebSockets
+- ✅ **Want Specific Features**: This plugin offers specific monitoring and control features tailored to community needs
+- ✅ **Compatibility**: You need an API solution that works alongside or independently of the official API
+
+### Coexistence with Official API
+
+This plugin **can coexist** with the official Unraid API. They operate independently and do not conflict with each other. You can use both simultaneously if your use case requires it.
+
+### Official Unraid API Documentation
+
+For information about the official Unraid GraphQL API, please refer to:
+- [Unraid Official Documentation](https://docs.unraid.net/)
+- Unraid OS 7.2+ release notes and API documentation
+
+---
+
 ## Features
 
 ### Real-time Monitoring
@@ -270,12 +311,12 @@ Defined in `daemon/common/const.go`:
 
 ### Logging
 
-The agent uses structured logging with automatic log rotation:
+The agent uses log rotation with the following settings:
 
 - **Location**: `/var/log/unraid-management-agent.log`
-- **Max Size**: 10 MB per file
-- **Retention**: 10 backup files
-- **Max Age**: 28 days
+- **Max Size**: 5 MB per file
+- **Backups**: None (only current log is kept)
+- **Age-based Retention**: None (logs are rotated based on size only)
 
 In debug mode (`--debug`), logs are written to stdout for immediate visibility.
 
