@@ -26,7 +26,6 @@ if (file_exists($config_file)) {
 // Default values
 $port = $config['PORT'] ?? '8043';
 $log_level = $config['LOG_LEVEL'] ?? 'info';
-$autostart = $config['AUTOSTART'] ?? 'yes';
 
 // Check if service is running
 function isServiceRunning() {
@@ -54,9 +53,8 @@ if ($_POST) {
         // Save configuration
         $new_config = "PORT=" . $_POST['port'] . "\n";
         $new_config .= "LOG_LEVEL=" . $_POST['log_level'] . "\n";
-        $new_config .= "AUTOSTART=" . $_POST['autostart'] . "\n";
         file_put_contents($config_file, $new_config);
-        
+
         // Restart service if running
         if ($running) {
             exec("/usr/local/emhttp/plugins/$plugin/scripts/stop > /dev/null 2>&1");
@@ -66,7 +64,7 @@ if ($_POST) {
         }
     } elseif (isset($_POST['default'])) {
         // Reset to defaults
-        $default_config = "PORT=8043\nLOG_LEVEL=info\nAUTOSTART=yes\n";
+        $default_config = "PORT=8043\nLOG_LEVEL=info\n";
         file_put_contents($config_file, $default_config);
         
         // Restart service if running
@@ -197,12 +195,10 @@ if ($_POST) {
             </div>
 
             <div class="form-row">
-                <label class="form-label">Auto-start:</label>
-                <select name="autostart" class="form-input">
-                    <option value="yes" <?= $autostart === 'yes' ? 'selected' : '' ?>>Yes</option>
-                    <option value="no" <?= $autostart === 'no' ? 'selected' : '' ?>>No</option>
-                </select>
-                <div class="help-text">Start automatically when array starts</div>
+                <div class="help-text" style="margin-left: 200px;">
+                    <strong>Note:</strong> The service will automatically start when the Unraid array starts.
+                    You can manually stop or restart the service using the buttons above.
+                </div>
             </div>
         </div>
 

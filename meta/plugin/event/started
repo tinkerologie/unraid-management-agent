@@ -1,5 +1,3 @@
 #!/bin/bash
-source /boot/config/plugins/unraid-management-agent/config.cfg
-if [ "$AUTOSTART" = "yes" ]; then
-  /usr/local/emhttp/plugins/unraid-management-agent/scripts/start
-fi
+# Always start the service when the array starts
+/usr/local/emhttp/plugins/unraid-management-agent/scripts/start

@@ -168,7 +168,6 @@ if [ ! -f /boot/config/plugins/${PLUGIN_NAME}/config.cfg ]; then
     cat > /boot/config/plugins/${PLUGIN_NAME}/config.cfg << EOF
 PORT=8043
 LOG_LEVEL=info
-AUTOSTART=yes
 EOF
     echo \"✅ Default configuration created\"
 else
