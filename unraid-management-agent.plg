@@ -5,19 +5,19 @@
 <!ENTITY displayname "Unraid Management Agent">
 <!ENTITY author      "ruaan-deysel">
 <!ENTITY version     "2025.11.0">
-<!ENTITY launch      "Settings/&name;">
 <!ENTITY gitURL      "https://github.com/&author;/&name;">
 <!ENTITY pluginURL   "&gitURL;/raw/main/&name;.plg">
-<!ENTITY supportURL  "&gitURL;/issues">
+<!ENTITY supportURL  "https://forums.unraid.net/topic/XXXXX-support-unraid-management-agent">
 <!ENTITY iconURL     "https://raw.githubusercontent.com/&author;/&name;/main/icon.png">
 <!ENTITY bundle      "&name;-&version;.tgz">
 <!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
+<!ENTITY md5         "63d9311eb120db45b9d6495ce92fdb2c">
 ]>
 
 <PLUGIN  name="&displayname;"
          author="&author;"
          version="&version;"
-         launch="&launch;"
+         min="6.9.0"
          pluginURL="&pluginURL;"
          support="&supportURL;"
          icon="&iconURL;">
@@ -84,6 +84,7 @@ Support:
 <!-- Download the plugin bundle -->
 <FILE Name="/boot/config/plugins/&name;/&bundle;">
 <URL>&bundleURL;</URL>
+<MD5>&md5;</MD5>
 </FILE>
 
 <!-- Install default configuration -->
