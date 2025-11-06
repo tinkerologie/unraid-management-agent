@@ -28,7 +28,7 @@ package: release
 	cp $(BUILD_DIR)/$(BINARY) $(BUILD_DIR)/usr/local/emhttp/plugins/$(BINARY)/
 	cp VERSION $(BUILD_DIR)/usr/local/emhttp/plugins/$(BINARY)/
 	cp -r $(PLUGIN_DIR)/* $(BUILD_DIR)/usr/local/emhttp/plugins/$(BINARY)/
-	cd $(BUILD_DIR) && tar czf $(BINARY)-$(VERSION).tgz usr/
+	cd $(BUILD_DIR) && tar --no-xattrs -czf $(BINARY)-$(VERSION).tgz usr/
 	@echo "Package created: $(BUILD_DIR)/$(BINARY)-$(VERSION).tgz"
 
 test:
