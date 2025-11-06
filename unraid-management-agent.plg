@@ -12,12 +12,7 @@
     <!ENTITY md5         "63d9311eb120db45b9d6495ce92fdb2c">
 ]>
 
-<PLUGIN  name="&name;"
-         author="&author;"
-         version="&version;"
-         min="6.9.0"
-         pluginURL="&pluginURL;"
-         support="&supportURL;">
+<PLUGIN name="&name;" author="&author;" version="&version;" min="6.9.0" pluginURL="&pluginURL;" support="&supportURL;">
 
 <DESCRIPTION>
 This Unraid plugin provides REST API and WebSocket interfaces for real-time system monitoring, Docker/VM control, and comprehensive hardware metrics.
