@@ -1,20 +1,19 @@
 <?xml version='1.0' standalone='yes'?>
 
 <!DOCTYPE PLUGIN [
-<!ENTITY name        "unraid-management-agent">
-<!ENTITY displayname "Unraid Management Agent">
-<!ENTITY author      "ruaan-deysel">
-<!ENTITY version     "2025.11.0">
-<!ENTITY gitURL      "https://github.com/&author;/&name;">
-<!ENTITY pluginURL   "&gitURL;/raw/main/&name;.plg">
-<!ENTITY supportURL  "https://forums.unraid.net/topic/XXXXX-support-unraid-management-agent">
-<!ENTITY iconURL     "https://raw.githubusercontent.com/&author;/&name;/main/icon.png">
-<!ENTITY bundle      "&name;-&version;.tgz">
-<!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
-<!ENTITY md5         "63d9311eb120db45b9d6495ce92fdb2c">
+    <!ENTITY name        "unraid-management-agent">
+    <!ENTITY author      "ruaan-deysel">
+    <!ENTITY version     "2025.11.0">
+    <!ENTITY gitURL      "https://github.com/&author;/&name;">
+    <!ENTITY pluginURL   "&gitURL;/raw/main/&name;.plg">
+    <!ENTITY supportURL  "https://forums.unraid.net/topic/XXXXX-support-unraid-management-agent">
+    <!ENTITY iconURL     "https://raw.githubusercontent.com/&author;/&name;/main/icon.png">
+    <!ENTITY bundle      "&name;-&version;.tgz">
+    <!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
+    <!ENTITY md5         "63d9311eb120db45b9d6495ce92fdb2c">
 ]>
 
-<PLUGIN  name="&displayname;"
+<PLUGIN  name="&name;"
          author="&author;"
          version="&version;"
          min="6.9.0"
@@ -80,6 +79,46 @@ Support:
 - GitHub Issues: https://github.com/ruaan-deysel/unraid-management-agent/issues
 - Documentation: https://github.com/ruaan-deysel/unraid-management-agent/blob/main/README.md
 -->
+
+<!-- Verify Unraid version compatibility -->
+<FILE Run="/bin/bash">
+<INLINE>
+<![CDATA[
+#!/bin/bash
+
+# Check Unraid version compatibility
+if [ -f /etc/unraid-version ]; then
+    source /etc/unraid-version
+
+    # Extract major and minor version numbers
+    major_version=$(echo "$version" | cut -d'.' -f1)
+    minor_version=$(echo "$version" | cut -d'.' -f2)
+
+    # Check if version is at least 6.9.0
+    if [ "$major_version" -lt 6 ] || ([ "$major_version" -eq 6 ] && [ "$minor_version" -lt 9 ]); then
+        echo ""
+        echo "========================================="
+        echo " ERROR: Incompatible Unraid Version"
+        echo "========================================="
+        echo ""
+        echo "This plugin requires Unraid 6.9.0 or higher."
+        echo "Your current version: $version"
+        echo ""
+        echo "Please upgrade your Unraid system before installing this plugin."
+        echo ""
+        exit 1
+    fi
+
+    echo "✓ Unraid version check passed (version: $version)"
+else
+    echo "⚠ Warning: Could not verify Unraid version"
+    echo "  Proceeding with installation..."
+fi
+
+exit 0
+]]>
+</INLINE>
+</FILE>
 
 <!-- Download the plugin bundle -->
 <FILE Name="/boot/config/plugins/&name;/&bundle;">
