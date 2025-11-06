@@ -2,7 +2,6 @@
 
 <!DOCTYPE PLUGIN [
 <!ENTITY name        "unraid-management-agent">
-<!ENTITY displayname "Unraid Management Agent">
 <!ENTITY author      "ruaan-deysel">
 <!ENTITY version     "2025.11.0">
 <!ENTITY launch      "Settings/&name;">
@@ -14,7 +13,7 @@
 <!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
 ]>
 
-<PLUGIN  name="&displayname;"
+<PLUGIN  name="&name;"
          author="&author;"
          version="&version;"
          launch="&launch;"
@@ -116,20 +115,16 @@ INTERVAL_SHARES=60
 #!/bin/bash
 
 PLUGIN_NAME="unraid-management-agent"
-DISPLAY_NAME="Unraid Management Agent"
 VERSION="2025.11.0"
 BUNDLE="/boot/config/plugins/${PLUGIN_NAME}/unraid-management-agent-2025.11.0.tgz"
 INSTALL_DIR="/usr/local/emhttp/plugins/${PLUGIN_NAME}"
 CONFIG_DIR="/boot/config/plugins/${PLUGIN_NAME}"
 
-# Print header
 echo ""
-echo "╔═══════════════════════════════════════════════════════════════╗"
-echo "║                                                               ║"
-echo "║  ${DISPLAY_NAME}                              ║"
-echo "║  Version ${VERSION}                                          ║"
-echo "║                                                               ║"
-echo "╚═══════════════════════════════════════════════════════════════╝"
+echo "========================================="
+echo " Installing ${PLUGIN_NAME}"
+echo " Version: ${VERSION}"
+echo "========================================="
 echo ""
 
 # Check if service is running
@@ -137,94 +132,79 @@ running=$(pidof ${PLUGIN_NAME} | wc -w)
 
 # Stop service if running
 if [ $running -ge 1 ]; then
-    echo "[1/6] Stopping existing service..."
+    echo "Stopping existing service..."
     killall ${PLUGIN_NAME} 2>/dev/null
     sleep 2
-    echo "      ✓ Service stopped"
-else
-    echo "[1/6] Checking for existing service..."
-    echo "      ℹ No existing service found"
 fi
 
 # Remove old plugin files
-echo "[2/6] Removing old plugin files..."
+echo "Removing old plugin files..."
 rm -rf ${INSTALL_DIR}/* 2>/dev/null
 mkdir -p ${INSTALL_DIR}
-echo "      ✓ Old files removed"
 
 # Remove old bundle files (keep current version)
-echo "[3/6] Cleaning up old bundles..."
+echo "Cleaning up old bundles..."
 rm -f $(ls ${CONFIG_DIR}/${PLUGIN_NAME}*.tgz 2>/dev/null | grep -v "${VERSION}.tgz")
-echo "      ✓ Cleanup complete"
 
 # Extract the bundle
-echo "[4/6] Extracting plugin bundle..."
+echo "Extracting plugin bundle..."
 if [ -f "${BUNDLE}" ]; then
     tar -xzf ${BUNDLE} -C / 2>&1
     TAR_EXIT=$?
     if [ $TAR_EXIT -eq 0 ]; then
-        echo "      ✓ Bundle extracted successfully"
+        echo "✓ Bundle extracted successfully"
     else
-        echo "      ✗ Failed to extract bundle (exit code: $TAR_EXIT)"
+        echo "✗ Failed to extract bundle (exit code: $TAR_EXIT)"
         exit 1
     fi
 else
-    echo "      ✗ Bundle not found: ${BUNDLE}"
+    echo "✗ Bundle not found: ${BUNDLE}"
     exit 1
 fi
 
 # Set executable permissions
-echo "[5/6] Setting permissions..."
+echo "Setting permissions..."
 chmod +x ${INSTALL_DIR}/${PLUGIN_NAME} 2>/dev/null
 chmod +x ${INSTALL_DIR}/scripts/* 2>/dev/null
 chmod +x ${INSTALL_DIR}/event/* 2>/dev/null
 
 # Verify installation
 if [ -f "${INSTALL_DIR}/${PLUGIN_NAME}" ]; then
-    echo "      ✓ Binary installed"
+    echo "✓ Binary installed"
 else
-    echo "      ✗ Binary not found after installation"
+    echo "✗ Binary not found after installation"
     exit 1
 fi
 
 # Start service if it was running before, or if this is a fresh install
-echo "[6/6] Starting service..."
 if [ $running -ge 1 ] || [ ! -f "${CONFIG_DIR}/.installed" ]; then
+    echo "Starting service..."
     ${INSTALL_DIR}/scripts/start
     sleep 2
-
+    
     # Verify service started
     if pidof ${PLUGIN_NAME} > /dev/null; then
-        echo "      ✓ Service started successfully"
+        echo "✓ Service started successfully"
     else
-        echo "      ⚠ Service may not have started. Check logs: /var/log/${PLUGIN_NAME}.log"
+        echo "⚠ Service may not have started. Check logs: /var/log/${PLUGIN_NAME}.log"
     fi
-else
-    echo "      ℹ Service was not running before, skipping auto-start"
 fi
 
 # Mark as installed
 touch ${CONFIG_DIR}/.installed
 
-# Print success footer
 echo ""
-echo "╔═══════════════════════════════════════════════════════════════╗"
-echo "║                                                               ║"
-echo "║  ✓ Installation Complete!                                     ║"
-echo "║                                                               ║"
-echo "║  ${DISPLAY_NAME} v${VERSION}                     ║"
-echo "║                                                               ║"
-echo "╚═══════════════════════════════════════════════════════════════╝"
+echo "========================================="
+echo " ${PLUGIN_NAME} v${VERSION}"
+echo " Installation Complete!"
+echo "========================================="
 echo ""
-echo "Quick Start:"
-echo "  • API Server:     http://localhost:8043"
-echo "  • Health Check:   http://localhost:8043/api/v1/health"
-echo "  • Configuration:  ${CONFIG_DIR}/config.cfg"
-echo "  • Logs:           /var/log/${PLUGIN_NAME}.log"
+echo "API Server: http://localhost:8043"
+echo "Configuration: ${CONFIG_DIR}/config.cfg"
+echo "Logs: /var/log/${PLUGIN_NAME}.log"
 echo ""
-echo "Documentation & Support:"
-echo "  • GitHub:  https://github.com/ruaan-deysel/unraid-management-agent"
-echo "  • API Docs: See README.md for full API documentation"
+echo "For documentation and support:"
+echo "  https://github.com/ruaan-deysel/unraid-management-agent"
 echo ""
 ]]>
 </INLINE>
@@ -237,24 +217,20 @@ echo ""
 #!/bin/bash
 
 PLUGIN_NAME="unraid-management-agent"
-DISPLAY_NAME="Unraid Management Agent"
 VERSION="2025.11.0"
 INSTALL_DIR="/usr/local/emhttp/plugins/${PLUGIN_NAME}"
 CONFIG_DIR="/boot/config/plugins/${PLUGIN_NAME}"
 LOG_FILE="/var/log/${PLUGIN_NAME}.log"
 
-# Print header
 echo ""
-echo "╔═══════════════════════════════════════════════════════════════╗"
-echo "║                                                               ║"
-echo "║  Uninstalling ${DISPLAY_NAME}                    ║"
-echo "║  Version ${VERSION}                                          ║"
-echo "║                                                               ║"
-echo "╚═══════════════════════════════════════════════════════════════╝"
+echo "========================================="
+echo " Removing ${PLUGIN_NAME}"
+echo " Version: ${VERSION}"
+echo "========================================="
 echo ""
 
 # Stop the service
-echo "[1/3] Stopping service..."
+echo "Stopping service..."
 if [ -f "${INSTALL_DIR}/scripts/stop" ]; then
     ${INSTALL_DIR}/scripts/stop
 else
@@ -264,59 +240,31 @@ sleep 2
 
 # Verify service stopped
 if pidof ${PLUGIN_NAME} > /dev/null; then
-    echo "      ⚠ Force stopping service..."
+    echo "Force stopping service..."
     killall -9 ${PLUGIN_NAME} 2>/dev/null
     sleep 1
 fi
 
-if ! pidof ${PLUGIN_NAME} > /dev/null; then
-    echo "      ✓ Service stopped"
-else
-    echo "      ✗ Failed to stop service"
-fi
-
 # Remove plugin files
-echo "[2/3] Removing plugin files..."
+echo "Removing plugin files..."
 rm -rf ${INSTALL_DIR}
-if [ ! -d "${INSTALL_DIR}" ]; then
-    echo "      ✓ Plugin files removed"
-else
-    echo "      ✗ Failed to remove plugin files"
-fi
 
 # Remove log file
-echo "[3/3] Removing log file..."
+echo "Removing log file..."
 rm -f ${LOG_FILE}
-if [ ! -f "${LOG_FILE}" ]; then
-    echo "      ✓ Log file removed"
-else
-    echo "      ✗ Failed to remove log file"
-fi
 
-# Configuration preservation notice
+# Ask about configuration
 echo ""
-echo "╔═══════════════════════════════════════════════════════════════╗"
-echo "║                                                               ║"
-echo "║  Configuration Preserved                                      ║"
-echo "║                                                               ║"
-echo "╚═══════════════════════════════════════════════════════════════╝"
+echo "Configuration files are located in:"
+echo "  ${CONFIG_DIR}"
 echo ""
-echo "Your configuration files have been preserved:"
-echo "  • Location: ${CONFIG_DIR}"
-echo "  • Files:    config.cfg"
-echo ""
-echo "To completely remove all plugin data:"
+echo "To completely remove all data, run:"
 echo "  rm -rf ${CONFIG_DIR}"
 echo ""
 
-# Print success footer
-echo "╔═══════════════════════════════════════════════════════════════╗"
-echo "║                                                               ║"
-echo "║  ✓ Uninstallation Complete!                                   ║"
-echo "║                                                               ║"
-echo "║  ${DISPLAY_NAME} has been removed                 ║"
-echo "║                                                               ║"
-echo "╚═══════════════════════════════════════════════════════════════╝"
+echo "========================================="
+echo " ${PLUGIN_NAME} has been removed"
+echo "========================================="
 echo ""
 ]]>
 </INLINE>
