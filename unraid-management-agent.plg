@@ -288,26 +288,59 @@ if pidof ${PLUGIN_NAME} > /dev/null; then
     sleep 1
 fi
 
-# Remove plugin files
-echo "Removing plugin files..."
-rm -rf ${INSTALL_DIR}
+# Final verification
+if pidof ${PLUGIN_NAME} > /dev/null; then
+    echo "✗ Warning: Service may still be running"
+else
+    echo "✓ Service stopped"
+fi
+
+echo ""
+echo "Removing all plugin files and data..."
+echo ""
+
+# Remove plugin installation directory
+if [ -d "${INSTALL_DIR}" ]; then
+    rm -rf ${INSTALL_DIR}
+    if [ $? -eq 0 ]; then
+        echo "✓ Removed plugin directory: ${INSTALL_DIR}"
+    else
+        echo "✗ Failed to remove: ${INSTALL_DIR}"
+    fi
+else
+    echo "  Plugin directory not found (already removed)"
+fi
+
+# Remove configuration directory
+if [ -d "${CONFIG_DIR}" ]; then
+    rm -rf ${CONFIG_DIR}
+    if [ $? -eq 0 ]; then
+        echo "✓ Removed configuration directory: ${CONFIG_DIR}"
+    else
+        echo "✗ Failed to remove: ${CONFIG_DIR}"
+    fi
+else
+    echo "  Configuration directory not found (already removed)"
+fi
 
 # Remove log file
-echo "Removing log file..."
-rm -f ${LOG_FILE}
+if [ -f "${LOG_FILE}" ]; then
+    rm -f ${LOG_FILE}
+    if [ $? -eq 0 ]; then
+        echo "✓ Removed log file: ${LOG_FILE}"
+    else
+        echo "✗ Failed to remove: ${LOG_FILE}"
+    fi
+else
+    echo "  Log file not found (already removed)"
+fi
 
-# Ask about configuration
 echo ""
-echo "Configuration files are located in:"
-echo "  ${CONFIG_DIR}"
-echo ""
-echo "To completely remove all data, run:"
-echo "  rm -rf ${CONFIG_DIR}"
-echo ""
-
 echo "========================================="
-echo " ${PLUGIN_NAME} has been removed"
+echo " Complete Removal Successful"
 echo "========================================="
+echo ""
+echo "All plugin files and data have been removed from the system."
 echo ""
 ]]>
 </INLINE>
