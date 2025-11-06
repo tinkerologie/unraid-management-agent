@@ -17,7 +17,7 @@
          version="&version;"
          min="6.9.0"
          pluginURL="&pluginURL;"
-         support="&supportURL;"
+         support="&supportURL;">
 
 <DESCRIPTION>
 This Unraid plugin provides REST API and WebSocket interfaces for real-time system monitoring, Docker/VM control, and comprehensive hardware metrics.
