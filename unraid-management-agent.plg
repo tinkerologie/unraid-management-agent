@@ -114,9 +114,9 @@ INTERVAL_SHARES=60
 <![CDATA[
 #!/bin/bash
 
-PLUGIN_NAME="&name;"
-VERSION="&version;"
-BUNDLE="/boot/config/plugins/${PLUGIN_NAME}/&bundle;"
+PLUGIN_NAME="unraid-management-agent"
+VERSION="2025.11.0"
+BUNDLE="/boot/config/plugins/${PLUGIN_NAME}/unraid-management-agent-2025.11.0.tgz"
 INSTALL_DIR="/usr/local/emhttp/plugins/${PLUGIN_NAME}"
 CONFIG_DIR="/boot/config/plugins/${PLUGIN_NAME}"
 
@@ -203,7 +203,7 @@ echo "Configuration: ${CONFIG_DIR}/config.cfg"
 echo "Logs: /var/log/${PLUGIN_NAME}.log"
 echo ""
 echo "For documentation and support:"
-echo "  https://github.com/&author;/&name;"
+echo "  https://github.com/ruaan-deysel/unraid-management-agent"
 echo ""
 ]]>
 </INLINE>
@@ -215,8 +215,8 @@ echo ""
 <![CDATA[
 #!/bin/bash
 
-PLUGIN_NAME="&name;"
-VERSION="&version;"
+PLUGIN_NAME="unraid-management-agent"
+VERSION="2025.11.0"
 INSTALL_DIR="/usr/local/emhttp/plugins/${PLUGIN_NAME}"
 CONFIG_DIR="/boot/config/plugins/${PLUGIN_NAME}"
 LOG_FILE="/var/log/${PLUGIN_NAME}.log"
