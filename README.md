@@ -104,14 +104,32 @@ Coordinates the entire application lifecycle:
 ## Installation
 
 ### Prerequisites
-- Unraid 7.x or later
-- Go 1.21+ (for building from source)
+- Unraid 6.9+ (tested on Unraid 7.x)
+- Port 8043 available (configurable)
 
-### From Release Package
+### Via Community Applications (Recommended)
+
+**Coming Soon**: This plugin will be available in the Unraid Community Applications store.
+
+For now, you can install manually using the plugin URL:
+
+1. Open your Unraid Web UI
+2. Navigate to **Plugins** → **Install Plugin**
+3. Enter the plugin URL:
+   ```
+   https://raw.githubusercontent.com/ruaan-deysel/unraid-management-agent/main/unraid-management-agent.plg
+   ```
+4. Click **Install**
+5. The plugin will automatically:
+   - Download and extract the package
+   - Create default configuration
+   - Start the service on port 8043
+
+### Manual Installation from Release Package
 
 1. Download the latest release package:
    ```bash
-   wget https://github.com/ruaan-deysel/unraid-management-agent/releases/latest/unraid-management-agent-2025.11.0.tgz
+   wget https://github.com/ruaan-deysel/unraid-management-agent/releases/download/v2025.11.0/unraid-management-agent-2025.11.0.tgz
    ```
 
 2. Extract and install:
@@ -121,7 +139,7 @@ Coordinates the entire application lifecycle:
 
 3. Start the service:
    ```bash
-   /usr/local/emhttp/plugins/unraid-management-agent/unraid-management-agent boot
+   /usr/local/emhttp/plugins/unraid-management-agent/scripts/start
    ```
 
 ### Building from Source
@@ -295,9 +313,42 @@ make clean
 
 ## Configuration
 
+### Configuration File
+
+When installed via the .plg file, the plugin creates a configuration file at:
+```
+/boot/config/plugins/unraid-management-agent/config.cfg
+```
+
+Default configuration:
+```bash
+# API Server Configuration
+PORT=8043
+LOG_LEVEL=info
+
+# Feature Toggles
+ENABLE_UPS=yes
+ENABLE_GPU=yes
+
+# Collection Intervals (seconds)
+INTERVAL_SYSTEM=5
+INTERVAL_DISK=30
+INTERVAL_ARRAY=10
+INTERVAL_DOCKER=10
+INTERVAL_VM=10
+INTERVAL_UPS=10
+INTERVAL_SHARES=60
+```
+
+You can edit this file to customize the plugin behavior. Changes require a service restart:
+```bash
+/usr/local/emhttp/plugins/unraid-management-agent/scripts/stop
+/usr/local/emhttp/plugins/unraid-management-agent/scripts/start
+```
+
 ### Collection Intervals
 
-Defined in `daemon/common/const.go`:
+Default intervals (configurable via config file):
 
 - System: 5 seconds
 - Array: 10 seconds
@@ -317,8 +368,9 @@ The agent uses log rotation with the following settings:
 - **Max Size**: 5 MB per file
 - **Backups**: None (only current log is kept)
 - **Age-based Retention**: None (logs are rotated based on size only)
+- **Log Levels**: DEBUG, INFO, WARNING, ERROR (configurable via `LOG_LEVEL` in config file)
 
-In debug mode (`--debug`), logs are written to stdout for immediate visibility.
+In debug mode (`--debug` or `LOG_LEVEL=debug`), logs are written to stdout for immediate visibility.
 
 ## Troubleshooting
 
