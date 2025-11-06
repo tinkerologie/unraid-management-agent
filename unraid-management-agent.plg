@@ -6,7 +6,7 @@
     <!ENTITY version     "2025.11.0">
     <!ENTITY gitURL      "https://github.com/&author;/&name;">
     <!ENTITY pluginURL   "&gitURL;/raw/main/&name;.plg">
-    <!ENTITY supportURL  "https://forums.unraid.net/topic/XXXXX-support-unraid-management-agent">
+    <!ENTITY supportURL  "https://forums.unraid.net/topic/178262-home-assistant-unraid-integration">
     <!ENTITY iconURL     "https://raw.githubusercontent.com/&author;/&name;/main/icon.png">
     <!ENTITY bundle      "&name;-&version;.tgz">
     <!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
