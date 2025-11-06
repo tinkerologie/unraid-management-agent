@@ -1,0 +1,273 @@
+<?xml version='1.0' standalone='yes'?>
+
+<!DOCTYPE PLUGIN [
+<!ENTITY name        "unraid-management-agent">
+<!ENTITY author      "ruaan-deysel">
+<!ENTITY version     "2025.11.0">
+<!ENTITY launch      "Settings/&name;">
+<!ENTITY gitURL      "https://github.com/&author;/&name;">
+<!ENTITY pluginURL   "&gitURL;/raw/main/&name;.plg">
+<!ENTITY supportURL  "&gitURL;/issues">
+<!ENTITY iconURL     "https://raw.githubusercontent.com/&author;/&name;/main/icon.png">
+<!ENTITY bundle      "&name;-&version;.tgz">
+<!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
+]>
+
+<PLUGIN  name="&name;"
+         author="&author;"
+         version="&version;"
+         launch="&launch;"
+         pluginURL="&pluginURL;"
+         support="&supportURL;"
+         icon="&iconURL;">
+
+<CHANGES>
+###2025.11.0 (2025-11-03)
+- Security: Fixed path injection vulnerabilities in share config endpoints (HIGH severity)
+- Added: Enhanced System Information Collector with CPU model, BIOS info, per-core CPU usage
+- Added: Detailed Disk Metrics with I/O statistics and spin state detection
+- Added: Input validation for share names, container IDs, VM names, and disk IDs
+- Changed: Implemented automatic log rotation (5 MB max file size)
+- Changed: Added configurable log levels (DEBUG, INFO, WARNING, ERROR)
+- Changed: Service now auto-starts when Unraid array starts
+- Fixed: Configuration synchronization issues
+- Fixed: LOG_LEVEL not being read from config file
+- Testing: All 66 tests passing (100% pass rate)
+
+###2025.10.03 (Initial Release)
+- Initial release with REST API and WebSocket support
+- 20+ REST API endpoints for system monitoring and control
+- WebSocket support for real-time events
+- Docker container control (start, stop, restart, pause, unpause)
+- Virtual machine control (start, stop, restart, pause, resume)
+- System monitoring (CPU, RAM, temperatures, fans)
+- Array status monitoring and control
+- Disk health and SMART data
+- UPS status monitoring (if available)
+- GPU metrics (if available)
+- Parity check control and history
+- Configuration endpoints (read-only and write)
+- Home Assistant integration ready
+</CHANGES>
+
+<!--
+Unraid Management Agent - REST API and WebSocket server for comprehensive system monitoring and control.
+
+This plugin provides a REST API and WebSocket interface for monitoring and controlling your Unraid server.
+Perfect for Home Assistant integration, custom dashboards, or automation scripts.
+
+Features:
+- 20+ REST API endpoints
+- Real-time WebSocket events
+- Docker and VM control
+- System monitoring (CPU, RAM, temps, fans, disks)
+- Array management
+- Parity check control
+- UPS and GPU monitoring
+- Secure input validation
+- Automatic log rotation
+
+Requirements:
+- Unraid 6.9+ (tested on Unraid 7.x)
+- Port 8043 available (configurable)
+
+Support:
+- GitHub Issues: https://github.com/ruaan-deysel/unraid-management-agent/issues
+- Documentation: https://github.com/ruaan-deysel/unraid-management-agent/blob/main/README.md
+-->
+
+<!-- Download the plugin bundle -->
+<FILE Name="/boot/config/plugins/&name;/&bundle;">
+<URL>&bundleURL;</URL>
+</FILE>
+
+<!-- Install default configuration -->
+<FILE Name="/boot/config/plugins/&name;/config.cfg">
+<INLINE>
+<![CDATA[
+# Unraid Management Agent Configuration
+# This file is automatically created if it doesn't exist
+
+# API Server Configuration
+PORT=8043
+LOG_LEVEL=info
+
+# Feature Toggles
+ENABLE_UPS=yes
+ENABLE_GPU=yes
+
+# Collection Intervals (seconds)
+INTERVAL_SYSTEM=5
+INTERVAL_DISK=30
+INTERVAL_ARRAY=10
+INTERVAL_DOCKER=10
+INTERVAL_VM=10
+INTERVAL_UPS=10
+INTERVAL_SHARES=60
+]]>
+</INLINE>
+</FILE>
+
+<!-- Installation script -->
+<FILE Run="/bin/bash">
+<INLINE>
+<![CDATA[
+#!/bin/bash
+
+PLUGIN_NAME="&name;"
+VERSION="&version;"
+BUNDLE="/boot/config/plugins/${PLUGIN_NAME}/&bundle;"
+INSTALL_DIR="/usr/local/emhttp/plugins/${PLUGIN_NAME}"
+CONFIG_DIR="/boot/config/plugins/${PLUGIN_NAME}"
+
+echo ""
+echo "========================================="
+echo " Installing ${PLUGIN_NAME}"
+echo " Version: ${VERSION}"
+echo "========================================="
+echo ""
+
+# Check if service is running
+running=$(pidof ${PLUGIN_NAME} | wc -w)
+
+# Stop service if running
+if [ $running -ge 1 ]; then
+    echo "Stopping existing service..."
+    killall ${PLUGIN_NAME} 2>/dev/null
+    sleep 2
+fi
+
+# Remove old plugin files
+echo "Removing old plugin files..."
+rm -rf ${INSTALL_DIR}/* 2>/dev/null
+mkdir -p ${INSTALL_DIR}
+
+# Remove old bundle files (keep current version)
+echo "Cleaning up old bundles..."
+rm -f $(ls ${CONFIG_DIR}/${PLUGIN_NAME}*.tgz 2>/dev/null | grep -v "${VERSION}.tgz")
+
+# Extract the bundle
+echo "Extracting plugin bundle..."
+if [ -f "${BUNDLE}" ]; then
+    tar -xzf ${BUNDLE} -C /usr/local/emhttp/plugins 2>&1
+    if [ $? -eq 0 ]; then
+        echo "✓ Bundle extracted successfully"
+    else
+        echo "✗ Failed to extract bundle"
+        exit 1
+    fi
+else
+    echo "✗ Bundle not found: ${BUNDLE}"
+    exit 1
+fi
+
+# Set executable permissions
+echo "Setting permissions..."
+chmod +x ${INSTALL_DIR}/${PLUGIN_NAME} 2>/dev/null
+chmod +x ${INSTALL_DIR}/scripts/* 2>/dev/null
+chmod +x ${INSTALL_DIR}/event/* 2>/dev/null
+
+# Verify installation
+if [ -f "${INSTALL_DIR}/${PLUGIN_NAME}" ]; then
+    echo "✓ Binary installed"
+else
+    echo "✗ Binary not found after installation"
+    exit 1
+fi
+
+# Start service if it was running before, or if this is a fresh install
+if [ $running -ge 1 ] || [ ! -f "${CONFIG_DIR}/.installed" ]; then
+    echo "Starting service..."
+    ${INSTALL_DIR}/scripts/start
+    sleep 2
+    
+    # Verify service started
+    if pidof ${PLUGIN_NAME} > /dev/null; then
+        echo "✓ Service started successfully"
+    else
+        echo "⚠ Service may not have started. Check logs: /var/log/${PLUGIN_NAME}.log"
+    fi
+fi
+
+# Mark as installed
+touch ${CONFIG_DIR}/.installed
+
+echo ""
+echo "========================================="
+echo " ${PLUGIN_NAME} v${VERSION}"
+echo " Installation Complete!"
+echo "========================================="
+echo ""
+echo "API Server: http://localhost:8043"
+echo "Configuration: ${CONFIG_DIR}/config.cfg"
+echo "Logs: /var/log/${PLUGIN_NAME}.log"
+echo ""
+echo "For documentation and support:"
+echo "  https://github.com/&author;/&name;"
+echo ""
+]]>
+</INLINE>
+</FILE>
+
+<!-- Removal script -->
+<FILE Run="/bin/bash" Method="remove">
+<INLINE>
+<![CDATA[
+#!/bin/bash
+
+PLUGIN_NAME="&name;"
+VERSION="&version;"
+INSTALL_DIR="/usr/local/emhttp/plugins/${PLUGIN_NAME}"
+CONFIG_DIR="/boot/config/plugins/${PLUGIN_NAME}"
+LOG_FILE="/var/log/${PLUGIN_NAME}.log"
+
+echo ""
+echo "========================================="
+echo " Removing ${PLUGIN_NAME}"
+echo " Version: ${VERSION}"
+echo "========================================="
+echo ""
+
+# Stop the service
+echo "Stopping service..."
+if [ -f "${INSTALL_DIR}/scripts/stop" ]; then
+    ${INSTALL_DIR}/scripts/stop
+else
+    killall ${PLUGIN_NAME} 2>/dev/null
+fi
+sleep 2
+
+# Verify service stopped
+if pidof ${PLUGIN_NAME} > /dev/null; then
+    echo "Force stopping service..."
+    killall -9 ${PLUGIN_NAME} 2>/dev/null
+    sleep 1
+fi
+
+# Remove plugin files
+echo "Removing plugin files..."
+rm -rf ${INSTALL_DIR}
+
+# Remove log file
+echo "Removing log file..."
+rm -f ${LOG_FILE}
+
+# Ask about configuration
+echo ""
+echo "Configuration files are located in:"
+echo "  ${CONFIG_DIR}"
+echo ""
+echo "To completely remove all data, run:"
+echo "  rm -rf ${CONFIG_DIR}"
+echo ""
+
+echo "========================================="
+echo " ${PLUGIN_NAME} has been removed"
+echo "========================================="
+echo ""
+]]>
+</INLINE>
+</FILE>
+
+</PLUGIN>
+
