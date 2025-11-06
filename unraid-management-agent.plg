@@ -7,7 +7,6 @@
     <!ENTITY gitURL      "https://github.com/&author;/&name;">
     <!ENTITY pluginURL   "&gitURL;/raw/main/&name;.plg">
     <!ENTITY supportURL  "https://forums.unraid.net/topic/178262-home-assistant-unraid-integration">
-    <!ENTITY iconURL     "https://raw.githubusercontent.com/&author;/&name;/main/icon.png">
     <!ENTITY bundle      "&name;-&version;.tgz">
     <!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
     <!ENTITY md5         "63d9311eb120db45b9d6495ce92fdb2c">
@@ -19,7 +18,6 @@
          min="6.9.0"
          pluginURL="&pluginURL;"
          support="&supportURL;"
-         icon="&iconURL;">
 
 <DESCRIPTION>
 This Unraid plugin provides REST API and WebSocket interfaces for real-time system monitoring, Docker/VM control, and comprehensive hardware metrics.
