@@ -149,11 +149,12 @@ rm -f $(ls ${CONFIG_DIR}/${PLUGIN_NAME}*.tgz 2>/dev/null | grep -v "${VERSION}.t
 # Extract the bundle
 echo "Extracting plugin bundle..."
 if [ -f "${BUNDLE}" ]; then
-    tar -xzf ${BUNDLE} -C / 2>&1 | grep -v "Ignoring unknown extended header keyword"
-    if [ $? -eq 0 ]; then
+    tar -xzf ${BUNDLE} -C / 2>&1
+    TAR_EXIT=$?
+    if [ $TAR_EXIT -eq 0 ]; then
         echo "✓ Bundle extracted successfully"
     else
-        echo "✗ Failed to extract bundle"
+        echo "✗ Failed to extract bundle (exit code: $TAR_EXIT)"
         exit 1
     fi
 else
