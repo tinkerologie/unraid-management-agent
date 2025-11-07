@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+- Improved plugin UI/UX in Unraid interface
+  - Added clickable settings link to plugin icon
+  - Updated settings page title to "Unraid Management Agent"
+  - Added server icon to plugin listing
 
 ### Fixed
 

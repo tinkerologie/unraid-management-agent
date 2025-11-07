@@ -1,5 +1,5 @@
 Menu="Utilities"
-Title="Management Agent"
+Title="Unraid Management Agent"
 Icon="/plugins/unraid-management-agent/images/unraid-management-agent.png"
 ---
 <?PHP
