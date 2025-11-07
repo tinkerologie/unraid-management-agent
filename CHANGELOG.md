@@ -10,14 +10,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+---
+
+## [2025.11.2] - 2025-11-07
+
+### Added
 - Automated CI/CD workflow for releases using GitHub Actions
   - Automatically builds release package when Git tag is pushed
   - Calculates MD5 checksum and includes in release notes
   - Creates GitHub release with .tgz file attached
   - Extracts release notes from CHANGELOG.md
   - Supports pre-release detection (alpha, beta, rc versions)
-
-### Changed
 
 ### Fixed
 - SMART health status now correctly reported in `/api/v1/disks` endpoint (#4)
