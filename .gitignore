@@ -20,6 +20,9 @@ go.work
 # Build directory
 build/
 
+# Binary output from local builds
+unraid-management-agent
+
 # IDE files
 .vscode/
 .idea/

@@ -1,3 +1,0 @@
-#!/bin/bash
-# Always start the service when the array starts
-/usr/local/emhttp/plugins/unraid-management-agent/scripts/start
