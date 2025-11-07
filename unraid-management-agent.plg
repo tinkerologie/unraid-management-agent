@@ -3,13 +3,13 @@
 <!DOCTYPE PLUGIN [
     <!ENTITY name        "unraid-management-agent">
     <!ENTITY author      "ruaan-deysel">
-    <!ENTITY version     "2025.11.0">
+    <!ENTITY version     "2025.11.1">
     <!ENTITY gitURL      "https://github.com/&author;/&name;">
     <!ENTITY pluginURL   "&gitURL;/raw/main/&name;.plg">
     <!ENTITY supportURL  "https://forums.unraid.net/topic/178262-home-assistant-unraid-integration">
     <!ENTITY bundle      "&name;-&version;.tgz">
     <!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
-    <!ENTITY md5         "63d9311eb120db45b9d6495ce92fdb2c">
+    <!ENTITY md5         "5ceeb675ea6bda899a85a2b050dd890e">
 ]>
 
 <PLUGIN name="&name;" author="&author;" version="&version;" min="6.9.0" pluginURL="&pluginURL;" support="&supportURL;">
@@ -153,8 +153,8 @@ INTERVAL_SHARES=60
 #!/bin/bash
 
 PLUGIN_NAME="unraid-management-agent"
-VERSION="2025.11.0"
-BUNDLE="/boot/config/plugins/${PLUGIN_NAME}/unraid-management-agent-2025.11.0.tgz"
+VERSION="2025.11.1"
+BUNDLE="/boot/config/plugins/${PLUGIN_NAME}/unraid-management-agent-2025.11.1.tgz"
 INSTALL_DIR="/usr/local/emhttp/plugins/${PLUGIN_NAME}"
 CONFIG_DIR="/boot/config/plugins/${PLUGIN_NAME}"
 
@@ -255,7 +255,7 @@ echo ""
 #!/bin/bash
 
 PLUGIN_NAME="unraid-management-agent"
-VERSION="2025.11.0"
+VERSION="2025.11.1"
 INSTALL_DIR="/usr/local/emhttp/plugins/${PLUGIN_NAME}"
 CONFIG_DIR="/boot/config/plugins/${PLUGIN_NAME}"
 LOG_FILE="/var/log/${PLUGIN_NAME}.log"
