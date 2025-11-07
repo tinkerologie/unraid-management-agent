@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added server icon to plugin listing
 
 ### Fixed
+- Settings page URL now uses correct lowercase-with-hyphens format
+  - Changed from `/Settings/UnraidManagementAgent` to `/Settings/unraid-management-agent`
+  - Plugin icon now navigates to the correct settings page URL
 
 ---
 

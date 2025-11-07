@@ -77,7 +77,7 @@ if ($_POST) {
     }
     
     // Redirect to refresh page
-    header("Location: /Settings/UnraidManagementAgent");
+    header("Location: /Settings/unraid-management-agent");
     exit;
 }
 ?>
