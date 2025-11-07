@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Assigned role `docker_vdisk` for easy filtering
   - Enables monitoring of Docker storage capacity for alerts
 
+- Log filesystem usage monitoring in `/api/v1/disks` endpoint
+  - Automatically detects log filesystem at `/var/log` mount point
+  - Reports size, used, free bytes, and usage percentage
+  - Identifies device name (e.g., `tmpfs` for RAM-based log storage)
+  - Includes filesystem type detection (tmpfs, ext4, xfs, etc.)
+  - Assigned role `log` for easy filtering
+  - Enables monitoring of log storage capacity to prevent system failures
+  - Critical for tmpfs-based log filesystems that can fill up and cause issues
+
 ### Fixed
 - UPS API endpoint now returns actual UPS model name instead of hostname (#1) - 2025-11-03
 

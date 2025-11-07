@@ -194,6 +194,12 @@ func (c *DiskCollector) collectDisks() ([]dto.DiskInfo, error) {
 		logger.Debug("Disk: Added Docker vDisk to collection")
 	}
 
+	// Collect Log filesystem information
+	if logFS := c.collectLogFilesystem(); logFS != nil {
+		disks = append(disks, *logFS)
+		logger.Debug("Disk: Added Log filesystem to collection")
+	}
+
 	return disks, nil
 }
 
@@ -471,6 +477,79 @@ func (c *DiskCollector) getFilesystemType(mountPoint string) string {
 			// fields[1] is mount point, fields[2] is filesystem type
 			if fields[1] == mountPoint {
 				return fields[2]
+			}
+		}
+	}
+
+	return "unknown"
+}
+
+// collectLogFilesystem collects Log filesystem usage information
+func (c *DiskCollector) collectLogFilesystem() *dto.DiskInfo {
+	// Check if log mount point exists
+	logMountPoint := "/var/log"
+	if _, err := os.Stat(logMountPoint); err != nil {
+		logger.Debug("Log mount point not found: %v", err)
+		return nil
+	}
+
+	// Get filesystem statistics using statfs
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs(logMountPoint, &stat); err != nil {
+		logger.Debug("Failed to get Log filesystem stats: %v", err)
+		return nil
+	}
+
+	// Calculate sizes in bytes
+	totalBytes := stat.Blocks * uint64(stat.Bsize)
+	freeBytes := stat.Bfree * uint64(stat.Bsize)
+	usedBytes := totalBytes - freeBytes
+
+	// Calculate usage percentage
+	var usagePercent float64
+	if totalBytes > 0 {
+		usagePercent = float64(usedBytes) / float64(totalBytes) * 100
+	}
+
+	// Determine filesystem type
+	filesystem := c.getFilesystemType(logMountPoint)
+
+	// Determine device name from /proc/mounts
+	deviceName := c.getDeviceForMountPoint(logMountPoint)
+
+	logFS := &dto.DiskInfo{
+		ID:           "log_filesystem",
+		Name:         "Log",
+		Role:         "log",
+		Device:       deviceName,
+		Size:         totalBytes,
+		Used:         usedBytes,
+		Free:         freeBytes,
+		UsagePercent: usagePercent,
+		MountPoint:   logMountPoint,
+		FileSystem:   filesystem,
+		Status:       "DISK_OK",
+		Timestamp:    time.Now(),
+	}
+
+	return logFS
+}
+
+// getDeviceForMountPoint finds the device name for a given mount point
+func (c *DiskCollector) getDeviceForMountPoint(mountPoint string) string {
+	// Read /proc/mounts to find device
+	data, err := os.ReadFile("/proc/mounts")
+	if err != nil {
+		return "unknown"
+	}
+
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) >= 2 {
+			// fields[0] is device, fields[1] is mount point
+			if fields[1] == mountPoint {
+				return fields[0]
 			}
 		}
 	}
