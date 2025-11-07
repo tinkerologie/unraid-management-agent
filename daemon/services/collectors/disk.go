@@ -187,6 +187,13 @@ func (c *DiskCollector) collectDisks() ([]dto.DiskInfo, error) {
 	}
 
 	logger.Debug("Disk: Parsed %d disks successfully", len(disks))
+
+	// Collect Docker vDisk information
+	if dockerVDisk := c.collectDockerVDisk(); dockerVDisk != nil {
+		disks = append(disks, *dockerVDisk)
+		logger.Debug("Disk: Added Docker vDisk to collection")
+	}
+
 	return disks, nil
 }
 
@@ -315,8 +322,8 @@ func (c *DiskCollector) enrichWithMountInfo(disk *dto.DiskInfo) {
 	var stat syscall.Statfs_t
 	if err := syscall.Statfs(disk.MountPoint, &stat); err == nil {
 		// Calculate sizes in bytes
-		totalBytes := uint64(stat.Blocks) * uint64(stat.Bsize)
-		freeBytes := uint64(stat.Bfree) * uint64(stat.Bsize)
+		totalBytes := stat.Blocks * uint64(stat.Bsize)
+		freeBytes := stat.Bfree * uint64(stat.Bsize)
 		usedBytes := totalBytes - freeBytes
 
 		disk.Used = usedBytes
@@ -374,4 +381,99 @@ func (c *DiskCollector) enrichWithSpinState(disk *dto.DiskInfo) {
 
 	// Alternative: Could execute hdparm -C /dev/sdX to get actual state
 	// But that requires executing external command which we want to minimize
+}
+
+// collectDockerVDisk collects Docker vDisk usage information
+func (c *DiskCollector) collectDockerVDisk() *dto.DiskInfo {
+	// Check if Docker mount point exists
+	dockerMountPoint := "/var/lib/docker"
+	if _, err := os.Stat(dockerMountPoint); err != nil {
+		logger.Debug("Docker mount point not found: %v", err)
+		return nil
+	}
+
+	// Get filesystem statistics using statfs
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs(dockerMountPoint, &stat); err != nil {
+		logger.Debug("Failed to get Docker vDisk stats: %v", err)
+		return nil
+	}
+
+	// Calculate sizes in bytes
+	totalBytes := stat.Blocks * uint64(stat.Bsize)
+	freeBytes := stat.Bfree * uint64(stat.Bsize)
+	usedBytes := totalBytes - freeBytes
+
+	// Calculate usage percentage
+	var usagePercent float64
+	if totalBytes > 0 {
+		usagePercent = float64(usedBytes) / float64(totalBytes) * 100
+	}
+
+	// Try to find the actual vDisk file path
+	vdiskPath := c.findDockerVDiskPath()
+
+	// Determine filesystem type
+	filesystem := c.getFilesystemType(dockerMountPoint)
+
+	dockerVDisk := &dto.DiskInfo{
+		ID:           "docker_vdisk",
+		Name:         "Docker vDisk",
+		Role:         "docker_vdisk",
+		Size:         totalBytes,
+		Used:         usedBytes,
+		Free:         freeBytes,
+		UsagePercent: usagePercent,
+		MountPoint:   dockerMountPoint,
+		FileSystem:   filesystem,
+		Status:       "DISK_OK",
+		Timestamp:    time.Now(),
+	}
+
+	// Add vDisk path if found
+	if vdiskPath != "" {
+		dockerVDisk.Device = vdiskPath
+	}
+
+	return dockerVDisk
+}
+
+// findDockerVDiskPath attempts to locate the Docker vDisk file
+func (c *DiskCollector) findDockerVDiskPath() string {
+	// Common Docker vDisk locations on Unraid
+	possiblePaths := []string{
+		"/mnt/user/system/docker/docker.vdisk",
+		"/mnt/cache/system/docker/docker.vdisk",
+		"/var/lib/docker.img",
+	}
+
+	for _, path := range possiblePaths {
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+
+	return ""
+}
+
+// getFilesystemType determines the filesystem type for a mount point
+func (c *DiskCollector) getFilesystemType(mountPoint string) string {
+	// Read /proc/mounts to find filesystem type
+	data, err := os.ReadFile("/proc/mounts")
+	if err != nil {
+		return "unknown"
+	}
+
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) >= 3 {
+			// fields[1] is mount point, fields[2] is filesystem type
+			if fields[1] == mountPoint {
+				return fields[2]
+			}
+		}
+	}
+
+	return "unknown"
 }

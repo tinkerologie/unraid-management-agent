@@ -7,7 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2025.11.0] - 2025-11-03
+## [2025.11.0]
+
+### Added
+- Docker vDisk usage monitoring in `/api/v1/disks` endpoint
+  - Automatically detects Docker vDisk at `/var/lib/docker` mount point
+  - Reports size, used, free bytes, and usage percentage
+  - Identifies vDisk file path (e.g., `/mnt/user/system/docker/docker.vdisk`)
+  - Includes filesystem type detection
+  - Assigned role `docker_vdisk` for easy filtering
+  - Enables monitoring of Docker storage capacity for alerts
+
+### Fixed
+- UPS API endpoint now returns actual UPS model name instead of hostname (#1) - 2025-11-03
 
 ### Added
 

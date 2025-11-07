@@ -480,7 +480,7 @@ interface DiskInfo {
   id: string;
   device: string;
   name: string;
-  role: 'parity' | 'data' | 'cache';
+  role: 'parity' | 'parity2' | 'data' | 'cache' | 'pool' | 'docker_vdisk';
   size_bytes: number;
   used_bytes: number;
   free_bytes: number;
