@@ -1,0 +1,155 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+      
+      - name: Extract version from tag
+        id: version
+        run: |
+          # Extract version from tag (e.g., v2025.11.1 -> 2025.11.1)
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+          
+          # Check if this is a pre-release
+          if [[ "$VERSION" =~ (alpha|beta|rc) ]]; then
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+            echo "This is a pre-release"
+          else
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+            echo "This is a stable release"
+          fi
+      
+      - name: Verify VERSION file matches tag
+        run: |
+          FILE_VERSION=$(cat VERSION | tr -d '\n')
+          TAG_VERSION="${{ steps.version.outputs.version }}"
+          
+          if [ "$FILE_VERSION" != "$TAG_VERSION" ]; then
+            echo "ERROR: VERSION file ($FILE_VERSION) does not match tag ($TAG_VERSION)"
+            exit 1
+          fi
+          
+          echo "✅ VERSION file matches tag: $TAG_VERSION"
+      
+      - name: Build release package
+        run: |
+          echo "Building release package..."
+          make package
+          
+          # Verify the package was created
+          PACKAGE_FILE="build/unraid-management-agent-${{ steps.version.outputs.version }}.tgz"
+          if [ ! -f "$PACKAGE_FILE" ]; then
+            echo "ERROR: Package file not found: $PACKAGE_FILE"
+            ls -la build/
+            exit 1
+          fi
+          
+          echo "✅ Package created: $PACKAGE_FILE"
+          ls -lh "$PACKAGE_FILE"
+      
+      - name: Calculate MD5 checksum
+        id: checksum
+        run: |
+          PACKAGE_FILE="build/unraid-management-agent-${{ steps.version.outputs.version }}.tgz"
+          
+          # Calculate MD5 checksum (Linux uses md5sum, macOS uses md5)
+          if command -v md5sum &> /dev/null; then
+            MD5=$(md5sum "$PACKAGE_FILE" | awk '{print $1}')
+          else
+            MD5=$(md5 -q "$PACKAGE_FILE")
+          fi
+          
+          echo "md5=$MD5" >> $GITHUB_OUTPUT
+          echo "✅ MD5 checksum: $MD5"
+          
+          # Save checksum to file for release notes
+          echo "$MD5" > build/MD5SUM
+      
+      - name: Extract release notes from CHANGELOG
+        id: changelog
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          
+          # Extract release notes for this version from CHANGELOG.md
+          # Look for the section between [VERSION] and the next version header
+          
+          if grep -q "\[$VERSION\]" CHANGELOG.md; then
+            # Extract the section for this version
+            NOTES=$(awk "/\[$VERSION\]/,/^## \[/" CHANGELOG.md | sed '1d;$d' | sed '/^$/d')
+            
+            if [ -z "$NOTES" ]; then
+              echo "⚠️  No release notes found for version $VERSION in CHANGELOG.md"
+              NOTES="See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details."
+            else
+              echo "✅ Extracted release notes for version $VERSION"
+            fi
+          else
+            echo "⚠️  Version $VERSION not found in CHANGELOG.md"
+            NOTES="See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details."
+          fi
+          
+          # Save to file (GitHub Actions doesn't handle multiline outputs well)
+          echo "$NOTES" > build/RELEASE_NOTES.md
+          
+          # Add MD5 checksum to release notes
+          echo "" >> build/RELEASE_NOTES.md
+          echo "---" >> build/RELEASE_NOTES.md
+          echo "" >> build/RELEASE_NOTES.md
+          echo "**MD5 Checksum:**" >> build/RELEASE_NOTES.md
+          echo "\`\`\`" >> build/RELEASE_NOTES.md
+          echo "${{ steps.checksum.outputs.md5 }}  unraid-management-agent-$VERSION.tgz" >> build/RELEASE_NOTES.md
+          echo "\`\`\`" >> build/RELEASE_NOTES.md
+          
+          cat build/RELEASE_NOTES.md
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release v${{ steps.version.outputs.version }}
+          body_path: build/RELEASE_NOTES.md
+          files: |
+            build/unraid-management-agent-${{ steps.version.outputs.version }}.tgz
+            build/MD5SUM
+          prerelease: ${{ steps.version.outputs.prerelease }}
+          draft: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Release Summary
+        run: |
+          echo "## 🎉 Release v${{ steps.version.outputs.version }} Created Successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Package:** \`unraid-management-agent-${{ steps.version.outputs.version }}.tgz\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**MD5 Checksum:** \`${{ steps.checksum.outputs.md5 }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Release URL:** https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.version.outputs.prerelease }}" == "true" ]; then
+            echo "**Type:** Pre-release" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Type:** Stable release" >> $GITHUB_STEP_SUMMARY
+          fi
+
