@@ -142,7 +142,7 @@ func (c *UPSCollector) collectAPC() (*dto.UPSStatus, error) {
 			if _, err := strconv.ParseFloat(value, 64); err == nil {
 				// status.BatteryVoltage (not in DTO) = volts
 			}
-		case "UPSNAME":
+		case "MODEL":
 			status.Model = value
 		}
 	}
