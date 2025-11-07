@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Settings page URL now uses correct lowercase-with-hyphens format
   - Changed from `/Settings/UnraidManagementAgent` to `/Settings/unraid-management-agent`
   - Plugin icon now navigates to the correct settings page URL
+- SMART health status now correctly retrieved by running `smartctl -H` directly
+  - Previous implementation tried to read from Unraid's cached files which use disk names instead of device names
+  - Cached files also don't include the health status line
+  - Now executes `smartctl -H /dev/{device}` to get actual health status
+  - Fixes issue where all disks showed `smart_status: "UNKNOWN"`
 
 ---
 
