@@ -23,6 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2025.11.2-test] - 2025-11-07
+
+### Added
+- Test release to verify automated CI/CD workflow
+
+---
+
 ## [2025.11.1] - 2025-11-07
 
 ### Added
