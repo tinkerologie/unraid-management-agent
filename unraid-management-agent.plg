@@ -153,8 +153,8 @@ INTERVAL_SHARES=60
 #!/bin/bash
 
 PLUGIN_NAME="unraid-management-agent"
-VERSION="2025.11.1"
-BUNDLE="/boot/config/plugins/${PLUGIN_NAME}/unraid-management-agent-2025.11.1.tgz"
+VERSION="&version;"
+BUNDLE="/boot/config/plugins/${PLUGIN_NAME}/&bundle;"
 INSTALL_DIR="/usr/local/emhttp/plugins/${PLUGIN_NAME}"
 CONFIG_DIR="/boot/config/plugins/${PLUGIN_NAME}"
 
@@ -255,7 +255,7 @@ echo ""
 #!/bin/bash
 
 PLUGIN_NAME="unraid-management-agent"
-VERSION="2025.11.1"
+VERSION="&version;"
 INSTALL_DIR="/usr/local/emhttp/plugins/${PLUGIN_NAME}"
 CONFIG_DIR="/boot/config/plugins/${PLUGIN_NAME}"
 LOG_FILE="/var/log/${PLUGIN_NAME}.log"
