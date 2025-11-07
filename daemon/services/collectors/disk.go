@@ -258,12 +258,19 @@ func (c *DiskCollector) enrichWithSMARTData(disk *dto.DiskInfo) {
 	// Default to UNKNOWN if we can't read SMART data
 	disk.SMARTStatus = "UNKNOWN"
 
-	// Run smartctl -H to get health status
-	// Note: Unraid's cached files at /var/local/emhttp/smart/ use disk names (parity, disk1)
-	// instead of device names (sdb, sdc) and don't include the health status line
-	lines, err := lib.ExecCommand("smartctl", "-H", devicePath)
+	// Run smartctl with -n standby to avoid waking up spun-down disks
+	// The -n standby flag tells smartctl to skip the check if the disk is in standby mode
+	// This preserves Unraid's disk spin-down functionality
+	// Exit codes:
+	//   0 = Success, disk is active, SMART data retrieved
+	//   2 = Disk is in standby/sleep mode, check skipped (disk NOT woken up)
+	//   Other = Error accessing disk
+	lines, err := lib.ExecCommand("smartctl", "-n", "standby", "-H", devicePath)
 	if err != nil {
-		logger.Debug("Disk: Unable to get SMART health for %s: %v", disk.Device, err)
+		// Check if this is a "disk in standby" error (exit code 2)
+		// In this case, we preserve the disk's spun-down state and skip SMART check
+		// The SMART status will remain as the last known value or UNKNOWN
+		logger.Debug("Disk: Skipping SMART check for %s (disk may be in standby mode): %v", disk.Device, err)
 		return
 	}
 

@@ -19,6 +19,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2025.11.4] - 2025-11-08
+
+### Fixed
+- **CRITICAL FIX**: Disk spin-down compatibility - Plugin now respects Unraid's disk spin-down settings
+  - Changed SMART data collection to use `smartctl -n standby` flag
+  - Disks in standby mode are no longer woken up for SMART health checks
+  - Previous implementation was preventing disks from spinning down by accessing them every 30 seconds
+  - SMART status is now only collected when disks are already active
+  - Preserves power savings and reduces disk wear for users with spin-down configured
+  - Fixes critical issue where plugin prevented Unraid's disk spin-down functionality from working
+
+---
+
 ## [2025.11.3] - 2025-11-08
 
 ### Changed
