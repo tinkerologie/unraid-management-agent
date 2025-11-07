@@ -153,10 +153,18 @@ INTERVAL_SHARES=60
 #!/bin/bash
 
 PLUGIN_NAME="unraid-management-agent"
-VERSION="&version;"
-BUNDLE="/boot/config/plugins/${PLUGIN_NAME}/&bundle;"
-INSTALL_DIR="/usr/local/emhttp/plugins/${PLUGIN_NAME}"
 CONFIG_DIR="/boot/config/plugins/${PLUGIN_NAME}"
+INSTALL_DIR="/usr/local/emhttp/plugins/${PLUGIN_NAME}"
+
+# Find the downloaded bundle and extract version from filename
+BUNDLE=$(ls ${CONFIG_DIR}/${PLUGIN_NAME}-*.tgz 2>/dev/null | sort -V | tail -n 1)
+if [ -z "$BUNDLE" ]; then
+    echo "✗ Error: No plugin bundle found in ${CONFIG_DIR}"
+    exit 1
+fi
+
+# Extract version from bundle filename (e.g., unraid-management-agent-2025.11.2.tgz -> 2025.11.2)
+VERSION=$(basename "$BUNDLE" .tgz | sed "s/${PLUGIN_NAME}-//")
 
 echo ""
 echo "========================================="
@@ -255,10 +263,17 @@ echo ""
 #!/bin/bash
 
 PLUGIN_NAME="unraid-management-agent"
-VERSION="&version;"
 INSTALL_DIR="/usr/local/emhttp/plugins/${PLUGIN_NAME}"
 CONFIG_DIR="/boot/config/plugins/${PLUGIN_NAME}"
 LOG_FILE="/var/log/${PLUGIN_NAME}.log"
+
+# Try to extract version from bundle filename, fallback to "unknown" if not found
+BUNDLE=$(ls ${CONFIG_DIR}/${PLUGIN_NAME}-*.tgz 2>/dev/null | sort -V | tail -n 1)
+if [ -n "$BUNDLE" ]; then
+    VERSION=$(basename "$BUNDLE" .tgz | sed "s/${PLUGIN_NAME}-//")
+else
+    VERSION="unknown"
+fi
 
 echo ""
 echo "========================================="
