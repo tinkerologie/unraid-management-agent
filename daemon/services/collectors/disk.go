@@ -254,26 +254,65 @@ func (c *DiskCollector) enrichWithSMARTData(disk *dto.DiskInfo) {
 		return
 	}
 
-	// Get basic SMART health
+	// Default to UNKNOWN if we can't read SMART data
 	disk.SMARTStatus = "UNKNOWN"
 
-	// Try to get serial number and model from smartctl -i
+	// Read SMART data from Unraid's cached smartctl output
+	//nolint:gosec // G304: Path is constructed from trusted Unraid directory, device name from trusted source
 	data, err := os.ReadFile("/var/local/emhttp/smart/" + disk.Device)
-	if err == nil {
-		lines := strings.Split(string(data), "\n")
-		for _, line := range lines {
-			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "Serial Number:") {
-				disk.SerialNumber = strings.TrimSpace(strings.TrimPrefix(line, "Serial Number:"))
-			} else if strings.HasPrefix(line, "Device Model:") || strings.HasPrefix(line, "Model Number:") {
-				disk.Model = strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(line, "Device Model:"), "Model Number:"))
+	if err != nil {
+		// If we can't read the file, leave status as UNKNOWN
+		return
+	}
+
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// Parse SMART health status (SATA/SAS drives)
+		// Example: "SMART overall-health self-assessment test result: PASSED"
+		if strings.Contains(line, "SMART overall-health self-assessment test result:") {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) == 2 {
+				status := strings.TrimSpace(parts[1])
+				disk.SMARTStatus = strings.ToUpper(status)
 			}
+		}
+
+		// Parse SMART health status (NVMe drives)
+		// Example: "SMART Health Status: OK"
+		if strings.Contains(line, "SMART Health Status:") {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) == 2 {
+				status := strings.TrimSpace(parts[1])
+				// Normalize NVMe "OK" to "PASSED" for consistency
+				if strings.ToUpper(status) == "OK" {
+					disk.SMARTStatus = "PASSED"
+				} else {
+					disk.SMARTStatus = strings.ToUpper(status)
+				}
+			}
+		}
+
+		// Parse serial number
+		if value, found := strings.CutPrefix(line, "Serial Number:"); found {
+			disk.SerialNumber = strings.TrimSpace(value)
+		}
+
+		// Parse device model (SATA/SAS drives)
+		if value, found := strings.CutPrefix(line, "Device Model:"); found {
+			disk.Model = strings.TrimSpace(value)
+		}
+
+		// Parse model number (NVMe drives)
+		if value, found := strings.CutPrefix(line, "Model Number:"); found && disk.Model == "" {
+			disk.Model = strings.TrimSpace(value)
 		}
 	}
 
-	// Note: Full SMART parsing would require smartctl execution
-	// For now, we'll keep the existing SMART error count from disks.ini
-	// Future enhancement: Parse smartctl -a output for detailed attributes
+	// Note: Full SMART attribute parsing would require parsing the SMART attributes table
+	// For now, we rely on the SMART error count from disks.ini and the overall health status
+	// Future enhancement: Parse detailed SMART attributes for power-on hours, reallocated sectors, etc.
 }
 
 // enrichWithMountInfo adds mount point and usage information

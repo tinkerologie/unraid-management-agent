@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
+- SMART health status now correctly reported in `/api/v1/disks` endpoint (#4)
+  - Parses actual SMART health status from Unraid's cached smartctl output
+  - Returns "PASSED" for healthy disks (SATA/SAS drives)
+  - Returns "PASSED" for healthy NVMe drives (normalizes "OK" to "PASSED")
+  - Returns actual status values like "FAILED" when SMART tests fail
+  - No longer returns "UNKNOWN" for all disks when SMART data is available
 
 ---
 
