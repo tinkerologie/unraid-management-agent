@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
@@ -14,12 +15,24 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
+// cpuStats holds CPU usage tracking data for a VM
+type cpuStats struct {
+	guestCPUTime uint64    // Cumulative guest CPU time in nanoseconds
+	hostCPUTime  uint64    // Cumulative host CPU time in clock ticks
+	timestamp    time.Time // When this measurement was taken
+}
+
 type VMCollector struct {
-	ctx *domain.Context
+	ctx           *domain.Context
+	cpuStatsMutex sync.RWMutex
+	previousStats map[string]*cpuStats // vmName -> previous CPU stats
 }
 
 func NewVMCollector(ctx *domain.Context) *VMCollector {
-	return &VMCollector{ctx: ctx}
+	return &VMCollector{
+		ctx:           ctx,
+		previousStats: make(map[string]*cpuStats),
+	}
 }
 
 func (c *VMCollector) Start(ctx context.Context, interval time.Duration) {
@@ -108,10 +121,14 @@ func (c *VMCollector) collectVMs() ([]*dto.VMInfo, error) {
 				vm.MemoryUsed = memUsed
 			}
 
-			// Get CPU usage
-			if guestCPU, hostCPU, err := c.getVMCPUUsage(vmName); err == nil {
-				vm.GuestCPUPercent = guestCPU
-				vm.HostCPUPercent = hostCPU
+			// Get CPU usage (pass number of vCPUs for percentage calculation)
+			if vm.CPUCount > 0 {
+				if guestCPU, hostCPU, err := c.getVMCPUUsage(vmName, vm.CPUCount); err == nil {
+					vm.GuestCPUPercent = guestCPU
+					vm.HostCPUPercent = hostCPU
+				} else {
+					logger.Debug("Failed to get CPU usage for VM %s: %v", vmName, err)
+				}
 			}
 
 			// Get disk I/O stats
@@ -125,6 +142,9 @@ func (c *VMCollector) collectVMs() ([]*dto.VMInfo, error) {
 				vm.NetworkRXBytes = rxBytes
 				vm.NetworkTXBytes = txBytes
 			}
+		} else {
+			// VM is not running, clear CPU stats history
+			c.clearCPUStats(vmName)
 		}
 
 		// Format memory display
@@ -134,6 +154,13 @@ func (c *VMCollector) collectVMs() ([]*dto.VMInfo, error) {
 	}
 
 	return vms, nil
+}
+
+// clearCPUStats removes CPU stats history for a VM (called when VM is shut off)
+func (c *VMCollector) clearCPUStats(vmName string) {
+	c.cpuStatsMutex.Lock()
+	defer c.cpuStatsMutex.Unlock()
+	delete(c.previousStats, vmName)
 }
 
 type vmInfo struct {
@@ -239,22 +266,156 @@ func (c *VMCollector) getVMMemoryUsage(vmName string) (uint64, error) {
 }
 
 // getVMCPUUsage returns guest and host CPU usage percentages
-func (c *VMCollector) getVMCPUUsage(vmName string) (float64, float64, error) {
-	output, err := lib.ExecCommandOutput("virsh", "cpu-stats", vmName, "--total")
+func (c *VMCollector) getVMCPUUsage(vmName string, numVCPUs int) (float64, float64, error) {
+	currentTime := time.Now()
+
+	// Get guest CPU time from virsh domstats
+	guestCPUTime, err := c.getGuestCPUTime(vmName)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, fmt.Errorf("failed to get guest CPU time: %w", err)
 	}
 
-	// Parse CPU time from output
-	// Format: "cpu_time          123456789 ns"
-	re := regexp.MustCompile(`cpu_time\s+(\d+)`)
-	if matches := re.FindStringSubmatch(output); len(matches) > 1 {
-		_ = matches[1] // CPU time available but needs historical data for percentage calculation
+	// Get host CPU time from QEMU process
+	hostCPUTime, err := c.getHostCPUTime(vmName)
+	if err != nil {
+		// Host CPU might not be available, log but don't fail
+		logger.Debug("Failed to get host CPU time for VM %s: %v", vmName, err)
+		hostCPUTime = 0
 	}
 
-	// For now, return 0 as we need historical data to calculate percentage
-	// This would require storing previous values and calculating delta
-	return 0, 0, nil
+	// Calculate percentages using historical data
+	c.cpuStatsMutex.Lock()
+	defer c.cpuStatsMutex.Unlock()
+
+	var guestCPUPercent, hostCPUPercent float64
+
+	if prevStats, exists := c.previousStats[vmName]; exists {
+		// Calculate time delta in seconds
+		timeDelta := currentTime.Sub(prevStats.timestamp).Seconds()
+
+		if timeDelta > 0 {
+			// Calculate guest CPU percentage
+			// Guest CPU time is in nanoseconds, convert to seconds
+			guestCPUDelta := float64(guestCPUTime-prevStats.guestCPUTime) / 1e9
+			guestCPUPercent = (guestCPUDelta / timeDelta / float64(numVCPUs)) * 100
+
+			// Clamp to valid range [0, 100]
+			if guestCPUPercent < 0 {
+				guestCPUPercent = 0
+			} else if guestCPUPercent > 100 {
+				guestCPUPercent = 100
+			}
+
+			// Calculate host CPU percentage if available
+			if hostCPUTime > 0 && prevStats.hostCPUTime > 0 {
+				// Host CPU time is in clock ticks, need to convert
+				// Clock ticks per second (typically 100 on Linux)
+				clockTicksPerSec := 100.0
+				hostCPUDelta := float64(hostCPUTime-prevStats.hostCPUTime) / clockTicksPerSec
+				hostCPUPercent = (hostCPUDelta / timeDelta) * 100
+
+				// Clamp to valid range [0, 100]
+				if hostCPUPercent < 0 {
+					hostCPUPercent = 0
+				} else if hostCPUPercent > 100 {
+					hostCPUPercent = 100
+				}
+			}
+		}
+	}
+
+	// Store current stats for next calculation
+	c.previousStats[vmName] = &cpuStats{
+		guestCPUTime: guestCPUTime,
+		hostCPUTime:  hostCPUTime,
+		timestamp:    currentTime,
+	}
+
+	return guestCPUPercent, hostCPUPercent, nil
+}
+
+// getGuestCPUTime returns cumulative guest CPU time in nanoseconds
+func (c *VMCollector) getGuestCPUTime(vmName string) (uint64, error) {
+	output, err := lib.ExecCommandOutput("virsh", "domstats", vmName, "--cpu-total")
+	if err != nil {
+		return 0, err
+	}
+
+	// Parse cpu.time from output
+	// Format: "cpu.time=123456789"
+	re := regexp.MustCompile(`cpu\.time=(\d+)`)
+	matches := re.FindStringSubmatch(output)
+	if len(matches) < 2 {
+		return 0, fmt.Errorf("failed to parse cpu.time from domstats output")
+	}
+
+	cpuTime, err := strconv.ParseUint(matches[1], 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse cpu time value: %w", err)
+	}
+
+	return cpuTime, nil
+}
+
+// getHostCPUTime returns cumulative host CPU time in clock ticks for the QEMU process
+func (c *VMCollector) getHostCPUTime(vmName string) (uint64, error) {
+	// Get QEMU process PID
+	pid, err := c.getQEMUProcessPID(vmName)
+	if err != nil {
+		return 0, err
+	}
+
+	// Read /proc/[pid]/stat
+	output, err := lib.ExecCommandOutput("cat", fmt.Sprintf("/proc/%d/stat", pid))
+	if err != nil {
+		return 0, fmt.Errorf("failed to read /proc/%d/stat: %w", pid, err)
+	}
+
+	// Parse /proc/[pid]/stat
+	// Format: pid (comm) state ppid pgrp session tty_nr tpgid flags minflt cminflt majflt cmajflt utime stime ...
+	// We need utime (field 14) + stime (field 15)
+	fields := strings.Fields(output)
+	if len(fields) < 15 {
+		return 0, fmt.Errorf("unexpected /proc/stat format")
+	}
+
+	// utime is at index 13 (0-based), stime at index 14
+	utime, err := strconv.ParseUint(fields[13], 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse utime: %w", err)
+	}
+
+	stime, err := strconv.ParseUint(fields[14], 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse stime: %w", err)
+	}
+
+	// Total CPU time = utime + stime
+	return utime + stime, nil
+}
+
+// getQEMUProcessPID returns the PID of the QEMU process for a VM
+func (c *VMCollector) getQEMUProcessPID(vmName string) (int, error) {
+	// Use pgrep to find QEMU process with VM name
+	output, err := lib.ExecCommandOutput("pgrep", "-f", fmt.Sprintf("qemu.*guest=%s", vmName))
+	if err != nil {
+		return 0, fmt.Errorf("failed to find QEMU process for VM %s: %w", vmName, err)
+	}
+
+	pidStr := strings.TrimSpace(output)
+	if pidStr == "" {
+		return 0, fmt.Errorf("no QEMU process found for VM %s", vmName)
+	}
+
+	// If multiple PIDs, take the first one
+	pidStr = strings.Split(pidStr, "\n")[0]
+
+	pid, err := strconv.Atoi(pidStr)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse PID: %w", err)
+	}
+
+	return pid, nil
 }
 
 // getVMDiskIO returns disk read and write bytes

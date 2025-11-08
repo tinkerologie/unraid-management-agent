@@ -19,6 +19,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2025.11.11] - 2025-11-08
+
+### Fixed
+- **VM CPU Percentage Tracking**: Implemented proper CPU percentage calculation for VMs
+  - Added historical tracking to VM collector using `cpuStats` struct with mutex protection
+  - Guest CPU % now calculated from `virsh domstats` CPU time deltas over time intervals
+  - Host CPU % now calculated from QEMU process CPU usage via `/proc/[pid]/stat`
+  - CPU percentages are calculated as: `(current_time - previous_time) / time_interval / num_vcpus * 100`
+  - Percentages are clamped to valid range [0, 100] to handle edge cases
+  - CPU stats history is automatically cleared when VMs are shut off
+  - First measurement after VM start returns 0% (requires two measurements for delta calculation)
+  - Subsequent measurements return accurate real-time CPU percentages
+  - Host CPU % matches the percentage shown in `ps`/`top` for the QEMU process
+  - Guest CPU % represents the percentage of allocated vCPUs being used inside the guest OS
+
+### Changed
+- **VM Collector**: Enhanced with CPU tracking infrastructure
+  - Added `cpuStats` struct to store guest CPU time, host CPU time, and timestamp
+  - Added `previousStats` map with mutex for thread-safe historical tracking
+  - Added `getGuestCPUTime()` method using `virsh domstats --cpu-total`
+  - Added `getHostCPUTime()` method reading `/proc/[pid]/stat`
+  - Added `getQEMUProcessPID()` method using `pgrep` to find QEMU process
+  - Added `clearCPUStats()` method to reset tracking when VMs are shut off
+  - Updated `getVMCPUUsage()` to accept `numVCPUs` parameter and calculate real percentages
+
+### Removed
+- **Placeholder CPU Values**: Removed the "needs historical data" limitation
+  - CPU percentage fields now return real values instead of always returning 0
+  - Removed placeholder comments about needing historical data implementation
+
+---
+
 ## [2025.11.10] - 2025-11-08
 
 ### Added

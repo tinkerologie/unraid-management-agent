@@ -3,14 +3,14 @@
 <!DOCTYPE PLUGIN [
     <!ENTITY name        "unraid-management-agent">
     <!ENTITY author      "ruaan-deysel">
-    <!ENTITY version     "2025.11.10">
+    <!ENTITY version     "2025.11.11">
     <!ENTITY gitURL      "https://github.com/&author;/&name;">
     <!ENTITY pluginURL   "&gitURL;/raw/main/&name;.plg">
     <!ENTITY supportURL  "https://forums.unraid.net/topic/178262-home-assistant-unraid-integration">
     <!ENTITY launch      "Settings/unraid-management-agent">
     <!ENTITY bundle      "&name;-&version;.tgz">
     <!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
-    <!ENTITY md5         "dfc2631a70eb883e7e5bcefa3d2669a5">
+    <!ENTITY md5         "PLACEHOLDER_MD5">
 ]>
 
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" icon="server" min="6.9.0" pluginURL="&pluginURL;" support="&supportURL;">
@@ -20,6 +20,13 @@ This Unraid plugin provides REST API and WebSocket interfaces for real-time syst
 </DESCRIPTION>
 
 <CHANGES>
+###2025.11.11 (2025-11-08)
+- Fixed: VM CPU percentage tracking now returns real values instead of 0
+- Fixed: Guest CPU % calculated from virsh domstats CPU time deltas
+- Fixed: Host CPU % calculated from QEMU process CPU usage via /proc/[pid]/stat
+- Added: Historical CPU tracking with automatic cleanup when VMs are shut off
+- Changed: VM collector now tracks CPU usage over time for accurate percentage calculation
+
 ###2025.11.10 (2025-11-08)
 - Added: Enhanced VM statistics - disk I/O (read/write bytes), network I/O (RX/TX bytes), memory display
 - Added: Enhanced Docker statistics - version, network mode, IP address, port mappings, volume mappings, restart policy, uptime
