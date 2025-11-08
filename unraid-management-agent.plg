@@ -20,6 +20,29 @@ This Unraid plugin provides REST API and WebSocket interfaces for real-time syst
 </DESCRIPTION>
 
 <CHANGES>
+###2025.11.6 (2025-11-08)
+- Fixed: Plugin now displays as "Unraid Management Agent" in Plugin Manager (instead of "unraid-management-agent")
+- Added: README.md file following Unraid plugin naming conventions
+
+###2025.11.5 (2025-11-08)
+- Added: USB flash drive detection - skips SMART checks on USB devices (including boot drive)
+- Added: NVMe-specific SMART handling - optimized for NVMe drives (no standby check)
+- Changed: Enhanced device type detection with detailed debug logging
+- Aligned with ha-unraid best practices for disk spin-down compatibility
+
+###2025.11.4 (2025-11-08)
+- CRITICAL FIX: Disk spin-down compatibility - plugin now respects Unraid's disk spin-down settings
+- Changed: SMART data collection now uses `smartctl -n standby` flag
+- Fixed: Disks in standby mode are no longer woken up for SMART health checks
+
+###2025.11.3 (2025-11-07)
+- Fixed: Plugin icon now clickable in Unraid UI
+- Fixed: Settings page URL corrected
+
+###2025.11.2 (2025-11-06)
+- Fixed: All physical disks now report correct SMART health status (was showing "UNKNOWN")
+- Changed: Direct execution of smartctl command for reliable SMART data collection
+
 ###2025.11.0 (2025-11-03)
 - Security: Fixed path injection vulnerabilities in share config endpoints (HIGH severity)
 - Added: Enhanced System Information Collector with CPU model, BIOS info, per-core CPU usage

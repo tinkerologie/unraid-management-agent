@@ -19,6 +19,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2025.11.6] - 2025-11-08
+
+### Fixed
+- **Plugin Display Name**: Plugin now displays as "Unraid Management Agent" in the Unraid Plugin Manager instead of "unraid-management-agent"
+  - Added README.md file to plugin directory with proper display name formatting
+  - Follows Unraid plugin naming conventions used by Community Applications and other established plugins
+  - Settings menu display name remains unchanged (was already correct)
+  - Improves user experience and plugin discoverability in the Plugin Manager
+
+---
+
 ## [2025.11.5] - 2025-11-08
 
 ### Added
