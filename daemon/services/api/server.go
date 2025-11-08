@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
-	"github.com/gorilla/mux"
 )
 
 type Server struct {
@@ -108,6 +108,10 @@ func (s *Server) setupRoutes() {
 	// Configuration endpoints (write)
 	api.HandleFunc("/shares/{name}/config", s.handleUpdateShareConfig).Methods("POST")
 	api.HandleFunc("/settings/system", s.handleUpdateSystemSettings).Methods("POST")
+
+	// User Scripts endpoints
+	api.HandleFunc("/user-scripts", s.handleUserScripts).Methods("GET")
+	api.HandleFunc("/user-scripts/{name}/execute", s.handleUserScriptExecute).Methods("POST")
 
 	// WebSocket endpoint
 	api.HandleFunc("/ws", s.handleWebSocket)

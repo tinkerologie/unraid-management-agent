@@ -725,6 +725,46 @@ func (s *Server) handleUpdateSystemSettings(w http.ResponseWriter, r *http.Reque
 	})
 }
 
+// handleUserScripts returns a list of all available user scripts
+func (s *Server) handleUserScripts(w http.ResponseWriter, r *http.Request) {
+	scripts, err := controllers.ListUserScripts()
+	if err != nil {
+		logger.Error("API: Failed to list user scripts: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to list user scripts: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, scripts)
+}
+
+// handleUserScriptExecute executes a user script
+func (s *Server) handleUserScriptExecute(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	scriptName := vars["name"]
+
+	// Parse request body for execution options
+	var req dto.UserScriptExecuteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		// Use defaults if no body provided
+		req.Background = true
+		req.Wait = false
+	}
+
+	// Execute the script
+	response, err := controllers.ExecuteUserScript(scriptName, req.Background, req.Wait)
+	if err != nil {
+		logger.Error("API: Failed to execute user script %s: %v", scriptName, err)
+		respondJSON(w, http.StatusInternalServerError, response)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, response)
+}
+
 // Helper function to respond with JSON
 func respondJSON(w http.ResponseWriter, status int, payload interface{}) {
 	w.Header().Set("Content-Type", "application/json")

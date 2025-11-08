@@ -22,6 +22,10 @@ var (
 	// Share names: alphanumeric, hyphens, underscores (max 255 chars)
 	// Must not contain path separators or parent directory references
 	shareNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,255}$`)
+
+	// User script names: alphanumeric, hyphens, underscores, dots (max 255 chars)
+	// Must not contain path separators or parent directory references
+	userScriptNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_.-]{1,255}$`)
 )
 
 // ValidateContainerID validates a Docker container ID format
@@ -132,5 +136,49 @@ func ValidateMaxLength(value, fieldName string, maxLength int) error {
 	if len(value) > maxLength {
 		return fmt.Errorf("%s too long: maximum %d characters, got %d", fieldName, maxLength, len(value))
 	}
+	return nil
+}
+
+// ValidateUserScriptName validates a user script name
+// Prevents path traversal attacks by ensuring the name contains only safe characters
+// and does not contain path separators or parent directory references
+func ValidateUserScriptName(name string) error {
+	if name == "" {
+		return fmt.Errorf("user script name cannot be empty")
+	}
+
+	if len(name) > 255 {
+		return fmt.Errorf("user script name too long: maximum 255 characters, got %d", len(name))
+	}
+
+	// Check for parent directory references first (more specific check)
+	if strings.Contains(name, "..") {
+		return fmt.Errorf("invalid user script name: cannot contain parent directory references")
+	}
+
+	// Check for path separators
+	if strings.Contains(name, "/") || strings.Contains(name, "\\") {
+		return fmt.Errorf("invalid user script name: cannot contain path separators")
+	}
+
+	// Check for absolute paths
+	if strings.HasPrefix(name, "/") || strings.HasPrefix(name, "\\") {
+		return fmt.Errorf("invalid user script name: cannot be an absolute path")
+	}
+
+	// Validate against regex pattern (alphanumeric, hyphens, underscores, dots only)
+	if !userScriptNameRegex.MatchString(name) {
+		return fmt.Errorf("invalid user script name format: must contain only alphanumeric characters, hyphens, underscores, and dots")
+	}
+
+	// Additional checks for common issues
+	if strings.HasPrefix(name, "-") || strings.HasSuffix(name, "-") {
+		return fmt.Errorf("invalid user script name: cannot start or end with hyphen")
+	}
+
+	if strings.HasPrefix(name, ".") || strings.HasSuffix(name, ".") {
+		return fmt.Errorf("invalid user script name: cannot start or end with dot")
+	}
+
 	return nil
 }

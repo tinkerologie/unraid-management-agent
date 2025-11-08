@@ -19,6 +19,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2025.11.8] - 2025-11-08
+
+### Added
+- **User Scripts API**: New REST API endpoints for discovering and executing Unraid User Scripts
+  - GET `/api/v1/user-scripts` - List all available user scripts with metadata
+  - POST `/api/v1/user-scripts/{name}/execute` - Execute a user script with background/wait options
+  - Supports reading script descriptions from the `description` file
+  - Includes path traversal protection and input validation
+  - Returns script metadata: name, description, path, executable status, last modified timestamp
+  - Execution options: `background` (default: true), `wait` (default: false)
+  - Enables automation tools like Home Assistant to remotely execute Unraid maintenance scripts
+
+---
+
 ## [2025.11.7] - 2025-11-08
 
 ### Changed
