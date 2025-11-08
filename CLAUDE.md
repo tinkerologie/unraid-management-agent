@@ -74,6 +74,7 @@ Collectors → Event Bus (PubSub) → API Server Cache → REST Endpoints
 ```
 
 **Critical Initialization Order:**
+
 1. API server subscriptions are started FIRST (before collectors)
 2. Small delay (100ms) to ensure subscriptions are ready
 3. Then collectors start publishing events
@@ -83,16 +84,20 @@ This order is crucial to avoid race conditions where collectors publish events b
 ### Core Components
 
 #### 1. Domain Layer (`daemon/domain/`)
+
 - `Context`: Application runtime context holding the PubSub hub and configuration
 - `Config`: Configuration settings (version, port)
 
 #### 2. Data Transfer Objects (`daemon/dto/`)
+
 All data structures shared between collectors, API, and WebSocket clients:
+
 - `SystemInfo`, `ArrayStatus`, `DiskInfo`, `NetworkInfo`
 - `ContainerInfo`, `VMInfo`, `UPSStatus`, `GPUMetrics`
 - `ShareInfo`, `WebSocketMessage`
 
 #### 3. Collectors (`daemon/services/collectors/`)
+
 Independent goroutines that collect data at fixed intervals and publish to the event bus:
 
 | Collector | Interval | Event Topic | Purpose |
@@ -108,6 +113,7 @@ Independent goroutines that collect data at fixed intervals and publish to the e
 | Share | 60s | `share_list_update` | User share information |
 
 Each collector:
+
 - Runs in its own goroutine with context cancellation support
 - Has panic recovery to prevent crashes
 - Publishes events via `ctx.Hub.Pub(data, topic)`
@@ -116,41 +122,50 @@ Each collector:
 #### 4. API Server (`daemon/services/api/`)
 
 **server.go:**
+
 - Maintains in-memory cache of latest collector data
 - Subscribes to all event topics to update cache
 - Broadcasts events to WebSocket clients
 - Uses `sync.RWMutex` for thread-safe cache access
 
 **handlers.go:**
+
 - REST endpoint handlers that return cached data
 - Control endpoints that execute Docker/VM/Array commands
 - Configuration endpoints (read and write)
 
 **websocket.go:**
+
 - WebSocket hub managing connected clients
 - Broadcasts events to all connected clients
 - Client registration/unregistration
 - Ping/pong for connection health
 
 **middleware.go:**
+
 - CORS middleware for API access
 - Logging middleware for request/response
 - Recovery middleware for panic handling
 
 #### 5. Controllers (`daemon/services/controllers/`)
+
 Execute control operations:
+
 - `docker.go`: Start, stop, restart, pause, unpause containers
 - `vm.go`: Start, stop, restart, pause, resume, hibernate VMs
 - `array.go`: Start/stop array, parity check operations
 
 #### 6. Library Utilities (`daemon/lib/`)
+
 - `shell.go`: Execute shell commands with error handling
 - `parser.go`: Parse Unraid-specific file formats (.ini files)
 - `utils.go`: Common utility functions
 - `validation.go`: Input validation for API requests
 
 #### 7. Orchestrator (`daemon/services/orchestrator.go`)
+
 Coordinates the entire application lifecycle:
+
 1. Initializes all collectors
 2. Starts API server subscriptions **before** collectors (critical!)
 3. Starts collectors in separate goroutines
@@ -170,16 +185,19 @@ Coordinates the entire application lifecycle:
 The agent reads from Unraid-specific locations (see `daemon/common/const.go`):
 
 **Configuration Files:**
+
 - `/var/local/emhttp/var.ini` - System variables
 - `/var/local/emhttp/disks.ini` - Disk configuration
 - `/var/local/emhttp/shares.ini` - Share configuration
 - `/var/local/emhttp/network.ini` - Network configuration
 
 **System Files:**
+
 - `/proc/cpuinfo`, `/proc/meminfo`, `/proc/uptime` - System metrics
 - `/sys/class/hwmon/` - Temperature sensors
 
 **Binaries:**
+
 - `/usr/local/sbin/mdcmd` - Unraid management command (array operations)
 - `/usr/bin/docker` - Docker CLI
 - `/usr/bin/virsh` - VM management
@@ -191,31 +209,37 @@ The agent reads from Unraid-specific locations (see `daemon/common/const.go`):
 Base URL: `http://localhost:8043/api/v1`
 
 ### Monitoring Endpoints (GET)
+
 - `/health`, `/system`, `/array`, `/disks`, `/disks/{id}`
 - `/network`, `/shares`, `/ups`, `/gpu`
 - `/docker`, `/docker/{id}`, `/vm`, `/vm/{id}`
 
 ### Control Endpoints (POST)
+
 - `/docker/{id}/{action}` - start, stop, restart, pause, unpause
 - `/vm/{id}/{action}` - start, stop, restart, pause, resume, hibernate, force-stop
 - `/array/{action}` - start, stop
 - `/array/parity-check/{action}` - start, stop, pause, resume
 
 ### Configuration Endpoints
+
 - GET: `/shares/{name}/config`, `/network/{interface}/config`, `/settings/{subsystem}`
 - POST: `/shares/{name}/config`, `/settings/system`
 
 ### WebSocket
+
 - `/ws` - Real-time event streaming
 
 ## Testing
 
 **Test Locations:**
+
 - `daemon/dto/system_test.go` - DTO tests
 - `daemon/lib/shell_test.go`, `daemon/lib/validation_test.go` - Library tests
 - `daemon/services/api/handlers_test.go` - API handler tests
 
 **Test Conventions:**
+
 - Use table-driven tests where appropriate
 - Mock external dependencies (file system, command execution)
 - Test both success and error paths
@@ -227,6 +251,7 @@ Base URL: `http://localhost:8043/api/v1`
 **Logger:** `daemon/logger/logger.go` (wrapper around lumberjack for rotation)
 
 **Log Levels:**
+
 - `logger.Debug()` - Detailed diagnostic info
 - `logger.Info()` - General informational messages
 - `logger.Success()` - Successful operations (green)
@@ -234,6 +259,7 @@ Base URL: `http://localhost:8043/api/v1`
 - `logger.Error()` - Error conditions (red)
 
 **Log Rotation:**
+
 - Max size: 5 MB
 - No backups (only current log)
 - No age-based retention
@@ -248,6 +274,7 @@ This plugin was developed on a specific hardware configuration. Hardware variati
 4. Document the fix in the PR with hardware details
 
 Common hardware variation areas:
+
 - GPU metrics parsing (`nvidia-smi` output formats)
 - Disk controller command outputs
 - UPS monitoring tool differences (apcupsd vs NUT)

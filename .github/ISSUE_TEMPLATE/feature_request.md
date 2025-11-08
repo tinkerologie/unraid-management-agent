@@ -29,12 +29,14 @@ Describe how you envision this feature working.
 If this involves new API endpoints, describe the proposed API:
 
 **New Endpoints:**
+
 ```
 GET /api/v1/example
 POST /api/v1/example/{id}/action
 ```
 
 **Request/Response Format:**
+
 ```json
 {
   "example_field": "value"
@@ -42,6 +44,7 @@ POST /api/v1/example/{id}/action
 ```
 
 **WebSocket Events:**
+
 ```
 Event topic: "example_update"
 ```
@@ -76,4 +79,5 @@ Add any other context, mockups, examples from other projects, or screenshots abo
 ## Related Issues
 
 Link to any related issues or discussions:
+
 - #

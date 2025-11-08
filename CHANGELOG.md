@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2025.11.11] - 2025-11-08
 
 ### Fixed
+
 - **VM CPU Percentage Tracking**: Implemented proper CPU percentage calculation for VMs
   - Added historical tracking to VM collector using `cpuStats` struct with mutex protection
   - Guest CPU % now calculated from `virsh domstats` CPU time deltas over time intervals
@@ -35,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Guest CPU % represents the percentage of allocated vCPUs being used inside the guest OS
 
 ### Changed
+
 - **VM Collector**: Enhanced with CPU tracking infrastructure
   - Added `cpuStats` struct to store guest CPU time, host CPU time, and timestamp
   - Added `previousStats` map with mutex for thread-safe historical tracking
@@ -45,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated `getVMCPUUsage()` to accept `numVCPUs` parameter and calculate real percentages
 
 ### Removed
+
 - **Placeholder CPU Values**: Removed the "needs historical data" limitation
   - CPU percentage fields now return real values instead of always returning 0
   - Removed placeholder comments about needing historical data implementation
@@ -54,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2025.11.10] - 2025-11-08
 
 ### Added
+
 - **Enhanced VM Statistics**: Added comprehensive VM monitoring metrics
   - Guest CPU usage percentage (placeholder for future implementation with historical data)
   - Host CPU usage percentage (placeholder for future implementation with historical data)
@@ -74,6 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - New DTO fields: `version`, `network_mode`, `ip_address`, `port_mappings`, `volume_mappings`, `restart_policy`, `uptime`, `memory_display`
 
 ### Changed
+
 - **VM Collector**: Enhanced data collection using additional virsh commands
   - Added `getVMCPUUsage()` method using `virsh cpu-stats` (returns 0 pending historical data implementation)
   - Added `getVMDiskIO()` method using `virsh domblklist` and `virsh domblkstat`
@@ -91,6 +96,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2025.11.9] - 2025-11-08
 
 ### Fixed
+
 - **VM Collector**: Fixed parsing of VM names containing spaces
   - Changed from parsing `virsh list --all` column-based output to using `virsh list --all --name`
   - Added `getVMState()` helper method to get VM state using `virsh domstate <name>`
@@ -109,6 +115,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2025.11.8] - 2025-11-08
 
 ### Added
+
 - **User Scripts API**: New REST API endpoints for discovering and executing Unraid User Scripts
   - GET `/api/v1/user-scripts` - List all available user scripts with metadata
   - POST `/api/v1/user-scripts/{name}/execute` - Execute a user script with background/wait options
@@ -123,6 +130,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2025.11.7] - 2025-11-08
 
 ### Changed
+
 - **README.md Simplified**: Reduced README.md to essential information only
   - Removed detailed feature lists, API endpoints, and support links
   - Kept only the plugin name heading and brief description
@@ -134,6 +142,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2025.11.6] - 2025-11-08
 
 ### Fixed
+
 - **Plugin Display Name**: Plugin now displays as "Unraid Management Agent" in the Unraid Plugin Manager instead of "unraid-management-agent"
   - Added README.md file to plugin directory with proper display name formatting
   - Follows Unraid plugin naming conventions used by Community Applications and other established plugins
@@ -145,6 +154,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2025.11.5] - 2025-11-08
 
 ### Added
+
 - **USB Flash Drive Detection**: Plugin now detects USB flash drives (including the Unraid boot drive) and skips SMART data collection
   - Checks device sysfs path to identify USB transport
   - Detects Unraid boot drive by checking if device is mounted at `/boot`
@@ -153,6 +163,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Adds debug logging to indicate when USB flash drive detection occurs
 
 ### Changed
+
 - **NVMe-Specific SMART Collection**: Optimized SMART data collection for NVMe drives
   - NVMe drives are now detected by checking device name pattern (e.g., `nvme0n1`)
   - NVMe drives skip the `-n standby` flag since they don't support standby mode
@@ -166,6 +177,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2025.11.4] - 2025-11-08
 
 ### Fixed
+
 - **CRITICAL FIX**: Disk spin-down compatibility - Plugin now respects Unraid's disk spin-down settings
   - Changed SMART data collection to use `smartctl -n standby` flag
   - Disks in standby mode are no longer woken up for SMART health checks
@@ -179,12 +191,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2025.11.3] - 2025-11-08
 
 ### Changed
+
 - Improved plugin UI/UX in Unraid interface
   - Added clickable settings link to plugin icon
   - Updated settings page title to "Unraid Management Agent"
   - Added server icon to plugin listing
 
 ### Fixed
+
 - Settings page URL now uses correct lowercase-with-hyphens format
   - Changed from `/Settings/UnraidManagementAgent` to `/Settings/unraid-management-agent`
   - Plugin icon now navigates to the correct settings page URL
@@ -199,6 +213,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2025.11.2] - 2025-11-07
 
 ### Added
+
 - Automated CI/CD workflow for releases using GitHub Actions
   - Automatically builds release package when Git tag is pushed
   - Calculates MD5 checksum and includes in release notes
@@ -207,6 +222,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Supports pre-release detection (alpha, beta, rc versions)
 
 ### Fixed
+
 - SMART health status now correctly reported in `/api/v1/disks` endpoint (#4)
   - Parses actual SMART health status from Unraid's cached smartctl output
   - Returns "PASSED" for healthy disks (SATA/SAS drives)
@@ -219,6 +235,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2025.11.1] - 2025-11-07
 
 ### Added
+
 - Docker vDisk usage monitoring in `/api/v1/disks` endpoint (#2)
   - Automatically detects Docker vDisk at `/var/lib/docker` mount point
   - Reports size, used, free bytes, and usage percentage
@@ -237,6 +254,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Critical for tmpfs-based log filesystems that can fill up and cause issues
 
 ### Fixed
+
 - UPS API endpoint now returns actual UPS model name instead of hostname (#1)
 
 ---
@@ -246,12 +264,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### Enhanced System Information Collector
+
 - **CPU Model Detection**: Automatic detection of CPU model, cores, threads, and frequency from `/proc/cpuinfo`
 - **BIOS Information**: Server model, BIOS version, and BIOS release date via `dmidecode`
 - **Per-Core CPU Usage**: Individual CPU core usage monitoring with `cpu_per_core_usage` field
 - **Server Model Identification**: Hardware model detection for better system identification
 
 #### Detailed Disk Metrics
+
 - **I/O Statistics**: Read/write operations and bytes per disk from `/sys/block/{device}/stat`
   - `read_ops` - Total read operations
   - `read_bytes` - Total bytes read
@@ -264,6 +284,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 #### Documentation Updates
+
 - **README.md Roadmap Reorganization**:
   - Added "Recently Implemented ✅" section to highlight completed features
   - Moved Enhanced System Info Collector and Detailed Disk Metrics from planned to implemented
@@ -275,6 +296,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Version References**: Updated from Unraid 6.x to 7.x throughout documentation
 
 #### Configuration Management
+
 - **Log Rotation**: Implemented automatic log rotation with 5 MB max file size (using lumberjack.v2)
 - **Log Level Support**: Added configurable log levels (DEBUG, INFO, WARNING, ERROR) with `--log-level` CLI flag
 - **Default Log Level**: Set to WARNING for production to minimize disk usage
@@ -282,11 +304,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Auto-Start Behavior**: Service now always starts automatically when Unraid array starts (removed toggle option)
 
 ### Fixed
+
 - **Configuration Synchronization**: Fixed LOG_LEVEL not being read from config file
 - **Start Script**: Now properly creates config directory and default config file
 - **Deployment Script**: Updated to use start script instead of bypassing configuration
 
 ### Testing
+
 - **Test Suite**: All 66 tests passing across 3 packages (100% pass rate)
 - **Deployment Verification**: Successfully deployed and verified on Unraid 7.x server
 
@@ -299,6 +323,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Phase 1 & 2 API Enhancements
 
 **Phase 1.1: Array Control Operations**
+
 - `POST /api/v1/array/start` - Start the Unraid array
 - `POST /api/v1/array/stop` - Stop the Unraid array
 - `POST /api/v1/array/parity-check/start` - Start parity check (with correcting option)
@@ -310,6 +335,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New `ParityCheckRecord` and `ParityCheckHistory` DTOs
 
 **Phase 1.2: Single Resource Endpoints**
+
 - `GET /api/v1/disks/{id}` - Get single disk by ID, device, or name
 - `GET /api/v1/docker/{id}` - Get single container by ID or name
 - `GET /api/v1/vm/{id}` - Get single VM by ID or name
@@ -317,6 +343,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 404 error handling for missing resources
 
 **Phase 1.3: Enhanced Disk Details**
+
 - Added `serial_number` field to DiskInfo DTO
 - Added `model` field to DiskInfo DTO
 - Added `role` field to DiskInfo DTO (parity, parity2, data, cache, pool)
@@ -326,6 +353,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SMART data extraction for serial number and model
 
 **Phase 2.1: Read-Only Configuration Endpoints**
+
 - `GET /api/v1/shares/{name}/config` - Get share configuration
 - `GET /api/v1/network/{interface}/config` - Get network interface configuration
 - `GET /api/v1/settings/system` - Get system settings
@@ -335,6 +363,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New `ConfigCollector` with parsers for all config files
 
 **Phase 2.2: Configuration Write Endpoints**
+
 - `POST /api/v1/shares/{name}/config` - Update share configuration
 - `POST /api/v1/settings/system` - Update system settings
 - Automatic backup creation before config updates (.bak files)
@@ -409,6 +438,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Total Endpoints: 46
 
 **Monitoring** (13):
+
 - GET /api/v1/health
 - GET /api/v1/system
 - GET /api/v1/array
@@ -424,6 +454,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GET /api/v1/network
 
 **Control** (19):
+
 - POST /api/v1/docker/{id}/start
 - POST /api/v1/docker/{id}/stop
 - POST /api/v1/docker/{id}/restart
@@ -445,6 +476,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GET /api/v1/array/parity-check/history
 
 **Configuration** (13):
+
 - GET /api/v1/shares/{name}/config
 - POST /api/v1/shares/{name}/config
 - GET /api/v1/network/{interface}/config
@@ -455,6 +487,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GET /api/v1/settings/disks
 
 **WebSocket** (1):
+
 - GET /api/v1/ws
 
 ---
@@ -496,22 +529,26 @@ None at this time.
 ## Planned Features
 
 ### Phase 3: Advanced Configuration
+
 - Network configuration write endpoint
 - Docker settings write endpoint
 - VM settings write endpoint
 - Per-disk spindown override settings
 
 ### Phase 4: User Management
+
 - User list endpoint
 - User permissions endpoint
 - User creation/modification endpoints
 
 ### Phase 5: Plugin Management
+
 - Plugin list endpoint
 - Plugin install/update/remove endpoints
 - Plugin settings endpoints
 
 ### Future Enhancements
+
 - Historical data storage
 - Alerting and notification system
 - Network statistics trending
@@ -535,13 +572,12 @@ This is the initial release. No migration required.
 
 ## Links
 
-- **GitHub Repository**: https://github.com/ruaan-deysel/unraid-management-agent
+- **GitHub Repository**: <https://github.com/ruaan-deysel/unraid-management-agent>
 - **Documentation**: [docs/README.md](docs/README.md)
 - **API Reference**: [docs/api/API_REFERENCE.md](docs/api/API_REFERENCE.md)
-- **Issues**: https://github.com/ruaan-deysel/unraid-management-agent/issues
+- **Issues**: <https://github.com/ruaan-deysel/unraid-management-agent/issues>
 
 ---
 
 **Last Updated**: 2025-11-03
 **Current Version**: 2025.11.0
-

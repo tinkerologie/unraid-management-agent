@@ -172,17 +172,21 @@ See [CLAUDE.md](CLAUDE.md) for detailed architecture documentation.
 
 1. **Fork the Repository**: Create your own fork on GitHub
 2. **Create a Branch**: Use a descriptive branch name
+
    ```bash
    git checkout -b feature/add-disk-temperature-support
    git checkout -b fix/gpu-metrics-nvidia-rtx
    git checkout -b docs/improve-api-examples
    ```
+
 3. **Make Your Changes**: Write clean, documented code
 4. **Add Tests**: Include tests for new functionality
 5. **Run Tests**: Ensure all tests pass
+
    ```bash
    make test
    ```
+
 6. **Test on Unraid**: If possible, test on actual Unraid hardware
 7. **Commit Your Changes**: Follow commit message guidelines (see below)
 8. **Push to Your Fork**: Push your branch to GitHub
@@ -248,6 +252,7 @@ Include relevant screenshots or log excerpts
 ### Why This Matters
 
 As a single maintainer, it's challenging to:
+
 - Test across all possible hardware configurations
 - Debug issues on systems I don't have access to
 - Support every variation of disk controllers, GPUs, UPS models, etc.
@@ -277,11 +282,13 @@ The plugin may behave differently across:
 #### 2. Investigate the Root Cause
 
 **Enable debug logging:**
+
 ```bash
 ./unraid-management-agent boot --debug
 ```
 
 **Common problem areas:**
+
 - Command output parsing differences
 - Different command-line tool versions
 - Missing binaries or tools
@@ -300,6 +307,7 @@ The plugin may behave differently across:
 #### 3. Make the Fix
 
 **Update the appropriate collector:**
+
 - Collectors are in `daemon/services/collectors/`
 - Parsers are in `daemon/lib/parser.go`
 
@@ -336,6 +344,7 @@ if err != nil {
 In your pull request, include:
 
 **Hardware Configuration:**
+
 ```
 - CPU: AMD Ryzen 9 5950X
 - Disk Controller: LSI 9300-8i HBA
@@ -345,16 +354,19 @@ In your pull request, include:
 ```
 
 **Issue Description:**
+
 - What wasn't working and why
 - Command output differences you discovered
 - Error messages from logs
 
 **Solution Implemented:**
+
 - How your changes fix the issue
 - What parsing/detection logic was added
 - Any fallback mechanisms implemented
 
 **Testing Performed:**
+
 - Which endpoints you tested
 - Command outputs before and after
 - Any edge cases you tested
@@ -483,24 +495,28 @@ If possible, test on an actual Unraid system:
 ### Project-Specific Conventions
 
 **Collectors:**
+
 - Always respect context cancellation
 - Implement panic recovery
 - Log at appropriate levels (Debug for frequent events, Info for important events)
 - Publish events via `ctx.Hub.Pub(data, topic)`
 
 **API Handlers:**
+
 - Use mutex locks when accessing cache (`s.cacheMutex.RLock()`)
 - Validate all user input
 - Return appropriate HTTP status codes
 - Use `respondWithJSON()` and `respondWithError()` helpers
 
 **Controllers:**
+
 - Validate input with `lib.Validate*()` functions
 - Use `lib.ExecuteShellCommand()` for command execution
 - Never trust user input in shell commands (prevent injection)
 - Return detailed error messages
 
 **Logging:**
+
 - Debug: Detailed diagnostic info (frequent events)
 - Info: General informational messages
 - Success: Successful operations

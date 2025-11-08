@@ -24,25 +24,30 @@ Which component/feature isn't working correctly?
 Please provide detailed information about your hardware:
 
 **CPU:**
+
 - Model: (e.g., Intel Core i7-12700K)
 - Architecture: (e.g., x86_64)
 
 **Disk Controller:**
+
 - Type: (e.g., HBA, RAID controller, onboard SATA)
 - Model: (e.g., LSI 9300-8i, Dell PERC H310)
 - Driver: (if known)
 
 **GPU:**
+
 - Vendor: (NVIDIA / AMD / Intel)
 - Model: (e.g., RTX 3080, RX 6800 XT)
 - Driver Version: (if known)
 
 **UPS:**
+
 - Brand/Model: (e.g., APC Back-UPS Pro 1500)
 - Monitoring Software: (apcupsd / NUT / other)
 - Connection Type: (USB / Serial / Network)
 
 **Network:**
+
 - Card Model: (e.g., Intel I350)
 - Configuration: (e.g., bonded interfaces, VLAN, bridge)
 
@@ -86,7 +91,7 @@ $ /usr/bin/nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader
 Enable debug logging and share relevant entries:
 
 ```bash
-$ ./unraid-management-agent boot --debug
+./unraid-management-agent boot --debug
 ```
 
 ```
@@ -96,6 +101,7 @@ $ ./unraid-management-agent boot --debug
 ### Collector Affected
 
 If you know which collector is failing:
+
 - [ ] System Collector (`daemon/services/collectors/system.go`)
 - [ ] Disk Collector (`daemon/services/collectors/disk.go`)
 - [ ] GPU Collector (`daemon/services/collectors/gpu.go`)
@@ -114,6 +120,7 @@ If you've identified a potential fix:
 (e.g., "Add alternative parsing for newer nvidia-smi XML format")
 
 **I can submit a PR:**
+
 - [ ] Yes, I can fix this and submit a PR
 - [ ] No, but I can test a fix on my hardware
 - [ ] No, I just want to report the issue
@@ -125,6 +132,7 @@ Have you found any workarounds?
 ## Additional Context
 
 Any other information that might help diagnose this issue:
+
 - Does this affect all functionality or just specific metrics?
 - Did this work in a previous plugin version?
 - Are there any error messages in system logs?

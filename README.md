@@ -38,6 +38,7 @@ This plugin **can coexist** with the official Unraid API. They operate independe
 ### Official Unraid API Documentation
 
 For information about the official Unraid GraphQL API, please refer to:
+
 - [Unraid Official Documentation](https://docs.unraid.net/)
 - Unraid OS 7.2+ release notes and API documentation
 
@@ -46,6 +47,7 @@ For information about the official Unraid GraphQL API, please refer to:
 ## Features
 
 ### Real-time Monitoring
+
 - **System Information**: CPU usage, RAM, temperatures, uptime, hostname
 - **Array Status**: Array state, parity status, disk counts
 - **Disk Information**: Per-disk metrics, SMART data, temperatures, space usage
@@ -57,16 +59,19 @@ For information about the official Unraid GraphQL API, please refer to:
 - **User Shares**: Share list, space usage, paths
 
 ### Control Operations
+
 - **Docker**: Start, stop, restart, pause, unpause containers
 - **Virtual Machines**: Start, stop, restart, pause, resume, hibernate VMs
 
 ### Communication Protocols
+
 - **REST API**: HTTP endpoints for synchronous queries
 - **WebSocket**: Real-time event streaming for live updates
 
 ## Architecture
 
 ### Event-Driven Design
+
 The agent uses a pubsub event bus for decoupled, real-time data flow:
 
 ```
@@ -78,7 +83,9 @@ Collectors → Event Bus → API Server Cache → REST Endpoints
 ### Components
 
 #### Collectors
+
 Data collectors run independently at fixed intervals:
+
 - **System Collector** (5s): CPU, RAM, temps, uptime
 - **Array Collector** (10s): Array state and parity info
 - **Disk Collector** (30s): Per-disk metrics
@@ -90,13 +97,16 @@ Data collectors run independently at fixed intervals:
 - **Share Collector** (60s): User share information
 
 #### API Server
+
 - Maintains in-memory cache of latest collector data
 - Serves REST endpoints for instant responses
 - Broadcasts events to WebSocket clients
 - Implements CORS, logging, and recovery middleware
 
 #### Orchestrator
+
 Coordinates the entire application lifecycle:
+
 - Initializes all collectors
 - Starts API server subscriptions before collectors
 - Manages graceful shutdown
@@ -104,6 +114,7 @@ Coordinates the entire application lifecycle:
 ## Installation
 
 ### Prerequisites
+
 - Unraid 6.9+ (tested on Unraid 7.x)
 - Port 8043 available (configurable)
 
@@ -116,9 +127,11 @@ For now, you can install manually using the plugin URL:
 1. Open your Unraid Web UI
 2. Navigate to **Plugins** → **Install Plugin**
 3. Enter the plugin URL:
+
    ```
    https://raw.githubusercontent.com/ruaan-deysel/unraid-management-agent/main/unraid-management-agent.plg
    ```
+
 4. Click **Install**
 5. The plugin will automatically:
    - Download and extract the package
@@ -128,16 +141,19 @@ For now, you can install manually using the plugin URL:
 ### Manual Installation from Release Package
 
 1. Download the latest release package:
+
    ```bash
    wget https://github.com/ruaan-deysel/unraid-management-agent/releases/download/v2025.11.0/unraid-management-agent-2025.11.0.tgz
    ```
 
 2. Extract and install:
+
    ```bash
    tar xzf unraid-management-agent-2025.11.0.tgz -C /
    ```
 
 3. Start the service:
+
    ```bash
    /usr/local/emhttp/plugins/unraid-management-agent/scripts/start
    ```
@@ -207,6 +223,7 @@ This plugin has been developed and tested on the following configuration:
 Base URL: `http://localhost:8043/api/v1`
 
 #### Monitoring Endpoints
+
 - `GET /health` - Health check
 - `GET /system` - System information
 - `GET /array` - Array status
@@ -222,6 +239,7 @@ Base URL: `http://localhost:8043/api/v1`
 - `GET /gpu` - GPU metrics
 
 #### Control Endpoints
+
 - `POST /docker/{id}/start` - Start container
 - `POST /docker/{id}/stop` - Stop container
 - `POST /docker/{id}/restart` - Restart container
@@ -316,11 +334,13 @@ make clean
 ### Configuration File
 
 When installed via the .plg file, the plugin creates a configuration file at:
+
 ```
 /boot/config/plugins/unraid-management-agent/config.cfg
 ```
 
 Default configuration:
+
 ```bash
 # API Server Configuration
 PORT=8043
@@ -341,6 +361,7 @@ INTERVAL_SHARES=60
 ```
 
 You can edit this file to customize the plugin behavior. Changes require a service restart:
+
 ```bash
 /usr/local/emhttp/plugins/unraid-management-agent/scripts/stop
 /usr/local/emhttp/plugins/unraid-management-agent/scripts/start
@@ -398,6 +419,7 @@ If endpoints return empty or default data:
 ## API Response Examples
 
 ### System Information
+
 ```json
 {
   "hostname": "Tower",
@@ -411,6 +433,7 @@ If endpoints return empty or default data:
 ```
 
 ### Network Interfaces
+
 ```json
 [
   {
@@ -431,6 +454,7 @@ If endpoints return empty or default data:
 ```
 
 ### Array Status
+
 ```json
 {
   "state": "STARTED",
@@ -482,6 +506,7 @@ If the plugin doesn't work correctly on your hardware configuration:
    - **Unraid Version**: Your Unraid version number
 
 **Example PR Description:**
+
 ```
 Hardware: AMD Ryzen 9 5950X, LSI 9300-8i HBA, NVIDIA RTX 3080
 Issue: GPU temperature not detected due to different nvidia-smi output format
@@ -493,6 +518,7 @@ Unraid Version: 7.2
 ### Why Community Contributions Matter
 
 As a single maintainer, it's challenging to:
+
 - Test across all possible hardware configurations
 - Debug issues on systems I don't have access to
 - Support every variation of disk controllers, GPUs, UPS models, etc.
@@ -525,6 +551,7 @@ Comprehensive documentation is available in the `docs/` directory:
 ## Support
 
 For issues, questions, or feature requests:
+
 - Check existing documentation in the `docs/` directory
 - Review the [Documentation Index](docs/README.md) for comprehensive guides
 

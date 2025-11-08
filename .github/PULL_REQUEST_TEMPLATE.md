@@ -61,14 +61,17 @@ Related to #(issue number)
 
 **API Endpoints Tested:**
 -
+
 -
 
 **Test Output/Results:**
+
 ```
 [Paste relevant test output or API responses]
 ```
 
 **Log Output (if relevant):**
+
 ```
 [Paste relevant log entries]
 ```
@@ -118,9 +121,7 @@ Related to #(issue number)
 
 **Issue on Original Hardware:**
 
-
 **Fix Implemented:**
-
 
 **Tested On:**
 -
@@ -129,7 +130,6 @@ Related to #(issue number)
 -
 
 **Potential Impact on Other Hardware:**
-
 
 ## Additional Notes
 
