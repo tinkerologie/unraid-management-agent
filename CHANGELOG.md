@@ -19,6 +19,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2025.11.7] - 2025-11-08
+
+### Changed
+- **README.md Simplified**: Reduced README.md to essential information only
+  - Removed detailed feature lists, API endpoints, and support links
+  - Kept only the plugin name heading and brief description
+  - Maintains proper display name format for Plugin Manager
+  - Reduces file size while preserving functionality
+
+---
+
 ## [2025.11.6] - 2025-11-08
 
 ### Fixed

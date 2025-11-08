@@ -20,6 +20,9 @@ This Unraid plugin provides REST API and WebSocket interfaces for real-time syst
 </DESCRIPTION>
 
 <CHANGES>
+###2025.11.7 (2025-11-08)
+- Changed: Simplified README.md to essential information only (reduced file size)
+
 ###2025.11.6 (2025-11-08)
 - Fixed: Plugin now displays as "Unraid Management Agent" in Plugin Manager (instead of "unraid-management-agent")
 - Added: README.md file following Unraid plugin naming conventions
