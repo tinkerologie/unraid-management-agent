@@ -80,13 +80,13 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/docker/{id}/pause", s.handleDockerPause).Methods("POST")
 	api.HandleFunc("/docker/{id}/unpause", s.handleDockerUnpause).Methods("POST")
 
-	api.HandleFunc("/vm/{id}/start", s.handleVMStart).Methods("POST")
-	api.HandleFunc("/vm/{id}/stop", s.handleVMStop).Methods("POST")
-	api.HandleFunc("/vm/{id}/restart", s.handleVMRestart).Methods("POST")
-	api.HandleFunc("/vm/{id}/pause", s.handleVMPause).Methods("POST")
-	api.HandleFunc("/vm/{id}/resume", s.handleVMResume).Methods("POST")
-	api.HandleFunc("/vm/{id}/hibernate", s.handleVMHibernate).Methods("POST")
-	api.HandleFunc("/vm/{id}/force-stop", s.handleVMForceStop).Methods("POST")
+	api.HandleFunc("/vm/{name}/start", s.handleVMStart).Methods("POST")
+	api.HandleFunc("/vm/{name}/stop", s.handleVMStop).Methods("POST")
+	api.HandleFunc("/vm/{name}/restart", s.handleVMRestart).Methods("POST")
+	api.HandleFunc("/vm/{name}/pause", s.handleVMPause).Methods("POST")
+	api.HandleFunc("/vm/{name}/resume", s.handleVMResume).Methods("POST")
+	api.HandleFunc("/vm/{name}/hibernate", s.handleVMHibernate).Methods("POST")
+	api.HandleFunc("/vm/{name}/force-stop", s.handleVMForceStop).Methods("POST")
 
 	// Array control endpoints
 	api.HandleFunc("/array/start", s.handleArrayStart).Methods("POST")

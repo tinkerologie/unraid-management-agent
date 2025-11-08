@@ -19,6 +19,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2025.11.9] - 2025-11-08
+
+### Fixed
+- **VM Collector**: Fixed parsing of VM names containing spaces
+  - Changed from parsing `virsh list --all` column-based output to using `virsh list --all --name`
+  - Added `getVMState()` helper method to get VM state using `virsh domstate <name>`
+  - Added `getVMID()` helper method to get VM ID using `virsh domid <name>`
+  - Now correctly handles VM names with spaces, hyphens, underscores, and special characters
+  - Example: "Windows Server 2016" is now correctly parsed instead of being split into "Windows" and "Server 2016 running"
+
+- **VM Control API**: Fixed VM control endpoints to work with VM names containing spaces
+  - Updated VM name validation regex to allow spaces: `^[a-zA-Z0-9 _.-]{1,253}$`
+  - Fixed route parameter mismatch: changed VM control routes from `{id}` to `{name}`
+  - VM control endpoints now correctly accept URL-encoded spaces (e.g., `Windows%20Server%202016`)
+  - All VM operations (start, stop, restart, pause, resume, hibernate, force-stop) now work with spaces in VM names
+
+---
+
 ## [2025.11.8] - 2025-11-08
 
 ### Added

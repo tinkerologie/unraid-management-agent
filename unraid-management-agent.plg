@@ -3,14 +3,14 @@
 <!DOCTYPE PLUGIN [
     <!ENTITY name        "unraid-management-agent">
     <!ENTITY author      "ruaan-deysel">
-    <!ENTITY version     "2025.11.8">
+    <!ENTITY version     "2025.11.9">
     <!ENTITY gitURL      "https://github.com/&author;/&name;">
     <!ENTITY pluginURL   "&gitURL;/raw/main/&name;.plg">
     <!ENTITY supportURL  "https://forums.unraid.net/topic/178262-home-assistant-unraid-integration">
     <!ENTITY launch      "Settings/unraid-management-agent">
     <!ENTITY bundle      "&name;-&version;.tgz">
     <!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
-    <!ENTITY md5         "abfd175045c01b31020b30d08ab6aab0">
+    <!ENTITY md5         "PLACEHOLDER_MD5">
 ]>
 
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" icon="server" min="6.9.0" pluginURL="&pluginURL;" support="&supportURL;">
@@ -20,6 +20,13 @@ This Unraid plugin provides REST API and WebSocket interfaces for real-time syst
 </DESCRIPTION>
 
 <CHANGES>
+###2025.11.9 (2025-11-08)
+- Fixed: VM collector now correctly parses VM names containing spaces
+- Fixed: VM control API endpoints now work with VM names containing spaces
+- Changed: VM collector uses `virsh list --all --name` for robust name parsing
+- Changed: VM name validation now allows spaces in addition to alphanumeric, hyphens, underscores, and dots
+- Fixed: Route parameter mismatch in VM control endpoints (changed from {id} to {name})
+
 ###2025.11.8 (2025-11-08)
 - Added: User Scripts API - REST endpoints for discovering and executing Unraid User Scripts
 - Added: GET /api/v1/user-scripts - List all available scripts with metadata

@@ -11,9 +11,9 @@ var (
 	containerIDShortRegex = regexp.MustCompile(`^[a-f0-9]{12}$`)
 	containerIDFullRegex  = regexp.MustCompile(`^[a-f0-9]{64}$`)
 
-	// VM names: alphanumeric, hyphens, underscores, dots (max 253 chars)
-	// Based on DNS naming conventions and common VM naming practices
-	vmNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_.-]{1,253}$`)
+	// VM names: alphanumeric, spaces, hyphens, underscores, dots (max 253 chars)
+	// Based on common VM naming practices (allows spaces for user-friendly names)
+	vmNameRegex = regexp.MustCompile(`^[a-zA-Z0-9 _.-]{1,253}$`)
 
 	// Disk IDs: common Linux disk naming patterns
 	// Examples: sda, sdb1, nvme0n1, nvme0n1p1, md0, loop0
@@ -47,7 +47,7 @@ func ValidateContainerID(id string) error {
 }
 
 // ValidateVMName validates a virtual machine name
-// Allows alphanumeric characters, hyphens, underscores, and dots
+// Allows alphanumeric characters, spaces, hyphens, underscores, and dots
 // Maximum length: 253 characters (DNS hostname limit)
 func ValidateVMName(name string) error {
 	if name == "" {
@@ -59,7 +59,7 @@ func ValidateVMName(name string) error {
 	}
 
 	if !vmNameRegex.MatchString(name) {
-		return fmt.Errorf("invalid VM name format: must contain only alphanumeric characters, hyphens, underscores, and dots")
+		return fmt.Errorf("invalid VM name format: must contain only alphanumeric characters, spaces, hyphens, underscores, and dots")
 	}
 
 	// Additional checks for common issues

@@ -61,8 +61,9 @@ func (c *VMCollector) Collect() {
 }
 
 func (c *VMCollector) collectVMs() ([]*dto.VMInfo, error) {
-	// Get list of all VMs
-	output, err := lib.ExecCommandOutput("virsh", "list", "--all")
+	// Get list of all VM names (one per line)
+	// This approach handles VM names with spaces correctly
+	output, err := lib.ExecCommandOutput("virsh", "list", "--all", "--name")
 	if err != nil {
 		return nil, fmt.Errorf("failed to list VMs: %w", err)
 	}
@@ -70,32 +71,21 @@ func (c *VMCollector) collectVMs() ([]*dto.VMInfo, error) {
 	lines := strings.Split(output, "\n")
 	vms := make([]*dto.VMInfo, 0)
 
-	// Skip header lines (first 2 lines)
-	for i := 2; i < len(lines); i++ {
-		line := strings.TrimSpace(lines[i])
-		if line == "" {
+	for _, line := range lines {
+		vmName := strings.TrimSpace(line)
+		if vmName == "" {
 			continue
 		}
 
-		// Parse line format: " ID   Name   State"
-		fields := strings.Fields(line)
-		if len(fields) < 2 {
+		// Get VM state
+		vmState, err := c.getVMState(vmName)
+		if err != nil {
+			logger.Warning("Failed to get state for VM %s: %v", vmName, err)
 			continue
 		}
 
-		// Determine if VM is running or not
-		var vmID, vmName, vmState string
-		if fields[0] == "-" {
-			// Inactive VM: "- Name shut off"
-			vmID = ""
-			vmName = fields[1]
-			vmState = strings.Join(fields[2:], " ")
-		} else {
-			// Active VM: "ID Name running"
-			vmID = fields[0]
-			vmName = fields[1]
-			vmState = strings.Join(fields[2:], " ")
-		}
+		// Get VM ID (only for running VMs)
+		vmID := c.getVMID(vmName)
 
 		vm := &dto.VMInfo{
 			ID:        vmID,
@@ -130,6 +120,29 @@ type vmInfo struct {
 	MemoryAllocated uint64
 	Autostart       bool
 	PersistentState bool
+}
+
+// getVMState returns the state of a VM (e.g., "running", "shut off", "paused")
+func (c *VMCollector) getVMState(vmName string) (string, error) {
+	output, err := lib.ExecCommandOutput("virsh", "domstate", vmName)
+	if err != nil {
+		return "", fmt.Errorf("failed to get VM state: %w", err)
+	}
+	return strings.TrimSpace(output), nil
+}
+
+// getVMID returns the ID of a running VM, or empty string if not running
+func (c *VMCollector) getVMID(vmName string) string {
+	output, err := lib.ExecCommandOutput("virsh", "domid", vmName)
+	if err != nil {
+		return ""
+	}
+	id := strings.TrimSpace(output)
+	// virsh domid returns "-" for shut off VMs
+	if id == "-" || id == "" {
+		return ""
+	}
+	return id
 }
 
 func (c *VMCollector) getVMInfo(vmName string) (*vmInfo, error) {
