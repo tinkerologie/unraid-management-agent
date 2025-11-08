@@ -3,14 +3,14 @@
 <!DOCTYPE PLUGIN [
     <!ENTITY name        "unraid-management-agent">
     <!ENTITY author      "ruaan-deysel">
-    <!ENTITY version     "2025.11.9">
+    <!ENTITY version     "2025.11.10">
     <!ENTITY gitURL      "https://github.com/&author;/&name;">
     <!ENTITY pluginURL   "&gitURL;/raw/main/&name;.plg">
     <!ENTITY supportURL  "https://forums.unraid.net/topic/178262-home-assistant-unraid-integration">
     <!ENTITY launch      "Settings/unraid-management-agent">
     <!ENTITY bundle      "&name;-&version;.tgz">
     <!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
-    <!ENTITY md5         "db21c61a0e4b0d90dbcd41fa7ee57e5f">
+    <!ENTITY md5         "PLACEHOLDER_MD5">
 ]>
 
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" icon="server" min="6.9.0" pluginURL="&pluginURL;" support="&supportURL;">
@@ -20,6 +20,14 @@ This Unraid plugin provides REST API and WebSocket interfaces for real-time syst
 </DESCRIPTION>
 
 <CHANGES>
+###2025.11.10 (2025-11-08)
+- Added: Enhanced VM statistics - disk I/O (read/write bytes), network I/O (RX/TX bytes), memory display
+- Added: Enhanced Docker statistics - version, network mode, IP address, port mappings, volume mappings, restart policy, uptime
+- Added: Human-readable memory display for VMs and containers (e.g., "1.17 GB / 4.00 GB")
+- Added: Container uptime display in human-readable format (e.g., "2d 5h 30m")
+- Changed: VM collector now uses virsh domblkstat and domifstat for I/O metrics
+- Changed: Docker collector now uses docker inspect for comprehensive container metadata
+
 ###2025.11.9 (2025-11-08)
 - Fixed: VM collector now correctly parses VM names containing spaces
 - Fixed: VM control API endpoints now work with VM names containing spaces

@@ -103,6 +103,17 @@ func (c *DockerCollector) collectContainers() ([]*dto.ContainerInfo, error) {
 			Timestamp: time.Now(),
 		}
 
+		// Get enhanced container details using docker inspect
+		if details, err := c.getContainerDetails(container.ID); err == nil {
+			container.Version = details.Version
+			container.NetworkMode = details.NetworkMode
+			container.IPAddress = details.IPAddress
+			container.PortMappings = details.PortMappings
+			container.VolumeMappings = details.VolumeMappings
+			container.RestartPolicy = details.RestartPolicy
+			container.Uptime = details.Uptime
+		}
+
 		// Get container stats if running
 		if container.State == "running" {
 			if stats, err := c.getContainerStats(container.ID); err == nil {
@@ -111,6 +122,7 @@ func (c *DockerCollector) collectContainers() ([]*dto.ContainerInfo, error) {
 				container.MemoryLimit = stats.MemoryLimit
 				container.NetworkRX = stats.NetworkRX
 				container.NetworkTX = stats.NetworkTX
+				container.MemoryDisplay = c.formatMemoryDisplay(stats.MemoryUsage, stats.MemoryLimit)
 			}
 		}
 
@@ -253,4 +265,156 @@ func (c *DockerCollector) parsePorts(portsStr string) []dto.PortMapping {
 	}
 
 	return ports
+}
+
+type containerDetails struct {
+	Version        string
+	NetworkMode    string
+	IPAddress      string
+	PortMappings   []string
+	VolumeMappings []dto.VolumeMapping
+	RestartPolicy  string
+	Uptime         string
+}
+
+// getContainerDetails retrieves detailed container information using docker inspect
+func (c *DockerCollector) getContainerDetails(containerID string) (*containerDetails, error) {
+	output, err := lib.ExecCommandOutput("docker", "inspect", containerID)
+	if err != nil {
+		return nil, err
+	}
+
+	var inspectOutput []struct {
+		Config struct {
+			Image string `json:"Image"`
+		} `json:"Config"`
+		NetworkSettings struct {
+			Networks map[string]struct {
+				IPAddress string `json:"IPAddress"`
+			} `json:"Networks"`
+		} `json:"NetworkSettings"`
+		HostConfig struct {
+			NetworkMode   string `json:"NetworkMode"`
+			RestartPolicy struct {
+				Name string `json:"Name"`
+			} `json:"RestartPolicy"`
+			PortBindings map[string][]struct {
+				HostIP   string `json:"HostIp"`
+				HostPort string `json:"HostPort"`
+			} `json:"PortBindings"`
+			Binds []string `json:"Binds"`
+		} `json:"HostConfig"`
+		State struct {
+			StartedAt string `json:"StartedAt"`
+		} `json:"State"`
+	}
+
+	if err := json.Unmarshal([]byte(output), &inspectOutput); err != nil {
+		return nil, err
+	}
+
+	if len(inspectOutput) == 0 {
+		return nil, fmt.Errorf("no inspect data returned")
+	}
+
+	inspect := inspectOutput[0]
+	details := &containerDetails{}
+
+	// Extract version from image tag
+	imageParts := strings.Split(inspect.Config.Image, ":")
+	if len(imageParts) > 1 {
+		details.Version = imageParts[1]
+	} else {
+		details.Version = "latest"
+	}
+
+	// Network mode
+	details.NetworkMode = inspect.HostConfig.NetworkMode
+
+	// IP Address (get first available)
+	for _, network := range inspect.NetworkSettings.Networks {
+		if network.IPAddress != "" {
+			details.IPAddress = network.IPAddress
+			break
+		}
+	}
+
+	// Port mappings
+	portMappings := []string{}
+	for containerPort, bindings := range inspect.HostConfig.PortBindings {
+		for _, binding := range bindings {
+			if binding.HostPort != "" {
+				portMappings = append(portMappings, fmt.Sprintf("%s:%s", binding.HostPort, containerPort))
+			}
+		}
+	}
+	details.PortMappings = portMappings
+
+	// Volume mappings
+	volumeMappings := []dto.VolumeMapping{}
+	for _, bind := range inspect.HostConfig.Binds {
+		parts := strings.Split(bind, ":")
+		if len(parts) >= 2 {
+			mode := "rw"
+			if len(parts) >= 3 {
+				mode = parts[2]
+			}
+			volumeMappings = append(volumeMappings, dto.VolumeMapping{
+				HostPath:      parts[0],
+				ContainerPath: parts[1],
+				Mode:          mode,
+			})
+		}
+	}
+	details.VolumeMappings = volumeMappings
+
+	// Restart policy
+	details.RestartPolicy = inspect.HostConfig.RestartPolicy.Name
+	if details.RestartPolicy == "" {
+		details.RestartPolicy = "no"
+	}
+
+	// Calculate uptime
+	if inspect.State.StartedAt != "" {
+		startTime, err := time.Parse(time.RFC3339Nano, inspect.State.StartedAt)
+		if err == nil {
+			uptime := time.Since(startTime)
+			details.Uptime = c.formatUptime(uptime)
+		}
+	}
+
+	return details, nil
+}
+
+// formatUptime formats a duration into a human-readable uptime string
+func (c *DockerCollector) formatUptime(d time.Duration) string {
+	days := int(d.Hours() / 24)
+	hours := int(d.Hours()) % 24
+	minutes := int(d.Minutes()) % 60
+
+	if days > 0 {
+		return fmt.Sprintf("%dd %dh %dm", days, hours, minutes)
+	} else if hours > 0 {
+		return fmt.Sprintf("%dh %dm", hours, minutes)
+	} else {
+		return fmt.Sprintf("%dm", minutes)
+	}
+}
+
+// formatMemoryDisplay formats memory usage as "used / limit"
+func (c *DockerCollector) formatMemoryDisplay(used, limit uint64) string {
+	if limit == 0 {
+		return "0 / 0"
+	}
+
+	usedMB := float64(used) / (1024 * 1024)
+	limitMB := float64(limit) / (1024 * 1024)
+
+	if limitMB >= 1024 {
+		usedGB := usedMB / 1024
+		limitGB := limitMB / 1024
+		return fmt.Sprintf("%.2f GB / %.2f GB", usedGB, limitGB)
+	}
+
+	return fmt.Sprintf("%.2f MB / %.2f MB", usedMB, limitMB)
 }

@@ -107,7 +107,28 @@ func (c *VMCollector) collectVMs() ([]*dto.VMInfo, error) {
 			if memUsed, err := c.getVMMemoryUsage(vmName); err == nil {
 				vm.MemoryUsed = memUsed
 			}
+
+			// Get CPU usage
+			if guestCPU, hostCPU, err := c.getVMCPUUsage(vmName); err == nil {
+				vm.GuestCPUPercent = guestCPU
+				vm.HostCPUPercent = hostCPU
+			}
+
+			// Get disk I/O stats
+			if readBytes, writeBytes, err := c.getVMDiskIO(vmName); err == nil {
+				vm.DiskReadBytes = readBytes
+				vm.DiskWriteBytes = writeBytes
+			}
+
+			// Get network I/O stats
+			if rxBytes, txBytes, err := c.getVMNetworkIO(vmName); err == nil {
+				vm.NetworkRXBytes = rxBytes
+				vm.NetworkTXBytes = txBytes
+			}
 		}
+
+		// Format memory display
+		vm.MemoryDisplay = c.formatMemoryDisplay(vm.MemoryUsed, vm.MemoryAllocated)
 
 		vms = append(vms, vm)
 	}
@@ -215,4 +236,121 @@ func (c *VMCollector) getVMMemoryUsage(vmName string) (uint64, error) {
 	}
 
 	return 0, nil
+}
+
+// getVMCPUUsage returns guest and host CPU usage percentages
+func (c *VMCollector) getVMCPUUsage(vmName string) (float64, float64, error) {
+	output, err := lib.ExecCommandOutput("virsh", "cpu-stats", vmName, "--total")
+	if err != nil {
+		return 0, 0, err
+	}
+
+	// Parse CPU time from output
+	// Format: "cpu_time          123456789 ns"
+	re := regexp.MustCompile(`cpu_time\s+(\d+)`)
+	if matches := re.FindStringSubmatch(output); len(matches) > 1 {
+		_ = matches[1] // CPU time available but needs historical data for percentage calculation
+	}
+
+	// For now, return 0 as we need historical data to calculate percentage
+	// This would require storing previous values and calculating delta
+	return 0, 0, nil
+}
+
+// getVMDiskIO returns disk read and write bytes
+func (c *VMCollector) getVMDiskIO(vmName string) (uint64, uint64, error) {
+	// Get list of disk devices
+	output, err := lib.ExecCommandOutput("virsh", "domblklist", vmName)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	var totalRead, totalWrite uint64
+	lines := strings.Split(output, "\n")
+
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) < 2 || fields[0] == "Target" {
+			continue
+		}
+
+		device := fields[0]
+		stats, err := lib.ExecCommandOutput("virsh", "domblkstat", vmName, device)
+		if err != nil {
+			continue
+		}
+
+		// Parse read and write bytes
+		// Format: "rd_bytes 123456"
+		reRead := regexp.MustCompile(`rd_bytes\s+(\d+)`)
+		if matches := reRead.FindStringSubmatch(stats); len(matches) > 1 {
+			if bytes, err := strconv.ParseUint(matches[1], 10, 64); err == nil {
+				totalRead += bytes
+			}
+		}
+
+		reWrite := regexp.MustCompile(`wr_bytes\s+(\d+)`)
+		if matches := reWrite.FindStringSubmatch(stats); len(matches) > 1 {
+			if bytes, err := strconv.ParseUint(matches[1], 10, 64); err == nil {
+				totalWrite += bytes
+			}
+		}
+	}
+
+	return totalRead, totalWrite, nil
+}
+
+// getVMNetworkIO returns network RX and TX bytes
+func (c *VMCollector) getVMNetworkIO(vmName string) (uint64, uint64, error) {
+	// Get list of network interfaces
+	output, err := lib.ExecCommandOutput("virsh", "domiflist", vmName)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	var totalRX, totalTX uint64
+	lines := strings.Split(output, "\n")
+
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) < 1 || fields[0] == "Interface" || fields[0] == "-" {
+			continue
+		}
+
+		iface := fields[0]
+		stats, err := lib.ExecCommandOutput("virsh", "domifstat", vmName, iface)
+		if err != nil {
+			continue
+		}
+
+		// Parse RX and TX bytes
+		// Format: "rx_bytes 123456"
+		reRX := regexp.MustCompile(`rx_bytes\s+(\d+)`)
+		if matches := reRX.FindStringSubmatch(stats); len(matches) > 1 {
+			if bytes, err := strconv.ParseUint(matches[1], 10, 64); err == nil {
+				totalRX += bytes
+			}
+		}
+
+		reTX := regexp.MustCompile(`tx_bytes\s+(\d+)`)
+		if matches := reTX.FindStringSubmatch(stats); len(matches) > 1 {
+			if bytes, err := strconv.ParseUint(matches[1], 10, 64); err == nil {
+				totalTX += bytes
+			}
+		}
+	}
+
+	return totalRX, totalTX, nil
+}
+
+// formatMemoryDisplay formats memory usage as "used / allocated"
+func (c *VMCollector) formatMemoryDisplay(used, allocated uint64) string {
+	if allocated == 0 {
+		return "0 / 0"
+	}
+
+	usedGB := float64(used) / (1024 * 1024 * 1024)
+	allocatedGB := float64(allocated) / (1024 * 1024 * 1024)
+
+	return fmt.Sprintf("%.2f GB / %.2f GB", usedGB, allocatedGB)
 }

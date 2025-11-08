@@ -19,6 +19,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2025.11.10] - 2025-11-08
+
+### Added
+- **Enhanced VM Statistics**: Added comprehensive VM monitoring metrics
+  - Guest CPU usage percentage (placeholder for future implementation with historical data)
+  - Host CPU usage percentage (placeholder for future implementation with historical data)
+  - Memory display in human-readable format (e.g., "1.17 GB / 4.00 GB")
+  - Disk I/O statistics: total read and write bytes across all VM disks
+  - Network I/O statistics: total RX and TX bytes across all VM network interfaces
+  - New DTO fields: `guest_cpu_percent`, `host_cpu_percent`, `memory_display`, `disk_read_bytes`, `disk_write_bytes`, `network_rx_bytes`, `network_tx_bytes`
+
+- **Enhanced Docker Container Statistics**: Added comprehensive container monitoring metrics
+  - Container version extracted from image tag
+  - Network mode (e.g., "bridge", "host", "none")
+  - Container IP address
+  - Port mappings in "host_port:container_port" format
+  - Volume mappings with host path, container path, and mode (rw/ro)
+  - Restart policy (e.g., "always", "unless-stopped", "on-failure", "no")
+  - Container uptime in human-readable format (e.g., "2d 5h 30m", "3h 45m", "15m")
+  - Memory display in human-readable format (e.g., "512.00 MB / 2.00 GB")
+  - New DTO fields: `version`, `network_mode`, `ip_address`, `port_mappings`, `volume_mappings`, `restart_policy`, `uptime`, `memory_display`
+
+### Changed
+- **VM Collector**: Enhanced data collection using additional virsh commands
+  - Added `getVMCPUUsage()` method using `virsh cpu-stats` (returns 0 pending historical data implementation)
+  - Added `getVMDiskIO()` method using `virsh domblklist` and `virsh domblkstat`
+  - Added `getVMNetworkIO()` method using `virsh domiflist` and `virsh domifstat`
+  - Added `formatMemoryDisplay()` helper for human-readable memory formatting
+
+- **Docker Collector**: Enhanced data collection using docker inspect
+  - Added `getContainerDetails()` method using `docker inspect` for comprehensive container metadata
+  - Added `formatUptime()` helper for human-readable uptime formatting
+  - Added `formatMemoryDisplay()` helper for human-readable memory formatting
+  - Container details now include network configuration, volume mappings, and restart policies
+
+---
+
 ## [2025.11.9] - 2025-11-08
 
 ### Fixed
