@@ -246,6 +246,81 @@ func (c *DiskCollector) enrichWithIOStats(disk *dto.DiskInfo) {
 	}
 }
 
+// isUSBDevice checks if a device is a USB device by examining its sysfs path
+func (c *DiskCollector) isUSBDevice(device string) bool {
+	// Read the device's sysfs path to determine if it's USB
+	sysfsPath := "/sys/block/" + device + "/device"
+
+	// Read the symlink and resolve it to the full path
+	devicePath, err := os.Readlink(sysfsPath)
+	if err != nil {
+		// If we can't read the symlink, assume it's not USB
+		return false
+	}
+
+	// Resolve the relative path to an absolute path
+	// The symlink is relative (e.g., ../../../6:0:0:0), so we need to resolve it
+	fullPath, err := lib.ExecCommand("readlink", "-f", sysfsPath)
+	if err != nil || len(fullPath) == 0 {
+		// If we can't resolve the path, fall back to checking the relative path
+		fullPath = []string{devicePath}
+	}
+
+	// USB devices have "usb" in their full device path
+	// Example: /sys/devices/pci0000:00/0000:00:14.0/usb1/1-10/1-10:1.0/host6/target6:0:0/6:0:0:0
+	fullPathStr := strings.Join(fullPath, "")
+	isUSB := strings.Contains(fullPathStr, "/usb")
+
+	if isUSB {
+		logger.Debug("Disk: Device %s detected as USB device (path: %s)", device, fullPathStr)
+	}
+
+	return isUSB
+}
+
+// isBootDrive checks if a device is the Unraid boot drive by checking mount points
+func (c *DiskCollector) isBootDrive(device string) bool {
+	// Read /proc/mounts to check if this device is mounted at /boot
+	file, err := os.Open("/proc/mounts")
+	if err != nil {
+		return false
+	}
+	defer func() {
+		if err := file.Close(); err != nil {
+			logger.Debug("Error closing /proc/mounts: %v", err)
+		}
+	}()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		fields := strings.Fields(line)
+		if len(fields) >= 2 {
+			// Check if this device is mounted at /boot
+			// Example: /dev/sda1 /boot vfat ...
+			if strings.Contains(fields[0], device) && fields[1] == "/boot" {
+				logger.Debug("Disk: Device %s detected as boot drive (mounted at /boot)", device)
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// isNVMeDevice checks if a device is an NVMe device
+func (c *DiskCollector) isNVMeDevice(device string) bool {
+	// NVMe devices have "nvme" in their device name
+	// Example: nvme0n1, nvme1n1, etc.
+	isNVMe := strings.Contains(device, "nvme")
+
+	if isNVMe {
+		logger.Debug("Disk: Device %s detected as NVMe device", device)
+	}
+
+	return isNVMe
+}
+
 // enrichWithSMARTData adds SMART attributes using smartctl
 func (c *DiskCollector) enrichWithSMARTData(disk *dto.DiskInfo) {
 	devicePath := "/dev/" + disk.Device
@@ -258,14 +333,42 @@ func (c *DiskCollector) enrichWithSMARTData(disk *dto.DiskInfo) {
 	// Default to UNKNOWN if we can't read SMART data
 	disk.SMARTStatus = "UNKNOWN"
 
-	// Run smartctl with -n standby to avoid waking up spun-down disks
-	// The -n standby flag tells smartctl to skip the check if the disk is in standby mode
-	// This preserves Unraid's disk spin-down functionality
-	// Exit codes:
-	//   0 = Success, disk is active, SMART data retrieved
-	//   2 = Disk is in standby/sleep mode, check skipped (disk NOT woken up)
-	//   Other = Error accessing disk
-	lines, err := lib.ExecCommand("smartctl", "-n", "standby", "-H", devicePath)
+	// Check if this is a USB flash drive (like the Unraid boot drive)
+	// USB flash drives typically don't support SMART monitoring
+	if c.isUSBDevice(disk.Device) {
+		if c.isBootDrive(disk.Device) {
+			logger.Debug("Disk: Skipping SMART check for %s (USB boot drive)", disk.Device)
+		} else {
+			logger.Debug("Disk: Skipping SMART check for %s (USB flash drive)", disk.Device)
+		}
+		// Keep status as UNKNOWN for USB flash drives
+		return
+	}
+
+	// Detect device type for optimized SMART collection
+	isNVMe := c.isNVMeDevice(disk.Device)
+
+	var lines []string
+	var err error
+
+	if isNVMe {
+		// NVMe drives don't support standby mode, so we skip the -n standby flag
+		// Use smartctl -H directly for NVMe drives
+		logger.Debug("Disk: Collecting SMART data for NVMe device %s (no standby check)", disk.Device)
+		lines, err = lib.ExecCommand("smartctl", "-H", devicePath)
+	} else {
+		// SATA/SAS drives support standby mode
+		// Run smartctl with -n standby to avoid waking up spun-down disks
+		// The -n standby flag tells smartctl to skip the check if the disk is in standby mode
+		// This preserves Unraid's disk spin-down functionality
+		// Exit codes:
+		//   0 = Success, disk is active, SMART data retrieved
+		//   2 = Disk is in standby/sleep mode, check skipped (disk NOT woken up)
+		//   Other = Error accessing disk
+		logger.Debug("Disk: Collecting SMART data for SATA/SAS device %s (with standby check)", disk.Device)
+		lines, err = lib.ExecCommand("smartctl", "-n", "standby", "-H", devicePath)
+	}
+
 	if err != nil {
 		// Check if this is a "disk in standby" error (exit code 2)
 		// In this case, we preserve the disk's spun-down state and skip SMART check

@@ -19,6 +19,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2025.11.5] - 2025-11-08
+
+### Added
+- **USB Flash Drive Detection**: Plugin now detects USB flash drives (including the Unraid boot drive) and skips SMART data collection
+  - Checks device sysfs path to identify USB transport
+  - Detects Unraid boot drive by checking if device is mounted at `/boot`
+  - Avoids unnecessary SMART commands on devices that don't support SMART monitoring
+  - SMART status remains "UNKNOWN" for USB flash drives (consistent with previous behavior)
+  - Adds debug logging to indicate when USB flash drive detection occurs
+
+### Changed
+- **NVMe-Specific SMART Collection**: Optimized SMART data collection for NVMe drives
+  - NVMe drives are now detected by checking device name pattern (e.g., `nvme0n1`)
+  - NVMe drives skip the `-n standby` flag since they don't support standby mode
+  - Uses `smartctl -H /dev/{device}` for NVMe drives (without `-n standby`)
+  - SATA/SAS drives continue to use `smartctl -n standby -H /dev/{device}` (existing behavior)
+  - Adds debug logging to indicate device type detection (NVMe vs SATA/SAS)
+  - Improves efficiency by avoiding unnecessary standby checks on NVMe drives
+
+---
+
 ## [2025.11.4] - 2025-11-08
 
 ### Fixed
