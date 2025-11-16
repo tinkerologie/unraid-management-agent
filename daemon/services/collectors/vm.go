@@ -104,7 +104,7 @@ func (c *VMCollector) collectVMs() ([]*dto.VMInfo, error) {
 			continue
 		}
 
-		// Get VM ID (only for running VMs)
+		// Get VM UUID (stable identifier for all VM states)
 		vmID := c.getVMID(vmName)
 
 		vm := &dto.VMInfo{
@@ -186,18 +186,19 @@ func (c *VMCollector) getVMState(vmName string) (string, error) {
 	return strings.TrimSpace(output), nil
 }
 
-// getVMID returns the ID of a running VM, or empty string if not running
+// getVMID returns the UUID of a VM (stable identifier that works for all VM states)
 func (c *VMCollector) getVMID(vmName string) string {
-	output, err := lib.ExecCommandOutput("virsh", "domid", vmName)
+	output, err := lib.ExecCommandOutput("virsh", "domuuid", vmName)
 	if err != nil {
-		return ""
+		// Fallback to using VM name as ID if UUID is not available
+		return vmName
 	}
-	id := strings.TrimSpace(output)
-	// virsh domid returns "-" for shut off VMs
-	if id == "-" || id == "" {
-		return ""
+	uuid := strings.TrimSpace(output)
+	if uuid == "" {
+		// Fallback to using VM name as ID
+		return vmName
 	}
-	return id
+	return uuid
 }
 
 func (c *VMCollector) getVMInfo(vmName string) (*vmInfo, error) {

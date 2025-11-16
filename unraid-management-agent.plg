@@ -3,14 +3,14 @@
 <!DOCTYPE PLUGIN [
     <!ENTITY name        "unraid-management-agent">
     <!ENTITY author      "ruaan-deysel">
-    <!ENTITY version     "2025.11.19">
+    <!ENTITY version     "2025.11.20">
     <!ENTITY gitURL      "https://github.com/&author;/&name;">
     <!ENTITY pluginURL   "&gitURL;/raw/main/&name;.plg">
     <!ENTITY supportURL  "https://forums.unraid.net/topic/178262-home-assistant-unraid-integration">
     <!ENTITY launch      "Settings/unraid-management-agent">
     <!ENTITY bundle      "&name;-&version;.tgz">
     <!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
-    <!ENTITY md5         "e8f974fd1938b31d45a1a5dab07f6845">
+    <!ENTITY md5         "TBD">
 ]>
 
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" icon="server" min="6.9.0" pluginURL="&pluginURL;" support="&supportURL;">
@@ -20,6 +20,14 @@ This Unraid plugin provides REST API and WebSocket interfaces for real-time syst
 </DESCRIPTION>
 
 <CHANGES>
+###2025.11.20 (2025-11-16)
+- Bug Fixes (Issues #21 and #22)
+- Fixed VM endpoint returning empty string for id field (Issue #22)
+- VM IDs now use stable UUIDs instead of runtime IDs
+- Fixed incorrect parity status reporting (Issue #21)
+- Array endpoint now correctly reports parity_valid and num_parity_disks
+- Improved parity validity logic to check timestamp-based sync status
+
 ###2025.11.19 (2025-11-16)
 - Code Quality Improvements
 - Resolved all critical linting warnings across the entire codebase (93% reduction from 302 to 22 warnings)

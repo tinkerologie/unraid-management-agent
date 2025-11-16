@@ -19,6 +19,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2025.11.20] - 2025-11-16
+
+### Fixed
+
+- **VM Endpoint ID Field** (Issue #22):
+  - Fixed VM endpoint returning empty string for `id` field
+  - Changed from using `virsh domid` (runtime ID) to `virsh domuuid` (persistent UUID)
+  - VM IDs are now stable, unique identifiers that work for all VM states (running, shut off, paused)
+  - Provides consistent identification for API clients and automation systems
+  - Falls back to VM name if UUID is not available
+
+- **Array Parity Status** (Issue #21):
+  - Fixed incorrect parity status reporting (`parity_valid: false` when parity is actually valid)
+  - Fixed incorrect parity disk count (`num_parity_disks: 0` when parity disks exist)
+  - Now correctly counts parity disks from `disks.ini` (field `type="Parity"`)
+  - Improved parity validity logic to check `sbSynced` timestamp and `sbSyncErrs` count
+  - Parity is marked valid only when:
+    - At least one parity disk exists
+    - Parity has been synced (sbSynced is non-zero timestamp)
+    - No parity errors exist (sbSyncErrs is 0)
+
+### Technical Details
+
+- **VM Collector**: Updated `getVMID()` to use `virsh domuuid` for stable UUID-based identification
+- **Array Collector**: Added `countParityDisks()` function to parse disks.ini and count parity disks
+- **Parity Logic**: Improved validation to check timestamp-based sync status instead of yes/no flag
+- **Compatibility**: Both fixes maintain backward compatibility with existing API clients
+
+---
+
 ## [2025.11.19] - 2025-11-16
 
 ### Fixed

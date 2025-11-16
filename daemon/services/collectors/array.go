@@ -130,26 +130,34 @@ func (c *ArrayCollector) collectArrayStatus() (*dto.ArrayStatus, error) {
 		}
 	}
 
-	if numParity, ok := file.Get("", "mdNumParity"); ok {
-		numParity = strings.Trim(numParity, `"`)
-		if n, err := strconv.Atoi(numParity); err == nil {
-			status.NumParityDisks = n
-		}
-	}
+	// Count parity disks from disks.ini (mdNumParity doesn't exist in var.ini)
+	status.NumParityDisks = c.countParityDisks()
 
-	// Parity status
+	// Parity validity - check if parity sync has completed and has no errors
+	// sbSynced contains a timestamp when parity was last synced, or "0" if never synced
+	// sbSyncErrs contains the number of errors from the last parity check
+	parityValid := false
 	if sbSynced, ok := file.Get("", "sbSynced"); ok {
 		sbSynced = strings.Trim(sbSynced, `"`)
-		status.ParityValid = (sbSynced == "yes" || sbSynced == "1")
+		// If sbSynced is a non-zero number (timestamp), parity has been synced
+		if sbSynced != "0" && sbSynced != "" {
+			parityValid = true
+		}
 	}
 
+	// Check for parity errors - if there are any errors, parity is not valid
 	if sbSyncErrs, ok := file.Get("", "sbSyncErrs"); ok {
 		sbSyncErrs = strings.Trim(sbSyncErrs, `"`)
-		if n, err := strconv.Atoi(sbSyncErrs); err == nil && n == 0 {
-			status.ParityValid = status.ParityValid && true
-		} else {
-			status.ParityValid = false
+		if n, err := strconv.Atoi(sbSyncErrs); err == nil && n > 0 {
+			parityValid = false
 		}
+	}
+
+	// Only mark parity as valid if we have at least one parity disk
+	if status.NumParityDisks > 0 {
+		status.ParityValid = parityValid
+	} else {
+		status.ParityValid = false
 	}
 
 	// Parity check status
@@ -190,4 +198,29 @@ func (c *ArrayCollector) enrichWithArraySize(status *dto.ArrayStatus) {
 
 	logger.Debug("Array: Size - total=%d bytes (%.2f TB), used=%.1f%%",
 		totalBytes, float64(totalBytes)/(1024*1024*1024*1024), status.UsedPercent)
+}
+
+// countParityDisks counts the number of parity disks from disks.ini
+func (c *ArrayCollector) countParityDisks() int {
+	// Parse disks.ini to count parity disks
+	file, err := ini.LoadFile(common.DisksIni)
+	if err != nil {
+		logger.Debug("Array: Failed to load disks.ini: %v", err)
+		return 0
+	}
+
+	parityCount := 0
+	// Iterate through all sections in disks.ini
+	for sectionName := range file {
+		// Check if this section has type="Parity"
+		if diskType, ok := file.Get(sectionName, "type"); ok {
+			diskType = strings.Trim(diskType, `"`)
+			if diskType == "Parity" {
+				parityCount++
+			}
+		}
+	}
+
+	logger.Debug("Array: Counted %d parity disk(s) from disks.ini", parityCount)
+	return parityCount
 }
