@@ -169,6 +169,15 @@ func (c *SystemCollector) collectSystemInfo() (*dto.SystemInfo, error) {
 		info.Fans = fans
 	}
 
+	// Get virtualization features
+	info.HVMEnabled = c.isHVMEnabled()
+	info.IOMMUEnabled = c.isIOMMUEnabled()
+
+	// Get additional system information
+	info.OpenSSLVersion = c.getOpenSSLVersion()
+	info.KernelVersion = c.getKernelVersion()
+	info.ParityCheckSpeed = c.getParityCheckSpeed()
+
 	// Set timestamp
 	info.Timestamp = time.Now()
 
@@ -728,4 +737,83 @@ func (c *SystemCollector) readPerCoreCPUStat() (map[string]map[string]uint64, er
 	}
 
 	return coreStats, nil
+}
+
+// isHVMEnabled checks if hardware virtualization (HVM) is enabled
+// Checks for vmx (Intel) or svm (AMD) flags in /proc/cpuinfo
+func (c *SystemCollector) isHVMEnabled() bool {
+	data, err := os.ReadFile("/proc/cpuinfo")
+	if err != nil {
+		return false
+	}
+
+	content := string(data)
+	// Check for Intel VT-x (vmx) or AMD-V (svm)
+	return strings.Contains(content, " vmx ") || strings.Contains(content, " svm ")
+}
+
+// isIOMMUEnabled checks if IOMMU is enabled
+// Checks kernel command line and /sys/class/iommu/
+func (c *SystemCollector) isIOMMUEnabled() bool {
+	// Check kernel command line for IOMMU parameters
+	cmdline, err := os.ReadFile("/proc/cmdline")
+	if err == nil {
+		content := string(cmdline)
+		if strings.Contains(content, "intel_iommu=on") || strings.Contains(content, "amd_iommu=on") {
+			return true
+		}
+	}
+
+	// Check if /sys/class/iommu/ exists and has entries
+	entries, err := os.ReadDir("/sys/class/iommu")
+	if err == nil && len(entries) > 0 {
+		return true
+	}
+
+	return false
+}
+
+// getOpenSSLVersion gets the OpenSSL version
+func (c *SystemCollector) getOpenSSLVersion() string {
+	output, err := lib.ExecCommandOutput("openssl", "version")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(output)
+}
+
+// getKernelVersion gets the kernel version
+func (c *SystemCollector) getKernelVersion() string {
+	output, err := lib.ExecCommandOutput("uname", "-r")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(output)
+}
+
+// getParityCheckSpeed gets the parity check speed from var.ini
+func (c *SystemCollector) getParityCheckSpeed() string {
+	// Try to read from /var/local/emhttp/var.ini
+	data, err := os.ReadFile("/var/local/emhttp/var.ini")
+	if err != nil {
+		return ""
+	}
+
+	// Parse for sbSynced line which contains parity check speed
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "sbSynced=") {
+			// Extract the speed part (e.g., "18645 MB/s + 38044 MB/s")
+			parts := strings.SplitN(line, "=", 2)
+			if len(parts) == 2 {
+				value := strings.Trim(parts[1], "\"")
+				// Look for the speed pattern
+				if strings.Contains(value, "MB/s") {
+					return value
+				}
+			}
+		}
+	}
+
+	return ""
 }

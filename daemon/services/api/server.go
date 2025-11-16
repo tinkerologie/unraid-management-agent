@@ -22,16 +22,17 @@ type Server struct {
 	cancelFunc context.CancelFunc
 
 	// Cache for latest data from collectors
-	cacheMutex   sync.RWMutex
-	systemCache  *dto.SystemInfo
-	arrayCache   *dto.ArrayStatus
-	disksCache   []dto.DiskInfo
-	sharesCache  []dto.ShareInfo
-	dockerCache  []dto.ContainerInfo
-	vmsCache     []dto.VMInfo
-	upsCache     *dto.UPSStatus
-	gpuCache     []*dto.GPUMetrics
-	networkCache []dto.NetworkInfo
+	cacheMutex    sync.RWMutex
+	systemCache   *dto.SystemInfo
+	arrayCache    *dto.ArrayStatus
+	disksCache    []dto.DiskInfo
+	sharesCache   []dto.ShareInfo
+	dockerCache   []dto.ContainerInfo
+	vmsCache      []dto.VMInfo
+	upsCache      *dto.UPSStatus
+	gpuCache      []*dto.GPUMetrics
+	networkCache  []dto.NetworkInfo
+	hardwareCache *dto.HardwareInfo
 }
 
 func NewServer(ctx *domain.Context) *Server {
@@ -72,6 +73,15 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/ups", s.handleUPS).Methods("GET")
 	api.HandleFunc("/gpu", s.handleGPU).Methods("GET")
 	api.HandleFunc("/network", s.handleNetwork).Methods("GET")
+
+	// Hardware endpoints
+	api.HandleFunc("/hardware/full", s.handleHardwareFull).Methods("GET")
+	api.HandleFunc("/hardware/bios", s.handleHardwareBIOS).Methods("GET")
+	api.HandleFunc("/hardware/baseboard", s.handleHardwareBaseboard).Methods("GET")
+	api.HandleFunc("/hardware/cpu", s.handleHardwareCPU).Methods("GET")
+	api.HandleFunc("/hardware/cache", s.handleHardwareCache).Methods("GET")
+	api.HandleFunc("/hardware/memory-array", s.handleHardwareMemoryArray).Methods("GET")
+	api.HandleFunc("/hardware/memory-devices", s.handleHardwareMemoryDevices).Methods("GET")
 
 	// Control endpoints
 	api.HandleFunc("/docker/{id}/start", s.handleDockerStart).Methods("POST")
@@ -179,6 +189,7 @@ func (s *Server) subscribeToEvents(ctx context.Context) {
 		"ups_status_update",
 		"gpu_metrics_update",
 		"network_list_update",
+		"hardware_update",
 	)
 	logger.Info("Cache: Subscription ready, waiting for events...")
 
@@ -246,6 +257,25 @@ func (s *Server) subscribeToEvents(ctx context.Context) {
 				s.networkCache = v
 				s.cacheMutex.Unlock()
 				logger.Debug("Cache: Updated network list - count=%d", len(v))
+			case *dto.HardwareInfo:
+				s.cacheMutex.Lock()
+				s.hardwareCache = v
+				s.cacheMutex.Unlock()
+				logger.Debug("Cache: Updated hardware info - BIOS: %s, Baseboard: %s",
+					func() string {
+						if v.BIOS != nil {
+							return v.BIOS.Vendor
+						} else {
+							return "N/A"
+						}
+					}(),
+					func() string {
+						if v.Baseboard != nil {
+							return v.Baseboard.Manufacturer
+						} else {
+							return "N/A"
+						}
+					}())
 			default:
 				logger.Warning("Cache: Received unknown event type: %T", msg)
 			}
@@ -265,6 +295,7 @@ func (s *Server) broadcastEvents(ctx context.Context) {
 		"ups_status_update",
 		"gpu_metrics_update",
 		"network_list_update",
+		"hardware_update",
 	)
 
 	for {

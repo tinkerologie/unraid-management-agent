@@ -31,6 +31,15 @@ type SystemInfo struct {
 	BIOSDate        string  `json:"bios_date"`
 	MotherboardTemp float64 `json:"motherboard_temp_celsius"`
 
+	// Virtualization Features
+	HVMEnabled   bool `json:"hvm_enabled"`
+	IOMMUEnabled bool `json:"iommu_enabled"`
+
+	// Additional System Information
+	OpenSSLVersion   string `json:"openssl_version,omitempty"`
+	ParityCheckSpeed string `json:"parity_check_speed,omitempty"`
+	KernelVersion    string `json:"kernel_version,omitempty"`
+
 	// Additional Metrics
 	Fans      []FanInfo `json:"fans"`
 	Timestamp time.Time `json:"timestamp"`

@@ -64,6 +64,8 @@ const (
 	IntervalShares = 60
 	// IntervalNetwork is the collection interval for network metrics in seconds.
 	IntervalNetwork = 15
+	// IntervalHardware is the collection interval for hardware metrics in seconds.
+	IntervalHardware = 300
 
 	// WSPingInterval is the WebSocket ping interval in seconds.
 	WSPingInterval = 30

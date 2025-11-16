@@ -114,6 +114,9 @@ func (c *NetworkCollector) collectNetworkInterfaces() ([]dto.NetworkInfo, error)
 		// Get operational state
 		netInfo.State = c.getOperState(ifName)
 
+		// Get ethtool information (enhanced network details)
+		c.enrichWithEthtool(&netInfo, ifName)
+
 		interfaces = append(interfaces, netInfo)
 	}
 
@@ -235,4 +238,38 @@ func (c *NetworkCollector) getOperState(ifName string) string {
 func parseUint64(s string) uint64 {
 	val, _ := strconv.ParseUint(s, 10, 64)
 	return val
+}
+
+// enrichWithEthtool adds ethtool information to the network interface
+func (c *NetworkCollector) enrichWithEthtool(netInfo *dto.NetworkInfo, ifName string) {
+	// Parse ethtool information
+	ethtoolInfo, err := lib.ParseEthtool(ifName)
+	if err != nil {
+		logger.Debug("Network: Failed to get ethtool info for %s: %v", ifName, err)
+		return
+	}
+
+	// Populate ethtool fields
+	netInfo.SupportedPorts = ethtoolInfo.SupportedPorts
+	netInfo.SupportedLinkModes = ethtoolInfo.SupportedLinkModes
+	netInfo.SupportedPauseFrame = ethtoolInfo.SupportedPauseFrame
+	netInfo.SupportsAutoNeg = ethtoolInfo.SupportsAutoNeg
+	netInfo.SupportedFECModes = ethtoolInfo.SupportedFECModes
+	netInfo.AdvertisedLinkModes = ethtoolInfo.AdvertisedLinkModes
+	netInfo.AdvertisedPauseFrame = ethtoolInfo.AdvertisedPauseFrame
+	netInfo.AdvertisedAutoNeg = ethtoolInfo.AdvertisedAutoNeg
+	netInfo.AdvertisedFECModes = ethtoolInfo.AdvertisedFECModes
+	netInfo.Duplex = ethtoolInfo.Duplex
+	netInfo.AutoNegotiation = ethtoolInfo.AutoNegotiation
+	netInfo.Port = ethtoolInfo.Port
+	netInfo.PHYAD = ethtoolInfo.PHYAD
+	netInfo.Transceiver = ethtoolInfo.Transceiver
+	netInfo.MDIX = ethtoolInfo.MDIX
+	netInfo.SupportsWakeOn = ethtoolInfo.SupportsWakeOn
+	netInfo.WakeOn = ethtoolInfo.WakeOn
+	netInfo.MessageLevel = ethtoolInfo.MessageLevel
+	netInfo.LinkDetected = ethtoolInfo.LinkDetected
+	netInfo.MTU = ethtoolInfo.MTU
+
+	logger.Debug("Network: Enriched %s with ethtool data - Duplex: %s, Link: %v", ifName, netInfo.Duplex, netInfo.LinkDetected)
 }

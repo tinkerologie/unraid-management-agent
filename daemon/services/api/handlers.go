@@ -765,6 +765,100 @@ func (s *Server) handleUserScriptExecute(w http.ResponseWriter, r *http.Request)
 	respondJSON(w, http.StatusOK, response)
 }
 
+// Hardware endpoints
+
+func (s *Server) handleHardwareFull(w http.ResponseWriter, r *http.Request) {
+	s.cacheMutex.RLock()
+	hardware := s.hardwareCache
+	s.cacheMutex.RUnlock()
+
+	if hardware == nil {
+		hardware = &dto.HardwareInfo{
+			Timestamp: time.Now(),
+		}
+	}
+
+	respondJSON(w, http.StatusOK, hardware)
+}
+
+func (s *Server) handleHardwareBIOS(w http.ResponseWriter, r *http.Request) {
+	s.cacheMutex.RLock()
+	hardware := s.hardwareCache
+	s.cacheMutex.RUnlock()
+
+	if hardware == nil || hardware.BIOS == nil {
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "BIOS information not available"})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, hardware.BIOS)
+}
+
+func (s *Server) handleHardwareBaseboard(w http.ResponseWriter, r *http.Request) {
+	s.cacheMutex.RLock()
+	hardware := s.hardwareCache
+	s.cacheMutex.RUnlock()
+
+	if hardware == nil || hardware.Baseboard == nil {
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Baseboard information not available"})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, hardware.Baseboard)
+}
+
+func (s *Server) handleHardwareCPU(w http.ResponseWriter, r *http.Request) {
+	s.cacheMutex.RLock()
+	hardware := s.hardwareCache
+	s.cacheMutex.RUnlock()
+
+	if hardware == nil || hardware.CPU == nil {
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "CPU hardware information not available"})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, hardware.CPU)
+}
+
+func (s *Server) handleHardwareCache(w http.ResponseWriter, r *http.Request) {
+	s.cacheMutex.RLock()
+	hardware := s.hardwareCache
+	s.cacheMutex.RUnlock()
+
+	if hardware == nil || len(hardware.Cache) == 0 {
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "CPU cache information not available"})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, hardware.Cache)
+}
+
+func (s *Server) handleHardwareMemoryArray(w http.ResponseWriter, r *http.Request) {
+	s.cacheMutex.RLock()
+	hardware := s.hardwareCache
+	s.cacheMutex.RUnlock()
+
+	if hardware == nil || hardware.MemoryArray == nil {
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Memory array information not available"})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, hardware.MemoryArray)
+}
+
+func (s *Server) handleHardwareMemoryDevices(w http.ResponseWriter, r *http.Request) {
+	s.cacheMutex.RLock()
+	hardware := s.hardwareCache
+	s.cacheMutex.RUnlock()
+
+	if hardware == nil || len(hardware.MemoryDevices) == 0 {
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Memory device information not available"})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, hardware.MemoryDevices)
+}
+
 // Helper function to respond with JSON
 func respondJSON(w http.ResponseWriter, status int, payload interface{}) {
 	w.Header().Set("Content-Type", "application/json")

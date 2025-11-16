@@ -19,6 +19,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2025.11.2] - 2025-11-16
+
+### Added
+
+- **Hardware Information API** (Issue #5): Comprehensive hardware details via dmidecode and ethtool
+  - New `/api/v1/hardware/*` endpoints exposing detailed hardware information
+  - `/api/v1/hardware/full` - Complete hardware information
+  - `/api/v1/hardware/bios` - BIOS information (vendor, version, release date, characteristics)
+  - `/api/v1/hardware/baseboard` - Motherboard information (manufacturer, product name, version, serial number)
+  - `/api/v1/hardware/cpu` - CPU hardware details (socket, manufacturer, family, max speed, core/thread count, voltage)
+  - `/api/v1/hardware/cache` - CPU cache information (L1/L2/L3 cache levels, size, type, associativity)
+  - `/api/v1/hardware/memory-array` - Memory array information (location, max capacity, error correction, number of devices)
+  - `/api/v1/hardware/memory-devices` - Individual memory module details (size, speed, manufacturer, part number, type)
+  - Hardware collector runs every 5 minutes (hardware information is static)
+  - All hardware data is cached and broadcast via WebSocket for real-time updates
+
+- **Enhanced System Information**:
+  - `HVMEnabled` - Hardware virtualization support (Intel VT-x/AMD-V detection via /proc/cpuinfo)
+  - `IOMMUEnabled` - IOMMU support detection (kernel command line and /sys/class/iommu/)
+  - `OpenSSLVersion` - OpenSSL version information
+  - `KernelVersion` - Linux kernel version
+  - `ParityCheckSpeed` - Current parity check speed from var.ini
+
+- **Enhanced Network Information** via ethtool:
+  - `SupportedPorts` - Supported port types (TP, AUI, MII, Fibre, etc.)
+  - `SupportedLinkModes` - Supported link speeds and modes
+  - `SupportedPauseFrame` - Pause frame support
+  - `SupportsAutoNeg` - Auto-negotiation support
+  - `SupportedFECModes` - Forward Error Correction modes
+  - `AdvertisedLinkModes` - Advertised link speeds and modes
+  - `AdvertisedPauseFrame` - Advertised pause frame use
+  - `AdvertisedAutoNeg` - Advertised auto-negotiation
+  - `AdvertisedFECModes` - Advertised FEC modes
+  - `Duplex` - Duplex mode (Full/Half)
+  - `AutoNegotiation` - Auto-negotiation status (on/off)
+  - `Port` - Port type (Twisted Pair, Fibre, etc.)
+  - `PHYAD` - PHY address
+  - `Transceiver` - Transceiver type (internal/external)
+  - `MDIX` - MDI-X status (on/off/Unknown)
+  - `SupportsWakeOn` - Supported Wake-on-LAN modes
+  - `WakeOn` - Current Wake-on-LAN setting
+  - `MessageLevel` - Driver message level
+  - `LinkDetected` - Link detection status
+  - `MTU` - Maximum Transmission Unit
+
+- **New Libraries**:
+  - `daemon/lib/dmidecode.go` - Parser for dmidecode output (SMBIOS/DMI types 0, 2, 4, 7, 16, 17)
+  - `daemon/lib/ethtool.go` - Parser for ethtool output with comprehensive network interface details
+
+- **New DTOs**:
+  - `HardwareInfo` - Container for all hardware information
+  - `BIOSInfo` - BIOS/UEFI information
+  - `BaseboardInfo` - Motherboard/baseboard information
+  - `CPUHardwareInfo` - CPU hardware specifications
+  - `CPUCacheInfo` - CPU cache level information
+  - `MemoryArrayInfo` - Memory array/controller information
+  - `MemoryDeviceInfo` - Individual memory module information
+
+### Changed
+
+- **System Collector**: Enhanced with virtualization and additional system information
+  - Added `isHVMEnabled()` method to detect hardware virtualization support
+  - Added `isIOMMUEnabled()` method to detect IOMMU support
+  - Added `getOpenSSLVersion()` method to retrieve OpenSSL version
+  - Added `getKernelVersion()` method to retrieve kernel version
+  - Added `getParityCheckSpeed()` method to parse parity check speed from var.ini
+
+- **Network Collector**: Enhanced with ethtool integration
+  - Added `enrichWithEthtool()` method to populate network interface details
+  - Network information now includes comprehensive ethtool data when available
+  - Gracefully handles cases where ethtool is not available or fails
+
+- **Orchestrator**: Updated to manage hardware collector
+  - Increased collector count from 9 to 10
+  - Hardware collector initialized and started with 5-minute interval
+
+- **API Server**: Updated to cache and serve hardware information
+  - Added `hardwareCache` field to Server struct
+  - Subscribed to `hardware_update` events
+  - Hardware events broadcast to WebSocket clients
+
+---
+
 ## [2025.11.11] - 2025-11-08
 
 ### Fixed
