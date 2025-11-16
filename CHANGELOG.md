@@ -19,6 +19,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2025.11.16] - 2025-11-16
+
+### Added
+
+- **System Log File Access API** (Issue #15):
+  - New `/api/v1/logs` endpoint to list all available log files
+  - Log content retrieval with pagination support via query parameters
+  - Tail behavior: `?path=/var/log/syslog&lines=100` returns last 100 lines
+  - Range retrieval: `?path=/var/log/syslog&start=500&lines=100` returns lines 500-600
+  - Automatic discovery of common Unraid log files (syslog, docker.log, libvirtd.log, agent log)
+  - Plugin log file discovery from `/boot/config/plugins/*/logs/*.log`
+  - Directory traversal protection for secure log file access
+  - Returns log metadata: name, path, size, modified timestamp
+  - Returns log content: full content string, line array, total lines, start/end line numbers
+
+### Technical Details
+
+- **New DTOs**: `daemon/dto/logs.go` - LogFile and LogFileContent structures
+- **New API Module**: `daemon/services/api/logs.go` - Log listing and content retrieval logic
+- **Security**: Path validation prevents directory traversal attacks
+- **Pagination**: Supports both tail behavior (last N lines) and range retrieval (start + lines)
+- **Common Logs**: Automatically discovers syslog, Docker, libvirt, and plugin logs
+- **Error Handling**: Graceful handling of missing files, permission errors, and invalid paths
+
+---
+
 ## [2025.11.15] - 2025-11-16
 
 ### Added

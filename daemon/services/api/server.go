@@ -127,6 +127,9 @@ func (s *Server) setupRoutes() {
 	// Registration/License endpoint
 	api.HandleFunc("/registration", s.handleRegistration).Methods("GET")
 
+	// Log file endpoints
+	api.HandleFunc("/logs", s.handleLogs).Methods("GET")
+
 	// WebSocket endpoint
 	api.HandleFunc("/ws", s.handleWebSocket)
 }

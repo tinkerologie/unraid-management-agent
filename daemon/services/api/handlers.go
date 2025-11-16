@@ -877,6 +877,31 @@ func (s *Server) handleRegistration(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, registration)
 }
 
+func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
+	logger.Debug("API: Getting logs")
+
+	// Get query parameters
+	path := r.URL.Query().Get("path")
+	linesParam := r.URL.Query().Get("lines")
+	startParam := r.URL.Query().Get("start")
+
+	// If no path specified, list all available logs
+	if path == "" {
+		logs := s.listLogFiles()
+		respondJSON(w, http.StatusOK, map[string]interface{}{"logs": logs})
+		return
+	}
+
+	// Get log content with optional pagination
+	content, err := s.getLogContent(path, linesParam, startParam)
+	if err != nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, content)
+}
+
 // Helper function to respond with JSON
 func respondJSON(w http.ResponseWriter, status int, payload interface{}) {
 	w.Header().Set("Content-Type", "application/json")
