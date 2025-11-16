@@ -3,14 +3,14 @@
 <!DOCTYPE PLUGIN [
     <!ENTITY name        "unraid-management-agent">
     <!ENTITY author      "ruaan-deysel">
-    <!ENTITY version     "2025.11.15">
+    <!ENTITY version     "2025.11.16">
     <!ENTITY gitURL      "https://github.com/&author;/&name;">
     <!ENTITY pluginURL   "&gitURL;/raw/main/&name;.plg">
     <!ENTITY supportURL  "https://forums.unraid.net/topic/178262-home-assistant-unraid-integration">
     <!ENTITY launch      "Settings/unraid-management-agent">
     <!ENTITY bundle      "&name;-&version;.tgz">
     <!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
-    <!ENTITY md5         "1cfb8690e35fcdf90d7bd33b9bc68757">
+    <!ENTITY md5         "e9a4e59253e863004348c732ec3b4b25">
 ]>
 
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" icon="server" min="6.9.0" pluginURL="&pluginURL;" support="&supportURL;">
@@ -20,6 +20,16 @@ This Unraid plugin provides REST API and WebSocket interfaces for real-time syst
 </DESCRIPTION>
 
 <CHANGES>
+###2025.11.16 (2025-11-16)
+- System Log File Access API (Issue #15)
+- New /api/v1/logs endpoint to list all available log files
+- Log content retrieval with pagination support
+- Tail behavior: ?path=/var/log/syslog&lines=100 returns last 100 lines
+- Range retrieval: ?path=/var/log/syslog&start=500&lines=100 returns lines 500-600
+- Automatic discovery of common Unraid logs (syslog, docker, libvirt, agent)
+- Plugin log file discovery from /boot/config/plugins/*/logs/*.log
+- Directory traversal protection for secure log file access
+
 ###2025.11.15 (2025-11-16)
 - Registration/License Information API (Issue #18)
 - New /api/v1/registration endpoint for Unraid license information
