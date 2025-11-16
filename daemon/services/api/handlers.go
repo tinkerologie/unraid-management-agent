@@ -1126,3 +1126,58 @@ func (s *Server) handleArchiveAllNotifications(w http.ResponseWriter, r *http.Re
 
 	respondJSON(w, http.StatusOK, map[string]string{"message": "All notifications archived successfully"})
 }
+
+// handleUnassignedDevices returns all unassigned devices and remote shares
+func (s *Server) handleUnassignedDevices(w http.ResponseWriter, r *http.Request) {
+	s.cacheMutex.RLock()
+	defer s.cacheMutex.RUnlock()
+
+	if s.unassignedCache == nil {
+		respondJSON(w, http.StatusOK, map[string]interface{}{
+			"devices":       []interface{}{},
+			"remote_shares": []interface{}{},
+			"timestamp":     time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, s.unassignedCache)
+}
+
+// handleUnassignedDevicesList returns only unassigned devices (no remote shares)
+func (s *Server) handleUnassignedDevicesList(w http.ResponseWriter, r *http.Request) {
+	s.cacheMutex.RLock()
+	defer s.cacheMutex.RUnlock()
+
+	if s.unassignedCache == nil {
+		respondJSON(w, http.StatusOK, map[string]interface{}{
+			"devices":   []interface{}{},
+			"timestamp": time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"devices":   s.unassignedCache.Devices,
+		"timestamp": s.unassignedCache.Timestamp,
+	})
+}
+
+// handleUnassignedRemoteShares returns only remote shares (no devices)
+func (s *Server) handleUnassignedRemoteShares(w http.ResponseWriter, r *http.Request) {
+	s.cacheMutex.RLock()
+	defer s.cacheMutex.RUnlock()
+
+	if s.unassignedCache == nil {
+		respondJSON(w, http.StatusOK, map[string]interface{}{
+			"remote_shares": []interface{}{},
+			"timestamp":     time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"remote_shares": s.unassignedCache.RemoteShares,
+		"timestamp":     s.unassignedCache.Timestamp,
+	})
+}

@@ -6,10 +6,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/common"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
-	"github.com/gorilla/websocket"
 )
 
 var upgrader = websocket.Upgrader{

@@ -35,6 +35,7 @@ type Server struct {
 	hardwareCache      *dto.HardwareInfo
 	registrationCache  *dto.Registration
 	notificationsCache *dto.NotificationList
+	unassignedCache    *dto.UnassignedDeviceList
 }
 
 func NewServer(ctx *domain.Context) *Server {
@@ -145,6 +146,11 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/notifications/{id}", s.handleDeleteNotification).Methods("DELETE")
 	api.HandleFunc("/notifications/archive/all", s.handleArchiveAllNotifications).Methods("POST")
 
+	// Unassigned Devices endpoints (monitoring)
+	api.HandleFunc("/unassigned", s.handleUnassignedDevices).Methods("GET")
+	api.HandleFunc("/unassigned/devices", s.handleUnassignedDevicesList).Methods("GET")
+	api.HandleFunc("/unassigned/remote-shares", s.handleUnassignedRemoteShares).Methods("GET")
+
 	// WebSocket endpoint
 	api.HandleFunc("/ws", s.handleWebSocket)
 }
@@ -214,6 +220,7 @@ func (s *Server) subscribeToEvents(ctx context.Context) {
 		"hardware_update",
 		"registration_update",
 		"notifications_update",
+		"unassigned_devices_update",
 	)
 	logger.Info("Cache: Subscription ready, waiting for events...")
 
@@ -311,6 +318,12 @@ func (s *Server) subscribeToEvents(ctx context.Context) {
 				s.cacheMutex.Unlock()
 				logger.Debug("Cache: Updated notifications - unread=%d, archived=%d",
 					v.Overview.Unread.Total, v.Overview.Archive.Total)
+			case *dto.UnassignedDeviceList:
+				s.cacheMutex.Lock()
+				s.unassignedCache = v
+				s.cacheMutex.Unlock()
+				logger.Debug("Cache: Updated unassigned devices - devices=%d, remote_shares=%d",
+					len(v.Devices), len(v.RemoteShares))
 			default:
 				logger.Warning("Cache: Received unknown event type: %T", msg)
 			}

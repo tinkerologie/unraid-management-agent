@@ -19,6 +19,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2025.11.18] - 2025-11-16
+
+### Added
+
+- **Unassigned Devices Plugin Support** (Issue #7):
+  - Complete support for Unassigned Devices plugin integration
+  - New `/api/v1/unassigned` endpoint to list all unassigned devices and remote shares
+  - New `/api/v1/unassigned/devices` endpoint for unassigned devices only
+  - New `/api/v1/unassigned/remote-shares` endpoint for remote shares only
+  - Automatic detection of unassigned disk devices (USB drives, eSATA, internal disks not in array)
+  - Support for remote SMB/NFS shares and ISO file mounts
+  - Per-device information: serial number, model, partitions, mount status, spin state
+  - Per-partition information: label, filesystem, mount point, size, usage, SMB/NFS share status
+  - Automatic filtering of array disks, loop devices, md devices, and zram
+  - Real-time monitoring with 30-second collection interval
+  - WebSocket real-time updates when unassigned devices change
+
+### Technical Details
+
+- **New DTOs**: `daemon/dto/unassigned.go` - UnassignedDevice, UnassignedPartition, UnassignedRemoteShare, UnassignedDeviceList structures
+- **New Collector**: `daemon/services/collectors/unassigned.go` - Unassigned devices collector with lsblk integration
+- **Device Discovery**: Uses lsblk to enumerate all block devices and filters out array disks
+- **Array Disk Detection**: Parses `/var/local/emhttp/disks.ini` to identify array disks
+- **Partition Information**: Collects filesystem type, mount point, size, usage for each partition
+- **Remote Share Support**: Detects mounted ISO files from `/proc/mounts`
+- **API Integration**: Added 3 new monitoring endpoints for unassigned devices
+- **WebSocket Events**: Real-time `unassigned_devices_update` events for connected clients
+- **Collection Interval**: 30 seconds for device discovery and status updates
+
+---
+
 ## [2025.11.17] - 2025-11-16
 
 ### Added

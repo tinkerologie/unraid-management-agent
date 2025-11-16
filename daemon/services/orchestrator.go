@@ -57,9 +57,10 @@ func (o *Orchestrator) Run() error {
 	hardwareCollector := collectors.NewHardwareCollector(o.ctx)
 	registrationCollector := collectors.NewRegistrationCollector(o.ctx)
 	notificationCollector := collectors.NewNotificationCollector(o.ctx)
+	unassignedCollector := collectors.NewUnassignedCollector(o.ctx)
 
 	// Start collectors with context and WaitGroup
-	wg.Add(12)
+	wg.Add(13)
 	go func() {
 		defer wg.Done()
 		systemCollector.Start(ctx, time.Duration(common.IntervalSystem)*time.Second)
@@ -107,6 +108,10 @@ func (o *Orchestrator) Run() error {
 	go func() {
 		defer wg.Done()
 		notificationCollector.Start(ctx, 15*time.Second) // 15 seconds for notifications
+	}()
+	go func() {
+		defer wg.Done()
+		unassignedCollector.Start(ctx, 30*time.Second) // 30 seconds for unassigned devices
 	}()
 
 	logger.Success("All collectors started")
