@@ -174,6 +174,70 @@ func (c *ShareCollector) collectShares() ([]dto.ShareInfo, error) {
 		shares[i].Timestamp = time.Now()
 	}
 
+	// Enrich shares with configuration data
+	configCollector := NewConfigCollector()
+	for i := range shares {
+		c.enrichShareWithConfig(&shares[i], configCollector)
+	}
+
 	logger.Debug("Share: Parsed %d shares successfully", len(shares))
 	return shares, nil
+}
+
+// enrichShareWithConfig enriches a share with configuration data
+func (c *ShareCollector) enrichShareWithConfig(share *dto.ShareInfo, configCollector *ConfigCollector) {
+	config, err := configCollector.GetShareConfig(share.Name)
+	if err != nil {
+		logger.Debug("Share: Failed to get config for share %s: %v", share.Name, err)
+		// Set default values for shares without config
+		share.Storage = "unknown"
+		share.SMBExport = false
+		share.NFSExport = false
+		return
+	}
+
+	// Populate configuration fields
+	share.Comment = config.Comment
+	share.UseCache = config.UseCache
+	share.Security = config.Security
+	share.Storage = c.determineStorage(config.UseCache)
+	share.SMBExport = c.isSMBExported(config.Export, config.Security)
+	share.NFSExport = c.isNFSExported(config.Export)
+
+	logger.Debug("Share: Enriched %s - Storage: %s, SMB: %v, NFS: %v", share.Name, share.Storage, share.SMBExport, share.NFSExport)
+}
+
+// determineStorage determines storage location based on UseCache setting
+func (c *ShareCollector) determineStorage(useCache string) string {
+	switch useCache {
+	case "no":
+		return "array"
+	case "only":
+		return "cache"
+	case "yes", "prefer":
+		return "cache+array"
+	default:
+		return "unknown"
+	}
+}
+
+// isSMBExported checks if share is exported via SMB
+func (c *ShareCollector) isSMBExported(export string, security string) bool {
+	// If security is set, share is typically SMB exported
+	if security == "public" || security == "private" || security == "secure" {
+		return true
+	}
+
+	// Check export field for SMB indicators
+	if strings.Contains(export, "smb") || strings.Contains(export, "-e") {
+		return true
+	}
+
+	return false
+}
+
+// isNFSExported checks if share is exported via NFS
+func (c *ShareCollector) isNFSExported(export string) bool {
+	// Check export field for NFS indicators
+	return strings.Contains(export, "nfs") || strings.Contains(export, "-n")
 }

@@ -19,6 +19,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2025.11.13] - 2025-11-16
+
+### Added
+
+- **Enhanced Share List API** (Issue #6): Eliminated N+1 query problem for share information
+  - Share list endpoint `/api/v1/shares` now includes configuration details directly
+  - New fields in ShareInfo DTO:
+    - `comment` - Share comment/description from config
+    - `smb_export` - Boolean indicating if share is exported via SMB
+    - `nfs_export` - Boolean indicating if share is exported via NFS
+    - `storage` - Storage location: "cache", "array", "cache+array", or "unknown"
+    - `use_cache` - Cache usage setting: "yes", "no", "only", "prefer"
+    - `security` - Security setting: "public", "private", "secure"
+  - Share collector automatically enriches shares with config data
+  - SMB export detection based on security settings and export field
+  - NFS export detection based on export field
+  - Storage location determined from UseCache setting
+  - All new fields use `omitempty` for backward compatibility
+  - Single API call now provides complete share information matching Unraid UI
+  - Graceful error handling: shares without config files return basic info only
+
+### Changed
+
+- Share collector now reads individual share config files during collection
+- Share enrichment happens automatically for all shares in the list
+
+### Performance
+
+- Share collection remains at 60-second interval
+- Config file reads are lightweight and fast
+- No performance impact from enrichment process
+
+---
+
 ## [2025.11.12] - 2025-11-16
 
 ### Added
