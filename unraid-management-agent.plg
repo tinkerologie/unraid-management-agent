@@ -3,14 +3,14 @@
 <!DOCTYPE PLUGIN [
     <!ENTITY name        "unraid-management-agent">
     <!ENTITY author      "ruaan-deysel">
-    <!ENTITY version     "2025.11.11">
+    <!ENTITY version     "2025.11.14">
     <!ENTITY gitURL      "https://github.com/&author;/&name;">
     <!ENTITY pluginURL   "&gitURL;/raw/main/&name;.plg">
     <!ENTITY supportURL  "https://forums.unraid.net/topic/178262-home-assistant-unraid-integration">
     <!ENTITY launch      "Settings/unraid-management-agent">
     <!ENTITY bundle      "&name;-&version;.tgz">
     <!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
-    <!ENTITY md5         "6066930c4e84938184045f9e298afa73">
+    <!ENTITY md5         "e73653a80727c251aaa75eaef6697054">
 ]>
 
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" icon="server" min="6.9.0" pluginURL="&pluginURL;" support="&supportURL;">
@@ -20,6 +20,33 @@ This Unraid plugin provides REST API and WebSocket interfaces for real-time syst
 </DESCRIPTION>
 
 <CHANGES>
+###2025.11.14 (2025-11-16)
+- Enhanced GPU monitoring and multi-GPU support (Issue #8 - High Priority)
+- Added GPU identification fields: Index, PCIID, Vendor, UUID
+- Added fan speed monitoring for NVIDIA (%) and AMD (RPM)
+- Fixed AMD GPU detection: switched to radeontop for broader compatibility
+- Fixed multiple Intel GPU detection (removed break statement)
+- NVIDIA: Added UUID, PCI ID, fan speed monitoring
+- AMD: Support for consumer Radeon GPUs (RX series), fallback to rocm-smi
+- Intel: Detect all Intel GPUs (iGPU + Arc discrete)
+- Backward compatible with omitempty JSON tags
+
+###2025.11.13 (2025-11-16)
+- Enhanced share list API with configuration details (Issue #6)
+- Eliminated N+1 query problem - single API call provides complete share info
+- New share fields: comment, smb_export, nfs_export, storage, use_cache, security
+- Automatic SMB/NFS export detection based on config settings
+- Storage location determined from UseCache setting
+- Backward compatible with omitempty tags
+
+###2025.11.12 (2025-11-16)
+- Added comprehensive hardware information API (Issue #5)
+- New /api/v1/hardware/* endpoints (BIOS, motherboard, CPU, cache, memory)
+- Enhanced system information (HVM/IOMMU detection, OpenSSL/kernel versions)
+- Enhanced network information via ethtool (link modes, duplex, auto-negotiation)
+- Hardware collector runs every 5 minutes
+- All hardware data cached and broadcast via WebSocket
+
 ###2025.11.11 (2025-11-08)
 - Fixed: VM CPU percentage tracking now returns real values instead of 0
 - Fixed: Guest CPU % calculated from virsh domstats CPU time deltas
