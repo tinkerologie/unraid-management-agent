@@ -52,10 +52,12 @@ func (c *NotificationCollector) Start(ctx context.Context, interval time.Duratio
 	}()
 
 	// Ensure directories exist
-	if err := os.MkdirAll(notificationsDir, 0755); err != nil { // #nosec G301 - Unraid standard permissions
+	// #nosec G301 - Unraid standard permissions (0755 for directories)
+	if err := os.MkdirAll(notificationsDir, 0755); err != nil {
 		logger.Warning("Failed to create notifications directory: %v", err)
 	}
-	if err := os.MkdirAll(notificationsArchiveDir, 0755); err != nil { // #nosec G301 - Unraid standard permissions
+	// #nosec G301 - Unraid standard permissions (0755 for directories)
+	if err := os.MkdirAll(notificationsArchiveDir, 0755); err != nil {
 		logger.Warning("Failed to create notifications archive directory: %v", err)
 	}
 

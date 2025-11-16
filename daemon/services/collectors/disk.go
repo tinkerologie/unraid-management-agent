@@ -16,14 +16,19 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
+// DiskCollector collects detailed information about all disks in the Unraid system.
+// It gathers disk metrics, SMART data, temperature, and usage statistics for array and cache disks.
 type DiskCollector struct {
 	ctx *domain.Context
 }
 
+// NewDiskCollector creates a new disk information collector with the given context.
 func NewDiskCollector(ctx *domain.Context) *DiskCollector {
 	return &DiskCollector{ctx: ctx}
 }
 
+// Start begins the disk collector's periodic data collection.
+// It runs in a goroutine and publishes disk information updates at the specified interval until the context is cancelled.
 func (c *DiskCollector) Start(ctx context.Context, interval time.Duration) {
 	logger.Info("Starting disk collector (interval: %v)", interval)
 
@@ -58,6 +63,8 @@ func (c *DiskCollector) Start(ctx context.Context, interval time.Duration) {
 	}
 }
 
+// Collect gathers detailed disk information and publishes it to the event bus.
+// It collects data from multiple sources including lsblk, smartctl, and Unraid configuration files.
 func (c *DiskCollector) Collect() {
 	logger.Debug("Collecting disk data...")
 

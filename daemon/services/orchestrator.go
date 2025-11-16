@@ -16,14 +16,19 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/collectors"
 )
 
+// Orchestrator coordinates the lifecycle of all collectors, API server, and handles graceful shutdown.
+// It manages the initialization order, starts all components, and ensures proper cleanup on termination.
 type Orchestrator struct {
 	ctx *domain.Context
 }
 
+// CreateOrchestrator creates a new orchestrator with the given context.
 func CreateOrchestrator(ctx *domain.Context) *Orchestrator {
 	return &Orchestrator{ctx: ctx}
 }
 
+// Run starts all collectors and the API server, then waits for a termination signal.
+// It ensures proper initialization order and handles graceful shutdown of all components.
 func (o *Orchestrator) Run() error {
 	logger.Info("Starting Unraid Management Agent v%s", o.ctx.Version)
 

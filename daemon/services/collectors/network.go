@@ -15,14 +15,19 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
+// NetworkCollector collects network interface information including status, speed, and statistics.
+// It gathers data from network interfaces, bonds, bridges, and VLANs.
 type NetworkCollector struct {
 	ctx *domain.Context
 }
 
+// NewNetworkCollector creates a new network interface collector with the given context.
 func NewNetworkCollector(ctx *domain.Context) *NetworkCollector {
 	return &NetworkCollector{ctx: ctx}
 }
 
+// Start begins the network collector's periodic data collection.
+// It runs in a goroutine and publishes network interface updates at the specified interval until the context is cancelled.
 func (c *NetworkCollector) Start(ctx context.Context, interval time.Duration) {
 	logger.Info("Starting network collector (interval: %v)", interval)
 
@@ -57,6 +62,8 @@ func (c *NetworkCollector) Start(ctx context.Context, interval time.Duration) {
 	}
 }
 
+// Collect gathers network interface information and publishes it to the event bus.
+// It collects data from /sys/class/net and uses ethtool for detailed interface information.
 func (c *NetworkCollector) Collect() {
 	logger.Debug("Collecting network data...")
 

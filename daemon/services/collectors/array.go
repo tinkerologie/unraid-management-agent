@@ -15,14 +15,19 @@ import (
 	"github.com/vaughan0/go-ini"
 )
 
+// ArrayCollector collects Unraid array status information including state, parity status, and disk assignments.
+// It publishes array status updates to the event bus at regular intervals.
 type ArrayCollector struct {
 	ctx *domain.Context
 }
 
+// NewArrayCollector creates a new array status collector with the given context.
 func NewArrayCollector(ctx *domain.Context) *ArrayCollector {
 	return &ArrayCollector{ctx: ctx}
 }
 
+// Start begins the array collector's periodic data collection.
+// It runs in a goroutine and publishes array status updates at the specified interval until the context is cancelled.
 func (c *ArrayCollector) Start(ctx context.Context, interval time.Duration) {
 	logger.Info("Starting array collector (interval: %v)", interval)
 
@@ -57,6 +62,8 @@ func (c *ArrayCollector) Start(ctx context.Context, interval time.Duration) {
 	}
 }
 
+// Collect gathers current array status information and publishes it to the event bus.
+// It reads array state from Unraid's mdcmd command and var.ini configuration file.
 func (c *ArrayCollector) Collect() {
 	logger.Debug("Collecting array data...")
 	logger.Debug("TRACE: About to call collectArrayStatus()")
@@ -169,8 +176,8 @@ func (c *ArrayCollector) enrichWithArraySize(status *dto.ArrayStatus) {
 	}
 
 	// Calculate sizes in bytes
-	totalBytes := uint64(stat.Blocks) * uint64(stat.Bsize)
-	freeBytes := uint64(stat.Bfree) * uint64(stat.Bsize)
+	totalBytes := stat.Blocks * uint64(stat.Bsize)
+	freeBytes := stat.Bfree * uint64(stat.Bsize)
 	usedBytes := totalBytes - freeBytes
 
 	status.TotalBytes = totalBytes

@@ -13,14 +13,19 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
+// UPSCollector collects UPS (Uninterruptible Power Supply) status information.
+// It supports both apcupsd and NUT (Network UPS Tools) monitoring systems.
 type UPSCollector struct {
 	ctx *domain.Context
 }
 
+// NewUPSCollector creates a new UPS status collector with the given context.
 func NewUPSCollector(ctx *domain.Context) *UPSCollector {
 	return &UPSCollector{ctx: ctx}
 }
 
+// Start begins the UPS collector's periodic data collection.
+// It runs in a goroutine and publishes UPS status updates at the specified interval until the context is cancelled.
 func (c *UPSCollector) Start(ctx context.Context, interval time.Duration) {
 	logger.Info("Starting ups collector (interval: %v)", interval)
 	ticker := time.NewTicker(interval)
@@ -37,6 +42,8 @@ func (c *UPSCollector) Start(ctx context.Context, interval time.Duration) {
 	}
 }
 
+// Collect gathers UPS status information and publishes it to the event bus.
+// It attempts to collect data from apcupsd first, then falls back to NUT if apcupsd is not available.
 func (c *UPSCollector) Collect() {
 
 	logger.Debug("Collecting ups data...")
@@ -132,16 +139,14 @@ func (c *UPSCollector) collectAPC() (*dto.UPSStatus, error) {
 			if strings.HasSuffix(value, "Volts") {
 				value = strings.TrimSuffix(value, " Volts")
 			}
-			if _, err := strconv.ParseFloat(value, 64); err == nil {
-				// status.InputVoltage (not in DTO) = volts
-			}
+			// InputVoltage field not in DTO, parsing for potential future use
+			_, _ = strconv.ParseFloat(value, 64)
 		case "BATTV":
 			if strings.HasSuffix(value, "Volts") {
 				value = strings.TrimSuffix(value, " Volts")
 			}
-			if _, err := strconv.ParseFloat(value, 64); err == nil {
-				// status.BatteryVoltage (not in DTO) = volts
-			}
+			// BatteryVoltage field not in DTO, parsing for potential future use
+			_, _ = strconv.ParseFloat(value, 64)
 		case "MODEL":
 			status.Model = value
 		}
@@ -217,13 +222,11 @@ func (c *UPSCollector) collectNUT() (*dto.UPSStatus, error) {
 				status.NominalPower = power
 			}
 		case "input.voltage":
-			if _, err := strconv.ParseFloat(value, 64); err == nil {
-				// status.InputVoltage (not in DTO) = volts
-			}
+			// InputVoltage field not in DTO, parsing for potential future use
+			_, _ = strconv.ParseFloat(value, 64)
 		case "battery.voltage":
-			if _, err := strconv.ParseFloat(value, 64); err == nil {
-				// status.BatteryVoltage (not in DTO) = volts
-			}
+			// BatteryVoltage field not in DTO, parsing for potential future use
+			_, _ = strconv.ParseFloat(value, 64)
 		case "device.model", "ups.model":
 			status.Model = value
 		}

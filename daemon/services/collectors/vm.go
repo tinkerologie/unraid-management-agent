@@ -22,12 +22,15 @@ type cpuStats struct {
 	timestamp    time.Time // When this measurement was taken
 }
 
+// VMCollector collects information about virtual machines managed by libvirt/virsh.
+// It gathers VM status, resource allocation, CPU usage, and configuration details.
 type VMCollector struct {
 	ctx           *domain.Context
 	cpuStatsMutex sync.RWMutex
 	previousStats map[string]*cpuStats // vmName -> previous CPU stats
 }
 
+// NewVMCollector creates a new virtual machine collector with the given context.
 func NewVMCollector(ctx *domain.Context) *VMCollector {
 	return &VMCollector{
 		ctx:           ctx,
@@ -35,6 +38,8 @@ func NewVMCollector(ctx *domain.Context) *VMCollector {
 	}
 }
 
+// Start begins the VM collector's periodic data collection.
+// It runs in a goroutine and publishes VM information updates at the specified interval until the context is cancelled.
 func (c *VMCollector) Start(ctx context.Context, interval time.Duration) {
 	logger.Info("Starting vm collector (interval: %v)", interval)
 	ticker := time.NewTicker(interval)
@@ -51,6 +56,8 @@ func (c *VMCollector) Start(ctx context.Context, interval time.Duration) {
 	}
 }
 
+// Collect gathers virtual machine information and publishes it to the event bus.
+// It uses virsh to query VM status and calculates CPU usage based on previous measurements.
 func (c *VMCollector) Collect() {
 
 	logger.Debug("Collecting vm data...")

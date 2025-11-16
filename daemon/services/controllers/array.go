@@ -9,10 +9,13 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
+// ArrayController provides control operations for the Unraid array.
+// It handles array start/stop, parity check operations, and array management commands.
 type ArrayController struct {
 	ctx *domain.Context
 }
 
+// NewArrayController creates a new array controller with the given context.
 func NewArrayController(ctx *domain.Context) *ArrayController {
 	return &ArrayController{ctx: ctx}
 }

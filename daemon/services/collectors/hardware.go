@@ -10,14 +10,19 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
+// HardwareCollector collects detailed hardware information using dmidecode.
+// It gathers BIOS, baseboard, CPU, cache, and memory information from the system's DMI tables.
 type HardwareCollector struct {
 	ctx *domain.Context
 }
 
+// NewHardwareCollector creates a new hardware information collector with the given context.
 func NewHardwareCollector(ctx *domain.Context) *HardwareCollector {
 	return &HardwareCollector{ctx: ctx}
 }
 
+// Start begins the hardware collector's periodic data collection.
+// It runs in a goroutine and publishes hardware information updates at the specified interval until the context is cancelled.
 func (c *HardwareCollector) Start(ctx context.Context, interval time.Duration) {
 	logger.Info("Starting hardware collector (interval: %v)", interval)
 
@@ -52,6 +57,8 @@ func (c *HardwareCollector) Start(ctx context.Context, interval time.Duration) {
 	}
 }
 
+// Collect gathers hardware information from DMI tables and publishes it to the event bus.
+// It uses dmidecode to extract BIOS, baseboard, CPU, cache, and memory device information.
 func (c *HardwareCollector) Collect() {
 	logger.Debug("Collecting hardware data...")
 

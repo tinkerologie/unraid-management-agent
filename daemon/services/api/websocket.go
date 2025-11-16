@@ -18,6 +18,8 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+// WSHub manages WebSocket client connections and broadcasts messages to all connected clients.
+// It handles client registration, unregistration, and message broadcasting in a thread-safe manner.
 type WSHub struct {
 	clients    map[*WSClient]bool
 	broadcast  chan interface{}
@@ -26,12 +28,16 @@ type WSHub struct {
 	mu         sync.RWMutex
 }
 
+// WSClient represents a single WebSocket client connection.
+// It maintains the connection to the hub, the WebSocket connection, and a send channel for outgoing messages.
 type WSClient struct {
 	hub  *WSHub
 	conn *websocket.Conn
 	send chan dto.WSEvent
 }
 
+// NewWSHub creates and initializes a new WebSocket hub.
+// The hub is ready to accept client connections and broadcast messages.
 func NewWSHub() *WSHub {
 	return &WSHub{
 		clients:    make(map[*WSClient]bool),
@@ -41,6 +47,8 @@ func NewWSHub() *WSHub {
 	}
 }
 
+// Run starts the WebSocket hub's main event loop.
+// It handles client registration, unregistration, and message broadcasting until the context is cancelled.
 func (h *WSHub) Run(ctx context.Context) {
 	for {
 		select {
@@ -90,6 +98,8 @@ func (h *WSHub) Run(ctx context.Context) {
 	}
 }
 
+// Broadcast sends a message to all connected WebSocket clients.
+// The message is wrapped in a WSEvent and sent asynchronously to each client.
 func (h *WSHub) Broadcast(message interface{}) {
 	h.broadcast <- message
 }

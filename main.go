@@ -1,3 +1,5 @@
+// Package main is the entry point for the Unraid Management Agent.
+// It provides a REST API and WebSocket interface for monitoring and controlling Unraid systems.
 package main
 
 import (
@@ -16,7 +18,8 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
-var Version string = "dev"
+// Version is the application version, set at build time via ldflags.
+var Version = "dev"
 
 var cli struct {
 	LogsDir  string `default:"/var/log" help:"directory to store logs"`

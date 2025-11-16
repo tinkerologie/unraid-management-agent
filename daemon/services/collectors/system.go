@@ -15,14 +15,19 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
+// SystemCollector collects overall system information including CPU, memory, uptime, and temperatures.
+// It provides high-level system metrics and status information.
 type SystemCollector struct {
 	ctx *domain.Context
 }
 
+// NewSystemCollector creates a new system information collector with the given context.
 func NewSystemCollector(ctx *domain.Context) *SystemCollector {
 	return &SystemCollector{ctx: ctx}
 }
 
+// Start begins the system collector's periodic data collection.
+// It runs in a goroutine and publishes system information updates at the specified interval until the context is cancelled.
 func (c *SystemCollector) Start(ctx context.Context, interval time.Duration) {
 	logger.Info("Starting system collector (interval: %v)", interval)
 
@@ -57,6 +62,8 @@ func (c *SystemCollector) Start(ctx context.Context, interval time.Duration) {
 	}
 }
 
+// Collect gathers system information and publishes it to the event bus.
+// It collects CPU, memory, uptime, and temperature data from /proc and /sys filesystems.
 func (c *SystemCollector) Collect() {
 	logger.Debug("Collecting system data...")
 
@@ -352,19 +359,17 @@ func (c *SystemCollector) getMemoryInfo() (uint64, uint64, uint64, uint64, uint6
 }
 
 func (c *SystemCollector) getTemperatures() (map[string]float64, error) {
-	temperatures := make(map[string]float64)
-
 	// Try using sensors command first
 	output, err := lib.ExecCommandOutput("sensors", "-u")
 	if err == nil {
-		temperatures = c.parseSensorsOutput(output)
+		temperatures := c.parseSensorsOutput(output)
 		if len(temperatures) > 0 {
 			return temperatures, nil
 		}
 	}
 
 	// Fallback: try reading from /sys/class/hwmon
-	temperatures, err = c.readHwmonTemperatures()
+	temperatures, err := c.readHwmonTemperatures()
 	if err != nil {
 		return nil, err
 	}

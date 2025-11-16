@@ -14,14 +14,19 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
+// DockerCollector collects information about Docker containers running on the Unraid system.
+// It gathers container status, resource usage, network information, and configuration details.
 type DockerCollector struct {
 	ctx *domain.Context
 }
 
+// NewDockerCollector creates a new Docker container collector with the given context.
 func NewDockerCollector(ctx *domain.Context) *DockerCollector {
 	return &DockerCollector{ctx: ctx}
 }
 
+// Start begins the Docker collector's periodic data collection.
+// It runs in a goroutine and publishes container information updates at the specified interval until the context is cancelled.
 func (c *DockerCollector) Start(ctx context.Context, interval time.Duration) {
 	logger.Info("Starting docker collector (interval: %v)", interval)
 	ticker := time.NewTicker(interval)
@@ -38,6 +43,8 @@ func (c *DockerCollector) Start(ctx context.Context, interval time.Duration) {
 	}
 }
 
+// Collect gathers Docker container information and publishes it to the event bus.
+// It uses the Docker CLI to inspect all containers and extract detailed information.
 func (c *DockerCollector) Collect() {
 
 	logger.Debug("Collecting docker data...")
@@ -394,11 +401,11 @@ func (c *DockerCollector) formatUptime(d time.Duration) string {
 
 	if days > 0 {
 		return fmt.Sprintf("%dd %dh %dm", days, hours, minutes)
-	} else if hours > 0 {
-		return fmt.Sprintf("%dh %dm", hours, minutes)
-	} else {
-		return fmt.Sprintf("%dm", minutes)
 	}
+	if hours > 0 {
+		return fmt.Sprintf("%dh %dm", hours, minutes)
+	}
+	return fmt.Sprintf("%dm", minutes)
 }
 
 // formatMemoryDisplay formats memory usage as "used / limit"

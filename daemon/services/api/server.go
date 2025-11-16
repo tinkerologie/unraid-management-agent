@@ -302,16 +302,14 @@ func (s *Server) subscribeToEvents(ctx context.Context) {
 					func() string {
 						if v.BIOS != nil {
 							return v.BIOS.Vendor
-						} else {
-							return "N/A"
 						}
+						return "N/A"
 					}(),
 					func() string {
 						if v.Baseboard != nil {
 							return v.Baseboard.Manufacturer
-						} else {
-							return "N/A"
 						}
+						return "N/A"
 					}())
 			case *dto.Registration:
 				s.cacheMutex.Lock()

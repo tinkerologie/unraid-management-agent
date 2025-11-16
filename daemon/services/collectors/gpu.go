@@ -16,14 +16,19 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
+// GPUCollector collects GPU metrics from NVIDIA, AMD, and Intel GPUs.
+// It gathers temperature, utilization, memory usage, and power consumption data.
 type GPUCollector struct {
 	ctx *domain.Context
 }
 
+// NewGPUCollector creates a new GPU metrics collector with the given context.
 func NewGPUCollector(ctx *domain.Context) *GPUCollector {
 	return &GPUCollector{ctx: ctx}
 }
 
+// Start begins the GPU collector's periodic data collection.
+// It runs in a goroutine and publishes GPU metrics updates at the specified interval until the context is cancelled.
 func (c *GPUCollector) Start(ctx context.Context, interval time.Duration) {
 	logger.Info("Starting gpu collector (interval: %v)", interval)
 	ticker := time.NewTicker(interval)
@@ -40,6 +45,8 @@ func (c *GPUCollector) Start(ctx context.Context, interval time.Duration) {
 	}
 }
 
+// Collect gathers GPU metrics from all available GPUs and publishes them to the event bus.
+// It detects and collects data from NVIDIA, AMD, and Intel GPUs using vendor-specific tools.
 func (c *GPUCollector) Collect() {
 	logger.Debug("Collecting gpu data...")
 

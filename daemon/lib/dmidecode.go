@@ -34,7 +34,7 @@ func parseDmidecodeOutput(output string) []map[string]string {
 
 		// New section starts with non-indented line
 		if !strings.HasPrefix(line, "\t") && !strings.HasPrefix(line, " ") {
-			if currentSection != nil && len(currentSection) > 0 {
+			if len(currentSection) > 0 {
 				sections = append(sections, currentSection)
 			}
 			currentSection = make(map[string]string)
@@ -61,7 +61,7 @@ func parseDmidecodeOutput(output string) []map[string]string {
 	}
 
 	// Add last section
-	if currentSection != nil && len(currentSection) > 0 {
+	if len(currentSection) > 0 {
 		sections = append(sections, currentSection)
 	}
 

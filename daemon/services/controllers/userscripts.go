@@ -53,6 +53,7 @@ func ListUserScripts() ([]dto.UserScriptInfo, error) {
 
 		// Read description if it exists
 		description := ""
+		// #nosec G304 - descriptionPath is constructed from trusted userscripts directory
 		if descData, err := os.ReadFile(descriptionPath); err == nil {
 			description = strings.TrimSpace(string(descData))
 		}
@@ -98,13 +99,13 @@ func ExecuteUserScript(scriptName string, background bool, wait bool) (*dto.User
 	if background && !wait {
 		// Background execution - don't wait for completion
 		return executeScriptBackground(scriptPath, scriptName)
-	} else if wait {
+	}
+	if wait {
 		// Wait for completion and return output
 		return executeScriptWait(scriptPath, scriptName)
-	} else {
-		// Default: background execution
-		return executeScriptBackground(scriptPath, scriptName)
 	}
+	// Default: background execution
+	return executeScriptBackground(scriptPath, scriptName)
 }
 
 // executeScriptBackground executes a script in the background

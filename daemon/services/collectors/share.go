@@ -14,14 +14,19 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
+// ShareCollector collects information about Unraid user shares.
+// It gathers share configuration, usage statistics, and disk allocation details.
 type ShareCollector struct {
 	ctx *domain.Context
 }
 
+// NewShareCollector creates a new user share collector with the given context.
 func NewShareCollector(ctx *domain.Context) *ShareCollector {
 	return &ShareCollector{ctx: ctx}
 }
 
+// Start begins the share collector's periodic data collection.
+// It runs in a goroutine and publishes share information updates at the specified interval until the context is cancelled.
 func (c *ShareCollector) Start(ctx context.Context, interval time.Duration) {
 	logger.Info("Starting share collector (interval: %v)", interval)
 
@@ -56,6 +61,8 @@ func (c *ShareCollector) Start(ctx context.Context, interval time.Duration) {
 	}
 }
 
+// Collect gathers user share information and publishes it to the event bus.
+// It reads share configuration from /boot/config/shares/ and enriches with usage data from df command.
 func (c *ShareCollector) Collect() {
 	logger.Debug("Collecting share data...")
 

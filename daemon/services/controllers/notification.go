@@ -39,7 +39,8 @@ link="%s"`,
 		title, subject, description, importance,
 		timestamp.Format("2006-01-02 15:04:05"), link)
 
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil { // #nosec G306 - Notification files need to be readable
+	// #nosec G306 - Notification files need to be readable by Unraid web UI (0644)
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		logger.Error("Failed to create notification: %v", err)
 		return fmt.Errorf("failed to create notification: %w", err)
 	}
@@ -59,7 +60,8 @@ func ArchiveNotification(id string) error {
 	}
 
 	// Ensure archive directory exists
-	if err := os.MkdirAll(notificationsArchiveDir, 0755); err != nil { // #nosec G301 - Unraid standard permissions
+	// #nosec G301 - Unraid standard permissions (0755 for directories)
+	if err := os.MkdirAll(notificationsArchiveDir, 0755); err != nil {
 		return fmt.Errorf("failed to create archive directory: %w", err)
 	}
 
@@ -121,7 +123,8 @@ func ArchiveAllNotifications() error {
 	}
 
 	// Ensure archive directory exists
-	if err := os.MkdirAll(notificationsArchiveDir, 0755); err != nil { // #nosec G301 - Unraid standard permissions
+	// #nosec G301 - Unraid standard permissions (0755 for directories)
+	if err := os.MkdirAll(notificationsArchiveDir, 0755); err != nil {
 		return fmt.Errorf("failed to create archive directory: %w", err)
 	}
 
