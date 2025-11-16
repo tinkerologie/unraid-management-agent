@@ -15,11 +15,11 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/controllers"
 )
 
-func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-func (s *Server) handleSystem(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleSystem(w http.ResponseWriter, _ *http.Request) {
 	// Get latest system info from cache
 	s.cacheMutex.RLock()
 	info := s.systemCache
@@ -36,7 +36,7 @@ func (s *Server) handleSystem(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, info)
 }
 
-func (s *Server) handleArray(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleArray(w http.ResponseWriter, _ *http.Request) {
 	// Get latest array status from cache
 	s.cacheMutex.RLock()
 	status := s.arrayCache
@@ -52,7 +52,7 @@ func (s *Server) handleArray(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, status)
 }
 
-func (s *Server) handleDisks(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDisks(w http.ResponseWriter, _ *http.Request) {
 	// Get latest disk list from cache
 	s.cacheMutex.RLock()
 	disks := s.disksCache
@@ -90,7 +90,7 @@ func (s *Server) handleDisk(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleShares(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleShares(w http.ResponseWriter, _ *http.Request) {
 	// Get latest share list from cache
 	s.cacheMutex.RLock()
 	shares := s.sharesCache
@@ -103,7 +103,7 @@ func (s *Server) handleShares(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, shares)
 }
 
-func (s *Server) handleDockerList(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDockerList(w http.ResponseWriter, _ *http.Request) {
 	// Get latest container list from cache
 	s.cacheMutex.RLock()
 	containers := s.dockerCache
@@ -141,7 +141,7 @@ func (s *Server) handleDockerInfo(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleVMList(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleVMList(w http.ResponseWriter, _ *http.Request) {
 	// Get latest VM list from cache
 	s.cacheMutex.RLock()
 	vms := s.vmsCache
@@ -179,7 +179,7 @@ func (s *Server) handleVMInfo(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleUPS(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleUPS(w http.ResponseWriter, _ *http.Request) {
 	// Get latest UPS status from cache
 	s.cacheMutex.RLock()
 	ups := s.upsCache
@@ -195,7 +195,7 @@ func (s *Server) handleUPS(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, ups)
 }
 
-func (s *Server) handleGPU(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGPU(w http.ResponseWriter, _ *http.Request) {
 	// Get latest GPU metrics from cache
 	s.cacheMutex.RLock()
 	gpus := s.gpuCache
@@ -208,7 +208,7 @@ func (s *Server) handleGPU(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, gpus)
 }
 
-func (s *Server) handleNetwork(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleNetwork(w http.ResponseWriter, _ *http.Request) {
 	// Get latest network interfaces from cache
 	s.cacheMutex.RLock()
 	interfaces := s.networkCache
@@ -358,7 +358,7 @@ func (s *Server) handleVMForceStop(w http.ResponseWriter, r *http.Request) {
 }
 
 // Array control handlers
-func (s *Server) handleArrayStart(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleArrayStart(w http.ResponseWriter, _ *http.Request) {
 	logger.Info("API: Starting array")
 
 	arrayCtrl := controllers.NewArrayController(s.ctx)
@@ -381,7 +381,7 @@ func (s *Server) handleArrayStart(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleArrayStop(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleArrayStop(w http.ResponseWriter, _ *http.Request) {
 	logger.Info("API: Stopping array")
 
 	arrayCtrl := controllers.NewArrayController(s.ctx)
@@ -429,7 +429,7 @@ func (s *Server) handleParityCheckStart(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
-func (s *Server) handleParityCheckStop(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleParityCheckStop(w http.ResponseWriter, _ *http.Request) {
 	logger.Info("API: Stopping parity check")
 
 	arrayCtrl := controllers.NewArrayController(s.ctx)
@@ -452,7 +452,7 @@ func (s *Server) handleParityCheckStop(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleParityCheckPause(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleParityCheckPause(w http.ResponseWriter, _ *http.Request) {
 	logger.Info("API: Pausing parity check")
 
 	arrayCtrl := controllers.NewArrayController(s.ctx)
@@ -475,7 +475,7 @@ func (s *Server) handleParityCheckPause(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
-func (s *Server) handleParityCheckResume(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleParityCheckResume(w http.ResponseWriter, _ *http.Request) {
 	logger.Info("API: Resuming parity check")
 
 	arrayCtrl := controllers.NewArrayController(s.ctx)
@@ -498,7 +498,7 @@ func (s *Server) handleParityCheckResume(w http.ResponseWriter, r *http.Request)
 	})
 }
 
-func (s *Server) handleParityCheckHistory(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleParityCheckHistory(w http.ResponseWriter, _ *http.Request) {
 	logger.Debug("API: Getting parity check history")
 
 	parityCollector := collectors.NewParityCollector()
@@ -571,7 +571,7 @@ func (s *Server) handleNetworkConfig(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, config)
 }
 
-func (s *Server) handleSystemSettings(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleSystemSettings(w http.ResponseWriter, _ *http.Request) {
 	logger.Debug("API: Getting system settings")
 
 	configCollector := collectors.NewConfigCollector()
@@ -590,7 +590,7 @@ func (s *Server) handleSystemSettings(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, settings)
 }
 
-func (s *Server) handleDockerSettings(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDockerSettings(w http.ResponseWriter, _ *http.Request) {
 	logger.Debug("API: Getting Docker settings")
 
 	configCollector := collectors.NewConfigCollector()
@@ -609,7 +609,7 @@ func (s *Server) handleDockerSettings(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, settings)
 }
 
-func (s *Server) handleVMSettings(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleVMSettings(w http.ResponseWriter, _ *http.Request) {
 	logger.Debug("API: Getting VM settings")
 
 	configCollector := collectors.NewConfigCollector()
@@ -628,7 +628,7 @@ func (s *Server) handleVMSettings(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, settings)
 }
 
-func (s *Server) handleDiskSettings(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDiskSettings(w http.ResponseWriter, _ *http.Request) {
 	logger.Debug("API: Getting disk settings")
 
 	configCollector := collectors.NewConfigCollector()
@@ -726,7 +726,7 @@ func (s *Server) handleUpdateSystemSettings(w http.ResponseWriter, r *http.Reque
 }
 
 // handleUserScripts returns a list of all available user scripts
-func (s *Server) handleUserScripts(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleUserScripts(w http.ResponseWriter, _ *http.Request) {
 	scripts, err := controllers.ListUserScripts()
 	if err != nil {
 		logger.Error("API: Failed to list user scripts: %v", err)
@@ -767,7 +767,7 @@ func (s *Server) handleUserScriptExecute(w http.ResponseWriter, r *http.Request)
 
 // Hardware endpoints
 
-func (s *Server) handleHardwareFull(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleHardwareFull(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	hardware := s.hardwareCache
 	s.cacheMutex.RUnlock()
@@ -781,7 +781,7 @@ func (s *Server) handleHardwareFull(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, hardware)
 }
 
-func (s *Server) handleHardwareBIOS(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleHardwareBIOS(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	hardware := s.hardwareCache
 	s.cacheMutex.RUnlock()
@@ -794,7 +794,7 @@ func (s *Server) handleHardwareBIOS(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, hardware.BIOS)
 }
 
-func (s *Server) handleHardwareBaseboard(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleHardwareBaseboard(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	hardware := s.hardwareCache
 	s.cacheMutex.RUnlock()
@@ -807,7 +807,7 @@ func (s *Server) handleHardwareBaseboard(w http.ResponseWriter, r *http.Request)
 	respondJSON(w, http.StatusOK, hardware.Baseboard)
 }
 
-func (s *Server) handleHardwareCPU(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleHardwareCPU(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	hardware := s.hardwareCache
 	s.cacheMutex.RUnlock()
@@ -820,7 +820,7 @@ func (s *Server) handleHardwareCPU(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, hardware.CPU)
 }
 
-func (s *Server) handleHardwareCache(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleHardwareCache(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	hardware := s.hardwareCache
 	s.cacheMutex.RUnlock()
@@ -833,7 +833,7 @@ func (s *Server) handleHardwareCache(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, hardware.Cache)
 }
 
-func (s *Server) handleHardwareMemoryArray(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleHardwareMemoryArray(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	hardware := s.hardwareCache
 	s.cacheMutex.RUnlock()
@@ -846,7 +846,7 @@ func (s *Server) handleHardwareMemoryArray(w http.ResponseWriter, r *http.Reques
 	respondJSON(w, http.StatusOK, hardware.MemoryArray)
 }
 
-func (s *Server) handleHardwareMemoryDevices(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleHardwareMemoryDevices(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	hardware := s.hardwareCache
 	s.cacheMutex.RUnlock()
@@ -859,7 +859,7 @@ func (s *Server) handleHardwareMemoryDevices(w http.ResponseWriter, r *http.Requ
 	respondJSON(w, http.StatusOK, hardware.MemoryDevices)
 }
 
-func (s *Server) handleRegistration(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleRegistration(w http.ResponseWriter, _ *http.Request) {
 	logger.Debug("API: Getting registration information")
 
 	s.cacheMutex.RLock()
@@ -949,7 +949,7 @@ func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleNotificationsUnread returns only unread notifications
-func (s *Server) handleNotificationsUnread(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleNotificationsUnread(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	notificationList := s.notificationsCache
 	s.cacheMutex.RUnlock()
@@ -976,7 +976,7 @@ func (s *Server) handleNotificationsUnread(w http.ResponseWriter, r *http.Reques
 }
 
 // handleNotificationsArchive returns only archived notifications
-func (s *Server) handleNotificationsArchive(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleNotificationsArchive(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	notificationList := s.notificationsCache
 	s.cacheMutex.RUnlock()
@@ -1003,7 +1003,7 @@ func (s *Server) handleNotificationsArchive(w http.ResponseWriter, r *http.Reque
 }
 
 // handleNotificationsOverview returns only the overview counts
-func (s *Server) handleNotificationsOverview(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleNotificationsOverview(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	notificationList := s.notificationsCache
 	s.cacheMutex.RUnlock()
@@ -1118,7 +1118,7 @@ func (s *Server) handleDeleteNotification(w http.ResponseWriter, r *http.Request
 }
 
 // handleArchiveAllNotifications archives all unread notifications
-func (s *Server) handleArchiveAllNotifications(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleArchiveAllNotifications(w http.ResponseWriter, _ *http.Request) {
 	if err := controllers.ArchiveAllNotifications(); err != nil {
 		respondWithError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -1128,7 +1128,7 @@ func (s *Server) handleArchiveAllNotifications(w http.ResponseWriter, r *http.Re
 }
 
 // handleUnassignedDevices returns all unassigned devices and remote shares
-func (s *Server) handleUnassignedDevices(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleUnassignedDevices(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	defer s.cacheMutex.RUnlock()
 
@@ -1145,7 +1145,7 @@ func (s *Server) handleUnassignedDevices(w http.ResponseWriter, r *http.Request)
 }
 
 // handleUnassignedDevicesList returns only unassigned devices (no remote shares)
-func (s *Server) handleUnassignedDevicesList(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleUnassignedDevicesList(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	defer s.cacheMutex.RUnlock()
 
@@ -1164,7 +1164,7 @@ func (s *Server) handleUnassignedDevicesList(w http.ResponseWriter, r *http.Requ
 }
 
 // handleUnassignedRemoteShares returns only remote shares (no devices)
-func (s *Server) handleUnassignedRemoteShares(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleUnassignedRemoteShares(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	defer s.cacheMutex.RUnlock()
 

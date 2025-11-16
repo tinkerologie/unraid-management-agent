@@ -13,6 +13,8 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
+// Server represents the HTTP API server that handles REST endpoints and WebSocket connections.
+// It maintains an in-memory cache of data from collectors and broadcasts updates to WebSocket clients.
 type Server struct {
 	ctx        *domain.Context
 	httpServer *http.Server
@@ -38,6 +40,8 @@ type Server struct {
 	unassignedCache    *dto.UnassignedDeviceList
 }
 
+// NewServer creates a new API server instance with the given context.
+// It initializes the HTTP router, WebSocket hub, and sets up all API routes.
 func NewServer(ctx *domain.Context) *Server {
 	cancelCtx, cancelFunc := context.WithCancel(context.Background())
 	s := &Server{
@@ -191,6 +195,8 @@ func (s *Server) Start() error {
 	return s.StartHTTP()
 }
 
+// Stop gracefully shuts down the API server.
+// It cancels all background goroutines and shuts down the HTTP server with a 5-second timeout.
 func (s *Server) Stop() {
 	// Cancel all background goroutines
 	s.cancelFunc()
