@@ -910,3 +910,219 @@ func respondJSON(w http.ResponseWriter, status int, payload interface{}) {
 		logger.Error("Failed to encode JSON response: %v", err)
 	}
 }
+
+// Helper function to respond with error
+func respondWithError(w http.ResponseWriter, status int, message string) {
+	respondJSON(w, status, map[string]string{"error": message})
+}
+
+// handleNotifications returns all notifications with overview
+func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
+	s.cacheMutex.RLock()
+	notificationList := s.notificationsCache
+	s.cacheMutex.RUnlock()
+
+	if notificationList == nil {
+		notificationList = &dto.NotificationList{
+			Overview: dto.NotificationOverview{
+				Unread:  dto.NotificationCounts{},
+				Archive: dto.NotificationCounts{},
+			},
+			Notifications: []dto.Notification{},
+			Timestamp:     time.Now(),
+		}
+	}
+
+	// Filter by importance if specified
+	importance := r.URL.Query().Get("importance")
+	if importance != "" {
+		filtered := []dto.Notification{}
+		for _, n := range notificationList.Notifications {
+			if n.Importance == importance {
+				filtered = append(filtered, n)
+			}
+		}
+		notificationList.Notifications = filtered
+	}
+
+	respondJSON(w, http.StatusOK, notificationList)
+}
+
+// handleNotificationsUnread returns only unread notifications
+func (s *Server) handleNotificationsUnread(w http.ResponseWriter, r *http.Request) {
+	s.cacheMutex.RLock()
+	notificationList := s.notificationsCache
+	s.cacheMutex.RUnlock()
+
+	if notificationList == nil {
+		respondJSON(w, http.StatusOK, map[string]interface{}{
+			"notifications": []dto.Notification{},
+			"count":         0,
+		})
+		return
+	}
+
+	unread := []dto.Notification{}
+	for _, n := range notificationList.Notifications {
+		if n.Type == "unread" {
+			unread = append(unread, n)
+		}
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"notifications": unread,
+		"count":         len(unread),
+	})
+}
+
+// handleNotificationsArchive returns only archived notifications
+func (s *Server) handleNotificationsArchive(w http.ResponseWriter, r *http.Request) {
+	s.cacheMutex.RLock()
+	notificationList := s.notificationsCache
+	s.cacheMutex.RUnlock()
+
+	if notificationList == nil {
+		respondJSON(w, http.StatusOK, map[string]interface{}{
+			"notifications": []dto.Notification{},
+			"count":         0,
+		})
+		return
+	}
+
+	archived := []dto.Notification{}
+	for _, n := range notificationList.Notifications {
+		if n.Type == "archive" {
+			archived = append(archived, n)
+		}
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"notifications": archived,
+		"count":         len(archived),
+	})
+}
+
+// handleNotificationsOverview returns only the overview counts
+func (s *Server) handleNotificationsOverview(w http.ResponseWriter, r *http.Request) {
+	s.cacheMutex.RLock()
+	notificationList := s.notificationsCache
+	s.cacheMutex.RUnlock()
+
+	if notificationList == nil {
+		respondJSON(w, http.StatusOK, dto.NotificationOverview{
+			Unread:  dto.NotificationCounts{},
+			Archive: dto.NotificationCounts{},
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, notificationList.Overview)
+}
+
+// handleNotificationByID returns a specific notification by ID
+func (s *Server) handleNotificationByID(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	s.cacheMutex.RLock()
+	notificationList := s.notificationsCache
+	s.cacheMutex.RUnlock()
+
+	if notificationList == nil {
+		respondWithError(w, http.StatusNotFound, "Notification not found")
+		return
+	}
+
+	for _, n := range notificationList.Notifications {
+		if n.ID == id {
+			respondJSON(w, http.StatusOK, n)
+			return
+		}
+	}
+
+	respondWithError(w, http.StatusNotFound, "Notification not found")
+}
+
+// handleCreateNotification creates a new notification
+func (s *Server) handleCreateNotification(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Title       string `json:"title"`
+		Subject     string `json:"subject"`
+		Description string `json:"description"`
+		Importance  string `json:"importance"`
+		Link        string `json:"link"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.Title == "" {
+		respondWithError(w, http.StatusBadRequest, "Title is required")
+		return
+	}
+
+	if req.Importance == "" {
+		req.Importance = "info"
+	}
+
+	if err := controllers.CreateNotification(req.Title, req.Subject, req.Description, req.Importance, req.Link); err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusCreated, map[string]string{"message": "Notification created successfully"})
+}
+
+// handleArchiveNotification archives a specific notification
+func (s *Server) handleArchiveNotification(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	if err := controllers.ArchiveNotification(id); err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"message": "Notification archived successfully"})
+}
+
+// handleUnarchiveNotification unarchives a specific notification
+func (s *Server) handleUnarchiveNotification(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	if err := controllers.UnarchiveNotification(id); err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"message": "Notification unarchived successfully"})
+}
+
+// handleDeleteNotification deletes a specific notification
+func (s *Server) handleDeleteNotification(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	// Check if notification is in archive
+	isArchived := r.URL.Query().Get("archived") == "true"
+
+	if err := controllers.DeleteNotification(id, isArchived); err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"message": "Notification deleted successfully"})
+}
+
+// handleArchiveAllNotifications archives all unread notifications
+func (s *Server) handleArchiveAllNotifications(w http.ResponseWriter, r *http.Request) {
+	if err := controllers.ArchiveAllNotifications(); err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"message": "All notifications archived successfully"})
+}

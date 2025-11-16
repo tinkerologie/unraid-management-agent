@@ -22,18 +22,19 @@ type Server struct {
 	cancelFunc context.CancelFunc
 
 	// Cache for latest data from collectors
-	cacheMutex        sync.RWMutex
-	systemCache       *dto.SystemInfo
-	arrayCache        *dto.ArrayStatus
-	disksCache        []dto.DiskInfo
-	sharesCache       []dto.ShareInfo
-	dockerCache       []dto.ContainerInfo
-	vmsCache          []dto.VMInfo
-	upsCache          *dto.UPSStatus
-	gpuCache          []*dto.GPUMetrics
-	networkCache      []dto.NetworkInfo
-	hardwareCache     *dto.HardwareInfo
-	registrationCache *dto.Registration
+	cacheMutex         sync.RWMutex
+	systemCache        *dto.SystemInfo
+	arrayCache         *dto.ArrayStatus
+	disksCache         []dto.DiskInfo
+	sharesCache        []dto.ShareInfo
+	dockerCache        []dto.ContainerInfo
+	vmsCache           []dto.VMInfo
+	upsCache           *dto.UPSStatus
+	gpuCache           []*dto.GPUMetrics
+	networkCache       []dto.NetworkInfo
+	hardwareCache      *dto.HardwareInfo
+	registrationCache  *dto.Registration
+	notificationsCache *dto.NotificationList
 }
 
 func NewServer(ctx *domain.Context) *Server {
@@ -130,6 +131,20 @@ func (s *Server) setupRoutes() {
 	// Log file endpoints
 	api.HandleFunc("/logs", s.handleLogs).Methods("GET")
 
+	// Notification endpoints (monitoring)
+	api.HandleFunc("/notifications", s.handleNotifications).Methods("GET")
+	api.HandleFunc("/notifications/unread", s.handleNotificationsUnread).Methods("GET")
+	api.HandleFunc("/notifications/archive", s.handleNotificationsArchive).Methods("GET")
+	api.HandleFunc("/notifications/overview", s.handleNotificationsOverview).Methods("GET")
+	api.HandleFunc("/notifications/{id}", s.handleNotificationByID).Methods("GET")
+
+	// Notification endpoints (control)
+	api.HandleFunc("/notifications", s.handleCreateNotification).Methods("POST")
+	api.HandleFunc("/notifications/{id}/archive", s.handleArchiveNotification).Methods("POST")
+	api.HandleFunc("/notifications/{id}/unarchive", s.handleUnarchiveNotification).Methods("POST")
+	api.HandleFunc("/notifications/{id}", s.handleDeleteNotification).Methods("DELETE")
+	api.HandleFunc("/notifications/archive/all", s.handleArchiveAllNotifications).Methods("POST")
+
 	// WebSocket endpoint
 	api.HandleFunc("/ws", s.handleWebSocket)
 }
@@ -198,6 +213,7 @@ func (s *Server) subscribeToEvents(ctx context.Context) {
 		"network_list_update",
 		"hardware_update",
 		"registration_update",
+		"notifications_update",
 	)
 	logger.Info("Cache: Subscription ready, waiting for events...")
 
@@ -289,6 +305,12 @@ func (s *Server) subscribeToEvents(ctx context.Context) {
 				s.registrationCache = v
 				s.cacheMutex.Unlock()
 				logger.Debug("Cache: Updated registration info - type=%s, state=%s", v.Type, v.State)
+			case *dto.NotificationList:
+				s.cacheMutex.Lock()
+				s.notificationsCache = v
+				s.cacheMutex.Unlock()
+				logger.Debug("Cache: Updated notifications - unread=%d, archived=%d",
+					v.Overview.Unread.Total, v.Overview.Archive.Total)
 			default:
 				logger.Warning("Cache: Received unknown event type: %T", msg)
 			}

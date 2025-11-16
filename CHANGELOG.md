@@ -19,6 +19,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2025.11.17] - 2025-11-16
+
+### Added
+
+- **Unraid Notifications System** (Issue #10):
+  - Complete notification management system with file monitoring
+  - New `/api/v1/notifications` endpoint to list all notifications with overview counts
+  - New `/api/v1/notifications/unread` endpoint for unread notifications only
+  - New `/api/v1/notifications/archive` endpoint for archived notifications only
+  - New `/api/v1/notifications/overview` endpoint for notification counts by importance
+  - New `/api/v1/notifications/{id}` endpoint to get specific notification
+  - Create custom notifications via POST `/api/v1/notifications`
+  - Archive notifications via POST `/api/v1/notifications/{id}/archive`
+  - Unarchive notifications via POST `/api/v1/notifications/{id}/unarchive`
+  - Delete notifications via DELETE `/api/v1/notifications/{id}`
+  - Archive all unread notifications via POST `/api/v1/notifications/archive/all`
+  - Real-time file monitoring with fsnotify for instant notification updates
+  - Automatic notification discovery from `/usr/local/emhttp/state/notifications/`
+  - Support for all importance levels: alert, warning, info
+  - Notification counts by type (unread/archive) and importance level
+  - WebSocket real-time updates when notifications change
+  - Filter notifications by importance level via query parameter
+
+### Technical Details
+
+- **New DTOs**: `daemon/dto/notification.go` - Notification, NotificationOverview, NotificationCounts, NotificationList structures
+- **New Collector**: `daemon/services/collectors/notification.go` - File-based notification collector with fsnotify monitoring
+- **New Controller**: `daemon/services/controllers/notification.go` - Notification CRUD operations (create, archive, unarchive, delete)
+- **File Monitoring**: Uses fsnotify to watch notification directories for real-time updates
+- **Collection Interval**: 15 seconds (with instant updates via file watcher)
+- **Notification Format**: Parses Unraid .notify files with key-value pairs
+- **Archive Support**: Moves notifications between active and archive directories
+- **Bulk Operations**: Archive all unread notifications at once
+- **Security**: Proper file permissions (0644 for files, 0755 for directories)
+- **Error Handling**: Graceful handling of missing directories, parse errors, and file operations
+
+---
+
 ## [2025.11.16] - 2025-11-16
 
 ### Added
