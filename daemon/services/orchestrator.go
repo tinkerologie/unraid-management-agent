@@ -55,9 +55,10 @@ func (o *Orchestrator) Run() error {
 	shareCollector := collectors.NewShareCollector(o.ctx)
 	networkCollector := collectors.NewNetworkCollector(o.ctx)
 	hardwareCollector := collectors.NewHardwareCollector(o.ctx)
+	registrationCollector := collectors.NewRegistrationCollector(o.ctx)
 
 	// Start collectors with context and WaitGroup
-	wg.Add(10)
+	wg.Add(11)
 	go func() {
 		defer wg.Done()
 		systemCollector.Start(ctx, time.Duration(common.IntervalSystem)*time.Second)
@@ -97,6 +98,10 @@ func (o *Orchestrator) Run() error {
 	go func() {
 		defer wg.Done()
 		hardwareCollector.Start(ctx, time.Duration(common.IntervalHardware)*time.Second)
+	}()
+	go func() {
+		defer wg.Done()
+		registrationCollector.Start(ctx, time.Duration(common.IntervalHardware)*time.Second)
 	}()
 
 	logger.Success("All collectors started")

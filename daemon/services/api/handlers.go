@@ -859,6 +859,24 @@ func (s *Server) handleHardwareMemoryDevices(w http.ResponseWriter, r *http.Requ
 	respondJSON(w, http.StatusOK, hardware.MemoryDevices)
 }
 
+func (s *Server) handleRegistration(w http.ResponseWriter, r *http.Request) {
+	logger.Debug("API: Getting registration information")
+
+	s.cacheMutex.RLock()
+	registration := s.registrationCache
+	s.cacheMutex.RUnlock()
+
+	if registration == nil {
+		registration = &dto.Registration{
+			Type:      "unknown",
+			State:     "invalid",
+			Timestamp: time.Now(),
+		}
+	}
+
+	respondJSON(w, http.StatusOK, registration)
+}
+
 // Helper function to respond with JSON
 func respondJSON(w http.ResponseWriter, status int, payload interface{}) {
 	w.Header().Set("Content-Type", "application/json")

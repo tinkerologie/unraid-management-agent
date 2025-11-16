@@ -19,6 +19,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2025.11.15] - 2025-11-16
+
+### Added
+
+- **Registration/License Information API** (Issue #18):
+  - New `/api/v1/registration` endpoint to retrieve Unraid license and registration information
+  - Returns license type (trial, basic, plus, pro, lifetime), state (valid, expired, invalid, trial), expiration dates, server name, and registration GUID
+  - Automatically determines license state based on expiration date and license type
+  - Supports all Unraid license types including trial, basic, plus, pro, and lifetime/unleashed licenses
+  - Real-time updates via WebSocket when registration information changes
+  - Graceful handling of missing or invalid registration data
+
+### Technical Details
+
+- **New DTO**: `daemon/dto/registration.go` - Registration data structure with license type, state, expiration, server name, and GUID
+- **New Collector**: `daemon/services/collectors/registration.go` - Parses `/var/local/emhttp/var.ini` for registration data
+- **API Integration**: Added registration cache, handler, route, and event subscription to API server
+- **Event Bus**: Registration collector publishes `registration_update` events to the PubSub hub
+- **Collection Interval**: Uses hardware collection interval (60 seconds) for registration data updates
+
+---
+
 ## [2025.11.14] - 2025-11-16
 
 ### Added

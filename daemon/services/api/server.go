@@ -22,17 +22,18 @@ type Server struct {
 	cancelFunc context.CancelFunc
 
 	// Cache for latest data from collectors
-	cacheMutex    sync.RWMutex
-	systemCache   *dto.SystemInfo
-	arrayCache    *dto.ArrayStatus
-	disksCache    []dto.DiskInfo
-	sharesCache   []dto.ShareInfo
-	dockerCache   []dto.ContainerInfo
-	vmsCache      []dto.VMInfo
-	upsCache      *dto.UPSStatus
-	gpuCache      []*dto.GPUMetrics
-	networkCache  []dto.NetworkInfo
-	hardwareCache *dto.HardwareInfo
+	cacheMutex        sync.RWMutex
+	systemCache       *dto.SystemInfo
+	arrayCache        *dto.ArrayStatus
+	disksCache        []dto.DiskInfo
+	sharesCache       []dto.ShareInfo
+	dockerCache       []dto.ContainerInfo
+	vmsCache          []dto.VMInfo
+	upsCache          *dto.UPSStatus
+	gpuCache          []*dto.GPUMetrics
+	networkCache      []dto.NetworkInfo
+	hardwareCache     *dto.HardwareInfo
+	registrationCache *dto.Registration
 }
 
 func NewServer(ctx *domain.Context) *Server {
@@ -123,6 +124,9 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/user-scripts", s.handleUserScripts).Methods("GET")
 	api.HandleFunc("/user-scripts/{name}/execute", s.handleUserScriptExecute).Methods("POST")
 
+	// Registration/License endpoint
+	api.HandleFunc("/registration", s.handleRegistration).Methods("GET")
+
 	// WebSocket endpoint
 	api.HandleFunc("/ws", s.handleWebSocket)
 }
@@ -190,6 +194,7 @@ func (s *Server) subscribeToEvents(ctx context.Context) {
 		"gpu_metrics_update",
 		"network_list_update",
 		"hardware_update",
+		"registration_update",
 	)
 	logger.Info("Cache: Subscription ready, waiting for events...")
 
@@ -276,6 +281,11 @@ func (s *Server) subscribeToEvents(ctx context.Context) {
 							return "N/A"
 						}
 					}())
+			case *dto.Registration:
+				s.cacheMutex.Lock()
+				s.registrationCache = v
+				s.cacheMutex.Unlock()
+				logger.Debug("Cache: Updated registration info - type=%s, state=%s", v.Type, v.State)
 			default:
 				logger.Warning("Cache: Received unknown event type: %T", msg)
 			}
