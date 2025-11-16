@@ -3,14 +3,14 @@
 <!DOCTYPE PLUGIN [
     <!ENTITY name        "unraid-management-agent">
     <!ENTITY author      "ruaan-deysel">
-    <!ENTITY version     "2025.11.14">
+    <!ENTITY version     "2025.11.15">
     <!ENTITY gitURL      "https://github.com/&author;/&name;">
     <!ENTITY pluginURL   "&gitURL;/raw/main/&name;.plg">
     <!ENTITY supportURL  "https://forums.unraid.net/topic/178262-home-assistant-unraid-integration">
     <!ENTITY launch      "Settings/unraid-management-agent">
     <!ENTITY bundle      "&name;-&version;.tgz">
     <!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
-    <!ENTITY md5         "e73653a80727c251aaa75eaef6697054">
+    <!ENTITY md5         "1cfb8690e35fcdf90d7bd33b9bc68757">
 ]>
 
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" icon="server" min="6.9.0" pluginURL="&pluginURL;" support="&supportURL;">
@@ -20,6 +20,14 @@ This Unraid plugin provides REST API and WebSocket interfaces for real-time syst
 </DESCRIPTION>
 
 <CHANGES>
+###2025.11.15 (2025-11-16)
+- Registration/License Information API (Issue #18)
+- New /api/v1/registration endpoint for Unraid license information
+- Returns license type (trial, basic, plus, pro, lifetime), state, expiration, server name, GUID
+- Automatically determines license state based on expiration date and type
+- Real-time updates via WebSocket when registration information changes
+- Graceful handling of missing or invalid registration data
+
 ###2025.11.14 (2025-11-16)
 - Enhanced GPU monitoring and multi-GPU support (Issue #8 - High Priority)
 - Added GPU identification fields: Index, PCIID, Vendor, UUID

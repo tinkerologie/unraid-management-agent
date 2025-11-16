@@ -3,7 +3,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name        "unraid-management-agent">
 <!ENTITY author      "ruaan-deysel">
-<!ENTITY version     "2025.11.14">
+<!ENTITY version     "2025.11.15">
 <!ENTITY launch      "Settings/&name;">
 <!ENTITY gitURL      "https://github.com/ruaandeysel/&name;">
 <!ENTITY pluginURL   "&gitURL;/releases/latest/download/&name;.plg">
@@ -19,6 +19,14 @@
          icon="server">
 
 <CHANGES>
+###2025.11.15
+- Registration/License Information API (Issue #18)
+- New /api/v1/registration endpoint for Unraid license information
+- Returns license type (trial, basic, plus, pro, lifetime), state, expiration, server name, GUID
+- Automatically determines license state based on expiration date and type
+- Real-time updates via WebSocket when registration information changes
+- Graceful handling of missing or invalid registration data
+
 ###2025.11.14
 - Enhanced GPU monitoring and multi-GPU support (Issue #8 - High Priority)
 - Added GPU identification fields: Index, PCIID, Vendor, UUID
