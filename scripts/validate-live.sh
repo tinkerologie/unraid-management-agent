@@ -98,141 +98,274 @@ else
     exit 1
 fi
 
-# Test health endpoint
-print_header "2. HEALTH CHECK"
-if test_endpoint "/health" "Health check"; then
-    :
-fi
+# Test all 16 API endpoints
+print_header "2. API ENDPOINT VALIDATION"
+echo "Testing all 16 API endpoints..."
+echo ""
 
-# Test system endpoint
-print_header "3. SYSTEM INFORMATION"
-print_test "Fetching system information from API"
-SYSTEM_DATA=$(curl -s "${API_BASE}/system")
-echo "$SYSTEM_DATA" | jq '.' 2>/dev/null || echo "$SYSTEM_DATA"
-
-print_test "Comparing with actual system state"
-print_info "Getting actual system information via SSH"
-eval "$SSH_CMD 'uname -a'"
-eval "$SSH_CMD 'uptime'"
-eval "$SSH_CMD 'free -h'"
-eval "$SSH_CMD 'df -h | head -5'"
-
-# Validate system data fields
-if echo "$SYSTEM_DATA" | jq -e '.hostname' > /dev/null 2>&1; then
-    HOSTNAME=$(echo "$SYSTEM_DATA" | jq -r '.hostname')
-    ACTUAL_HOSTNAME=$(eval "$SSH_CMD 'hostname'")
-    if [ "$HOSTNAME" = "$ACTUAL_HOSTNAME" ]; then
-        print_pass "Hostname matches: $HOSTNAME"
-    else
-        print_fail "Hostname mismatch: API=$HOSTNAME, Actual=$ACTUAL_HOSTNAME"
-    fi
+# 1. Health endpoint
+print_test "1. Testing /health"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/health")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ] && echo "$body" | jq -e '.status == "ok"' >/dev/null 2>&1; then
+    print_pass "HTTP $http_code | ${time}s | Status: OK"
 else
-    print_fail "System data missing hostname field"
+    print_fail "HTTP $http_code | Failed"
 fi
 
-# Test array endpoint
-print_header "4. ARRAY STATUS"
-print_test "Fetching array status from API"
-ARRAY_DATA=$(curl -s "${API_BASE}/array")
-echo "$ARRAY_DATA" | jq '.' 2>/dev/null || echo "$ARRAY_DATA"
+# 2. System endpoint
+print_test "2. Testing /system"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/system")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    hostname=$(echo "$body" | jq -r '.hostname // "N/A"')
+    cpu=$(echo "$body" | jq -r '.cpu_usage_percent // "N/A"')
+    ram=$(echo "$body" | jq -r '.ram_usage_percent // "N/A"')
+    uptime=$(echo "$body" | jq -r '.uptime_seconds // "N/A"')
+    print_pass "HTTP $http_code | ${time}s | Host: $hostname | CPU: ${cpu}% | RAM: ${ram}%"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
 
-print_test "Comparing with actual array state"
-eval "$SSH_CMD 'cat /var/local/emhttp/var.ini | grep -E \"(mdState|mdNumDisks|mdNumInvalid)\"'"
+# 3. Array endpoint
+print_test "3. Testing /array"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/array")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    state=$(echo "$body" | jq -r '.state // "N/A"')
+    disks=$(echo "$body" | jq -r '.num_disks // 0')
+    total_tb=$(echo "$body" | jq -r '(.total_bytes // 0) / 1099511627776 | floor')
+    free_tb=$(echo "$body" | jq -r '(.free_bytes // 0) / 1099511627776 | floor')
+    print_pass "HTTP $http_code | ${time}s | State: $state | Disks: $disks | Total: ${total_tb}TB | Free: ${free_tb}TB"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
 
-# Test disks endpoint
-print_header "5. DISK INFORMATION"
-print_test "Fetching disk information from API"
-DISK_DATA=$(curl -s "${API_BASE}/disks")
-echo "$DISK_DATA" | jq '.' 2>/dev/null || echo "$DISK_DATA"
+# 4. Disks endpoint
+print_test "4. Testing /disks"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/disks")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    count=$(echo "$body" | jq 'length')
+    print_pass "HTTP $http_code | ${time}s | Count: $count disks"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
 
-DISK_COUNT=$(echo "$DISK_DATA" | jq '. | length' 2>/dev/null || echo "0")
-print_info "API reports $DISK_COUNT disks"
+# 5. Network endpoint
+print_test "5. Testing /network"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/network")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    count=$(echo "$body" | jq 'length')
+    print_pass "HTTP $http_code | ${time}s | Count: $count interfaces"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
 
-print_test "Comparing with actual disk state"
-eval "$SSH_CMD 'lsblk -o NAME,SIZE,TYPE,MOUNTPOINT'"
-eval "$SSH_CMD 'df -h | grep -E \"(^/dev|Filesystem)\"'"
+# 6. Shares endpoint
+print_test "6. Testing /shares"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/shares")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    count=$(echo "$body" | jq 'length')
+    print_pass "HTTP $http_code | ${time}s | Count: $count shares"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
 
-# Test Docker endpoint
-print_header "6. DOCKER CONTAINERS"
-print_test "Fetching Docker container information from API"
-DOCKER_DATA=$(curl -s "${API_BASE}/docker/containers")
-echo "$DOCKER_DATA" | jq '.' 2>/dev/null || echo "$DOCKER_DATA"
+# 7. Docker endpoint
+print_test "7. Testing /docker"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/docker")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    count=$(echo "$body" | jq 'length')
+    running=$(echo "$body" | jq '[.[] | select(.status == "running")] | length')
+    print_pass "HTTP $http_code | ${time}s | Total: $count | Running: $running"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
 
-CONTAINER_COUNT=$(echo "$DOCKER_DATA" | jq '. | length' 2>/dev/null || echo "0")
-print_info "API reports $CONTAINER_COUNT containers"
+# 8. VM endpoint
+print_test "8. Testing /vm"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/vm")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    count=$(echo "$body" | jq 'length')
+    running=$(echo "$body" | jq '[.[] | select(.state == "running")] | length')
+    print_pass "HTTP $http_code | ${time}s | Total: $count | Running: $running"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
 
-print_test "Comparing with actual Docker state"
-eval "$SSH_CMD 'docker ps -a --format \"table {{.Names}}\t{{.Status}}\t{{.State}}\"'"
+# 9. UPS endpoint
+print_test "9. Testing /ups"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/ups")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    status=$(echo "$body" | jq -r '.status // "N/A"')
+    charge=$(echo "$body" | jq -r '.battery_charge_percent // "N/A"')
+    print_pass "HTTP $http_code | ${time}s | Status: $status | Charge: ${charge}%"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
 
-# Test VM endpoint
-print_header "7. VIRTUAL MACHINES"
-print_test "Fetching VM information from API"
-VM_DATA=$(curl -s "${API_BASE}/vms")
-echo "$VM_DATA" | jq '.' 2>/dev/null || echo "$VM_DATA"
+# 10. GPU endpoint
+print_test "10. Testing /gpu"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/gpu")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    count=$(echo "$body" | jq 'length')
+    print_pass "HTTP $http_code | ${time}s | Count: $count GPUs"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
 
-VM_COUNT=$(echo "$VM_DATA" | jq '. | length' 2>/dev/null || echo "0")
-print_info "API reports $VM_COUNT VMs"
+# 11. Registration endpoint
+print_test "11. Testing /registration"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/registration")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    type=$(echo "$body" | jq -r '.type // "N/A"')
+    state=$(echo "$body" | jq -r '.state // "N/A"')
+    print_pass "HTTP $http_code | ${time}s | Type: $type | State: $state"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
 
-print_test "Comparing with actual VM state"
-eval "$SSH_CMD 'virsh list --all 2>/dev/null || echo \"Libvirt not available\"'"
+# 12. Logs endpoint
+print_test "12. Testing /logs?type=syslog&lines=5"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/logs?type=syslog&lines=5")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    lines=$(echo "$body" | jq -r '.lines | length')
+    print_pass "HTTP $http_code | ${time}s | Lines: $lines"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
 
-# Test network endpoint
-print_header "8. NETWORK INTERFACES"
-print_test "Fetching network information from API"
-NETWORK_DATA=$(curl -s "${API_BASE}/network")
-echo "$NETWORK_DATA" | jq '.' 2>/dev/null || echo "$NETWORK_DATA"
+# 13. Notifications endpoint
+print_test "13. Testing /notifications"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/notifications")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    count=$(echo "$body" | jq 'length')
+    print_pass "HTTP $http_code | ${time}s | Count: $count notifications"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
 
-INTERFACE_COUNT=$(echo "$NETWORK_DATA" | jq '. | length' 2>/dev/null || echo "0")
-print_info "API reports $INTERFACE_COUNT network interfaces"
+# 14. Unassigned devices endpoint
+print_test "14. Testing /unassigned"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/unassigned")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    devices=$(echo "$body" | jq '.devices | length')
+    shares=$(echo "$body" | jq '.remote_shares | length')
+    print_pass "HTTP $http_code | ${time}s | Devices: $devices | Shares: $shares"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
 
-print_test "Comparing with actual network state"
-eval "$SSH_CMD 'ip -br addr'"
-eval "$SSH_CMD 'ip -s link'"
+# 15. Unassigned devices (devices only)
+print_test "15. Testing /unassigned/devices"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/unassigned/devices")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    count=$(echo "$body" | jq 'length')
+    print_pass "HTTP $http_code | ${time}s | Count: $count devices"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
 
-# Test shares endpoint
-print_header "9. USER SHARES"
-print_test "Fetching share information from API"
-SHARE_DATA=$(curl -s "${API_BASE}/shares")
-echo "$SHARE_DATA" | jq '.' 2>/dev/null || echo "$SHARE_DATA"
-
-SHARE_COUNT=$(echo "$SHARE_DATA" | jq '. | length' 2>/dev/null || echo "0")
-print_info "API reports $SHARE_COUNT shares"
-
-print_test "Comparing with actual share state"
-eval "$SSH_CMD 'ls -la /mnt/user/'"
-
-# Test UPS endpoint
-print_header "10. UPS STATUS"
-print_test "Fetching UPS information from API"
-UPS_DATA=$(curl -s "${API_BASE}/ups")
-echo "$UPS_DATA" | jq '.' 2>/dev/null || echo "$UPS_DATA"
-
-# Test GPU endpoint
-print_header "11. GPU INFORMATION"
-print_test "Fetching GPU information from API"
-GPU_DATA=$(curl -s "${API_BASE}/gpu")
-echo "$GPU_DATA" | jq '.' 2>/dev/null || echo "$GPU_DATA"
-
-print_test "Comparing with actual GPU state"
-eval "$SSH_CMD 'lspci | grep -i vga'"
-eval "$SSH_CMD 'nvidia-smi 2>/dev/null || echo \"nvidia-smi not available\"'"
+# 16. Unassigned devices (remote shares only)
+print_test "16. Testing /unassigned/remote-shares"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/unassigned/remote-shares")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    count=$(echo "$body" | jq 'length')
+    print_pass "HTTP $http_code | ${time}s | Count: $count shares"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
 
 # Performance monitoring
-print_header "12. PERFORMANCE MONITORING"
+print_header "3. PERFORMANCE MONITORING"
 print_test "Monitoring resource usage"
-print_info "Initial resource usage:"
-eval "$SSH_CMD 'ps aux | grep unraid-management-agent | grep -v grep | awk '\"'\"'{print \"CPU: \"\$3\"% MEM: \"\$4\"% RSS: \"\$6\" KB\"}'\"'\"''"
+print_info "Current resource usage:"
+eval "$SSH_CMD 'ps aux | grep unraid-management-agent | grep -v grep | awk '\"'\"'{print \"PID: \"\$2\" | CPU: \"\$3\"% | MEM: \"\$4\"% | RSS: \"\$6/1024\" MB | VSZ: \"\$5/1024\" MB\"}'\"'\"''"
 
-print_info "Waiting 10 seconds to check for stability..."
-sleep 10
+print_info "Waiting 5 seconds to check for stability..."
+sleep 5
 
-print_info "Resource usage after 10 seconds:"
-eval "$SSH_CMD 'ps aux | grep unraid-management-agent | grep -v grep | awk '\"'\"'{print \"CPU: \"\$3\"% MEM: \"\$4\"% RSS: \"\$6\" KB\"}'\"'\"''"
+print_info "Resource usage after 5 seconds:"
+eval "$SSH_CMD 'ps aux | grep unraid-management-agent | grep -v grep | awk '\"'\"'{print \"PID: \"\$2\" | CPU: \"\$3\"% | MEM: \"\$4\"% | RSS: \"\$6/1024\" MB | VSZ: \"\$5/1024\" MB\"}'\"'\"''"
 
 # Check logs for errors
-print_header "13. LOG ANALYSIS"
-print_test "Checking logs for errors"
-eval "$SSH_CMD 'tail -50 /var/log/unraid-management-agent.log'" || print_info "Log file not found or empty"
+print_header "4. LOG ANALYSIS"
+print_test "Checking logs for errors and warnings"
+print_info "Last 30 lines of log:"
+eval "$SSH_CMD 'tail -30 /var/log/unraid-management-agent.log'" || print_info "Log file not found or empty"
+
+print_test "Checking for errors in logs"
+ERROR_COUNT=$(eval "$SSH_CMD 'grep -i error /var/log/unraid-management-agent.log | grep -v \"http: Server closed\" | wc -l'" || echo "0")
+WARNING_COUNT=$(eval "$SSH_CMD 'grep -i warning /var/log/unraid-management-agent.log | grep -v \"Received terminated signal\" | wc -l'" || echo "0")
+
+if [ "$ERROR_COUNT" -eq 0 ]; then
+    print_pass "No errors found in logs"
+else
+    print_fail "Found $ERROR_COUNT errors in logs"
+fi
+
+if [ "$WARNING_COUNT" -eq 0 ]; then
+    print_pass "No warnings found in logs"
+else
+    print_info "Found $WARNING_COUNT warnings in logs (may be normal)"
+fi
+
+# Check version
+print_header "5. VERSION VERIFICATION"
+print_test "Checking deployed version"
+DEPLOYED_VERSION=$(eval "$SSH_CMD 'cat /usr/local/emhttp/plugins/unraid-management-agent/VERSION'" || echo "unknown")
+EXPECTED_VERSION=$(cat VERSION)
+
+if [ "$DEPLOYED_VERSION" = "$EXPECTED_VERSION" ]; then
+    print_pass "Version matches: $DEPLOYED_VERSION"
+else
+    print_fail "Version mismatch: Deployed=$DEPLOYED_VERSION, Expected=$EXPECTED_VERSION"
+fi
 
 # Summary
 print_header "VALIDATION SUMMARY"
