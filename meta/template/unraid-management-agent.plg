@@ -3,11 +3,12 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name        "unraid-management-agent">
 <!ENTITY author      "ruaan-deysel">
-<!ENTITY version     "2025.11.17">
+<!ENTITY version     "2025.11.18">
 <!ENTITY launch      "Settings/&name;">
 <!ENTITY gitURL      "https://github.com/ruaandeysel/&name;">
 <!ENTITY pluginURL   "&gitURL;/releases/latest/download/&name;.plg">
 <!ENTITY bundle      "&name;-&version;.tgz">
+<!ENTITY md5         "22ab2280c2a0a22a6a217e7b6da9cfed">
 ]>
 
 <PLUGIN  name="&name;"
@@ -19,6 +20,20 @@
          icon="server">
 
 <CHANGES>
+###2025.11.18
+- Unassigned Devices Plugin Support (Issue #7)
+- Complete support for Unassigned Devices plugin integration
+- New /api/v1/unassigned endpoint to list all unassigned devices and remote shares
+- New /api/v1/unassigned/devices endpoint for unassigned devices only
+- New /api/v1/unassigned/remote-shares endpoint for remote shares only
+- Automatic detection of unassigned disk devices (USB drives, eSATA, internal disks not in array)
+- Support for remote SMB/NFS shares and ISO file mounts
+- Per-device information: serial number, model, partitions, mount status, spin state
+- Per-partition information: label, filesystem, mount point, size, usage, SMB/NFS share status
+- Automatic filtering of array disks, loop devices, md devices, and zram
+- Real-time monitoring with 30-second collection interval
+- WebSocket real-time updates when unassigned devices change
+
 ###2025.11.17
 - Unraid Notifications System (Issue #10)
 - Complete notification management system with real-time file monitoring
