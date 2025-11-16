@@ -65,8 +65,8 @@ func (c *GPUCollector) Collect() {
 		}
 	}
 
-	// Try AMD GPU
-	if lib.CommandExists("rocm-smi") {
+	// Try AMD GPU (radeontop or rocm-smi)
+	if lib.CommandExists("radeontop") || lib.CommandExists("rocm-smi") {
 		if amdGPUs, err := c.collectAMDGPU(); err == nil && len(amdGPUs) > 0 {
 			gpuMetrics = append(gpuMetrics, amdGPUs...)
 			logger.Debug("Collected %d AMD GPU(s)", len(amdGPUs))
@@ -96,19 +96,25 @@ func (c *GPUCollector) collectIntelGPU() ([]*dto.GPUMetrics, error) {
 
 	logger.Debug("Intel GPU: Got lspci output, searching for Intel VGA")
 
-	// Look for Intel GPU in lspci output
-	var intelGPUID string
-	var intelGPUModel string
+	// Collect ALL Intel GPUs (not just the first one)
+	type intelGPUInfo struct {
+		PCIID string
+		Model string
+	}
+	intelGPUs := make([]intelGPUInfo, 0)
+
 	for _, line := range strings.Split(output, "\n") {
 		if (strings.Contains(line, "VGA") || strings.Contains(line, "Display")) && strings.Contains(line, "Intel Corporation") {
 			logger.Debug("Intel GPU: Found Intel GPU line: %s", line)
 			// Parse PCI ID and model name using a more robust approach
 			// Format: "0000:00:02.0" "VGA compatible controller" "Intel Corporation" "CoffeeLake-S GT2 [UHD Graphics 630]" -p00 "ASRock Incorporation" "Device 3e92"
 
+			var pciID, model string
+
 			// Extract PCI ID (everything before first quote)
 			firstQuote := strings.Index(line, "\"")
 			if firstQuote > 0 {
-				intelGPUID = strings.TrimSpace(line[:firstQuote])
+				pciID = strings.TrimSpace(line[:firstQuote])
 			}
 
 			// Extract all quoted strings using regex
@@ -127,24 +133,30 @@ func (c *GPUCollector) collectIntelGPU() ([]*dto.GPUMetrics, error) {
 					start := strings.Index(fullModel, "[")
 					end := strings.Index(fullModel, "]")
 					if start != -1 && end != -1 && end > start {
-						intelGPUModel = strings.TrimSpace(fullModel[start+1 : end])
+						model = strings.TrimSpace(fullModel[start+1 : end])
 					}
 				} else {
 					// No brackets, use the full model name
-					intelGPUModel = fullModel
+					model = fullModel
 				}
-				logger.Debug("Intel GPU: Parsed - ID: %s, Model: %s", intelGPUID, intelGPUModel)
+				logger.Debug("Intel GPU: Parsed - ID: %s, Model: %s", pciID, model)
 			} else {
 				logger.Debug("Intel GPU: Failed to parse model name from line (found %d quoted strings, need at least 3)", len(matches))
 			}
-			break
+
+			if pciID != "" && model != "" {
+				intelGPUs = append(intelGPUs, intelGPUInfo{PCIID: pciID, Model: model})
+			}
+			// REMOVED: break statement - continue searching for more Intel GPUs
 		}
 	}
 
-	if intelGPUID == "" {
+	if len(intelGPUs) == 0 {
 		logger.Debug("Intel GPU: No Intel GPU found in lspci output")
 		return nil, fmt.Errorf("no Intel GPU found")
 	}
+
+	logger.Debug("Intel GPU: Found %d Intel GPU(s)", len(intelGPUs))
 
 	// Check if intel_gpu_top is available
 	if !lib.CommandExists("intel_gpu_top") {
@@ -152,38 +164,52 @@ func (c *GPUCollector) collectIntelGPU() ([]*dto.GPUMetrics, error) {
 		return nil, fmt.Errorf("intel_gpu_top not found")
 	}
 
-	logger.Debug("Intel GPU: intel_gpu_top found, checking driver")
+	logger.Debug("Intel GPU: intel_gpu_top found, collecting metrics for each GPU")
 
-	logger.Debug("Intel GPU: Running intel_gpu_top...")
-	// Run intel_gpu_top in JSON mode with 2 samples (like gpustat plugin does)
-	// Note: We don't specify device as it auto-detects the Intel GPU
-	// Note: timeout returns exit code 124 when it times out successfully, which is expected
-	// Use 5 second timeout to allow 2 samples at 1000ms each plus overhead
+	// Collect metrics for each Intel GPU
+	gpuMetrics := make([]*dto.GPUMetrics, 0, len(intelGPUs))
+	for idx, intelGPU := range intelGPUs {
+		gpu := c.collectSingleIntelGPU(intelGPU.PCIID, intelGPU.Model, idx)
+		if gpu != nil {
+			gpuMetrics = append(gpuMetrics, gpu)
+		}
+	}
+
+	if len(gpuMetrics) == 0 {
+		return nil, fmt.Errorf("failed to collect metrics for any Intel GPU")
+	}
+
+	return gpuMetrics, nil
+}
+
+// collectSingleIntelGPU collects metrics for a single Intel GPU
+func (c *GPUCollector) collectSingleIntelGPU(pciID, model string, index int) *dto.GPUMetrics {
+	logger.Debug("Intel GPU: Collecting metrics for GPU %d (%s)", index, pciID)
+
+	// Run intel_gpu_top in JSON mode with 2 samples
+	// Note: intel_gpu_top auto-detects Intel GPU, doesn't support -d flag for specific device
+	// For multi-GPU systems, we run it once and it reports the first GPU
+	// This is a limitation of intel_gpu_top
 	cmdOutput, err := lib.ExecCommandOutput("timeout", "5", "intel_gpu_top", "-J", "-s", "1000", "-n", "2")
 	if err != nil && len(cmdOutput) == 0 {
-		// Real error - no output at all
 		logger.Debug("Intel GPU: intel_gpu_top query failed with no output: %v", err)
-		return nil, fmt.Errorf("intel_gpu_top query failed: %w", err)
+		return nil
 	} else if err != nil {
-		// timeout command exited with error but we got output - this is OK
 		logger.Debug("Intel GPU: intel_gpu_top timed out (expected), got %d bytes output", len(cmdOutput))
 	} else {
 		logger.Debug("Intel GPU: Got output from intel_gpu_top (%d bytes)", len(cmdOutput))
 	}
 
 	// Parse JSON output - intel_gpu_top returns malformed JSON array with -n 2
-	// Just find the first complete JSON object
 	stdout := strings.TrimSpace(cmdOutput)
-	logger.Debug("Intel GPU: Got %d bytes of output", len(stdout))
-
-	// Remove array brackets and clean up newlines/tabs
 	stdout = strings.ReplaceAll(stdout, "\n", "")
 	stdout = strings.ReplaceAll(stdout, "\t", "")
 
 	// Find the first { and match its closing }
 	startIdx := strings.Index(stdout, "{")
 	if startIdx == -1 {
-		return nil, fmt.Errorf("no JSON object found in output")
+		logger.Debug("Intel GPU: No JSON object found in output")
+		return nil
 	}
 
 	// Simple brace matching to find the complete first JSON object
@@ -202,7 +228,8 @@ func (c *GPUCollector) collectIntelGPU() ([]*dto.GPUMetrics, error) {
 	}
 
 	if endIdx == -1 {
-		return nil, fmt.Errorf("incomplete JSON object in output")
+		logger.Debug("Intel GPU: Incomplete JSON object in output")
+		return nil
 	}
 
 	sampleJSON := stdout[startIdx:endIdx]
@@ -212,14 +239,17 @@ func (c *GPUCollector) collectIntelGPU() ([]*dto.GPUMetrics, error) {
 	var intelData map[string]interface{}
 	if err := json.Unmarshal([]byte(sampleJSON), &intelData); err != nil {
 		logger.Debug("Intel GPU: Failed to parse sample: %v", err)
-		return nil, fmt.Errorf("failed to parse intel_gpu_top JSON: %w", err)
+		return nil
 	}
 
-	logger.Debug("Intel GPU: Successfully parsed sample")
+	logger.Debug("Intel GPU: Successfully parsed sample for GPU %d", index)
 
 	gpu := &dto.GPUMetrics{
 		Available: true,
-		Name:      "Intel " + intelGPUModel,
+		Index:     index,
+		PCIID:     pciID,
+		Vendor:    "intel",
+		Name:      "Intel " + model,
 		Timestamp: time.Now(),
 	}
 
@@ -282,7 +312,7 @@ func (c *GPUCollector) collectIntelGPU() ([]*dto.GPUMetrics, error) {
 		logger.Debug("Intel GPU: CPU temperature: %.1f°C", cpuTemp)
 	}
 
-	return []*dto.GPUMetrics{gpu}, nil
+	return gpu
 }
 
 // Get Intel GPU temperature from sysfs
@@ -349,10 +379,10 @@ func (c *GPUCollector) getIntelDriverVersion() (string, error) {
 // NVIDIA GPU collection using nvidia-smi
 func (c *GPUCollector) collectNvidiaGPU() ([]*dto.GPUMetrics, error) {
 	// Query nvidia-smi with CSV output for easy parsing
-	// Format: index, name, temperature.gpu, utilization.gpu, memory.used, memory.total, power.draw
+	// Added: pci.bus_id, uuid, fan.speed
 	output, err := lib.ExecCommandOutput(
 		"nvidia-smi",
-		"--query-gpu=index,name,temperature.gpu,utilization.gpu,memory.used,memory.total,power.draw,power.limit",
+		"--query-gpu=index,pci.bus_id,uuid,name,temperature.gpu,utilization.gpu,memory.used,memory.total,power.draw,fan.speed",
 		"--format=csv,noheader,nounits",
 	)
 	if err != nil {
@@ -369,40 +399,47 @@ func (c *GPUCollector) collectNvidiaGPU() ([]*dto.GPUMetrics, error) {
 	gpus := make([]*dto.GPUMetrics, 0, len(records))
 
 	for _, record := range records {
-		if len(record) < 8 {
+		if len(record) < 10 {
 			continue
 		}
 
 		gpu := &dto.GPUMetrics{
 			Available: true,
+			Vendor:    "nvidia",
 			Timestamp: time.Now(),
 		}
 
 		// Index
-		if _, err := strconv.Atoi(strings.TrimSpace(record[0])); err == nil {
-			// gpu.Index (not in DTO) = idx
+		if idx, err := strconv.Atoi(strings.TrimSpace(record[0])); err == nil {
+			gpu.Index = idx
 		}
 
+		// PCI Bus ID
+		gpu.PCIID = strings.TrimSpace(record[1])
+
+		// UUID
+		gpu.UUID = strings.TrimSpace(record[2])
+
 		// Name
-		gpu.Name = strings.TrimSpace(record[1])
+		gpu.Name = strings.TrimSpace(record[3])
 
 		// Temperature (°C)
-		if temp, err := strconv.ParseFloat(strings.TrimSpace(record[2]), 64); err == nil {
+		if temp, err := strconv.ParseFloat(strings.TrimSpace(record[4]), 64); err == nil {
 			gpu.Temperature = temp
 		}
 
 		// Utilization (%)
-		if util, err := strconv.ParseFloat(strings.TrimSpace(record[3]), 64); err == nil {
+		if util, err := strconv.ParseFloat(strings.TrimSpace(record[5]), 64); err == nil {
 			gpu.UtilizationGPU = util
 		}
 
 		// Memory Used (MiB)
-		if memUsed, err := strconv.ParseFloat(strings.TrimSpace(record[4]), 64); err == nil {
+		if memUsed, err := strconv.ParseFloat(strings.TrimSpace(record[6]), 64); err == nil {
 			gpu.MemoryUsed = uint64(memUsed * 1024 * 1024) // Convert MiB to bytes
 		}
 
 		// Memory Total (MiB)
-		if memTotal, err := strconv.ParseFloat(strings.TrimSpace(record[5]), 64); err == nil {
+		if memTotal, err := strconv.ParseFloat(strings.TrimSpace(record[7]), 64); err == nil {
 			gpu.MemoryTotal = uint64(memTotal * 1024 * 1024) // Convert MiB to bytes
 			if gpu.MemoryTotal > 0 {
 				gpu.UtilizationMemory = float64(gpu.MemoryUsed) / float64(gpu.MemoryTotal) * 100
@@ -410,13 +447,22 @@ func (c *GPUCollector) collectNvidiaGPU() ([]*dto.GPUMetrics, error) {
 		}
 
 		// Power Draw (W)
-		if power, err := strconv.ParseFloat(strings.TrimSpace(record[6]), 64); err == nil {
+		if power, err := strconv.ParseFloat(strings.TrimSpace(record[8]), 64); err == nil {
 			gpu.PowerDraw = power
 		}
 
-		// Power Limit (W)
-		if _, err := strconv.ParseFloat(strings.TrimSpace(record[7]), 64); err == nil {
-			// gpu.PowerLimit (not in DTO) = powerLimit
+		// Fan Speed (%)
+		if fanSpeed, err := strconv.ParseFloat(strings.TrimSpace(record[9]), 64); err == nil {
+			gpu.FanSpeed = fanSpeed
+		}
+
+		// Get driver version (same for all GPUs, only query once)
+		if len(gpus) == 0 {
+			if driverVersion, err := c.getNvidiaDriverVersion(); err == nil {
+				gpu.DriverVersion = driverVersion
+			}
+		} else {
+			gpu.DriverVersion = gpus[0].DriverVersion
 		}
 
 		gpus = append(gpus, gpu)
@@ -425,8 +471,226 @@ func (c *GPUCollector) collectNvidiaGPU() ([]*dto.GPUMetrics, error) {
 	return gpus, nil
 }
 
-// AMD GPU collection using rocm-smi
+// getNvidiaDriverVersion gets NVIDIA driver version
+func (c *GPUCollector) getNvidiaDriverVersion() (string, error) {
+	output, err := lib.ExecCommandOutput("nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(output), nil
+}
+
+// AMD GPU collection using radeontop (broader AMD GPU compatibility)
 func (c *GPUCollector) collectAMDGPU() ([]*dto.GPUMetrics, error) {
+	// Try radeontop first (supports consumer Radeon GPUs)
+	if lib.CommandExists("radeontop") {
+		return c.collectAMDGPUWithRadeontop()
+	}
+
+	// Fallback to rocm-smi for datacenter GPUs
+	if lib.CommandExists("rocm-smi") {
+		return c.collectAMDGPUWithROCm()
+	}
+
+	return nil, fmt.Errorf("neither radeontop nor rocm-smi found")
+}
+
+// collectAMDGPUWithRadeontop uses radeontop for consumer AMD GPUs
+func (c *GPUCollector) collectAMDGPUWithRadeontop() ([]*dto.GPUMetrics, error) {
+	// First, detect AMD GPUs using lspci
+	output, err := lib.ExecCommandOutput("lspci", "-Dmm")
+	if err != nil {
+		return nil, fmt.Errorf("lspci query failed: %w", err)
+	}
+
+	type amdGPUInfo struct {
+		PCIID string
+		Model string
+	}
+	amdGPUs := make([]amdGPUInfo, 0)
+
+	for _, line := range strings.Split(output, "\n") {
+		if (strings.Contains(line, "VGA") || strings.Contains(line, "Display")) &&
+			(strings.Contains(line, "AMD") || strings.Contains(line, "Advanced Micro Devices") || strings.Contains(line, "ATI")) {
+
+			var pciID, model string
+
+			// Extract PCI ID
+			firstQuote := strings.Index(line, "\"")
+			if firstQuote > 0 {
+				pciID = strings.TrimSpace(line[:firstQuote])
+			}
+
+			// Extract model name
+			re := regexp.MustCompile(`"([^"]*)"`)
+			matches := re.FindAllStringSubmatch(line, -1)
+			if len(matches) >= 3 {
+				fullModel := matches[2][1]
+				// Extract marketing name from brackets if present
+				if strings.Contains(fullModel, "[") {
+					start := strings.Index(fullModel, "[")
+					end := strings.Index(fullModel, "]")
+					if start != -1 && end != -1 && end > start {
+						model = strings.TrimSpace(fullModel[start+1 : end])
+					}
+				} else {
+					model = fullModel
+				}
+			}
+
+			if pciID != "" && model != "" {
+				amdGPUs = append(amdGPUs, amdGPUInfo{PCIID: pciID, Model: model})
+			}
+		}
+	}
+
+	if len(amdGPUs) == 0 {
+		return nil, fmt.Errorf("no AMD GPU found")
+	}
+
+	logger.Debug("AMD GPU: Found %d AMD GPU(s)", len(amdGPUs))
+
+	// Collect metrics for each AMD GPU
+	gpuMetrics := make([]*dto.GPUMetrics, 0, len(amdGPUs))
+	for idx, amdGPU := range amdGPUs {
+		gpu := c.collectSingleAMDGPU(amdGPU.PCIID, amdGPU.Model, idx)
+		if gpu != nil {
+			gpuMetrics = append(gpuMetrics, gpu)
+		}
+	}
+
+	return gpuMetrics, nil
+}
+
+// collectSingleAMDGPU collects metrics for a single AMD GPU using radeontop
+func (c *GPUCollector) collectSingleAMDGPU(pciID, model string, index int) *dto.GPUMetrics {
+	logger.Debug("AMD GPU: Collecting metrics for GPU %d (%s)", index, pciID)
+
+	// Run radeontop with dump mode: radeontop -d - -l 1
+	// Output format: bus 0000:01:00.0, gpu 45.00%, ee 0.00%, vgt 0.00%, ta 0.00%, tc 0.00%, sx 0.00%, sh 0.00%, spi 0.00%, sc 0.00%, pa 0.00%, db 0.00%, cb 0.00%, vram 15.00% 1234mb, gtt 5.00% 123mb, mclk 100.00% 1.750ghz, sclk 50.00% 1.200ghz
+	cmdOutput, err := lib.ExecCommandOutput("timeout", "3", "radeontop", "-d", "-", "-l", "1")
+	if err != nil && len(cmdOutput) == 0 {
+		logger.Debug("AMD GPU: radeontop query failed: %v", err)
+		return nil
+	}
+
+	gpu := &dto.GPUMetrics{
+		Available: true,
+		Index:     index,
+		PCIID:     pciID,
+		Vendor:    "amd",
+		Name:      "AMD " + model,
+		Timestamp: time.Now(),
+	}
+
+	// Parse radeontop output
+	// Example: bus 0000:03:00.0, gpu 12.34%, vram 25.50% 2048mb, sclk 50.00% 1.200ghz
+	output := strings.TrimSpace(cmdOutput)
+	if output != "" {
+		// Extract GPU utilization
+		if matches := regexp.MustCompile(`gpu\s+([\d.]+)%`).FindStringSubmatch(output); len(matches) > 1 {
+			if util, err := strconv.ParseFloat(matches[1], 64); err == nil {
+				gpu.UtilizationGPU = util
+			}
+		}
+
+		// Extract VRAM usage: "vram 15.00% 1234mb"
+		if matches := regexp.MustCompile(`vram\s+([\d.]+)%\s+([\d]+)mb`).FindStringSubmatch(output); len(matches) > 2 {
+			if vramPercent, err := strconv.ParseFloat(matches[1], 64); err == nil {
+				gpu.UtilizationMemory = vramPercent
+			}
+			if vramUsedMB, err := strconv.ParseUint(matches[2], 10, 64); err == nil {
+				gpu.MemoryUsed = vramUsedMB * 1024 * 1024 // Convert MB to bytes
+				// Calculate total from percentage
+				if gpu.UtilizationMemory > 0 {
+					gpu.MemoryTotal = uint64(float64(gpu.MemoryUsed) / (gpu.UtilizationMemory / 100.0))
+				}
+			}
+		}
+	}
+
+	// Get temperature from sysfs
+	if temp, err := c.getAMDGPUTemp(index); err == nil {
+		gpu.Temperature = temp
+	}
+
+	// Get fan speed from sysfs (discrete GPUs only)
+	if fanRPM, fanMaxRPM, err := c.getAMDGPUFanSpeed(index); err == nil {
+		gpu.FanRPM = fanRPM
+		gpu.FanMaxRPM = fanMaxRPM
+	}
+
+	// Get driver version
+	if driverVersion, err := c.getAMDDriverVersion(); err == nil {
+		gpu.DriverVersion = driverVersion
+	}
+
+	return gpu
+}
+
+// getAMDGPUTemp gets AMD GPU temperature from sysfs
+func (c *GPUCollector) getAMDGPUTemp(cardIndex int) (float64, error) {
+	// AMD GPU temp is in hwmon
+	output, err := lib.ExecCommandOutput("bash", "-c", fmt.Sprintf("cat /sys/class/drm/card%d/device/hwmon/hwmon*/temp1_input 2>/dev/null | head -1", cardIndex))
+	if err != nil || output == "" {
+		return 0, fmt.Errorf("failed to read AMD GPU temperature")
+	}
+
+	tempMilliC, err := strconv.ParseFloat(strings.TrimSpace(output), 64)
+	if err != nil {
+		return 0, err
+	}
+
+	return tempMilliC / 1000.0, nil
+}
+
+// getAMDGPUFanSpeed gets AMD GPU fan speed from sysfs (discrete GPUs only)
+func (c *GPUCollector) getAMDGPUFanSpeed(cardIndex int) (int, int, error) {
+	// Read current fan RPM
+	rpmOutput, err := lib.ExecCommandOutput("bash", "-c", fmt.Sprintf("cat /sys/class/drm/card%d/device/hwmon/hwmon*/fan1_input 2>/dev/null | head -1", cardIndex))
+	if err != nil || rpmOutput == "" {
+		return 0, 0, fmt.Errorf("fan speed not available (integrated GPU or no fan sensor)")
+	}
+
+	rpm, err := strconv.Atoi(strings.TrimSpace(rpmOutput))
+	if err != nil {
+		return 0, 0, err
+	}
+
+	// Read max fan RPM
+	maxRPMOutput, err := lib.ExecCommandOutput("bash", "-c", fmt.Sprintf("cat /sys/class/drm/card%d/device/hwmon/hwmon*/fan1_max 2>/dev/null | head -1", cardIndex))
+	maxRPM := 0
+	if err == nil && maxRPMOutput != "" {
+		if val, err := strconv.Atoi(strings.TrimSpace(maxRPMOutput)); err == nil {
+			maxRPM = val
+		}
+	}
+
+	return rpm, maxRPM, nil
+}
+
+// getAMDDriverVersion gets AMD driver version
+func (c *GPUCollector) getAMDDriverVersion() (string, error) {
+	output, err := lib.ExecCommandOutput("modinfo", "amdgpu")
+	if err != nil {
+		return "", err
+	}
+
+	// Parse modinfo output for version
+	for _, line := range strings.Split(output, "\n") {
+		if strings.HasPrefix(line, "version:") {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) == 2 {
+				return strings.TrimSpace(parts[1]), nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("failed to parse driver version")
+}
+
+// collectAMDGPUWithROCm uses rocm-smi for datacenter AMD GPUs (fallback)
+func (c *GPUCollector) collectAMDGPUWithROCm() ([]*dto.GPUMetrics, error) {
 	// Query rocm-smi with JSON output
 	output, err := lib.ExecCommandOutput("rocm-smi", "--showid", "--showtemp", "--showuse", "--showmeminfo", "vram", "--json")
 	if err != nil {
@@ -439,6 +703,7 @@ func (c *GPUCollector) collectAMDGPU() ([]*dto.GPUMetrics, error) {
 	}
 
 	gpus := make([]*dto.GPUMetrics, 0)
+	index := 0
 
 	// Parse each GPU
 	for gpuID, gpuDataInterface := range rocmData {
@@ -453,6 +718,8 @@ func (c *GPUCollector) collectAMDGPU() ([]*dto.GPUMetrics, error) {
 
 		gpu := &dto.GPUMetrics{
 			Available: true,
+			Index:     index,
+			Vendor:    "amd",
 			Timestamp: time.Now(),
 		}
 
@@ -482,7 +749,15 @@ func (c *GPUCollector) collectAMDGPU() ([]*dto.GPUMetrics, error) {
 			}
 		}
 
+		// Get driver version
+		if index == 0 {
+			if driverVersion, err := c.getAMDDriverVersion(); err == nil {
+				gpu.DriverVersion = driverVersion
+			}
+		}
+
 		gpus = append(gpus, gpu)
+		index++
 	}
 
 	return gpus, nil

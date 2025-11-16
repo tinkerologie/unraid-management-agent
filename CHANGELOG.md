@@ -19,6 +19,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2025.11.14] - 2025-11-16
+
+### Added
+
+- **Enhanced GPU Monitoring and Multi-GPU Support** (Issue #8 - High Priority Items):
+  - **GPU Identification Fields**: Added `Index`, `PCIID`, `Vendor`, and `UUID` fields to GPUMetrics DTO
+    - `Index`: GPU index for multi-GPU systems (0-based)
+    - `PCIID`: PCI bus ID (e.g., "0000:01:00.0")
+    - `Vendor`: GPU vendor ("nvidia", "intel", "amd")
+    - `UUID`: Device UUID (NVIDIA only)
+  - **Fan Speed Monitoring**:
+    - NVIDIA: `FanSpeed` field (percentage, 0-100)
+    - AMD: `FanRPM` and `FanMaxRPM` fields (discrete GPUs only)
+  - **AMD GPU Detection Improvements**:
+    - Switched from `rocm-smi` to `radeontop` for broader AMD GPU compatibility
+    - Now supports consumer Radeon GPUs (RX 5000/6000/7000 series)
+    - Fallback to `rocm-smi` for datacenter GPUs (Instinct series)
+    - AMD GPU temperature and fan speed read from sysfs
+  - **Multiple Intel GPU Detection**:
+    - Fixed bug where only first Intel GPU was detected
+    - Now detects all Intel GPUs (iGPU + discrete Arc GPUs)
+    - Each Intel GPU gets unique index and PCI ID
+  - **NVIDIA Enhancements**:
+    - Added UUID field for unique GPU identification
+    - Added fan speed monitoring (percentage)
+    - Added PCI bus ID extraction
+
+### Changed
+
+- **GPU Collector**: Complete refactor to support multi-GPU systems
+  - Intel GPU collector now detects ALL Intel GPUs (removed `break` statement)
+  - AMD GPU collector uses `radeontop` by default, `rocm-smi` as fallback
+  - NVIDIA GPU collector queries additional fields (UUID, PCI ID, fan speed)
+  - All GPU collectors now populate vendor, index, and PCI ID fields
+- **GPU API Response**: Already returns array of GPUMetrics (no breaking change)
+- **GPU Detection Order**: Intel → NVIDIA → AMD (unchanged)
+
+### Technical Details
+
+- **Intel Multi-GPU**: Collects metrics for each detected Intel GPU separately
+  - Note: `intel_gpu_top` limitation - reports only first GPU's metrics
+  - Multiple GPUs detected via lspci, but metrics may be from primary GPU
+- **AMD radeontop**: Parses dump mode output for GPU/VRAM utilization
+  - Temperature read from `/sys/class/drm/card*/device/hwmon/hwmon*/temp1_input`
+  - Fan speed read from `/sys/class/drm/card*/device/hwmon/hwmon*/fan1_input`
+  - Fan max RPM read from `/sys/class/drm/card*/device/hwmon/hwmon*/fan1_max`
+- **NVIDIA nvidia-smi**: Extended query to include `pci.bus_id`, `uuid`, `fan.speed`
+- **Driver Versions**: Extracted from `modinfo` (Intel/AMD) or `nvidia-smi` (NVIDIA)
+
+### Compatibility
+
+- **Backward Compatible**: All new fields use `omitempty` JSON tags
+- **AMD GPU Requirements**:
+  - Consumer GPUs: Requires `radeontop` (install via Nerd Tools or manual)
+  - Datacenter GPUs: Requires `rocm-smi` (ROCm packages)
+- **Intel GPU Requirements**: `intel_gpu_top` from `igt-gpu-tools` (Unraid 6.12+)
+- **NVIDIA GPU Requirements**: `nvidia-smi` (included with NVIDIA driver)
+
+### Known Limitations
+
+- **Intel Multi-GPU**: `intel_gpu_top` doesn't support per-device metrics
+  - Multiple Intel GPUs detected, but metrics may be from primary GPU only
+  - This is a limitation of `intel_gpu_top` tool, not the agent
+- **AMD Fan Speed**: Only available on discrete GPUs with fan sensors
+  - Integrated AMD GPUs (APUs) don't have fan sensors
+- **AMD radeontop**: May require manual installation on some systems
+
+---
+
 ## [2025.11.13] - 2025-11-16
 
 ### Added

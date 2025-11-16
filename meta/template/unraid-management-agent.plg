@@ -2,7 +2,7 @@
 
 <!DOCTYPE PLUGIN [
 <!ENTITY name        "unraid-management-agent">
-<!ENTITY author      "Ruan de Eysel">
+<!ENTITY author      "Ruaan Deysel">
 <!ENTITY version     "2025.11.13">
 <!ENTITY launch      "Settings/&name;">
 <!ENTITY gitURL      "https://github.com/ruaandeysel/&name;">
