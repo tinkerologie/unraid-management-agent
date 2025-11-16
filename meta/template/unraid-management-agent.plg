@@ -3,7 +3,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name        "unraid-management-agent">
 <!ENTITY author      "Ruan de Eysel">
-<!ENTITY version     "2025.10.03">
+<!ENTITY version     "2025.11.12">
 <!ENTITY launch      "Settings/&name;">
 <!ENTITY gitURL      "https://github.com/ruaandeysel/&name;">
 <!ENTITY pluginURL   "&gitURL;/releases/latest/download/&name;.plg">
@@ -19,6 +19,14 @@
          icon="server">
 
 <CHANGES>
+###2025.11.12
+- Added comprehensive hardware information API (Issue #5)
+- New /api/v1/hardware/* endpoints (BIOS, motherboard, CPU, cache, memory)
+- Enhanced system information (HVM/IOMMU detection, OpenSSL/kernel versions)
+- Enhanced network information via ethtool (link modes, duplex, auto-negotiation)
+- Hardware collector runs every 5 minutes
+- All hardware data cached and broadcast via WebSocket
+
 ###2025.10.03
 - Initial release
 - REST API with 20+ endpoints
