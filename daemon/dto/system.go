@@ -4,9 +4,10 @@ import "time"
 
 // SystemInfo contains system-level metrics
 type SystemInfo struct {
-	Hostname string `json:"hostname"`
-	Version  string `json:"version"`
-	Uptime   int64  `json:"uptime_seconds"`
+	Hostname     string `json:"hostname"`
+	Version      string `json:"version"`
+	AgentVersion string `json:"agent_version"`
+	Uptime       int64  `json:"uptime_seconds"`
 
 	// CPU Information
 	CPUUsage   float64            `json:"cpu_usage_percent"`

@@ -19,6 +19,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2025.11.22] - 2025-11-17
+
+### Added
+
+- **Management Agent Version Field** (Issue #26):
+  - Added `agent_version` field to `/api/v1/system` endpoint
+  - Returns the Unraid Management Agent plugin version (e.g., "2025.11.22")
+  - Complements the `version` field which returns the Unraid OS version
+  - Enables API clients to:
+    - Implement agent-specific compatibility checks
+    - Detect features based on agent capabilities
+    - Display complete version information in diagnostics
+    - Track agent updates independently from OS updates
+  - Improves Home Assistant integration and other API clients
+  - Version is automatically populated from the VERSION file during build
+
+---
+
 ## [2025.11.21] - 2025-11-17
 
 ### Fixed

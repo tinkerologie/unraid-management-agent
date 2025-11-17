@@ -95,6 +95,9 @@ func (c *SystemCollector) collectSystemInfo() (*dto.SystemInfo, error) {
 	// Get Unraid version
 	info.Version = c.getUnraidVersion()
 
+	// Get Management Agent version
+	info.AgentVersion = c.ctx.Version
+
 	// Get uptime
 	uptime, err := c.getUptime()
 	if err != nil {
