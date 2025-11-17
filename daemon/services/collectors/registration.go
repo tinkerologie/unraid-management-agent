@@ -10,7 +10,7 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
-	"github.com/vaughan0/go-ini"
+	"gopkg.in/ini.v1"
 )
 
 // RegistrationCollector collects Unraid registration/license information
@@ -82,33 +82,36 @@ func (c *RegistrationCollector) collectRegistration() (*dto.Registration, error)
 	}
 
 	// Parse var.ini for registration information
-	file, err := ini.LoadFile(constants.VarIni)
+	cfg, err := ini.Load(constants.VarIni)
 	if err != nil {
 		logger.Error("Registration: Failed to load file: %v", err)
 		return nil, err
 	}
 
+	// Get the default section (unnamed section)
+	section := cfg.Section("")
+
 	// Registration type (regTy)
-	if regTy, ok := file.Get("", "regTy"); ok {
-		regType := strings.Trim(regTy, `"`)
+	if section.HasKey("regTy") {
+		regType := strings.Trim(section.Key("regTy").String(), `"`)
 		registration.Type = strings.ToLower(regType)
 	} else {
 		registration.Type = "unknown"
 	}
 
 	// Registration GUID (regGUID)
-	if regGUID, ok := file.Get("", "regGUID"); ok {
-		registration.GUID = strings.Trim(regGUID, `"`)
+	if section.HasKey("regGUID") {
+		registration.GUID = strings.Trim(section.Key("regGUID").String(), `"`)
 	}
 
 	// Server name (NAME)
-	if serverName, ok := file.Get("", "NAME"); ok {
-		registration.ServerName = strings.Trim(serverName, `"`)
+	if section.HasKey("NAME") {
+		registration.ServerName = strings.Trim(section.Key("NAME").String(), `"`)
 	}
 
 	// Registration timestamp/expiration (regTm)
-	if regTm, ok := file.Get("", "regTm"); ok {
-		regTmStr := strings.Trim(regTm, `"`)
+	if section.HasKey("regTm") {
+		regTmStr := strings.Trim(section.Key("regTm").String(), `"`)
 		if timestamp, err := strconv.ParseInt(regTmStr, 10, 64); err == nil {
 			registration.Expiration = time.Unix(timestamp, 0)
 			registration.UpdateExpiration = time.Unix(timestamp, 0)

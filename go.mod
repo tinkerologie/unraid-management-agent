@@ -8,8 +8,11 @@ require (
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/websocket v1.5.3
-	github.com/vaughan0/go-ini v0.0.0-20130923145212-a98ad7ee00ec
+	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
-require golang.org/x/sys v0.38.0 // indirect
+require (
+	github.com/stretchr/testify v1.11.1 // indirect
+	golang.org/x/sys v0.38.0 // indirect
+)

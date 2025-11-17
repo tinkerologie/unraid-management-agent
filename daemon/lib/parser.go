@@ -4,19 +4,21 @@ package lib
 import (
 	"fmt"
 
-	"github.com/vaughan0/go-ini"
+	"gopkg.in/ini.v1"
 )
 
 // ParseINIFile parses an INI file and returns a map
 func ParseINIFile(path string) (map[string]string, error) {
-	file, err := ini.LoadFile(path)
+	cfg, err := ini.Load(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse INI file %s: %w", path, err)
 	}
 
 	result := make(map[string]string)
-	for key, value := range file[""] {
-		result[key] = value
+	// Get the default section (unnamed section)
+	defaultSection := cfg.Section("")
+	for _, key := range defaultSection.Keys() {
+		result[key.Name()] = key.String()
 	}
 
 	return result, nil

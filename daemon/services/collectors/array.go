@@ -12,7 +12,7 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
-	"github.com/vaughan0/go-ini"
+	"gopkg.in/ini.v1"
 )
 
 // ArrayCollector collects Unraid array status information including state, parity status, and disk assignments.
@@ -95,23 +95,26 @@ func (c *ArrayCollector) collectArrayStatus() (*dto.ArrayStatus, error) {
 	}
 
 	// Parse var.ini for array information
-	file, err := ini.LoadFile(constants.VarIni)
+	cfg, err := ini.Load(constants.VarIni)
 	if err != nil {
 		logger.Error("Array: Failed to load file: %v", err)
 		return nil, err
 	}
 	logger.Debug("Array: File loaded successfully")
 
+	// Get the default section (unnamed section)
+	section := cfg.Section("")
+
 	// Array state
-	if mdState, ok := file.Get("", "mdState"); ok {
-		status.State = strings.Trim(mdState, `"`)
+	if section.HasKey("mdState") {
+		status.State = strings.Trim(section.Key("mdState").String(), `"`)
 	} else {
 		status.State = "unknown"
 	}
 
 	// Number of disks
-	if numDisks, ok := file.Get("", "mdNumDisks"); ok {
-		numDisks = strings.Trim(numDisks, `"`)
+	if section.HasKey("mdNumDisks") {
+		numDisks := strings.Trim(section.Key("mdNumDisks").String(), `"`)
 		logger.Debug("Array: Found mdNumDisks=%s", numDisks)
 		if n, err := strconv.Atoi(numDisks); err == nil {
 			status.NumDisks = n
@@ -123,8 +126,8 @@ func (c *ArrayCollector) collectArrayStatus() (*dto.ArrayStatus, error) {
 		logger.Warning("Array: mdNumDisks not found in file")
 	}
 
-	if numData, ok := file.Get("", "mdNumDisabled"); ok {
-		numData = strings.Trim(numData, `"`)
+	if section.HasKey("mdNumDisabled") {
+		numData := strings.Trim(section.Key("mdNumDisabled").String(), `"`)
 		if n, err := strconv.Atoi(numData); err == nil {
 			status.NumDataDisks = n
 		}
@@ -137,8 +140,8 @@ func (c *ArrayCollector) collectArrayStatus() (*dto.ArrayStatus, error) {
 	// sbSynced contains a timestamp when parity was last synced, or "0" if never synced
 	// sbSyncErrs contains the number of errors from the last parity check
 	parityValid := false
-	if sbSynced, ok := file.Get("", "sbSynced"); ok {
-		sbSynced = strings.Trim(sbSynced, `"`)
+	if section.HasKey("sbSynced") {
+		sbSynced := strings.Trim(section.Key("sbSynced").String(), `"`)
 		// If sbSynced is a non-zero number (timestamp), parity has been synced
 		if sbSynced != "0" && sbSynced != "" {
 			parityValid = true
@@ -146,8 +149,8 @@ func (c *ArrayCollector) collectArrayStatus() (*dto.ArrayStatus, error) {
 	}
 
 	// Check for parity errors - if there are any errors, parity is not valid
-	if sbSyncErrs, ok := file.Get("", "sbSyncErrs"); ok {
-		sbSyncErrs = strings.Trim(sbSyncErrs, `"`)
+	if section.HasKey("sbSyncErrs") {
+		sbSyncErrs := strings.Trim(section.Key("sbSyncErrs").String(), `"`)
 		if n, err := strconv.Atoi(sbSyncErrs); err == nil && n > 0 {
 			parityValid = false
 		}
@@ -161,8 +164,8 @@ func (c *ArrayCollector) collectArrayStatus() (*dto.ArrayStatus, error) {
 	}
 
 	// Parity check status
-	if sbSyncAction, ok := file.Get("", "sbSyncAction"); ok {
-		status.ParityCheckStatus = strings.Trim(sbSyncAction, `"`)
+	if section.HasKey("sbSyncAction") {
+		status.ParityCheckStatus = strings.Trim(section.Key("sbSyncAction").String(), `"`)
 	}
 
 	// Get array size information from /mnt/user filesystem
@@ -203,7 +206,7 @@ func (c *ArrayCollector) enrichWithArraySize(status *dto.ArrayStatus) {
 // countParityDisks counts the number of parity disks from disks.ini
 func (c *ArrayCollector) countParityDisks() int {
 	// Parse disks.ini to count parity disks
-	file, err := ini.LoadFile(constants.DisksIni)
+	cfg, err := ini.Load(constants.DisksIni)
 	if err != nil {
 		logger.Debug("Array: Failed to load disks.ini: %v", err)
 		return 0
@@ -211,10 +214,10 @@ func (c *ArrayCollector) countParityDisks() int {
 
 	parityCount := 0
 	// Iterate through all sections in disks.ini
-	for sectionName := range file {
+	for _, section := range cfg.Sections() {
 		// Check if this section has type="Parity"
-		if diskType, ok := file.Get(sectionName, "type"); ok {
-			diskType = strings.Trim(diskType, `"`)
+		if section.HasKey("type") {
+			diskType := strings.Trim(section.Key("type").String(), `"`)
 			if diskType == "Parity" {
 				parityCount++
 			}
