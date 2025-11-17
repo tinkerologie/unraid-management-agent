@@ -19,6 +19,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2025.11.23] - 2025-11-17
+
+### Changed
+
+- **Dependency Updates**:
+  - Updated `github.com/alecthomas/kong` from v0.9.0 to v1.13.0
+  - Updated `golang.org/x/sys` from v0.13.0 to v0.38.0
+  - Upgraded Go language version from 1.23 to 1.24.0 (required by golang.org/x/sys v0.38.0)
+  - Migrated from deprecated `github.com/vaughan0/go-ini` (last updated 2013) to actively maintained `gopkg.in/ini.v1` v1.67.0
+  - All dependencies now use modern, actively maintained libraries
+
+- **Code Quality Improvements**:
+  - Fixed all pre-existing linting issues (now 0 errors, 0 warnings)
+  - Converted if-else chains to switch statements for better readability (gocritic)
+  - Reduced cyclomatic complexity by extracting helper functions (gocyclo)
+  - Renamed `daemon/common` package to `daemon/constants` for better clarity (revive)
+  - Improved code maintainability and adherence to Go best practices
+
+### Technical Details
+
+- **Linting Fixes**:
+  - `daemon/lib/dmidecode.go`: Converted cache level parsing to switch statement
+  - `daemon/lib/ethtool.go`: Extracted `parseEthtoolKeyValue()` helper (complexity 34 → 18)
+  - `daemon/services/collectors/disk.go`: Extracted `parseDisksINI()`, `parseDiskKeyValue()`, `enrichDisks()` helpers (complexity 32 → 12)
+  - `daemon/services/collectors/disk.go`: Converted disk role determination to switch statement
+  - `daemon/services/collectors/gpu.go`: Converted Intel GPU error handling to switch statement
+
+- **INI Library Migration**:
+  - Updated `daemon/lib/parser.go`: Refactored `ParseINIFile()` to use new API
+  - Updated `daemon/services/collectors/array.go`: Migrated `collectArrayStatus()` and `countParityDisks()`
+  - Updated `daemon/services/collectors/registration.go`: Migrated `collectRegistration()`
+  - API changes: `ini.LoadFile()` → `ini.Load()`, `file.Get()` → `section.HasKey()` + `section.Key().String()`
+
+All tests pass successfully. Builds verified for local and release targets.
+
+---
+
 ## [2025.11.22] - 2025-11-17
 
 ### Added
