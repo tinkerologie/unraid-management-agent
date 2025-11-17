@@ -3,12 +3,12 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name        "unraid-management-agent">
 <!ENTITY author      "ruaan-deysel">
-<!ENTITY version     "2025.11.21">
+<!ENTITY version     "2025.11.22">
 <!ENTITY launch      "Settings/&name;">
 <!ENTITY gitURL      "https://github.com/ruaandeysel/&name;">
 <!ENTITY pluginURL   "&gitURL;/releases/latest/download/&name;.plg">
 <!ENTITY bundle      "&name;-&version;.tgz">
-<!ENTITY md5         "62df6212c4069e1320665cc83faeda2c">
+<!ENTITY md5         "7470dedf421133494056f85f3e317d77">
 ]>
 
 <PLUGIN  name="&name;"
@@ -20,6 +20,14 @@
          icon="server">
 
 <CHANGES>
+###2025.11.22
+- New Feature (Issue #26)
+- Added agent_version field to /api/v1/system endpoint
+- Returns Management Agent plugin version (e.g., "2025.11.22")
+- Enables agent-specific compatibility checks and feature detection
+- Improves diagnostics with complete version information
+- Enhances Home Assistant integration and other API clients
+
 ###2025.11.21
 - Bug Fixes (Issues #24 and #25)
 - Fixed motherboard temperature API returning 0 instead of actual value (Issue #24)
