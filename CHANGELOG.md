@@ -19,6 +19,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2025.11.21] - 2025-11-17
+
+### Fixed
+
+- **Motherboard Temperature API** (Issue #24):
+  - Fixed motherboard temperature returning 0 instead of actual value
+  - Improved sensor parser to capture sensor labels (e.g., "MB Temp") from `sensors -u` output
+  - Updated temperature matching logic to correctly identify motherboard temperature sensor
+  - Motherboard temperature now displays actual readings (e.g., 45°C) instead of 0°C
+  - Affects Home Assistant integration and other API clients relying on temperature data
+
+- **Unraid OS Version Field** (Issue #25):
+  - Fixed system API returning empty string for `version` field
+  - Added `getUnraidVersion()` function to read Unraid OS version from `/etc/unraid-version`
+  - Fallback to `/var/local/emhttp/var.ini` if primary version file is unavailable
+  - Version field now correctly displays Unraid OS version (e.g., "7.2.0")
+  - Improves device information display in Home Assistant and other integrations
+  - Enables version-specific feature detection and compatibility checks
+
+---
+
 ## [2025.11.20] - 2025-11-16
 
 ### Fixed

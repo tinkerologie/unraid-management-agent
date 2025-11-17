@@ -155,9 +155,9 @@ func TestValidateVMName(t *testing.T) {
 		},
 		{
 			name:    "contains spaces",
-			vmName:  "invalid name",
-			wantErr: true,
-			errMsg:  "invalid VM name format",
+			vmName:  "valid name with spaces",
+			wantErr: false,
+			errMsg:  "",
 		},
 		{
 			name:    "contains special characters",

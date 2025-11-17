@@ -1,3 +1,4 @@
+// Package collectors provides data collection services for system metrics.
 package collectors
 
 import (
@@ -91,6 +92,9 @@ func (c *SystemCollector) collectSystemInfo() (*dto.SystemInfo, error) {
 		info.Hostname = hostname
 	}
 
+	// Get Unraid version
+	info.Version = c.getUnraidVersion()
+
 	// Get uptime
 	uptime, err := c.getUptime()
 	if err != nil {
@@ -157,9 +161,9 @@ func (c *SystemCollector) collectSystemInfo() (*dto.SystemInfo, error) {
 					info.CPUTemp = temp
 				}
 			}
-			// Motherboard temperature - look for "MB Temp" specifically from coretemp
+			// Motherboard temperature - look for "MB Temp" or "MB_Temp" specifically from coretemp
 			// Ignore SYSTIN and AUXTIN as they often have bogus readings
-			if strings.Contains(nameLower, "mb_temp") || strings.Contains(name, "MB Temp") {
+			if strings.Contains(nameLower, "mb_temp") {
 				// Sanity check: temperature should be reasonable (0-100°C)
 				if temp > 0 && temp < 100 {
 					info.MotherboardTemp = temp
@@ -382,27 +386,42 @@ func (c *SystemCollector) parseSensorsOutput(output string) map[string]float64 {
 	lines := strings.Split(output, "\n")
 
 	var currentChip string
+	var currentLabel string
 	for _, line := range lines {
+		originalLine := line
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
 
 		// New chip/adapter
-		if !strings.Contains(line, ":") && !strings.HasPrefix(line, " ") {
+		if !strings.Contains(line, ":") && !strings.HasPrefix(originalLine, " ") {
 			currentChip = line
+			currentLabel = ""
 			continue
 		}
 
-		// Temperature input line
+		// Sensor label (e.g., "MB Temp:", "Core 0:", "SYSTIN:")
+		// These are lines that end with ":" and are not indented with spaces
+		if strings.HasSuffix(line, ":") && !strings.HasPrefix(originalLine, " ") && !strings.Contains(line, "_") {
+			currentLabel = strings.TrimSuffix(line, ":")
+			continue
+		}
+
+		// Temperature input line (indented with spaces)
 		if strings.Contains(line, "_input:") && currentChip != "" {
 			parts := strings.Split(line, ":")
 			if len(parts) == 2 {
 				key := strings.TrimSpace(parts[0])
 				valueStr := strings.TrimSpace(parts[1])
 				if value, err := strconv.ParseFloat(valueStr, 64); err == nil {
-					// Create a friendly name
-					name := fmt.Sprintf("%s_%s", currentChip, key)
+					// Create a friendly name using label if available, otherwise use key
+					var name string
+					if currentLabel != "" {
+						name = fmt.Sprintf("%s_%s_%s", currentChip, currentLabel, key)
+					} else {
+						name = fmt.Sprintf("%s_%s", currentChip, key)
+					}
 					name = strings.ReplaceAll(name, " ", "_")
 					// sensors -u already outputs in degrees, no need to divide
 					temperatures[name] = value
@@ -794,6 +813,41 @@ func (c *SystemCollector) getKernelVersion() string {
 		return ""
 	}
 	return strings.TrimSpace(output)
+}
+
+// getUnraidVersion gets the Unraid OS version
+func (c *SystemCollector) getUnraidVersion() string {
+	// Try reading from /etc/unraid-version first
+	data, err := os.ReadFile("/etc/unraid-version")
+	if err == nil {
+		content := strings.TrimSpace(string(data))
+		// The file contains version="7.2.0" format
+		if strings.HasPrefix(content, "version=") {
+			version := strings.TrimPrefix(content, "version=")
+			version = strings.Trim(version, "\"")
+			return version
+		}
+		// If it's just the version number without the prefix
+		return content
+	}
+
+	// Fallback: try reading from /var/local/emhttp/var.ini
+	varIniPath := "/var/local/emhttp/var.ini"
+	varIniData, err := os.ReadFile(varIniPath)
+	if err == nil {
+		lines := strings.Split(string(varIniData), "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "version=") {
+				version := strings.TrimPrefix(line, "version=")
+				version = strings.Trim(version, "\"")
+				return version
+			}
+		}
+	}
+
+	// If all else fails, return empty string
+	return ""
 }
 
 // getParityCheckSpeed gets the parity check speed from var.ini
