@@ -72,8 +72,8 @@ This Unraid plugin provides REST API and WebSocket interfaces for real-time syst
 - System Log File Access API (Issue #15)
 - New /api/v1/logs endpoint to list all available log files
 - Log content retrieval with pagination support
-- Tail behavior: ?path=/var/log/syslog&lines=100 returns last 100 lines
-- Range retrieval: ?path=/var/log/syslog&start=500&lines=100 returns lines 500-600
+- Tail behavior: ?path=/var/log/syslog&amp;lines=100 returns last 100 lines
+- Range retrieval: ?path=/var/log/syslog&amp;start=500&amp;lines=100 returns lines 500-600
 - Automatic discovery of common Unraid logs (syslog, docker, libvirt, agent)
 - Plugin log file discovery from /boot/config/plugins/*/logs/*.log
 - Directory traversal protection for secure log file access
