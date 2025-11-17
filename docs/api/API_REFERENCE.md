@@ -244,10 +244,12 @@ def get_array_status(base_url):
     array_info = response.json()
 
     print(f"Array State: {array_info['state']}")
-    print(f"Total Disks: {array_info['total_disks']}")
-    print(f"Data Disks: {array_info['data_disks']}")
-    print(f"Parity Disks: {array_info['parity_disks']}")
-    print(f"Usage: {array_info['usage_percent']:.1f}%")
+    print(f"Total Disks: {array_info['num_disks']}")
+    print(f"Data Disks: {array_info['num_data_disks']}")
+    print(f"Parity Disks: {array_info['num_parity_disks']}")
+    print(f"Usage: {array_info['used_percent']:.1f}%")
+    print(f"Total: {array_info['total_bytes'] / (1024**4):.2f} TB")
+    print(f"Free: {array_info['free_bytes'] / (1024**4):.2f} TB")
 
     return array_info
 
@@ -316,7 +318,8 @@ async function getSystemInfo() {
 
     console.log(`Hostname: ${systemInfo.hostname}`);
     console.log(`CPU Usage: ${systemInfo.cpu_usage_percent}%`);
-    console.log(`Memory Usage: ${systemInfo.memory_usage_percent}%`);
+    console.log(`RAM Usage: ${systemInfo.ram_usage_percent}%`);
+    console.log(`CPU Temp: ${systemInfo.cpu_temp_celsius}°C`);
 
     return systemInfo;
   } catch (error) {
@@ -642,7 +645,8 @@ async function displaySystemInfo() {
     const systemInfo = await client.getSystemInfo();
     console.log(`Hostname: ${systemInfo.hostname}`);
     console.log(`CPU Usage: ${systemInfo.cpu_usage_percent}%`);
-    console.log(`Memory Usage: ${systemInfo.memory_usage_percent}%`);
+    console.log(`RAM Usage: ${systemInfo.ram_usage_percent}%`);
+    console.log(`CPU Temp: ${systemInfo.cpu_temp_celsius}°C`);
   } catch (error) {
     console.error('Error:', error);
   }
@@ -766,26 +770,83 @@ curl http://192.168.20.21:8043/api/v1/health
 
 ### GET /system
 
-Get system information including CPU, memory, and uptime.
+Get system information including CPU, memory, temperatures, and uptime.
 
 **Response**:
 ```json
 {
   "hostname": "Cube",
-  "uptime_seconds": 1234567,
-  "cpu_usage_percent": 15.5,
-  "memory_total_bytes": 17179869184,
-  "memory_used_bytes": 8589934592,
-  "memory_usage_percent": 50.0,
-  "load_average": [1.5, 1.2, 1.0],
-  "timestamp": "2025-10-03T13:41:13+10:00"
+  "version": "7.2.0",
+  "agent_version": "2025.11.23",
+  "uptime_seconds": 698918,
+  "cpu_usage_percent": 0,
+  "cpu_model": "Intel(R) Core(TM) i7-8700K CPU @ 3.70GHz",
+  "cpu_cores": 1,
+  "cpu_threads": 12,
+  "cpu_mhz": 800.113,
+  "cpu_per_core_usage": {
+    "cpu0": 0.5,
+    "cpu1": 0.3
+  },
+  "cpu_temp_celsius": 36,
+  "ram_usage_percent": 41.82,
+  "ram_total_bytes": 33328332800,
+  "ram_used_bytes": 13937836032,
+  "ram_free_bytes": 19390496768,
+  "ram_buffers_bytes": 1073741824,
+  "ram_cached_bytes": 8589934592,
+  "server_model": "System Product Name",
+  "bios_version": "1.0",
+  "bios_date": "01/01/2020",
+  "motherboard_temp_celsius": 36,
+  "hvm_enabled": true,
+  "iommu_enabled": true,
+  "openssl_version": "OpenSSL 3.0.0",
+  "kernel_version": "6.1.0-unRAID",
+  "fans": [
+    {
+      "name": "CPU Fan",
+      "rpm": 1200
+    }
+  ],
+  "timestamp": "2025-11-17T14:39:17+10:00"
 }
 ```
+
+**Field Descriptions**:
+- `hostname`: Server hostname
+- `version`: Unraid OS version
+- `agent_version`: Management Agent version
+- `uptime_seconds`: System uptime in seconds
+- `cpu_usage_percent`: Overall CPU usage percentage
+- `cpu_model`: CPU model name
+- `cpu_cores`: Number of physical CPU cores
+- `cpu_threads`: Number of CPU threads (with hyperthreading)
+- `cpu_mhz`: Current CPU frequency in MHz
+- `cpu_per_core_usage`: Per-core CPU usage map (optional)
+- `cpu_temp_celsius`: CPU temperature in Celsius
+- `ram_usage_percent`: RAM usage percentage
+- `ram_total_bytes`: Total RAM in bytes
+- `ram_used_bytes`: Used RAM in bytes
+- `ram_free_bytes`: Free RAM in bytes
+- `ram_buffers_bytes`: RAM used for buffers in bytes
+- `ram_cached_bytes`: RAM used for cache in bytes
+- `server_model`: Server/motherboard model
+- `bios_version`: BIOS version
+- `bios_date`: BIOS date
+- `motherboard_temp_celsius`: Motherboard temperature in Celsius
+- `hvm_enabled`: Hardware virtualization enabled
+- `iommu_enabled`: IOMMU enabled for PCIe passthrough
+- `openssl_version`: OpenSSL version (optional)
+- `kernel_version`: Linux kernel version (optional)
+- `fans`: Array of fan information (optional)
 
 **Example**:
 ```bash
 curl http://192.168.20.21:8043/api/v1/system
 ```
+
+**Note**: All size fields are in **bytes**, all temperatures are in **Celsius**, and all percentages use the `_percent` suffix.
 
 ---
 
@@ -799,17 +860,32 @@ Get array status and information.
 ```json
 {
   "state": "STARTED",
-  "total_disks": 5,
-  "data_disks": 3,
-  "parity_disks": 1,
-  "cache_disks": 1,
-  "size_bytes": 16000000000000,
-  "used_bytes": 8000000000000,
-  "free_bytes": 8000000000000,
-  "usage_percent": 50.0,
-  "timestamp": "2025-10-03T13:41:13+10:00"
+  "used_percent": 31.27,
+  "free_bytes": 28864055205888,
+  "total_bytes": 41996310249472,
+  "parity_valid": true,
+  "parity_check_status": "idle",
+  "parity_check_progress": 0,
+  "num_disks": 5,
+  "num_data_disks": 1,
+  "num_parity_disks": 2,
+  "timestamp": "2025-11-17T14:39:17+10:00"
 }
 ```
+
+**Field Descriptions**:
+- `state`: Array state (`STARTED`, `STOPPED`, `STARTING`, `STOPPING`)
+- `used_percent`: Percentage of array capacity used
+- `free_bytes`: Free space in bytes
+- `total_bytes`: Total array capacity in bytes
+- `parity_valid`: Whether parity is valid
+- `parity_check_status`: Parity check status (`idle`, `running`, `paused`)
+- `parity_check_progress`: Parity check progress percentage (0-100)
+- `num_disks`: Total number of disks in array
+- `num_data_disks`: Number of data disks
+- `num_parity_disks`: Number of parity disks (0, 1, or 2)
+
+**Note**: Cache disks are shown in the `/api/v1/disks` endpoint with `role: "cache"` or `role: "pool"`.
 
 ---
 
@@ -1039,20 +1115,62 @@ List all disks in the system.
     "id": "WUH721816ALE6L4_2CGV0URP",
     "device": "sdb",
     "name": "parity",
-    "role": "parity",
-    "size_bytes": 16000000000000,
+    "status": "DISK_OK",
+    "size_bytes": 8000450304000,
     "used_bytes": 0,
-    "free_bytes": 16000000000000,
+    "free_bytes": 8000450304000,
     "temperature_celsius": 0,
-    "spin_state": "standby",
+    "smart_status": "PASSED",
+    "smart_errors": 0,
+    "spindown_delay": 0,
+    "filesystem": "xfs",
     "serial_number": "2CGV0URP",
     "model": "WDC WUH721816ALE6L4",
-    "filesystem": "xfs",
-    "status": "DISK_OK",
-    "timestamp": "2025-10-03T13:41:13+10:00"
+    "role": "parity",
+    "spin_state": "standby",
+    "smart_attributes": {
+      "5": {
+        "id": 5,
+        "name": "Reallocated_Sector_Ct",
+        "value": 100,
+        "worst": 100,
+        "threshold": 10,
+        "raw_value": "0"
+      }
+    },
+    "power_on_hours": 12345,
+    "power_cycle_count": 100,
+    "mount_point": "/mnt/disk1",
+    "usage_percent": 50.5,
+    "timestamp": "2025-11-17T14:39:17+10:00"
   }
 ]
 ```
+
+**Field Descriptions**:
+- `id`: Unique disk identifier (model_serial)
+- `device`: Linux device name (e.g., `sdb`, `sdc`)
+- `name`: Unraid disk name (e.g., `parity`, `disk1`, `cache`)
+- `status`: Disk status (`DISK_OK`, `DISK_DSBL`, etc.)
+- `size_bytes`: Total disk capacity in bytes
+- `used_bytes`: Used space in bytes
+- `free_bytes`: Free space in bytes
+- `temperature_celsius`: Disk temperature in Celsius (0 if spun down)
+- `smart_status`: SMART health status (`PASSED`, `FAILED`)
+- `smart_errors`: Number of SMART errors
+- `spindown_delay`: Spindown delay in minutes (0 = never)
+- `filesystem`: Filesystem type (`xfs`, `btrfs`, etc.)
+- `serial_number`: Disk serial number
+- `model`: Disk model name
+- `role`: Disk role (`parity`, `parity2`, `data`, `cache`, `pool`)
+- `spin_state`: Current spin state (`active`, `standby`, `unknown`)
+- `smart_attributes`: SMART attribute details (optional)
+- `power_on_hours`: Total power-on hours (optional)
+- `power_cycle_count`: Number of power cycles (optional)
+- `mount_point`: Mount point path (optional)
+- `usage_percent`: Disk usage percentage (optional)
+
+**Note**: Temperature of 0°C typically indicates the disk is in standby/spun down state.
 
 ---
 

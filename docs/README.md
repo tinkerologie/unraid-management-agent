@@ -9,8 +9,12 @@ Complete documentation for the Unraid Management Agent plugin and API.
 ### API Documentation
 
 - **[API Reference](api/API_REFERENCE.md)** - Complete API endpoint reference (46 endpoints)
-- **[WebSocket Events Documentation](WEBSOCKET_EVENTS_DOCUMENTATION.md)** - Complete guide to WebSocket event system
-- **[WebSocket Event Structure](WEBSOCKET_EVENT_STRUCTURE.md)** - Technical details of WebSocket event structure
+- **[WebSocket Events Documentation](websocket/WEBSOCKET_EVENTS_DOCUMENTATION.md)** - Complete guide to WebSocket event system
+- **[WebSocket Event Structure](websocket/WEBSOCKET_EVENT_STRUCTURE.md)** - Technical details of WebSocket event structure
+
+### Integrations
+
+- **[Grafana Integration Guide](integrations/GRAFANA.md)** - Complete guide to integrating with Grafana for monitoring and dashboards
 
 ### Development
 
@@ -314,8 +318,8 @@ For issues, questions, or feature requests:
 
 ---
 
-**Last Updated**: 2025-10-03  
-**Version**: 1.0.0  
-**API Endpoints**: 46  
+**Last Updated**: 2025-11-17
+**Version**: 2025.11.23
+**API Endpoints**: 46
 **WebSocket Events**: 9
 
