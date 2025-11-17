@@ -3,14 +3,14 @@
 <!DOCTYPE PLUGIN [
     <!ENTITY name        "unraid-management-agent">
     <!ENTITY author      "ruaan-deysel">
-    <!ENTITY version     "2025.11.22">
+    <!ENTITY version     "2025.11.23">
     <!ENTITY gitURL      "https://github.com/&author;/&name;">
     <!ENTITY pluginURL   "&gitURL;/raw/main/&name;.plg">
     <!ENTITY supportURL  "https://forums.unraid.net/topic/178262-home-assistant-unraid-integration">
     <!ENTITY launch      "Settings/unraid-management-agent">
     <!ENTITY bundle      "&name;-&version;.tgz">
     <!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
-    <!ENTITY md5         "7470dedf421133494056f85f3e317d77">
+    <!ENTITY md5         "39a43729f3d8b302493a580ffef6092e">
 ]>
 
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" icon="server" min="6.9.0" pluginURL="&pluginURL;" support="&supportURL;">
@@ -20,6 +20,21 @@ This Unraid plugin provides REST API and WebSocket interfaces for real-time syst
 </DESCRIPTION>
 
 <CHANGES>
+###2025.11.23 (2025-11-17)
+- Dependency Updates
+- Updated github.com/alecthomas/kong from v0.9.0 to v1.13.0
+- Updated golang.org/x/sys from v0.13.0 to v0.38.0
+- Upgraded Go language version from 1.23 to 1.24.0 (required by golang.org/x/sys v0.38.0)
+- Migrated from deprecated github.com/vaughan0/go-ini (last updated 2013) to gopkg.in/ini.v1 v1.67.0
+- Code Quality Improvements
+- Fixed all pre-existing linting issues (6 issues resolved)
+- Achieved zero-tolerance linting policy compliance (0 errors, 0 warnings)
+- Fixed 3 gocritic warnings (converted if-else chains to switch statements)
+- Fixed 2 gocyclo warnings (reduced cyclomatic complexity from 30+ to &lt;20)
+- Fixed 1 revive warning (renamed package from daemon/common to daemon/constants)
+- All tests pass successfully
+- Builds verified for local and release targets
+
 ###2025.11.22 (2025-11-17)
 - New Feature (Issue #26)
 - Added agent_version field to /api/v1/system endpoint
