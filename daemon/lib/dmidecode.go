@@ -225,11 +225,12 @@ func ParseCPUCacheInfo() ([]dto.CPUCacheInfo, error) {
 		}
 
 		// Parse level from socket designation (e.g., "L1-Cache", "L2-Cache")
-		if strings.Contains(cache.SocketDesignation, "L1") {
+		switch {
+		case strings.Contains(cache.SocketDesignation, "L1"):
 			cache.Level = 1
-		} else if strings.Contains(cache.SocketDesignation, "L2") {
+		case strings.Contains(cache.SocketDesignation, "L2"):
 			cache.Level = 2
-		} else if strings.Contains(cache.SocketDesignation, "L3") {
+		case strings.Contains(cache.SocketDesignation, "L3"):
 			cache.Level = 3
 		}
 

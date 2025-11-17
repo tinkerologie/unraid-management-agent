@@ -198,12 +198,13 @@ func (c *GPUCollector) collectSingleIntelGPU(pciID, model string, index int) *dt
 	// For multi-GPU systems, we run it once and it reports the first GPU
 	// This is a limitation of intel_gpu_top
 	cmdOutput, err := lib.ExecCommandOutput("timeout", "5", "intel_gpu_top", "-J", "-s", "1000", "-n", "2")
-	if err != nil && len(cmdOutput) == 0 {
+	switch {
+	case err != nil && len(cmdOutput) == 0:
 		logger.Debug("Intel GPU: intel_gpu_top query failed with no output: %v", err)
 		return nil
-	} else if err != nil {
+	case err != nil:
 		logger.Debug("Intel GPU: intel_gpu_top timed out (expected), got %d bytes output", len(cmdOutput))
-	} else {
+	default:
 		logger.Debug("Intel GPU: Got output from intel_gpu_top (%d bytes)", len(cmdOutput))
 	}
 

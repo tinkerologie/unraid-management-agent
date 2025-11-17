@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/common"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
@@ -82,11 +82,37 @@ func (c *DiskCollector) Collect() {
 }
 
 func (c *DiskCollector) collectDisks() ([]dto.DiskInfo, error) {
-	logger.Debug("Disk: Starting collection from %s", common.DisksIni)
-	var disks []dto.DiskInfo
+	logger.Debug("Disk: Starting collection from %s", constants.DisksIni)
 
 	// Parse disks.ini
-	file, err := os.Open(common.DisksIni)
+	disks, err := c.parseDisksINI()
+	if err != nil {
+		return nil, err
+	}
+
+	// Enhance each disk with additional stats
+	c.enrichDisks(disks)
+
+	logger.Debug("Disk: Parsed %d disks successfully", len(disks))
+
+	// Collect Docker vDisk information
+	if dockerVDisk := c.collectDockerVDisk(); dockerVDisk != nil {
+		disks = append(disks, *dockerVDisk)
+		logger.Debug("Disk: Added Docker vDisk to collection")
+	}
+
+	// Collect Log filesystem information
+	if logFS := c.collectLogFilesystem(); logFS != nil {
+		disks = append(disks, *logFS)
+		logger.Debug("Disk: Added Log filesystem to collection")
+	}
+
+	return disks, nil
+}
+
+// parseDisksINI parses the disks.ini file and returns a slice of DiskInfo
+func (c *DiskCollector) parseDisksINI() ([]dto.DiskInfo, error) {
+	file, err := os.Open(constants.DisksIni)
 	if err != nil {
 		logger.Error("Disk: Failed to open file: %v", err)
 		return nil, err
@@ -98,6 +124,7 @@ func (c *DiskCollector) collectDisks() ([]dto.DiskInfo, error) {
 	}()
 	logger.Debug("Disk: File opened successfully")
 
+	var disks []dto.DiskInfo
 	scanner := bufio.NewScanner(file)
 	var currentDisk *dto.DiskInfo
 
@@ -120,45 +147,7 @@ func (c *DiskCollector) collectDisks() ([]dto.DiskInfo, error) {
 
 		// Parse key=value pairs
 		if currentDisk != nil && strings.Contains(line, "=") {
-			parts := strings.SplitN(line, "=", 2)
-			if len(parts) != 2 {
-				continue
-			}
-
-			key := strings.TrimSpace(parts[0])
-			value := strings.Trim(strings.TrimSpace(parts[1]), `"`)
-
-			switch key {
-			case "name":
-				currentDisk.Name = value
-			case "device":
-				currentDisk.Device = value
-			case "id":
-				currentDisk.ID = value
-			case "status":
-				currentDisk.Status = value
-			case "size":
-				if size, err := strconv.ParseUint(value, 10, 64); err == nil {
-					currentDisk.Size = size * 512 // Convert sectors to bytes
-				}
-			case "temp":
-				// Temperature might be "*" if spun down
-				if value != "*" && value != "" {
-					if temp, err := strconv.ParseFloat(value, 64); err == nil {
-						currentDisk.Temperature = temp
-					}
-				}
-			case "numErrors":
-				if errors, err := strconv.Atoi(value); err == nil {
-					currentDisk.SMARTErrors = errors
-				}
-			case "spindownDelay":
-				if delay, err := strconv.Atoi(value); err == nil {
-					currentDisk.SpindownDelay = delay
-				}
-			case "format":
-				currentDisk.FileSystem = value
-			}
+			c.parseDiskKeyValue(currentDisk, line)
 		}
 	}
 
@@ -172,7 +161,54 @@ func (c *DiskCollector) collectDisks() ([]dto.DiskInfo, error) {
 		return disks, err
 	}
 
-	// Enhance each disk with additional stats
+	return disks, nil
+}
+
+// parseDiskKeyValue parses a single key=value line from disks.ini
+func (c *DiskCollector) parseDiskKeyValue(disk *dto.DiskInfo, line string) {
+	parts := strings.SplitN(line, "=", 2)
+	if len(parts) != 2 {
+		return
+	}
+
+	key := strings.TrimSpace(parts[0])
+	value := strings.Trim(strings.TrimSpace(parts[1]), `"`)
+
+	switch key {
+	case "name":
+		disk.Name = value
+	case "device":
+		disk.Device = value
+	case "id":
+		disk.ID = value
+	case "status":
+		disk.Status = value
+	case "size":
+		if size, err := strconv.ParseUint(value, 10, 64); err == nil {
+			disk.Size = size * 512 // Convert sectors to bytes
+		}
+	case "temp":
+		// Temperature might be "*" if spun down
+		if value != "*" && value != "" {
+			if temp, err := strconv.ParseFloat(value, 64); err == nil {
+				disk.Temperature = temp
+			}
+		}
+	case "numErrors":
+		if errors, err := strconv.Atoi(value); err == nil {
+			disk.SMARTErrors = errors
+		}
+	case "spindownDelay":
+		if delay, err := strconv.Atoi(value); err == nil {
+			disk.SpindownDelay = delay
+		}
+	case "format":
+		disk.FileSystem = value
+	}
+}
+
+// enrichDisks enhances each disk with additional statistics
+func (c *DiskCollector) enrichDisks(disks []dto.DiskInfo) {
 	for i := range disks {
 		// Get I/O statistics
 		c.enrichWithIOStats(&disks[i])
@@ -193,22 +229,6 @@ func (c *DiskCollector) collectDisks() ([]dto.DiskInfo, error) {
 			c.enrichWithSpinState(&disks[i])
 		}
 	}
-
-	logger.Debug("Disk: Parsed %d disks successfully", len(disks))
-
-	// Collect Docker vDisk information
-	if dockerVDisk := c.collectDockerVDisk(); dockerVDisk != nil {
-		disks = append(disks, *dockerVDisk)
-		logger.Debug("Disk: Added Docker vDisk to collection")
-	}
-
-	// Collect Log filesystem information
-	if logFS := c.collectLogFilesystem(); logFS != nil {
-		disks = append(disks, *logFS)
-		logger.Debug("Disk: Added Log filesystem to collection")
-	}
-
-	return disks, nil
 }
 
 // enrichWithIOStats adds I/O statistics from /sys/block
@@ -489,19 +509,18 @@ func (c *DiskCollector) enrichWithRole(disk *dto.DiskInfo) {
 	name := strings.ToLower(disk.Name)
 	id := strings.ToLower(disk.ID)
 
-	if strings.Contains(name, "parity") || strings.Contains(id, "parity") {
-		if strings.Contains(name, "parity2") || strings.Contains(id, "parity2") {
-			disk.Role = "parity2"
-		} else {
-			disk.Role = "parity"
-		}
-	} else if strings.Contains(name, "cache") || strings.Contains(id, "cache") {
+	switch {
+	case strings.Contains(name, "parity2") || strings.Contains(id, "parity2"):
+		disk.Role = "parity2"
+	case strings.Contains(name, "parity") || strings.Contains(id, "parity"):
+		disk.Role = "parity"
+	case strings.Contains(name, "cache") || strings.Contains(id, "cache"):
 		disk.Role = "cache"
-	} else if strings.Contains(name, "pool") || strings.Contains(id, "pool") {
+	case strings.Contains(name, "pool") || strings.Contains(id, "pool"):
 		disk.Role = "pool"
-	} else if strings.Contains(name, "disk") || strings.Contains(id, "disk") {
+	case strings.Contains(name, "disk") || strings.Contains(id, "disk"):
 		disk.Role = "data"
-	} else {
+	default:
 		disk.Role = "unknown"
 	}
 }

@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/common"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/api"
@@ -68,47 +68,47 @@ func (o *Orchestrator) Run() error {
 	wg.Add(13)
 	go func() {
 		defer wg.Done()
-		systemCollector.Start(ctx, time.Duration(common.IntervalSystem)*time.Second)
+		systemCollector.Start(ctx, time.Duration(constants.IntervalSystem)*time.Second)
 	}()
 	go func() {
 		defer wg.Done()
-		arrayCollector.Start(ctx, time.Duration(common.IntervalArray)*time.Second)
+		arrayCollector.Start(ctx, time.Duration(constants.IntervalArray)*time.Second)
 	}()
 	go func() {
 		defer wg.Done()
-		diskCollector.Start(ctx, time.Duration(common.IntervalDisk)*time.Second)
+		diskCollector.Start(ctx, time.Duration(constants.IntervalDisk)*time.Second)
 	}()
 	go func() {
 		defer wg.Done()
-		dockerCollector.Start(ctx, time.Duration(common.IntervalDocker)*time.Second)
+		dockerCollector.Start(ctx, time.Duration(constants.IntervalDocker)*time.Second)
 	}()
 	go func() {
 		defer wg.Done()
-		vmCollector.Start(ctx, time.Duration(common.IntervalVM)*time.Second)
+		vmCollector.Start(ctx, time.Duration(constants.IntervalVM)*time.Second)
 	}()
 	go func() {
 		defer wg.Done()
-		upsCollector.Start(ctx, time.Duration(common.IntervalUPS)*time.Second)
+		upsCollector.Start(ctx, time.Duration(constants.IntervalUPS)*time.Second)
 	}()
 	go func() {
 		defer wg.Done()
-		gpuCollector.Start(ctx, time.Duration(common.IntervalGPU)*time.Second)
+		gpuCollector.Start(ctx, time.Duration(constants.IntervalGPU)*time.Second)
 	}()
 	go func() {
 		defer wg.Done()
-		shareCollector.Start(ctx, time.Duration(common.IntervalShares)*time.Second)
+		shareCollector.Start(ctx, time.Duration(constants.IntervalShares)*time.Second)
 	}()
 	go func() {
 		defer wg.Done()
-		networkCollector.Start(ctx, time.Duration(common.IntervalNetwork)*time.Second)
+		networkCollector.Start(ctx, time.Duration(constants.IntervalNetwork)*time.Second)
 	}()
 	go func() {
 		defer wg.Done()
-		hardwareCollector.Start(ctx, time.Duration(common.IntervalHardware)*time.Second)
+		hardwareCollector.Start(ctx, time.Duration(constants.IntervalHardware)*time.Second)
 	}()
 	go func() {
 		defer wg.Done()
-		registrationCollector.Start(ctx, time.Duration(common.IntervalHardware)*time.Second)
+		registrationCollector.Start(ctx, time.Duration(constants.IntervalHardware)*time.Second)
 	}()
 	go func() {
 		defer wg.Done()

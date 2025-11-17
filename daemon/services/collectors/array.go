@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/common"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
@@ -89,13 +89,13 @@ func (c *ArrayCollector) collectArrayStatus() (*dto.ArrayStatus, error) {
 		}
 	}()
 
-	logger.Debug("Array: Starting collection from %s", common.VarIni)
+	logger.Debug("Array: Starting collection from %s", constants.VarIni)
 	status := &dto.ArrayStatus{
 		Timestamp: time.Now(),
 	}
 
 	// Parse var.ini for array information
-	file, err := ini.LoadFile(common.VarIni)
+	file, err := ini.LoadFile(constants.VarIni)
 	if err != nil {
 		logger.Error("Array: Failed to load file: %v", err)
 		return nil, err
@@ -203,7 +203,7 @@ func (c *ArrayCollector) enrichWithArraySize(status *dto.ArrayStatus) {
 // countParityDisks counts the number of parity disks from disks.ini
 func (c *ArrayCollector) countParityDisks() int {
 	// Parse disks.ini to count parity disks
-	file, err := ini.LoadFile(common.DisksIni)
+	file, err := ini.LoadFile(constants.DisksIni)
 	if err != nil {
 		logger.Debug("Array: Failed to load disks.ini: %v", err)
 		return 0

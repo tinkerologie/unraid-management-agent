@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/common"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
@@ -75,14 +75,14 @@ func (c *RegistrationCollector) Collect() {
 
 // collectRegistration reads registration information from var.ini
 func (c *RegistrationCollector) collectRegistration() (*dto.Registration, error) {
-	logger.Debug("Registration: Reading from %s", common.VarIni)
+	logger.Debug("Registration: Reading from %s", constants.VarIni)
 
 	registration := &dto.Registration{
 		Timestamp: time.Now(),
 	}
 
 	// Parse var.ini for registration information
-	file, err := ini.LoadFile(common.VarIni)
+	file, err := ini.LoadFile(constants.VarIni)
 	if err != nil {
 		logger.Error("Registration: Failed to load file: %v", err)
 		return nil, err

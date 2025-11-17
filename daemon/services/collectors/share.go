@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/common"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
@@ -80,11 +80,11 @@ func (c *ShareCollector) Collect() {
 }
 
 func (c *ShareCollector) collectShares() ([]dto.ShareInfo, error) {
-	logger.Debug("Share: Starting collection from %s", common.SharesIni)
+	logger.Debug("Share: Starting collection from %s", constants.SharesIni)
 	var shares []dto.ShareInfo
 
 	// Parse shares.ini
-	file, err := os.Open(common.SharesIni)
+	file, err := os.Open(constants.SharesIni)
 	if err != nil {
 		logger.Error("Share: Failed to open file: %v", err)
 		return nil, err

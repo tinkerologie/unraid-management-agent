@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/common"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
@@ -41,7 +41,7 @@ type WSClient struct {
 func NewWSHub() *WSHub {
 	return &WSHub{
 		clients:    make(map[*WSClient]bool),
-		broadcast:  make(chan interface{}, common.WSBufferSize),
+		broadcast:  make(chan interface{}, constants.WSBufferSize),
 		register:   make(chan *WSClient),
 		unregister: make(chan *WSClient),
 	}
@@ -114,7 +114,7 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	client := &WSClient{
 		hub:  s.wsHub,
 		conn: conn,
-		send: make(chan dto.WSEvent, common.WSBufferSize),
+		send: make(chan dto.WSEvent, constants.WSBufferSize),
 	}
 
 	client.hub.register <- client
@@ -124,7 +124,7 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *WSClient) writePump() {
-	ticker := time.NewTicker(time.Duration(common.WSPingInterval) * time.Second)
+	ticker := time.NewTicker(time.Duration(constants.WSPingInterval) * time.Second)
 	defer func() {
 		ticker.Stop()
 		if err := c.conn.Close(); err != nil {

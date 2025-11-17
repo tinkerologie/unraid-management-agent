@@ -1,5 +1,5 @@
-// Package common provides shared constants and configuration values for the Unraid Management Agent.
-package common
+// Package constants provides shared constants and configuration values for the Unraid Management Agent.
+package constants
 
 const (
 	// VarIni is the path to the Unraid var.ini configuration file.

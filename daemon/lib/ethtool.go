@@ -64,58 +64,9 @@ func ParseEthtool(ifName string) (*EthtoolInfo, error) {
 			key := strings.TrimSpace(parts[0])
 			value := strings.TrimSpace(parts[1])
 
-			switch key {
-			case "Supported ports":
-				info.SupportedPorts = parseListValue(value)
-			case "Supported link modes":
-				inSupportedLinkModes = true
-				inAdvertisedLinkModes = false
-				if value != "" {
-					info.SupportedLinkModes = append(info.SupportedLinkModes, value)
-				}
-			case "Supported pause frame use":
-				info.SupportedPauseFrame = value
-			case "Supports auto-negotiation":
-				info.SupportsAutoNeg = value == "Yes"
-			case "Supported FEC modes":
-				info.SupportedFECModes = parseListValue(value)
-			case "Advertised link modes":
-				inAdvertisedLinkModes = true
-				inSupportedLinkModes = false
-				if value != "" {
-					info.AdvertisedLinkModes = append(info.AdvertisedLinkModes, value)
-				}
-			case "Advertised pause frame use":
-				info.AdvertisedPauseFrame = value
-			case "Advertised auto-negotiation":
-				info.AdvertisedAutoNeg = value == "Yes"
-			case "Advertised FEC modes":
-				info.AdvertisedFECModes = parseListValue(value)
-			case "Speed":
-				// Speed is already parsed elsewhere, skip
-			case "Duplex":
-				info.Duplex = value
-			case "Auto-negotiation":
-				info.AutoNegotiation = value
-			case "Port":
-				info.Port = value
-			case "PHYAD":
-				if phyad, err := strconv.Atoi(value); err == nil {
-					info.PHYAD = phyad
-				}
-			case "Transceiver":
-				info.Transceiver = value
-			case "MDI-X":
-				info.MDIX = value
-			case "Supports Wake-on":
-				info.SupportsWakeOn = parseWakeOnFlags(value)
-			case "Wake-on":
-				info.WakeOn = value
-			case "Current message level":
-				info.MessageLevel = value
-			case "Link detected":
-				info.LinkDetected = value == "yes"
-			}
+			inSupportedLinkModes, inAdvertisedLinkModes = parseEthtoolKeyValue(
+				info, key, value, inSupportedLinkModes, inAdvertisedLinkModes,
+			)
 		} else {
 			// Handle multi-line values (link modes)
 			if inSupportedLinkModes && trimmed != "" {
@@ -127,6 +78,63 @@ func ParseEthtool(ifName string) (*EthtoolInfo, error) {
 	}
 
 	return info, nil
+}
+
+// parseEthtoolKeyValue parses a single key-value pair from ethtool output
+func parseEthtoolKeyValue(info *EthtoolInfo, key, value string, inSupported, inAdvertised bool) (bool, bool) {
+	switch key {
+	case "Supported ports":
+		info.SupportedPorts = parseListValue(value)
+	case "Supported link modes":
+		inSupported = true
+		inAdvertised = false
+		if value != "" {
+			info.SupportedLinkModes = append(info.SupportedLinkModes, value)
+		}
+	case "Supported pause frame use":
+		info.SupportedPauseFrame = value
+	case "Supports auto-negotiation":
+		info.SupportsAutoNeg = value == "Yes"
+	case "Supported FEC modes":
+		info.SupportedFECModes = parseListValue(value)
+	case "Advertised link modes":
+		inAdvertised = true
+		inSupported = false
+		if value != "" {
+			info.AdvertisedLinkModes = append(info.AdvertisedLinkModes, value)
+		}
+	case "Advertised pause frame use":
+		info.AdvertisedPauseFrame = value
+	case "Advertised auto-negotiation":
+		info.AdvertisedAutoNeg = value == "Yes"
+	case "Advertised FEC modes":
+		info.AdvertisedFECModes = parseListValue(value)
+	case "Speed":
+		// Speed is already parsed elsewhere, skip
+	case "Duplex":
+		info.Duplex = value
+	case "Auto-negotiation":
+		info.AutoNegotiation = value
+	case "Port":
+		info.Port = value
+	case "PHYAD":
+		if phyad, err := strconv.Atoi(value); err == nil {
+			info.PHYAD = phyad
+		}
+	case "Transceiver":
+		info.Transceiver = value
+	case "MDI-X":
+		info.MDIX = value
+	case "Supports Wake-on":
+		info.SupportsWakeOn = parseWakeOnFlags(value)
+	case "Wake-on":
+		info.WakeOn = value
+	case "Current message level":
+		info.MessageLevel = value
+	case "Link detected":
+		info.LinkDetected = value == "yes"
+	}
+	return inSupported, inAdvertised
 }
 
 // parseListValue parses a comma-separated or space-separated list
