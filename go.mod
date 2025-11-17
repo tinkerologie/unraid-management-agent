@@ -1,9 +1,9 @@
 module github.com/ruaan-deysel/unraid-management-agent
 
-go 1.23
+go 1.24.0
 
 require (
-	github.com/alecthomas/kong v0.9.0
+	github.com/alecthomas/kong v1.13.0
 	github.com/cskr/pubsub v1.0.2
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/gorilla/mux v1.8.1
@@ -12,4 +12,4 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
-require golang.org/x/sys v0.13.0 // indirect
+require golang.org/x/sys v0.38.0 // indirect
