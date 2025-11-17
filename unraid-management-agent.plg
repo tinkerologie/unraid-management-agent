@@ -3,14 +3,14 @@
 <!DOCTYPE PLUGIN [
     <!ENTITY name        "unraid-management-agent">
     <!ENTITY author      "ruaan-deysel">
-    <!ENTITY version     "2025.11.20">
+    <!ENTITY version     "2025.11.21">
     <!ENTITY gitURL      "https://github.com/&author;/&name;">
     <!ENTITY pluginURL   "&gitURL;/raw/main/&name;.plg">
     <!ENTITY supportURL  "https://forums.unraid.net/topic/178262-home-assistant-unraid-integration">
     <!ENTITY launch      "Settings/unraid-management-agent">
     <!ENTITY bundle      "&name;-&version;.tgz">
     <!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
-    <!ENTITY md5         "e6f1336b685318e34218c39978a0f966">
+    <!ENTITY md5         "62df6212c4069e1320665cc83faeda2c">
 ]>
 
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" icon="server" min="6.9.0" pluginURL="&pluginURL;" support="&supportURL;">
@@ -20,6 +20,16 @@ This Unraid plugin provides REST API and WebSocket interfaces for real-time syst
 </DESCRIPTION>
 
 <CHANGES>
+###2025.11.21 (2025-11-17)
+- Bug Fixes (Issues #24 and #25)
+- Fixed motherboard temperature API returning 0 instead of actual value (Issue #24)
+- Improved sensor parser to capture sensor labels from sensors -u output
+- Motherboard temperature now displays actual readings (e.g., 37°C)
+- Fixed system API returning empty string for version field (Issue #25)
+- Added getUnraidVersion() function to read Unraid OS version
+- Version field now correctly displays Unraid OS version (e.g., "7.2.0")
+- Affects Home Assistant integration and other API clients
+
 ###2025.11.20 (2025-11-16)
 - Bug Fixes (Issues #21 and #22)
 - Fixed VM endpoint returning empty string for id field (Issue #22)
