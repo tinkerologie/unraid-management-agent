@@ -3,14 +3,14 @@
 <!DOCTYPE PLUGIN [
     <!ENTITY name        "unraid-management-agent">
     <!ENTITY author      "ruaan-deysel">
-    <!ENTITY version     "2025.11.23">
+    <!ENTITY version     "2025.11.24">
     <!ENTITY gitURL      "https://github.com/&author;/&name;">
     <!ENTITY pluginURL   "&gitURL;/raw/main/&name;.plg">
     <!ENTITY supportURL  "https://forums.unraid.net/topic/178262-home-assistant-unraid-integration">
     <!ENTITY launch      "Settings/unraid-management-agent">
     <!ENTITY bundle      "&name;-&version;.tgz">
     <!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
-    <!ENTITY md5         "39a43729f3d8b302493a580ffef6092e">
+    <!ENTITY md5         "8ad9d677273092f29ec9424826ac0c4e">
 ]>
 
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" icon="server" min="6.9.0" pluginURL="&pluginURL;" support="&supportURL;">
@@ -20,6 +20,22 @@ This Unraid plugin provides REST API and WebSocket interfaces for real-time syst
 </DESCRIPTION>
 
 <CHANGES>
+###2025.11.24 (2025-11-18)
+- ZFS Storage Pool Support (Issue #9)
+- Complete ZFS integration for monitoring ZFS storage pools on Unraid
+- New REST API endpoints: /api/v1/zfs/pools, /api/v1/zfs/pools/{name}, /api/v1/zfs/datasets, /api/v1/zfs/snapshots, /api/v1/zfs/arc
+- ZFS collector with 30-second collection interval
+- Pool metrics: size, allocated space, free space, fragmentation, capacity, dedup ratio, compression ratio
+- Pool health: state, health status, read/write/checksum errors
+- VDEVs: virtual device information (mirrors, raidz, disks)
+- Datasets: filesystem and volume information with compression and quota details
+- Snapshots: point-in-time snapshots with creation time and space usage
+- ARC statistics: cache hit ratios, size metrics, L2ARC stats
+- Automatic detection of ZFS availability (gracefully handles systems without ZFS)
+- Full support for ZFS pool properties: autoexpand, autotrim, readonly, altroot
+- Scrub/resilver status tracking
+- Real-time WebSocket events for ZFS pool, dataset, snapshot, and ARC stats updates
+
 ###2025.11.23 (2025-11-17)
 - Dependency Updates
 - Updated github.com/alecthomas/kong from v0.9.0 to v1.13.0

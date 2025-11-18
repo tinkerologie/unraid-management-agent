@@ -3,12 +3,12 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name        "unraid-management-agent">
 <!ENTITY author      "ruaan-deysel">
-<!ENTITY version     "2025.11.23">
+<!ENTITY version     "2025.11.24">
 <!ENTITY launch      "Settings/&name;">
 <!ENTITY gitURL      "https://github.com/ruaandeysel/&name;">
 <!ENTITY pluginURL   "&gitURL;/releases/latest/download/&name;.plg">
 <!ENTITY bundle      "&name;-&version;.tgz">
-<!ENTITY md5         "39a43729f3d8b302493a580ffef6092e">
+<!ENTITY md5         "8ad9d677273092f29ec9424826ac0c4e">
 ]>
 
 <PLUGIN  name="&name;"
@@ -20,6 +20,22 @@
          icon="server">
 
 <CHANGES>
+###2025.11.24
+- ZFS Storage Pool Support (Issue #9)
+- Complete ZFS integration for monitoring ZFS storage pools on Unraid
+- New REST API endpoints: /api/v1/zfs/pools, /api/v1/zfs/pools/{name}, /api/v1/zfs/datasets, /api/v1/zfs/snapshots, /api/v1/zfs/arc
+- ZFS collector with 30-second collection interval
+- Pool metrics: size, allocated space, free space, fragmentation, capacity, dedup ratio, compression ratio
+- Pool health: state, health status, read/write/checksum errors
+- VDEVs: virtual device information (mirrors, raidz, disks)
+- Datasets: filesystem and volume information with compression and quota details
+- Snapshots: point-in-time snapshots with creation time and space usage
+- ARC statistics: cache hit ratios, size metrics, L2ARC stats
+- Automatic detection of ZFS availability (gracefully handles systems without ZFS)
+- Full support for ZFS pool properties: autoexpand, autotrim, readonly, altroot
+- Scrub/resilver status tracking
+- Real-time WebSocket events for ZFS pool, dataset, snapshot, and ARC stats updates
+
 ###2025.11.23
 - Dependency Updates
 - Updated github.com/alecthomas/kong from v0.9.0 to v1.13.0
