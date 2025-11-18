@@ -24,11 +24,24 @@ func CreateNotification(title, subject, description, importance, link string) er
 	}
 
 	timestamp := time.Now()
+	sanitizedTitle := sanitizeFilename(title)
+
+	// Validate sanitized title to prevent path traversal
+	if err := validateFilename(sanitizedTitle); err != nil {
+		return fmt.Errorf("invalid title: %w", err)
+	}
+
 	filename := fmt.Sprintf("%s-%s.notify",
 		timestamp.Format("20060102-150405"),
-		sanitizeFilename(title))
+		sanitizedTitle)
 
 	path := filepath.Join(notificationsDir, filename)
+
+	// Verify the final path is within the notifications directory
+	cleanPath := filepath.Clean(path)
+	if !strings.HasPrefix(cleanPath, notificationsDir) {
+		return fmt.Errorf("invalid notification path: path escapes notifications directory")
+	}
 
 	content := fmt.Sprintf(`event="%s"
 subject="%s"
@@ -175,6 +188,31 @@ func sanitizeFilename(s string) string {
 		s = s[:50]
 	}
 	return s
+}
+
+// validateFilename validates a filename to prevent path traversal attacks
+// This is used after sanitizeFilename to ensure the sanitized result is safe
+func validateFilename(filename string) error {
+	if filename == "" {
+		return fmt.Errorf("filename cannot be empty")
+	}
+
+	// Check for parent directory references
+	if strings.Contains(filename, "..") {
+		return fmt.Errorf("parent directory references not allowed")
+	}
+
+	// Check for absolute paths
+	if strings.HasPrefix(filename, "/") || strings.HasPrefix(filename, "\\") {
+		return fmt.Errorf("absolute paths not allowed")
+	}
+
+	// Check for path separators
+	if strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
+		return fmt.Errorf("path separators not allowed")
+	}
+
+	return nil
 }
 
 // validateNotificationID validates a notification ID to prevent path traversal attacks
