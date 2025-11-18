@@ -51,6 +51,11 @@ link="%s"`,
 
 // ArchiveNotification moves a notification to the archive directory
 func ArchiveNotification(id string) error {
+	// Validate notification ID to prevent path traversal
+	if err := validateNotificationID(id); err != nil {
+		return err
+	}
+
 	src := filepath.Join(notificationsDir, id)
 	dst := filepath.Join(notificationsArchiveDir, id)
 
@@ -76,6 +81,11 @@ func ArchiveNotification(id string) error {
 
 // UnarchiveNotification moves a notification from archive back to active
 func UnarchiveNotification(id string) error {
+	// Validate notification ID to prevent path traversal
+	if err := validateNotificationID(id); err != nil {
+		return err
+	}
+
 	src := filepath.Join(notificationsArchiveDir, id)
 	dst := filepath.Join(notificationsDir, id)
 
@@ -95,6 +105,11 @@ func UnarchiveNotification(id string) error {
 
 // DeleteNotification deletes a notification file
 func DeleteNotification(id string, isArchived bool) error {
+	// Validate notification ID to prevent path traversal
+	if err := validateNotificationID(id); err != nil {
+		return err
+	}
+
 	dir := notificationsDir
 	if isArchived {
 		dir = notificationsArchiveDir
@@ -160,4 +175,41 @@ func sanitizeFilename(s string) string {
 		s = s[:50]
 	}
 	return s
+}
+
+// validateNotificationID validates a notification ID to prevent path traversal attacks
+// Notification IDs should be filenames only (no path separators or parent directory references)
+func validateNotificationID(id string) error {
+	if id == "" {
+		return fmt.Errorf("notification ID cannot be empty")
+	}
+
+	// Check for parent directory references first (most specific attack)
+	if strings.Contains(id, "..") {
+		return fmt.Errorf("invalid notification ID: parent directory references not allowed")
+	}
+
+	// Check for absolute paths
+	if strings.HasPrefix(id, "/") || strings.HasPrefix(id, "\\") {
+		return fmt.Errorf("invalid notification ID: absolute paths not allowed")
+	}
+
+	// Check for path separators (both Unix and Windows)
+	if strings.Contains(id, "/") || strings.Contains(id, "\\") {
+		return fmt.Errorf("invalid notification ID: path separators not allowed")
+	}
+
+	// Validate file extension (must be .notify)
+	if !strings.HasSuffix(id, ".notify") {
+		return fmt.Errorf("invalid notification ID: must have .notify extension")
+	}
+
+	// Additional security: ensure the resolved path stays within the notifications directory
+	// This prevents symlink attacks and other edge cases
+	cleanPath := filepath.Clean(filepath.Join(notificationsDir, id))
+	if !strings.HasPrefix(cleanPath, notificationsDir) {
+		return fmt.Errorf("invalid notification ID: path escapes notifications directory")
+	}
+
+	return nil
 }

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -22,10 +23,15 @@ func NewConfigCollector() *ConfigCollector {
 
 // GetShareConfig reads share configuration from /boot/config/shares/{name}.cfg
 func (c *ConfigCollector) GetShareConfig(shareName string) (*dto.ShareConfig, error) {
+	// Validate share name to prevent path traversal
+	if err := validateShareName(shareName); err != nil {
+		return nil, err
+	}
+
 	configPath := fmt.Sprintf("/boot/config/shares/%s.cfg", shareName)
 	logger.Debug("Config: Reading share config from %s", configPath)
 
-	//nolint:gosec // G304: Path is constructed from Unraid config directory, shareName is validated
+	// #nosec G304 - Path is validated by validateShareName() to prevent path traversal
 	file, err := os.Open(configPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -371,6 +377,11 @@ func (c *ConfigCollector) GetVMSettings() (*dto.VMSettings, error) {
 
 // UpdateShareConfig writes share configuration to /boot/config/shares/{name}.cfg
 func (c *ConfigCollector) UpdateShareConfig(config *dto.ShareConfig) error {
+	// Validate share name to prevent path traversal
+	if err := validateShareName(config.Name); err != nil {
+		return err
+	}
+
 	configPath := fmt.Sprintf("/boot/config/shares/%s.cfg", config.Name)
 	logger.Info("Config: Writing share config to %s", configPath)
 
@@ -382,7 +393,7 @@ func (c *ConfigCollector) UpdateShareConfig(config *dto.ShareConfig) error {
 		}
 	}
 
-	//nolint:gosec // G304: Path is constructed from Unraid config directory, shareName is validated
+	// #nosec G304 - Path is validated by validateShareName() to prevent path traversal
 	file, err := os.Create(configPath)
 	if err != nil {
 		return fmt.Errorf("failed to create share config: %w", err)
@@ -568,4 +579,40 @@ func (c *ConfigCollector) GetDiskSettings() (*dto.DiskSettings, error) {
 	}
 
 	return settings, nil
+}
+
+// validateShareName validates a share name to prevent path traversal attacks
+// Share names should contain only safe characters and no path separators
+func validateShareName(name string) error {
+	if name == "" {
+		return fmt.Errorf("share name cannot be empty")
+	}
+
+	if len(name) > 255 {
+		return fmt.Errorf("share name too long: maximum 255 characters, got %d", len(name))
+	}
+
+	// Check for parent directory references first (most specific attack)
+	if strings.Contains(name, "..") {
+		return fmt.Errorf("invalid share name: parent directory references not allowed")
+	}
+
+	// Check for absolute paths
+	if strings.HasPrefix(name, "/") || strings.HasPrefix(name, "\\") {
+		return fmt.Errorf("invalid share name: absolute paths not allowed")
+	}
+
+	// Check for path separators (both Unix and Windows)
+	if strings.Contains(name, "/") || strings.Contains(name, "\\") {
+		return fmt.Errorf("invalid share name: path separators not allowed")
+	}
+
+	// Additional security: ensure the resolved path stays within the shares directory
+	const sharesDir = "/boot/config/shares"
+	cleanPath := filepath.Clean(filepath.Join(sharesDir, name+".cfg"))
+	if !strings.HasPrefix(cleanPath, sharesDir) {
+		return fmt.Errorf("invalid share name: path escapes shares directory")
+	}
+
+	return nil
 }
