@@ -1181,3 +1181,86 @@ func (s *Server) handleUnassignedRemoteShares(w http.ResponseWriter, _ *http.Req
 		"timestamp":     s.unassignedCache.Timestamp,
 	})
 }
+
+// ============================================================================
+// ZFS Handlers
+// ============================================================================
+
+// handleZFSPools returns all ZFS pools
+func (s *Server) handleZFSPools(w http.ResponseWriter, _ *http.Request) {
+	s.cacheMutex.RLock()
+	pools := s.zfsPoolsCache
+	s.cacheMutex.RUnlock()
+
+	if pools == nil {
+		pools = []dto.ZFSPool{}
+	}
+
+	respondJSON(w, http.StatusOK, pools)
+}
+
+// handleZFSPool returns a specific ZFS pool by name
+func (s *Server) handleZFSPool(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	poolName := vars["name"]
+
+	s.cacheMutex.RLock()
+	pools := s.zfsPoolsCache
+	s.cacheMutex.RUnlock()
+
+	// Find pool by name
+	for _, pool := range pools {
+		if pool.Name == poolName {
+			respondJSON(w, http.StatusOK, pool)
+			return
+		}
+	}
+
+	// Pool not found
+	respondJSON(w, http.StatusNotFound, dto.Response{
+		Success:   false,
+		Message:   fmt.Sprintf("ZFS pool not found: %s", poolName),
+		Timestamp: time.Now(),
+	})
+}
+
+// handleZFSDatasets returns all ZFS datasets
+func (s *Server) handleZFSDatasets(w http.ResponseWriter, _ *http.Request) {
+	s.cacheMutex.RLock()
+	datasets := s.zfsDatasetsCache
+	s.cacheMutex.RUnlock()
+
+	if datasets == nil {
+		datasets = []dto.ZFSDataset{}
+	}
+
+	respondJSON(w, http.StatusOK, datasets)
+}
+
+// handleZFSSnapshots returns all ZFS snapshots
+func (s *Server) handleZFSSnapshots(w http.ResponseWriter, _ *http.Request) {
+	s.cacheMutex.RLock()
+	snapshots := s.zfsSnapshotsCache
+	s.cacheMutex.RUnlock()
+
+	if snapshots == nil {
+		snapshots = []dto.ZFSSnapshot{}
+	}
+
+	respondJSON(w, http.StatusOK, snapshots)
+}
+
+// handleZFSARC returns ZFS ARC statistics
+func (s *Server) handleZFSARC(w http.ResponseWriter, _ *http.Request) {
+	s.cacheMutex.RLock()
+	arcStats := s.zfsARCStatsCache
+	s.cacheMutex.RUnlock()
+
+	if arcStats == nil {
+		arcStats = &dto.ZFSARCStats{
+			Timestamp: time.Now(),
+		}
+	}
+
+	respondJSON(w, http.StatusOK, arcStats)
+}

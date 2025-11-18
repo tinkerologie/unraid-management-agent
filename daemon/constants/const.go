@@ -40,6 +40,13 @@ const (
 	UpscBin = "/usr/bin/upsc"
 	// NvidiaSMIBin is the path to the nvidia-smi binary.
 	NvidiaSMIBin = "/usr/bin/nvidia-smi"
+	// ZpoolBin is the path to the zpool binary.
+	ZpoolBin = "/usr/sbin/zpool"
+	// ZfsBin is the path to the zfs binary.
+	ZfsBin = "/usr/sbin/zfs"
+
+	// ProcSPLARCStats is the path to the ZFS ARC statistics file.
+	ProcSPLARCStats = "/proc/spl/kstat/zfs/arcstats"
 
 	// NutPidFile is the path to the NUT UPS monitor PID file.
 	NutPidFile = "/var/run/nut/upsmon.pid"
@@ -66,6 +73,8 @@ const (
 	IntervalNetwork = 15
 	// IntervalHardware is the collection interval for hardware metrics in seconds.
 	IntervalHardware = 300
+	// IntervalZFS is the collection interval for ZFS metrics in seconds.
+	IntervalZFS = 30
 
 	// WSPingInterval is the WebSocket ping interval in seconds.
 	WSPingInterval = 30

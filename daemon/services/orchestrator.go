@@ -63,9 +63,10 @@ func (o *Orchestrator) Run() error {
 	registrationCollector := collectors.NewRegistrationCollector(o.ctx)
 	notificationCollector := collectors.NewNotificationCollector(o.ctx)
 	unassignedCollector := collectors.NewUnassignedCollector(o.ctx)
+	zfsCollector := collectors.NewZFSCollector(o.ctx)
 
 	// Start collectors with context and WaitGroup
-	wg.Add(13)
+	wg.Add(14)
 	go func() {
 		defer wg.Done()
 		systemCollector.Start(ctx, time.Duration(constants.IntervalSystem)*time.Second)
@@ -117,6 +118,10 @@ func (o *Orchestrator) Run() error {
 	go func() {
 		defer wg.Done()
 		unassignedCollector.Start(ctx, 30*time.Second) // 30 seconds for unassigned devices
+	}()
+	go func() {
+		defer wg.Done()
+		zfsCollector.Start(ctx, time.Duration(constants.IntervalZFS)*time.Second)
 	}()
 
 	logger.Success("All collectors started")

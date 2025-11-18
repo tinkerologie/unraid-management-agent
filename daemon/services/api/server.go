@@ -38,6 +38,10 @@ type Server struct {
 	registrationCache  *dto.Registration
 	notificationsCache *dto.NotificationList
 	unassignedCache    *dto.UnassignedDeviceList
+	zfsPoolsCache      []dto.ZFSPool
+	zfsDatasetsCache   []dto.ZFSDataset
+	zfsSnapshotsCache  []dto.ZFSSnapshot
+	zfsARCStatsCache   *dto.ZFSARCStats
 }
 
 // NewServer creates a new API server instance with the given context.
@@ -80,6 +84,13 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/ups", s.handleUPS).Methods("GET")
 	api.HandleFunc("/gpu", s.handleGPU).Methods("GET")
 	api.HandleFunc("/network", s.handleNetwork).Methods("GET")
+
+	// ZFS endpoints
+	api.HandleFunc("/zfs/pools", s.handleZFSPools).Methods("GET")
+	api.HandleFunc("/zfs/pools/{name}", s.handleZFSPool).Methods("GET")
+	api.HandleFunc("/zfs/datasets", s.handleZFSDatasets).Methods("GET")
+	api.HandleFunc("/zfs/snapshots", s.handleZFSSnapshots).Methods("GET")
+	api.HandleFunc("/zfs/arc", s.handleZFSARC).Methods("GET")
 
 	// Hardware endpoints
 	api.HandleFunc("/hardware/full", s.handleHardwareFull).Methods("GET")
@@ -227,6 +238,10 @@ func (s *Server) subscribeToEvents(ctx context.Context) {
 		"registration_update",
 		"notifications_update",
 		"unassigned_devices_update",
+		"zfs_pools_update",
+		"zfs_datasets_update",
+		"zfs_snapshots_update",
+		"zfs_arc_stats_update",
 	)
 	logger.Info("Cache: Subscription ready, waiting for events...")
 
@@ -328,6 +343,26 @@ func (s *Server) subscribeToEvents(ctx context.Context) {
 				s.cacheMutex.Unlock()
 				logger.Debug("Cache: Updated unassigned devices - devices=%d, remote_shares=%d",
 					len(v.Devices), len(v.RemoteShares))
+			case []dto.ZFSPool:
+				s.cacheMutex.Lock()
+				s.zfsPoolsCache = v
+				s.cacheMutex.Unlock()
+				logger.Debug("Cache: Updated ZFS pools - count=%d", len(v))
+			case []dto.ZFSDataset:
+				s.cacheMutex.Lock()
+				s.zfsDatasetsCache = v
+				s.cacheMutex.Unlock()
+				logger.Debug("Cache: Updated ZFS datasets - count=%d", len(v))
+			case []dto.ZFSSnapshot:
+				s.cacheMutex.Lock()
+				s.zfsSnapshotsCache = v
+				s.cacheMutex.Unlock()
+				logger.Debug("Cache: Updated ZFS snapshots - count=%d", len(v))
+			case dto.ZFSARCStats:
+				s.cacheMutex.Lock()
+				s.zfsARCStatsCache = &v
+				s.cacheMutex.Unlock()
+				logger.Debug("Cache: Updated ZFS ARC stats - hit_ratio=%.2f%%", v.HitRatioPct)
 			default:
 				logger.Warning("Cache: Received unknown event type: %T", msg)
 			}

@@ -19,6 +19,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2025.11.24] - 2025-11-18
+
+### Added
+
+- **ZFS Storage Pool Support** (GitHub Issue #9):
+  - Complete ZFS integration for monitoring ZFS storage pools on Unraid
+  - New REST API endpoints:
+    - `GET /api/v1/zfs/pools` - List all ZFS pools with comprehensive metrics
+    - `GET /api/v1/zfs/pools/{name}` - Get detailed information about a specific pool
+    - `GET /api/v1/zfs/datasets` - List all ZFS datasets (filesystems and volumes)
+    - `GET /api/v1/zfs/snapshots` - List all ZFS snapshots
+    - `GET /api/v1/zfs/arc` - Get ZFS ARC (Adaptive Replacement Cache) statistics
+  - ZFS collector with 30-second collection interval
+  - Real-time WebSocket events for ZFS pool, dataset, snapshot, and ARC stats updates
+  - Comprehensive ZFS data structures:
+    - Pool metrics: size, allocated space, free space, fragmentation, capacity, dedup ratio, compression ratio
+    - Pool health: state, health status, read/write/checksum errors
+    - VDEVs: virtual device information (mirrors, raidz, disks)
+    - Datasets: filesystem and volume information with compression and quota details
+    - Snapshots: point-in-time snapshots with creation time and space usage
+    - ARC statistics: cache hit ratios, size metrics, L2ARC stats
+  - Automatic detection of ZFS availability (gracefully handles systems without ZFS)
+  - Full support for ZFS pool properties: autoexpand, autotrim, readonly, altroot
+  - Scrub/resilver status tracking
+
+### Technical Details
+
+- **New Files**:
+  - `daemon/dto/zfs.go`: ZFS data transfer objects (ZFSPool, ZFSVdev, ZFSDevice, ZFSDataset, ZFSSnapshot, ZFSARCStats, ZFSIOStats)
+  - `daemon/services/collectors/zfs.go`: ZFS collector implementation with parsers for zpool/zfs command output
+  - `docs/ZFS_INVESTIGATION_FINDINGS.md`: Complete investigation findings and implementation documentation
+
+- **Modified Files**:
+  - `daemon/constants/const.go`: Added ZFS binary paths and collection interval constants
+  - `daemon/services/orchestrator.go`: Integrated ZFS collector into application lifecycle
+  - `daemon/services/api/server.go`: Added ZFS cache fields and event subscriptions
+  - `daemon/services/api/handlers.go`: Implemented ZFS endpoint handlers
+
+- **ZFS Data Sources**:
+  - `/usr/sbin/zpool list -Hp`: Pool metrics (parseable format)
+  - `/usr/sbin/zpool status -v`: Pool status, vdev tree, error counters
+  - `/usr/sbin/zpool get all`: Pool properties
+  - `/usr/sbin/zfs list -Hp`: Dataset information
+  - `/proc/spl/kstat/zfs/arcstats`: ARC cache statistics
+
+- **Testing**:
+  - Validated on Unraid 7.2.0 with ZFS 2.3.4-1
+  - Tested with "garbage" pool (222GB, single disk, ONLINE)
+  - All endpoints returning correct data
+  - ARC hit ratio: 99.89% (53,172 hits, 58 misses)
+
+---
+
 ## [2025.11.23] - 2025-11-17
 
 ### Changed
