@@ -19,6 +19,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2025.11.25] - 2025-11-18
+
+### Security
+
+- **CRITICAL: Fixed 5 CWE-22 Path Traversal Vulnerabilities** (High Severity):
+  - Fixed path traversal vulnerability in notification controller (`daemon/services/controllers/notification.go`)
+    - Added `validateNotificationID()` function to validate notification IDs before file operations
+    - Protected functions: `ArchiveNotification()`, `UnarchiveNotification()`, `DeleteNotification()`
+    - Blocks parent directory references (`..`), absolute paths, and path separators
+    - Enforces `.notify` file extension requirement
+  - Fixed path traversal vulnerabilities in config collector (`daemon/services/collectors/config.go`)
+    - Added `validateShareName()` function to validate share names before config file access
+    - Protected functions: `GetShareConfig()`, `UpdateShareConfig()`
+    - Blocks parent directory references (`..`), absolute paths, and path separators
+    - Enforces 255 character limit for share names
+  - Implemented defense-in-depth validation strategy:
+    - Input validation at function level (not just API level)
+    - Path normalization using `filepath.Clean()`
+    - Path containment verification using `strings.HasPrefix()`
+    - Multiple validation layers for comprehensive protection
+  - Added comprehensive security test coverage:
+    - `daemon/services/controllers/notification_security_test.go` (4 test suites, 27 test cases)
+    - `daemon/services/collectors/config_security_test.go` (3 test suites, 21 test cases)
+    - All tests validate rejection of malicious path traversal attempts
+  - **Impact**: Prevents attackers from reading or writing arbitrary files on the system
+  - **CWE-22**: Improper Limitation of a Pathname to a Restricted Directory
+  - **Affected Versions**: All versions prior to v2025.11.25
+  - **Recommendation**: All users should upgrade immediately to v2025.11.25
+
+### Documentation
+
+- Added `SECURITY_FIX_PATH_TRAVERSAL.md` with detailed vulnerability analysis and fix documentation
+
+---
+
 ## [2025.11.24] - 2025-11-18
 
 ### Added
