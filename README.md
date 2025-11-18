@@ -111,12 +111,20 @@ Coordinates the entire application lifecycle:
 - Starts API server subscriptions before collectors
 - Manages graceful shutdown
 
-## Installation
+## System Requirements and Dependencies
 
-### Prerequisites
+**Important:** The Unraid Management Agent has **NO external plugin dependencies**. It collects data directly from system sources.
+
+For detailed information, see:
+- **[System Requirements & Dependencies](docs/SYSTEM_REQUIREMENTS_AND_DEPENDENCIES.md)** - Complete requirements and data collection methods
+- **[Quick Reference](docs/QUICK_REFERENCE_DEPENDENCIES.md)** - TL;DR version
+- **[Diagnostic Commands](docs/DIAGNOSTIC_COMMANDS.md)** - Troubleshooting guide
+
+### Quick Prerequisites
 
 - Unraid 6.9+ (tested on Unraid 7.x)
 - Port 8043 available (configurable)
+- No other plugins required
 
 ### Via Community Applications (Recommended)
 
