@@ -3,12 +3,12 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name        "unraid-management-agent">
 <!ENTITY author      "ruaan-deysel">
-<!ENTITY version     "2025.11.24">
+<!ENTITY version     "2025.11.25">
 <!ENTITY launch      "Settings/&name;">
 <!ENTITY gitURL      "https://github.com/ruaandeysel/&name;">
 <!ENTITY pluginURL   "&gitURL;/releases/latest/download/&name;.plg">
 <!ENTITY bundle      "&name;-&version;.tgz">
-<!ENTITY md5         "8ad9d677273092f29ec9424826ac0c4e">
+<!ENTITY md5         "2afe1cba6dc47ab8c2cfdd5ce684c131">
 ]>
 
 <PLUGIN  name="&name;"
@@ -20,6 +20,17 @@
          icon="server">
 
 <CHANGES>
+###2025.11.25
+- CRITICAL SECURITY UPDATE - All users should upgrade immediately
+- Fixed 5 CWE-22 path traversal vulnerabilities (High Severity)
+- Added comprehensive input validation for file paths in notification controller and config collector
+- Implemented defense-in-depth validation strategy with multiple protection layers
+- Added 48 security test cases to prevent path traversal attacks
+- Blocks parent directory references (..), absolute paths, and path separators
+- Prevents attackers from reading or writing arbitrary files on the system
+- CWE-22: Improper Limitation of a Pathname to a Restricted Directory
+- See SECURITY_FIX_PATH_TRAVERSAL.md for detailed information
+
 ###2025.11.24
 - ZFS Storage Pool Support (Issue #9)
 - Complete ZFS integration for monitoring ZFS storage pools on Unraid

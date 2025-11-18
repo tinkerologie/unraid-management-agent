@@ -3,14 +3,14 @@
 <!DOCTYPE PLUGIN [
     <!ENTITY name        "unraid-management-agent">
     <!ENTITY author      "ruaan-deysel">
-    <!ENTITY version     "2025.11.24">
+    <!ENTITY version     "2025.11.25">
     <!ENTITY gitURL      "https://github.com/&author;/&name;">
     <!ENTITY pluginURL   "&gitURL;/raw/main/&name;.plg">
     <!ENTITY supportURL  "https://forums.unraid.net/topic/178262-home-assistant-unraid-integration">
     <!ENTITY launch      "Settings/unraid-management-agent">
     <!ENTITY bundle      "&name;-&version;.tgz">
     <!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
-    <!ENTITY md5         "8ad9d677273092f29ec9424826ac0c4e">
+    <!ENTITY md5         "2afe1cba6dc47ab8c2cfdd5ce684c131">
 ]>
 
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" icon="server" min="6.9.0" pluginURL="&pluginURL;" support="&supportURL;">
@@ -20,6 +20,17 @@ This Unraid plugin provides REST API and WebSocket interfaces for real-time syst
 </DESCRIPTION>
 
 <CHANGES>
+###2025.11.25 (2025-11-18)
+- CRITICAL SECURITY UPDATE - All users should upgrade immediately
+- Fixed 5 CWE-22 path traversal vulnerabilities (High Severity)
+- Added comprehensive input validation for file paths in notification controller and config collector
+- Implemented defense-in-depth validation strategy with multiple protection layers
+- Added 48 security test cases to prevent path traversal attacks
+- Blocks parent directory references (..), absolute paths, and path separators
+- Prevents attackers from reading or writing arbitrary files on the system
+- CWE-22: Improper Limitation of a Pathname to a Restricted Directory
+- See SECURITY_FIX_PATH_TRAVERSAL.md for detailed information
+
 ###2025.11.24 (2025-11-18)
 - ZFS Storage Pool Support (Issue #9)
 - Complete ZFS integration for monitoring ZFS storage pools on Unraid
