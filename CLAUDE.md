@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The Unraid Management Agent is a Go-based plugin for Unraid that exposes comprehensive system monitoring and control via REST API and WebSockets. This is a **third-party community plugin**, not an official Unraid product. It provides a REST API + WebSocket interface as an alternative/complement to the official Unraid GraphQL API.
 
-**Language:** Go 1.23
+**Language:** Go 1.24
 **Target Platform:** Linux/amd64 (Unraid OS)
 
 ## Essential Commands
@@ -54,11 +54,11 @@ make clean
 
 ### Development Workflow
 
-The project uses semantic versioning with date-based releases (e.g., `2025.11.1`). When creating a release:
+The project uses semantic versioning with date-based releases (e.g., `2025.11.25`). When creating a release:
 
 1. Update the `VERSION` file with the new version number
 2. Update `CHANGELOG.md` with release notes
-3. Create and push a git tag: `git tag v2025.11.1 && git push origin v2025.11.1`
+3. Create and push a git tag: `git tag v2025.11.25 && git push origin v2025.11.25`
 4. GitHub Actions will automatically build and release the package
 
 ## Architecture
@@ -94,7 +94,8 @@ All data structures shared between collectors, API, and WebSocket clients:
 
 - `SystemInfo`, `ArrayStatus`, `DiskInfo`, `NetworkInfo`
 - `ContainerInfo`, `VMInfo`, `UPSStatus`, `GPUMetrics`
-- `ShareInfo`, `WebSocketMessage`
+- `ShareInfo`, `WebSocketMessage`, `HardwareInfo`, `Registration`
+- `NotificationList`, `UnassignedDeviceList`, `ZFSPool`, `ZFSDataset`
 
 #### 3. Collectors (`daemon/services/collectors/`)
 
@@ -111,6 +112,11 @@ Independent goroutines that collect data at fixed intervals and publish to the e
 | UPS | 10s | `ups_status_update` | UPS status (if available) |
 | GPU | 10s | `gpu_metrics_update` | GPU metrics (if available) |
 | Share | 60s | `share_list_update` | User share information |
+| Hardware | 300s | `hardware_update` | BIOS, baseboard, CPU, memory |
+| Registration | 300s | `registration_update` | License/registration status |
+| Notification | 15s | `notifications_update` | System notifications |
+| Unassigned | 30s | `unassigned_devices_update` | Unassigned devices/shares |
+| ZFS | 30s | `zfs_*_update` | ZFS pools, datasets, snapshots |
 
 Each collector:
 
@@ -154,13 +160,17 @@ Execute control operations:
 - `docker.go`: Start, stop, restart, pause, unpause containers
 - `vm.go`: Start, stop, restart, pause, resume, hibernate VMs
 - `array.go`: Start/stop array, parity check operations
+- `notification.go`: Create, archive, delete notifications
+- `userscripts.go`: Execute user scripts
 
 #### 6. Library Utilities (`daemon/lib/`)
 
 - `shell.go`: Execute shell commands with error handling
 - `parser.go`: Parse Unraid-specific file formats (.ini files)
 - `utils.go`: Common utility functions
-- `validation.go`: Input validation for API requests
+- `validation.go`: Input validation for API requests (CWE-22 path traversal protection)
+- `dmidecode.go`: DMI/SMBIOS data parsing for hardware info
+- `ethtool.go`: Network interface tool parsing
 
 #### 7. Orchestrator (`daemon/services/orchestrator.go`)
 
@@ -182,7 +192,7 @@ Coordinates the entire application lifecycle:
 
 ### Unraid Integration
 
-The agent reads from Unraid-specific locations (see `daemon/common/const.go`):
+The agent reads from Unraid-specific locations (see `daemon/constants/const.go`):
 
 **Configuration Files:**
 
@@ -195,6 +205,7 @@ The agent reads from Unraid-specific locations (see `daemon/common/const.go`):
 
 - `/proc/cpuinfo`, `/proc/meminfo`, `/proc/uptime` - System metrics
 - `/sys/class/hwmon/` - Temperature sensors
+- `/proc/spl/kstat/zfs/arcstats` - ZFS ARC statistics
 
 **Binaries:**
 
@@ -203,6 +214,9 @@ The agent reads from Unraid-specific locations (see `daemon/common/const.go`):
 - `/usr/bin/virsh` - VM management
 - `/usr/sbin/smartctl` - SMART data
 - `/sbin/apcaccess`, `/usr/bin/upsc` - UPS monitoring
+- `/usr/bin/nvidia-smi` - GPU metrics
+- `/usr/sbin/zpool`, `/usr/sbin/zfs` - ZFS management
+- `/usr/sbin/dmidecode` - Hardware information
 
 ## API Structure
 
@@ -213,6 +227,9 @@ Base URL: `http://localhost:8043/api/v1`
 - `/health`, `/system`, `/array`, `/disks`, `/disks/{id}`
 - `/network`, `/shares`, `/ups`, `/gpu`
 - `/docker`, `/docker/{id}`, `/vm`, `/vm/{id}`
+- `/hardware/*`, `/registration`, `/logs`
+- `/notifications`, `/notifications/{id}`, `/unassigned`
+- `/zfs/pools`, `/zfs/datasets`, `/zfs/snapshots`, `/zfs/arc`
 
 ### Control Endpoints (POST)
 
@@ -220,6 +237,8 @@ Base URL: `http://localhost:8043/api/v1`
 - `/vm/{id}/{action}` - start, stop, restart, pause, resume, hibernate, force-stop
 - `/array/{action}` - start, stop
 - `/array/parity-check/{action}` - start, stop, pause, resume
+- `/notifications` - create, archive, delete notifications
+- `/user-scripts/{name}/execute` - execute user scripts
 
 ### Configuration Endpoints
 
@@ -237,6 +256,8 @@ Base URL: `http://localhost:8043/api/v1`
 - `daemon/dto/system_test.go` - DTO tests
 - `daemon/lib/shell_test.go`, `daemon/lib/validation_test.go` - Library tests
 - `daemon/services/api/handlers_test.go` - API handler tests
+- `daemon/services/collectors/config_security_test.go` - Config security tests
+- `daemon/services/controllers/notification_security_test.go` - Notification security tests
 
 **Test Conventions:**
 
@@ -264,12 +285,27 @@ Base URL: `http://localhost:8043/api/v1`
 - No backups (only current log)
 - No age-based retention
 
+## Security Considerations
+
+**Input Validation:**
+
+- All user-provided file paths must be validated using `lib.ValidateConfigPath()` or `lib.ValidateNotificationFilename()`
+- Protection against CWE-22 path traversal vulnerabilities
+- No directory traversal (`..`), absolute paths (`/`), or null bytes allowed
+- See `daemon/lib/validation.go` for validation functions
+
+**Command Injection:**
+
+- Use `lib.ExecuteShellCommand()` for safe command execution
+- Validate container names, VM names, and other user inputs before using in commands
+- Never directly interpolate user input into shell commands
+
 ## Hardware Compatibility
 
 This plugin was developed on a specific hardware configuration. Hardware variations (CPU, disk controllers, GPUs, UPS models) may cause compatibility issues. When fixing hardware-specific bugs:
 
 1. Identify the failing component (disk collector, GPU collector, etc.)
-2. Update command parsing in `daemon/lib/parser.go` or collector logic
+2. Update command parsing in `daemon/lib/parser.go`, `daemon/lib/dmidecode.go`, or collector logic
 3. Add fallback logic for different hardware variations
 4. Document the fix in the PR with hardware details
 
@@ -279,6 +315,7 @@ Common hardware variation areas:
 - Disk controller command outputs
 - UPS monitoring tool differences (apcupsd vs NUT)
 - Network interface variations
+- DMI/SMBIOS data structure differences
 
 ## Key Dependencies
 
@@ -286,8 +323,9 @@ Common hardware variation areas:
 - `github.com/cskr/pubsub` - Event bus (PubSub pattern)
 - `github.com/gorilla/mux` - HTTP router
 - `github.com/gorilla/websocket` - WebSocket implementation
-- `github.com/vaughan0/go-ini` - INI file parsing
+- `gopkg.in/ini.v1` - INI file parsing
 - `gopkg.in/natefinch/lumberjack.v2` - Log rotation
+- `github.com/fsnotify/fsnotify` - File system notifications
 
 ## Common Patterns
 
@@ -301,6 +339,7 @@ Common hardware variation areas:
 6. Add subscription in `api/server.go` `subscribeToEvents()`
 7. Add cache field and update logic
 8. Create REST endpoint handler
+9. Register collector in `orchestrator.go`
 
 ### Adding a New REST Endpoint
 
@@ -314,15 +353,15 @@ Common hardware variation areas:
 
 1. Create controller function in `daemon/services/controllers/`
 2. Use `lib.ExecuteShellCommand()` for command execution
-3. Add endpoint handler in `api/handlers.go`
-4. Validate input with `lib.ValidateContainerName()` or similar
+3. Validate input with `lib.ValidateContainerName()` or similar
+4. Add endpoint handler in `api/handlers.go`
 5. Return appropriate HTTP status codes
 
 ## Important Notes
 
 - **Never skip the initialization order** in orchestrator.go (API subscriptions before collectors)
 - **Always use mutex locks** when accessing API server cache
-- **Always validate user input** on control endpoints to prevent command injection
+- **Always validate user input** on control endpoints to prevent command injection and path traversal
 - **Test on actual Unraid** if possible, as local development differs from production
 - **Handle graceful shutdown** by respecting context cancellation in goroutines
 - **Panic recovery** is built into collectors and middleware, but avoid panics when possible
