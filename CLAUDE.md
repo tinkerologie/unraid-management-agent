@@ -365,3 +365,5 @@ Common hardware variation areas:
 - **Test on actual Unraid** if possible, as local development differs from production
 - **Handle graceful shutdown** by respecting context cancellation in goroutines
 - **Panic recovery** is built into collectors and middleware, but avoid panics when possible
+- **Use Context7** Always use context7 when I need code generation, setup or configuration steps, or library/API documentation. This means you should automatically use the Context7 MCP tools to resolve library id and get library docs without me having to explicitly ask.
+- **Always use Sequential Thinking** internally reason step-by-step before answering, ensuring each solution is planned, validated, and logically sequenced, while keeping the reasoning hidden unless explicitly requested.
