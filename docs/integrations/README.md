@@ -61,7 +61,7 @@ If you've created an integration with another platform, please consider contribu
 
 For questions or issues with integrations:
 
-- **GitHub Issues**: [Report an issue](https://github.com/domalab/unraid-management-agent/issues)
-- **Documentation**: [Main README](../../README.md)
+- **GitHub Issues**: [Report an issue](https://github.com/ruaan-deysel/unraid-management-agent/issues)
+- **Documentation**: [Main README](../README.md)
 - **API Reference**: [API Documentation](../api/API_REFERENCE.md)
 

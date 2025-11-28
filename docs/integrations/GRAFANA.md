@@ -2,8 +2,8 @@
 
 Complete guide to integrating the Unraid Management Agent with Grafana for monitoring and dashboards.
 
-**Version**: 2025.11.23  
-**Last Updated**: 2025-11-17
+**Version**: 2025.11.26  
+**Last Updated**: 2025-11-28
 
 ---
 
