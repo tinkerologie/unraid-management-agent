@@ -98,9 +98,9 @@ else
     exit 1
 fi
 
-# Test all 16 API endpoints
+# Test all API endpoints (18 tests including new log endpoints)
 print_header "2. API ENDPOINT VALIDATION"
-echo "Testing all 16 API endpoints..."
+echo "Testing API endpoints..."
 echo ""
 
 # 1. Health endpoint
@@ -255,15 +255,41 @@ else
     print_fail "HTTP $http_code | Failed"
 fi
 
-# 12. Logs endpoint
-print_test "12. Testing /logs?type=syslog&lines=5"
-response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/logs?type=syslog&lines=5")
+# 12. Logs list endpoint
+print_test "12. Testing /logs (log list)"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/logs")
 http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
 time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
 body=$(echo "$response" | sed '$d')
 if [ "$http_code" = "200" ]; then
-    lines=$(echo "$body" | jq -r '.lines | length')
-    print_pass "HTTP $http_code | ${time}s | Lines: $lines"
+    count=$(echo "$body" | jq '.logs | length')
+    print_pass "HTTP $http_code | ${time}s | Available logs: $count"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
+
+# 12a. Logs by filename - syslog
+print_test "12a. Testing /logs/syslog?lines=5 (new endpoint)"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/logs/syslog?lines=5")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    lines=$(echo "$body" | jq -r '.lines_returned // 0')
+    print_pass "HTTP $http_code | ${time}s | Lines returned: $lines"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
+
+# 12b. Logs by filename - dmesg
+print_test "12b. Testing /logs/dmesg?lines=5 (new endpoint)"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/logs/dmesg?lines=5")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    lines=$(echo "$body" | jq -r '.lines_returned // 0')
+    print_pass "HTTP $http_code | ${time}s | Lines returned: $lines"
 else
     print_fail "HTTP $http_code | Failed"
 fi
