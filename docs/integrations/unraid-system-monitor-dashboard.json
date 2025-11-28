@@ -89,7 +89,7 @@
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "11.0.0",
+      "pluginVersion": "12.0.0",
       "targets": [
         {
           "columns": [],
@@ -179,7 +179,7 @@
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "11.0.0",
+      "pluginVersion": "12.0.0",
       "targets": [
         {
           "columns": [],
@@ -269,7 +269,7 @@
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "11.0.0",
+      "pluginVersion": "12.0.0",
       "targets": [
         {
           "columns": [],
@@ -359,7 +359,7 @@
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "11.0.0",
+      "pluginVersion": "12.0.0",
       "targets": [
         {
           "columns": [],
@@ -494,7 +494,7 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "11.0.0",
+      "pluginVersion": "12.0.0",
       "targets": [
         {
           "columns": [],
@@ -584,7 +584,7 @@
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "11.0.0",
+      "pluginVersion": "12.0.0",
       "targets": [
         {
           "columns": [],
@@ -686,7 +686,7 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "11.0.0",
+      "pluginVersion": "12.0.0",
       "targets": [
         {
           "columns": [],
@@ -769,7 +769,7 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "11.0.0",
+      "pluginVersion": "12.0.0",
       "targets": [
         {
           "columns": [],
@@ -967,7 +967,7 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "11.0.0",
+      "pluginVersion": "12.0.0",
       "targets": [
         {
           "columns": [],
@@ -1174,7 +1174,7 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "11.0.0",
+      "pluginVersion": "12.0.0",
       "targets": [
         {
           "columns": [],
@@ -1365,7 +1365,7 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "11.0.0",
+      "pluginVersion": "12.0.0",
       "targets": [
         {
           "columns": [],
@@ -1410,8 +1410,9 @@
       "type": "table"
     }
   ],
+  "preload": false,
   "refresh": "30s",
-  "schemaVersion": 39,
+  "schemaVersion": 41,
   "style": "dark",
   "tags": [
     "unraid",
