@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -36,11 +37,60 @@ func (s *Server) handleSystem(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, info)
 }
 
+// handleSystemReboot initiates a system reboot
+func (s *Server) handleSystemReboot(w http.ResponseWriter, _ *http.Request) {
+	logger.Info("API: System reboot requested")
+
+	systemCtrl := controllers.NewSystemController(s.ctx)
+	err := systemCtrl.Reboot()
+
+	if err != nil {
+		logger.Error("API: Failed to initiate reboot: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to initiate reboot: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   "Server reboot initiated",
+		Timestamp: time.Now(),
+	})
+}
+
+// handleSystemShutdown initiates a system shutdown
+func (s *Server) handleSystemShutdown(w http.ResponseWriter, _ *http.Request) {
+	logger.Info("API: System shutdown requested")
+
+	systemCtrl := controllers.NewSystemController(s.ctx)
+	err := systemCtrl.Shutdown()
+
+	if err != nil {
+		logger.Error("API: Failed to initiate shutdown: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to initiate shutdown: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   "Server shutdown initiated",
+		Timestamp: time.Now(),
+	})
+}
+
 func (s *Server) handleArray(w http.ResponseWriter, _ *http.Request) {
 	// Get latest array status from cache
 	s.cacheMutex.RLock()
 	status := s.arrayCache
 	s.cacheMutex.RUnlock()
+
 
 	if status == nil {
 		status = &dto.ArrayStatus{
@@ -896,6 +946,61 @@ func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
 	content, err := s.getLogContent(path, linesParam, startParam)
 	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, content)
+}
+
+// handleLogFile retrieves a specific log file by filename
+// This provides a cleaner REST endpoint for accessing known log files
+func (s *Server) handleLogFile(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	filename := vars["filename"]
+	logger.Debug("API: Getting log file: %s", filename)
+
+	// Validate filename to prevent directory traversal (CWE-22)
+	if !lib.ValidateLogFilename(filename) {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   "Invalid filename",
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	// Find the log file in our known log paths
+	logs := s.listLogFiles()
+	var foundPath string
+	for _, log := range logs {
+		// Match by filename (base name) or full name (for plugin logs)
+		if log.Name == filename || filepath.Base(log.Path) == filename {
+			foundPath = log.Path
+			break
+		}
+	}
+
+	if foundPath == "" {
+		respondJSON(w, http.StatusNotFound, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Log file not found: %s", filename),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	// Get optional query parameters for pagination
+	linesParam := r.URL.Query().Get("lines")
+	startParam := r.URL.Query().Get("start")
+
+	// Get log content
+	content, err := s.getLogContent(foundPath, linesParam, startParam)
+	if err != nil {
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   err.Error(),
+			Timestamp: time.Now(),
+		})
 		return
 	}
 

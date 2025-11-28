@@ -12,10 +12,11 @@ type LogFile struct {
 
 // LogFileContent represents the content of a log file with pagination support
 type LogFileContent struct {
-	Path       string   `json:"path"`
-	Content    string   `json:"content"`
-	Lines      []string `json:"lines"`
-	TotalLines int      `json:"total_lines"`
-	StartLine  int      `json:"start_line"`
-	EndLine    int      `json:"end_line"`
+	Path          string   `json:"path"`
+	Content       string   `json:"content"`
+	Lines         []string `json:"lines"`
+	TotalLines    int      `json:"total_lines"`
+	LinesReturned int      `json:"lines_returned"`
+	StartLine     int      `json:"start_line"`
+	EndLine       int      `json:"end_line"`
 }

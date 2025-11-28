@@ -182,3 +182,38 @@ func ValidateUserScriptName(name string) error {
 
 	return nil
 }
+
+// ValidateLogFilename validates a log filename
+// Prevents path traversal attacks (CWE-22) by ensuring the filename contains only safe characters
+// and does not contain path separators or parent directory references
+func ValidateLogFilename(name string) bool {
+	if name == "" {
+		return false
+	}
+
+	if len(name) > 255 {
+		return false
+	}
+
+	// Check for parent directory references (CWE-22 path traversal)
+	if strings.Contains(name, "..") {
+		return false
+	}
+
+	// Check for path separators (only allow forward slashes for plugin log paths like "plugin/file.log")
+	if strings.Contains(name, "\\") {
+		return false
+	}
+
+	// Check for absolute paths
+	if strings.HasPrefix(name, "/") {
+		return false
+	}
+
+	// Check for null bytes (CWE-158)
+	if strings.Contains(name, "\x00") {
+		return false
+	}
+
+	return true
+}

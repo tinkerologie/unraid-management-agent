@@ -245,6 +245,8 @@ Base URL: `http://localhost:8043/api/v1`
 - `GET /vm/{id}` - Get VM details
 - `GET /ups` - UPS status
 - `GET /gpu` - GPU metrics
+- `GET /logs` - List log files or get log content
+- `GET /logs/{filename}` - Get specific log file by name
 
 #### Control Endpoints
 

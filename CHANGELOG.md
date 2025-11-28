@@ -19,6 +19,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2025.11.26] - 2025-11-28
+
+### Added
+
+- **Enhanced Log API** (Issue #28):
+  - Expanded `commonLogPaths` from 4 to 30+ common Unraid log file paths
+  - New log files include: dmesg, messages, cron, debug, btmp, lastlog, wtmp, graphql-api.log, unraid-api.log, recycle.log, dhcplog, mover.log, apcupsd.events, nohup.out, nginx error/access logs, vfsd.log, smbd.log, nfsd.log, samba logs, and more
+  - New REST endpoint: `GET /api/v1/logs/{filename}` for direct log file access by filename
+  - Added `lines_returned` field to `LogFileContent` DTO for pagination clarity
+  - Added `ValidateLogFilename()` function in `daemon/lib/validation.go` for secure filename validation
+  - Proper path traversal protection (CWE-22) on new `/logs/{filename}` endpoint
+  - Matches Unraid GraphQL API log coverage for parity
+
+- **System Reboot and Shutdown API** (Issue #20):
+  - New REST endpoint: `POST /api/v1/system/reboot` to initiate server reboot
+  - New REST endpoint: `POST /api/v1/system/shutdown` to initiate server shutdown
+  - New `SystemController` in `daemon/services/controllers/system.go`
+  - Enables Home Assistant integration for server power management
+  - Graceful shutdown/reboot using standard Linux shutdown command
+
+---
+
 ## [2025.11.25] - 2025-11-18
 
 ### Security

@@ -83,6 +83,10 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/vm/{id}", s.handleVMInfo).Methods("GET")
 	api.HandleFunc("/ups", s.handleUPS).Methods("GET")
 	api.HandleFunc("/gpu", s.handleGPU).Methods("GET")
+
+	// System control endpoints
+	api.HandleFunc("/system/reboot", s.handleSystemReboot).Methods("POST")
+	api.HandleFunc("/system/shutdown", s.handleSystemShutdown).Methods("POST")
 	api.HandleFunc("/network", s.handleNetwork).Methods("GET")
 
 	// ZFS endpoints
@@ -146,6 +150,7 @@ func (s *Server) setupRoutes() {
 
 	// Log file endpoints
 	api.HandleFunc("/logs", s.handleLogs).Methods("GET")
+	api.HandleFunc("/logs/{filename}", s.handleLogFile).Methods("GET")
 
 	// Notification endpoints (monitoring)
 	api.HandleFunc("/notifications", s.handleNotifications).Methods("GET")

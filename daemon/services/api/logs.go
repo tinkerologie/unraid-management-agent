@@ -13,11 +13,46 @@ import (
 )
 
 // Common log file locations on Unraid
+// Expanded to match Unraid GraphQL API coverage per issue #28
 var commonLogPaths = []string{
+	// Core system logs
 	"/var/log/syslog",
+	"/var/log/dmesg",
+	"/var/log/messages",
+	"/var/log/cron",
+	"/var/log/debug",
+	"/var/log/btmp",
+	"/var/log/lastlog",
+	"/var/log/wtmp",
+
+	// Unraid-specific logs
 	"/var/log/docker.log",
 	"/var/log/libvirt/libvirtd.log",
 	"/var/log/unraid-management-agent.log",
+	"/var/log/graphql-api.log",
+	"/var/log/unraid-api.log",
+	"/var/log/recycle.log",
+	"/var/log/dhcplog",
+	"/var/log/pkgtools/script.log",
+	"/var/log/mover.log",
+
+	// UPS logs
+	"/var/log/apcupsd.events",
+	"/var/log/nohup.out",
+
+	// Web server logs
+	"/var/log/nginx/error.log",
+	"/var/log/nginx/access.log",
+
+	// VFS and share logs
+	"/var/log/vfsd.log",
+	"/var/log/smbd.log",
+	"/var/log/nfsd.log",
+
+	// Plugin and system logs
+	"/var/log/plugins",
+	"/var/log/samba/log.smbd",
+	"/var/log/samba/log.nmbd",
 }
 
 // listLogFiles returns a list of available log files
@@ -121,12 +156,13 @@ func (s *Server) getLogContent(path, linesParam, startParam string) (*dto.LogFil
 	// Default: return all lines if no pagination specified
 	if !linesSpecified && !startSpecified {
 		return &dto.LogFileContent{
-			Path:       path,
-			Content:    strings.Join(allLines, "\n"),
-			Lines:      allLines,
-			TotalLines: totalLines,
-			StartLine:  0,
-			EndLine:    totalLines,
+			Path:          path,
+			Content:       strings.Join(allLines, "\n"),
+			Lines:         allLines,
+			TotalLines:    totalLines,
+			LinesReturned: totalLines,
+			StartLine:     0,
+			EndLine:       totalLines,
 		}, nil
 	}
 
@@ -144,12 +180,13 @@ func (s *Server) getLogContent(path, linesParam, startParam string) (*dto.LogFil
 	}
 	if startLine >= totalLines {
 		return &dto.LogFileContent{
-			Path:       path,
-			Content:    "",
-			Lines:      []string{},
-			TotalLines: totalLines,
-			StartLine:  startLine,
-			EndLine:    startLine,
+			Path:          path,
+			Content:       "",
+			Lines:         []string{},
+			TotalLines:    totalLines,
+			LinesReturned: 0,
+			StartLine:     startLine,
+			EndLine:       startLine,
 		}, nil
 	}
 
@@ -161,11 +198,12 @@ func (s *Server) getLogContent(path, linesParam, startParam string) (*dto.LogFil
 	selectedLines := allLines[startLine:endLine]
 
 	return &dto.LogFileContent{
-		Path:       path,
-		Content:    strings.Join(selectedLines, "\n"),
-		Lines:      selectedLines,
-		TotalLines: totalLines,
-		StartLine:  startLine,
-		EndLine:    endLine,
+		Path:          path,
+		Content:       strings.Join(selectedLines, "\n"),
+		Lines:         selectedLines,
+		TotalLines:    totalLines,
+		LinesReturned: len(selectedLines),
+		StartLine:     startLine,
+		EndLine:       endLine,
 	}, nil
 }

@@ -4,7 +4,7 @@ Complete reference for all Unraid Management Agent API endpoints.
 
 **Base URL**: `http://YOUR_UNRAID_IP:8043/api/v1`  
 **Version**: 1.0.0  
-**Total Endpoints**: 46
+**Total Endpoints**: 49
 
 ---
 
@@ -24,6 +24,7 @@ Complete reference for all Unraid Management Agent API endpoints.
 - [Docker Containers](#docker-containers)
 - [Virtual Machines](#virtual-machines)
 - [Hardware](#hardware)
+- [Log Files](#log-files)
 - [Configuration](#configuration)
 - [WebSocket](#websocket)
 - [Security Best Practices](#security-best-practices)
@@ -847,6 +848,74 @@ curl http://192.168.20.21:8043/api/v1/system
 ```
 
 **Note**: All size fields are in **bytes**, all temperatures are in **Celsius**, and all percentages use the `_percent` suffix.
+
+---
+
+### POST /system/reboot
+
+Initiate a server reboot.
+
+**⚠️ Warning**: This is a destructive operation. The server will reboot immediately. Ensure all critical operations are complete before calling this endpoint.
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "System reboot initiated"
+}
+```
+
+**Error Response** (if reboot command fails):
+```json
+{
+  "success": false,
+  "message": "Failed to initiate reboot: <error details>"
+}
+```
+
+**Example**:
+```bash
+curl -X POST http://192.168.20.21:8043/api/v1/system/reboot
+```
+
+**Use Cases**:
+- Home Assistant integration for automated server power management
+- Remote server administration
+- Post-maintenance reboot automation
+
+---
+
+### POST /system/shutdown
+
+Initiate a server shutdown (power off).
+
+**⚠️ Warning**: This is a destructive operation. The server will shut down immediately. You will need physical access or out-of-band management (IPMI/iLO/iDRAC) to power the server back on.
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "System shutdown initiated"
+}
+```
+
+**Error Response** (if shutdown command fails):
+```json
+{
+  "success": false,
+  "message": "Failed to initiate shutdown: <error details>"
+}
+```
+
+**Example**:
+```bash
+curl -X POST http://192.168.20.21:8043/api/v1/system/shutdown
+```
+
+**Use Cases**:
+- Home Assistant integration for scheduled server shutdowns
+- Power-saving automation (shutdown during off-peak hours)
+- Emergency shutdown via remote access
 
 ---
 
@@ -1944,9 +2013,114 @@ Get network interfaces and statistics.
 
 ---
 
+## Log Files
+
+### GET /logs
+
+List available log files or retrieve log content.
+
+**Query Parameters**:
+- `path` (optional) - Full path to log file. If omitted, lists all available log files.
+- `lines` (optional) - Number of lines to return (tail behavior if start not specified)
+- `start` (optional) - Starting line number for range retrieval
+
+**List All Logs Response**:
+```json
+{
+  "logs": [
+    {
+      "name": "syslog",
+      "path": "/var/log/syslog",
+      "size_bytes": 1048576,
+      "modified_at": "2025-11-28T12:00:00+10:00"
+    },
+    {
+      "name": "docker.log",
+      "path": "/var/log/docker.log",
+      "size_bytes": 524288,
+      "modified_at": "2025-11-28T11:30:00+10:00"
+    }
+  ]
+}
+```
+
+**Get Log Content Response** (with `?path=/var/log/syslog&lines=100`):
+```json
+{
+  "path": "/var/log/syslog",
+  "content": "Nov 28 12:00:00 Cube ...\n...",
+  "lines": ["Nov 28 12:00:00 Cube ...", "..."],
+  "total_lines": 10000,
+  "lines_returned": 100,
+  "start_line": 9900,
+  "end_line": 10000
+}
+```
+
+**Available Log Files**:
+- `/var/log/syslog` - System log
+- `/var/log/dmesg` - Kernel ring buffer
+- `/var/log/messages` - System messages
+- `/var/log/cron` - Cron job logs
+- `/var/log/docker.log` - Docker daemon logs
+- `/var/log/libvirt/libvirtd.log` - Libvirt daemon logs
+- `/var/log/unraid-management-agent.log` - This plugin's logs
+- `/var/log/graphql-api.log` - Unraid GraphQL API logs
+- `/var/log/nginx/error.log` - Nginx error logs
+- `/var/log/nginx/access.log` - Nginx access logs
+- `/var/log/apcupsd.events` - UPS events
+- And 20+ more system and application logs
+
+---
+
+### GET /logs/{filename}
+
+Retrieve a specific log file by filename.
+
+**Path Parameters**:
+- `filename` - The name of the log file (e.g., `syslog`, `docker.log`)
+
+**Query Parameters**:
+- `lines` (optional) - Number of lines to return
+- `start` (optional) - Starting line number
+
+**Response**:
+```json
+{
+  "path": "/var/log/syslog",
+  "content": "Nov 28 12:00:00 Cube ...\n...",
+  "lines": ["Nov 28 12:00:00 Cube ...", "..."],
+  "total_lines": 10000,
+  "lines_returned": 50,
+  "start_line": 9950,
+  "end_line": 10000
+}
+```
+
+**Error Response** (invalid filename):
+```json
+{
+  "success": false,
+  "message": "Invalid filename",
+  "timestamp": "2025-11-28T12:00:00+10:00"
+}
+```
+
+**Error Response** (not found):
+```json
+{
+  "success": false,
+  "message": "Log file not found: unknown.log",
+  "timestamp": "2025-11-28T12:00:00+10:00"
+}
+```
+
+---
+
 ## Configuration
 
 ### GET /settings/system
+
 
 Get system settings.
 
