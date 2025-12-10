@@ -1,0 +1,44 @@
+{
+  "name": "unraid-management-agent-dev",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "unraid-management-agent-dev",
+  "workspaceFolder": "/workspaces/unraid-management-agent",
+  "shutdownAction": "stopCompose",
+  "containerEnv": {
+    "GOOS": "linux",
+    "GOARCH": "amd64",
+    "GOPATH": "/go",
+    "GOBIN": "/go/bin"
+  },
+  "forwardPorts": [8043],
+  "remoteUser": "vscode",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "ms-vscode.makefile-tools",
+        "esbenp.prettier-vscode",
+        "GitHub.vscode-pull-request-github",
+        "GitHub.copilot",
+        "GitHub.copilot-chat",
+        "GitHub.remotehub",
+        "GitHub.vscode-github-actions",
+        "GitHub.codespaces",
+        "GitHub.github-vscode-theme",
+        "Anthropic.claude-dev"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "[go]": {
+          "editor.defaultFormatter": "golang.go",
+          "editor.formatOnSave": true
+        },
+        "go.useLanguageServer": true,
+        "go.toolsManagement.autoUpdate": true,
+        "makefile.makefilePath": "Makefile"
+      }
+    }
+  },
+  "postCreateCommand": "go mod download"
+}
