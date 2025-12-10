@@ -3,9 +3,7 @@
   "dockerComposeFile": "docker-compose.yml",
   "service": "unraid-management-agent-dev",
   "workspaceFolder": "/workspaces/unraid-management-agent",
-  "runServices": ["unraid-management-agent-dev"],
   "shutdownAction": "stopCompose",
-  "runArgs": ["--name", "unraid-management-agent-dev"],
   "containerEnv": {
     "GOOS": "linux",
     "GOARCH": "amd64",
