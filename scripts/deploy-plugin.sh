@@ -24,18 +24,19 @@ UNRAID_IP="${1:-$UNRAID_IP}"
 UNRAID_PASSWORD="${2:-$UNRAID_PASSWORD}"
 CREATE_BACKUP="${3:-no}"  # Set to "yes" to create backup, default is "no"
 
-# Update SSH command if password was overridden
-if [ -n "$2" ]; then
-    SSH_CMD="sshpass -p '$UNRAID_PASSWORD' ssh -o StrictHostKeyChecking=no root@$UNRAID_IP"
-fi
-
 VERSION=$(cat VERSION)
 BUILD_DIR="build"
 PLUGIN_BUNDLE="${BUILD_DIR}/${PLUGIN_NAME}-${VERSION}.tgz"
 
-# SSH command wrapper with sshpass
-SSH_CMD="sshpass -p '$UNRAID_PASSWORD' ssh -o StrictHostKeyChecking=no root@$UNRAID_IP"
-SCP_CMD="sshpass -p '$UNRAID_PASSWORD' scp -o StrictHostKeyChecking=no"
+# Helper functions to avoid eval and command injection risks
+# These functions properly quote arguments to prevent shell metacharacter injection
+run_ssh() {
+    sshpass -p "$UNRAID_PASSWORD" ssh -o StrictHostKeyChecking=no "root@$UNRAID_IP" "$@"
+}
+
+run_scp() {
+    sshpass -p "$UNRAID_PASSWORD" scp -o StrictHostKeyChecking=no "$@"
+}
 
 echo "========================================="
 echo "Unraid Plugin Deployment with Icon Fix"
@@ -49,7 +50,7 @@ echo "Step 1: Checking server connectivity..."
 # Use curl to check API health endpoint (more reliable than ping which may be blocked)
 if ! curl -s -m 5 "http://${UNRAID_IP}:${API_PORT}/api/v1/health" > /dev/null 2>&1; then
     # Fallback to SSH check if API isn't running yet
-    if ! eval "$SSH_CMD 'echo ok'" > /dev/null 2>&1; then
+    if ! run_ssh echo ok > /dev/null 2>&1; then
         echo "❌ Error: Cannot reach server at $UNRAID_IP"
         exit 1
     fi
@@ -86,7 +87,7 @@ echo ""
 
 # Step 4: Stop existing service
 echo "Step 4: Stopping existing service..."
-eval "$SSH_CMD 'killall ${PLUGIN_NAME} 2>/dev/null || true'"
+run_ssh "killall ${PLUGIN_NAME} 2>/dev/null || true"
 sleep 2
 echo "✅ Service stopped"
 echo ""
@@ -95,7 +96,7 @@ echo ""
 if [ "$CREATE_BACKUP" = "yes" ]; then
     echo "Step 5: Backing up existing plugin..."
     BACKUP_DIR="/boot/config/plugins/${PLUGIN_NAME}/backup-$(date +%Y%m%d-%H%M%S)"
-    eval "$SSH_CMD '
+    run_ssh "
     if [ -d /usr/local/emhttp/plugins/${PLUGIN_NAME} ]; then
         mkdir -p $BACKUP_DIR
         cp -r /usr/local/emhttp/plugins/${PLUGIN_NAME}/* $BACKUP_DIR/ 2>/dev/null || true
@@ -103,7 +104,7 @@ if [ "$CREATE_BACKUP" = "yes" ]; then
     else
         echo \"No existing plugin to backup\"
     fi
-    '"
+    "
     echo "✅ Backup complete"
 else
     echo "Step 5: Skipping backup (CREATE_BACKUP=no)"
@@ -112,16 +113,16 @@ echo ""
 
 # Step 6: Remove old plugin files
 echo "Step 6: Removing old plugin files..."
-eval "$SSH_CMD '
+run_ssh "
 rm -rf /usr/local/emhttp/plugins/${PLUGIN_NAME}/* 2>/dev/null || true
 mkdir -p /usr/local/emhttp/plugins/${PLUGIN_NAME}
-'"
+"
 echo "✅ Old files removed"
 echo ""
 
 # Step 7: Upload plugin bundle
 echo "Step 7: Uploading plugin bundle..."
-if ! eval "$SCP_CMD '$PLUGIN_BUNDLE' root@$UNRAID_IP:/tmp/"; then
+if ! run_scp "$PLUGIN_BUNDLE" "root@$UNRAID_IP:/tmp/"; then
     echo "❌ Error: Failed to upload plugin bundle"
     exit 1
 fi
@@ -130,29 +131,29 @@ echo ""
 
 # Step 8: Extract plugin bundle
 echo "Step 8: Extracting plugin bundle..."
-eval "$SSH_CMD '
+run_ssh "
 cd /tmp
 tar -xzf ${PLUGIN_NAME}-${VERSION}.tgz
 cp -r usr/local/emhttp/plugins/${PLUGIN_NAME}/* /usr/local/emhttp/plugins/${PLUGIN_NAME}/
 rm -rf usr ${PLUGIN_NAME}-${VERSION}.tgz
-'"
+"
 echo "✅ Plugin extracted"
 echo ""
 
 # Step 9: Set permissions
 echo "Step 9: Setting permissions..."
-eval "$SSH_CMD '
+run_ssh "
 chmod +x /usr/local/emhttp/plugins/${PLUGIN_NAME}/${PLUGIN_NAME}
 chmod +x /usr/local/emhttp/plugins/${PLUGIN_NAME}/scripts/* 2>/dev/null || true
 chmod +x /usr/local/emhttp/plugins/${PLUGIN_NAME}/event/* 2>/dev/null || true
-'"
+"
 echo "✅ Permissions set"
 echo ""
 
 # Step 10: Verify plugin files
 echo "Step 10: Verifying plugin files..."
 echo "----------------------------------------"
-eval "$SSH_CMD '
+run_ssh "
 echo \"Checking required files:\"
 [ -f /usr/local/emhttp/plugins/${PLUGIN_NAME}/${PLUGIN_NAME} ] && echo \"  ✅ Binary executable\" || echo \"  ❌ Binary missing\"
 [ -f /usr/local/emhttp/plugins/${PLUGIN_NAME}/${PLUGIN_NAME}.page ] && echo \"  ✅ Page file\" || echo \"  ❌ Page file missing\"
@@ -161,12 +162,12 @@ echo \"Checking required files:\"
 [ -f /usr/local/emhttp/plugins/${PLUGIN_NAME}/images/${PLUGIN_NAME}.png ] && echo \"  ✅ Icon PNG\" || echo \"  ❌ Icon PNG missing\"
 [ -d /usr/local/emhttp/plugins/${PLUGIN_NAME}/scripts ] && echo \"  ✅ Scripts directory\" || echo \"  ❌ Scripts directory missing\"
 [ -d /usr/local/emhttp/plugins/${PLUGIN_NAME}/event ] && echo \"  ✅ Event directory\" || echo \"  ❌ Event directory missing\"
-'"
+"
 echo ""
 
 # Step 11: Create default configuration if needed
 echo "Step 11: Creating default configuration..."
-eval "$SSH_CMD '
+run_ssh "
 mkdir -p /boot/config/plugins/${PLUGIN_NAME}
 if [ ! -f /boot/config/plugins/${PLUGIN_NAME}/config.cfg ]; then
     cat > /boot/config/plugins/${PLUGIN_NAME}/config.cfg << EOF
@@ -177,26 +178,24 @@ EOF
 else
     echo \"✅ Configuration file already exists\"
 fi
-'"
+"
 echo ""
 
 # Step 12: Start the service using the start script
 echo "Step 12: Starting service..."
-eval "$SSH_CMD '
-/usr/local/emhttp/plugins/${PLUGIN_NAME}/scripts/start
-'"
+run_ssh "/usr/local/emhttp/plugins/${PLUGIN_NAME}/scripts/start"
 sleep 3
 echo "✅ Service started"
 echo ""
 
 # Step 13: Verify service is running
 echo "Step 13: Verifying service status..."
-if eval "$SSH_CMD 'pidof ${PLUGIN_NAME}'" > /dev/null 2>&1; then
-    PID=$(eval "$SSH_CMD 'pidof ${PLUGIN_NAME}'")
+if run_ssh "pidof ${PLUGIN_NAME}" > /dev/null 2>&1; then
+    PID=$(run_ssh "pidof ${PLUGIN_NAME}")
     echo "✅ Service is running (PID: $PID)"
 else
     echo "❌ Warning: Service may not be running"
-    echo "   Check logs: $SSH_CMD 'tail -f /var/log/${PLUGIN_NAME}.log'"
+    echo "   Check logs: ssh root@$UNRAID_IP 'tail -f /var/log/${PLUGIN_NAME}.log'"
 fi
 echo ""
 
@@ -209,7 +208,7 @@ sleep 2
 
 # Test health endpoint
 echo -n "Testing /api/v1/health... "
-if eval "$SSH_CMD 'curl -s http://localhost:8043/api/v1/health'" | grep -q "ok"; then
+if run_ssh "curl -s http://localhost:8043/api/v1/health" | grep -q "ok"; then
     echo "✅"
 else
     echo "❌"
@@ -217,7 +216,7 @@ fi
 
 # Test system endpoint
 echo -n "Testing /api/v1/system... "
-if eval "$SSH_CMD 'curl -s http://localhost:8043/api/v1/system'" | grep -q "hostname"; then
+if run_ssh "curl -s http://localhost:8043/api/v1/system" | grep -q "hostname"; then
     echo "✅"
 else
     echo "❌"
@@ -225,7 +224,7 @@ fi
 
 # Test array endpoint
 echo -n "Testing /api/v1/array... "
-if eval "$SSH_CMD 'curl -s http://localhost:8043/api/v1/array'" | grep -q "state"; then
+if run_ssh "curl -s http://localhost:8043/api/v1/array" | grep -q "state"; then
     echo "✅"
 else
     echo "❌"
