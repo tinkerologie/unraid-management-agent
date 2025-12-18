@@ -46,9 +46,13 @@ echo ""
 
 # Step 1: Check server connectivity
 echo "Step 1: Checking server connectivity..."
-if ! ping -c 1 -W 2 "$UNRAID_IP" > /dev/null 2>&1; then
-    echo "❌ Error: Cannot reach server at $UNRAID_IP"
-    exit 1
+# Use curl to check API health endpoint (more reliable than ping which may be blocked)
+if ! curl -s -m 5 "http://${UNRAID_IP}:${API_PORT}/api/v1/health" > /dev/null 2>&1; then
+    # Fallback to SSH check if API isn't running yet
+    if ! eval "$SSH_CMD 'echo ok'" > /dev/null 2>&1; then
+        echo "❌ Error: Cannot reach server at $UNRAID_IP"
+        exit 1
+    fi
 fi
 echo "✅ Server is reachable"
 echo ""

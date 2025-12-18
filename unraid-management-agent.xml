@@ -5,7 +5,7 @@
     <PluginAuthor>ruaan-deysel</PluginAuthor>
     <Beta>False</Beta>
     <Category>Tools:System</Category>
-    <Date>2025-11-25</Date>
+    <Date>2025-12-18</Date>
     <Name>Unraid Management Agent</Name>
     <Description>
         This Unraid plugin provides REST API and WebSocket interfaces for real-time system monitoring, Docker/VM control, and comprehensive hardware metrics. Monitor CPU, RAM, temperatures, disks, network, Docker containers, VMs, UPS, GPU, ZFS pools, and user shares. Control Docker containers and VMs via REST API. Real-time WebSocket event streaming for live updates.

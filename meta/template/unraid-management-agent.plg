@@ -3,7 +3,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name        "unraid-management-agent">
 <!ENTITY author      "ruaan-deysel">
-<!ENTITY version     "2025.11.26">
+<!ENTITY version     "2025.12.0">
 <!ENTITY launch      "Settings/&name;">
 <!ENTITY gitURL      "https://github.com/ruaandeysel/&name;">
 <!ENTITY pluginURL   "&gitURL;/releases/latest/download/&name;.plg">
@@ -20,6 +20,14 @@
          icon="server">
 
 <CHANGES>
+###2025.12.0
+- Bug Fix (Issue #30)
+- Fixed array disk counts inverted: num_data_disks and num_parity_disks were swapped
+- Removed incorrect use of mdNumDisabled field for data disk count
+- Data disks now correctly calculated as total disks minus active parity count
+- Parity disk count now only includes active parity disks (excludes disabled/missing)
+- Affects Home Assistant integration and other API clients
+
 ###2025.11.26
 - Enhanced Log API (Issue #28)
 - Expanded log file coverage from 4 to 30+ common Unraid log paths

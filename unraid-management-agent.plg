@@ -3,7 +3,7 @@
 <!DOCTYPE PLUGIN [
     <!ENTITY name        "unraid-management-agent">
     <!ENTITY author      "ruaan-deysel">
-    <!ENTITY version     "2025.11.26">
+    <!ENTITY version     "2025.12.0">
     <!ENTITY gitURL      "https://github.com/&author;/&name;">
     <!ENTITY pluginURL   "&gitURL;/raw/main/&name;.plg">
     <!ENTITY supportURL  "https://forums.unraid.net/topic/178262-home-assistant-unraid-integration">
@@ -20,6 +20,14 @@ This Unraid plugin provides REST API and WebSocket interfaces for real-time syst
 </DESCRIPTION>
 
 <CHANGES>
+###2025.12.0 (2025-12-18)
+- Bug Fix (Issue #30)
+- Fixed array disk counts inverted: num_data_disks and num_parity_disks were swapped
+- Removed incorrect use of mdNumDisabled field for data disk count
+- Data disks now correctly calculated as total disks minus active parity count
+- Parity disk count now only includes active parity disks (excludes disabled/missing)
+- Affects Home Assistant integration and other API clients
+
 ###2025.11.26 (2025-11-28)
 - Enhanced Log API (Issue #28)
 - Expanded log file coverage from 4 to 30+ common Unraid log paths

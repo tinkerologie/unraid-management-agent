@@ -126,15 +126,14 @@ func (c *ArrayCollector) collectArrayStatus() (*dto.ArrayStatus, error) {
 		logger.Warning("Array: mdNumDisks not found in file")
 	}
 
-	if section.HasKey("mdNumDisabled") {
-		numData := strings.Trim(section.Key("mdNumDisabled").String(), `"`)
-		if n, err := strconv.Atoi(numData); err == nil {
-			status.NumDataDisks = n
-		}
-	}
-
-	// Count parity disks from disks.ini (mdNumParity doesn't exist in var.ini)
+	// Count parity disks from disks.ini
 	status.NumParityDisks = c.countParityDisks()
+
+	// Calculate data disks: total disks minus parity disks
+	// mdNumDisks includes all array disks (data + parity), excluding cache/flash
+	status.NumDataDisks = status.NumDisks - status.NumParityDisks
+	logger.Debug("Array: Calculated NumDataDisks=%d (total=%d - parity=%d)",
+		status.NumDataDisks, status.NumDisks, status.NumParityDisks)
 
 	// Parity validity - check if parity sync has completed and has no errors
 	// sbSynced contains a timestamp when parity was last synced, or "0" if never synced
@@ -205,7 +204,7 @@ func (c *ArrayCollector) enrichWithArraySize(status *dto.ArrayStatus) {
 
 // countParityDisks counts the number of parity disks from disks.ini
 func (c *ArrayCollector) countParityDisks() int {
-	// Parse disks.ini to count parity disks
+	// Parse disks.ini to count active parity disks
 	cfg, err := ini.Load(constants.DisksIni)
 	if err != nil {
 		logger.Debug("Array: Failed to load disks.ini: %v", err)
@@ -215,15 +214,22 @@ func (c *ArrayCollector) countParityDisks() int {
 	parityCount := 0
 	// Iterate through all sections in disks.ini
 	for _, section := range cfg.Sections() {
-		// Check if this section has type="Parity"
-		if section.HasKey("type") {
+		// Check if this section has type="Parity" and is active
+		if section.HasKey("type") && section.HasKey("status") {
 			diskType := strings.Trim(section.Key("type").String(), `"`)
-			if diskType == "Parity" {
+			diskStatus := strings.Trim(section.Key("status").String(), `"`)
+
+			// Only count parity disks that are active (not disabled)
+			// DISK_NP_DSBL = Not Present/Disabled, DISK_NP = Not Present, DISK_DSBL = Disabled
+			if diskType == "Parity" && diskStatus != "DISK_NP_DSBL" && diskStatus != "DISK_NP" && diskStatus != "DISK_DSBL" {
 				parityCount++
+				logger.Debug("Array: Found active parity disk in section [%s] with status=%s", section.Name(), diskStatus)
+			} else if diskType == "Parity" {
+				logger.Debug("Array: Skipping disabled/missing parity disk in section [%s] with status=%s", section.Name(), diskStatus)
 			}
 		}
 	}
 
-	logger.Debug("Array: Counted %d parity disk(s) from disks.ini", parityCount)
+	logger.Debug("Array: Counted %d active parity disk(s) from disks.ini", parityCount)
 	return parityCount
 }

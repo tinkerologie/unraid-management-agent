@@ -19,11 +19,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2025.12.0] - 2025-12-18
+
+### Fixed
+
+- **Array Disk Counts Inverted** (Issue #30):
+  - Fixed `num_data_disks` and `num_parity_disks` being swapped in `/api/v1/array` endpoint
+  - Removed incorrect use of `mdNumDisabled` field (disabled disks) for data disk count
+  - Data disks now correctly calculated as: `mdNumDisks - active_parity_count`
+  - Parity disk count now only includes active parity disks (excludes disabled/missing)
+  - Disabled parity disks (DISK_NP_DSBL, DISK_NP, DISK_DSBL) are no longer counted
+  - Affects Home Assistant integration and other API clients relying on accurate disk counts
+
+---
+
 ## [2025.11.26] - 2025-11-28
 
 ### Added
 
 - **Enhanced Log API** (Issue #28):
+
   - Expanded `commonLogPaths` from 4 to 30+ common Unraid log file paths
   - New log files include: dmesg, messages, cron, debug, btmp, lastlog, wtmp, graphql-api.log, unraid-api.log, recycle.log, dhcplog, mover.log, apcupsd.events, nohup.out, nginx error/access logs, vfsd.log, smbd.log, nfsd.log, samba logs, and more
   - New REST endpoint: `GET /api/v1/logs/{filename}` for direct log file access by filename
@@ -104,17 +119,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Technical Details
 
 - **New Files**:
+
   - `daemon/dto/zfs.go`: ZFS data transfer objects (ZFSPool, ZFSVdev, ZFSDevice, ZFSDataset, ZFSSnapshot, ZFSARCStats, ZFSIOStats)
   - `daemon/services/collectors/zfs.go`: ZFS collector implementation with parsers for zpool/zfs command output
   - `docs/ZFS_INVESTIGATION_FINDINGS.md`: Complete investigation findings and implementation documentation
 
 - **Modified Files**:
+
   - `daemon/constants/const.go`: Added ZFS binary paths and collection interval constants
   - `daemon/services/orchestrator.go`: Integrated ZFS collector into application lifecycle
   - `daemon/services/api/server.go`: Added ZFS cache fields and event subscriptions
   - `daemon/services/api/handlers.go`: Implemented ZFS endpoint handlers
 
 - **ZFS Data Sources**:
+
   - `/usr/sbin/zpool list -Hp`: Pool metrics (parseable format)
   - `/usr/sbin/zpool status -v`: Pool status, vdev tree, error counters
   - `/usr/sbin/zpool get all`: Pool properties
@@ -134,6 +152,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Dependency Updates**:
+
   - Updated `github.com/alecthomas/kong` from v0.9.0 to v1.13.0
   - Updated `golang.org/x/sys` from v0.13.0 to v0.38.0
   - Upgraded Go language version from 1.23 to 1.24.0 (required by golang.org/x/sys v0.38.0)
@@ -150,6 +169,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Technical Details
 
 - **Linting Fixes**:
+
   - `daemon/lib/dmidecode.go`: Converted cache level parsing to switch statement
   - `daemon/lib/ethtool.go`: Extracted `parseEthtoolKeyValue()` helper (complexity 34 → 18)
   - `daemon/services/collectors/disk.go`: Extracted `parseDisksINI()`, `parseDiskKeyValue()`, `enrichDisks()` helpers (complexity 32 → 12)
@@ -189,6 +209,7 @@ All tests pass successfully. Builds verified for local and release targets.
 ### Fixed
 
 - **Motherboard Temperature API** (Issue #24):
+
   - Fixed motherboard temperature returning 0 instead of actual value
   - Improved sensor parser to capture sensor labels (e.g., "MB Temp") from `sensors -u` output
   - Updated temperature matching logic to correctly identify motherboard temperature sensor
@@ -210,6 +231,7 @@ All tests pass successfully. Builds verified for local and release targets.
 ### Fixed
 
 - **VM Endpoint ID Field** (Issue #22):
+
   - Fixed VM endpoint returning empty string for `id` field
   - Changed from using `virsh domid` (runtime ID) to `virsh domuuid` (persistent UUID)
   - VM IDs are now stable, unique identifiers that work for all VM states (running, shut off, paused)
@@ -484,6 +506,7 @@ All tests pass successfully. Builds verified for local and release targets.
 ### Added
 
 - **Hardware Information API** (Issue #5): Comprehensive hardware details via dmidecode and ethtool
+
   - New `/api/v1/hardware/*` endpoints exposing detailed hardware information
   - `/api/v1/hardware/full` - Complete hardware information
   - `/api/v1/hardware/bios` - BIOS information (vendor, version, release date, characteristics)
@@ -496,6 +519,7 @@ All tests pass successfully. Builds verified for local and release targets.
   - All hardware data is cached and broadcast via WebSocket for real-time updates
 
 - **Enhanced System Information**:
+
   - `HVMEnabled` - Hardware virtualization support (Intel VT-x/AMD-V detection via /proc/cpuinfo)
   - `IOMMUEnabled` - IOMMU support detection (kernel command line and /sys/class/iommu/)
   - `OpenSSLVersion` - OpenSSL version information
@@ -503,6 +527,7 @@ All tests pass successfully. Builds verified for local and release targets.
   - `ParityCheckSpeed` - Current parity check speed from var.ini
 
 - **Enhanced Network Information** via ethtool:
+
   - `SupportedPorts` - Supported port types (TP, AUI, MII, Fibre, etc.)
   - `SupportedLinkModes` - Supported link speeds and modes
   - `SupportedPauseFrame` - Pause frame support
@@ -525,6 +550,7 @@ All tests pass successfully. Builds verified for local and release targets.
   - `MTU` - Maximum Transmission Unit
 
 - **New Libraries**:
+
   - `daemon/lib/dmidecode.go` - Parser for dmidecode output (SMBIOS/DMI types 0, 2, 4, 7, 16, 17)
   - `daemon/lib/ethtool.go` - Parser for ethtool output with comprehensive network interface details
 
@@ -540,6 +566,7 @@ All tests pass successfully. Builds verified for local and release targets.
 ### Changed
 
 - **System Collector**: Enhanced with virtualization and additional system information
+
   - Added `isHVMEnabled()` method to detect hardware virtualization support
   - Added `isIOMMUEnabled()` method to detect IOMMU support
   - Added `getOpenSSLVersion()` method to retrieve OpenSSL version
@@ -547,11 +574,13 @@ All tests pass successfully. Builds verified for local and release targets.
   - Added `getParityCheckSpeed()` method to parse parity check speed from var.ini
 
 - **Network Collector**: Enhanced with ethtool integration
+
   - Added `enrichWithEthtool()` method to populate network interface details
   - Network information now includes comprehensive ethtool data when available
   - Gracefully handles cases where ethtool is not available or fails
 
 - **Orchestrator**: Updated to manage hardware collector
+
   - Increased collector count from 9 to 10
   - Hardware collector initialized and started with 5-minute interval
 
@@ -602,6 +631,7 @@ All tests pass successfully. Builds verified for local and release targets.
 ### Added
 
 - **Enhanced VM Statistics**: Added comprehensive VM monitoring metrics
+
   - Guest CPU usage percentage (placeholder for future implementation with historical data)
   - Host CPU usage percentage (placeholder for future implementation with historical data)
   - Memory display in human-readable format (e.g., "1.17 GB / 4.00 GB")
@@ -623,6 +653,7 @@ All tests pass successfully. Builds verified for local and release targets.
 ### Changed
 
 - **VM Collector**: Enhanced data collection using additional virsh commands
+
   - Added `getVMCPUUsage()` method using `virsh cpu-stats` (returns 0 pending historical data implementation)
   - Added `getVMDiskIO()` method using `virsh domblklist` and `virsh domblkstat`
   - Added `getVMNetworkIO()` method using `virsh domiflist` and `virsh domifstat`
@@ -641,6 +672,7 @@ All tests pass successfully. Builds verified for local and release targets.
 ### Fixed
 
 - **VM Collector**: Fixed parsing of VM names containing spaces
+
   - Changed from parsing `virsh list --all` column-based output to using `virsh list --all --name`
   - Added `getVMState()` helper method to get VM state using `virsh domstate <name>`
   - Added `getVMID()` helper method to get VM ID using `virsh domid <name>`
@@ -780,6 +812,7 @@ All tests pass successfully. Builds verified for local and release targets.
 ### Added
 
 - Docker vDisk usage monitoring in `/api/v1/disks` endpoint (#2)
+
   - Automatically detects Docker vDisk at `/var/lib/docker` mount point
   - Reports size, used, free bytes, and usage percentage
   - Identifies vDisk file path (e.g., `/mnt/user/system/docker/docker.vdisk`)
@@ -1037,13 +1070,13 @@ All tests pass successfully. Builds verified for local and release targets.
 
 ## API Coverage
 
-| Category | Coverage | Status |
-|----------|----------|--------|
-| **Overall** | **60%** | 🟡 Partial |
-| Monitoring | 85% | ✅ Good |
-| Control Operations | 75% | ✅ Good |
-| Configuration | 40% | 🟡 Partial |
-| Administration | 0% | 🔴 None |
+| Category           | Coverage | Status     |
+| ------------------ | -------- | ---------- |
+| **Overall**        | **60%**  | 🟡 Partial |
+| Monitoring         | 85%      | ✅ Good    |
+| Control Operations | 75%      | ✅ Good    |
+| Configuration      | 40%      | 🟡 Partial |
+| Administration     | 0%       | 🔴 None    |
 
 ---
 
