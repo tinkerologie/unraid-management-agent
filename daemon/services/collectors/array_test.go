@@ -199,8 +199,8 @@ device="sdb"
 			expectedParity: 0,
 		},
 		{
-			name: "empty INI file",
-			disksINI: ``,
+			name:           "empty INI file",
+			disksINI:       ``,
 			expectedParity: 0,
 		},
 		{
@@ -400,13 +400,13 @@ device="sda"
 // TestArrayDiskCountsIntegration tests the complete disk counting scenario that was broken in Issue #30
 func TestArrayDiskCountsIntegration(t *testing.T) {
 	tests := []struct {
-		name              string
-		mdNumDisks        int // From var.ini
-		disksINI          string
-		expectedTotal     int
-		expectedData      int
-		expectedParity    int
-		description       string
+		name           string
+		mdNumDisks     int // From var.ini
+		disksINI       string
+		expectedTotal  int
+		expectedData   int
+		expectedParity int
+		description    string
 	}{
 		{
 			name:       "Issue #30 scenario: 5 disks with 1 parity",
