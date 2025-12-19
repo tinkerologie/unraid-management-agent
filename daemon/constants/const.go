@@ -53,28 +53,44 @@ const (
 	// ApcPidFile is the path to the APC UPS daemon PID file.
 	ApcPidFile = "/var/run/apcupsd.pid"
 
+	// Collection intervals optimized for power efficiency (Issue #8)
+	// Higher intervals reduce CPU wake-ups and allow deeper C-states
+
 	// IntervalSystem is the collection interval for system metrics in seconds.
-	IntervalSystem = 5
+	// Increased from 5s to 15s - sensors command is CPU intensive
+	IntervalSystem = 15
 	// IntervalArray is the collection interval for array metrics in seconds.
-	IntervalArray = 10
+	// Increased from 10s to 30s - array status rarely changes
+	IntervalArray = 30
 	// IntervalDisk is the collection interval for disk metrics in seconds.
 	IntervalDisk = 30
 	// IntervalDocker is the collection interval for Docker metrics in seconds.
-	IntervalDocker = 10
+	// Increased from 10s to 30s - docker stats is very CPU intensive with many containers
+	IntervalDocker = 30
 	// IntervalVM is the collection interval for VM metrics in seconds.
-	IntervalVM = 10
+	// Increased from 10s to 30s - virsh commands spawn multiple processes
+	IntervalVM = 30
 	// IntervalUPS is the collection interval for UPS metrics in seconds.
-	IntervalUPS = 10
+	// Increased from 10s to 60s - UPS status rarely changes
+	IntervalUPS = 60
 	// IntervalGPU is the collection interval for GPU metrics in seconds.
-	IntervalGPU = 10
+	// Increased from 10s to 60s - intel_gpu_top is extremely CPU intensive
+	IntervalGPU = 60
 	// IntervalShares is the collection interval for share metrics in seconds.
 	IntervalShares = 60
 	// IntervalNetwork is the collection interval for network metrics in seconds.
-	IntervalNetwork = 15
+	// Increased from 15s to 30s - network status rarely changes
+	IntervalNetwork = 30
 	// IntervalHardware is the collection interval for hardware metrics in seconds.
 	IntervalHardware = 300
 	// IntervalZFS is the collection interval for ZFS metrics in seconds.
 	IntervalZFS = 30
+	// IntervalNotification is the collection interval for notification metrics in seconds.
+	IntervalNotification = 30
+	// IntervalRegistration is the collection interval for registration metrics in seconds.
+	IntervalRegistration = 300
+	// IntervalUnassigned is the collection interval for unassigned devices in seconds.
+	IntervalUnassigned = 60
 
 	// WSPingInterval is the WebSocket ping interval in seconds.
 	WSPingInterval = 30

@@ -15,6 +15,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Power Consumption Optimization** (Issue #8 in ha-unraid-management-agent):
+  - Increased collection intervals to reduce CPU wakeups and allow deeper C-states
+  - System: 5s → 15s (sensors command is CPU intensive)
+  - Array: 10s → 30s (array status rarely changes)
+  - Docker: 10s → 30s (docker stats is very CPU intensive with many containers)
+  - VM: 10s → 30s (virsh commands spawn multiple processes)
+  - UPS: 10s → 60s (UPS status rarely changes)
+  - GPU: 10s → 60s (intel_gpu_top is extremely CPU intensive)
+  - Network: 15s → 30s (network status changes infrequently)
+  - Optimized Docker stats collection to batch all container stats in a single command (reduces process spawns from N containers to 1)
+  - Reduced intel_gpu_top timeout from 5s to 2s and samples from 2 to 1
+  - Expected power savings: 15-20W for systems previously reporting 30W→50W increases
+
 ### Removed
 
 ---

@@ -193,11 +193,10 @@ func (c *GPUCollector) collectIntelGPU() ([]*dto.GPUMetrics, error) {
 func (c *GPUCollector) collectSingleIntelGPU(pciID, model string, index int) *dto.GPUMetrics {
 	logger.Debug("Intel GPU: Collecting metrics for GPU %d (%s)", index, pciID)
 
-	// Run intel_gpu_top in JSON mode with 2 samples
+	// Run intel_gpu_top in JSON mode with 1 sample for power efficiency
+	// Reduced timeout from 5s to 2s and samples from 2 to 1 to minimize CPU usage (Issue #8)
 	// Note: intel_gpu_top auto-detects Intel GPU, doesn't support -d flag for specific device
-	// For multi-GPU systems, we run it once and it reports the first GPU
-	// This is a limitation of intel_gpu_top
-	cmdOutput, err := lib.ExecCommandOutput("timeout", "5", "intel_gpu_top", "-J", "-s", "1000", "-n", "2")
+	cmdOutput, err := lib.ExecCommandOutput("timeout", "2", "intel_gpu_top", "-J", "-s", "500", "-n", "1")
 	switch {
 	case err != nil && len(cmdOutput) == 0:
 		logger.Debug("Intel GPU: intel_gpu_top query failed with no output: %v", err)

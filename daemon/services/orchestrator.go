@@ -109,15 +109,15 @@ func (o *Orchestrator) Run() error {
 	}()
 	go func() {
 		defer wg.Done()
-		registrationCollector.Start(ctx, time.Duration(constants.IntervalHardware)*time.Second)
+		registrationCollector.Start(ctx, time.Duration(constants.IntervalRegistration)*time.Second)
 	}()
 	go func() {
 		defer wg.Done()
-		notificationCollector.Start(ctx, 15*time.Second) // 15 seconds for notifications
+		notificationCollector.Start(ctx, time.Duration(constants.IntervalNotification)*time.Second)
 	}()
 	go func() {
 		defer wg.Done()
-		unassignedCollector.Start(ctx, 30*time.Second) // 30 seconds for unassigned devices
+		unassignedCollector.Start(ctx, time.Duration(constants.IntervalUnassigned)*time.Second)
 	}()
 	go func() {
 		defer wg.Done()

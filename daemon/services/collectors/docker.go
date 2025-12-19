@@ -121,19 +121,34 @@ func (c *DockerCollector) collectContainers() ([]*dto.ContainerInfo, error) {
 			container.Uptime = details.Uptime
 		}
 
-		// Get container stats if running
+		containers = append(containers, container)
+	}
+
+	// Get stats for all running containers in a single command (power optimization)
+	// This reduces process spawns from N (one per container) to 1
+	runningIDs := make([]string, 0)
+	containerMap := make(map[string]*dto.ContainerInfo)
+	for _, container := range containers {
 		if container.State == "running" {
-			if stats, err := c.getContainerStats(container.ID); err == nil {
-				container.CPUPercent = stats.CPUPercent
-				container.MemoryUsage = stats.MemoryUsage
-				container.MemoryLimit = stats.MemoryLimit
-				container.NetworkRX = stats.NetworkRX
-				container.NetworkTX = stats.NetworkTX
-				container.MemoryDisplay = c.formatMemoryDisplay(stats.MemoryUsage, stats.MemoryLimit)
+			runningIDs = append(runningIDs, container.ID)
+			containerMap[container.ID] = container
+		}
+	}
+
+	if len(runningIDs) > 0 {
+		allStats, err := c.getAllContainerStats(runningIDs)
+		if err == nil {
+			for id, stats := range allStats {
+				if container, ok := containerMap[id]; ok {
+					container.CPUPercent = stats.CPUPercent
+					container.MemoryUsage = stats.MemoryUsage
+					container.MemoryLimit = stats.MemoryLimit
+					container.NetworkRX = stats.NetworkRX
+					container.NetworkTX = stats.NetworkTX
+					container.MemoryDisplay = c.formatMemoryDisplay(stats.MemoryUsage, stats.MemoryLimit)
+				}
 			}
 		}
-
-		containers = append(containers, container)
 	}
 
 	return containers, nil
@@ -147,6 +162,67 @@ type containerStats struct {
 	NetworkTX   uint64
 }
 
+// getAllContainerStats gets stats for all running containers in a single docker stats call
+// This is much more power-efficient than calling docker stats per container
+func (c *DockerCollector) getAllContainerStats(containerIDs []string) (map[string]*containerStats, error) {
+	// Get stats for all containers in one command
+	args := append([]string{"stats", "--no-stream", "--format", "{{json .}}"}, containerIDs...)
+	output, err := lib.ExecCommandOutput("docker", args...)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]*containerStats)
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+
+		var statsOutput struct {
+			Container string `json:"Container"`
+			ID        string `json:"ID"`
+			CPUPerc   string `json:"CPUPerc"`
+			MemUsage  string `json:"MemUsage"`
+			MemPerc   string `json:"MemPerc"`
+			NetIO     string `json:"NetIO"`
+		}
+
+		if err := json.Unmarshal([]byte(line), &statsOutput); err != nil {
+			logger.Warning("Failed to parse container stats JSON: %v", err)
+			continue
+		}
+
+		stats := &containerStats{}
+
+		// Parse CPU percentage (e.g., "0.50%")
+		if cpuStr := strings.TrimSuffix(statsOutput.CPUPerc, "%"); cpuStr != "" {
+			if cpu, err := strconv.ParseFloat(cpuStr, 64); err == nil {
+				stats.CPUPercent = cpu
+			}
+		}
+
+		// Parse memory usage (e.g., "1.5GiB / 8GiB")
+		if parts := strings.Split(statsOutput.MemUsage, " / "); len(parts) == 2 {
+			stats.MemoryUsage = c.parseSize(parts[0])
+			stats.MemoryLimit = c.parseSize(parts[1])
+		}
+
+		// Parse network I/O (e.g., "1.2MB / 3.4MB")
+		if parts := strings.Split(statsOutput.NetIO, " / "); len(parts) == 2 {
+			stats.NetworkRX = c.parseSize(parts[0])
+			stats.NetworkTX = c.parseSize(parts[1])
+		}
+
+		// Use container ID to match back
+		result[statsOutput.ID] = stats
+	}
+
+	return result, nil
+}
+
+// getContainerStats gets stats for a single container (kept for compatibility)
 func (c *DockerCollector) getContainerStats(containerID string) (*containerStats, error) {
 	// Get stats without streaming
 	output, err := lib.ExecCommandOutput("docker", "stats", "--no-stream", "--format", "{{json .}}", containerID)
