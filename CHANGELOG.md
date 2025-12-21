@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Configurable Collection Intervals** (Issue #8 follow-up):
+  - All collection intervals are now configurable via `/boot/config/plugins/unraid-management-agent/config.cfg`
+  - Added missing interval configurations: `INTERVAL_GPU`, `INTERVAL_NETWORK`, `INTERVAL_ZFS`, `INTERVAL_NOTIFICATION`, `INTERVAL_HARDWARE`, `INTERVAL_REGISTRATION`, `INTERVAL_UNASSIGNED`
+  - Environment variables automatically read from config file on service start
+  - Users can now customize intervals to balance responsiveness vs power consumption
+  - Config file changes require service restart to take effect
+
 ### Changed
 
 ### Fixed
@@ -27,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Optimized Docker stats collection to batch all container stats in a single command (reduces process spawns from N containers to 1)
   - Reduced intel_gpu_top timeout from 5s to 2s and samples from 2 to 1
   - Expected power savings: 15-20W for systems previously reporting 30W→50W increases
+  - All intervals remain configurable via config file for users who prefer faster updates
 
 ### Removed
 

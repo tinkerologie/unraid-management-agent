@@ -369,14 +369,22 @@ LOG_LEVEL=info
 ENABLE_UPS=yes
 ENABLE_GPU=yes
 
-# Collection Intervals (seconds)
-INTERVAL_SYSTEM=5
+# Collection Intervals (seconds) - Power-optimized defaults
+# Higher intervals reduce CPU wakeups and power consumption
+INTERVAL_SYSTEM=15
+INTERVAL_ARRAY=30
 INTERVAL_DISK=30
-INTERVAL_ARRAY=10
-INTERVAL_DOCKER=10
-INTERVAL_VM=10
-INTERVAL_UPS=10
+INTERVAL_DOCKER=30
+INTERVAL_VM=30
+INTERVAL_UPS=60
+INTERVAL_GPU=60
 INTERVAL_SHARES=60
+INTERVAL_NETWORK=30
+INTERVAL_ZFS=30
+INTERVAL_NOTIFICATION=30
+INTERVAL_HARDWARE=300
+INTERVAL_REGISTRATION=300
+INTERVAL_UNASSIGNED=60
 ```
 
 You can edit this file to customize the plugin behavior. Changes require a service restart:
@@ -388,17 +396,24 @@ You can edit this file to customize the plugin behavior. Changes require a servi
 
 ### Collection Intervals
 
-Default intervals (configurable via config file):
+Default intervals (configurable via config file at `/boot/config/plugins/unraid-management-agent/config.cfg`):
 
-- System: 5 seconds
-- Array: 10 seconds
+- System: 15 seconds
+- Array: 30 seconds
 - Disk: 30 seconds
-- Network: 15 seconds
-- Docker: 10 seconds
-- VM: 10 seconds
-- UPS: 10 seconds
-- GPU: 10 seconds
+- Docker: 30 seconds
+- VM: 30 seconds
+- UPS: 60 seconds
+- GPU: 60 seconds
+- Network: 30 seconds
 - Shares: 60 seconds
+- ZFS: 30 seconds
+- Notification: 30 seconds
+- Hardware: 300 seconds
+- Registration: 300 seconds
+- Unassigned Devices: 60 seconds
+
+**Power Optimization Note:** These defaults are optimized to reduce power consumption (see Issue #8). Higher intervals reduce CPU wakeups and allow the processor to enter deeper C-states (power saving modes). For faster updates, you can reduce the intervals in the config file, but expect a 15-20W increase in idle power consumption on systems with Intel CPUs and many Docker containers.
 
 ### Logging
 

@@ -9,7 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/api"
@@ -65,63 +64,63 @@ func (o *Orchestrator) Run() error {
 	unassignedCollector := collectors.NewUnassignedCollector(o.ctx)
 	zfsCollector := collectors.NewZFSCollector(o.ctx)
 
-	// Start collectors with context and WaitGroup
+	// Start collectors with context and WaitGroup - use intervals from context (configurable via environment)
 	wg.Add(14)
 	go func() {
 		defer wg.Done()
-		systemCollector.Start(ctx, time.Duration(constants.IntervalSystem)*time.Second)
+		systemCollector.Start(ctx, time.Duration(o.ctx.Intervals.System)*time.Second)
 	}()
 	go func() {
 		defer wg.Done()
-		arrayCollector.Start(ctx, time.Duration(constants.IntervalArray)*time.Second)
+		arrayCollector.Start(ctx, time.Duration(o.ctx.Intervals.Array)*time.Second)
 	}()
 	go func() {
 		defer wg.Done()
-		diskCollector.Start(ctx, time.Duration(constants.IntervalDisk)*time.Second)
+		diskCollector.Start(ctx, time.Duration(o.ctx.Intervals.Disk)*time.Second)
 	}()
 	go func() {
 		defer wg.Done()
-		dockerCollector.Start(ctx, time.Duration(constants.IntervalDocker)*time.Second)
+		dockerCollector.Start(ctx, time.Duration(o.ctx.Intervals.Docker)*time.Second)
 	}()
 	go func() {
 		defer wg.Done()
-		vmCollector.Start(ctx, time.Duration(constants.IntervalVM)*time.Second)
+		vmCollector.Start(ctx, time.Duration(o.ctx.Intervals.VM)*time.Second)
 	}()
 	go func() {
 		defer wg.Done()
-		upsCollector.Start(ctx, time.Duration(constants.IntervalUPS)*time.Second)
+		upsCollector.Start(ctx, time.Duration(o.ctx.Intervals.UPS)*time.Second)
 	}()
 	go func() {
 		defer wg.Done()
-		gpuCollector.Start(ctx, time.Duration(constants.IntervalGPU)*time.Second)
+		gpuCollector.Start(ctx, time.Duration(o.ctx.Intervals.GPU)*time.Second)
 	}()
 	go func() {
 		defer wg.Done()
-		shareCollector.Start(ctx, time.Duration(constants.IntervalShares)*time.Second)
+		shareCollector.Start(ctx, time.Duration(o.ctx.Intervals.Shares)*time.Second)
 	}()
 	go func() {
 		defer wg.Done()
-		networkCollector.Start(ctx, time.Duration(constants.IntervalNetwork)*time.Second)
+		networkCollector.Start(ctx, time.Duration(o.ctx.Intervals.Network)*time.Second)
 	}()
 	go func() {
 		defer wg.Done()
-		hardwareCollector.Start(ctx, time.Duration(constants.IntervalHardware)*time.Second)
+		hardwareCollector.Start(ctx, time.Duration(o.ctx.Intervals.Hardware)*time.Second)
 	}()
 	go func() {
 		defer wg.Done()
-		registrationCollector.Start(ctx, time.Duration(constants.IntervalRegistration)*time.Second)
+		registrationCollector.Start(ctx, time.Duration(o.ctx.Intervals.Registration)*time.Second)
 	}()
 	go func() {
 		defer wg.Done()
-		notificationCollector.Start(ctx, time.Duration(constants.IntervalNotification)*time.Second)
+		notificationCollector.Start(ctx, time.Duration(o.ctx.Intervals.Notification)*time.Second)
 	}()
 	go func() {
 		defer wg.Done()
-		unassignedCollector.Start(ctx, time.Duration(constants.IntervalUnassigned)*time.Second)
+		unassignedCollector.Start(ctx, time.Duration(o.ctx.Intervals.Unassigned)*time.Second)
 	}()
 	go func() {
 		defer wg.Done()
-		zfsCollector.Start(ctx, time.Duration(constants.IntervalZFS)*time.Second)
+		zfsCollector.Start(ctx, time.Duration(o.ctx.Intervals.ZFS)*time.Second)
 	}()
 
 	logger.Success("All collectors started")
