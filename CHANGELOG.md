@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Environment variables automatically read from config file on service start
   - Users can now customize intervals to balance responsiveness vs power consumption
   - Config file changes require service restart to take effect
+  - **NEW:** User-friendly web UI for configuring collection intervals
+    - Accessible from Unraid Settings → Unraid Management Agent
+    - Descriptive labels for each interval type (e.g., "System Metrics (CPU, RAM, Temperature)")
+    - Organized into logical sections: System Monitoring, Containers & VMs, Hardware & Power, Storage & Shares, System Information
+    - Real-time validation with min/max values
+    - Power consumption warning with recommendations
+    - Automatic service restart when applying changes
+    - No need to manually edit config files
 
 ### Changed
 
