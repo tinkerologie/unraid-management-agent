@@ -8,6 +8,7 @@ ARG NODE_VERSION=20
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Base tooling and build dependencies
+# Added development tools: php-cli (plugin page validation), shellcheck (bash linting), yamllint (YAML validation)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
@@ -27,6 +28,9 @@ RUN apt-get update \
         libssl-dev \
         openssh-client \
         jq \
+        php-cli \
+        shellcheck \
+        yamllint \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Go (matches go.mod requirement) for linux/amd64 (deployment target)
