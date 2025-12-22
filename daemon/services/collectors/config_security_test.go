@@ -83,6 +83,21 @@ func TestValidateShareName(t *testing.T) {
 			shareName: "share\x00.cfg",
 			wantError: false, // Null bytes are handled by the OS, not our validation
 		},
+		{
+			name:      "Valid name with numbers",
+			shareName: "share123",
+			wantError: false,
+		},
+		{
+			name:      "Single character name",
+			shareName: "a",
+			wantError: false,
+		},
+		{
+			name:      "Max length name",
+			shareName: strings.Repeat("x", 255),
+			wantError: false,
+		},
 	}
 
 	for _, tt := range tests {

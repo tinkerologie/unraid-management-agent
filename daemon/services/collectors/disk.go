@@ -488,9 +488,11 @@ func (c *DiskCollector) enrichWithMountInfo(disk *dto.DiskInfo) {
 	// Get filesystem statistics using statfs
 	var stat syscall.Statfs_t
 	if err := syscall.Statfs(disk.MountPoint, &stat); err == nil {
-		// Calculate sizes in bytes
-		totalBytes := stat.Blocks * uint64(stat.Bsize)
-		freeBytes := stat.Bfree * uint64(stat.Bsize)
+		// Calculate sizes in bytes (safe conversion - Bsize is always positive)
+		//nolint:gosec // G115: Bsize is always positive on Linux systems
+		bsize := uint64(stat.Bsize)
+		totalBytes := stat.Blocks * bsize
+		freeBytes := stat.Bfree * bsize
 		usedBytes := totalBytes - freeBytes
 
 		disk.Used = usedBytes
@@ -565,9 +567,11 @@ func (c *DiskCollector) collectDockerVDisk() *dto.DiskInfo {
 		return nil
 	}
 
-	// Calculate sizes in bytes
-	totalBytes := stat.Blocks * uint64(stat.Bsize)
-	freeBytes := stat.Bfree * uint64(stat.Bsize)
+	// Calculate sizes in bytes (safe conversion - Bsize is always positive)
+	//nolint:gosec // G115: Bsize is always positive on Linux systems
+	bsize := uint64(stat.Bsize)
+	totalBytes := stat.Blocks * bsize
+	freeBytes := stat.Bfree * bsize
 	usedBytes := totalBytes - freeBytes
 
 	// Calculate usage percentage
@@ -660,9 +664,11 @@ func (c *DiskCollector) collectLogFilesystem() *dto.DiskInfo {
 		return nil
 	}
 
-	// Calculate sizes in bytes
-	totalBytes := stat.Blocks * uint64(stat.Bsize)
-	freeBytes := stat.Bfree * uint64(stat.Bsize)
+	// Calculate sizes in bytes (safe conversion - Bsize is always positive)
+	//nolint:gosec // G115: Bsize is always positive on Linux systems
+	bsize := uint64(stat.Bsize)
+	totalBytes := stat.Blocks * bsize
+	freeBytes := stat.Bfree * bsize
 	usedBytes := totalBytes - freeBytes
 
 	// Calculate usage percentage

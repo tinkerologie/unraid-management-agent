@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Web UI for Collection Intervals** (Issue #8):
+
   - New settings page accessible from Unraid Settings → Unraid Management Agent
   - Dropdown menus with predefined interval options (5 seconds to 30 minutes)
   - Organized into logical sections: System Monitoring, Containers & VMs, Hardware, Storage, Other
@@ -26,6 +27,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Config file persists settings across reboots at `/boot/config/plugins/unraid-management-agent/config.cfg`
 
 ### Changed
+
+- **Industry-Standard Default Intervals**:
+
+  - Updated defaults to follow industry monitoring standards (Zabbix, Prometheus, Datadog)
+  - Disk Health: 30s → 300s (5 min) - SMART data rarely changes
+  - ZFS Pools: 30s → 300s (5 min) - pool health rarely changes
+  - Array Status: 30s → 60s - array state changes infrequently
+  - Hardware Info: 300s → 600s (10 min) - static hardware info
+  - VM Monitoring: 30s → 60s - VMs typically have stable state
+  - Network: 30s → 60s - interface config rarely changes
+  - Registration: 300s → 600s (10 min) - license info is static
 
 - **Start Script**: Fixed environment variable passing to Go binary through sudo
 

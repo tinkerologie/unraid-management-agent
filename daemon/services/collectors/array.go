@@ -185,9 +185,11 @@ func (c *ArrayCollector) enrichWithArraySize(status *dto.ArrayStatus) {
 		return
 	}
 
-	// Calculate sizes in bytes
-	totalBytes := stat.Blocks * uint64(stat.Bsize)
-	freeBytes := stat.Bfree * uint64(stat.Bsize)
+	// Calculate sizes in bytes (safe conversion - Bsize is always positive)
+	//nolint:gosec // G115: Bsize is always positive on Linux systems
+	bsize := uint64(stat.Bsize)
+	totalBytes := stat.Blocks * bsize
+	freeBytes := stat.Bfree * bsize
 	usedBytes := totalBytes - freeBytes
 
 	status.TotalBytes = totalBytes

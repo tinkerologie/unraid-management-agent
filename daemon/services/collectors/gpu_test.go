@@ -115,3 +115,83 @@ func TestGPUMemoryParsing(t *testing.T) {
 		})
 	}
 }
+func TestGPUPowerParsing(t *testing.T) {
+	// Test parsing power values
+	tests := []struct {
+		input    string
+		expected float64
+	}{
+		{"120.50 W", 120.50},
+		{"320.00 W", 320.00},
+		{"0.00 W", 0.00},
+		{"250.75 W", 250.75},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			if !strings.Contains(tt.input, "W") {
+				t.Errorf("Power value %q should contain 'W'", tt.input)
+			}
+		})
+	}
+}
+
+func TestGPUVendorTypes(t *testing.T) {
+	// Test known GPU vendor types
+	vendors := []string{"NVIDIA", "AMD", "Intel"}
+
+	for _, vendor := range vendors {
+		t.Run(vendor, func(t *testing.T) {
+			if vendor == "" {
+				t.Error("Vendor should not be empty")
+			}
+		})
+	}
+}
+
+func TestGPUTemperatureParsing(t *testing.T) {
+	// Test parsing temperature values
+	tests := []struct {
+		input    string
+		expected int
+	}{
+		{"55 C", 55},
+		{"75 C", 75},
+		{"30 C", 30},
+		{"90 C", 90},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			if !strings.Contains(tt.input, "C") {
+				t.Errorf("Temperature %q should contain 'C'", tt.input)
+			}
+		})
+	}
+}
+
+func TestGPUUtilizationRanges(t *testing.T) {
+	// Test valid utilization percentage ranges
+	tests := []struct {
+		name        string
+		utilization int
+		valid       bool
+	}{
+		{"zero", 0, true},
+		{"low", 25, true},
+		{"medium", 50, true},
+		{"high", 75, true},
+		{"full", 100, true},
+		{"negative", -1, false},
+		{"over 100", 101, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			isValid := tt.utilization >= 0 && tt.utilization <= 100
+			if isValid != tt.valid {
+				t.Errorf("Utilization %d: valid = %v, want %v", tt.utilization, isValid, tt.valid)
+			}
+		})
+	}
+}

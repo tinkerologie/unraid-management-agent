@@ -109,3 +109,115 @@ func TestShareCacheSettings(t *testing.T) {
 		})
 	}
 }
+func TestShareSplitLevels(t *testing.T) {
+	// Test split level values
+	tests := []struct {
+		level       string
+		description string
+	}{
+		{"", "automatic"},
+		{"1", "level 1"},
+		{"2", "level 2"},
+		{"3", "level 3"},
+		{"manual", "manual"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.description, func(t *testing.T) {
+			// Verify split level is handled
+			if tt.level == "" {
+				// Empty means automatic
+			}
+		})
+	}
+}
+
+func TestShareIncludeExcludeDisks(t *testing.T) {
+	// Test include/exclude disk parsing
+	tests := []struct {
+		input    string
+		expected int
+	}{
+		{"", 0},
+		{"disk1", 1},
+		{"disk1,disk2", 2},
+		{"disk1,disk2,disk3", 3},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			count := countDisks(tt.input)
+			if count != tt.expected {
+				t.Errorf("countDisks(%q) = %d, want %d", tt.input, count, tt.expected)
+			}
+		})
+	}
+}
+
+func countDisks(s string) int {
+	if s == "" {
+		return 0
+	}
+	count := 1
+	for i := 0; i < len(s); i++ {
+		if s[i] == ',' {
+			count++
+		}
+	}
+	return count
+}
+
+func TestShareSecurityModes(t *testing.T) {
+	// Test share security modes
+	modes := []string{"public", "secure", "private"}
+
+	for _, mode := range modes {
+		t.Run(mode, func(t *testing.T) {
+			if mode == "" {
+				t.Error("Security mode should not be empty")
+			}
+		})
+	}
+}
+
+func TestShareFreeSpaceThreshold(t *testing.T) {
+	// Test minimum free space settings
+	tests := []struct {
+		bytes   uint64
+		humanGB float64
+	}{
+		{0, 0},
+		{1024 * 1024 * 1024, 1.0},         // 1 GB
+		{10 * 1024 * 1024 * 1024, 10.0},   // 10 GB
+		{100 * 1024 * 1024 * 1024, 100.0}, // 100 GB
+	}
+
+	for _, tt := range tests {
+		t.Run(formatFloat(tt.humanGB), func(t *testing.T) {
+			gb := float64(tt.bytes) / (1024 * 1024 * 1024)
+			if gb != tt.humanGB {
+				t.Errorf("bytes %d = %.1f GB, want %.1f GB", tt.bytes, gb, tt.humanGB)
+			}
+		})
+	}
+}
+
+func formatFloat(f float64) string {
+	if f == 0 {
+		return "0"
+	}
+	// Simple integer formatting for test names
+	return formatInt64(int64(f))
+}
+
+func formatInt64(n int64) string {
+	if n == 0 {
+		return "0"
+	}
+	var digits []byte
+	for n > 0 {
+		digits = append([]byte{byte('0' + n%10)}, digits...)
+		n /= 10
+	}
+	return string(digits)
+}

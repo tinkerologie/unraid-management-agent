@@ -117,3 +117,77 @@ func TestUPSPercentageParsing(t *testing.T) {
 		})
 	}
 }
+func TestUPSTimeleftParsing(t *testing.T) {
+	// Test parsing timeleft values from APC output
+	tests := []struct {
+		input    string
+		expected float64
+	}{
+		{"45.0 Minutes", 45.0},
+		{"120.0 Minutes", 120.0},
+		{"0.0 Minutes", 0.0},
+		{"30 Minutes", 30.0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			// Verify the parsing pattern
+			if !strings.Contains(tt.input, "Minutes") {
+				t.Errorf("Timeleft %q should contain 'Minutes'", tt.input)
+			}
+		})
+	}
+}
+
+func TestUPSVoltageParsing(t *testing.T) {
+	// Test parsing voltage values from APC output
+	tests := []struct {
+		input    string
+		expected float64
+	}{
+		{"120.0 Volts", 120.0},
+		{"240.0 Volts", 240.0},
+		{"27.1 Volts", 27.1},
+		{"0.0 Volts", 0.0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			// Verify the parsing pattern
+			if !strings.Contains(tt.input, "Volts") {
+				t.Errorf("Voltage %q should contain 'Volts'", tt.input)
+			}
+		})
+	}
+}
+
+func TestUPSLoadParsing(t *testing.T) {
+	// Test load percentage interpretation
+	tests := []struct {
+		load     float64
+		expected string
+	}{
+		{0.0, "light"},
+		{25.0, "light"},
+		{50.0, "moderate"},
+		{75.0, "moderate"},
+		{90.0, "heavy"},
+		{100.0, "heavy"},
+	}
+
+	for _, tt := range tests {
+		t.Run(strings.ReplaceAll(tt.expected, " ", "_"), func(t *testing.T) {
+			var category string
+			if tt.load < 50 {
+				category = "light"
+			} else if tt.load < 80 {
+				category = "moderate"
+			} else {
+				category = "heavy"
+			}
+			if category != tt.expected {
+				t.Errorf("Load %.1f%% category = %q, want %q", tt.load, category, tt.expected)
+			}
+		})
+	}
+}

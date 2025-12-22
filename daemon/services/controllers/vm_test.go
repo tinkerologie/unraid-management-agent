@@ -80,4 +80,32 @@ func TestVMControllerWithInvalidVM(t *testing.T) {
 			t.Log("Note: No error returned - virsh might not be running or VM might exist")
 		}
 	})
+
+	t.Run("Restart with invalid VM", func(t *testing.T) {
+		err := vc.Restart("nonexistent-vm-12345")
+		if err == nil {
+			t.Log("Note: No error returned - virsh might not be running or VM might exist")
+		}
+	})
+
+	t.Run("Pause with invalid VM", func(t *testing.T) {
+		err := vc.Pause("nonexistent-vm-12345")
+		if err == nil {
+			t.Log("Note: No error returned - virsh might not be running or VM might exist")
+		}
+	})
+
+	t.Run("Resume with invalid VM", func(t *testing.T) {
+		err := vc.Resume("nonexistent-vm-12345")
+		if err == nil {
+			t.Log("Note: No error returned - virsh might not be running or VM might exist")
+		}
+	})
+
+	t.Run("Hibernate with invalid VM", func(t *testing.T) {
+		err := vc.Hibernate("nonexistent-vm-12345")
+		if err == nil {
+			t.Log("Note: No error returned - virsh might not be running or VM might exist")
+		}
+	})
 }

@@ -27,20 +27,20 @@ if (file_exists($config_file)) {
 $port = $config['PORT'] ?? '8043';
 $log_level = $config['LOG_LEVEL'] ?? 'info';
 
-// Collection interval defaults (power-optimized)
+// Collection interval defaults (industry-standard: Zabbix, Prometheus, Datadog)
 $interval_system = $config['INTERVAL_SYSTEM'] ?? '15';
-$interval_array = $config['INTERVAL_ARRAY'] ?? '30';
-$interval_disk = $config['INTERVAL_DISK'] ?? '30';
+$interval_array = $config['INTERVAL_ARRAY'] ?? '60';
+$interval_disk = $config['INTERVAL_DISK'] ?? '300';
 $interval_docker = $config['INTERVAL_DOCKER'] ?? '30';
-$interval_vm = $config['INTERVAL_VM'] ?? '30';
+$interval_vm = $config['INTERVAL_VM'] ?? '60';
 $interval_ups = $config['INTERVAL_UPS'] ?? '60';
 $interval_gpu = $config['INTERVAL_GPU'] ?? '60';
 $interval_shares = $config['INTERVAL_SHARES'] ?? '60';
-$interval_network = $config['INTERVAL_NETWORK'] ?? '30';
-$interval_zfs = $config['INTERVAL_ZFS'] ?? '30';
+$interval_network = $config['INTERVAL_NETWORK'] ?? '60';
+$interval_zfs = $config['INTERVAL_ZFS'] ?? '300';
 $interval_notification = $config['INTERVAL_NOTIFICATION'] ?? '30';
-$interval_hardware = $config['INTERVAL_HARDWARE'] ?? '300';
-$interval_registration = $config['INTERVAL_REGISTRATION'] ?? '300';
+$interval_hardware = $config['INTERVAL_HARDWARE'] ?? '600';
+$interval_registration = $config['INTERVAL_REGISTRATION'] ?? '600';
 $interval_unassigned = $config['INTERVAL_UNASSIGNED'] ?? '60';
 
 // Check if service is running
@@ -101,23 +101,17 @@ function intervalOptions($selected, $type = 'standard') {
 if ($_POST) {
     if (isset($_POST['start'])) {
         exec("/usr/local/emhttp/plugins/$plugin/scripts/start > /dev/null 2>&1 &");
-        sleep(1);
     } elseif (isset($_POST['stop'])) {
         exec("/usr/local/emhttp/plugins/$plugin/scripts/stop > /dev/null 2>&1 &");
-        sleep(1);
     } elseif (isset($_POST['restart'])) {
-        exec("/usr/local/emhttp/plugins/$plugin/scripts/stop > /dev/null 2>&1");
-        sleep(1);
-        exec("/usr/local/emhttp/plugins/$plugin/scripts/start > /dev/null 2>&1 &");
-        sleep(1);
+        exec("/usr/local/emhttp/plugins/$plugin/scripts/stop > /dev/null 2>&1 && sleep 1 && /usr/local/emhttp/plugins/$plugin/scripts/start > /dev/null 2>&1 &");
     } elseif (isset($_POST['apply'])) {
         // Save configuration
         $new_config = "# Unraid Management Agent Configuration\n\n";
         $new_config .= "# API Server Configuration\n";
         $new_config .= "PORT=" . $_POST['port'] . "\n";
         $new_config .= "LOG_LEVEL=" . $_POST['log_level'] . "\n\n";
-        $new_config .= "# Collection Intervals (seconds)\n";
-        $new_config .= "# Higher intervals reduce power consumption, lower intervals provide faster updates\n";
+        $new_config .= "# Collection Intervals in seconds\n";
         $new_config .= "INTERVAL_SYSTEM=" . $_POST['interval_system'] . "\n";
         $new_config .= "INTERVAL_ARRAY=" . $_POST['interval_array'] . "\n";
         $new_config .= "INTERVAL_DISK=" . $_POST['interval_disk'] . "\n";
@@ -134,47 +128,41 @@ if ($_POST) {
         $new_config .= "INTERVAL_UNASSIGNED=" . $_POST['interval_unassigned'] . "\n";
         file_put_contents($config_file, $new_config);
 
-        // Restart service if running
+        // Restart service in background if running
         if ($running) {
-            exec("/usr/local/emhttp/plugins/$plugin/scripts/stop > /dev/null 2>&1");
-            sleep(1);
-            exec("/usr/local/emhttp/plugins/$plugin/scripts/start > /dev/null 2>&1 &");
-            sleep(1);
+            exec("/usr/local/emhttp/plugins/$plugin/scripts/stop > /dev/null 2>&1 && sleep 1 && /usr/local/emhttp/plugins/$plugin/scripts/start > /dev/null 2>&1 &");
         }
     } elseif (isset($_POST['default'])) {
-        // Reset to defaults (power-optimized values)
+        // Reset to defaults - power-optimized values
         $default_config = "# Unraid Management Agent Configuration\n\n";
         $default_config .= "# API Server Configuration\n";
         $default_config .= "PORT=8043\n";
         $default_config .= "LOG_LEVEL=info\n\n";
-        $default_config .= "# Collection Intervals (seconds) - Power-optimized defaults\n";
+        $default_config .= "# Collection Intervals in seconds - Industry-standard defaults\n";
         $default_config .= "INTERVAL_SYSTEM=15\n";
-        $default_config .= "INTERVAL_ARRAY=30\n";
-        $default_config .= "INTERVAL_DISK=30\n";
+        $default_config .= "INTERVAL_ARRAY=60\n";
+        $default_config .= "INTERVAL_DISK=300\n";
         $default_config .= "INTERVAL_DOCKER=30\n";
-        $default_config .= "INTERVAL_VM=30\n";
+        $default_config .= "INTERVAL_VM=60\n";
         $default_config .= "INTERVAL_UPS=60\n";
         $default_config .= "INTERVAL_GPU=60\n";
         $default_config .= "INTERVAL_SHARES=60\n";
-        $default_config .= "INTERVAL_NETWORK=30\n";
-        $default_config .= "INTERVAL_ZFS=30\n";
+        $default_config .= "INTERVAL_NETWORK=60\n";
+        $default_config .= "INTERVAL_ZFS=300\n";
         $default_config .= "INTERVAL_NOTIFICATION=30\n";
-        $default_config .= "INTERVAL_HARDWARE=300\n";
-        $default_config .= "INTERVAL_REGISTRATION=300\n";
+        $default_config .= "INTERVAL_HARDWARE=600\n";
+        $default_config .= "INTERVAL_REGISTRATION=600\n";
         $default_config .= "INTERVAL_UNASSIGNED=60\n";
         file_put_contents($config_file, $default_config);
         
-        // Restart service if running
+        // Restart service in background if running
         if ($running) {
-            exec("/usr/local/emhttp/plugins/$plugin/scripts/stop > /dev/null 2>&1");
-            sleep(1);
-            exec("/usr/local/emhttp/plugins/$plugin/scripts/start > /dev/null 2>&1 &");
-            sleep(1);
+            exec("/usr/local/emhttp/plugins/$plugin/scripts/stop > /dev/null 2>&1 && sleep 1 && /usr/local/emhttp/plugins/$plugin/scripts/start > /dev/null 2>&1 &");
         }
     }
     
-    // Redirect to refresh page
-    header("Location: /Settings/unraid-management-agent");
+    // Redirect using JavaScript (more reliable in Unraid's PHP environment)
+    echo "<script>window.location.href = window.location.pathname;</script>";
     exit;
 }
 ?>
@@ -366,7 +354,7 @@ if ($_POST) {
                     <div class="interval-row">
                         <span class="interval-label">Disk Health</span>
                         <select name="interval_disk" class="interval-select">
-                            <?= intervalOptions($interval_disk, 'standard') ?>
+                            <?= intervalOptions($interval_disk, 'slow') ?>
                         </select>
                     </div>
                     <div class="interval-row">
@@ -432,7 +420,7 @@ if ($_POST) {
                     <div class="interval-row">
                         <span class="interval-label">ZFS Pools</span>
                         <select name="interval_zfs" class="interval-select">
-                            <?= intervalOptions($interval_zfs, 'standard') ?>
+                            <?= intervalOptions($interval_zfs, 'slow') ?>
                         </select>
                     </div>
                     <div class="interval-row">
@@ -463,7 +451,7 @@ if ($_POST) {
             </div>
 
             <div class="power-warning">
-                <strong>⚡ Power Note:</strong> Default values are optimized for low power. Faster intervals can increase idle power by 15-20W on Intel systems.
+                <strong>⚡ Power Tip:</strong> Defaults follow industry-standard monitoring intervals (Zabbix, Prometheus, Datadog). Selecting faster intervals increases CPU activity and can raise idle power consumption. Click <strong>Reset to Defaults</strong> to restore industry-standard settings.
             </div>
         </div>
 

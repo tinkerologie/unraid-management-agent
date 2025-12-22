@@ -12,7 +12,7 @@ func TestNewSystemController(t *testing.T) {
 	controller := NewSystemController(ctx)
 
 	if controller == nil {
-		t.Error("Expected non-nil controller")
+		t.Fatal("Expected non-nil controller")
 	}
 
 	if controller.ctx != ctx {
@@ -36,6 +36,38 @@ func TestSystemControllerInterface(t *testing.T) {
 				t.Errorf("SystemController should have %s method", method)
 			}
 		})
+	}
+}
+
+func TestSystemControllerReboot(t *testing.T) {
+	// Skip in normal tests - running shutdown/reboot is destructive
+	if testing.Short() {
+		t.Skip("Skipping destructive system test in short mode")
+	}
+
+	ctx := &domain.Context{}
+	controller := NewSystemController(ctx)
+
+	// Will fail without root privileges or in container
+	err := controller.Reboot()
+	if err == nil {
+		t.Log("Note: No error - reboot command might be available")
+	}
+}
+
+func TestSystemControllerShutdown(t *testing.T) {
+	// Skip in normal tests - running shutdown/reboot is destructive
+	if testing.Short() {
+		t.Skip("Skipping destructive system test in short mode")
+	}
+
+	ctx := &domain.Context{}
+	controller := NewSystemController(ctx)
+
+	// Will fail without root privileges or in container
+	err := controller.Shutdown()
+	if err == nil {
+		t.Log("Note: No error - shutdown command might be available")
 	}
 }
 

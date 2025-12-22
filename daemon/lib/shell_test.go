@@ -64,3 +64,51 @@ func TestExecCommandFailure(t *testing.T) {
 		t.Fatal("Expected error for non-existent command")
 	}
 }
+
+func TestExecCommandOutputFailure(t *testing.T) {
+	// Test command that returns non-zero exit code
+	output, err := ExecCommandOutput("false")
+	if err == nil {
+		t.Fatal("Expected error for failed command")
+	}
+	// Output might be empty but error should indicate failure
+	_ = output
+}
+
+func TestExecCommandOutputNonExistent(t *testing.T) {
+	// Test command that doesn't exist
+	_, err := ExecCommandOutput("command-that-does-not-exist")
+	if err == nil {
+		t.Fatal("Expected error for non-existent command")
+	}
+}
+
+func TestExecCommandWithTimeoutSuccess(t *testing.T) {
+	// Test command completes within timeout
+	lines, err := ExecCommandWithTimeout(5*time.Second, "echo", "quick")
+	if err != nil {
+		t.Fatalf("ExecCommandWithTimeout failed: %v", err)
+	}
+	if len(lines) != 1 || lines[0] != "quick" {
+		t.Errorf("Expected ['quick'], got %v", lines)
+	}
+}
+
+func TestExecCommandWithTimeoutMultiLine(t *testing.T) {
+	// Test command with multiple lines of output
+	lines, err := ExecCommandWithTimeout(5*time.Second, "printf", "line1\nline2\nline3")
+	if err != nil {
+		t.Fatalf("ExecCommandWithTimeout failed: %v", err)
+	}
+	if len(lines) != 3 {
+		t.Errorf("Expected 3 lines, got %d", len(lines))
+	}
+}
+
+func TestExecCommandWithTimeoutNonExistent(t *testing.T) {
+	// Test non-existent command
+	_, err := ExecCommandWithTimeout(5*time.Second, "command-that-does-not-exist")
+	if err == nil {
+		t.Fatal("Expected error for non-existent command")
+	}
+}

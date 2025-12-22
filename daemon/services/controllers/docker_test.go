@@ -67,3 +67,38 @@ func TestDockerControllerWithInvalidContainer(t *testing.T) {
 		}
 	})
 }
+func TestDockerControllerPause(t *testing.T) {
+	dc := NewDockerController()
+
+	t.Run("Pause with nonexistent container", func(t *testing.T) {
+		err := dc.Pause("nonexistent-container-67890")
+		// Should return an error
+		if err == nil {
+			t.Log("Note: No error returned - Docker might not be available")
+		}
+	})
+}
+
+func TestDockerControllerUnpause(t *testing.T) {
+	dc := NewDockerController()
+
+	t.Run("Unpause with nonexistent container", func(t *testing.T) {
+		err := dc.Unpause("nonexistent-container-67890")
+		// Should return an error
+		if err == nil {
+			t.Log("Note: No error returned - Docker might not be available")
+		}
+	})
+}
+
+func TestDockerControllerRestart(t *testing.T) {
+	dc := NewDockerController()
+
+	t.Run("Restart with nonexistent container", func(t *testing.T) {
+		err := dc.Restart("nonexistent-container-67890")
+		// Should return an error
+		if err == nil {
+			t.Log("Note: No error returned - Docker might not be available")
+		}
+	})
+}

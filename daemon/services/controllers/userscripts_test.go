@@ -114,6 +114,22 @@ func TestListUserScriptsNonExistentDirectory(t *testing.T) {
 	}
 }
 
+func TestListUserScriptsActual(t *testing.T) {
+	// Test the actual ListUserScripts function
+	// It will return an empty list if the scripts directory doesn't exist
+	scripts, err := ListUserScripts()
+
+	// Directory likely doesn't exist in test environment, expect error
+	if err != nil {
+		t.Logf("ListUserScripts returned error (expected if scripts dir doesn't exist): %v", err)
+	}
+
+	// Should return an array, possibly nil on error
+	if err == nil && scripts == nil {
+		t.Error("Expected non-nil scripts array when no error")
+	}
+}
+
 func TestExecuteUserScriptValidation(t *testing.T) {
 	// Test script name validation
 	tests := []struct {

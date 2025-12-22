@@ -477,3 +477,218 @@ func TestValidateMaxLength(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateUserScriptName(t *testing.T) {
+	tests := []struct {
+		name    string
+		script  string
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name:    "valid simple name",
+			script:  "my_script",
+			wantErr: false,
+		},
+		{
+			name:    "valid name with hyphen",
+			script:  "my-script",
+			wantErr: false,
+		},
+		{
+			name:    "valid name with underscore",
+			script:  "my_script_v2",
+			wantErr: false,
+		},
+		{
+			name:    "valid name with dot",
+			script:  "backup.sh",
+			wantErr: false,
+		},
+		{
+			name:    "valid alphanumeric",
+			script:  "script123",
+			wantErr: false,
+		},
+		{
+			name:    "empty name",
+			script:  "",
+			wantErr: true,
+			errMsg:  "cannot be empty",
+		},
+		{
+			name:    "too long",
+			script:  strings.Repeat("a", 256),
+			wantErr: true,
+			errMsg:  "too long",
+		},
+		{
+			name:    "path traversal with ../",
+			script:  "../etc/passwd",
+			wantErr: true,
+			errMsg:  "cannot contain parent directory references",
+		},
+		{
+			name:    "path traversal with ..",
+			script:  "script..evil",
+			wantErr: true,
+			errMsg:  "cannot contain parent directory references",
+		},
+		{
+			name:    "forward slash",
+			script:  "path/to/script",
+			wantErr: true,
+			errMsg:  "cannot contain path separators",
+		},
+		{
+			name:    "backslash",
+			script:  "path\\to\\script",
+			wantErr: true,
+			errMsg:  "cannot contain path separators",
+		},
+		{
+			name:    "starts with hyphen",
+			script:  "-script",
+			wantErr: true,
+			errMsg:  "cannot start or end with hyphen",
+		},
+		{
+			name:    "ends with hyphen",
+			script:  "script-",
+			wantErr: true,
+			errMsg:  "cannot start or end with hyphen",
+		},
+		{
+			name:    "starts with dot",
+			script:  ".hidden",
+			wantErr: true,
+			errMsg:  "cannot start or end with dot",
+		},
+		{
+			name:    "ends with dot",
+			script:  "script.",
+			wantErr: true,
+			errMsg:  "cannot start or end with dot",
+		},
+		{
+			name:    "contains spaces",
+			script:  "my script",
+			wantErr: true,
+			errMsg:  "invalid user script name format",
+		},
+		{
+			name:    "command injection attempt",
+			script:  "script;rm -rf",
+			wantErr: true,
+			errMsg:  "invalid user script name format",
+		},
+		{
+			name:    "SQL injection attempt",
+			script:  "script' OR '1'='1",
+			wantErr: true,
+			errMsg:  "invalid user script name format",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateUserScriptName(tt.script)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateUserScriptName() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr && tt.errMsg != "" && err != nil {
+				if !strings.Contains(err.Error(), tt.errMsg) {
+					t.Errorf("ValidateUserScriptName() error = %v, want error containing %q", err, tt.errMsg)
+				}
+			}
+		})
+	}
+}
+
+func TestValidateLogFilename(t *testing.T) {
+	tests := []struct {
+		name     string
+		filename string
+		expected bool
+	}{
+		{
+			name:     "valid simple filename",
+			filename: "syslog",
+			expected: true,
+		},
+		{
+			name:     "valid filename with extension",
+			filename: "app.log",
+			expected: true,
+		},
+		{
+			name:     "valid plugin log path",
+			filename: "plugin/my-plugin.log",
+			expected: true,
+		},
+		{
+			name:     "valid nested path",
+			filename: "logs/2024/01/app.log",
+			expected: true,
+		},
+		{
+			name:     "empty filename",
+			filename: "",
+			expected: false,
+		},
+		{
+			name:     "too long",
+			filename: strings.Repeat("a", 256),
+			expected: false,
+		},
+		{
+			name:     "path traversal with ../",
+			filename: "../etc/passwd",
+			expected: false,
+		},
+		{
+			name:     "path traversal with ..",
+			filename: "logs/../etc/passwd",
+			expected: false,
+		},
+		{
+			name:     "backslash",
+			filename: "path\\to\\file",
+			expected: false,
+		},
+		{
+			name:     "absolute path",
+			filename: "/var/log/syslog",
+			expected: false,
+		},
+		{
+			name:     "null byte injection",
+			filename: "file\x00.log",
+			expected: false,
+		},
+		{
+			name:     "valid with numbers",
+			filename: "log123.txt",
+			expected: true,
+		},
+		{
+			name:     "valid with hyphen",
+			filename: "my-log-file.log",
+			expected: true,
+		},
+		{
+			name:     "valid with underscore",
+			filename: "my_log_file.log",
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ValidateLogFilename(tt.filename)
+			if result != tt.expected {
+				t.Errorf("ValidateLogFilename(%q) = %v, want %v", tt.filename, result, tt.expected)
+			}
+		})
+	}
+}

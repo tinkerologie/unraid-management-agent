@@ -14,13 +14,13 @@ A Go-based plugin for Unraid that exposes comprehensive system monitoring and co
 
 ### Key Differences
 
-| Feature | Official Unraid API | This Plugin (Unraid Management Agent) |
-|---------|---------------------|----------------------------------------|
-| **Developer** | Lime Technology (Official) | Community (Third-Party) |
-| **API Type** | GraphQL | REST API + WebSocket |
-| **Availability** | Built into Unraid OS 7.2+ | Separate plugin installation required |
-| **Support** | Official Unraid support | Community support |
-| **Purpose** | Official system API | Alternative/complementary monitoring solution |
+| Feature          | Official Unraid API        | This Plugin (Unraid Management Agent)         |
+| ---------------- | -------------------------- | --------------------------------------------- |
+| **Developer**    | Lime Technology (Official) | Community (Third-Party)                       |
+| **API Type**     | GraphQL                    | REST API + WebSocket                          |
+| **Availability** | Built into Unraid OS 7.2+  | Separate plugin installation required         |
+| **Support**      | Official Unraid support    | Community support                             |
+| **Purpose**      | Official system API        | Alternative/complementary monitoring solution |
 
 ### When to Use This Plugin
 
@@ -118,6 +118,7 @@ Coordinates the entire application lifecycle:
 **Important:** The Unraid Management Agent has **NO external plugin dependencies**. It collects data directly from system sources.
 
 For detailed information, see:
+
 - **[System Requirements & Dependencies](docs/SYSTEM_REQUIREMENTS_AND_DEPENDENCIES.md)** - Complete requirements and data collection methods
 - **[Quick Reference](docs/QUICK_REFERENCE_DEPENDENCIES.md)** - TL;DR version
 - **[Diagnostic Commands](docs/DIAGNOSTIC_COMMANDS.md)** - Troubleshooting guide
@@ -270,11 +271,11 @@ Base URL: `http://localhost:8043/api/v1`
 Connect to `ws://localhost:8043/api/v1/ws` to receive real-time events:
 
 ```javascript
-const ws = new WebSocket('ws://localhost:8043/api/v1/ws');
+const ws = new WebSocket("ws://localhost:8043/api/v1/ws");
 
 ws.onmessage = (event) => {
   const data = JSON.parse(event.data);
-  console.log('Event received:', data);
+  console.log("Event received:", data);
 };
 ```
 
@@ -358,6 +359,7 @@ Configure the plugin through the Unraid web UI:
 
 1. Navigate to **Settings** → **Unraid Management Agent**
 2. Adjust settings as needed:
+
    - **Port**: API server port (default: 8043)
    - **Log Level**: Logging verbosity (info, debug)
    - **Collection Intervals**: How often each data type is collected
@@ -368,12 +370,12 @@ Configure the plugin through the Unraid web UI:
 
 The settings page provides dropdown menus to configure how often data is collected. Default values are optimized for low power consumption:
 
-| Category | Collectors | Default |
-|----------|-----------|---------|
-| **Fast** | System Metrics | 15 seconds |
+| Category     | Collectors                                           | Default    |
+| ------------ | ---------------------------------------------------- | ---------- |
+| **Fast**     | System Metrics                                       | 15 seconds |
 | **Standard** | Array, Disk, Docker, VM, Network, ZFS, Notifications | 30 seconds |
-| **Moderate** | UPS, GPU, Shares, Unassigned Devices | 1 minute |
-| **Slow** | Hardware Info, License Info | 5 minutes |
+| **Moderate** | UPS, GPU, Shares, Unassigned Devices                 | 1 minute   |
+| **Slow**     | Hardware Info, License Info                          | 5 minutes  |
 
 **⚡ Power Note:** Lower intervals provide faster updates but increase CPU usage and power consumption. On Intel systems with many Docker containers, aggressive intervals (5-10s) can increase idle power by 15-20W.
 
@@ -386,6 +388,7 @@ For automation or headless setups, you can edit the config file directly:
 ```
 
 Changes require a service restart:
+
 ```bash
 /usr/local/emhttp/plugins/unraid-management-agent/scripts/stop
 /usr/local/emhttp/plugins/unraid-management-agent/scripts/start
@@ -572,22 +575,26 @@ For issues, questions, or feature requests:
 The following features are planned for future releases:
 
 - **User Management Collector**
+
   - User account listing and information
   - User permissions and group membership
   - Active user sessions monitoring
 
 - **Network Statistics Trending**
+
   - Historical network bandwidth tracking
   - Time-series data for network metrics
   - Bandwidth usage trends and analysis
 
 - **Alerting and Notification System**
+
   - Configurable alert rules and thresholds
   - Notification delivery (email, webhook, etc.)
   - Alert history and acknowledgment
   - Integration with monitoring platforms
 
 - **Historical Data Storage**
+
   - Time-series database integration
   - Long-term metrics retention
   - Historical data querying and analysis

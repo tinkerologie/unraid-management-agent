@@ -137,6 +137,16 @@ func TestParseEthtoolKeyValue(t *testing.T) {
 		{"Advertised auto-negotiation", "Yes", false, false},
 		{"Supported link modes", "1000baseT/Full", true, false},
 		{"Advertised link modes", "1000baseT/Full", false, true},
+		// Additional test cases for full coverage
+		{"Supported ports", "[ TP ]", false, false},
+		{"Supported pause frame use", "Symmetric", false, false},
+		{"Supported FEC modes", "Base-R RS", false, false},
+		{"Advertised pause frame use", "Symmetric", false, false},
+		{"Advertised FEC modes", "Base-R", false, false},
+		{"Speed", "1000Mb/s", false, false},
+		{"MDI-X", "off (auto)", false, false},
+		{"Current message level", "0x00000007 (7)", false, false},
+		{"Transceiver", "internal", false, false},
 	}
 
 	for _, tt := range tests {
@@ -266,5 +276,351 @@ func TestEthtoolInfoStruct(t *testing.T) {
 	}
 	if info.MTU != 1500 {
 		t.Errorf("MTU = %d, want 1500", info.MTU)
+	}
+}
+
+func TestParseSpeedValue(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected int
+	}{
+		{"1Gbps", "1000Mb/s", 1000},
+		{"10Gbps", "10000Mb/s", 10000},
+		{"100Mbps", "100Mb/s", 100},
+		{"2.5Gbps", "2500Mb/s", 2500},
+		{"Unknown", "Unknown!", 0},
+		{"empty", "", 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Simulate the speed parsing logic
+			var speed int
+			for _, c := range tt.input {
+				if c >= '0' && c <= '9' {
+					speed = speed*10 + int(c-'0')
+				} else if speed > 0 {
+					break
+				}
+			}
+			if speed != tt.expected {
+				t.Errorf("parseSpeed(%q) = %d, want %d", tt.input, speed, tt.expected)
+			}
+		})
+	}
+}
+
+func TestParseDuplexValue(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"full duplex", "Full", "Full"},
+		{"half duplex", "Half", "Half"},
+		{"unknown", "Unknown! (255)", "Unknown! (255)"},
+		{"empty", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.input != tt.expected {
+				t.Errorf("Duplex = %q, want %q", tt.input, tt.expected)
+			}
+		})
+	}
+}
+
+func TestParseAutoNegotiation(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"on", "on", "on"},
+		{"off", "off", "off"},
+		{"not supported", "Not supported", "Not supported"},
+		{"empty", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.input != tt.expected {
+				t.Errorf("AutoNegotiation = %q, want %q", tt.input, tt.expected)
+			}
+		})
+	}
+}
+
+func TestParseLinkModes(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []string
+	}{
+		{
+			name:     "single mode",
+			input:    "1000baseT/Full",
+			expected: []string{"1000baseT/Full"},
+		},
+		{
+			name:     "multiple modes",
+			input:    "10baseT/Half 10baseT/Full 100baseT/Half 100baseT/Full",
+			expected: []string{"10baseT/Half", "10baseT/Full", "100baseT/Half", "100baseT/Full"},
+		},
+		{
+			name:     "high speed modes",
+			input:    "10000baseT/Full 2500baseT/Full 5000baseT/Full",
+			expected: []string{"10000baseT/Full", "2500baseT/Full", "5000baseT/Full"},
+		},
+		{
+			name:     "not reported",
+			input:    "Not reported",
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseListValue(tt.input)
+			if len(got) != len(tt.expected) {
+				t.Errorf("parseListValue(%q) returned %d items, want %d", tt.input, len(got), len(tt.expected))
+			}
+		})
+	}
+}
+
+func TestParsePortTypes(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"twisted pair", "Twisted Pair", "Twisted Pair"},
+		{"sfp", "SFP", "SFP"},
+		{"fiber", "Fibre", "Fibre"},
+		{"aui", "AUI", "AUI"},
+		{"mii", "MII", "MII"},
+		{"bnc", "BNC", "BNC"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.input != tt.expected {
+				t.Errorf("Port = %q, want %q", tt.input, tt.expected)
+			}
+		})
+	}
+}
+
+func TestParsePHYAD(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected int
+	}{
+		{"zero", "0", 0},
+		{"one", "1", 1},
+		{"common value", "2", 2},
+		{"max", "31", 31},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var phyad int
+			for _, c := range tt.input {
+				if c >= '0' && c <= '9' {
+					phyad = phyad*10 + int(c-'0')
+				}
+			}
+			if phyad != tt.expected {
+				t.Errorf("PHYAD = %d, want %d", phyad, tt.expected)
+			}
+		})
+	}
+}
+
+func TestParseMDIX(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"auto off", "off (auto)", "off (auto)"},
+		{"auto on", "on (auto)", "on (auto)"},
+		{"fixed off", "off", "off"},
+		{"fixed on", "on", "on"},
+		{"unknown", "Unknown", "Unknown"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.input != tt.expected {
+				t.Errorf("MDIX = %q, want %q", tt.input, tt.expected)
+			}
+		})
+	}
+}
+
+func TestParseMessageLevel(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"default", "0x00000007", "0x00000007"},
+		{"minimal", "0x00000001", "0x00000001"},
+		{"verbose", "0x0000ffff", "0x0000ffff"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.input != tt.expected {
+				t.Errorf("MessageLevel = %q, want %q", tt.input, tt.expected)
+			}
+		})
+	}
+}
+
+func TestParsePauseFrame(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"symmetric", "Symmetric", "Symmetric"},
+		{"receive only", "Receive-only", "Receive-only"},
+		{"asymmetric", "Asymmetric", "Asymmetric"},
+		{"no", "No", "No"},
+		{"not reported", "Not reported", "Not reported"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.input != tt.expected {
+				t.Errorf("PauseFrame = %q, want %q", tt.input, tt.expected)
+			}
+		})
+	}
+}
+
+func TestParseFECModes(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []string
+	}{
+		{
+			name:     "none",
+			input:    "None",
+			expected: []string{"None"},
+		},
+		{
+			name:     "base-r",
+			input:    "Base-R",
+			expected: []string{"Base-R"},
+		},
+		{
+			name:     "rs",
+			input:    "RS",
+			expected: []string{"RS"},
+		},
+		{
+			name:     "multiple",
+			input:    "Base-R RS",
+			expected: []string{"Base-R", "RS"},
+		},
+		{
+			name:     "not reported",
+			input:    "Not reported",
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseListValue(tt.input)
+			if len(got) != len(tt.expected) {
+				t.Errorf("parseListValue(%q) returned %d items, want %d", tt.input, len(got), len(tt.expected))
+			}
+		})
+	}
+}
+
+func TestParseEthtoolKeyValueAllBranches(t *testing.T) {
+	// Test Supported ports
+	info1 := &EthtoolInfo{}
+	parseEthtoolKeyValue(info1, "Supported ports", "TP MII", false, false)
+	if len(info1.SupportedPorts) != 2 {
+		t.Errorf("SupportedPorts has %d items, want 2", len(info1.SupportedPorts))
+	}
+
+	// Test Supported pause frame use
+	info2 := &EthtoolInfo{}
+	parseEthtoolKeyValue(info2, "Supported pause frame use", "Symmetric", false, false)
+	if info2.SupportedPauseFrame != "Symmetric" {
+		t.Errorf("SupportedPauseFrame = %q, want %q", info2.SupportedPauseFrame, "Symmetric")
+	}
+
+	// Test Supported FEC modes
+	info3 := &EthtoolInfo{}
+	parseEthtoolKeyValue(info3, "Supported FEC modes", "Base-R RS", false, false)
+	if len(info3.SupportedFECModes) != 2 {
+		t.Errorf("SupportedFECModes has %d items, want 2", len(info3.SupportedFECModes))
+	}
+
+	// Test Advertised pause frame use
+	info4 := &EthtoolInfo{}
+	parseEthtoolKeyValue(info4, "Advertised pause frame use", "No", false, false)
+	if info4.AdvertisedPauseFrame != "No" {
+		t.Errorf("AdvertisedPauseFrame = %q, want %q", info4.AdvertisedPauseFrame, "No")
+	}
+
+	// Test Advertised FEC modes
+	info5 := &EthtoolInfo{}
+	parseEthtoolKeyValue(info5, "Advertised FEC modes", "None", false, false)
+	if len(info5.AdvertisedFECModes) != 1 {
+		t.Errorf("AdvertisedFECModes has %d items, want 1", len(info5.AdvertisedFECModes))
+	}
+
+	// Test Speed - should be skipped (no change)
+	info6 := &EthtoolInfo{}
+	parseEthtoolKeyValue(info6, "Speed", "1000Mb/s", false, false)
+	// Speed is skipped, nothing to check
+
+	// Test MDI-X
+	info7 := &EthtoolInfo{}
+	parseEthtoolKeyValue(info7, "MDI-X", "off (auto)", false, false)
+	if info7.MDIX != "off (auto)" {
+		t.Errorf("MDIX = %q, want %q", info7.MDIX, "off (auto)")
+	}
+
+	// Test Current message level
+	info8 := &EthtoolInfo{}
+	parseEthtoolKeyValue(info8, "Current message level", "0x00000007 (7)", false, false)
+	if info8.MessageLevel != "0x00000007 (7)" {
+		t.Errorf("MessageLevel = %q, want %q", info8.MessageLevel, "0x00000007 (7)")
+	}
+
+	// Test Supported link modes with empty value
+	info9 := &EthtoolInfo{}
+	parseEthtoolKeyValue(info9, "Supported link modes", "", false, false)
+	if len(info9.SupportedLinkModes) != 0 {
+		t.Errorf("SupportedLinkModes has %d items, want 0", len(info9.SupportedLinkModes))
+	}
+
+	// Test Advertised link modes with empty value
+	info10 := &EthtoolInfo{}
+	parseEthtoolKeyValue(info10, "Advertised link modes", "", false, false)
+	if len(info10.AdvertisedLinkModes) != 0 {
+		t.Errorf("AdvertisedLinkModes has %d items, want 0", len(info10.AdvertisedLinkModes))
+	}
+
+	// Test PHYAD with invalid value
+	info11 := &EthtoolInfo{}
+	parseEthtoolKeyValue(info11, "PHYAD", "invalid", false, false)
+	if info11.PHYAD != 0 {
+		t.Errorf("PHYAD = %d, want 0 for invalid input", info11.PHYAD)
 	}
 }

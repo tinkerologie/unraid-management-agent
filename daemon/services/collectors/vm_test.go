@@ -96,3 +96,40 @@ func TestVMStateMapping(t *testing.T) {
 		})
 	}
 }
+func TestVMFormatMemoryDisplay(t *testing.T) {
+	hub := pubsub.New(10)
+	ctx := &domain.Context{Hub: hub}
+	collector := NewVMCollector(ctx)
+
+	tests := []struct {
+		name      string
+		used      uint64
+		allocated uint64
+		expected  string
+	}{
+		{"zero allocated", 100, 0, "0 / 0"},
+		{"4GB allocated", 2 * 1024 * 1024 * 1024, 4 * 1024 * 1024 * 1024, "2.00 GB / 4.00 GB"},
+		{"8GB allocated", 4 * 1024 * 1024 * 1024, 8 * 1024 * 1024 * 1024, "4.00 GB / 8.00 GB"},
+		{"16GB allocated", 8 * 1024 * 1024 * 1024, 16 * 1024 * 1024 * 1024, "8.00 GB / 16.00 GB"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := collector.formatMemoryDisplay(tt.used, tt.allocated)
+			if result != tt.expected {
+				t.Errorf("formatMemoryDisplay(%d, %d) = %q, want %q", tt.used, tt.allocated, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestVMCPUStatsTracking(t *testing.T) {
+	hub := pubsub.New(10)
+	ctx := &domain.Context{Hub: hub}
+	collector := NewVMCollector(ctx)
+
+	// Test that the collector has an initialized map for CPU stats
+	if collector.previousStats == nil {
+		t.Error("previousStats map should be initialized")
+	}
+}

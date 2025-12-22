@@ -87,6 +87,46 @@ func TestArrayControllerParityCheckModes(t *testing.T) {
 			t.Log("Note: No error - mdcmd might be available")
 		}
 	})
+
+	t.Run("StartArray", func(t *testing.T) {
+		err := ac.StartArray()
+		// Will fail without mdcmd, but tests the code path
+		if err == nil {
+			t.Log("Note: No error - mdcmd might be available")
+		}
+	})
+
+	t.Run("StopArray", func(t *testing.T) {
+		err := ac.StopArray()
+		// Will fail without mdcmd, but tests the code path
+		if err == nil {
+			t.Log("Note: No error - mdcmd might be available")
+		}
+	})
+
+	t.Run("StopParityCheck", func(t *testing.T) {
+		err := ac.StopParityCheck()
+		// Will fail without mdcmd, but tests the code path
+		if err == nil {
+			t.Log("Note: No error - mdcmd might be available")
+		}
+	})
+
+	t.Run("PauseParityCheck", func(t *testing.T) {
+		err := ac.PauseParityCheck()
+		// Will fail without mdcmd, but tests the code path
+		if err == nil {
+			t.Log("Note: No error - mdcmd might be available")
+		}
+	})
+
+	t.Run("ResumeParityCheck", func(t *testing.T) {
+		err := ac.ResumeParityCheck()
+		// Will fail without mdcmd, but tests the code path
+		if err == nil {
+			t.Log("Note: No error - mdcmd might be available")
+		}
+	})
 }
 
 func TestArrayControllerDiskOperations(t *testing.T) {
