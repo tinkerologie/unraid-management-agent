@@ -11,38 +11,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Configurable Collection Intervals** (Issue #8 follow-up):
-  - All collection intervals are now configurable via `/boot/config/plugins/unraid-management-agent/config.cfg`
-  - Added missing interval configurations: `INTERVAL_GPU`, `INTERVAL_NETWORK`, `INTERVAL_ZFS`, `INTERVAL_NOTIFICATION`, `INTERVAL_HARDWARE`, `INTERVAL_REGISTRATION`, `INTERVAL_UNASSIGNED`
-  - Environment variables automatically read from config file on service start
-  - Users can now customize intervals to balance responsiveness vs power consumption
-  - Config file changes require service restart to take effect
-  - **NEW:** User-friendly web UI for configuring collection intervals
-    - Accessible from Unraid Settings → Unraid Management Agent
-    - Descriptive labels for each interval type (e.g., "System Metrics (CPU, RAM, Temperature)")
-    - Organized into logical sections: System Monitoring, Containers & VMs, Hardware & Power, Storage & Shares, System Information
-    - Real-time validation with min/max values
-    - Power consumption warning with recommendations
-    - Automatic service restart when applying changes
-    - No need to manually edit config files
+- **Web UI for Collection Intervals** (Issue #8):
+  - New settings page accessible from Unraid Settings → Unraid Management Agent
+  - Dropdown menus with predefined interval options (5 seconds to 30 minutes)
+  - Organized into logical sections: System Monitoring, Containers & VMs, Hardware, Storage, Other
+  - Human-readable labels (e.g., "30 seconds", "1 minute", "5 minutes")
+  - Power consumption warning explaining impact of faster intervals
+  - Automatic service restart when clicking Apply
+  - No need to manually edit config files
+
+- **Configurable Collection Intervals**:
+  - All 14 collection intervals now configurable via UI or config file
+  - Environment variables properly passed to Go binary on service start
+  - Config file persists settings across reboots at `/boot/config/plugins/unraid-management-agent/config.cfg`
 
 ### Changed
 
+- **Start Script**: Fixed environment variable passing to Go binary through sudo
+
 ### Fixed
 
-- **Power Consumption Optimization** (Issue #8 in ha-unraid-management-agent):
-  - Increased collection intervals to reduce CPU wakeups and allow deeper C-states
-  - System: 5s → 15s (sensors command is CPU intensive)
-  - Array: 10s → 30s (array status rarely changes)
-  - Docker: 10s → 30s (docker stats is very CPU intensive with many containers)
-  - VM: 10s → 30s (virsh commands spawn multiple processes)
-  - UPS: 10s → 60s (UPS status rarely changes)
-  - GPU: 10s → 60s (intel_gpu_top is extremely CPU intensive)
-  - Network: 15s → 30s (network status changes infrequently)
-  - Optimized Docker stats collection to batch all container stats in a single command (reduces process spawns from N containers to 1)
-  - Reduced intel_gpu_top timeout from 5s to 2s and samples from 2 to 1
-  - Expected power savings: 15-20W for systems previously reporting 30W→50W increases
-  - All intervals remain configurable via config file for users who prefer faster updates
+- **Power Consumption Optimization** (Issue #8):
+  - Increased default collection intervals to reduce CPU wakeups
+  - System: 5s → 15s, Array: 10s → 30s, Docker: 10s → 30s
+  - VM: 10s → 30s, UPS: 10s → 60s, GPU: 10s → 60s
+  - Optimized Docker stats to batch all containers in single command
+  - Reduced intel_gpu_top timeout (5s → 2s) and samples (2 → 1)
+  - Expected power savings: 15-20W on affected systems
 
 ### Removed
 

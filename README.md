@@ -84,17 +84,19 @@ Collectors → Event Bus → API Server Cache → REST Endpoints
 
 #### Collectors
 
-Data collectors run independently at fixed intervals:
+Data collectors run at configurable intervals (defaults shown):
 
-- **System Collector** (5s): CPU, RAM, temps, uptime
-- **Array Collector** (10s): Array state and parity info
+- **System Collector** (15s): CPU, RAM, temps, uptime
+- **Array Collector** (30s): Array state and parity info
 - **Disk Collector** (30s): Per-disk metrics
-- **Network Collector** (15s): Interface status and statistics
-- **Docker Collector** (10s): Container information
-- **VM Collector** (10s): Virtual machine data
-- **UPS Collector** (10s): UPS status
-- **GPU Collector** (10s): GPU metrics
+- **Network Collector** (30s): Interface status and statistics
+- **Docker Collector** (30s): Container information
+- **VM Collector** (30s): Virtual machine data
+- **UPS Collector** (60s): UPS status
+- **GPU Collector** (60s): GPU metrics
 - **Share Collector** (60s): User share information
+- **Hardware Collector** (5m): Hardware info (rarely changes)
+- **Registration Collector** (5m): License info (rarely changes)
 
 #### API Server
 
@@ -350,70 +352,44 @@ make clean
 
 ## Configuration
 
-### Configuration File
+### Settings Page
 
-When installed via the .plg file, the plugin creates a configuration file at:
+Configure the plugin through the Unraid web UI:
+
+1. Navigate to **Settings** → **Unraid Management Agent**
+2. Adjust settings as needed:
+   - **Port**: API server port (default: 8043)
+   - **Log Level**: Logging verbosity (info, debug)
+   - **Collection Intervals**: How often each data type is collected
+
+3. Click **Apply** to save changes (service restarts automatically)
+
+### Collection Intervals
+
+The settings page provides dropdown menus to configure how often data is collected. Default values are optimized for low power consumption:
+
+| Category | Collectors | Default |
+|----------|-----------|---------|
+| **Fast** | System Metrics | 15 seconds |
+| **Standard** | Array, Disk, Docker, VM, Network, ZFS, Notifications | 30 seconds |
+| **Moderate** | UPS, GPU, Shares, Unassigned Devices | 1 minute |
+| **Slow** | Hardware Info, License Info | 5 minutes |
+
+**⚡ Power Note:** Lower intervals provide faster updates but increase CPU usage and power consumption. On Intel systems with many Docker containers, aggressive intervals (5-10s) can increase idle power by 15-20W.
+
+### Advanced: Manual Configuration
+
+For automation or headless setups, you can edit the config file directly:
 
 ```
 /boot/config/plugins/unraid-management-agent/config.cfg
 ```
 
-Default configuration:
-
-```bash
-# API Server Configuration
-PORT=8043
-LOG_LEVEL=info
-
-# Feature Toggles
-ENABLE_UPS=yes
-ENABLE_GPU=yes
-
-# Collection Intervals (seconds) - Power-optimized defaults
-# Higher intervals reduce CPU wakeups and power consumption
-INTERVAL_SYSTEM=15
-INTERVAL_ARRAY=30
-INTERVAL_DISK=30
-INTERVAL_DOCKER=30
-INTERVAL_VM=30
-INTERVAL_UPS=60
-INTERVAL_GPU=60
-INTERVAL_SHARES=60
-INTERVAL_NETWORK=30
-INTERVAL_ZFS=30
-INTERVAL_NOTIFICATION=30
-INTERVAL_HARDWARE=300
-INTERVAL_REGISTRATION=300
-INTERVAL_UNASSIGNED=60
-```
-
-You can edit this file to customize the plugin behavior. Changes require a service restart:
-
+Changes require a service restart:
 ```bash
 /usr/local/emhttp/plugins/unraid-management-agent/scripts/stop
 /usr/local/emhttp/plugins/unraid-management-agent/scripts/start
 ```
-
-### Collection Intervals
-
-Default intervals (configurable via config file at `/boot/config/plugins/unraid-management-agent/config.cfg`):
-
-- System: 15 seconds
-- Array: 30 seconds
-- Disk: 30 seconds
-- Docker: 30 seconds
-- VM: 30 seconds
-- UPS: 60 seconds
-- GPU: 60 seconds
-- Network: 30 seconds
-- Shares: 60 seconds
-- ZFS: 30 seconds
-- Notification: 30 seconds
-- Hardware: 300 seconds
-- Registration: 300 seconds
-- Unassigned Devices: 60 seconds
-
-**Power Optimization Note:** These defaults are optimized to reduce power consumption (see Issue #8). Higher intervals reduce CPU wakeups and allow the processor to enter deeper C-states (power saving modes). For faster updates, you can reduce the intervals in the config file, but expect a 15-20W increase in idle power consumption on systems with Intel CPUs and many Docker containers.
 
 ### Logging
 

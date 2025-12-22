@@ -52,6 +52,51 @@ function isServiceRunning() {
 $running = isServiceRunning();
 $status_text = $running ? "<span style='color:green;'>RUNNING</span>" : "<span style='color:red;'>STOPPED</span>";
 
+// Helper function to generate interval select options
+function intervalOptions($selected, $type = 'standard') {
+    $options = [];
+    
+    if ($type === 'fast') {
+        // For system metrics that can update quickly
+        $options = [
+            '5' => '5 seconds',
+            '10' => '10 seconds',
+            '15' => '15 seconds',
+            '30' => '30 seconds',
+            '60' => '1 minute',
+            '120' => '2 minutes',
+            '300' => '5 minutes',
+        ];
+    } elseif ($type === 'standard') {
+        // For most collectors
+        $options = [
+            '10' => '10 seconds',
+            '15' => '15 seconds',
+            '30' => '30 seconds',
+            '60' => '1 minute',
+            '120' => '2 minutes',
+            '300' => '5 minutes',
+        ];
+    } elseif ($type === 'slow') {
+        // For hardware/registration that rarely changes
+        $options = [
+            '60' => '1 minute',
+            '120' => '2 minutes',
+            '300' => '5 minutes',
+            '600' => '10 minutes',
+            '900' => '15 minutes',
+            '1800' => '30 minutes',
+        ];
+    }
+    
+    $html = '';
+    foreach ($options as $value => $label) {
+        $isSelected = ($selected == $value) ? 'selected' : '';
+        $html .= "<option value=\"$value\" $isSelected>$label</option>";
+    }
+    return $html;
+}
+
 // Handle form submission
 if ($_POST) {
     if (isset($_POST['start'])) {
@@ -202,28 +247,46 @@ if ($_POST) {
     margin-top: 5px;
 }
 .interval-section {
-    margin-top: 20px;
-    padding-top: 20px;
-    border-top: 1px solid #ddd;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #eee;
+}
+.interval-section:first-of-type {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+}
+.section-header {
+    font-size: 11px;
+    font-weight: bold;
+    color: #666;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 .interval-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 15px;
-    margin-top: 15px;
+    grid-template-columns: repeat(auto-fill, minmax(280px, max-content));
+    gap: 4px 40px;
 }
-.interval-item {
+.interval-row {
     display: flex;
     align-items: center;
+    gap: 10px;
+    padding: 3px 0;
 }
 .interval-label {
-    flex: 1;
-    font-weight: normal;
+    font-size: 13px;
+    color: #333;
+    min-width: 120px;
 }
-.interval-input {
-    width: 80px;
-    padding: 5px;
-    text-align: right;
+.interval-select {
+    width: 110px;
+    padding: 3px 6px;
+    font-size: 12px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    background-color: #fff;
 }
 .power-warning {
     background-color: #fff3cd;
@@ -231,13 +294,7 @@ if ($_POST) {
     border-radius: 5px;
     padding: 10px;
     margin-top: 15px;
-    font-size: 13px;
-}
-.section-header {
-    font-size: 16px;
-    font-weight: bold;
-    margin-bottom: 10px;
-    color: #333;
+    font-size: 12px;
 }
 </style>
 
@@ -287,29 +344,36 @@ if ($_POST) {
 
         <div class="config-box">
             <h3>Collection Intervals</h3>
-            <p class="help-text" style="margin-bottom: 15px;">
-                Configure how often data is collected from your system. Lower values provide faster updates but increase CPU usage and power consumption.
-                <strong>Changes require service restart to take effect.</strong>
+            <p class="help-text" style="margin-bottom: 10px;">
+                How often data is collected. Lower = faster updates but higher power usage.
             </p>
 
             <div class="interval-section">
                 <div class="section-header">System Monitoring</div>
                 <div class="interval-grid">
-                    <div class="interval-item">
-                        <label class="interval-label">System Metrics (CPU, RAM, Temperature):</label>
-                        <input type="number" name="interval_system" value="<?= htmlspecialchars($interval_system) ?>" class="interval-input" min="5" max="300"> seconds
+                    <div class="interval-row">
+                        <span class="interval-label">System Metrics</span>
+                        <select name="interval_system" class="interval-select">
+                            <?= intervalOptions($interval_system, 'fast') ?>
+                        </select>
                     </div>
-                    <div class="interval-item">
-                        <label class="interval-label">Array Status:</label>
-                        <input type="number" name="interval_array" value="<?= htmlspecialchars($interval_array) ?>" class="interval-input" min="10" max="300"> seconds
+                    <div class="interval-row">
+                        <span class="interval-label">Array Status</span>
+                        <select name="interval_array" class="interval-select">
+                            <?= intervalOptions($interval_array, 'standard') ?>
+                        </select>
                     </div>
-                    <div class="interval-item">
-                        <label class="interval-label">Disk Health & SMART Data:</label>
-                        <input type="number" name="interval_disk" value="<?= htmlspecialchars($interval_disk) ?>" class="interval-input" min="30" max="600"> seconds
+                    <div class="interval-row">
+                        <span class="interval-label">Disk Health</span>
+                        <select name="interval_disk" class="interval-select">
+                            <?= intervalOptions($interval_disk, 'standard') ?>
+                        </select>
                     </div>
-                    <div class="interval-item">
-                        <label class="interval-label">Network Interfaces:</label>
-                        <input type="number" name="interval_network" value="<?= htmlspecialchars($interval_network) ?>" class="interval-input" min="15" max="300"> seconds
+                    <div class="interval-row">
+                        <span class="interval-label">Network</span>
+                        <select name="interval_network" class="interval-select">
+                            <?= intervalOptions($interval_network, 'standard') ?>
+                        </select>
                     </div>
                 </div>
             </div>
@@ -317,79 +381,95 @@ if ($_POST) {
             <div class="interval-section">
                 <div class="section-header">Containers & VMs</div>
                 <div class="interval-grid">
-                    <div class="interval-item">
-                        <label class="interval-label">Docker Containers:</label>
-                        <input type="number" name="interval_docker" value="<?= htmlspecialchars($interval_docker) ?>" class="interval-input" min="10" max="300"> seconds
+                    <div class="interval-row">
+                        <span class="interval-label">Docker</span>
+                        <select name="interval_docker" class="interval-select">
+                            <?= intervalOptions($interval_docker, 'standard') ?>
+                        </select>
                     </div>
-                    <div class="interval-item">
-                        <label class="interval-label">Virtual Machines:</label>
-                        <input type="number" name="interval_vm" value="<?= htmlspecialchars($interval_vm) ?>" class="interval-input" min="10" max="300"> seconds
-                    </div>
-                </div>
-            </div>
-
-            <div class="interval-section">
-                <div class="section-header">Hardware & Power</div>
-                <div class="interval-grid">
-                    <div class="interval-item">
-                        <label class="interval-label">GPU Metrics:</label>
-                        <input type="number" name="interval_gpu" value="<?= htmlspecialchars($interval_gpu) ?>" class="interval-input" min="30" max="300"> seconds
-                    </div>
-                    <div class="interval-item">
-                        <label class="interval-label">UPS Status:</label>
-                        <input type="number" name="interval_ups" value="<?= htmlspecialchars($interval_ups) ?>" class="interval-input" min="30" max="300"> seconds
-                    </div>
-                    <div class="interval-item">
-                        <label class="interval-label">Hardware Information:</label>
-                        <input type="number" name="interval_hardware" value="<?= htmlspecialchars($interval_hardware) ?>" class="interval-input" min="60" max="600"> seconds
+                    <div class="interval-row">
+                        <span class="interval-label">Virtual Machines</span>
+                        <select name="interval_vm" class="interval-select">
+                            <?= intervalOptions($interval_vm, 'standard') ?>
+                        </select>
                     </div>
                 </div>
             </div>
 
             <div class="interval-section">
-                <div class="section-header">Storage & Shares</div>
+                <div class="section-header">Hardware</div>
                 <div class="interval-grid">
-                    <div class="interval-item">
-                        <label class="interval-label">User Shares:</label>
-                        <input type="number" name="interval_shares" value="<?= htmlspecialchars($interval_shares) ?>" class="interval-input" min="30" max="300"> seconds
+                    <div class="interval-row">
+                        <span class="interval-label">GPU Metrics</span>
+                        <select name="interval_gpu" class="interval-select">
+                            <?= intervalOptions($interval_gpu, 'standard') ?>
+                        </select>
                     </div>
-                    <div class="interval-item">
-                        <label class="interval-label">ZFS Pools & Datasets:</label>
-                        <input type="number" name="interval_zfs" value="<?= htmlspecialchars($interval_zfs) ?>" class="interval-input" min="30" max="300"> seconds
+                    <div class="interval-row">
+                        <span class="interval-label">UPS Status</span>
+                        <select name="interval_ups" class="interval-select">
+                            <?= intervalOptions($interval_ups, 'standard') ?>
+                        </select>
                     </div>
-                    <div class="interval-item">
-                        <label class="interval-label">Unassigned Devices:</label>
-                        <input type="number" name="interval_unassigned" value="<?= htmlspecialchars($interval_unassigned) ?>" class="interval-input" min="30" max="300"> seconds
+                    <div class="interval-row">
+                        <span class="interval-label">Hardware Info</span>
+                        <select name="interval_hardware" class="interval-select">
+                            <?= intervalOptions($interval_hardware, 'slow') ?>
+                        </select>
                     </div>
                 </div>
             </div>
 
             <div class="interval-section">
-                <div class="section-header">System Information</div>
+                <div class="section-header">Storage</div>
                 <div class="interval-grid">
-                    <div class="interval-item">
-                        <label class="interval-label">Notifications:</label>
-                        <input type="number" name="interval_notification" value="<?= htmlspecialchars($interval_notification) ?>" class="interval-input" min="15" max="300"> seconds
+                    <div class="interval-row">
+                        <span class="interval-label">User Shares</span>
+                        <select name="interval_shares" class="interval-select">
+                            <?= intervalOptions($interval_shares, 'standard') ?>
+                        </select>
                     </div>
-                    <div class="interval-item">
-                        <label class="interval-label">License Information:</label>
-                        <input type="number" name="interval_registration" value="<?= htmlspecialchars($interval_registration) ?>" class="interval-input" min="60" max="600"> seconds
+                    <div class="interval-row">
+                        <span class="interval-label">ZFS Pools</span>
+                        <select name="interval_zfs" class="interval-select">
+                            <?= intervalOptions($interval_zfs, 'standard') ?>
+                        </select>
+                    </div>
+                    <div class="interval-row">
+                        <span class="interval-label">Unassigned Devices</span>
+                        <select name="interval_unassigned" class="interval-select">
+                            <?= intervalOptions($interval_unassigned, 'standard') ?>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="interval-section">
+                <div class="section-header">Other</div>
+                <div class="interval-grid">
+                    <div class="interval-row">
+                        <span class="interval-label">Notifications</span>
+                        <select name="interval_notification" class="interval-select">
+                            <?= intervalOptions($interval_notification, 'standard') ?>
+                        </select>
+                    </div>
+                    <div class="interval-row">
+                        <span class="interval-label">License Info</span>
+                        <select name="interval_registration" class="interval-select">
+                            <?= intervalOptions($interval_registration, 'slow') ?>
+                        </select>
                     </div>
                 </div>
             </div>
 
             <div class="power-warning">
-                <strong>⚡ Power Consumption Note:</strong> Lower intervals (faster updates) increase CPU usage and power consumption.
-                On systems with Intel CPUs and many Docker containers, reducing intervals from these defaults to 5-10 seconds
-                can increase idle power consumption by 15-20W. The default values are optimized for low power usage while
-                maintaining responsive monitoring.
+                <strong>⚡ Power Note:</strong> Default values are optimized for low power. Faster intervals can increase idle power by 15-20W on Intel systems.
             </div>
         </div>
 
         <div class="config-box">
             <div class="help-text">
-                <strong>Note:</strong> The service will automatically start when the Unraid array starts.
-                You can manually stop or restart the service using the buttons above.
+                <strong>Note:</strong> Service auto-starts with array. Changes apply after clicking Apply.
             </div>
         </div>
 
