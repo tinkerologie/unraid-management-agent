@@ -3,12 +3,12 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name        "unraid-management-agent">
 <!ENTITY author      "ruaan-deysel">
-<!ENTITY version     "2025.12.0">
+<!ENTITY version     "2025.12.1">
 <!ENTITY launch      "Settings/&name;">
 <!ENTITY gitURL      "https://github.com/ruaandeysel/&name;">
 <!ENTITY pluginURL   "&gitURL;/releases/latest/download/&name;.plg">
 <!ENTITY bundle      "&name;-&version;.tgz">
-<!ENTITY md5         "4905d12b934a2724943f43441000a8f9">
+<!ENTITY md5         "PLACEHOLDER_MD5">
 ]>
 
 <PLUGIN  name="&name;"
@@ -20,6 +20,21 @@
          icon="server">
 
 <CHANGES>
+###2025.12.1 (2025-12-27)
+- Power Consumption Optimization (Issue #8)
+- New Web UI settings page for configurable collection intervals
+- Dropdown menus with predefined interval options (5 seconds to 30 minutes)
+- 14 configurable collection intervals via UI or config file
+- Industry-standard default intervals to reduce CPU wakeups and power consumption
+- Disk Health: 30s to 300s (5 min), ZFS Pools: 30s to 300s (5 min)
+- Hardware Info: 300s to 600s (10 min), Array Status: 30s to 60s
+- VM, Network, UPS, GPU intervals optimized for power savings
+- Optimized Docker stats to batch all containers in single command
+- Reduced intel_gpu_top timeout and samples for lower power usage
+- Expected power savings: 15-20W on affected systems
+- Automatic service restart when applying interval changes
+- Config persists at /boot/config/plugins/unraid-management-agent/config.cfg
+
 ###2025.12.0
 - Bug Fix (Issue #30)
 - Fixed array disk counts inverted: num_data_disks and num_parity_disks were swapped

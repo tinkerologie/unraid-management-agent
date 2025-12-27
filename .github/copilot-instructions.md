@@ -180,16 +180,20 @@ make package       # Create plugin .tgz
 **IMPORTANT**: Always use the provided deployment scripts for building and testing:
 
 1. **Prepare credentials**: Create `scripts/config.sh` with Unraid server SSH credentials
+
    ```bash
    cp scripts/config.sh.example scripts/config.sh
    # Edit config.sh with actual Unraid server IP, username, and password
    ```
 
 2. **Deploy and test**: Use `scripts/deploy-plugin.sh`
+
    ```bash
    ./scripts/deploy-plugin.sh
    ```
+
    This script:
+
    - Builds the plugin using `make release`
    - Uses `sshpass` to SSH into Unraid server without interactive password prompt
    - Uploads the plugin package
@@ -296,31 +300,38 @@ Uses date-based semantic versioning: `YYYY.MM.DD` (e.g., `2025.11.25`)
 **Release process:**
 
 1. **Update `CHANGELOG.md`** - ALWAYS keep this file up to date with every change:
+
    - Add entry at the top under new version section
    - Follow existing format: `## [YYYY.MM.DD]` with date
    - Include all bug fixes, features, and improvements
    - Link to relevant issues/PRs: `(#123)`
    - Group changes: Features, Bug Fixes, Security, Performance, etc.
    - **Example entry**:
+
      ```markdown
      ## [2025.12.22]
-     
+
      ### Added
+
      - New ZFS pool monitoring feature (#85)
      - WebSocket reconnection logic
-     
+
      ### Fixed
+
      - Memory leak in Docker collector (#92)
      - CPU usage calculation on ARM systems (#88)
-     
+
      ### Changed
+
      - Increased default collection intervals for performance
      ```
+
    - **DO NOT** skip or delay CHANGELOG updates—these must be kept current at all times
 
 2. Update `VERSION` file with new version
 
 3. **Update `.plg` files** (both root and `meta/template/` directory):
+
    - Update `<!ENTITY version "2025.11.26">` with new version
    - Update `<!ENTITY md5 "...">` with checksum **from GitHub release** (not local build)
    - **CRITICAL**: MD5 must match the GitHub release artifact or users cannot download updates
