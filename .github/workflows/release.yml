@@ -135,6 +135,42 @@ jobs:
           prerelease: ${{ steps.version.outputs.prerelease }}
           draft: false
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update PLG files with MD5 hash
+        run: |
+          MD5="${{ steps.checksum.outputs.md5 }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          
+          echo "Updating PLG files with MD5: $MD5"
+          
+          # Update root PLG file
+          sed -i "s/<!ENTITY md5.*\".*\">/<!ENTITY md5         \"$MD5\">/" unraid-management-agent.plg
+          
+          # Update template PLG file
+          sed -i "s/<!ENTITY md5.*\".*\">/<!ENTITY md5         \"$MD5\">/" meta/template/unraid-management-agent.plg
+          
+          echo "✅ Updated PLG files"
+          
+          # Verify updates
+          echo "Root PLG MD5:"
+          grep "ENTITY md5" unraid-management-agent.plg
+          echo "Template PLG MD5:"
+          grep "ENTITY md5" meta/template/unraid-management-agent.plg
+
+      - name: Commit and push PLG updates
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Check if there are changes
+          if git diff --quiet unraid-management-agent.plg meta/template/unraid-management-agent.plg; then
+            echo "No changes to PLG files"
+          else
+            git add unraid-management-agent.plg meta/template/unraid-management-agent.plg
+            git commit -m "chore: update PLG MD5 hash for v${{ steps.version.outputs.version }} [skip ci]"
+            git push origin HEAD:main
+            echo "✅ Committed and pushed PLG updates"
+          fi
       
       - name: Release Summary
         run: |
