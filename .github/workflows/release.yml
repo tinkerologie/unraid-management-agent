@@ -3,11 +3,11 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release (e.g., v2025.12.1)'
+        description: "Tag to release (e.g., v2025.12.1)"
         required: true
         type: string
 
@@ -18,19 +18,19 @@ jobs:
   release:
     name: Build and Release
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
           fetch-depth: 0
-      
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
-      
+          go-version: "1.25"
+
       - name: Extract version from tag
         id: version
         run: |
@@ -42,11 +42,11 @@ jobs:
             TAG=${GITHUB_REF#refs/tags/}
             VERSION=${TAG#v}
           fi
-          
+
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Version: $VERSION (Tag: $TAG)"
-          
+
           # Check if this is a pre-release
           if [[ "$VERSION" =~ (alpha|beta|rc) ]]; then
             echo "prerelease=true" >> $GITHUB_OUTPUT
@@ -55,24 +55,24 @@ jobs:
             echo "prerelease=false" >> $GITHUB_OUTPUT
             echo "This is a stable release"
           fi
-      
+
       - name: Verify VERSION file matches tag
         run: |
           FILE_VERSION=$(cat VERSION | tr -d '\n')
           TAG_VERSION="${{ steps.version.outputs.version }}"
-          
+
           if [ "$FILE_VERSION" != "$TAG_VERSION" ]; then
             echo "ERROR: VERSION file ($FILE_VERSION) does not match tag ($TAG_VERSION)"
             exit 1
           fi
-          
+
           echo "✅ VERSION file matches tag: $TAG_VERSION"
-      
+
       - name: Build release package
         run: |
           echo "Building release package..."
           make package
-          
+
           # Verify the package was created
           PACKAGE_FILE="build/unraid-management-agent-${{ steps.version.outputs.version }}.tgz"
           if [ ! -f "$PACKAGE_FILE" ]; then
@@ -80,36 +80,36 @@ jobs:
             ls -la build/
             exit 1
           fi
-          
+
           echo "✅ Package created: $PACKAGE_FILE"
           ls -lh "$PACKAGE_FILE"
-      
+
       - name: Calculate MD5 checksum
         id: checksum
         run: |
           PACKAGE_FILE="build/unraid-management-agent-${{ steps.version.outputs.version }}.tgz"
-          
+
           # Calculate MD5 checksum (Linux uses md5sum, macOS uses md5)
           if command -v md5sum &> /dev/null; then
             MD5=$(md5sum "$PACKAGE_FILE" | awk '{print $1}')
           else
             MD5=$(md5 -q "$PACKAGE_FILE")
           fi
-          
+
           echo "md5=$MD5" >> $GITHUB_OUTPUT
           echo "✅ MD5 checksum: $MD5"
-          
+
           # Save checksum to file for release notes
           echo "$MD5" > build/MD5SUM
-      
+
       - name: Extract release notes from CHANGELOG
         id: changelog
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          
+
           # Extract release notes for this version from CHANGELOG.md
           # Look for the section between [VERSION] and the next version header
-          
+
           if grep -q "\[$VERSION\]" CHANGELOG.md; then
             # Extract the section for this version
             NOTES=$(awk "/\[$VERSION\]/,/^## \[/" CHANGELOG.md | sed '1d;$d' | sed '/^$/d')
@@ -124,10 +124,10 @@ jobs:
             echo "⚠️  Version $VERSION not found in CHANGELOG.md"
             NOTES="See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details."
           fi
-          
+
           # Save to file (GitHub Actions doesn't handle multiline outputs well)
           echo "$NOTES" > build/RELEASE_NOTES.md
-          
+
           # Add MD5 checksum to release notes
           echo "" >> build/RELEASE_NOTES.md
           echo "---" >> build/RELEASE_NOTES.md
@@ -136,9 +136,9 @@ jobs:
           echo "\`\`\`" >> build/RELEASE_NOTES.md
           echo "${{ steps.checksum.outputs.md5 }}  unraid-management-agent-$VERSION.tgz" >> build/RELEASE_NOTES.md
           echo "\`\`\`" >> build/RELEASE_NOTES.md
-          
+
           cat build/RELEASE_NOTES.md
-      
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -156,17 +156,17 @@ jobs:
         run: |
           MD5="${{ steps.checksum.outputs.md5 }}"
           VERSION="${{ steps.version.outputs.version }}"
-          
+
           echo "Updating PLG files with MD5: $MD5"
-          
+
           # Update root PLG file
           sed -i "s/<!ENTITY md5.*\".*\">/<!ENTITY md5         \"$MD5\">/" unraid-management-agent.plg
-          
+
           # Update template PLG file
           sed -i "s/<!ENTITY md5.*\".*\">/<!ENTITY md5         \"$MD5\">/" meta/template/unraid-management-agent.plg
-          
+
           echo "✅ Updated PLG files"
-          
+
           # Verify updates
           echo "Root PLG MD5:"
           grep "ENTITY md5" unraid-management-agent.plg
@@ -177,7 +177,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          
+
           # Check if there are changes
           if git diff --quiet unraid-management-agent.plg meta/template/unraid-management-agent.plg; then
             echo "No changes to PLG files"
@@ -197,7 +197,7 @@ jobs:
             git push origin main
             echo "✅ Committed and pushed PLG updates"
           fi
-      
+
       - name: Release Summary
         run: |
           echo "## 🎉 v${{ steps.version.outputs.version }} Created Successfully!" >> $GITHUB_STEP_SUMMARY
@@ -214,4 +214,3 @@ jobs:
           else
             echo "**Type:** Stable release" >> $GITHUB_STEP_SUMMARY
           fi
-

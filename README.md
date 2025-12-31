@@ -1,3 +1,10 @@
+[![GitHub Release](https://img.shields.io/github/v/release/ruaan-deysel/unraid-management-agent?label=latest%20release)](https://github.com/ruaan-deysel/unraid-management-agent/releases/latest)
+[![GitHub Last Commit](https://img.shields.io/github/last-commit/ruaan-deysel/unraid-management-agent)](https://github.com/ruaan-deysel/unraid-management-agent/commits/main)
+[![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/ruaan-deysel/unraid-management-agent)](https://github.com/ruaan-deysel/unraid-management-agent)
+[![GitHub issues](https://img.shields.io/github/issues/ruaan-deysel/unraid-management-agent)](https://github.com/ruaan-deysel/unraid-management-agent/issues)
+[![License](https://img.shields.io/github/license/ruaan-deysel/unraid-management-agent)](./LICENSE)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ruaan-deysel/unraid-management-agent)
+
 # Unraid Management Agent
 
 A Go-based plugin for Unraid that exposes comprehensive system monitoring and control via REST API and WebSockets.
