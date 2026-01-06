@@ -48,82 +48,197 @@ func (o *Orchestrator) Run() error {
 	// Small delay to ensure subscriptions are fully set up
 	time.Sleep(100 * time.Millisecond)
 
-	// Initialize collectors
-	systemCollector := collectors.NewSystemCollector(o.ctx)
-	arrayCollector := collectors.NewArrayCollector(o.ctx)
-	diskCollector := collectors.NewDiskCollector(o.ctx)
-	dockerCollector := collectors.NewDockerCollector(o.ctx)
-	vmCollector := collectors.NewVMCollector(o.ctx)
-	upsCollector := collectors.NewUPSCollector(o.ctx)
-	gpuCollector := collectors.NewGPUCollector(o.ctx)
-	shareCollector := collectors.NewShareCollector(o.ctx)
-	networkCollector := collectors.NewNetworkCollector(o.ctx)
-	hardwareCollector := collectors.NewHardwareCollector(o.ctx)
-	registrationCollector := collectors.NewRegistrationCollector(o.ctx)
-	notificationCollector := collectors.NewNotificationCollector(o.ctx)
-	unassignedCollector := collectors.NewUnassignedCollector(o.ctx)
-	zfsCollector := collectors.NewZFSCollector(o.ctx)
+	// Initialize collectors (only if enabled - interval > 0)
+	// Interval of 0 means the collector is disabled
+	enabledCount := 0
+	disabledCollectors := []string{}
 
-	// Start collectors with context and WaitGroup - use intervals from context (configurable via environment)
-	wg.Add(14)
-	go func() {
-		defer wg.Done()
-		systemCollector.Start(ctx, time.Duration(o.ctx.Intervals.System)*time.Second)
-	}()
-	go func() {
-		defer wg.Done()
-		arrayCollector.Start(ctx, time.Duration(o.ctx.Intervals.Array)*time.Second)
-	}()
-	go func() {
-		defer wg.Done()
-		diskCollector.Start(ctx, time.Duration(o.ctx.Intervals.Disk)*time.Second)
-	}()
-	go func() {
-		defer wg.Done()
-		dockerCollector.Start(ctx, time.Duration(o.ctx.Intervals.Docker)*time.Second)
-	}()
-	go func() {
-		defer wg.Done()
-		vmCollector.Start(ctx, time.Duration(o.ctx.Intervals.VM)*time.Second)
-	}()
-	go func() {
-		defer wg.Done()
-		upsCollector.Start(ctx, time.Duration(o.ctx.Intervals.UPS)*time.Second)
-	}()
-	go func() {
-		defer wg.Done()
-		gpuCollector.Start(ctx, time.Duration(o.ctx.Intervals.GPU)*time.Second)
-	}()
-	go func() {
-		defer wg.Done()
-		shareCollector.Start(ctx, time.Duration(o.ctx.Intervals.Shares)*time.Second)
-	}()
-	go func() {
-		defer wg.Done()
-		networkCollector.Start(ctx, time.Duration(o.ctx.Intervals.Network)*time.Second)
-	}()
-	go func() {
-		defer wg.Done()
-		hardwareCollector.Start(ctx, time.Duration(o.ctx.Intervals.Hardware)*time.Second)
-	}()
-	go func() {
-		defer wg.Done()
-		registrationCollector.Start(ctx, time.Duration(o.ctx.Intervals.Registration)*time.Second)
-	}()
-	go func() {
-		defer wg.Done()
-		notificationCollector.Start(ctx, time.Duration(o.ctx.Intervals.Notification)*time.Second)
-	}()
-	go func() {
-		defer wg.Done()
-		unassignedCollector.Start(ctx, time.Duration(o.ctx.Intervals.Unassigned)*time.Second)
-	}()
-	go func() {
-		defer wg.Done()
-		zfsCollector.Start(ctx, time.Duration(o.ctx.Intervals.ZFS)*time.Second)
-	}()
+	// System collector
+	if o.ctx.Intervals.System > 0 {
+		systemCollector := collectors.NewSystemCollector(o.ctx)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			systemCollector.Start(ctx, time.Duration(o.ctx.Intervals.System)*time.Second)
+		}()
+		enabledCount++
+	} else {
+		disabledCollectors = append(disabledCollectors, "system")
+	}
 
-	logger.Success("All collectors started")
+	// Array collector
+	if o.ctx.Intervals.Array > 0 {
+		arrayCollector := collectors.NewArrayCollector(o.ctx)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			arrayCollector.Start(ctx, time.Duration(o.ctx.Intervals.Array)*time.Second)
+		}()
+		enabledCount++
+	} else {
+		disabledCollectors = append(disabledCollectors, "array")
+	}
+
+	// Disk collector
+	if o.ctx.Intervals.Disk > 0 {
+		diskCollector := collectors.NewDiskCollector(o.ctx)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			diskCollector.Start(ctx, time.Duration(o.ctx.Intervals.Disk)*time.Second)
+		}()
+		enabledCount++
+	} else {
+		disabledCollectors = append(disabledCollectors, "disk")
+	}
+
+	// Docker collector
+	if o.ctx.Intervals.Docker > 0 {
+		dockerCollector := collectors.NewDockerCollector(o.ctx)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			dockerCollector.Start(ctx, time.Duration(o.ctx.Intervals.Docker)*time.Second)
+		}()
+		enabledCount++
+	} else {
+		disabledCollectors = append(disabledCollectors, "docker")
+	}
+
+	// VM collector
+	if o.ctx.Intervals.VM > 0 {
+		vmCollector := collectors.NewVMCollector(o.ctx)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			vmCollector.Start(ctx, time.Duration(o.ctx.Intervals.VM)*time.Second)
+		}()
+		enabledCount++
+	} else {
+		disabledCollectors = append(disabledCollectors, "vm")
+	}
+
+	// UPS collector
+	if o.ctx.Intervals.UPS > 0 {
+		upsCollector := collectors.NewUPSCollector(o.ctx)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			upsCollector.Start(ctx, time.Duration(o.ctx.Intervals.UPS)*time.Second)
+		}()
+		enabledCount++
+	} else {
+		disabledCollectors = append(disabledCollectors, "ups")
+	}
+
+	// GPU collector
+	if o.ctx.Intervals.GPU > 0 {
+		gpuCollector := collectors.NewGPUCollector(o.ctx)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			gpuCollector.Start(ctx, time.Duration(o.ctx.Intervals.GPU)*time.Second)
+		}()
+		enabledCount++
+	} else {
+		disabledCollectors = append(disabledCollectors, "gpu")
+	}
+
+	// Share collector
+	if o.ctx.Intervals.Shares > 0 {
+		shareCollector := collectors.NewShareCollector(o.ctx)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			shareCollector.Start(ctx, time.Duration(o.ctx.Intervals.Shares)*time.Second)
+		}()
+		enabledCount++
+	} else {
+		disabledCollectors = append(disabledCollectors, "shares")
+	}
+
+	// Network collector
+	if o.ctx.Intervals.Network > 0 {
+		networkCollector := collectors.NewNetworkCollector(o.ctx)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			networkCollector.Start(ctx, time.Duration(o.ctx.Intervals.Network)*time.Second)
+		}()
+		enabledCount++
+	} else {
+		disabledCollectors = append(disabledCollectors, "network")
+	}
+
+	// Hardware collector
+	if o.ctx.Intervals.Hardware > 0 {
+		hardwareCollector := collectors.NewHardwareCollector(o.ctx)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			hardwareCollector.Start(ctx, time.Duration(o.ctx.Intervals.Hardware)*time.Second)
+		}()
+		enabledCount++
+	} else {
+		disabledCollectors = append(disabledCollectors, "hardware")
+	}
+
+	// Registration collector
+	if o.ctx.Intervals.Registration > 0 {
+		registrationCollector := collectors.NewRegistrationCollector(o.ctx)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			registrationCollector.Start(ctx, time.Duration(o.ctx.Intervals.Registration)*time.Second)
+		}()
+		enabledCount++
+	} else {
+		disabledCollectors = append(disabledCollectors, "registration")
+	}
+
+	// Notification collector
+	if o.ctx.Intervals.Notification > 0 {
+		notificationCollector := collectors.NewNotificationCollector(o.ctx)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			notificationCollector.Start(ctx, time.Duration(o.ctx.Intervals.Notification)*time.Second)
+		}()
+		enabledCount++
+	} else {
+		disabledCollectors = append(disabledCollectors, "notification")
+	}
+
+	// Unassigned collector
+	if o.ctx.Intervals.Unassigned > 0 {
+		unassignedCollector := collectors.NewUnassignedCollector(o.ctx)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			unassignedCollector.Start(ctx, time.Duration(o.ctx.Intervals.Unassigned)*time.Second)
+		}()
+		enabledCount++
+	} else {
+		disabledCollectors = append(disabledCollectors, "unassigned")
+	}
+
+	// ZFS collector
+	if o.ctx.Intervals.ZFS > 0 {
+		zfsCollector := collectors.NewZFSCollector(o.ctx)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			zfsCollector.Start(ctx, time.Duration(o.ctx.Intervals.ZFS)*time.Second)
+		}()
+		enabledCount++
+	} else {
+		disabledCollectors = append(disabledCollectors, "zfs")
+	}
+
+	logger.Success("%d collectors started", enabledCount)
+	if len(disabledCollectors) > 0 {
+		logger.Info("Disabled collectors: %v", disabledCollectors)
+	}
 
 	// Start HTTP server
 	wg.Add(1)

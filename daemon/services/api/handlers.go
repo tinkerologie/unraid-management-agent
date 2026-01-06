@@ -1369,3 +1369,59 @@ func (s *Server) handleZFSARC(w http.ResponseWriter, _ *http.Request) {
 
 	respondJSON(w, http.StatusOK, arcStats)
 }
+
+// handleCollectorsStatus returns the status of all collectors including enabled/disabled state
+func (s *Server) handleCollectorsStatus(w http.ResponseWriter, _ *http.Request) {
+	// Define all collectors with their names and interval references
+	type collectorDef struct {
+		name     string
+		interval int
+	}
+
+	collectors := []collectorDef{
+		{"system", s.ctx.Intervals.System},
+		{"array", s.ctx.Intervals.Array},
+		{"disk", s.ctx.Intervals.Disk},
+		{"docker", s.ctx.Intervals.Docker},
+		{"vm", s.ctx.Intervals.VM},
+		{"ups", s.ctx.Intervals.UPS},
+		{"gpu", s.ctx.Intervals.GPU},
+		{"shares", s.ctx.Intervals.Shares},
+		{"network", s.ctx.Intervals.Network},
+		{"hardware", s.ctx.Intervals.Hardware},
+		{"zfs", s.ctx.Intervals.ZFS},
+		{"notification", s.ctx.Intervals.Notification},
+		{"registration", s.ctx.Intervals.Registration},
+		{"unassigned", s.ctx.Intervals.Unassigned},
+	}
+
+	var statuses []dto.CollectorStatus
+	enabledCount := 0
+	disabledCount := 0
+
+	for _, c := range collectors {
+		enabled := c.interval > 0
+		status := "running"
+		if !enabled {
+			status = "disabled"
+			disabledCount++
+		} else {
+			enabledCount++
+		}
+
+		statuses = append(statuses, dto.CollectorStatus{
+			Name:     c.name,
+			Enabled:  enabled,
+			Interval: c.interval,
+			Status:   status,
+		})
+	}
+
+	respondJSON(w, http.StatusOK, dto.CollectorsStatusResponse{
+		Collectors:    statuses,
+		Total:         len(collectors),
+		EnabledCount:  enabledCount,
+		DisabledCount: disabledCount,
+		Timestamp:     time.Now(),
+	})
+}

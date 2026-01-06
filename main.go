@@ -21,28 +21,50 @@ import (
 // Version is the application version, set at build time via ldflags.
 var Version = "dev"
 
+// validCollectorNames contains all valid collector names for validation
+var validCollectorNames = map[string]bool{
+	"system":       true,
+	"array":        true,
+	"disk":         true,
+	"docker":       true,
+	"vm":           true,
+	"ups":          true,
+	"gpu":          true,
+	"shares":       true,
+	"network":      true,
+	"hardware":     true,
+	"zfs":          true,
+	"notification": true,
+	"registration": true,
+	"unassigned":   true,
+}
+
 var cli struct {
 	LogsDir  string `default:"/var/log" help:"directory to store logs"`
 	Port     int    `default:"8043" help:"HTTP server port"`
 	Debug    bool   `default:"false" help:"enable debug mode with stdout logging"`
 	LogLevel string `default:"warning" help:"log level: debug, info, warning, error"`
 
+	// Collector disable flag (alternative to setting interval=0)
+	DisableCollectors string `default:"" env:"UNRAID_DISABLE_COLLECTORS" help:"comma-separated list of collectors to disable (e.g., gpu,ups,zfs)"`
+
 	// Collection intervals (overridable via environment variables)
-	// Defaults follow industry standards (Zabbix, Prometheus, Datadog)
-	IntervalSystem       int `default:"15" env:"INTERVAL_SYSTEM" help:"system metrics collection interval (seconds)"`
-	IntervalArray        int `default:"60" env:"INTERVAL_ARRAY" help:"array metrics collection interval (seconds)"`
-	IntervalDisk         int `default:"300" env:"INTERVAL_DISK" help:"disk metrics collection interval (seconds)"`
-	IntervalDocker       int `default:"30" env:"INTERVAL_DOCKER" help:"docker metrics collection interval (seconds)"`
-	IntervalVM           int `default:"60" env:"INTERVAL_VM" help:"VM metrics collection interval (seconds)"`
-	IntervalUPS          int `default:"60" env:"INTERVAL_UPS" help:"UPS metrics collection interval (seconds)"`
-	IntervalGPU          int `default:"60" env:"INTERVAL_GPU" help:"GPU metrics collection interval (seconds)"`
-	IntervalShares       int `default:"60" env:"INTERVAL_SHARES" help:"shares metrics collection interval (seconds)"`
-	IntervalNetwork      int `default:"60" env:"INTERVAL_NETWORK" help:"network metrics collection interval (seconds)"`
-	IntervalHardware     int `default:"600" env:"INTERVAL_HARDWARE" help:"hardware metrics collection interval (seconds)"`
-	IntervalZFS          int `default:"300" env:"INTERVAL_ZFS" help:"ZFS metrics collection interval (seconds)"`
-	IntervalNotification int `default:"30" env:"INTERVAL_NOTIFICATION" help:"notification collection interval (seconds)"`
-	IntervalRegistration int `default:"600" env:"INTERVAL_REGISTRATION" help:"registration collection interval (seconds)"`
-	IntervalUnassigned   int `default:"60" env:"INTERVAL_UNASSIGNED" help:"unassigned devices collection interval (seconds)"`
+	// Use 0 to disable a collector completely
+	// Maximum interval: 86400 seconds (24 hours)
+	IntervalSystem       int `default:"15" env:"INTERVAL_SYSTEM" help:"system metrics interval (seconds, 0=disabled, max 86400)"`
+	IntervalArray        int `default:"60" env:"INTERVAL_ARRAY" help:"array metrics interval (seconds, 0=disabled, max 86400)"`
+	IntervalDisk         int `default:"300" env:"INTERVAL_DISK" help:"disk metrics interval (seconds, 0=disabled, max 86400)"`
+	IntervalDocker       int `default:"30" env:"INTERVAL_DOCKER" help:"docker metrics interval (seconds, 0=disabled, max 86400)"`
+	IntervalVM           int `default:"60" env:"INTERVAL_VM" help:"VM metrics interval (seconds, 0=disabled, max 86400)"`
+	IntervalUPS          int `default:"60" env:"INTERVAL_UPS" help:"UPS metrics interval (seconds, 0=disabled, max 86400)"`
+	IntervalGPU          int `default:"60" env:"INTERVAL_GPU" help:"GPU metrics interval (seconds, 0=disabled, max 86400)"`
+	IntervalShares       int `default:"60" env:"INTERVAL_SHARES" help:"shares metrics interval (seconds, 0=disabled, max 86400)"`
+	IntervalNetwork      int `default:"60" env:"INTERVAL_NETWORK" help:"network metrics interval (seconds, 0=disabled, max 86400)"`
+	IntervalHardware     int `default:"600" env:"INTERVAL_HARDWARE" help:"hardware metrics interval (seconds, 0=disabled, max 86400)"`
+	IntervalZFS          int `default:"300" env:"INTERVAL_ZFS" help:"ZFS metrics interval (seconds, 0=disabled, max 86400)"`
+	IntervalNotification int `default:"30" env:"INTERVAL_NOTIFICATION" help:"notification interval (seconds, 0=disabled, max 86400)"`
+	IntervalRegistration int `default:"600" env:"INTERVAL_REGISTRATION" help:"registration interval (seconds, 0=disabled, max 86400)"`
+	IntervalUnassigned   int `default:"60" env:"INTERVAL_UNASSIGNED" help:"unassigned devices interval (seconds, 0=disabled, max 86400)"`
 
 	Boot cmd.Boot `cmd:"" default:"1" help:"start the management agent"`
 }
@@ -87,6 +109,35 @@ func main() {
 
 	log.Printf("Starting Unraid Management Agent v%s (log level: %s)", Version, cli.LogLevel)
 
+	// Parse disabled collectors from CLI/env and create a map
+	disabledCollectors := make(map[string]bool)
+	if cli.DisableCollectors != "" {
+		for _, name := range strings.Split(cli.DisableCollectors, ",") {
+			name = strings.TrimSpace(strings.ToLower(name))
+			if name == "" {
+				continue
+			}
+			if name == "system" {
+				log.Printf("WARNING: Cannot disable system collector (always required), ignoring")
+				continue
+			}
+			if !validCollectorNames[name] {
+				log.Printf("WARNING: Unknown collector name '%s' in disable list, ignoring", name)
+				continue
+			}
+			disabledCollectors[name] = true
+			log.Printf("Collector '%s' disabled via UNRAID_DISABLE_COLLECTORS", name)
+		}
+	}
+
+	// Helper function to get interval (returns 0 if collector is disabled)
+	getInterval := func(name string, cliInterval int) int {
+		if disabledCollectors[name] {
+			return 0
+		}
+		return cliInterval
+	}
+
 	// Create application context with intervals from CLI/env
 	appCtx := &domain.Context{
 		Config: domain.Config{
@@ -95,20 +146,20 @@ func main() {
 		},
 		Hub: pubsub.New(1024), // Buffer size for event bus
 		Intervals: domain.Intervals{
-			System:       cli.IntervalSystem,
-			Array:        cli.IntervalArray,
-			Disk:         cli.IntervalDisk,
-			Docker:       cli.IntervalDocker,
-			VM:           cli.IntervalVM,
-			UPS:          cli.IntervalUPS,
-			GPU:          cli.IntervalGPU,
-			Shares:       cli.IntervalShares,
-			Network:      cli.IntervalNetwork,
-			Hardware:     cli.IntervalHardware,
-			ZFS:          cli.IntervalZFS,
-			Notification: cli.IntervalNotification,
-			Registration: cli.IntervalRegistration,
-			Unassigned:   cli.IntervalUnassigned,
+			System:       getInterval("system", cli.IntervalSystem),
+			Array:        getInterval("array", cli.IntervalArray),
+			Disk:         getInterval("disk", cli.IntervalDisk),
+			Docker:       getInterval("docker", cli.IntervalDocker),
+			VM:           getInterval("vm", cli.IntervalVM),
+			UPS:          getInterval("ups", cli.IntervalUPS),
+			GPU:          getInterval("gpu", cli.IntervalGPU),
+			Shares:       getInterval("shares", cli.IntervalShares),
+			Network:      getInterval("network", cli.IntervalNetwork),
+			Hardware:     getInterval("hardware", cli.IntervalHardware),
+			ZFS:          getInterval("zfs", cli.IntervalZFS),
+			Notification: getInterval("notification", cli.IntervalNotification),
+			Registration: getInterval("registration", cli.IntervalRegistration),
+			Unassigned:   getInterval("unassigned", cli.IntervalUnassigned),
 		},
 	}
 

@@ -53,12 +53,24 @@ $running = isServiceRunning();
 $status_text = $running ? "<span style='color:green;'>RUNNING</span>" : "<span style='color:red;'>STOPPED</span>";
 
 // Helper function to generate interval select options
+// All types now include Disabled option and extended ranges up to 24 hours
 function intervalOptions($selected, $type = 'standard') {
     $options = [];
+    
+    // Common extended options (up to 24 hours)
+    $extended = [
+        '3600' => '1 hour',
+        '7200' => '2 hours',
+        '14400' => '4 hours',
+        '21600' => '6 hours',
+        '43200' => '12 hours',
+        '86400' => '24 hours',
+    ];
     
     if ($type === 'fast') {
         // For system metrics that can update quickly
         $options = [
+            '0' => 'Disabled',
             '5' => '5 seconds',
             '10' => '10 seconds',
             '15' => '15 seconds',
@@ -66,27 +78,35 @@ function intervalOptions($selected, $type = 'standard') {
             '60' => '1 minute',
             '120' => '2 minutes',
             '300' => '5 minutes',
-        ];
+            '600' => '10 minutes',
+            '900' => '15 minutes',
+            '1800' => '30 minutes',
+        ] + $extended;
     } elseif ($type === 'standard') {
         // For most collectors
         $options = [
+            '0' => 'Disabled',
             '10' => '10 seconds',
             '15' => '15 seconds',
             '30' => '30 seconds',
             '60' => '1 minute',
             '120' => '2 minutes',
             '300' => '5 minutes',
-        ];
+            '600' => '10 minutes',
+            '900' => '15 minutes',
+            '1800' => '30 minutes',
+        ] + $extended;
     } elseif ($type === 'slow') {
         // For hardware/registration that rarely changes
         $options = [
+            '0' => 'Disabled',
             '60' => '1 minute',
             '120' => '2 minutes',
             '300' => '5 minutes',
             '600' => '10 minutes',
             '900' => '15 minutes',
             '1800' => '30 minutes',
-        ];
+        ] + $extended;
     }
     
     $html = '';
@@ -284,6 +304,14 @@ if ($_POST) {
     margin-top: 15px;
     font-size: 12px;
 }
+.interval-select option[value="0"] {
+    color: #d32f2f;
+    font-weight: bold;
+}
+.interval-select.is-disabled {
+    border-color: #d32f2f;
+    background-color: #ffebee;
+}
 </style>
 
 <div class="agent-container">
@@ -451,7 +479,7 @@ if ($_POST) {
             </div>
 
             <div class="power-warning">
-                <strong>⚡ Power Tip:</strong> Defaults follow industry-standard monitoring intervals (Zabbix, Prometheus, Datadog). Selecting faster intervals increases CPU activity and can raise idle power consumption. Click <strong>Reset to Defaults</strong> to restore industry-standard settings.
+                <strong>⚡ Power Tip:</strong> Defaults follow industry-standard monitoring intervals. Set to <strong>Disabled</strong> to completely stop a collector, or use longer intervals (up to 24 hours) for data that rarely changes. Click <strong>Reset to Defaults</strong> to restore industry-standard settings.
             </div>
         </div>
 
@@ -469,3 +497,24 @@ if ($_POST) {
     </form>
 
 </div>
+
+<script>
+// Highlight disabled interval selects
+function updateDisabledHighlighting() {
+    document.querySelectorAll('.interval-select').forEach(function(select) {
+        if (select.value === '0') {
+            select.classList.add('is-disabled');
+        } else {
+            select.classList.remove('is-disabled');
+        }
+    });
+}
+
+// Run on page load and on any select change
+document.addEventListener('DOMContentLoaded', function() {
+    updateDisabledHighlighting();
+    document.querySelectorAll('.interval-select').forEach(function(select) {
+        select.addEventListener('change', updateDisabledHighlighting);
+    });
+});
+</script>

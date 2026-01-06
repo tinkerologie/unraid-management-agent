@@ -171,6 +171,9 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/unassigned/devices", s.handleUnassignedDevicesList).Methods("GET")
 	api.HandleFunc("/unassigned/remote-shares", s.handleUnassignedRemoteShares).Methods("GET")
 
+	// Collectors status endpoint
+	api.HandleFunc("/collectors/status", s.handleCollectorsStatus).Methods("GET")
+
 	// WebSocket endpoint
 	api.HandleFunc("/ws", s.handleWebSocket)
 }

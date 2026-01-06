@@ -162,9 +162,80 @@ func (c *ArrayCollector) collectArrayStatus() (*dto.ArrayStatus, error) {
 		status.ParityValid = false
 	}
 
-	// Parity check status
-	if section.HasKey("sbSyncAction") {
-		status.ParityCheckStatus = strings.Trim(section.Key("sbSyncAction").String(), `"`)
+	// Parity check status - need to check multiple fields to detect state properly
+	// Key fields:
+	// - mdResyncPos: Current position in parity operation (>0 means operation in progress)
+	// - mdResyncDt: Delta time (0 = paused, >0 = running)
+	// - mdResyncSize: Total size for calculating progress
+	// - sbSyncAction: Type of parity operation (e.g., "check P", "check NOCORRECT")
+	var mdResyncPos, mdResyncSize uint64
+	var mdResyncDt int64
+
+	if section.HasKey("mdResyncPos") {
+		posStr := strings.Trim(section.Key("mdResyncPos").String(), `"`)
+		if pos, err := strconv.ParseUint(posStr, 10, 64); err == nil {
+			mdResyncPos = pos
+		}
+	}
+
+	if section.HasKey("mdResyncSize") {
+		sizeStr := strings.Trim(section.Key("mdResyncSize").String(), `"`)
+		if size, err := strconv.ParseUint(sizeStr, 10, 64); err == nil {
+			mdResyncSize = size
+		}
+	}
+
+	if section.HasKey("mdResyncDt") {
+		dtStr := strings.Trim(section.Key("mdResyncDt").String(), `"`)
+		if dt, err := strconv.ParseInt(dtStr, 10, 64); err == nil {
+			mdResyncDt = dt
+		}
+	}
+
+	// Determine parity check status based on mdResyncPos and mdResyncDt
+	// - mdResyncPos > 0 AND mdResyncDt = 0 → PAUSED
+	// - mdResyncPos > 0 AND mdResyncDt > 0 → RUNNING (check, correct, etc.)
+	// - mdResyncPos = 0 → IDLE (no active operation)
+	if mdResyncPos > 0 {
+		// There is an active parity operation
+		if mdResyncDt == 0 {
+			// Operation is paused
+			status.ParityCheckStatus = "paused"
+		} else {
+			// Operation is running - get the action type
+			if section.HasKey("sbSyncAction") {
+				action := strings.Trim(section.Key("sbSyncAction").String(), `"`)
+				// Map common action values to user-friendly status
+				switch {
+				case strings.Contains(strings.ToLower(action), "check"):
+					status.ParityCheckStatus = "running"
+				case strings.Contains(strings.ToLower(action), "clear"):
+					status.ParityCheckStatus = "clearing"
+				case strings.Contains(strings.ToLower(action), "recon"):
+					status.ParityCheckStatus = "reconstructing"
+				default:
+					status.ParityCheckStatus = "running"
+				}
+			} else {
+				status.ParityCheckStatus = "running"
+			}
+		}
+
+		// Calculate progress percentage
+		if mdResyncSize > 0 {
+			status.ParityCheckProgress = float64(mdResyncPos) / float64(mdResyncSize) * 100.0
+			// Clamp to 0-100 range
+			if status.ParityCheckProgress > 100 {
+				status.ParityCheckProgress = 100
+			}
+		}
+
+		logger.Debug("Array: Parity operation detected - pos=%d, size=%d, dt=%d, status=%s, progress=%.2f%%",
+			mdResyncPos, mdResyncSize, mdResyncDt, status.ParityCheckStatus, status.ParityCheckProgress)
+	} else {
+		// No active parity operation
+		status.ParityCheckStatus = ""
+		status.ParityCheckProgress = 0
 	}
 
 	// Get array size information from /mnt/user filesystem

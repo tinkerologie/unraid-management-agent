@@ -736,7 +736,13 @@ func (k *iniKey) String() string {
 // parseINIContent parses INI content into a structured format
 func parseINIContent(content string) (*iniFile, error) {
 	file := &iniFile{sections: make(map[string]*iniSection)}
-	var currentSection *iniSection
+	// Create a default (unnamed) section for key-value pairs before any [section] header
+	defaultSection := &iniSection{
+		name: "",
+		keys: make(map[string]string),
+	}
+	file.sections[""] = defaultSection
+	currentSection := defaultSection
 
 	lines := splitLines(content)
 	for _, line := range lines {
@@ -817,4 +823,220 @@ func indexByte(s string, c byte) int {
 		}
 	}
 	return -1
+}
+
+// TestParityCheckStatusDetection tests the parity check status detection logic
+// This addresses Issue #41: Parity check status not detected when paused
+func TestParityCheckStatusDetection(t *testing.T) {
+	tests := []struct {
+		name                    string
+		varINI                  string
+		expectedStatus          string
+		expectedProgress        float64
+		expectedProgressRangeOK bool // allows for floating point comparison
+	}{
+		{
+			name: "parity check paused",
+			varINI: `mdState="STARTED"
+mdNumDisks="5"
+mdResyncPos="17249019904"
+mdResyncSize="17563901952"
+mdResyncDt="0"
+sbSyncAction="check P"
+sbSynced="1735897200"
+sbSyncErrs="0"
+`,
+			expectedStatus:          "paused",
+			expectedProgress:        98.2, // 17249019904 / 17563901952 * 100
+			expectedProgressRangeOK: true,
+		},
+		{
+			name: "parity check running",
+			varINI: `mdState="STARTED"
+mdNumDisks="5"
+mdResyncPos="8000000000"
+mdResyncSize="17563901952"
+mdResyncDt="50"
+sbSyncAction="check P"
+sbSynced="1735897200"
+sbSyncErrs="0"
+`,
+			expectedStatus:          "running",
+			expectedProgress:        45.5, // 8000000000 / 17563901952 * 100
+			expectedProgressRangeOK: true,
+		},
+		{
+			name: "no parity check active",
+			varINI: `mdState="STARTED"
+mdNumDisks="5"
+mdResyncPos="0"
+mdResyncSize="17563901952"
+mdResyncDt="0"
+sbSyncAction="check P"
+sbSynced="1735897200"
+sbSyncErrs="0"
+`,
+			expectedStatus:          "",
+			expectedProgress:        0,
+			expectedProgressRangeOK: false,
+		},
+		{
+			name: "parity clear running",
+			varINI: `mdState="STARTED"
+mdNumDisks="5"
+mdResyncPos="5000000000"
+mdResyncSize="17563901952"
+mdResyncDt="100"
+sbSyncAction="clear"
+sbSynced="1735897200"
+sbSyncErrs="0"
+`,
+			expectedStatus:          "clearing",
+			expectedProgress:        28.5,
+			expectedProgressRangeOK: true,
+		},
+		{
+			name: "disk reconstruction running",
+			varINI: `mdState="STARTED"
+mdNumDisks="5"
+mdResyncPos="1000000000"
+mdResyncSize="17563901952"
+mdResyncDt="25"
+sbSyncAction="reconstruct"
+sbSynced="1735897200"
+sbSyncErrs="0"
+`,
+			expectedStatus:          "reconstructing",
+			expectedProgress:        5.7,
+			expectedProgressRangeOK: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Parse var.ini content directly
+			file, err := parseINIContent(tt.varINI)
+			if err != nil {
+				t.Fatalf("Failed to parse var.ini: %v", err)
+			}
+
+			// Get the default section (unnamed)
+			section := file.sections[""]
+
+			// Parse the key values
+			var mdResyncPos, mdResyncSize uint64
+			var mdResyncDt int64
+
+			if posStr, ok := section.keys["mdResyncPos"]; ok {
+				mdResyncPos = parseTestUint64(trimQuotes(posStr))
+			}
+
+			if sizeStr, ok := section.keys["mdResyncSize"]; ok {
+				mdResyncSize = parseTestUint64(trimQuotes(sizeStr))
+			}
+
+			if dtStr, ok := section.keys["mdResyncDt"]; ok {
+				mdResyncDt = parseTestInt64(trimQuotes(dtStr))
+			}
+
+			// Apply the same logic as in array.go
+			var status string
+			var progress float64
+
+			if mdResyncPos > 0 {
+				if mdResyncDt == 0 {
+					status = "paused"
+				} else {
+					action := trimQuotes(section.keys["sbSyncAction"])
+					switch {
+					case containsIgnoreCaseTest(action, "check"):
+						status = "running"
+					case containsIgnoreCaseTest(action, "clear"):
+						status = "clearing"
+					case containsIgnoreCaseTest(action, "recon"):
+						status = "reconstructing"
+					default:
+						status = "running"
+					}
+				}
+
+				if mdResyncSize > 0 {
+					progress = float64(mdResyncPos) / float64(mdResyncSize) * 100.0
+				}
+			}
+
+			// Verify status
+			if status != tt.expectedStatus {
+				t.Errorf("status = %q, want %q", status, tt.expectedStatus)
+			}
+
+			// Verify progress (with tolerance for floating point)
+			if tt.expectedProgressRangeOK {
+				// Allow 0.5% tolerance
+				if progress < tt.expectedProgress-0.5 || progress > tt.expectedProgress+0.5 {
+					t.Errorf("progress = %.2f%%, want ~%.2f%%", progress, tt.expectedProgress)
+				}
+			} else {
+				if progress != tt.expectedProgress {
+					t.Errorf("progress = %.2f%%, want %.2f%%", progress, tt.expectedProgress)
+				}
+			}
+		})
+	}
+}
+
+// Helper functions for the parity check status test
+func parseTestUint64(s string) uint64 {
+	var result uint64
+	for i := 0; i < len(s); i++ {
+		if s[i] >= '0' && s[i] <= '9' {
+			result = result*10 + uint64(s[i]-'0')
+		} else {
+			break
+		}
+	}
+	return result
+}
+
+func parseTestInt64(s string) int64 {
+	var result int64
+	for i := 0; i < len(s); i++ {
+		if s[i] >= '0' && s[i] <= '9' {
+			result = result*10 + int64(s[i]-'0')
+		} else {
+			break
+		}
+	}
+	return result
+}
+
+func containsIgnoreCaseTest(s, substr string) bool {
+	// Convert both to lowercase for comparison
+	sl := toLowerTest(s)
+	subsl := toLowerTest(substr)
+	return containsTest(sl, subsl)
+}
+
+func toLowerTest(s string) string {
+	b := make([]byte, len(s))
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= 'A' && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+		b[i] = c
+	}
+	return string(b)
+}
+
+func containsTest(s, substr string) bool {
+	if len(substr) > len(s) {
+		return false
+	}
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }

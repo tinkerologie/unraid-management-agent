@@ -70,3 +70,20 @@ type DiskSettings struct {
 	DefaultFsType   string    `json:"default_filesystem,omitempty"`       // Default filesystem type (xfs, btrfs, etc.)
 	Timestamp       time.Time `json:"timestamp"`
 }
+
+// CollectorStatus represents the status of a single collector
+type CollectorStatus struct {
+	Name     string `json:"name"`
+	Enabled  bool   `json:"enabled"`
+	Interval int    `json:"interval_seconds"` // 0 if disabled
+	Status   string `json:"status"`           // "running", "disabled"
+}
+
+// CollectorsStatusResponse is the response for /collectors/status
+type CollectorsStatusResponse struct {
+	Collectors    []CollectorStatus `json:"collectors"`
+	Total         int               `json:"total"`
+	EnabledCount  int               `json:"enabled_count"`
+	DisabledCount int               `json:"disabled_count"`
+	Timestamp     time.Time         `json:"timestamp"`
+}

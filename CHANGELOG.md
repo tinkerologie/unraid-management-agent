@@ -11,6 +11,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Collectors Status API Endpoint** (`GET /api/v1/collectors/status`):
+
+  - New endpoint to view status of all 14 collectors
+  - Shows enabled/disabled state for each collector
+  - Shows configured interval (in seconds) for each collector
+  - Shows running status ("running" or "disabled")
+  - Provides summary counts: total, enabled_count, disabled_count
+  - Useful for monitoring and debugging collector configuration
+
+- **Disable Collectors Feature**:
+
+  - Added "Disabled" option to all collection interval dropdowns
+  - Setting interval to 0 completely stops the collector (no CPU/memory usage)
+  - Useful for disabling collectors for hardware you don't have (GPU, UPS, ZFS)
+  - Disabled collectors shown with red border highlight in UI
+  - Backend logs which collectors are disabled at startup
+
+- **Environment Variable to Disable Collectors** (`UNRAID_DISABLE_COLLECTORS`):
+
+  - New environment variable for disabling collectors without UI
+  - Comma-separated list of collector names (e.g., `UNRAID_DISABLE_COLLECTORS='gpu,ups,zfs'`)
+  - Validates collector names and warns about unknown names
+  - System collector cannot be disabled (always required)
+  - Ideal for Docker deployments or automated setups
+
+- **CLI Flag to Disable Collectors** (`--disable-collectors`):
+
+  - New command-line flag for disabling collectors at startup
+  - Usage: `--disable-collectors=gpu,ups,zfs`
+  - Same validation as environment variable
+  - Both env var and CLI flag work (CLI flag populates from env var)
+
+- **Extended Collection Intervals (up to 24 hours)**:
+
+  - All collectors now support intervals from 5 seconds to 24 hours (86400 seconds)
+  - New interval options: 1 hour, 2 hours, 4 hours, 6 hours, 12 hours, 24 hours
+  - Ideal for static data that rarely changes (hardware info, registration/license)
+  - Reduces power consumption significantly for infrequently-changing data
+
 - **Web UI for Collection Intervals** (Issue #8):
 
   - New settings page accessible from Unraid Settings → Unraid Management Agent
@@ -42,6 +81,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Start Script**: Fixed environment variable passing to Go binary through sudo
 
 ### Fixed
+
+- **Parity Check Status Detection (Issue #41)**:
+
+  - Fixed parity check status not detecting "paused" state - now correctly parses `mdResyncDt` field (0 = paused, >0 = running)
+  - Fixed parity check progress percentage showing 0 - now calculates from `mdResyncPos / mdResyncSize * 100`
+  - Added support for detecting clearing and reconstructing operations via `sbSyncAction` field
+  - Added debug logging for parity check operations to aid troubleshooting
+  - Status values: `""` (idle), `"paused"`, `"running"`, `"clearing"`, `"reconstructing"`
+
+- **Disk Temperature Reporting**:
+  - Improved handling of temperature value `"*"` which indicates spun-down disk
+  - Temperature 0 is now documented expected behavior for standby disks (to avoid spinning up disks for temperature checks)
+  - Enhanced debug logging for temperature parsing
 
 - **Power Consumption Optimization** (Issue #8):
   - Increased default collection intervals to reduce CPU wakeups

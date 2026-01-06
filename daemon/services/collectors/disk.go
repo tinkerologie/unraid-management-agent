@@ -188,8 +188,13 @@ func (c *DiskCollector) parseDiskKeyValue(disk *dto.DiskInfo, line string) {
 			disk.Size = size * 512 // Convert sectors to bytes
 		}
 	case "temp":
-		// Temperature might be "*" if spun down
-		if value != "*" && value != "" {
+		// Temperature might be "*" if spun down, or empty, or a number
+		// Unraid uses "*" to indicate disk is spun down (no temperature available)
+		if value == "*" || value == "" {
+			// Temperature unavailable - disk is likely spun down
+			// Keep Temperature at 0 (default) and we'll set SpinState appropriately
+			logger.Debug("Disk: Device %s temperature unavailable (value='%s'), likely spun down", disk.Device, value)
+		} else {
 			if temp, err := strconv.ParseFloat(value, 64); err == nil {
 				disk.Temperature = temp
 			}
@@ -537,18 +542,23 @@ func (c *DiskCollector) enrichWithSpinState(disk *dto.DiskInfo) {
 		return
 	}
 
-	// Read spin state from /var/local/emhttp/var.ini or check temperature
-	// If temperature is "*", disk is spun down
-	if disk.Temperature == 0 {
-		// Try to read from sysfs or use hdparm
-		// For now, use a simple heuristic: if temp is 0, likely spun down
-		disk.SpinState = "standby"
-	} else {
+	// Determine spin state from temperature reading
+	// In Unraid's disks.ini, temp="*" indicates disk is spun down
+	// If temperature is 0, this usually means the disk was spun down when parsed
+	// A temperature > 0 indicates the disk is active/spinning
+	if disk.Temperature > 0 {
+		// Disk has a valid temperature reading - it must be active
 		disk.SpinState = "active"
+	} else {
+		// Temperature is 0 or unavailable - disk is likely in standby
+		// This could be because:
+		// 1. The disk is spun down (temp="*" in disks.ini)
+		// 2. Temperature couldn't be read (SMART not available)
+		disk.SpinState = "standby"
 	}
 
-	// Alternative: Could execute hdparm -C /dev/sdX to get actual state
-	// But that requires executing external command which we want to minimize
+	logger.Debug("Disk: Device %s spin state determined as '%s' (temp=%.1f)",
+		disk.Device, disk.SpinState, disk.Temperature)
 }
 
 // collectDockerVDisk collects Docker vDisk usage information
