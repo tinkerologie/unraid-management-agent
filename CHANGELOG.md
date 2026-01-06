@@ -11,6 +11,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **NUT (Network UPS Tools) Support** (`GET /api/v1/nut`):
+
+  - Full support for the [NUT-unRAID plugin](https://github.com/desertwitch/NUT-unRAID)
+  - New dedicated `/api/v1/nut` endpoint with comprehensive UPS data
+  - Detects NUT plugin installation and running state
+  - Returns detailed configuration from nut-dw.cfg
+  - Lists all configured UPS devices
+  - Provides detailed UPS status including:
+    - Battery charge, voltage, runtime, type, status
+    - Input/output voltage, frequency, current
+    - Load percentage and real/apparent power
+    - Device identification (manufacturer, model, serial)
+    - Driver information and raw variables
+  - Human-readable status text conversion (OL → "Online", OB → "On Battery", etc.)
+  - WebSocket broadcast support for real-time NUT updates
+
+- **Improved UPS Collector NUT Detection**:
+
+  - Fixed `upsc` command to properly use `@localhost` suffix
+  - UPS endpoint (`/api/v1/ups`) now correctly falls back to NUT when apcupsd unavailable
+  - Both `/api/v1/ups` (basic) and `/api/v1/nut` (detailed) work simultaneously
+
 - **Collectors Status API Endpoint** (`GET /api/v1/collectors/status`):
 
   - New endpoint to view status of all 14 collectors

@@ -38,6 +38,8 @@ const (
 	ApcaccessBin = "/sbin/apcaccess"
 	// UpscBin is the path to the upsc binary.
 	UpscBin = "/usr/bin/upsc"
+	// UpscmdBin is the path to the upscmd binary (NUT commands).
+	UpscmdBin = "/usr/bin/upscmd"
 	// NvidiaSMIBin is the path to the nvidia-smi binary.
 	NvidiaSMIBin = "/usr/bin/nvidia-smi"
 	// ZpoolBin is the path to the zpool binary.
@@ -50,6 +52,12 @@ const (
 
 	// NutPidFile is the path to the NUT UPS monitor PID file.
 	NutPidFile = "/var/run/nut/upsmon.pid"
+	// NutConfigDir is the path to the NUT configuration directory.
+	NutConfigDir = "/etc/nut"
+	// NutPluginCfg is the path to the NUT plugin configuration file.
+	NutPluginCfg = "/boot/config/plugins/nut-dw/nut-dw.cfg"
+	// NutPluginDir is the path to the NUT plugin directory.
+	NutPluginDir = "/usr/local/emhttp/plugins/nut-dw"
 	// ApcPidFile is the path to the APC UPS daemon PID file.
 	ApcPidFile = "/var/run/apcupsd.pid"
 

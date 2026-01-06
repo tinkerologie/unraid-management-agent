@@ -42,6 +42,7 @@ type Server struct {
 	zfsDatasetsCache   []dto.ZFSDataset
 	zfsSnapshotsCache  []dto.ZFSSnapshot
 	zfsARCStatsCache   *dto.ZFSARCStats
+	nutCache           *dto.NUTResponse
 }
 
 // NewServer creates a new API server instance with the given context.
@@ -82,6 +83,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/vm", s.handleVMList).Methods("GET")
 	api.HandleFunc("/vm/{id}", s.handleVMInfo).Methods("GET")
 	api.HandleFunc("/ups", s.handleUPS).Methods("GET")
+	api.HandleFunc("/nut", s.handleNUT).Methods("GET")
 	api.HandleFunc("/gpu", s.handleGPU).Methods("GET")
 
 	// System control endpoints
@@ -240,6 +242,7 @@ func (s *Server) subscribeToEvents(ctx context.Context) {
 		"container_list_update",
 		"vm_list_update",
 		"ups_status_update",
+		"nut_status_update",
 		"gpu_metrics_update",
 		"network_list_update",
 		"hardware_update",
@@ -307,6 +310,11 @@ func (s *Server) subscribeToEvents(ctx context.Context) {
 				s.upsCache = v
 				s.cacheMutex.Unlock()
 				logger.Debug("Cache: Updated UPS status - %s", v.Status)
+			case *dto.NUTResponse:
+				s.cacheMutex.Lock()
+				s.nutCache = v
+				s.cacheMutex.Unlock()
+				logger.Debug("Cache: Updated NUT status - installed=%t, running=%t", v.Installed, v.Running)
 			case []*dto.GPUMetrics:
 				s.cacheMutex.Lock()
 				s.gpuCache = v
@@ -388,6 +396,7 @@ func (s *Server) broadcastEvents(ctx context.Context) {
 		"container_list_update",
 		"vm_list_update",
 		"ups_status_update",
+		"nut_status_update",
 		"gpu_metrics_update",
 		"network_list_update",
 		"hardware_update",

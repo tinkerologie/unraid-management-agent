@@ -161,10 +161,13 @@ func (c *UPSCollector) collectAPC() (*dto.UPSStatus, error) {
 }
 
 func (c *UPSCollector) collectNUT() (*dto.UPSStatus, error) {
-	// First, get list of UPS devices
-	output, err := lib.ExecCommandOutput("upsc", "-l")
+	// First, get list of UPS devices (try localhost first, then without host)
+	output, err := lib.ExecCommandOutput("upsc", "-l", "localhost")
 	if err != nil {
-		return nil, err
+		output, err = lib.ExecCommandOutput("upsc", "-l")
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	devices := strings.Split(strings.TrimSpace(output), "\n")
@@ -172,8 +175,8 @@ func (c *UPSCollector) collectNUT() (*dto.UPSStatus, error) {
 		return nil, fmt.Errorf("no UPS devices found")
 	}
 
-	// Use first device
-	device := devices[0]
+	// Use first device with @localhost suffix for NUT protocol
+	device := devices[0] + "@localhost"
 
 	// Get device status
 	output, err = lib.ExecCommandOutput("upsc", device)

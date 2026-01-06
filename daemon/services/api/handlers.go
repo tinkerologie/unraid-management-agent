@@ -245,6 +245,23 @@ func (s *Server) handleUPS(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, ups)
 }
 
+func (s *Server) handleNUT(w http.ResponseWriter, _ *http.Request) {
+	// Get latest NUT status from cache
+	s.cacheMutex.RLock()
+	nut := s.nutCache
+	s.cacheMutex.RUnlock()
+
+	if nut == nil {
+		nut = &dto.NUTResponse{
+			Installed: false,
+			Running:   false,
+			Timestamp: time.Now(),
+		}
+	}
+
+	respondJSON(w, http.StatusOK, nut)
+}
+
 func (s *Server) handleGPU(w http.ResponseWriter, _ *http.Request) {
 	// Get latest GPU metrics from cache
 	s.cacheMutex.RLock()
