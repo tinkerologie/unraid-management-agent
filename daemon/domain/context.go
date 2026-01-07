@@ -10,6 +10,7 @@ type Intervals struct {
 	Docker       int
 	VM           int
 	UPS          int
+	NUT          int
 	GPU          int
 	Shares       int
 	Network      int

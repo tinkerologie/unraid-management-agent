@@ -29,6 +29,7 @@ var validCollectorNames = map[string]bool{
 	"docker":       true,
 	"vm":           true,
 	"ups":          true,
+	"nut":          true,
 	"gpu":          true,
 	"shares":       true,
 	"network":      true,
@@ -57,6 +58,7 @@ var cli struct {
 	IntervalDocker       int `default:"30" env:"INTERVAL_DOCKER" help:"docker metrics interval (seconds, 0=disabled, max 86400)"`
 	IntervalVM           int `default:"60" env:"INTERVAL_VM" help:"VM metrics interval (seconds, 0=disabled, max 86400)"`
 	IntervalUPS          int `default:"60" env:"INTERVAL_UPS" help:"UPS metrics interval (seconds, 0=disabled, max 86400)"`
+	IntervalNUT          int `default:"0" env:"INTERVAL_NUT" help:"NUT plugin metrics interval (seconds, 0=disabled, max 86400)"`
 	IntervalGPU          int `default:"60" env:"INTERVAL_GPU" help:"GPU metrics interval (seconds, 0=disabled, max 86400)"`
 	IntervalShares       int `default:"60" env:"INTERVAL_SHARES" help:"shares metrics interval (seconds, 0=disabled, max 86400)"`
 	IntervalNetwork      int `default:"60" env:"INTERVAL_NETWORK" help:"network metrics interval (seconds, 0=disabled, max 86400)"`
@@ -152,6 +154,7 @@ func main() {
 			Docker:       getInterval("docker", cli.IntervalDocker),
 			VM:           getInterval("vm", cli.IntervalVM),
 			UPS:          getInterval("ups", cli.IntervalUPS),
+			NUT:          getInterval("nut", cli.IntervalNUT),
 			GPU:          getInterval("gpu", cli.IntervalGPU),
 			Shares:       getInterval("shares", cli.IntervalShares),
 			Network:      getInterval("network", cli.IntervalNetwork),

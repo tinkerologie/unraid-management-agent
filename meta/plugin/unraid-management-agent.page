@@ -34,6 +34,7 @@ $interval_disk = $config['INTERVAL_DISK'] ?? '300';
 $interval_docker = $config['INTERVAL_DOCKER'] ?? '30';
 $interval_vm = $config['INTERVAL_VM'] ?? '60';
 $interval_ups = $config['INTERVAL_UPS'] ?? '60';
+$interval_nut = $config['INTERVAL_NUT'] ?? '0';  // Disabled by default - enable if using NUT plugin
 $interval_gpu = $config['INTERVAL_GPU'] ?? '60';
 $interval_shares = $config['INTERVAL_SHARES'] ?? '60';
 $interval_network = $config['INTERVAL_NETWORK'] ?? '60';
@@ -138,6 +139,7 @@ if ($_POST) {
         $new_config .= "INTERVAL_DOCKER=" . $_POST['interval_docker'] . "\n";
         $new_config .= "INTERVAL_VM=" . $_POST['interval_vm'] . "\n";
         $new_config .= "INTERVAL_UPS=" . $_POST['interval_ups'] . "\n";
+        $new_config .= "INTERVAL_NUT=" . $_POST['interval_nut'] . "\n";
         $new_config .= "INTERVAL_GPU=" . $_POST['interval_gpu'] . "\n";
         $new_config .= "INTERVAL_SHARES=" . $_POST['interval_shares'] . "\n";
         $new_config .= "INTERVAL_NETWORK=" . $_POST['interval_network'] . "\n";
@@ -165,6 +167,7 @@ if ($_POST) {
         $default_config .= "INTERVAL_DOCKER=30\n";
         $default_config .= "INTERVAL_VM=60\n";
         $default_config .= "INTERVAL_UPS=60\n";
+        $default_config .= "INTERVAL_NUT=0\n";  # Disabled by default - enable if using NUT plugin
         $default_config .= "INTERVAL_GPU=60\n";
         $default_config .= "INTERVAL_SHARES=60\n";
         $default_config .= "INTERVAL_NETWORK=60\n";
@@ -425,6 +428,12 @@ if ($_POST) {
                         <span class="interval-label">UPS Status</span>
                         <select name="interval_ups" class="interval-select">
                             <?= intervalOptions($interval_ups, 'standard') ?>
+                        </select>
+                    </div>
+                    <div class="interval-row">
+                        <span class="interval-label">NUT Plugin</span>
+                        <select name="interval_nut" class="interval-select">
+                            <?= intervalOptions($interval_nut, 'standard') ?>
                         </select>
                     </div>
                     <div class="interval-row">

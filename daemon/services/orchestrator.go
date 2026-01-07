@@ -131,15 +131,17 @@ func (o *Orchestrator) Run() error {
 		disabledCollectors = append(disabledCollectors, "ups")
 	}
 
-	// NUT collector (always runs if UPS is enabled - provides detailed NUT data)
-	if o.ctx.Intervals.UPS > 0 {
+	// NUT collector (separate from UPS - for NUT plugin users)
+	if o.ctx.Intervals.NUT > 0 {
 		nutCollector := collectors.NewNUTCollector(o.ctx)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			nutCollector.Start(ctx, time.Duration(o.ctx.Intervals.UPS)*time.Second)
+			nutCollector.Start(ctx, time.Duration(o.ctx.Intervals.NUT)*time.Second)
 		}()
-		// Don't increment enabledCount since NUT is bundled with UPS
+		enabledCount++
+	} else {
+		disabledCollectors = append(disabledCollectors, "nut")
 	}
 
 	// GPU collector

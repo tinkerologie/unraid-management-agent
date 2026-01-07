@@ -91,7 +91,6 @@ func (s *Server) handleArray(w http.ResponseWriter, _ *http.Request) {
 	status := s.arrayCache
 	s.cacheMutex.RUnlock()
 
-
 	if status == nil {
 		status = &dto.ArrayStatus{
 			State:     "unknown",
@@ -1402,6 +1401,7 @@ func (s *Server) handleCollectorsStatus(w http.ResponseWriter, _ *http.Request) 
 		{"docker", s.ctx.Intervals.Docker},
 		{"vm", s.ctx.Intervals.VM},
 		{"ups", s.ctx.Intervals.UPS},
+		{"nut", s.ctx.Intervals.NUT},
 		{"gpu", s.ctx.Intervals.GPU},
 		{"shares", s.ctx.Intervals.Shares},
 		{"network", s.ctx.Intervals.Network},

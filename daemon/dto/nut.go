@@ -19,24 +19,24 @@ type NUTStatus struct {
 	Type         string `json:"type"` // e.g., "ups"
 
 	// UPS status
-	Status         string   `json:"status"`          // e.g., "OL" (Online), "OB" (On Battery)
-	StatusText     string   `json:"status_text"`     // Human-readable status
-	Alarms         []string `json:"alarms"`          // Active alarms if any
-	BeeperStatus   string   `json:"beeper_status"`   // e.g., "enabled", "disabled"
-	TestResult     string   `json:"test_result"`     // Last test result
+	Status         string   `json:"status"`        // e.g., "OL" (Online), "OB" (On Battery)
+	StatusText     string   `json:"status_text"`   // Human-readable status
+	Alarms         []string `json:"alarms"`        // Active alarms if any
+	BeeperStatus   string   `json:"beeper_status"` // e.g., "enabled", "disabled"
+	TestResult     string   `json:"test_result"`   // Last test result
 	TestResultDate string   `json:"test_result_date"`
 
 	// Battery info
-	BatteryCharge        float64 `json:"battery_charge_percent"`
-	BatteryChargeLow     float64 `json:"battery_charge_low_percent"`
-	BatteryChargeWarning float64 `json:"battery_charge_warning_percent"`
-	BatteryRuntime       int     `json:"battery_runtime_seconds"`
-	BatteryRuntimeLow    int     `json:"battery_runtime_low_seconds"`
-	BatteryVoltage       float64 `json:"battery_voltage"`
+	BatteryCharge         float64 `json:"battery_charge_percent"`
+	BatteryChargeLow      float64 `json:"battery_charge_low_percent"`
+	BatteryChargeWarning  float64 `json:"battery_charge_warning_percent"`
+	BatteryRuntime        int     `json:"battery_runtime_seconds"`
+	BatteryRuntimeLow     int     `json:"battery_runtime_low_seconds"`
+	BatteryVoltage        float64 `json:"battery_voltage"`
 	BatteryVoltageNominal float64 `json:"battery_voltage_nominal"`
-	BatteryType          string  `json:"battery_type"` // e.g., "PbAcid"
-	BatteryStatus        string  `json:"battery_status"`
-	BatteryMfrDate       string  `json:"battery_mfr_date"`
+	BatteryType           string  `json:"battery_type"` // e.g., "PbAcid"
+	BatteryStatus         string  `json:"battery_status"`
+	BatteryMfrDate        string  `json:"battery_mfr_date"`
 
 	// Input power
 	InputVoltage        float64 `json:"input_voltage"`
@@ -81,16 +81,16 @@ type NUTStatus struct {
 // NUTConfig represents the NUT plugin configuration from nut-dw.cfg
 type NUTConfig struct {
 	ServiceEnabled bool   `json:"service_enabled"`
-	Mode           string `json:"mode"`           // "standalone", "netserver", "netclient"
-	UPSName        string `json:"ups_name"`       // e.g., "ups"
-	Driver         string `json:"driver"`         // e.g., "usbhid-ups"
-	Port           string `json:"port"`           // e.g., "auto"
-	IPAddress      string `json:"ip_address"`     // For netclient mode
-	PollInterval   int    `json:"poll_interval"`  // Seconds between polls
-	ShutdownMode   string `json:"shutdown_mode"`  // e.g., "sec_timer", "fsd"
-	BatteryLevel   int    `json:"battery_level"`  // Low battery threshold
-	RuntimeValue   int    `json:"runtime_value"`  // Low runtime threshold
-	Timeout        int    `json:"timeout"`        // Shutdown timeout
+	Mode           string `json:"mode"`          // "standalone", "netserver", "netclient"
+	UPSName        string `json:"ups_name"`      // e.g., "ups"
+	Driver         string `json:"driver"`        // e.g., "usbhid-ups"
+	Port           string `json:"port"`          // e.g., "auto"
+	IPAddress      string `json:"ip_address"`    // For netclient mode
+	PollInterval   int    `json:"poll_interval"` // Seconds between polls
+	ShutdownMode   string `json:"shutdown_mode"` // e.g., "sec_timer", "fsd"
+	BatteryLevel   int    `json:"battery_level"` // Low battery threshold
+	RuntimeValue   int    `json:"runtime_value"` // Low runtime threshold
+	Timeout        int    `json:"timeout"`       // Shutdown timeout
 }
 
 // NUTDevice represents a single NUT UPS device

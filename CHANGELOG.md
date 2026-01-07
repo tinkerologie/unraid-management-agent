@@ -113,6 +113,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Status values: `""` (idle), `"paused"`, `"running"`, `"clearing"`, `"reconstructing"`
 
 - **Disk Temperature Reporting**:
+
   - Improved handling of temperature value `"*"` which indicates spun-down disk
   - Temperature 0 is now documented expected behavior for standby disks (to avoid spinning up disks for temperature checks)
   - Enhanced debug logging for temperature parsing
