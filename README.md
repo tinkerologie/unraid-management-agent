@@ -100,11 +100,11 @@ Collectors → Event Bus → API Server Cache → REST Endpoints
 
 For optimal performance, collectors use native Go libraries instead of shell commands:
 
-| Component | Library | Description |
-|-----------|---------|-------------|
-| **Docker** | `github.com/moby/moby/client` | Docker Engine SDK for container data |
-| **VMs** | `github.com/digitalocean/go-libvirt` | Native libvirt bindings for VM data |
-| **System** | Direct `/proc`, `/sys` access | Kernel interfaces for metrics |
+| Component  | Library                              | Description                          |
+| ---------- | ------------------------------------ | ------------------------------------ |
+| **Docker** | `github.com/moby/moby/client`        | Docker Engine SDK for container data |
+| **VMs**    | `github.com/digitalocean/go-libvirt` | Native libvirt bindings for VM data  |
+| **System** | Direct `/proc`, `/sys` access        | Kernel interfaces for metrics        |
 
 ### Components
 
