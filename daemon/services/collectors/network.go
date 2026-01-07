@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -196,21 +197,24 @@ func (c *NetworkCollector) getMACAddress(ifName string) string {
 }
 
 func (c *NetworkCollector) getIPAddress(ifName string) string {
-	// Use ip command to get IP address
-	output, err := lib.ExecCommandOutput("ip", "-4", "addr", "show", ifName)
+	// Use Go's net package directly instead of spawning 'ip' command
+	// This is faster and avoids process overhead
+	iface, err := net.InterfaceByName(ifName)
 	if err != nil {
 		return ""
 	}
 
-	lines := strings.Split(output, "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "inet ") {
-			fields := strings.Fields(line)
-			if len(fields) >= 2 {
-				// Return IP without CIDR notation
-				ip := strings.Split(fields[1], "/")[0]
-				return ip
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return ""
+	}
+
+	for _, addr := range addrs {
+		// Check if it's an IP network address
+		if ipNet, ok := addr.(*net.IPNet); ok {
+			// Get IPv4 address only
+			if ipv4 := ipNet.IP.To4(); ipv4 != nil {
+				return ipv4.String()
 			}
 		}
 	}

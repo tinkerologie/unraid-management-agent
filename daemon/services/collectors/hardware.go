@@ -80,58 +80,77 @@ func (c *HardwareCollector) collectHardwareInfo() (*dto.HardwareInfo, error) {
 		Timestamp: time.Now(),
 	}
 
-	// Check if dmidecode is available
-	if !lib.CommandExists("dmidecode") {
-		logger.Warning("dmidecode command not found, skipping hardware collection")
-		return info, nil
+	// Try sysfs first (faster, no process spawn)
+	if lib.IsSysfsDMIAvailable() {
+		logger.Debug("Hardware: Using sysfs for basic hardware info (faster)")
+
+		// Collect BIOS information from sysfs
+		if bios, err := lib.ParseBIOSInfoSysfs(); err == nil && bios.Vendor != "" {
+			info.BIOS = bios
+			logger.Debug("Hardware: Collected BIOS info via sysfs - Vendor: %s, Version: %s", bios.Vendor, bios.Version)
+		}
+
+		// Collect baseboard information from sysfs
+		if baseboard, err := lib.ParseBaseboardInfoSysfs(); err == nil && baseboard.Manufacturer != "" {
+			info.Baseboard = baseboard
+			logger.Debug("Hardware: Collected baseboard info via sysfs - Manufacturer: %s, Product: %s", baseboard.Manufacturer, baseboard.ProductName)
+		}
 	}
 
-	// Collect BIOS information
-	if bios, err := lib.ParseBIOSInfo(); err == nil {
-		info.BIOS = bios
-		logger.Debug("Hardware: Collected BIOS info - Vendor: %s, Version: %s", bios.Vendor, bios.Version)
-	} else {
-		logger.Debug("Hardware: Failed to collect BIOS info: %v", err)
-	}
+	// Use dmidecode for detailed info not available in sysfs (CPU, cache, memory)
+	if lib.CommandExists("dmidecode") {
+		// Only fetch BIOS/baseboard from dmidecode if sysfs didn't provide them
+		if info.BIOS == nil || info.BIOS.Vendor == "" {
+			if bios, err := lib.ParseBIOSInfo(); err == nil {
+				info.BIOS = bios
+				logger.Debug("Hardware: Collected BIOS info via dmidecode - Vendor: %s, Version: %s", bios.Vendor, bios.Version)
+			} else {
+				logger.Debug("Hardware: Failed to collect BIOS info: %v", err)
+			}
+		}
 
-	// Collect baseboard information
-	if baseboard, err := lib.ParseBaseboardInfo(); err == nil {
-		info.Baseboard = baseboard
-		logger.Debug("Hardware: Collected baseboard info - Manufacturer: %s, Product: %s", baseboard.Manufacturer, baseboard.ProductName)
-	} else {
-		logger.Debug("Hardware: Failed to collect baseboard info: %v", err)
-	}
+		if info.Baseboard == nil || info.Baseboard.Manufacturer == "" {
+			if baseboard, err := lib.ParseBaseboardInfo(); err == nil {
+				info.Baseboard = baseboard
+				logger.Debug("Hardware: Collected baseboard info via dmidecode - Manufacturer: %s, Product: %s", baseboard.Manufacturer, baseboard.ProductName)
+			} else {
+				logger.Debug("Hardware: Failed to collect baseboard info: %v", err)
+			}
+		}
 
-	// Collect CPU hardware information
-	if cpu, err := lib.ParseCPUInfo(); err == nil {
-		info.CPU = cpu
-		logger.Debug("Hardware: Collected CPU hardware info - Socket: %s, Manufacturer: %s", cpu.SocketDesignation, cpu.Manufacturer)
-	} else {
-		logger.Debug("Hardware: Failed to collect CPU hardware info: %v", err)
-	}
+		// CPU info (not available in sysfs)
+		if cpu, err := lib.ParseCPUInfo(); err == nil {
+			info.CPU = cpu
+			logger.Debug("Hardware: Collected CPU hardware info - Socket: %s, Manufacturer: %s", cpu.SocketDesignation, cpu.Manufacturer)
+		} else {
+			logger.Debug("Hardware: Failed to collect CPU hardware info: %v", err)
+		}
 
-	// Collect CPU cache information
-	if caches, err := lib.ParseCPUCacheInfo(); err == nil {
-		info.Cache = caches
-		logger.Debug("Hardware: Collected %d CPU cache levels", len(caches))
-	} else {
-		logger.Debug("Hardware: Failed to collect CPU cache info: %v", err)
-	}
+		// CPU cache info (not available in sysfs)
+		if caches, err := lib.ParseCPUCacheInfo(); err == nil {
+			info.Cache = caches
+			logger.Debug("Hardware: Collected %d CPU cache levels", len(caches))
+		} else {
+			logger.Debug("Hardware: Failed to collect CPU cache info: %v", err)
+		}
 
-	// Collect memory array information
-	if memArray, err := lib.ParseMemoryArrayInfo(); err == nil {
-		info.MemoryArray = memArray
-		logger.Debug("Hardware: Collected memory array info - Max Capacity: %s, Devices: %d", memArray.MaximumCapacity, memArray.NumberOfDevices)
-	} else {
-		logger.Debug("Hardware: Failed to collect memory array info: %v", err)
-	}
+		// Memory array info (not available in sysfs)
+		if memArray, err := lib.ParseMemoryArrayInfo(); err == nil {
+			info.MemoryArray = memArray
+			logger.Debug("Hardware: Collected memory array info - Max Capacity: %s, Devices: %d", memArray.MaximumCapacity, memArray.NumberOfDevices)
+		} else {
+			logger.Debug("Hardware: Failed to collect memory array info: %v", err)
+		}
 
-	// Collect memory device information
-	if memDevices, err := lib.ParseMemoryDevices(); err == nil {
-		info.MemoryDevices = memDevices
-		logger.Debug("Hardware: Collected %d memory devices", len(memDevices))
+		// Memory device info (not available in sysfs)
+		if memDevices, err := lib.ParseMemoryDevices(); err == nil {
+			info.MemoryDevices = memDevices
+			logger.Debug("Hardware: Collected %d memory devices", len(memDevices))
+		} else {
+			logger.Debug("Hardware: Failed to collect memory devices: %v", err)
+		}
 	} else {
-		logger.Debug("Hardware: Failed to collect memory devices: %v", err)
+		logger.Warning("dmidecode command not found, skipping detailed hardware collection")
 	}
 
 	return info, nil

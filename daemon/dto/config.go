@@ -73,10 +73,13 @@ type DiskSettings struct {
 
 // CollectorStatus represents the status of a single collector
 type CollectorStatus struct {
-	Name     string `json:"name"`
-	Enabled  bool   `json:"enabled"`
-	Interval int    `json:"interval_seconds"` // 0 if disabled
-	Status   string `json:"status"`           // "running", "disabled"
+	Name       string     `json:"name"`
+	Enabled    bool       `json:"enabled"`
+	Interval   int        `json:"interval_seconds"` // 0 if disabled
+	Status     string     `json:"status"`           // "running", "stopped", "disabled", "registered"
+	LastRun    *time.Time `json:"last_run,omitempty"`
+	ErrorCount int        `json:"error_count"`
+	Required   bool       `json:"required"` // true if collector cannot be disabled
 }
 
 // CollectorsStatusResponse is the response for /collectors/status
@@ -86,4 +89,27 @@ type CollectorsStatusResponse struct {
 	EnabledCount  int               `json:"enabled_count"`
 	DisabledCount int               `json:"disabled_count"`
 	Timestamp     time.Time         `json:"timestamp"`
+}
+
+// CollectorResponse is the response for enable/disable/interval operations
+type CollectorResponse struct {
+	Success   bool            `json:"success"`
+	Message   string          `json:"message"`
+	Collector CollectorStatus `json:"collector"`
+	Timestamp time.Time       `json:"timestamp"`
+}
+
+// CollectorIntervalRequest is the request body for updating collector interval
+type CollectorIntervalRequest struct {
+	Interval int `json:"interval"` // seconds
+}
+
+// CollectorStateEvent represents a collector state change for WebSocket broadcast
+type CollectorStateEvent struct {
+	Event     string    `json:"event"`
+	Collector string    `json:"collector"`
+	Enabled   bool      `json:"enabled"`
+	Status    string    `json:"status"`
+	Interval  int       `json:"interval"`
+	Timestamp time.Time `json:"timestamp"`
 }

@@ -46,6 +46,9 @@ var cli struct {
 	Debug    bool   `default:"false" help:"enable debug mode with stdout logging"`
 	LogLevel string `default:"warning" help:"log level: debug, info, warning, error"`
 
+	// Low power mode - multiplies all intervals for resource-constrained systems
+	LowPowerMode bool `default:"false" env:"UNRAID_LOW_POWER" help:"enable low power mode (4x longer intervals for old/slow hardware)"`
+
 	// Collector disable flag (alternative to setting interval=0)
 	DisableCollectors string `default:"" env:"UNRAID_DISABLE_COLLECTORS" help:"comma-separated list of collectors to disable (e.g., gpu,ups,zfs)"`
 
@@ -133,11 +136,19 @@ func main() {
 	}
 
 	// Helper function to get interval (returns 0 if collector is disabled)
+	// In low power mode, intervals are multiplied by 4 for reduced CPU usage
 	getInterval := func(name string, cliInterval int) int {
 		if disabledCollectors[name] {
 			return 0
 		}
+		if cli.LowPowerMode && cliInterval > 0 {
+			return cliInterval * 4
+		}
 		return cliInterval
+	}
+
+	if cli.LowPowerMode {
+		log.Printf("Low power mode enabled - all intervals multiplied by 4x")
 	}
 
 	// Create application context with intervals from CLI/env

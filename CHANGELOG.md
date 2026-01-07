@@ -11,6 +11,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Low Power Mode** (`--low-power-mode` or `UNRAID_LOW_POWER=true`):
+  - New option for resource-constrained/older hardware (e.g., HP N40L with AMD Turion)
+  - Multiplies all collection intervals by 4x when enabled
+  - Reduces CPU wake-ups and allows deeper C-states
+  - Ideal for users experiencing high CPU load from the plugin
+
+- **Runtime Collector Management API** (#35):
+  - New endpoint `POST /api/v1/collectors/{name}/enable` - Enable a collector at runtime
+  - New endpoint `POST /api/v1/collectors/{name}/disable` - Disable a collector at runtime
+  - New endpoint `PATCH /api/v1/collectors/{name}/interval` - Update collection interval
+  - New endpoint `GET /api/v1/collectors/{name}` - Get status of a single collector
+  - Enable/disable collectors without restarting the agent
+  - Dynamic interval updates (5-3600 seconds)
+  - System collector protected from being disabled (always required)
+  - WebSocket broadcast for collector state changes (`collector_state_change` event)
+  - Full idempotent operations (enable already enabled = no-op)
+  - Enhanced `/api/v1/collectors/status` with real-time data:
+    - `last_run` timestamp for each collector
+    - `error_count` tracking
+    - `required` flag to indicate if collector can be disabled
+
+- **Network Access URLs Endpoint** (`GET /api/v1/network/access-urls`) (#19):
+  - New endpoint to get all methods to access the Unraid server
+  - Returns LAN IPv4 addresses from all network interfaces
+  - Includes mDNS hostname (hostname.local) for Bonjour/Avahi discovery
+  - Detects and includes WireGuard VPN interface addresses
+  - Retrieves public WAN IP (if accessible)
+  - Lists global IPv6 addresses for dual-stack access
+  - URL types: `lan`, `mdns`, `wireguard`, `wan`, `ipv6`, `other`
+  - Useful for dashboards, mobile apps, and connection discovery
+
+### Performance
+
+- **Docker SDK Collector (NEW)** - Massive performance improvement:
+  - Replaced CLI-based Docker collector with Docker SDK (socket API)
+  - Uses `/var/run/docker.sock` directly instead of spawning `docker` processes
+  - **~530x faster**: Container list from 5.8s → 10-15ms
+  - **Total docker collection: 15-43ms** (was 8.8 seconds!)
+  - Eliminates process spawning overhead on resource-constrained systems
+  - Still reads memory stats from cgroup v2 filesystem for optimal performance
+
+- **VM Libvirt Collector (NEW)** - Native libvirt API integration:
+  - Replaced CLI-based VM collector with libvirt Go bindings
+  - Uses direct RPC to libvirt daemon instead of `virsh` commands
+  - **~100-200x faster**: VM list from 1-2s → 6-7ms
+  - Collects CPU, memory, disk I/O, and network I/O stats efficiently
+  - Graceful fallback if libvirt is not available
+
+- **Docker Collector Optimizations** (Community feedback: HP N40L performance issue):
+  - **Batched docker inspect calls**: Reduced from N separate calls to 1 batched call (3.5x faster)
+  - **Skip inspect for stopped containers**: Only running containers get detailed inspection
+  - Overall docker collection cycle reduced from ~8.8s to ~5.9s on test server
+  - Significantly reduces CPU spikes on older hardware
+
 - **NUT (Network UPS Tools) Support** (`GET /api/v1/nut`):
 
   - Full support for the [NUT-unRAID plugin](https://github.com/desertwitch/NUT-unRAID)

@@ -13,15 +13,25 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
+// CollectorManagerInterface defines the methods required from CollectorManager
+type CollectorManagerInterface interface {
+	EnableCollector(name string) error
+	DisableCollector(name string) error
+	UpdateInterval(name string, intervalSeconds int) error
+	GetStatus(name string) (*dto.CollectorStatus, error)
+	GetAllStatus() dto.CollectorsStatusResponse
+}
+
 // Server represents the HTTP API server that handles REST endpoints and WebSocket connections.
 // It maintains an in-memory cache of data from collectors and broadcasts updates to WebSocket clients.
 type Server struct {
-	ctx        *domain.Context
-	httpServer *http.Server
-	router     *mux.Router
-	wsHub      *WSHub
-	cancelCtx  context.Context
-	cancelFunc context.CancelFunc
+	ctx              *domain.Context
+	httpServer       *http.Server
+	router           *mux.Router
+	wsHub            *WSHub
+	cancelCtx        context.Context
+	cancelFunc       context.CancelFunc
+	collectorManager CollectorManagerInterface
 
 	// Cache for latest data from collectors
 	cacheMutex         sync.RWMutex
@@ -48,13 +58,19 @@ type Server struct {
 // NewServer creates a new API server instance with the given context.
 // It initializes the HTTP router, WebSocket hub, and sets up all API routes.
 func NewServer(ctx *domain.Context) *Server {
+	return NewServerWithCollectorManager(ctx, nil)
+}
+
+// NewServerWithCollectorManager creates a new API server with a collector manager for runtime control.
+func NewServerWithCollectorManager(ctx *domain.Context, cm CollectorManagerInterface) *Server {
 	cancelCtx, cancelFunc := context.WithCancel(context.Background())
 	s := &Server{
-		ctx:        ctx,
-		router:     mux.NewRouter(),
-		wsHub:      NewWSHub(),
-		cancelCtx:  cancelCtx,
-		cancelFunc: cancelFunc,
+		ctx:              ctx,
+		router:           mux.NewRouter(),
+		wsHub:            NewWSHub(),
+		cancelCtx:        cancelCtx,
+		cancelFunc:       cancelFunc,
+		collectorManager: cm,
 	}
 
 	s.setupRoutes()
@@ -90,6 +106,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/system/reboot", s.handleSystemReboot).Methods("POST")
 	api.HandleFunc("/system/shutdown", s.handleSystemShutdown).Methods("POST")
 	api.HandleFunc("/network", s.handleNetwork).Methods("GET")
+	api.HandleFunc("/network/access-urls", s.handleNetworkAccessURLs).Methods("GET")
 
 	// ZFS endpoints
 	api.HandleFunc("/zfs/pools", s.handleZFSPools).Methods("GET")
@@ -173,8 +190,12 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/unassigned/devices", s.handleUnassignedDevicesList).Methods("GET")
 	api.HandleFunc("/unassigned/remote-shares", s.handleUnassignedRemoteShares).Methods("GET")
 
-	// Collectors status endpoint
+	// Collectors management endpoints
 	api.HandleFunc("/collectors/status", s.handleCollectorsStatus).Methods("GET")
+	api.HandleFunc("/collectors/{name}/enable", s.handleCollectorEnable).Methods("POST")
+	api.HandleFunc("/collectors/{name}/disable", s.handleCollectorDisable).Methods("POST")
+	api.HandleFunc("/collectors/{name}/interval", s.handleCollectorInterval).Methods("PATCH")
+	api.HandleFunc("/collectors/{name}", s.handleCollectorStatus).Methods("GET")
 
 	// WebSocket endpoint
 	api.HandleFunc("/ws", s.handleWebSocket)
@@ -400,6 +421,7 @@ func (s *Server) broadcastEvents(ctx context.Context) {
 		"gpu_metrics_update",
 		"network_list_update",
 		"hardware_update",
+		"collector_state_change",
 	)
 
 	for {

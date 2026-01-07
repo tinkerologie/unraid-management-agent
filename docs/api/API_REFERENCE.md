@@ -2013,6 +2013,289 @@ Get network interfaces and statistics.
 
 ---
 
+### GET /network/access-urls
+
+Get all methods to access the Unraid server, including LAN IP, mDNS hostname, WireGuard VPN IPs, WAN IP, and IPv6 addresses.
+
+**Response**:
+```json
+{
+  "urls": [
+    {
+      "type": "lan",
+      "name": "LAN (br0)",
+      "ipv4": "http://192.168.20.21"
+    },
+    {
+      "type": "mdns",
+      "name": "mDNS",
+      "ipv4": "http://cube.local"
+    },
+    {
+      "type": "wireguard",
+      "name": "VPN (wg0)",
+      "ipv4": "http://10.0.0.1"
+    },
+    {
+      "type": "wan",
+      "name": "Remote Access (WAN)",
+      "ipv4": "http://203.0.113.45"
+    },
+    {
+      "type": "ipv6",
+      "name": "IPv6 (br0)",
+      "ipv6": "http://[2001:db8::1]"
+    }
+  ],
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**URL Types**:
+| Type | Description |
+|------|-------------|
+| `lan` | Local Area Network IPv4 addresses |
+| `mdns` | mDNS hostname (hostname.local) for Bonjour/Avahi discovery |
+| `wireguard` | WireGuard VPN interface addresses |
+| `wan` | Public WAN IP (if accessible) |
+| `ipv6` | IPv6 global unicast addresses |
+| `other` | Other access methods |
+
+**Use Cases**:
+- Display all connection methods in a dashboard
+- Auto-discover server addresses for mobile apps
+- Generate connection links automatically
+- Verify remote access configuration
+
+---
+
+## Collector Management
+
+The agent runs multiple collectors that gather data at configurable intervals. These endpoints allow runtime management of collectors without restarting the agent.
+
+### GET /collectors/status
+
+Get status of all collectors including enabled state, interval, and runtime information.
+
+**Response**:
+```json
+{
+  "collectors": [
+    {
+      "name": "system",
+      "enabled": true,
+      "interval_seconds": 15,
+      "status": "running",
+      "last_run": "2026-01-07T12:05:10.959716559+10:00",
+      "error_count": 0,
+      "required": true
+    },
+    {
+      "name": "docker",
+      "enabled": true,
+      "interval_seconds": 30,
+      "status": "running",
+      "last_run": "2026-01-07T12:05:10.959676097+10:00",
+      "error_count": 0,
+      "required": false
+    },
+    {
+      "name": "gpu",
+      "enabled": false,
+      "interval_seconds": 60,
+      "status": "stopped",
+      "error_count": 0,
+      "required": false
+    }
+  ],
+  "total": 15,
+  "enabled_count": 11,
+  "disabled_count": 4,
+  "timestamp": "2026-01-07T12:05:25+10:00"
+}
+```
+
+**Status Values**:
+| Status | Description |
+|--------|-------------|
+| `running` | Collector is actively collecting data |
+| `stopped` | Collector has been disabled at runtime |
+| `disabled` | Collector was disabled at startup |
+| `registered` | Collector is registered but not yet started |
+
+---
+
+### GET /collectors/{name}
+
+Get status of a specific collector.
+
+**Path Parameters**:
+- `name` - Collector name (system, array, disk, docker, vm, ups, nut, gpu, shares, network, hardware, zfs, notification, registration, unassigned)
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "collector gpu status retrieved",
+  "collector": {
+    "name": "gpu",
+    "enabled": true,
+    "interval_seconds": 60,
+    "status": "running",
+    "last_run": "2026-01-07T12:05:10.959614279+10:00",
+    "error_count": 0,
+    "required": false
+  },
+  "timestamp": "2026-01-07T12:05:31+10:00"
+}
+```
+
+**Error Response (404)**:
+```json
+{
+  "success": false,
+  "message": "unknown collector: invalid_name",
+  "timestamp": "2026-01-07T12:05:31+10:00"
+}
+```
+
+---
+
+### POST /collectors/{name}/enable
+
+Enable a collector at runtime. The collector will start immediately using its configured interval.
+
+**Path Parameters**:
+- `name` - Collector name
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "gpu collector enabled",
+  "collector": {
+    "name": "gpu",
+    "enabled": true,
+    "interval_seconds": 60,
+    "status": "running",
+    "last_run": "2026-01-07T12:05:35+10:00",
+    "error_count": 0,
+    "required": false
+  },
+  "timestamp": "2026-01-07T12:05:35+10:00"
+}
+```
+
+**Notes**:
+- Enabling an already-enabled collector is a no-op (returns success)
+- If interval was 0, a default interval is used
+
+---
+
+### POST /collectors/{name}/disable
+
+Disable a collector at runtime. The collector will stop gracefully.
+
+**Path Parameters**:
+- `name` - Collector name
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "gpu collector disabled",
+  "collector": {
+    "name": "gpu",
+    "enabled": false,
+    "interval_seconds": 60,
+    "status": "stopped",
+    "last_run": "2026-01-07T12:05:10+10:00",
+    "error_count": 0,
+    "required": false
+  },
+  "timestamp": "2026-01-07T12:05:31+10:00"
+}
+```
+
+**Error Response (400)** - Required Collector:
+```json
+{
+  "success": false,
+  "message": "cannot disable system collector (always required)",
+  "timestamp": "2026-01-07T12:05:47+10:00"
+}
+```
+
+**Notes**:
+- The `system` collector cannot be disabled (it's required)
+- Disabling an already-disabled collector is a no-op (returns success)
+
+---
+
+### PATCH /collectors/{name}/interval
+
+Update the collection interval for a collector. If the collector is running, it will be restarted with the new interval.
+
+**Path Parameters**:
+- `name` - Collector name
+
+**Request Body**:
+```json
+{
+  "interval": 120
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "docker collector interval updated to 120 seconds",
+  "collector": {
+    "name": "docker",
+    "enabled": true,
+    "interval_seconds": 120,
+    "status": "running",
+    "last_run": "2026-01-07T12:05:40+10:00",
+    "error_count": 0,
+    "required": false
+  },
+  "timestamp": "2026-01-07T12:05:40+10:00"
+}
+```
+
+**Validation**:
+- Interval must be between 5 and 3600 seconds
+
+**Error Response (400)** - Invalid Interval:
+```json
+{
+  "success": false,
+  "message": "invalid interval: must be between 5 and 3600 seconds",
+  "timestamp": "2026-01-07T12:05:47+10:00"
+}
+```
+
+---
+
+### WebSocket Event: collector_state_change
+
+When a collector is enabled or disabled, a WebSocket event is broadcast to all connected clients.
+
+**Event Payload**:
+```json
+{
+  "event": "collector_state_change",
+  "collector": "gpu",
+  "enabled": true,
+  "status": "running",
+  "interval": 60,
+  "timestamp": "2026-01-07T12:05:35+10:00"
+}
+```
+
+---
+
 ## Log Files
 
 ### GET /logs

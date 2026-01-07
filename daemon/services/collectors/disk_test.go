@@ -103,7 +103,13 @@ func TestStatfsConversion(t *testing.T) {
 	bsize := uint64(stat.Bsize)
 	totalBytes := stat.Blocks * bsize
 	freeBytes := stat.Bfree * bsize
+	availBytes := stat.Bavail * bsize // Available bytes (for non-root users)
 	usedBytes := totalBytes - freeBytes
+
+	// Verify Bavail is used (available space for unprivileged users)
+	if availBytes != 450000*4096 {
+		t.Errorf("Expected availBytes %d, got %d", 450000*4096, availBytes)
+	}
 
 	expectedTotal := uint64(4096000000)
 	expectedFree := uint64(2048000000)

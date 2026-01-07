@@ -265,11 +265,59 @@ func TestEthtoolInfoStruct(t *testing.T) {
 	}
 
 	// Verify all fields are set correctly
+	if len(info.SupportedPorts) != 1 || info.SupportedPorts[0] != "TP" {
+		t.Errorf("SupportedPorts = %v, want [TP]", info.SupportedPorts)
+	}
+	if len(info.SupportedLinkModes) != 1 || info.SupportedLinkModes[0] != "1000baseT/Full" {
+		t.Errorf("SupportedLinkModes = %v, want [1000baseT/Full]", info.SupportedLinkModes)
+	}
+	if info.SupportedPauseFrame != "Symmetric" {
+		t.Errorf("SupportedPauseFrame = %s, want Symmetric", info.SupportedPauseFrame)
+	}
 	if !info.SupportsAutoNeg {
 		t.Error("SupportsAutoNeg should be true")
 	}
+	if len(info.SupportedFECModes) != 1 || info.SupportedFECModes[0] != "None" {
+		t.Errorf("SupportedFECModes = %v, want [None]", info.SupportedFECModes)
+	}
+	if len(info.AdvertisedLinkModes) != 1 || info.AdvertisedLinkModes[0] != "1000baseT/Full" {
+		t.Errorf("AdvertisedLinkModes = %v, want [1000baseT/Full]", info.AdvertisedLinkModes)
+	}
+	if info.AdvertisedPauseFrame != "Symmetric" {
+		t.Errorf("AdvertisedPauseFrame = %s, want Symmetric", info.AdvertisedPauseFrame)
+	}
 	if !info.AdvertisedAutoNeg {
 		t.Error("AdvertisedAutoNeg should be true")
+	}
+	if len(info.AdvertisedFECModes) != 1 || info.AdvertisedFECModes[0] != "None" {
+		t.Errorf("AdvertisedFECModes = %v, want [None]", info.AdvertisedFECModes)
+	}
+	if info.Duplex != "Full" {
+		t.Errorf("Duplex = %s, want Full", info.Duplex)
+	}
+	if info.AutoNegotiation != "on" {
+		t.Errorf("AutoNegotiation = %s, want on", info.AutoNegotiation)
+	}
+	if info.Port != "Twisted Pair" {
+		t.Errorf("Port = %s, want Twisted Pair", info.Port)
+	}
+	if info.PHYAD != 1 {
+		t.Errorf("PHYAD = %d, want 1", info.PHYAD)
+	}
+	if info.Transceiver != "internal" {
+		t.Errorf("Transceiver = %s, want internal", info.Transceiver)
+	}
+	if info.MDIX != "off (auto)" {
+		t.Errorf("MDIX = %s, want off (auto)", info.MDIX)
+	}
+	if len(info.SupportsWakeOn) != 1 || info.SupportsWakeOn[0] != "MagicPacket" {
+		t.Errorf("SupportsWakeOn = %v, want [MagicPacket]", info.SupportsWakeOn)
+	}
+	if info.WakeOn != "g" {
+		t.Errorf("WakeOn = %s, want g", info.WakeOn)
+	}
+	if info.MessageLevel != "0x00000007" {
+		t.Errorf("MessageLevel = %s, want 0x00000007", info.MessageLevel)
 	}
 	if !info.LinkDetected {
 		t.Error("LinkDetected should be true")

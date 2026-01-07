@@ -92,6 +92,12 @@ POLL="15"
 	if !config.ServiceEnabled {
 		t.Error("ServiceEnabled should be true")
 	}
+	if config.RuntimeValue != 240 {
+		t.Errorf("RuntimeValue = %d, want 240", config.RuntimeValue)
+	}
+	if config.Timeout != 240 {
+		t.Errorf("Timeout = %d, want 240", config.Timeout)
+	}
 	if config.Mode != "standalone" {
 		t.Errorf("Mode = %q, want %q", config.Mode, "standalone")
 	}

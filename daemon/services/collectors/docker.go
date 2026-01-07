@@ -2,35 +2,64 @@ package collectors
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"strconv"
+	"os"
 	"strings"
 	"time"
 
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
+
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
-// DockerCollector collects information about Docker containers running on the Unraid system.
-// It gathers container status, resource usage, network information, and configuration details.
+// DockerCollector collects Docker container information using the Docker SDK.
+// This is significantly faster than CLI commands as it avoids process spawning.
 type DockerCollector struct {
-	ctx *domain.Context
+	appCtx       *domain.Context
+	dockerClient *client.Client
+	initialized  bool
 }
 
-// NewDockerCollector creates a new Docker container collector with the given context.
+// NewDockerCollector creates a new Docker SDK-based collector
 func NewDockerCollector(ctx *domain.Context) *DockerCollector {
-	return &DockerCollector{ctx: ctx}
+	return &DockerCollector{
+		appCtx:      ctx,
+		initialized: false,
+	}
 }
 
-// Start begins the Docker collector's periodic data collection.
-// It runs in a goroutine and publishes container information updates at the specified interval until the context is cancelled.
+// initClient initializes the Docker client if not already done
+func (c *DockerCollector) initClient() error {
+	if c.dockerClient != nil {
+		return nil
+	}
+
+	dockerClient, err := client.NewClientWithOpts(
+		client.FromEnv,
+		client.WithAPIVersionNegotiation(),
+	)
+	if err != nil {
+		return err
+	}
+
+	c.dockerClient = dockerClient
+	c.initialized = true
+	return nil
+}
+
+// Start begins the Docker collector's periodic data collection
 func (c *DockerCollector) Start(ctx context.Context, interval time.Duration) {
 	logger.Info("Starting docker collector (interval: %v)", interval)
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
+	defer func() {
+		if c.dockerClient != nil {
+			c.dockerClient.Close()
+		}
+	}()
 
 	for {
 		select {
@@ -43,391 +72,195 @@ func (c *DockerCollector) Start(ctx context.Context, interval time.Duration) {
 	}
 }
 
-// Collect gathers Docker container information and publishes it to the event bus.
-// It uses the Docker CLI to inspect all containers and extract detailed information.
+// Collect gathers Docker container information using the SDK and publishes to event bus
 func (c *DockerCollector) Collect() {
+	startTotal := time.Now()
+	logger.Debug("Collecting docker data via SDK...")
 
-	logger.Debug("Collecting docker data...")
-
-	// Check if docker is available
-	if !lib.CommandExists("docker") {
-		logger.Warning("Docker command not found, skipping collection")
+	// Initialize client if needed
+	if err := c.initClient(); err != nil {
+		logger.Debug("Failed to initialize Docker client: %v (Docker may not be running)", err)
+		// Publish empty list
+		c.appCtx.Hub.Pub([]*dto.ContainerInfo{}, "container_list_update")
 		return
 	}
 
-	// Collect container information
-	containers, err := c.collectContainers()
+	ctx := context.Background()
+
+	// List all containers (including stopped) - SDK is much faster than CLI
+	startList := time.Now()
+	result, err := c.dockerClient.ContainerList(ctx, client.ContainerListOptions{All: true})
 	if err != nil {
-		logger.Error("Failed to collect containers: %v", err)
+		logger.Debug("Failed to list containers via SDK: %v", err)
+		c.appCtx.Hub.Pub([]*dto.ContainerInfo{}, "container_list_update")
 		return
 	}
+	apiContainers := result.Items
+	logger.Debug("Docker SDK: ContainerList took %v for %d containers", time.Since(startList), len(apiContainers))
 
-	// Publish event
-	c.ctx.Hub.Pub(containers, "container_list_update")
-	logger.Debug("Published container_list_update event with %d containers", len(containers))
-}
+	containers := make([]*dto.ContainerInfo, 0, len(apiContainers))
+	runningContainers := make([]container.Summary, 0)
 
-func (c *DockerCollector) collectContainers() ([]*dto.ContainerInfo, error) {
-	// Get container list with JSON format
-	output, err := lib.ExecCommandOutput("docker", "ps", "-a", "--format", "{{json .}}")
-	if err != nil {
-		return nil, fmt.Errorf("failed to list containers: %w", err)
-	}
+	// First pass: create basic container info
+	for _, apiContainer := range apiContainers {
+		shortID := apiContainer.ID[:12]
+		state := strings.ToLower(string(apiContainer.State))
 
-	if strings.TrimSpace(output) == "" {
-		return []*dto.ContainerInfo{}, nil
-	}
-
-	lines := strings.Split(strings.TrimSpace(output), "\n")
-	containers := make([]*dto.ContainerInfo, 0, len(lines))
-
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
-
-		var psOutput struct {
-			ID     string `json:"ID"`
-			Image  string `json:"Image"`
-			Names  string `json:"Names"`
-			State  string `json:"State"`
-			Status string `json:"Status"`
-			Ports  string `json:"Ports"`
-		}
-
-		if err := json.Unmarshal([]byte(line), &psOutput); err != nil {
-			logger.Warning("Failed to parse container JSON", "error", err)
-			continue
-		}
-
-		container := &dto.ContainerInfo{
-			ID:        psOutput.ID,
-			Name:      strings.TrimPrefix(psOutput.Names, "/"),
-			Image:     psOutput.Image,
-			State:     strings.ToLower(psOutput.State),
-			Status:    psOutput.Status,
-			Ports:     c.parsePorts(psOutput.Ports),
+		cont := &dto.ContainerInfo{
+			ID:        shortID,
+			Name:      strings.TrimPrefix(apiContainer.Names[0], "/"),
+			Image:     apiContainer.Image,
+			State:     state,
+			Status:    apiContainer.Status,
+			Ports:     c.convertPorts(apiContainer.Ports),
 			Timestamp: time.Now(),
 		}
 
-		// Get enhanced container details using docker inspect
-		if details, err := c.getContainerDetails(container.ID); err == nil {
-			container.Version = details.Version
-			container.NetworkMode = details.NetworkMode
-			container.IPAddress = details.IPAddress
-			container.PortMappings = details.PortMappings
-			container.VolumeMappings = details.VolumeMappings
-			container.RestartPolicy = details.RestartPolicy
-			container.Uptime = details.Uptime
+		// Extract version from image tag
+		imageParts := strings.Split(apiContainer.Image, ":")
+		if len(imageParts) > 1 {
+			cont.Version = imageParts[1]
+		} else {
+			cont.Version = "latest"
 		}
 
-		containers = append(containers, container)
-	}
+		containers = append(containers, cont)
 
-	// Get stats for all running containers in a single command (power optimization)
-	// This reduces process spawns from N (one per container) to 1
-	runningIDs := make([]string, 0)
-	containerMap := make(map[string]*dto.ContainerInfo)
-	for _, container := range containers {
-		if container.State == "running" {
-			runningIDs = append(runningIDs, container.ID)
-			containerMap[container.ID] = container
+		if state == "running" {
+			runningContainers = append(runningContainers, apiContainer)
 		}
 	}
 
-	if len(runningIDs) > 0 {
-		allStats, err := c.getAllContainerStats(runningIDs)
-		if err == nil {
-			for id, stats := range allStats {
-				if container, ok := containerMap[id]; ok {
-					container.CPUPercent = stats.CPUPercent
-					container.MemoryUsage = stats.MemoryUsage
-					container.MemoryLimit = stats.MemoryLimit
-					container.NetworkRX = stats.NetworkRX
-					container.NetworkTX = stats.NetworkTX
-					container.MemoryDisplay = c.formatMemoryDisplay(stats.MemoryUsage, stats.MemoryLimit)
+	// Batch inspect running containers for detailed info
+	if len(runningContainers) > 0 {
+		startInspect := time.Now()
+		containerMap := make(map[string]*dto.ContainerInfo)
+		for _, cont := range containers {
+			containerMap[cont.ID] = cont
+		}
+
+		for _, apiContainer := range runningContainers {
+			shortID := apiContainer.ID[:12]
+			inspectResult, err := c.dockerClient.ContainerInspect(ctx, apiContainer.ID, client.ContainerInspectOptions{})
+			if err != nil {
+				logger.Debug("Docker SDK: Failed to inspect container %s: %v", shortID, err)
+				continue
+			}
+
+			inspectData := inspectResult.Container
+
+			if cont, ok := containerMap[shortID]; ok {
+				// Network mode
+				if inspectData.HostConfig != nil {
+					cont.NetworkMode = string(inspectData.HostConfig.NetworkMode)
 				}
-			}
-		}
-	}
 
-	return containers, nil
-}
-
-type containerStats struct {
-	CPUPercent  float64
-	MemoryUsage uint64
-	MemoryLimit uint64
-	NetworkRX   uint64
-	NetworkTX   uint64
-}
-
-// getAllContainerStats gets stats for all running containers in a single docker stats call
-// This is much more power-efficient than calling docker stats per container
-func (c *DockerCollector) getAllContainerStats(containerIDs []string) (map[string]*containerStats, error) {
-	// Get stats for all containers in one command
-	args := append([]string{"stats", "--no-stream", "--format", "{{json .}}"}, containerIDs...)
-	output, err := lib.ExecCommandOutput("docker", args...)
-	if err != nil {
-		return nil, err
-	}
-
-	result := make(map[string]*containerStats)
-	lines := strings.Split(strings.TrimSpace(output), "\n")
-
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
-
-		var statsOutput struct {
-			Container string `json:"Container"`
-			ID        string `json:"ID"`
-			CPUPerc   string `json:"CPUPerc"`
-			MemUsage  string `json:"MemUsage"`
-			MemPerc   string `json:"MemPerc"`
-			NetIO     string `json:"NetIO"`
-		}
-
-		if err := json.Unmarshal([]byte(line), &statsOutput); err != nil {
-			logger.Warning("Failed to parse container stats JSON: %v", err)
-			continue
-		}
-
-		stats := &containerStats{}
-
-		// Parse CPU percentage (e.g., "0.50%")
-		if cpuStr := strings.TrimSuffix(statsOutput.CPUPerc, "%"); cpuStr != "" {
-			if cpu, err := strconv.ParseFloat(cpuStr, 64); err == nil {
-				stats.CPUPercent = cpu
-			}
-		}
-
-		// Parse memory usage (e.g., "1.5GiB / 8GiB")
-		if parts := strings.Split(statsOutput.MemUsage, " / "); len(parts) == 2 {
-			stats.MemoryUsage = c.parseSize(parts[0])
-			stats.MemoryLimit = c.parseSize(parts[1])
-		}
-
-		// Parse network I/O (e.g., "1.2MB / 3.4MB")
-		if parts := strings.Split(statsOutput.NetIO, " / "); len(parts) == 2 {
-			stats.NetworkRX = c.parseSize(parts[0])
-			stats.NetworkTX = c.parseSize(parts[1])
-		}
-
-		// Use container ID to match back
-		result[statsOutput.ID] = stats
-	}
-
-	return result, nil
-}
-
-func (c *DockerCollector) parseSize(sizeStr string) uint64 {
-	sizeStr = strings.TrimSpace(sizeStr)
-	if sizeStr == "" || sizeStr == "0B" {
-		return 0
-	}
-
-	// Extract number and unit
-	var value float64
-	var unit string
-
-	// Try to parse with unit
-	if n, err := fmt.Sscanf(sizeStr, "%f%s", &value, &unit); n >= 1 && err == nil {
-		unit = strings.ToUpper(unit)
-		multiplier := uint64(1)
-
-		switch {
-		case strings.HasPrefix(unit, "K"):
-			multiplier = 1024
-		case strings.HasPrefix(unit, "M"):
-			multiplier = 1024 * 1024
-		case strings.HasPrefix(unit, "G"):
-			multiplier = 1024 * 1024 * 1024
-		case strings.HasPrefix(unit, "T"):
-			multiplier = 1024 * 1024 * 1024 * 1024
-		}
-
-		return uint64(value * float64(multiplier))
-	}
-
-	return 0
-}
-
-func (c *DockerCollector) parsePorts(portsStr string) []dto.PortMapping {
-	if portsStr == "" {
-		return []dto.PortMapping{}
-	}
-
-	ports := []dto.PortMapping{}
-	parts := strings.Split(portsStr, ", ")
-
-	for _, part := range parts {
-		// Format examples:
-		// "0.0.0.0:8080->80/tcp"
-		// "80/tcp"
-		if strings.Contains(part, "->") {
-			// Has port mapping
-			mappingParts := strings.Split(part, "->")
-			if len(mappingParts) == 2 {
-				// Extract public port
-				publicPart := mappingParts[0]
-				if colonIdx := strings.LastIndex(publicPart, ":"); colonIdx >= 0 {
-					publicPort, _ := strconv.Atoi(publicPart[colonIdx+1:])
-
-					// Extract private port and type
-					privatePart := mappingParts[1]
-					if slashIdx := strings.Index(privatePart, "/"); slashIdx >= 0 {
-						privatePort, _ := strconv.Atoi(privatePart[:slashIdx])
-						portType := privatePart[slashIdx+1:]
-
-						ports = append(ports, dto.PortMapping{
-							PrivatePort: privatePort,
-							PublicPort:  publicPort,
-							Type:        portType,
-						})
+				// IP Address (get first available)
+				if inspectData.NetworkSettings != nil {
+					for _, network := range inspectData.NetworkSettings.Networks {
+						if network.IPAddress.IsValid() {
+							cont.IPAddress = network.IPAddress.String()
+							break
+						}
 					}
 				}
-			}
-		} else if strings.Contains(part, "/") {
-			// Just exposed port, no mapping
-			if slashIdx := strings.Index(part, "/"); slashIdx >= 0 {
-				port, _ := strconv.Atoi(part[:slashIdx])
-				portType := part[slashIdx+1:]
 
-				ports = append(ports, dto.PortMapping{
-					PrivatePort: port,
-					PublicPort:  0,
-					Type:        portType,
-				})
+				// Port mappings
+				if inspectData.HostConfig != nil {
+					portMappings := []string{}
+					for containerPort, bindings := range inspectData.HostConfig.PortBindings {
+						for _, binding := range bindings {
+							if binding.HostPort != "" {
+								portMappings = append(portMappings, fmt.Sprintf("%s:%s", binding.HostPort, containerPort))
+							}
+						}
+					}
+					cont.PortMappings = portMappings
+
+					// Restart policy
+					cont.RestartPolicy = string(inspectData.HostConfig.RestartPolicy.Name)
+					if cont.RestartPolicy == "" {
+						cont.RestartPolicy = "no"
+					}
+				}
+
+				// Volume mappings
+				volumeMappings := []dto.VolumeMapping{}
+				for _, mount := range inspectData.Mounts {
+					volumeMappings = append(volumeMappings, dto.VolumeMapping{
+						HostPath:      mount.Source,
+						ContainerPath: mount.Destination,
+						Mode:          string(mount.Mode),
+					})
+				}
+				cont.VolumeMappings = volumeMappings
+
+				// Uptime
+				if inspectData.State != nil && inspectData.State.StartedAt != "" {
+					startTime, err := time.Parse(time.RFC3339Nano, inspectData.State.StartedAt)
+					if err == nil {
+						cont.Uptime = dockerFormatUptime(time.Since(startTime))
+					}
+				}
+
+				// Memory stats from cgroups (much faster than ContainerStats API)
+				c.getMemoryFromCgroups(apiContainer.ID, cont)
 			}
+		}
+		logger.Debug("Docker SDK: Inspect + cgroup stats took %v for %d containers", time.Since(startInspect), len(runningContainers))
+	}
+
+	// Publish event
+	c.appCtx.Hub.Pub(containers, "container_list_update")
+	logger.Debug("Docker SDK: Total collection took %v, published %d containers", time.Since(startTotal), len(containers))
+}
+
+// getMemoryFromCgroups reads memory stats directly from cgroup v2 filesystem
+// This is much faster than using Docker's ContainerStats API
+func (c *DockerCollector) getMemoryFromCgroups(fullID string, cont *dto.ContainerInfo) {
+	cgroupPath := "/sys/fs/cgroup/docker/" + fullID
+
+	// Read memory.current
+	if data, err := os.ReadFile(cgroupPath + "/memory.current"); err == nil {
+		var memUsage uint64
+		fmt.Sscanf(strings.TrimSpace(string(data)), "%d", &memUsage)
+		cont.MemoryUsage = memUsage
+	}
+
+	// Read memory.max
+	if data, err := os.ReadFile(cgroupPath + "/memory.max"); err == nil {
+		content := strings.TrimSpace(string(data))
+		if content != "max" {
+			var memLimit uint64
+			fmt.Sscanf(content, "%d", &memLimit)
+			cont.MemoryLimit = memLimit
+		} else {
+			// "max" means unlimited - use system memory
+			cont.MemoryLimit = dockerGetSystemMemoryTotal()
 		}
 	}
 
+	// Format memory display
+	if cont.MemoryLimit > 0 {
+		cont.MemoryDisplay = dockerFormatMemoryDisplay(cont.MemoryUsage, cont.MemoryLimit)
+	}
+}
+
+// convertPorts converts Docker API port format to our DTO format
+func (c *DockerCollector) convertPorts(apiPorts []container.PortSummary) []dto.PortMapping {
+	ports := make([]dto.PortMapping, 0, len(apiPorts))
+	for _, p := range apiPorts {
+		ports = append(ports, dto.PortMapping{
+			PrivatePort: int(p.PrivatePort),
+			PublicPort:  int(p.PublicPort),
+			Type:        p.Type,
+		})
+	}
 	return ports
 }
 
-type containerDetails struct {
-	Version        string
-	NetworkMode    string
-	IPAddress      string
-	PortMappings   []string
-	VolumeMappings []dto.VolumeMapping
-	RestartPolicy  string
-	Uptime         string
-}
-
-// getContainerDetails retrieves detailed container information using docker inspect
-func (c *DockerCollector) getContainerDetails(containerID string) (*containerDetails, error) {
-	output, err := lib.ExecCommandOutput("docker", "inspect", containerID)
-	if err != nil {
-		return nil, err
-	}
-
-	var inspectOutput []struct {
-		Config struct {
-			Image string `json:"Image"`
-		} `json:"Config"`
-		NetworkSettings struct {
-			Networks map[string]struct {
-				IPAddress string `json:"IPAddress"`
-			} `json:"Networks"`
-		} `json:"NetworkSettings"`
-		HostConfig struct {
-			NetworkMode   string `json:"NetworkMode"`
-			RestartPolicy struct {
-				Name string `json:"Name"`
-			} `json:"RestartPolicy"`
-			PortBindings map[string][]struct {
-				HostIP   string `json:"HostIp"`
-				HostPort string `json:"HostPort"`
-			} `json:"PortBindings"`
-			Binds []string `json:"Binds"`
-		} `json:"HostConfig"`
-		State struct {
-			StartedAt string `json:"StartedAt"`
-		} `json:"State"`
-	}
-
-	if err := json.Unmarshal([]byte(output), &inspectOutput); err != nil {
-		return nil, err
-	}
-
-	if len(inspectOutput) == 0 {
-		return nil, fmt.Errorf("no inspect data returned")
-	}
-
-	inspect := inspectOutput[0]
-	details := &containerDetails{}
-
-	// Extract version from image tag
-	imageParts := strings.Split(inspect.Config.Image, ":")
-	if len(imageParts) > 1 {
-		details.Version = imageParts[1]
-	} else {
-		details.Version = "latest"
-	}
-
-	// Network mode
-	details.NetworkMode = inspect.HostConfig.NetworkMode
-
-	// IP Address (get first available)
-	for _, network := range inspect.NetworkSettings.Networks {
-		if network.IPAddress != "" {
-			details.IPAddress = network.IPAddress
-			break
-		}
-	}
-
-	// Port mappings
-	portMappings := []string{}
-	for containerPort, bindings := range inspect.HostConfig.PortBindings {
-		for _, binding := range bindings {
-			if binding.HostPort != "" {
-				portMappings = append(portMappings, fmt.Sprintf("%s:%s", binding.HostPort, containerPort))
-			}
-		}
-	}
-	details.PortMappings = portMappings
-
-	// Volume mappings
-	volumeMappings := []dto.VolumeMapping{}
-	for _, bind := range inspect.HostConfig.Binds {
-		parts := strings.Split(bind, ":")
-		if len(parts) >= 2 {
-			mode := "rw"
-			if len(parts) >= 3 {
-				mode = parts[2]
-			}
-			volumeMappings = append(volumeMappings, dto.VolumeMapping{
-				HostPath:      parts[0],
-				ContainerPath: parts[1],
-				Mode:          mode,
-			})
-		}
-	}
-	details.VolumeMappings = volumeMappings
-
-	// Restart policy
-	details.RestartPolicy = inspect.HostConfig.RestartPolicy.Name
-	if details.RestartPolicy == "" {
-		details.RestartPolicy = "no"
-	}
-
-	// Calculate uptime
-	if inspect.State.StartedAt != "" {
-		startTime, err := time.Parse(time.RFC3339Nano, inspect.State.StartedAt)
-		if err == nil {
-			uptime := time.Since(startTime)
-			details.Uptime = c.formatUptime(uptime)
-		}
-	}
-
-	return details, nil
-}
-
-// formatUptime formats a duration into a human-readable uptime string
-func (c *DockerCollector) formatUptime(d time.Duration) string {
+// dockerFormatUptime formats a duration as human-readable uptime string
+func dockerFormatUptime(d time.Duration) string {
 	days := int(d.Hours() / 24)
 	hours := int(d.Hours()) % 24
 	minutes := int(d.Minutes()) % 60
@@ -441,8 +274,8 @@ func (c *DockerCollector) formatUptime(d time.Duration) string {
 	return fmt.Sprintf("%dm", minutes)
 }
 
-// formatMemoryDisplay formats memory usage as "used / limit"
-func (c *DockerCollector) formatMemoryDisplay(used, limit uint64) string {
+// dockerFormatMemoryDisplay formats memory as human-readable string
+func dockerFormatMemoryDisplay(used, limit uint64) string {
 	if limit == 0 {
 		return "0 / 0"
 	}
@@ -457,4 +290,24 @@ func (c *DockerCollector) formatMemoryDisplay(used, limit uint64) string {
 	}
 
 	return fmt.Sprintf("%.2f MB / %.2f MB", usedMB, limitMB)
+}
+
+// dockerGetSystemMemoryTotal reads total system memory from /proc/meminfo
+func dockerGetSystemMemoryTotal() uint64 {
+	data, err := os.ReadFile("/proc/meminfo")
+	if err != nil {
+		return 0
+	}
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "MemTotal:") {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 {
+				var val uint64
+				fmt.Sscanf(fields[1], "%d", &val)
+				return val * 1024 // Convert from kB to bytes
+			}
+		}
+	}
+	return 0
 }

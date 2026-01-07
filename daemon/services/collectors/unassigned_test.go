@@ -85,7 +85,7 @@ func shouldSkipDevice(device string) bool {
 		return true
 	}
 	// Skip nvme partitions
-	if len(device) > 7 && device[:7] == "nvme0n1" && len(device) > 7 && device[7] == 'p' {
+	if len(device) > 7 && device[:7] == "nvme0n1" && device[7] == 'p' {
 		return true
 	}
 	// Skip disk partitions (sda1, sdb2, etc.)

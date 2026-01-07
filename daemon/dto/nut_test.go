@@ -77,8 +77,23 @@ func TestNUTStatusStructure(t *testing.T) {
 	if status.DeviceName != "ups" {
 		t.Errorf("Expected DeviceName 'ups', got %q", status.DeviceName)
 	}
+	if status.Host != "localhost" {
+		t.Errorf("Expected Host 'localhost', got %q", status.Host)
+	}
+	if status.Driver != "usbhid-ups" {
+		t.Errorf("Expected Driver 'usbhid-ups', got %q", status.Driver)
+	}
+	if status.Status != "OL" {
+		t.Errorf("Expected Status 'OL', got %q", status.Status)
+	}
+	if status.StatusText != "Online" {
+		t.Errorf("Expected StatusText 'Online', got %q", status.StatusText)
+	}
 	if status.BatteryCharge != 100.0 {
 		t.Errorf("Expected BatteryCharge 100.0, got %f", status.BatteryCharge)
+	}
+	if status.LoadPercent != 30.5 {
+		t.Errorf("Expected LoadPercent 30.5, got %f", status.LoadPercent)
 	}
 }
 
@@ -101,8 +116,23 @@ func TestNUTConfigStructure(t *testing.T) {
 	if config.Mode != "standalone" {
 		t.Errorf("Expected Mode 'standalone', got %q", config.Mode)
 	}
+	if config.UPSName != "ups" {
+		t.Errorf("Expected UPSName 'ups', got %q", config.UPSName)
+	}
+	if config.Driver != "usbhid-ups" {
+		t.Errorf("Expected Driver 'usbhid-ups', got %q", config.Driver)
+	}
+	if config.Port != "auto" {
+		t.Errorf("Expected Port 'auto', got %q", config.Port)
+	}
 	if config.PollInterval != 10 {
 		t.Errorf("Expected PollInterval 10, got %d", config.PollInterval)
+	}
+	if config.BatteryLevel != 20 {
+		t.Errorf("Expected BatteryLevel 20, got %d", config.BatteryLevel)
+	}
+	if config.RuntimeValue != 300 {
+		t.Errorf("Expected RuntimeValue 300, got %d", config.RuntimeValue)
 	}
 }
 
@@ -116,6 +146,9 @@ func TestNUTDeviceStructure(t *testing.T) {
 
 	if device.Name != "ups" {
 		t.Errorf("Expected Name 'ups', got %q", device.Name)
+	}
+	if device.Description != "Main UPS" {
+		t.Errorf("Expected Description 'Main UPS', got %q", device.Description)
 	}
 	if !device.Available {
 		t.Error("Expected Available to be true")

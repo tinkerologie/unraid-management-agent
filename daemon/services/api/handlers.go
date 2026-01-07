@@ -287,6 +287,13 @@ func (s *Server) handleNetwork(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, interfaces)
 }
 
+// handleNetworkAccessURLs returns all methods to access the Unraid server
+// including LAN IP, mDNS hostname, WireGuard VPN IPs, WAN IP, and IPv6 addresses
+func (s *Server) handleNetworkAccessURLs(w http.ResponseWriter, _ *http.Request) {
+	accessURLs := collectors.CollectNetworkAccessURLs()
+	respondJSON(w, http.StatusOK, accessURLs)
+}
+
 // Generic Docker operation handler to reduce code duplication
 //
 //nolint:dupl // Similar to handleVMOperation but serves different purpose (Docker vs VM)
@@ -1388,7 +1395,14 @@ func (s *Server) handleZFSARC(w http.ResponseWriter, _ *http.Request) {
 
 // handleCollectorsStatus returns the status of all collectors including enabled/disabled state
 func (s *Server) handleCollectorsStatus(w http.ResponseWriter, _ *http.Request) {
-	// Define all collectors with their names and interval references
+	// If we have a collector manager, use it for real-time status
+	if s.collectorManager != nil {
+		status := s.collectorManager.GetAllStatus()
+		respondJSON(w, http.StatusOK, status)
+		return
+	}
+
+	// Fallback to static configuration (legacy mode)
 	type collectorDef struct {
 		name     string
 		interval int
@@ -1440,5 +1454,161 @@ func (s *Server) handleCollectorsStatus(w http.ResponseWriter, _ *http.Request) 
 		EnabledCount:  enabledCount,
 		DisabledCount: disabledCount,
 		Timestamp:     time.Now(),
+	})
+}
+
+// handleCollectorStatus returns the status of a specific collector
+func (s *Server) handleCollectorStatus(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	name := vars["name"]
+
+	if s.collectorManager == nil {
+		respondJSON(w, http.StatusServiceUnavailable, dto.Response{
+			Success:   false,
+			Message:   "collector management not available",
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	status, err := s.collectorManager.GetStatus(name)
+	if err != nil {
+		respondJSON(w, http.StatusNotFound, dto.Response{
+			Success:   false,
+			Message:   err.Error(),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.CollectorResponse{
+		Success:   true,
+		Message:   fmt.Sprintf("collector %s status retrieved", name),
+		Collector: *status,
+		Timestamp: time.Now(),
+	})
+}
+
+// handleCollectorEnable enables a collector at runtime
+func (s *Server) handleCollectorEnable(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	name := vars["name"]
+
+	if s.collectorManager == nil {
+		respondJSON(w, http.StatusServiceUnavailable, dto.Response{
+			Success:   false,
+			Message:   "collector management not available",
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	logger.Info("Enabling collector: %s", name)
+
+	if err := s.collectorManager.EnableCollector(name); err != nil {
+		statusCode := http.StatusBadRequest
+		if err.Error() == fmt.Sprintf("unknown collector: %s", name) {
+			statusCode = http.StatusNotFound
+		}
+		respondJSON(w, statusCode, dto.Response{
+			Success:   false,
+			Message:   err.Error(),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	status, _ := s.collectorManager.GetStatus(name)
+	respondJSON(w, http.StatusOK, dto.CollectorResponse{
+		Success:   true,
+		Message:   fmt.Sprintf("%s collector enabled", name),
+		Collector: *status,
+		Timestamp: time.Now(),
+	})
+}
+
+// handleCollectorDisable disables a collector at runtime
+func (s *Server) handleCollectorDisable(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	name := vars["name"]
+
+	if s.collectorManager == nil {
+		respondJSON(w, http.StatusServiceUnavailable, dto.Response{
+			Success:   false,
+			Message:   "collector management not available",
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	logger.Info("Disabling collector: %s", name)
+
+	if err := s.collectorManager.DisableCollector(name); err != nil {
+		statusCode := http.StatusBadRequest
+		if err.Error() == fmt.Sprintf("unknown collector: %s", name) {
+			statusCode = http.StatusNotFound
+		}
+		respondJSON(w, statusCode, dto.Response{
+			Success:   false,
+			Message:   err.Error(),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	status, _ := s.collectorManager.GetStatus(name)
+	respondJSON(w, http.StatusOK, dto.CollectorResponse{
+		Success:   true,
+		Message:   fmt.Sprintf("%s collector disabled", name),
+		Collector: *status,
+		Timestamp: time.Now(),
+	})
+}
+
+// handleCollectorInterval updates the interval for a collector
+func (s *Server) handleCollectorInterval(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	name := vars["name"]
+
+	if s.collectorManager == nil {
+		respondJSON(w, http.StatusServiceUnavailable, dto.Response{
+			Success:   false,
+			Message:   "collector management not available",
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	var req dto.CollectorIntervalRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   "invalid request body",
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	logger.Info("Updating collector %s interval to %d seconds", name, req.Interval)
+
+	if err := s.collectorManager.UpdateInterval(name, req.Interval); err != nil {
+		statusCode := http.StatusBadRequest
+		if err.Error() == fmt.Sprintf("unknown collector: %s", name) {
+			statusCode = http.StatusNotFound
+		}
+		respondJSON(w, statusCode, dto.Response{
+			Success:   false,
+			Message:   err.Error(),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	status, _ := s.collectorManager.GetStatus(name)
+	respondJSON(w, http.StatusOK, dto.CollectorResponse{
+		Success:   true,
+		Message:   fmt.Sprintf("%s collector interval updated to %d seconds", name, req.Interval),
+		Collector: *status,
+		Timestamp: time.Now(),
 	})
 }
