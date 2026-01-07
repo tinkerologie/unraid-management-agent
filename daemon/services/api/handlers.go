@@ -16,10 +16,26 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/controllers"
 )
 
+// handleHealth godoc
+//
+//	@Summary		Health check
+//	@Description	Check if the API server is running and healthy
+//	@Tags			System
+//	@Produce		json
+//	@Success		200	{object}	map[string]string	"Server is healthy"
+//	@Router			/health [get]
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
+// handleSystem godoc
+//
+//	@Summary		Get system information
+//	@Description	Retrieve comprehensive system metrics including CPU, RAM, temperatures, and uptime
+//	@Tags			System
+//	@Produce		json
+//	@Success		200	{object}	dto.SystemInfo	"System information"
+//	@Router			/system [get]
 func (s *Server) handleSystem(w http.ResponseWriter, _ *http.Request) {
 	// Get latest system info from cache
 	s.cacheMutex.RLock()
@@ -37,7 +53,15 @@ func (s *Server) handleSystem(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, info)
 }
 
-// handleSystemReboot initiates a system reboot
+// handleSystemReboot godoc
+//
+//	@Summary		Reboot system
+//	@Description	Initiate a system reboot
+//	@Tags			System
+//	@Produce		json
+//	@Success		200	{object}	dto.Response	"Reboot initiated"
+//	@Failure		500	{object}	dto.Response	"Failed to initiate reboot"
+//	@Router			/system/reboot [post]
 func (s *Server) handleSystemReboot(w http.ResponseWriter, _ *http.Request) {
 	logger.Info("API: System reboot requested")
 
@@ -61,7 +85,15 @@ func (s *Server) handleSystemReboot(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-// handleSystemShutdown initiates a system shutdown
+// handleSystemShutdown godoc
+//
+//	@Summary		Shutdown system
+//	@Description	Initiate a system shutdown
+//	@Tags			System
+//	@Produce		json
+//	@Success		200	{object}	dto.Response	"Shutdown initiated"
+//	@Failure		500	{object}	dto.Response	"Failed to initiate shutdown"
+//	@Router			/system/shutdown [post]
 func (s *Server) handleSystemShutdown(w http.ResponseWriter, _ *http.Request) {
 	logger.Info("API: System shutdown requested")
 
@@ -85,6 +117,14 @@ func (s *Server) handleSystemShutdown(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
+// handleArray godoc
+//
+//	@Summary		Get array status
+//	@Description	Retrieve Unraid array status including parity information
+//	@Tags			Array
+//	@Produce		json
+//	@Success		200	{object}	dto.ArrayStatus	"Array status"
+//	@Router			/array [get]
 func (s *Server) handleArray(w http.ResponseWriter, _ *http.Request) {
 	// Get latest array status from cache
 	s.cacheMutex.RLock()
@@ -101,6 +141,14 @@ func (s *Server) handleArray(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, status)
 }
 
+// handleDisks godoc
+//
+//	@Summary		Get all disks
+//	@Description	Retrieve information about all disks including SMART data
+//	@Tags			Disks
+//	@Produce		json
+//	@Success		200	{array}	dto.DiskInfo	"List of disks"
+//	@Router			/disks [get]
 func (s *Server) handleDisks(w http.ResponseWriter, _ *http.Request) {
 	// Get latest disk list from cache
 	s.cacheMutex.RLock()
@@ -114,6 +162,16 @@ func (s *Server) handleDisks(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, disks)
 }
 
+// handleDisk godoc
+//
+//	@Summary		Get specific disk
+//	@Description	Retrieve information about a specific disk by ID, device name, or name
+//	@Tags			Disks
+//	@Produce		json
+//	@Param			id	path		string	true	"Disk ID, device name (e.g., sda), or disk name (e.g., disk1)"
+//	@Success		200	{object}	dto.DiskInfo	"Disk information"
+//	@Failure		404	{object}	dto.Response	"Disk not found"
+//	@Router			/disks/{id} [get]
 func (s *Server) handleDisk(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	diskID := vars["id"]
@@ -139,6 +197,14 @@ func (s *Server) handleDisk(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleShares godoc
+//
+//	@Summary		Get all shares
+//	@Description	Retrieve information about all user shares
+//	@Tags			Shares
+//	@Produce		json
+//	@Success		200	{array}	dto.ShareInfo	"List of shares"
+//	@Router			/shares [get]
 func (s *Server) handleShares(w http.ResponseWriter, _ *http.Request) {
 	// Get latest share list from cache
 	s.cacheMutex.RLock()
@@ -152,6 +218,14 @@ func (s *Server) handleShares(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, shares)
 }
 
+// handleDockerList godoc
+//
+//	@Summary		Get all Docker containers
+//	@Description	Retrieve information about all Docker containers including stats
+//	@Tags			Docker
+//	@Produce		json
+//	@Success		200	{array}	dto.ContainerInfo	"List of containers"
+//	@Router			/docker [get]
 func (s *Server) handleDockerList(w http.ResponseWriter, _ *http.Request) {
 	// Get latest container list from cache
 	s.cacheMutex.RLock()
@@ -165,6 +239,16 @@ func (s *Server) handleDockerList(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, containers)
 }
 
+// handleDockerInfo godoc
+//
+//	@Summary		Get specific Docker container
+//	@Description	Retrieve information about a specific Docker container by ID or name
+//	@Tags			Docker
+//	@Produce		json
+//	@Param			id	path		string	true	"Container ID or name"
+//	@Success		200	{object}	dto.ContainerInfo	"Container information"
+//	@Failure		404	{object}	dto.Response		"Container not found"
+//	@Router			/docker/{id} [get]
 func (s *Server) handleDockerInfo(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	containerID := vars["id"]
@@ -190,6 +274,14 @@ func (s *Server) handleDockerInfo(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleVMList godoc
+//
+//	@Summary		Get all VMs
+//	@Description	Retrieve information about all virtual machines
+//	@Tags			VMs
+//	@Produce		json
+//	@Success		200	{array}	dto.VMInfo	"List of VMs"
+//	@Router			/vm [get]
 func (s *Server) handleVMList(w http.ResponseWriter, _ *http.Request) {
 	// Get latest VM list from cache
 	s.cacheMutex.RLock()
@@ -203,6 +295,16 @@ func (s *Server) handleVMList(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, vms)
 }
 
+// handleVMInfo godoc
+//
+//	@Summary		Get specific VM
+//	@Description	Retrieve information about a specific virtual machine by ID or name
+//	@Tags			VMs
+//	@Produce		json
+//	@Param			id	path		string	true	"VM ID or name"
+//	@Success		200	{object}	dto.VMInfo		"VM information"
+//	@Failure		404	{object}	dto.Response	"VM not found"
+//	@Router			/vm/{id} [get]
 func (s *Server) handleVMInfo(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	vmID := vars["id"]
@@ -228,6 +330,14 @@ func (s *Server) handleVMInfo(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleUPS godoc
+//
+//	@Summary		Get UPS status
+//	@Description	Retrieve UPS status information from apcupsd
+//	@Tags			UPS
+//	@Produce		json
+//	@Success		200	{object}	dto.UPSStatus	"UPS status"
+//	@Router			/ups [get]
 func (s *Server) handleUPS(w http.ResponseWriter, _ *http.Request) {
 	// Get latest UPS status from cache
 	s.cacheMutex.RLock()
@@ -244,6 +354,14 @@ func (s *Server) handleUPS(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, ups)
 }
 
+// handleNUT godoc
+//
+//	@Summary		Get NUT status
+//	@Description	Retrieve Network UPS Tools (NUT) status information
+//	@Tags			UPS
+//	@Produce		json
+//	@Success		200	{object}	dto.NUTResponse	"NUT status"
+//	@Router			/nut [get]
 func (s *Server) handleNUT(w http.ResponseWriter, _ *http.Request) {
 	// Get latest NUT status from cache
 	s.cacheMutex.RLock()
@@ -261,6 +379,14 @@ func (s *Server) handleNUT(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, nut)
 }
 
+// handleGPU godoc
+//
+//	@Summary		Get GPU metrics
+//	@Description	Retrieve GPU metrics for NVIDIA and AMD GPUs
+//	@Tags			GPU
+//	@Produce		json
+//	@Success		200	{array}	dto.GPUMetrics	"List of GPU metrics"
+//	@Router			/gpu [get]
 func (s *Server) handleGPU(w http.ResponseWriter, _ *http.Request) {
 	// Get latest GPU metrics from cache
 	s.cacheMutex.RLock()
@@ -274,6 +400,14 @@ func (s *Server) handleGPU(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, gpus)
 }
 
+// handleNetwork godoc
+//
+//	@Summary		Get network interfaces
+//	@Description	Retrieve information about all network interfaces
+//	@Tags			Network
+//	@Produce		json
+//	@Success		200	{array}	dto.NetworkInfo	"List of network interfaces"
+//	@Router			/network [get]
 func (s *Server) handleNetwork(w http.ResponseWriter, _ *http.Request) {
 	// Get latest network interfaces from cache
 	s.cacheMutex.RLock()
@@ -287,8 +421,14 @@ func (s *Server) handleNetwork(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, interfaces)
 }
 
-// handleNetworkAccessURLs returns all methods to access the Unraid server
-// including LAN IP, mDNS hostname, WireGuard VPN IPs, WAN IP, and IPv6 addresses
+// handleNetworkAccessURLs godoc
+//
+//	@Summary		Get network access URLs
+//	@Description	Returns all methods to access the Unraid server including LAN IP, mDNS hostname, WireGuard VPN IPs, WAN IP, and IPv6 addresses
+//	@Tags			Network
+//	@Produce		json
+//	@Success		200	{object}	dto.NetworkAccessURLs	"Network access URLs"
+//	@Router			/network/access-urls [get]
 func (s *Server) handleNetworkAccessURLs(w http.ResponseWriter, _ *http.Request) {
 	accessURLs := collectors.CollectNetworkAccessURLs()
 	respondJSON(w, http.StatusOK, accessURLs)
@@ -368,69 +508,207 @@ func (s *Server) handleVMOperation(w http.ResponseWriter, r *http.Request, opera
 	})
 }
 
-// Docker control handlers
+// handleDockerStart godoc
+//
+//	@Summary		Start Docker container
+//	@Description	Start a specific Docker container by ID or name
+//	@Tags			Docker
+//	@Produce		json
+//	@Param			id	path		string	true	"Container ID or name"
+//	@Success		200	{object}	dto.Response	"Container started"
+//	@Failure		400	{object}	dto.Response	"Invalid container ID"
+//	@Failure		500	{object}	dto.Response	"Failed to start container"
+//	@Router			/docker/{id}/start [post]
 func (s *Server) handleDockerStart(w http.ResponseWriter, r *http.Request) {
 	controller := controllers.NewDockerController()
 	s.handleDockerOperation(w, r, "started", controller.Start)
 }
 
+// handleDockerStop godoc
+//
+//	@Summary		Stop Docker container
+//	@Description	Stop a specific Docker container by ID or name
+//	@Tags			Docker
+//	@Produce		json
+//	@Param			id	path		string	true	"Container ID or name"
+//	@Success		200	{object}	dto.Response	"Container stopped"
+//	@Failure		400	{object}	dto.Response	"Invalid container ID"
+//	@Failure		500	{object}	dto.Response	"Failed to stop container"
+//	@Router			/docker/{id}/stop [post]
 func (s *Server) handleDockerStop(w http.ResponseWriter, r *http.Request) {
 	controller := controllers.NewDockerController()
 	s.handleDockerOperation(w, r, "stopped", controller.Stop)
 }
 
+// handleDockerRestart godoc
+//
+//	@Summary		Restart Docker container
+//	@Description	Restart a specific Docker container by ID or name
+//	@Tags			Docker
+//	@Produce		json
+//	@Param			id	path		string	true	"Container ID or name"
+//	@Success		200	{object}	dto.Response	"Container restarted"
+//	@Failure		400	{object}	dto.Response	"Invalid container ID"
+//	@Failure		500	{object}	dto.Response	"Failed to restart container"
+//	@Router			/docker/{id}/restart [post]
 func (s *Server) handleDockerRestart(w http.ResponseWriter, r *http.Request) {
 	controller := controllers.NewDockerController()
 	s.handleDockerOperation(w, r, "restarted", controller.Restart)
 }
 
+// handleDockerPause godoc
+//
+//	@Summary		Pause Docker container
+//	@Description	Pause a specific Docker container by ID or name
+//	@Tags			Docker
+//	@Produce		json
+//	@Param			id	path		string	true	"Container ID or name"
+//	@Success		200	{object}	dto.Response	"Container paused"
+//	@Failure		400	{object}	dto.Response	"Invalid container ID"
+//	@Failure		500	{object}	dto.Response	"Failed to pause container"
+//	@Router			/docker/{id}/pause [post]
 func (s *Server) handleDockerPause(w http.ResponseWriter, r *http.Request) {
 	controller := controllers.NewDockerController()
 	s.handleDockerOperation(w, r, "paused", controller.Pause)
 }
 
+// handleDockerUnpause godoc
+//
+//	@Summary		Unpause Docker container
+//	@Description	Unpause a specific Docker container by ID or name
+//	@Tags			Docker
+//	@Produce		json
+//	@Param			id	path		string	true	"Container ID or name"
+//	@Success		200	{object}	dto.Response	"Container unpaused"
+//	@Failure		400	{object}	dto.Response	"Invalid container ID"
+//	@Failure		500	{object}	dto.Response	"Failed to unpause container"
+//	@Router			/docker/{id}/unpause [post]
 func (s *Server) handleDockerUnpause(w http.ResponseWriter, r *http.Request) {
 	controller := controllers.NewDockerController()
 	s.handleDockerOperation(w, r, "unpaused", controller.Unpause)
 }
 
-// VM control handlers
+// handleVMStart godoc
+//
+//	@Summary		Start VM
+//	@Description	Start a specific virtual machine by name
+//	@Tags			VMs
+//	@Produce		json
+//	@Param			name	path		string	true	"VM name"
+//	@Success		200		{object}	dto.Response	"VM started"
+//	@Failure		400		{object}	dto.Response	"Invalid VM name"
+//	@Failure		500		{object}	dto.Response	"Failed to start VM"
+//	@Router			/vm/{name}/start [post]
 func (s *Server) handleVMStart(w http.ResponseWriter, r *http.Request) {
 	controller := controllers.NewVMController()
 	s.handleVMOperation(w, r, "started", controller.Start)
 }
 
+// handleVMStop godoc
+//
+//	@Summary		Stop VM
+//	@Description	Gracefully stop a specific virtual machine by name
+//	@Tags			VMs
+//	@Produce		json
+//	@Param			name	path		string	true	"VM name"
+//	@Success		200		{object}	dto.Response	"VM stopped"
+//	@Failure		400		{object}	dto.Response	"Invalid VM name"
+//	@Failure		500		{object}	dto.Response	"Failed to stop VM"
+//	@Router			/vm/{name}/stop [post]
 func (s *Server) handleVMStop(w http.ResponseWriter, r *http.Request) {
 	controller := controllers.NewVMController()
 	s.handleVMOperation(w, r, "stopped", controller.Stop)
 }
 
+// handleVMRestart godoc
+//
+//	@Summary		Restart VM
+//	@Description	Restart a specific virtual machine by name
+//	@Tags			VMs
+//	@Produce		json
+//	@Param			name	path		string	true	"VM name"
+//	@Success		200		{object}	dto.Response	"VM restarted"
+//	@Failure		400		{object}	dto.Response	"Invalid VM name"
+//	@Failure		500		{object}	dto.Response	"Failed to restart VM"
+//	@Router			/vm/{name}/restart [post]
 func (s *Server) handleVMRestart(w http.ResponseWriter, r *http.Request) {
 	controller := controllers.NewVMController()
 	s.handleVMOperation(w, r, "restarted", controller.Restart)
 }
 
+// handleVMPause godoc
+//
+//	@Summary		Pause VM
+//	@Description	Pause a specific virtual machine by name
+//	@Tags			VMs
+//	@Produce		json
+//	@Param			name	path		string	true	"VM name"
+//	@Success		200		{object}	dto.Response	"VM paused"
+//	@Failure		400		{object}	dto.Response	"Invalid VM name"
+//	@Failure		500		{object}	dto.Response	"Failed to pause VM"
+//	@Router			/vm/{name}/pause [post]
 func (s *Server) handleVMPause(w http.ResponseWriter, r *http.Request) {
 	controller := controllers.NewVMController()
 	s.handleVMOperation(w, r, "paused", controller.Pause)
 }
 
+// handleVMResume godoc
+//
+//	@Summary		Resume VM
+//	@Description	Resume a paused virtual machine by name
+//	@Tags			VMs
+//	@Produce		json
+//	@Param			name	path		string	true	"VM name"
+//	@Success		200		{object}	dto.Response	"VM resumed"
+//	@Failure		400		{object}	dto.Response	"Invalid VM name"
+//	@Failure		500		{object}	dto.Response	"Failed to resume VM"
+//	@Router			/vm/{name}/resume [post]
 func (s *Server) handleVMResume(w http.ResponseWriter, r *http.Request) {
 	controller := controllers.NewVMController()
 	s.handleVMOperation(w, r, "resumed", controller.Resume)
 }
 
+// handleVMHibernate godoc
+//
+//	@Summary		Hibernate VM
+//	@Description	Hibernate a specific virtual machine by name
+//	@Tags			VMs
+//	@Produce		json
+//	@Param			name	path		string	true	"VM name"
+//	@Success		200		{object}	dto.Response	"VM hibernated"
+//	@Failure		400		{object}	dto.Response	"Invalid VM name"
+//	@Failure		500		{object}	dto.Response	"Failed to hibernate VM"
+//	@Router			/vm/{name}/hibernate [post]
 func (s *Server) handleVMHibernate(w http.ResponseWriter, r *http.Request) {
 	controller := controllers.NewVMController()
 	s.handleVMOperation(w, r, "hibernated", controller.Hibernate)
 }
 
+// handleVMForceStop godoc
+//
+//	@Summary		Force stop VM
+//	@Description	Force stop a specific virtual machine by name (equivalent to pulling the power cord)
+//	@Tags			VMs
+//	@Produce		json
+//	@Param			name	path		string	true	"VM name"
+//	@Success		200		{object}	dto.Response	"VM force stopped"
+//	@Failure		400		{object}	dto.Response	"Invalid VM name"
+//	@Failure		500		{object}	dto.Response	"Failed to force stop VM"
+//	@Router			/vm/{name}/force-stop [post]
 func (s *Server) handleVMForceStop(w http.ResponseWriter, r *http.Request) {
 	controller := controllers.NewVMController()
 	s.handleVMOperation(w, r, "force stopped", controller.ForceStop)
 }
 
-// Array control handlers
+// handleArrayStart godoc
+//
+//	@Summary		Start array
+//	@Description	Start the Unraid array
+//	@Tags			Array
+//	@Produce		json
+//	@Success		200	{object}	dto.Response	"Array started"
+//	@Failure		500	{object}	dto.Response	"Failed to start array"
+//	@Router			/array/start [post]
 func (s *Server) handleArrayStart(w http.ResponseWriter, _ *http.Request) {
 	logger.Info("API: Starting array")
 
@@ -454,6 +732,15 @@ func (s *Server) handleArrayStart(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
+// handleArrayStop godoc
+//
+//	@Summary		Stop array
+//	@Description	Stop the Unraid array
+//	@Tags			Array
+//	@Produce		json
+//	@Success		200	{object}	dto.Response	"Array stopped"
+//	@Failure		500	{object}	dto.Response	"Failed to stop array"
+//	@Router			/array/stop [post]
 func (s *Server) handleArrayStop(w http.ResponseWriter, _ *http.Request) {
 	logger.Info("API: Stopping array")
 
@@ -477,6 +764,16 @@ func (s *Server) handleArrayStop(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
+// handleParityCheckStart godoc
+//
+//	@Summary		Start parity check
+//	@Description	Start a parity check operation, optionally with correction
+//	@Tags			Array
+//	@Produce		json
+//	@Param			correcting	query		boolean	false	"Enable correcting mode"
+//	@Success		200			{object}	dto.Response	"Parity check started"
+//	@Failure		500			{object}	dto.Response	"Failed to start parity check"
+//	@Router			/array/parity-check/start [post]
 func (s *Server) handleParityCheckStart(w http.ResponseWriter, r *http.Request) {
 	// Read optional 'correcting' parameter from query
 	correcting := r.URL.Query().Get("correcting") == "true"
@@ -502,6 +799,15 @@ func (s *Server) handleParityCheckStart(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
+// handleParityCheckStop godoc
+//
+//	@Summary		Stop parity check
+//	@Description	Stop an in-progress parity check operation
+//	@Tags			Array
+//	@Produce		json
+//	@Success		200	{object}	dto.Response	"Parity check stopped"
+//	@Failure		500	{object}	dto.Response	"Failed to stop parity check"
+//	@Router			/array/parity-check/stop [post]
 func (s *Server) handleParityCheckStop(w http.ResponseWriter, _ *http.Request) {
 	logger.Info("API: Stopping parity check")
 
@@ -525,6 +831,15 @@ func (s *Server) handleParityCheckStop(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
+// handleParityCheckPause godoc
+//
+//	@Summary		Pause parity check
+//	@Description	Pause an in-progress parity check operation
+//	@Tags			Array
+//	@Produce		json
+//	@Success		200	{object}	dto.Response	"Parity check paused"
+//	@Failure		500	{object}	dto.Response	"Failed to pause parity check"
+//	@Router			/array/parity-check/pause [post]
 func (s *Server) handleParityCheckPause(w http.ResponseWriter, _ *http.Request) {
 	logger.Info("API: Pausing parity check")
 
@@ -548,6 +863,15 @@ func (s *Server) handleParityCheckPause(w http.ResponseWriter, _ *http.Request) 
 	})
 }
 
+// handleParityCheckResume godoc
+//
+//	@Summary		Resume parity check
+//	@Description	Resume a paused parity check operation
+//	@Tags			Array
+//	@Produce		json
+//	@Success		200	{object}	dto.Response	"Parity check resumed"
+//	@Failure		500	{object}	dto.Response	"Failed to resume parity check"
+//	@Router			/array/parity-check/resume [post]
 func (s *Server) handleParityCheckResume(w http.ResponseWriter, _ *http.Request) {
 	logger.Info("API: Resuming parity check")
 
@@ -571,6 +895,15 @@ func (s *Server) handleParityCheckResume(w http.ResponseWriter, _ *http.Request)
 	})
 }
 
+// handleParityCheckHistory godoc
+//
+//	@Summary		Get parity check history
+//	@Description	Retrieve the history of parity check operations
+//	@Tags			Array
+//	@Produce		json
+//	@Success		200	{object}	dto.ParityCheckHistory	"Parity check history"
+//	@Failure		500	{object}	dto.Response		"Failed to get parity check history"
+//	@Router			/array/parity-check/history [get]
 func (s *Server) handleParityCheckHistory(w http.ResponseWriter, _ *http.Request) {
 	logger.Debug("API: Getting parity check history")
 
@@ -590,7 +923,17 @@ func (s *Server) handleParityCheckHistory(w http.ResponseWriter, _ *http.Request
 	respondJSON(w, http.StatusOK, history)
 }
 
-// Configuration handlers
+// handleShareConfig godoc
+//
+//	@Summary		Get share configuration
+//	@Description	Retrieve configuration for a specific user share
+//	@Tags			Configuration
+//	@Produce		json
+//	@Param			name	path		string	true	"Share name"
+//	@Success		200		{object}	dto.ShareConfig	"Share configuration"
+//	@Failure		400		{object}	dto.Response	"Invalid share name"
+//	@Failure		404		{object}	dto.Response	"Share not found"
+//	@Router			/shares/{name}/config [get]
 func (s *Server) handleShareConfig(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	shareName := vars["name"]
@@ -623,6 +966,16 @@ func (s *Server) handleShareConfig(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, config)
 }
 
+// handleNetworkConfig godoc
+//
+//	@Summary		Get network interface configuration
+//	@Description	Retrieve configuration for a specific network interface
+//	@Tags			Configuration
+//	@Produce		json
+//	@Param			interface	path		string	true	"Interface name (e.g., eth0, bond0)"
+//	@Success		200			{object}	dto.NetworkConfig	"Network configuration"
+//	@Failure		404			{object}	dto.Response		"Interface not found"
+//	@Router			/network/{interface}/config [get]
 func (s *Server) handleNetworkConfig(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	interfaceName := vars["interface"]
@@ -644,6 +997,15 @@ func (s *Server) handleNetworkConfig(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, config)
 }
 
+// handleSystemSettings godoc
+//
+//	@Summary		Get system settings
+//	@Description	Retrieve Unraid system settings
+//	@Tags			Configuration
+//	@Produce		json
+//	@Success		200	{object}	dto.SystemSettings	"System settings"
+//	@Failure		500	{object}	dto.Response		"Failed to get settings"
+//	@Router			/settings/system [get]
 func (s *Server) handleSystemSettings(w http.ResponseWriter, _ *http.Request) {
 	logger.Debug("API: Getting system settings")
 
@@ -663,6 +1025,15 @@ func (s *Server) handleSystemSettings(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, settings)
 }
 
+// handleDockerSettings godoc
+//
+//	@Summary		Get Docker settings
+//	@Description	Retrieve Docker daemon settings
+//	@Tags			Configuration
+//	@Produce		json
+//	@Success		200	{object}	dto.DockerSettings	"Docker settings"
+//	@Failure		500	{object}	dto.Response		"Failed to get settings"
+//	@Router			/settings/docker [get]
 func (s *Server) handleDockerSettings(w http.ResponseWriter, _ *http.Request) {
 	logger.Debug("API: Getting Docker settings")
 
@@ -682,6 +1053,15 @@ func (s *Server) handleDockerSettings(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, settings)
 }
 
+// handleVMSettings godoc
+//
+//	@Summary		Get VM settings
+//	@Description	Retrieve virtual machine manager settings
+//	@Tags			Configuration
+//	@Produce		json
+//	@Success		200	{object}	dto.VMSettings	"VM settings"
+//	@Failure		500	{object}	dto.Response	"Failed to get settings"
+//	@Router			/settings/vm [get]
 func (s *Server) handleVMSettings(w http.ResponseWriter, _ *http.Request) {
 	logger.Debug("API: Getting VM settings")
 
@@ -701,6 +1081,15 @@ func (s *Server) handleVMSettings(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, settings)
 }
 
+// handleDiskSettings godoc
+//
+//	@Summary		Get disk settings
+//	@Description	Retrieve disk configuration settings
+//	@Tags			Configuration
+//	@Produce		json
+//	@Success		200	{object}	dto.DiskSettings	"Disk settings"
+//	@Failure		500	{object}	dto.Response		"Failed to get settings"
+//	@Router			/settings/disks [get]
 func (s *Server) handleDiskSettings(w http.ResponseWriter, _ *http.Request) {
 	logger.Debug("API: Getting disk settings")
 
@@ -720,6 +1109,19 @@ func (s *Server) handleDiskSettings(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, settings)
 }
 
+// handleUpdateShareConfig godoc
+//
+//	@Summary		Update share configuration
+//	@Description	Update configuration for a specific user share
+//	@Tags			Configuration
+//	@Accept			json
+//	@Produce		json
+//	@Param			name	path		string			true	"Share name"
+//	@Param			config	body		dto.ShareConfig	true	"Share configuration"
+//	@Success		200		{object}	dto.Response	"Configuration updated"
+//	@Failure		400		{object}	dto.Response	"Invalid request"
+//	@Failure		500		{object}	dto.Response	"Failed to update"
+//	@Router			/shares/{name}/config [post]
 func (s *Server) handleUpdateShareConfig(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	shareName := vars["name"]
@@ -767,6 +1169,18 @@ func (s *Server) handleUpdateShareConfig(w http.ResponseWriter, r *http.Request)
 	})
 }
 
+// handleUpdateSystemSettings godoc
+//
+//	@Summary		Update system settings
+//	@Description	Update Unraid system settings
+//	@Tags			Configuration
+//	@Accept			json
+//	@Produce		json
+//	@Param			settings	body		dto.SystemSettings	true	"System settings"
+//	@Success		200			{object}	dto.Response		"Settings updated"
+//	@Failure		400			{object}	dto.Response		"Invalid request"
+//	@Failure		500			{object}	dto.Response		"Failed to update"
+//	@Router			/settings/system [post]
 func (s *Server) handleUpdateSystemSettings(w http.ResponseWriter, r *http.Request) {
 	logger.Info("API: Updating system settings")
 
@@ -798,7 +1212,15 @@ func (s *Server) handleUpdateSystemSettings(w http.ResponseWriter, r *http.Reque
 	})
 }
 
-// handleUserScripts returns a list of all available user scripts
+// handleUserScripts godoc
+//
+//	@Summary		Get user scripts
+//	@Description	Retrieve a list of all available user scripts
+//	@Tags			User Scripts
+//	@Produce		json
+//	@Success		200	{array}		dto.UserScriptInfo	"List of user scripts"
+//	@Failure		500	{object}	dto.Response	"Failed to list scripts"
+//	@Router			/user-scripts [get]
 func (s *Server) handleUserScripts(w http.ResponseWriter, _ *http.Request) {
 	scripts, err := controllers.ListUserScripts()
 	if err != nil {
@@ -814,7 +1236,18 @@ func (s *Server) handleUserScripts(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, scripts)
 }
 
-// handleUserScriptExecute executes a user script
+// handleUserScriptExecute godoc
+//
+//	@Summary		Execute user script
+//	@Description	Execute a user script by name
+//	@Tags			User Scripts
+//	@Accept			json
+//	@Produce		json
+//	@Param			name	path		string							true	"Script name"
+//	@Param			options	body		dto.UserScriptExecuteRequest	false	"Execution options"
+//	@Success		200		{object}	dto.UserScriptExecuteResponse	"Execution result"
+//	@Failure		500		{object}	dto.UserScriptExecuteResponse	"Failed to execute"
+//	@Router			/user-scripts/{name}/execute [post]
 func (s *Server) handleUserScriptExecute(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	scriptName := vars["name"]
@@ -838,8 +1271,14 @@ func (s *Server) handleUserScriptExecute(w http.ResponseWriter, r *http.Request)
 	respondJSON(w, http.StatusOK, response)
 }
 
-// Hardware endpoints
-
+// handleHardwareFull godoc
+//
+//	@Summary		Get full hardware information
+//	@Description	Retrieve complete hardware information including BIOS, CPU, and memory
+//	@Tags			Hardware
+//	@Produce		json
+//	@Success		200	{object}	dto.HardwareInfo	"Hardware information"
+//	@Router			/hardware/full [get]
 func (s *Server) handleHardwareFull(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	hardware := s.hardwareCache
@@ -854,6 +1293,15 @@ func (s *Server) handleHardwareFull(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, hardware)
 }
 
+// handleHardwareBIOS godoc
+//
+//	@Summary		Get BIOS information
+//	@Description	Retrieve BIOS information from DMI data
+//	@Tags			Hardware
+//	@Produce		json
+//	@Success		200	{object}	dto.BIOSInfo		"BIOS information"
+//	@Failure		404	{object}	map[string]string	"BIOS info not available"
+//	@Router			/hardware/bios [get]
 func (s *Server) handleHardwareBIOS(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	hardware := s.hardwareCache
@@ -867,6 +1315,15 @@ func (s *Server) handleHardwareBIOS(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, hardware.BIOS)
 }
 
+// handleHardwareBaseboard godoc
+//
+//	@Summary		Get baseboard information
+//	@Description	Retrieve motherboard/baseboard information from DMI data
+//	@Tags			Hardware
+//	@Produce		json
+//	@Success		200	{object}	dto.BaseboardInfo	"Baseboard information"
+//	@Failure		404	{object}	map[string]string	"Baseboard info not available"
+//	@Router			/hardware/baseboard [get]
 func (s *Server) handleHardwareBaseboard(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	hardware := s.hardwareCache
@@ -880,6 +1337,15 @@ func (s *Server) handleHardwareBaseboard(w http.ResponseWriter, _ *http.Request)
 	respondJSON(w, http.StatusOK, hardware.Baseboard)
 }
 
+// handleHardwareCPU godoc
+//
+//	@Summary		Get CPU hardware information
+//	@Description	Retrieve CPU hardware information from DMI data
+//	@Tags			Hardware
+//	@Produce		json
+//	@Success		200	{object}	dto.CPUHardwareInfo		"CPU information"
+//	@Failure		404	{object}	map[string]string	"CPU info not available"
+//	@Router			/hardware/cpu [get]
 func (s *Server) handleHardwareCPU(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	hardware := s.hardwareCache
@@ -893,6 +1359,15 @@ func (s *Server) handleHardwareCPU(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, hardware.CPU)
 }
 
+// handleHardwareCache godoc
+//
+//	@Summary		Get CPU cache information
+//	@Description	Retrieve CPU cache hierarchy information from DMI data
+//	@Tags			Hardware
+//	@Produce		json
+//	@Success		200	{array}		dto.CPUCacheInfo		"CPU cache information"
+//	@Failure		404	{object}	map[string]string	"Cache info not available"
+//	@Router			/hardware/cache [get]
 func (s *Server) handleHardwareCache(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	hardware := s.hardwareCache
@@ -906,6 +1381,15 @@ func (s *Server) handleHardwareCache(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, hardware.Cache)
 }
 
+// handleHardwareMemoryArray godoc
+//
+//	@Summary		Get memory array information
+//	@Description	Retrieve physical memory array information from DMI data
+//	@Tags			Hardware
+//	@Produce		json
+//	@Success		200	{object}	dto.MemoryArrayInfo	"Memory array information"
+//	@Failure		404	{object}	map[string]string	"Memory array info not available"
+//	@Router			/hardware/memory-array [get]
 func (s *Server) handleHardwareMemoryArray(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	hardware := s.hardwareCache
@@ -919,6 +1403,15 @@ func (s *Server) handleHardwareMemoryArray(w http.ResponseWriter, _ *http.Reques
 	respondJSON(w, http.StatusOK, hardware.MemoryArray)
 }
 
+// handleHardwareMemoryDevices godoc
+//
+//	@Summary		Get memory device information
+//	@Description	Retrieve individual memory device (DIMM) information from DMI data
+//	@Tags			Hardware
+//	@Produce		json
+//	@Success		200	{array}		dto.MemoryDeviceInfo	"Memory device information"
+//	@Failure		404	{object}	map[string]string		"Memory device info not available"
+//	@Router			/hardware/memory-devices [get]
 func (s *Server) handleHardwareMemoryDevices(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	hardware := s.hardwareCache
@@ -932,6 +1425,14 @@ func (s *Server) handleHardwareMemoryDevices(w http.ResponseWriter, _ *http.Requ
 	respondJSON(w, http.StatusOK, hardware.MemoryDevices)
 }
 
+// handleRegistration godoc
+//
+//	@Summary		Get registration status
+//	@Description	Retrieve Unraid license/registration information
+//	@Tags			System
+//	@Produce		json
+//	@Success		200	{object}	dto.Registration	"Registration information"
+//	@Router			/registration [get]
 func (s *Server) handleRegistration(w http.ResponseWriter, _ *http.Request) {
 	logger.Debug("API: Getting registration information")
 
@@ -950,6 +1451,18 @@ func (s *Server) handleRegistration(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, registration)
 }
 
+// handleLogs godoc
+//
+//	@Summary		Get logs
+//	@Description	List available log files or get log content with optional pagination
+//	@Tags			Logs
+//	@Produce		json
+//	@Param			path	query		string	false	"Log file path (if empty, lists all logs)"
+//	@Param			lines	query		integer	false	"Number of lines to return"
+//	@Param			start	query		integer	false	"Starting line number"
+//	@Success		200		{object}	dto.LogFileContent	"Log content or list"
+//	@Failure		500		{object}	map[string]string	"Error reading logs"
+//	@Router			/logs [get]
 func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
 	logger.Debug("API: Getting logs")
 
@@ -975,8 +1488,20 @@ func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, content)
 }
 
-// handleLogFile retrieves a specific log file by filename
-// This provides a cleaner REST endpoint for accessing known log files
+// handleLogFile godoc
+//
+//	@Summary		Get specific log file
+//	@Description	Retrieve a specific log file by filename with optional pagination
+//	@Tags			Logs
+//	@Produce		json
+//	@Param			filename	path		string	true	"Log filename"
+//	@Param			lines		query		integer	false	"Number of lines to return"
+//	@Param			start		query		integer	false	"Starting line number"
+//	@Success		200			{object}	dto.LogFileContent	"Log content"
+//	@Failure		400			{object}	dto.Response	"Invalid filename"
+//	@Failure		404			{object}	dto.Response	"Log file not found"
+//	@Failure		500			{object}	dto.Response	"Error reading log"
+//	@Router			/logs/{filename} [get]
 func (s *Server) handleLogFile(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	filename := vars["filename"]
@@ -1044,7 +1569,15 @@ func respondWithError(w http.ResponseWriter, status int, message string) {
 	respondJSON(w, status, map[string]string{"error": message})
 }
 
-// handleNotifications returns all notifications with overview
+// handleNotifications godoc
+//
+//	@Summary		Get all notifications
+//	@Description	Retrieve all notifications with overview counts, optionally filtered by importance
+//	@Tags			Notifications
+//	@Produce		json
+//	@Param			importance	query		string	false	"Filter by importance level (alert, warning, normal)"
+//	@Success		200			{object}	dto.NotificationList	"Notifications with overview"
+//	@Router			/notifications [get]
 func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
 	s.cacheMutex.RLock()
 	notificationList := s.notificationsCache
@@ -1076,7 +1609,14 @@ func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, notificationList)
 }
 
-// handleNotificationsUnread returns only unread notifications
+// handleNotificationsUnread godoc
+//
+//	@Summary		Get unread notifications
+//	@Description	Retrieve only unread notifications
+//	@Tags			Notifications
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}	"Unread notifications with count"
+//	@Router			/notifications/unread [get]
 func (s *Server) handleNotificationsUnread(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	notificationList := s.notificationsCache
@@ -1103,7 +1643,14 @@ func (s *Server) handleNotificationsUnread(w http.ResponseWriter, _ *http.Reques
 	})
 }
 
-// handleNotificationsArchive returns only archived notifications
+// handleNotificationsArchive godoc
+//
+//	@Summary		Get archived notifications
+//	@Description	Retrieve only archived notifications
+//	@Tags			Notifications
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}	"Archived notifications with count"
+//	@Router			/notifications/archive [get]
 func (s *Server) handleNotificationsArchive(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	notificationList := s.notificationsCache
@@ -1130,7 +1677,14 @@ func (s *Server) handleNotificationsArchive(w http.ResponseWriter, _ *http.Reque
 	})
 }
 
-// handleNotificationsOverview returns only the overview counts
+// handleNotificationsOverview godoc
+//
+//	@Summary		Get notification counts
+//	@Description	Retrieve only the notification overview counts
+//	@Tags			Notifications
+//	@Produce		json
+//	@Success		200	{object}	dto.NotificationOverview	"Notification counts by category"
+//	@Router			/notifications/overview [get]
 func (s *Server) handleNotificationsOverview(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	notificationList := s.notificationsCache
@@ -1147,7 +1701,16 @@ func (s *Server) handleNotificationsOverview(w http.ResponseWriter, _ *http.Requ
 	respondJSON(w, http.StatusOK, notificationList.Overview)
 }
 
-// handleNotificationByID returns a specific notification by ID
+// handleNotificationByID godoc
+//
+//	@Summary		Get notification by ID
+//	@Description	Retrieve a specific notification by its ID
+//	@Tags			Notifications
+//	@Produce		json
+//	@Param			id	path		string	true	"Notification ID"
+//	@Success		200	{object}	dto.Notification	"Notification details"
+//	@Failure		404	{object}	map[string]string	"Notification not found"
+//	@Router			/notifications/{id} [get]
 func (s *Server) handleNotificationByID(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
@@ -1171,7 +1734,18 @@ func (s *Server) handleNotificationByID(w http.ResponseWriter, r *http.Request) 
 	respondWithError(w, http.StatusNotFound, "Notification not found")
 }
 
-// handleCreateNotification creates a new notification
+// handleCreateNotification godoc
+//
+//	@Summary		Create notification
+//	@Description	Create a new system notification
+//	@Tags			Notifications
+//	@Accept			json
+//	@Produce		json
+//	@Param			notification	body		object{title=string,subject=string,description=string,importance=string,link=string}	true	"Notification data"
+//	@Success		201				{object}	map[string]string	"Notification created"
+//	@Failure		400				{object}	map[string]string	"Invalid request"
+//	@Failure		500				{object}	map[string]string	"Failed to create notification"
+//	@Router			/notifications [post]
 func (s *Server) handleCreateNotification(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Title       string `json:"title"`
@@ -1203,7 +1777,16 @@ func (s *Server) handleCreateNotification(w http.ResponseWriter, r *http.Request
 	respondJSON(w, http.StatusCreated, map[string]string{"message": "Notification created successfully"})
 }
 
-// handleArchiveNotification archives a specific notification
+// handleArchiveNotification godoc
+//
+//	@Summary		Archive notification
+//	@Description	Archive a specific notification by ID
+//	@Tags			Notifications
+//	@Produce		json
+//	@Param			id	path		string	true	"Notification ID"
+//	@Success		200	{object}	map[string]string	"Notification archived"
+//	@Failure		500	{object}	map[string]string	"Failed to archive"
+//	@Router			/notifications/{id}/archive [post]
 func (s *Server) handleArchiveNotification(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
@@ -1216,7 +1799,16 @@ func (s *Server) handleArchiveNotification(w http.ResponseWriter, r *http.Reques
 	respondJSON(w, http.StatusOK, map[string]string{"message": "Notification archived successfully"})
 }
 
-// handleUnarchiveNotification unarchives a specific notification
+// handleUnarchiveNotification godoc
+//
+//	@Summary		Unarchive notification
+//	@Description	Unarchive a specific notification by ID
+//	@Tags			Notifications
+//	@Produce		json
+//	@Param			id	path		string	true	"Notification ID"
+//	@Success		200	{object}	map[string]string	"Notification unarchived"
+//	@Failure		500	{object}	map[string]string	"Failed to unarchive"
+//	@Router			/notifications/{id}/unarchive [post]
 func (s *Server) handleUnarchiveNotification(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
@@ -1229,7 +1821,17 @@ func (s *Server) handleUnarchiveNotification(w http.ResponseWriter, r *http.Requ
 	respondJSON(w, http.StatusOK, map[string]string{"message": "Notification unarchived successfully"})
 }
 
-// handleDeleteNotification deletes a specific notification
+// handleDeleteNotification godoc
+//
+//	@Summary		Delete notification
+//	@Description	Delete a specific notification by ID
+//	@Tags			Notifications
+//	@Produce		json
+//	@Param			id			path		string	true	"Notification ID"
+//	@Param			archived	query		boolean	false	"Whether notification is archived"
+//	@Success		200			{object}	map[string]string	"Notification deleted"
+//	@Failure		500			{object}	map[string]string	"Failed to delete"
+//	@Router			/notifications/{id} [delete]
 func (s *Server) handleDeleteNotification(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
@@ -1245,7 +1847,15 @@ func (s *Server) handleDeleteNotification(w http.ResponseWriter, r *http.Request
 	respondJSON(w, http.StatusOK, map[string]string{"message": "Notification deleted successfully"})
 }
 
-// handleArchiveAllNotifications archives all unread notifications
+// handleArchiveAllNotifications godoc
+//
+//	@Summary		Archive all notifications
+//	@Description	Archive all unread notifications
+//	@Tags			Notifications
+//	@Produce		json
+//	@Success		200	{object}	map[string]string	"All notifications archived"
+//	@Failure		500	{object}	map[string]string	"Failed to archive"
+//	@Router			/notifications/archive/all [post]
 func (s *Server) handleArchiveAllNotifications(w http.ResponseWriter, _ *http.Request) {
 	if err := controllers.ArchiveAllNotifications(); err != nil {
 		respondWithError(w, http.StatusInternalServerError, err.Error())
@@ -1255,7 +1865,14 @@ func (s *Server) handleArchiveAllNotifications(w http.ResponseWriter, _ *http.Re
 	respondJSON(w, http.StatusOK, map[string]string{"message": "All notifications archived successfully"})
 }
 
-// handleUnassignedDevices returns all unassigned devices and remote shares
+// handleUnassignedDevices godoc
+//
+//	@Summary		Get all unassigned devices
+//	@Description	Retrieve all unassigned devices and remote shares
+//	@Tags			Unassigned Devices
+//	@Produce		json
+//	@Success		200	{object}	dto.UnassignedDeviceList	"Unassigned devices and remote shares"
+//	@Router			/unassigned [get]
 func (s *Server) handleUnassignedDevices(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	defer s.cacheMutex.RUnlock()
@@ -1272,7 +1889,14 @@ func (s *Server) handleUnassignedDevices(w http.ResponseWriter, _ *http.Request)
 	respondJSON(w, http.StatusOK, s.unassignedCache)
 }
 
-// handleUnassignedDevicesList returns only unassigned devices (no remote shares)
+// handleUnassignedDevicesList godoc
+//
+//	@Summary		Get unassigned devices only
+//	@Description	Retrieve only unassigned devices (excludes remote shares)
+//	@Tags			Unassigned Devices
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}	"Unassigned devices"
+//	@Router			/unassigned/devices [get]
 func (s *Server) handleUnassignedDevicesList(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	defer s.cacheMutex.RUnlock()
@@ -1291,7 +1915,14 @@ func (s *Server) handleUnassignedDevicesList(w http.ResponseWriter, _ *http.Requ
 	})
 }
 
-// handleUnassignedRemoteShares returns only remote shares (no devices)
+// handleUnassignedRemoteShares godoc
+//
+//	@Summary		Get remote shares only
+//	@Description	Retrieve only remote shares (excludes local unassigned devices)
+//	@Tags			Unassigned Devices
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}	"Remote shares"
+//	@Router			/unassigned/remote-shares [get]
 func (s *Server) handleUnassignedRemoteShares(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	defer s.cacheMutex.RUnlock()
@@ -1314,7 +1945,14 @@ func (s *Server) handleUnassignedRemoteShares(w http.ResponseWriter, _ *http.Req
 // ZFS Handlers
 // ============================================================================
 
-// handleZFSPools returns all ZFS pools
+// handleZFSPools godoc
+//
+//	@Summary		Get all ZFS pools
+//	@Description	Retrieve information about all ZFS pools
+//	@Tags			ZFS
+//	@Produce		json
+//	@Success		200	{array}	dto.ZFSPool	"List of ZFS pools"
+//	@Router			/zfs/pools [get]
 func (s *Server) handleZFSPools(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	pools := s.zfsPoolsCache
@@ -1327,7 +1965,16 @@ func (s *Server) handleZFSPools(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, pools)
 }
 
-// handleZFSPool returns a specific ZFS pool by name
+// handleZFSPool godoc
+//
+//	@Summary		Get specific ZFS pool
+//	@Description	Retrieve information about a specific ZFS pool by name
+//	@Tags			ZFS
+//	@Produce		json
+//	@Param			name	path		string	true	"Pool name"
+//	@Success		200		{object}	dto.ZFSPool		"ZFS pool information"
+//	@Failure		404		{object}	dto.Response	"Pool not found"
+//	@Router			/zfs/pools/{name} [get]
 func (s *Server) handleZFSPool(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	poolName := vars["name"]
@@ -1352,7 +1999,14 @@ func (s *Server) handleZFSPool(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleZFSDatasets returns all ZFS datasets
+// handleZFSDatasets godoc
+//
+//	@Summary		Get all ZFS datasets
+//	@Description	Retrieve information about all ZFS datasets
+//	@Tags			ZFS
+//	@Produce		json
+//	@Success		200	{array}	dto.ZFSDataset	"List of ZFS datasets"
+//	@Router			/zfs/datasets [get]
 func (s *Server) handleZFSDatasets(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	datasets := s.zfsDatasetsCache
@@ -1365,7 +2019,14 @@ func (s *Server) handleZFSDatasets(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, datasets)
 }
 
-// handleZFSSnapshots returns all ZFS snapshots
+// handleZFSSnapshots godoc
+//
+//	@Summary		Get all ZFS snapshots
+//	@Description	Retrieve information about all ZFS snapshots
+//	@Tags			ZFS
+//	@Produce		json
+//	@Success		200	{array}	dto.ZFSSnapshot	"List of ZFS snapshots"
+//	@Router			/zfs/snapshots [get]
 func (s *Server) handleZFSSnapshots(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	snapshots := s.zfsSnapshotsCache
@@ -1378,7 +2039,14 @@ func (s *Server) handleZFSSnapshots(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, snapshots)
 }
 
-// handleZFSARC returns ZFS ARC statistics
+// handleZFSARC godoc
+//
+//	@Summary		Get ZFS ARC statistics
+//	@Description	Retrieve ZFS Adaptive Replacement Cache (ARC) statistics
+//	@Tags			ZFS
+//	@Produce		json
+//	@Success		200	{object}	dto.ZFSARCStats	"ZFS ARC statistics"
+//	@Router			/zfs/arc [get]
 func (s *Server) handleZFSARC(w http.ResponseWriter, _ *http.Request) {
 	s.cacheMutex.RLock()
 	arcStats := s.zfsARCStatsCache
@@ -1393,7 +2061,14 @@ func (s *Server) handleZFSARC(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, arcStats)
 }
 
-// handleCollectorsStatus returns the status of all collectors including enabled/disabled state
+// handleCollectorsStatus godoc
+//
+//	@Summary		Get all collectors status
+//	@Description	Retrieve status of all data collectors including enabled state and intervals
+//	@Tags			Collectors
+//	@Produce		json
+//	@Success		200	{object}	dto.CollectorsStatusResponse	"Collectors status"
+//	@Router			/collectors/status [get]
 func (s *Server) handleCollectorsStatus(w http.ResponseWriter, _ *http.Request) {
 	// If we have a collector manager, use it for real-time status
 	if s.collectorManager != nil {
@@ -1457,7 +2132,17 @@ func (s *Server) handleCollectorsStatus(w http.ResponseWriter, _ *http.Request) 
 	})
 }
 
-// handleCollectorStatus returns the status of a specific collector
+// handleCollectorStatus godoc
+//
+//	@Summary		Get specific collector status
+//	@Description	Retrieve status of a specific collector by name
+//	@Tags			Collectors
+//	@Produce		json
+//	@Param			name	path		string	true	"Collector name (e.g., system, docker, vm)"
+//	@Success		200		{object}	dto.CollectorResponse	"Collector status"
+//	@Failure		404		{object}	dto.Response			"Collector not found"
+//	@Failure		503		{object}	dto.Response			"Collector management not available"
+//	@Router			/collectors/{name} [get]
 func (s *Server) handleCollectorStatus(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	name := vars["name"]
@@ -1489,7 +2174,18 @@ func (s *Server) handleCollectorStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleCollectorEnable enables a collector at runtime
+// handleCollectorEnable godoc
+//
+//	@Summary		Enable collector
+//	@Description	Enable a specific collector at runtime
+//	@Tags			Collectors
+//	@Produce		json
+//	@Param			name	path		string	true	"Collector name"
+//	@Success		200		{object}	dto.CollectorResponse	"Collector enabled"
+//	@Failure		400		{object}	dto.Response			"Invalid request"
+//	@Failure		404		{object}	dto.Response			"Collector not found"
+//	@Failure		503		{object}	dto.Response			"Collector management not available"
+//	@Router			/collectors/{name}/enable [post]
 func (s *Server) handleCollectorEnable(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	name := vars["name"]
@@ -1527,7 +2223,18 @@ func (s *Server) handleCollectorEnable(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleCollectorDisable disables a collector at runtime
+// handleCollectorDisable godoc
+//
+//	@Summary		Disable collector
+//	@Description	Disable a specific collector at runtime
+//	@Tags			Collectors
+//	@Produce		json
+//	@Param			name	path		string	true	"Collector name"
+//	@Success		200		{object}	dto.CollectorResponse	"Collector disabled"
+//	@Failure		400		{object}	dto.Response			"Invalid request"
+//	@Failure		404		{object}	dto.Response			"Collector not found"
+//	@Failure		503		{object}	dto.Response			"Collector management not available"
+//	@Router			/collectors/{name}/disable [post]
 func (s *Server) handleCollectorDisable(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	name := vars["name"]
@@ -1565,7 +2272,20 @@ func (s *Server) handleCollectorDisable(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
-// handleCollectorInterval updates the interval for a collector
+// handleCollectorInterval godoc
+//
+//	@Summary		Update collector interval
+//	@Description	Update the collection interval for a specific collector
+//	@Tags			Collectors
+//	@Accept			json
+//	@Produce		json
+//	@Param			name		path		string							true	"Collector name"
+//	@Param			interval	body		dto.CollectorIntervalRequest	true	"New interval in seconds"
+//	@Success		200			{object}	dto.CollectorResponse			"Interval updated"
+//	@Failure		400			{object}	dto.Response					"Invalid request"
+//	@Failure		404			{object}	dto.Response					"Collector not found"
+//	@Failure		503			{object}	dto.Response					"Collector management not available"
+//	@Router			/collectors/{name}/interval [patch]
 func (s *Server) handleCollectorInterval(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	name := vars["name"]

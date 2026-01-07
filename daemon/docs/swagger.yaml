@@ -1,0 +1,3637 @@
+basePath: /api/v1
+definitions:
+  dto.AccessURL:
+    properties:
+      ipv4:
+        type: string
+      ipv6:
+        type: string
+      name:
+        type: string
+      type:
+        description: '"lan", "wan", "wireguard", "mdns", "ipv6", "other"'
+        type: string
+    type: object
+  dto.ArrayStatus:
+    properties:
+      free_bytes:
+        example: 54975581388800
+        type: integer
+      num_data_disks:
+        example: 8
+        type: integer
+      num_disks:
+        example: 10
+        type: integer
+      num_parity_disks:
+        example: 2
+        type: integer
+      parity_check_progress:
+        example: 0
+        type: number
+      parity_check_status:
+        example: idle
+        type: string
+      parity_valid:
+        example: true
+        type: boolean
+      state:
+        example: Started
+        type: string
+      timestamp:
+        type: string
+      total_bytes:
+        example: 100862164623360
+        type: integer
+      used_percent:
+        example: 45.5
+        type: number
+    type: object
+  dto.BIOSInfo:
+    properties:
+      address:
+        example: "0xF0000"
+        type: string
+      characteristics:
+        items:
+          type: string
+        type: array
+      release_date:
+        example: 12/25/2023
+        type: string
+      revision:
+        example: "5.14"
+        type: string
+      rom_size:
+        example: 16 MB
+        type: string
+      runtime_size:
+        example: 64 KB
+        type: string
+      vendor:
+        example: American Megatrends International, LLC.
+        type: string
+      version:
+        example: "1.4"
+        type: string
+    type: object
+  dto.BaseboardInfo:
+    properties:
+      asset_tag:
+        example: To be filled by O.E.M.
+        type: string
+      features:
+        items:
+          type: string
+        type: array
+      location_in_chassis:
+        example: Default string
+        type: string
+      manufacturer:
+        example: Supermicro
+        type: string
+      product_name:
+        example: X11SCL-F
+        type: string
+      serial_number:
+        example: OM123456789
+        type: string
+      type:
+        example: Motherboard
+        type: string
+      version:
+        example: "1.02"
+        type: string
+    type: object
+  dto.CPUCacheInfo:
+    properties:
+      associativity:
+        type: string
+      configuration:
+        type: string
+      error_correction_type:
+        type: string
+      installed_size:
+        type: string
+      installed_sram_type:
+        type: string
+      level:
+        type: integer
+      location:
+        type: string
+      maximum_size:
+        type: string
+      operational_mode:
+        type: string
+      socket_designation:
+        type: string
+      supported_sram_types:
+        items:
+          type: string
+        type: array
+      system_type:
+        type: string
+    type: object
+  dto.CPUHardwareInfo:
+    properties:
+      asset_tag:
+        example: To Be Filled By O.E.M.
+        type: string
+      characteristics:
+        items:
+          type: string
+        type: array
+      core_enabled:
+        example: 8
+        type: integer
+      current_speed_mhz:
+        example: 3600
+        type: integer
+      external_clock_mhz:
+        example: 100
+        type: integer
+      family:
+        example: Core i7
+        type: string
+      flags:
+        items:
+          type: string
+        type: array
+      manufacturer:
+        example: Intel(R) Corporation
+        type: string
+      max_speed_mhz:
+        example: 4900
+        type: integer
+      part_number:
+        example: To Be Filled By O.E.M.
+        type: string
+      serial_number:
+        example: To Be Filled By O.E.M.
+        type: string
+      signature:
+        example: Type 0, Family 6, Model 158, Stepping 10
+        type: string
+      socket_designation:
+        example: CPU 1
+        type: string
+      status:
+        example: Populated, Enabled
+        type: string
+      thread_count:
+        example: 8
+        type: integer
+      upgrade:
+        example: Socket LGA1151
+        type: string
+      voltage:
+        example: 1.0 V
+        type: string
+    type: object
+  dto.CollectorIntervalRequest:
+    properties:
+      interval:
+        description: seconds
+        type: integer
+    type: object
+  dto.CollectorResponse:
+    properties:
+      collector:
+        $ref: '#/definitions/dto.CollectorStatus'
+      message:
+        type: string
+      success:
+        type: boolean
+      timestamp:
+        type: string
+    type: object
+  dto.CollectorStatus:
+    properties:
+      enabled:
+        type: boolean
+      error_count:
+        type: integer
+      interval_seconds:
+        description: 0 if disabled
+        type: integer
+      last_run:
+        type: string
+      name:
+        type: string
+      required:
+        description: true if collector cannot be disabled
+        type: boolean
+      status:
+        description: '"running", "stopped", "disabled", "registered"'
+        type: string
+    type: object
+  dto.CollectorsStatusResponse:
+    properties:
+      collectors:
+        items:
+          $ref: '#/definitions/dto.CollectorStatus'
+        type: array
+      disabled_count:
+        type: integer
+      enabled_count:
+        type: integer
+      timestamp:
+        type: string
+      total:
+        type: integer
+    type: object
+  dto.ContainerInfo:
+    properties:
+      cpu_percent:
+        example: 5.2
+        type: number
+      id:
+        example: abc123def456
+        type: string
+      image:
+        example: plexinc/pms-docker:latest
+        type: string
+      ip_address:
+        example: 172.17.0.2
+        type: string
+      memory_display:
+        example: 1 GiB / 8 GiB
+        type: string
+      memory_limit_bytes:
+        example: 8589934592
+        type: integer
+      memory_usage_bytes:
+        example: 1073741824
+        type: integer
+      name:
+        example: plex
+        type: string
+      network_mode:
+        example: bridge
+        type: string
+      network_rx_bytes:
+        example: 104857600
+        type: integer
+      network_tx_bytes:
+        example: 52428800
+        type: integer
+      port_mappings:
+        items:
+          type: string
+        type: array
+      ports:
+        items:
+          $ref: '#/definitions/dto.PortMapping'
+        type: array
+      restart_policy:
+        example: unless-stopped
+        type: string
+      state:
+        example: running
+        type: string
+      status:
+        example: Up 2 days
+        type: string
+      timestamp:
+        type: string
+      uptime:
+        example: 2 days
+        type: string
+      version:
+        example: 1.40.1
+        type: string
+      volume_mappings:
+        items:
+          $ref: '#/definitions/dto.VolumeMapping'
+        type: array
+    type: object
+  dto.DiskInfo:
+    properties:
+      device:
+        example: sda
+        type: string
+      filesystem:
+        example: xfs
+        type: string
+      free_bytes:
+        example: 6600076243764
+        type: integer
+      id:
+        example: disk1
+        type: string
+      io_utilization_percent:
+        example: 5.2
+        type: number
+      model:
+        example: WDC WD120EFBX-68B0EN0
+        type: string
+      mount_point:
+        description: Mount information
+        example: /mnt/disk1
+        type: string
+      name:
+        example: Disk 1
+        type: string
+      power_cycle_count:
+        example: 100
+        type: integer
+      power_on_hours:
+        example: 25000
+        type: integer
+      read_bytes:
+        description: I/O Statistics
+        example: 1073741824
+        type: integer
+      read_ops:
+        example: 100000
+        type: integer
+      role:
+        description: '"parity", "parity2", "data", "cache", "pool"'
+        example: data
+        type: string
+      serial_number:
+        description: Disk identification
+        example: WD-WMC4N0123456
+        type: string
+      size_bytes:
+        example: 12000138625024
+        type: integer
+      smart_attributes:
+        additionalProperties:
+          $ref: '#/definitions/dto.SMARTAttribute'
+        description: Enhanced SMART attributes
+        type: object
+      smart_errors:
+        example: 0
+        type: integer
+      smart_status:
+        example: PASSED
+        type: string
+      spin_state:
+        description: '"active", "standby", "unknown"'
+        example: active
+        type: string
+      spindown_delay:
+        example: 30
+        type: integer
+      status:
+        example: OK
+        type: string
+      temperature_celsius:
+        example: 35
+        type: number
+      timestamp:
+        type: string
+      usage_percent:
+        example: 45
+        type: number
+      used_bytes:
+        example: 5400062381260
+        type: integer
+      write_bytes:
+        example: 536870912
+        type: integer
+      write_ops:
+        example: 50000
+        type: integer
+    type: object
+  dto.DiskSettings:
+    properties:
+      default_filesystem:
+        description: Default filesystem type (xfs, btrfs, etc.)
+        type: string
+      shutdown_timeout_seconds:
+        description: Shutdown timeout in seconds
+        type: integer
+      spindown_delay_minutes:
+        description: Default spin down delay in minutes
+        type: integer
+      spinup_groups:
+        description: Enable spinup groups
+        type: boolean
+      start_array:
+        description: Auto start array on boot
+        type: boolean
+      timestamp:
+        type: string
+    type: object
+  dto.DockerSettings:
+    properties:
+      custom_networks:
+        items:
+          type: string
+        type: array
+      default_network:
+        type: string
+      enabled:
+        type: boolean
+      image_path:
+        type: string
+      timestamp:
+        type: string
+    type: object
+  dto.FanInfo:
+    properties:
+      name:
+        example: CPU Fan
+        type: string
+      rpm:
+        example: 1200
+        type: integer
+    type: object
+  dto.GPUMetrics:
+    properties:
+      available:
+        example: true
+        type: boolean
+      cpu_temperature_celsius:
+        description: CPU temp for Intel iGPUs (shares die with CPU)
+        example: 45
+        type: number
+      driver_version:
+        example: 535.183.01
+        type: string
+      fan_max_rpm:
+        description: Max fan RPM (AMD discrete)
+        example: 3000
+        type: integer
+      fan_rpm:
+        description: Fan RPM (AMD discrete)
+        example: 2000
+        type: integer
+      fan_speed_percent:
+        description: Fan speed % (NVIDIA)
+        example: 65
+        type: number
+      index:
+        description: GPU index for multi-GPU systems
+        example: 0
+        type: integer
+      memory_total_bytes:
+        example: 10737418240
+        type: integer
+      memory_used_bytes:
+        example: 6442450944
+        type: integer
+      name:
+        example: NVIDIA GeForce RTX 3080
+        type: string
+      pci_id:
+        description: PCI bus ID (e.g., "0000:01:00.0")
+        example: "0000:01:00.0"
+        type: string
+      power_draw_watts:
+        example: 250.5
+        type: number
+      temperature_celsius:
+        example: 55
+        type: number
+      timestamp:
+        type: string
+      utilization_gpu_percent:
+        example: 75.5
+        type: number
+      utilization_memory_percent:
+        example: 60.2
+        type: number
+      uuid:
+        description: Device UUID (NVIDIA only)
+        example: GPU-12345678-1234-1234-1234-123456789012
+        type: string
+      vendor:
+        description: '"nvidia", "intel", "amd"'
+        example: nvidia
+        type: string
+    type: object
+  dto.HardwareInfo:
+    properties:
+      baseboard:
+        $ref: '#/definitions/dto.BaseboardInfo'
+      bios:
+        $ref: '#/definitions/dto.BIOSInfo'
+      cache:
+        items:
+          $ref: '#/definitions/dto.CPUCacheInfo'
+        type: array
+      cpu:
+        $ref: '#/definitions/dto.CPUHardwareInfo'
+      memory_array:
+        $ref: '#/definitions/dto.MemoryArrayInfo'
+      memory_devices:
+        items:
+          $ref: '#/definitions/dto.MemoryDeviceInfo'
+        type: array
+      timestamp:
+        type: string
+    type: object
+  dto.LogFileContent:
+    properties:
+      content:
+        type: string
+      end_line:
+        type: integer
+      lines:
+        items:
+          type: string
+        type: array
+      lines_returned:
+        type: integer
+      path:
+        type: string
+      start_line:
+        type: integer
+      total_lines:
+        type: integer
+    type: object
+  dto.MemoryArrayInfo:
+    properties:
+      error_correction_type:
+        type: string
+      location:
+        type: string
+      maximum_capacity:
+        type: string
+      number_of_devices:
+        type: integer
+      use:
+        type: string
+    type: object
+  dto.MemoryDeviceInfo:
+    properties:
+      asset_tag:
+        type: string
+      bank_locator:
+        type: string
+      configured_speed:
+        type: string
+      configured_voltage:
+        type: string
+      data_width:
+        type: integer
+      form_factor:
+        type: string
+      locator:
+        type: string
+      manufacturer:
+        type: string
+      maximum_voltage:
+        type: string
+      minimum_voltage:
+        type: string
+      part_number:
+        type: string
+      rank:
+        type: integer
+      serial_number:
+        type: string
+      size:
+        type: string
+      speed:
+        type: string
+      total_width:
+        type: integer
+      type:
+        type: string
+      type_detail:
+        type: string
+    type: object
+  dto.NUTConfig:
+    properties:
+      battery_level:
+        description: Low battery threshold
+        type: integer
+      driver:
+        description: e.g., "usbhid-ups"
+        type: string
+      ip_address:
+        description: For netclient mode
+        type: string
+      mode:
+        description: '"standalone", "netserver", "netclient"'
+        type: string
+      poll_interval:
+        description: Seconds between polls
+        type: integer
+      port:
+        description: e.g., "auto"
+        type: string
+      runtime_value:
+        description: Low runtime threshold
+        type: integer
+      service_enabled:
+        type: boolean
+      shutdown_mode:
+        description: e.g., "sec_timer", "fsd"
+        type: string
+      timeout:
+        description: Shutdown timeout
+        type: integer
+      ups_name:
+        description: e.g., "ups"
+        type: string
+    type: object
+  dto.NUTDevice:
+    properties:
+      available:
+        type: boolean
+      description:
+        type: string
+      name:
+        type: string
+    type: object
+  dto.NUTResponse:
+    properties:
+      config:
+        $ref: '#/definitions/dto.NUTConfig'
+      devices:
+        items:
+          $ref: '#/definitions/dto.NUTDevice'
+        type: array
+      installed:
+        description: Is NUT plugin installed?
+        type: boolean
+      running:
+        description: Is NUT service running?
+        type: boolean
+      status:
+        $ref: '#/definitions/dto.NUTStatus'
+      timestamp:
+        type: string
+    type: object
+  dto.NUTStatus:
+    properties:
+      alarms:
+        description: Active alarms if any
+        items:
+          type: string
+        type: array
+      apparent_power_nominal_va:
+        type: number
+      apparent_power_va:
+        type: number
+      battery_charge_low_percent:
+        type: number
+      battery_charge_percent:
+        description: Battery info
+        type: number
+      battery_charge_warning_percent:
+        type: number
+      battery_mfr_date:
+        type: string
+      battery_runtime_low_seconds:
+        type: integer
+      battery_runtime_seconds:
+        type: integer
+      battery_status:
+        type: string
+      battery_type:
+        description: e.g., "PbAcid"
+        type: string
+      battery_voltage:
+        type: number
+      battery_voltage_nominal:
+        type: number
+      beeper_status:
+        description: e.g., "enabled", "disabled"
+        type: string
+      connected:
+        description: Connection and detection info
+        type: boolean
+      delay_shutdown_seconds:
+        description: Timing
+        type: integer
+      delay_start_seconds:
+        type: integer
+      device_name:
+        description: e.g., "ups"
+        type: string
+      driver:
+        description: e.g., "usbhid-ups"
+        type: string
+      driver_state:
+        description: e.g., "quiet", "running"
+        type: string
+      driver_version:
+        description: Driver info
+        type: string
+      driver_version_data:
+        type: string
+      driver_version_usb:
+        type: string
+      host:
+        description: e.g., "localhost" or remote IP
+        type: string
+      input_current:
+        type: number
+      input_frequency:
+        type: number
+      input_transfer_high:
+        type: number
+      input_transfer_low:
+        type: number
+      input_voltage:
+        description: Input power
+        type: number
+      input_voltage_nominal:
+        type: number
+      load_percent:
+        description: Load and power
+        type: number
+      manufacturer:
+        description: UPS identification
+        type: string
+      model:
+        type: string
+      output_current:
+        type: number
+      output_frequency:
+        type: number
+      output_voltage:
+        description: Output power
+        type: number
+      product_id:
+        type: string
+      raw_variables:
+        additionalProperties:
+          type: string
+        description: Raw variables for advanced users
+        type: object
+      realpower_nominal_watts:
+        type: number
+      realpower_watts:
+        type: number
+      serial:
+        type: string
+      status:
+        description: UPS status
+        type: string
+      status_text:
+        description: Human-readable status
+        type: string
+      test_result:
+        description: Last test result
+        type: string
+      test_result_date:
+        type: string
+      timer_shutdown:
+        type: integer
+      timer_start:
+        type: integer
+      timestamp:
+        description: Metadata
+        type: string
+      type:
+        description: e.g., "ups"
+        type: string
+      vendor_id:
+        type: string
+    type: object
+  dto.NetworkAccessURLs:
+    properties:
+      timestamp:
+        type: string
+      urls:
+        items:
+          $ref: '#/definitions/dto.AccessURL'
+        type: array
+    type: object
+  dto.NetworkConfig:
+    properties:
+      bond_slaves:
+        description: If bond
+        items:
+          type: string
+        type: array
+      bonding_mode:
+        description: If bond
+        type: string
+      bridge_members:
+        description: If bridge
+        items:
+          type: string
+        type: array
+      gateway:
+        type: string
+      interface:
+        type: string
+      ip_address:
+        type: string
+      netmask:
+        type: string
+      timestamp:
+        type: string
+      type:
+        description: '"physical", "bond", "bridge", "vlan"'
+        type: string
+      vlan_id:
+        description: If VLAN
+        type: integer
+    type: object
+  dto.NetworkInfo:
+    properties:
+      advertised_auto_negotiation:
+        example: true
+        type: boolean
+      advertised_fec_modes:
+        items:
+          type: string
+        type: array
+      advertised_link_modes:
+        items:
+          type: string
+        type: array
+      advertised_pause_frame:
+        example: Symmetric
+        type: string
+      auto_negotiation:
+        example: "on"
+        type: string
+      bytes_received:
+        example: 1073741824
+        type: integer
+      bytes_sent:
+        example: 536870912
+        type: integer
+      duplex:
+        example: Full
+        type: string
+      errors_received:
+        example: 0
+        type: integer
+      errors_sent:
+        example: 0
+        type: integer
+      ip_address:
+        example: 192.168.1.100
+        type: string
+      link_detected:
+        example: true
+        type: boolean
+      mac_address:
+        example: "00:11:22:33:44:55"
+        type: string
+      mdix:
+        example: auto
+        type: string
+      message_level:
+        example: "0x0000003f"
+        type: string
+      mtu:
+        example: 1500
+        type: integer
+      name:
+        example: eth0
+        type: string
+      packets_received:
+        example: 1000000
+        type: integer
+      packets_sent:
+        example: 500000
+        type: integer
+      phyad:
+        example: 0
+        type: integer
+      port:
+        example: Twisted Pair
+        type: string
+      speed_mbps:
+        example: 1000
+        type: integer
+      state:
+        example: up
+        type: string
+      supported_fec_modes:
+        items:
+          type: string
+        type: array
+      supported_link_modes:
+        items:
+          type: string
+        type: array
+      supported_pause_frame:
+        example: Symmetric
+        type: string
+      supported_ports:
+        description: Enhanced ethtool information
+        items:
+          type: string
+        type: array
+      supports_auto_negotiation:
+        example: true
+        type: boolean
+      supports_wake_on:
+        items:
+          type: string
+        type: array
+      timestamp:
+        type: string
+      transceiver:
+        example: internal
+        type: string
+      wake_on:
+        example: g
+        type: string
+    type: object
+  dto.Notification:
+    properties:
+      description:
+        example: The array has been successfully started
+        type: string
+      formatted_timestamp:
+        example: "2025-01-15 10:30:00"
+        type: string
+      id:
+        example: notification_1234567890
+        type: string
+      importance:
+        description: '"alert", "warning", "info"'
+        example: info
+        type: string
+      link:
+        example: /Dashboard
+        type: string
+      subject:
+        example: Array Status
+        type: string
+      timestamp:
+        type: string
+      title:
+        example: Array Started
+        type: string
+      type:
+        description: '"unread", "archive"'
+        example: unread
+        type: string
+    type: object
+  dto.NotificationCounts:
+    properties:
+      alert:
+        example: 0
+        type: integer
+      info:
+        example: 5
+        type: integer
+      total:
+        example: 7
+        type: integer
+      warning:
+        example: 2
+        type: integer
+    type: object
+  dto.NotificationList:
+    properties:
+      notifications:
+        items:
+          $ref: '#/definitions/dto.Notification'
+        type: array
+      overview:
+        $ref: '#/definitions/dto.NotificationOverview'
+      timestamp:
+        type: string
+    type: object
+  dto.NotificationOverview:
+    properties:
+      archive:
+        $ref: '#/definitions/dto.NotificationCounts'
+      unread:
+        $ref: '#/definitions/dto.NotificationCounts'
+    type: object
+  dto.ParityCheckHistory:
+    properties:
+      records:
+        items:
+          $ref: '#/definitions/dto.ParityCheckRecord'
+        type: array
+      timestamp:
+        type: string
+    type: object
+  dto.ParityCheckRecord:
+    properties:
+      action:
+        description: '"Parity-Check", "Parity-Sync", "Read-Check", "Clear"'
+        type: string
+      date:
+        description: Date and time of the operation
+        type: string
+      duration_seconds:
+        description: Duration in seconds
+        type: integer
+      errors:
+        description: Number of errors found
+        type: integer
+      size_bytes:
+        description: Size of array checked in bytes
+        type: integer
+      speed_mbps:
+        description: Average speed in MB/s
+        type: number
+      status:
+        description: '"OK", "Canceled", or error count'
+        type: string
+    type: object
+  dto.PortMapping:
+    properties:
+      private_port:
+        example: 32400
+        type: integer
+      public_port:
+        example: 32400
+        type: integer
+      type:
+        example: tcp
+        type: string
+    type: object
+  dto.Registration:
+    properties:
+      expiration:
+        description: License expiration date
+        type: string
+      guid:
+        description: Registration GUID
+        type: string
+      server_name:
+        description: Server name from config
+        type: string
+      state:
+        description: '"valid", "expired", "invalid", "trial"'
+        type: string
+      timestamp:
+        description: Collection timestamp
+        type: string
+      type:
+        description: '"trial", "basic", "plus", "pro", "lifetime"'
+        type: string
+      update_expiration:
+        description: Update expiration date
+        type: string
+    type: object
+  dto.Response:
+    properties:
+      data: {}
+      error:
+        example: ""
+        type: string
+      message:
+        example: Operation completed successfully
+        type: string
+      success:
+        example: true
+        type: boolean
+      timestamp:
+        type: string
+    type: object
+  dto.SMARTAttribute:
+    properties:
+      id:
+        example: 5
+        type: integer
+      name:
+        example: Reallocated_Sector_Ct
+        type: string
+      raw_value:
+        example: "0"
+        type: string
+      threshold:
+        example: 5
+        type: integer
+      value:
+        example: 100
+        type: integer
+      when_failed:
+        example: ""
+        type: string
+      worst:
+        example: 100
+        type: integer
+    type: object
+  dto.ShareConfig:
+    properties:
+      allocator:
+        description: '"highwater", "mostfree", "fillup"'
+        type: string
+      comment:
+        type: string
+      exclude_disks:
+        description: Disks to exclude
+        items:
+          type: string
+        type: array
+      export:
+        description: SMB/NFS/AFP export settings
+        type: string
+      floor:
+        description: Minimum free space
+        type: string
+      include_disks:
+        description: Disks to include
+        items:
+          type: string
+        type: array
+      name:
+        type: string
+      security:
+        description: '"public", "private", "secure"'
+        type: string
+      split_level:
+        description: Directory depth for splitting
+        type: string
+      timestamp:
+        type: string
+      use_cache:
+        description: '"yes", "no", "only", "prefer"'
+        type: string
+    type: object
+  dto.ShareInfo:
+    properties:
+      comment:
+        description: Configuration fields from share config
+        example: Media storage share
+        type: string
+      free_bytes:
+        example: 5368709120000
+        type: integer
+      name:
+        example: Media
+        type: string
+      nfs_export:
+        description: Is share exported via NFS?
+        example: false
+        type: boolean
+      path:
+        example: /mnt/user/Media
+        type: string
+      security:
+        description: '"public", "private", "secure"'
+        example: private
+        type: string
+      smb_export:
+        description: Is share exported via SMB?
+        example: true
+        type: boolean
+      storage:
+        description: '"cache", "array", "cache+array", or "unknown"'
+        example: cache+array
+        type: string
+      timestamp:
+        type: string
+      total_bytes:
+        example: 10737418240000
+        type: integer
+      usage_percent:
+        example: 50
+        type: number
+      use_cache:
+        description: '"yes", "no", "only", "prefer"'
+        example: prefer
+        type: string
+      used_bytes:
+        example: 5368709120000
+        type: integer
+    type: object
+  dto.SystemInfo:
+    properties:
+      agent_version:
+        example: 2025.12.1
+        type: string
+      bios_date:
+        example: 12/25/2023
+        type: string
+      bios_version:
+        example: "1.4"
+        type: string
+      cpu_cores:
+        example: 8
+        type: integer
+      cpu_mhz:
+        example: 4900
+        type: number
+      cpu_model:
+        example: Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz
+        type: string
+      cpu_per_core_usage:
+        additionalProperties:
+          type: number
+        type: object
+      cpu_temp_celsius:
+        example: 45
+        type: number
+      cpu_threads:
+        example: 8
+        type: integer
+      cpu_usage_percent:
+        description: CPU Information
+        example: 45.2
+        type: number
+      fans:
+        description: Additional Metrics
+        items:
+          $ref: '#/definitions/dto.FanInfo'
+        type: array
+      hostname:
+        example: tower
+        type: string
+      hvm_enabled:
+        description: Virtualization Features
+        example: true
+        type: boolean
+      iommu_enabled:
+        example: true
+        type: boolean
+      kernel_version:
+        example: 6.1.64-Unraid
+        type: string
+      motherboard_temp_celsius:
+        example: 35
+        type: number
+      openssl_version:
+        description: Additional System Information
+        example: 3.0.2
+        type: string
+      parity_check_speed:
+        example: 100 MB/s
+        type: string
+      ram_buffers_bytes:
+        example: 1073741824
+        type: integer
+      ram_cached_bytes:
+        example: 8589934592
+        type: integer
+      ram_free_bytes:
+        example: 11811160064
+        type: integer
+      ram_total_bytes:
+        example: 34359738368
+        type: integer
+      ram_usage_percent:
+        description: Memory Information
+        example: 65.5
+        type: number
+      ram_used_bytes:
+        example: 22548578304
+        type: integer
+      server_model:
+        description: System Information
+        example: Supermicro X11SCL-F
+        type: string
+      timestamp:
+        type: string
+      uptime_seconds:
+        example: 86400
+        type: integer
+      version:
+        example: 6.12.6
+        type: string
+    type: object
+  dto.SystemSettings:
+    properties:
+      date_format:
+        type: string
+      description:
+        type: string
+      model:
+        type: string
+      security_mode:
+        description: '"public", "private"'
+        type: string
+      server_name:
+        type: string
+      time_format:
+        type: string
+      timestamp:
+        type: string
+      timezone:
+        type: string
+    type: object
+  dto.UPSStatus:
+    properties:
+      battery_charge_percent:
+        example: 100
+        type: number
+      connected:
+        example: true
+        type: boolean
+      load_percent:
+        example: 25.5
+        type: number
+      model:
+        example: APC Smart-UPS 1500
+        type: string
+      nominal_power_watts:
+        example: 1000
+        type: number
+      power_watts:
+        example: 250.5
+        type: number
+      runtime_left_seconds:
+        example: 3600
+        type: integer
+      status:
+        example: OL
+        type: string
+      timestamp:
+        type: string
+    type: object
+  dto.UnassignedDevice:
+    properties:
+      auto_mount:
+        description: Configuration
+        type: boolean
+      device:
+        description: Device identification
+        type: string
+      disable_mount:
+        type: boolean
+      identification:
+        description: Friendly name/label
+        type: string
+      model:
+        type: string
+      partitions:
+        description: Partition information
+        items:
+          $ref: '#/definitions/dto.UnassignedPartition'
+        type: array
+      pass_through:
+        type: boolean
+      reads:
+        description: I/O Statistics
+        type: integer
+      script_enabled:
+        type: boolean
+      script_path:
+        type: string
+      serial_number:
+        type: string
+      spin_state:
+        description: '"active", "standby", "unknown"'
+        type: string
+      status:
+        description: Status
+        type: string
+      temperature_celsius:
+        type: number
+      timestamp:
+        type: string
+      writes:
+        type: integer
+    type: object
+  dto.UnassignedDeviceList:
+    properties:
+      devices:
+        items:
+          $ref: '#/definitions/dto.UnassignedDevice'
+        type: array
+      remote_shares:
+        items:
+          $ref: '#/definitions/dto.UnassignedRemoteShare'
+        type: array
+      timestamp:
+        type: string
+    type: object
+  dto.UnassignedPartition:
+    properties:
+      filesystem:
+        description: '"ntfs", "ext4", "xfs", "btrfs", "exfat", "hfsplus", "apfs"'
+        type: string
+      free_bytes:
+        type: integer
+      label:
+        type: string
+      mount_point:
+        type: string
+      nfs_share:
+        description: Is shared via NFS?
+        type: boolean
+      partition_number:
+        type: integer
+      read_only:
+        type: boolean
+      size_bytes:
+        type: integer
+      smb_share:
+        description: Is shared via SMB?
+        type: boolean
+      status:
+        description: '"mounted", "unmounted"'
+        type: string
+      usage_percent:
+        type: number
+      used_bytes:
+        type: integer
+    type: object
+  dto.UnassignedRemoteShare:
+    properties:
+      auto_mount:
+        description: Configuration
+        type: boolean
+      free_bytes:
+        type: integer
+      mount_point:
+        type: string
+      nfs_export:
+        type: string
+      nfs_options:
+        type: string
+      nfs_server:
+        description: NFS-specific
+        type: string
+      read_only:
+        type: boolean
+      size_bytes:
+        description: Capacity (if mounted)
+        type: integer
+      smb_domain:
+        type: string
+      smb_server:
+        description: SMB-specific
+        type: string
+      smb_share:
+        type: string
+      smb_user:
+        type: string
+      source:
+        description: '"//server/share", "server:/export", "/path/file.iso"'
+        type: string
+      status:
+        description: Status
+        type: string
+      timestamp:
+        type: string
+      type:
+        description: Share identification
+        type: string
+      usage_percent:
+        type: number
+      used_bytes:
+        type: integer
+    type: object
+  dto.UserScriptExecuteRequest:
+    properties:
+      background:
+        type: boolean
+      wait:
+        type: boolean
+    type: object
+  dto.UserScriptExecuteResponse:
+    properties:
+      error:
+        type: string
+      message:
+        type: string
+      output:
+        type: string
+      pid:
+        type: integer
+      success:
+        type: boolean
+    type: object
+  dto.UserScriptInfo:
+    properties:
+      description:
+        type: string
+      executable:
+        type: boolean
+      last_modified:
+        type: string
+      name:
+        type: string
+      path:
+        type: string
+    type: object
+  dto.VMInfo:
+    properties:
+      autostart:
+        example: false
+        type: boolean
+      cpu_count:
+        example: 4
+        type: integer
+      disk_path:
+        example: /mnt/user/domains/Windows 11/vdisk1.img
+        type: string
+      disk_read_bytes:
+        example: 1073741824
+        type: integer
+      disk_size_bytes:
+        example: 107374182400
+        type: integer
+      disk_write_bytes:
+        example: 536870912
+        type: integer
+      guest_cpu_percent:
+        example: 25.5
+        type: number
+      host_cpu_percent:
+        example: 12.3
+        type: number
+      id:
+        example: "1"
+        type: string
+      memory_allocated_bytes:
+        example: 8589934592
+        type: integer
+      memory_display:
+        example: 4 GiB / 8 GiB
+        type: string
+      memory_used_bytes:
+        example: 4294967296
+        type: integer
+      name:
+        example: Windows 11
+        type: string
+      network_rx_bytes:
+        example: 104857600
+        type: integer
+      network_tx_bytes:
+        example: 52428800
+        type: integer
+      persistent:
+        example: true
+        type: boolean
+      state:
+        example: running
+        type: string
+      timestamp:
+        type: string
+    type: object
+  dto.VMSettings:
+    properties:
+      default_settings:
+        additionalProperties:
+          type: string
+        type: object
+      enabled:
+        type: boolean
+      pci_devices:
+        items:
+          type: string
+        type: array
+      timestamp:
+        type: string
+      usb_devices:
+        items:
+          type: string
+        type: array
+    type: object
+  dto.VolumeMapping:
+    properties:
+      container_path:
+        example: /config
+        type: string
+      host_path:
+        example: /mnt/user/appdata/plex
+        type: string
+      mode:
+        example: rw
+        type: string
+    type: object
+  dto.ZFSARCStats:
+    properties:
+      hit_ratio_percent:
+        description: Hit Ratios
+        example: 95.5
+        type: number
+      hits:
+        description: Hits and Misses
+        example: 1000000
+        type: integer
+      l2_hits:
+        description: L2ARC hits
+        example: 500000
+        type: integer
+      l2_misses:
+        description: L2ARC misses
+        example: 25000
+        type: integer
+      l2_size_bytes:
+        description: L2ARC (Level 2 ARC - SSD cache)
+        example: 107374182400
+        type: integer
+      max_size_bytes:
+        description: Maximum ARC size
+        example: 16106127360
+        type: integer
+      mfu_hit_ratio_percent:
+        description: Most Frequently Used hit ratio
+        example: 97.8
+        type: number
+      min_size_bytes:
+        description: Minimum ARC size
+        example: 2013265920
+        type: integer
+      misses:
+        description: Total cache misses
+        example: 50000
+        type: integer
+      mru_hit_ratio_percent:
+        description: Most Recently Used hit ratio
+        example: 92.3
+        type: number
+      size_bytes:
+        description: ARC Size
+        example: 8589934592
+        type: integer
+      target_size_bytes:
+        description: Target ARC size
+        example: 16106127360
+        type: integer
+      timestamp:
+        type: string
+    type: object
+  dto.ZFSDataset:
+    properties:
+      available_bytes:
+        description: Space available
+        example: 53687091200
+        type: integer
+      compress_ratio:
+        description: Compression ratio
+        example: 1.5
+        type: number
+      compression:
+        description: Compression algorithm
+        example: lz4
+        type: string
+      mountpoint:
+        description: Mount point (if filesystem)
+        example: /mnt/tank/media
+        type: string
+      name:
+        description: Full dataset name (pool/dataset/child)
+        example: tank/media
+        type: string
+      quota_bytes:
+        description: Dataset quota (0 = none)
+        example: 107374182400
+        type: integer
+      readonly:
+        description: Read-only status
+        example: false
+        type: boolean
+      referenced_bytes:
+        description: Space referenced by dataset
+        example: 53687091200
+        type: integer
+      reservation_bytes:
+        description: Reserved space
+        example: 0
+        type: integer
+      timestamp:
+        type: string
+      type:
+        description: '"filesystem", "volume", "snapshot"'
+        example: filesystem
+        type: string
+      used_bytes:
+        description: Space used
+        example: 53687091200
+        type: integer
+    type: object
+  dto.ZFSDevice:
+    properties:
+      checksum_errors:
+        example: 0
+        type: integer
+      name:
+        description: Device path (e.g., "sda1", "nvme0n1p1")
+        example: sda1
+        type: string
+      physical_path:
+        description: Physical device path
+        example: /dev/disk/by-id/ata-WDC_WD120EFBX-68B0EN0_WD-WMC4N0123456
+        type: string
+      read_errors:
+        example: 0
+        type: integer
+      state:
+        description: '"ONLINE", "DEGRADED", "FAULTED", "OFFLINE"'
+        example: ONLINE
+        type: string
+      write_errors:
+        example: 0
+        type: integer
+    type: object
+  dto.ZFSPool:
+    properties:
+      allocated_bytes:
+        description: Space allocated
+        example: 53687091200
+        type: integer
+      altroot:
+        description: Features
+        example: '-'
+        type: string
+      autoexpand:
+        description: Auto-expand on disk replacement
+        example: true
+        type: boolean
+      autotrim:
+        description: '"on", "off"'
+        example: "on"
+        type: string
+      capacity_percent:
+        description: Usage %
+        example: 50
+        type: number
+      checksum_errors:
+        example: 0
+        type: integer
+      compress_ratio:
+        description: Compression ratio (e.g., 1.50 = 1.5x)
+        example: 1.5
+        type: number
+      dedup_ratio:
+        description: Deduplication and Compression
+        example: 1
+        type: number
+      fragmentation_percent:
+        description: Fragmentation %
+        example: 5
+        type: number
+      free_bytes:
+        description: Space available
+        example: 53687091200
+        type: integer
+      guid:
+        description: Unique pool GUID
+        example: "1234567890123456789"
+        type: string
+      health:
+        description: Health and Status
+        example: ONLINE
+        type: string
+      name:
+        description: Pool Identification
+        example: tank
+        type: string
+      read_errors:
+        description: Error Counters
+        example: 0
+        type: integer
+      readonly:
+        description: Read-only status
+        example: false
+        type: boolean
+      scan_end_time:
+        description: When scrub ended
+        type: string
+      scan_errors:
+        description: Errors found during last scrub
+        example: 0
+        type: integer
+      scan_progress_percent:
+        description: Scrub progress %
+        example: 100
+        type: number
+      scan_repaired_bytes:
+        description: Data repaired in last scrub
+        example: 0
+        type: integer
+      scan_start_time:
+        description: When scrub started
+        type: string
+      scan_state:
+        description: '"scanning", "finished", "canceled"'
+        example: finished
+        type: string
+      scan_status:
+        description: Scrub Information
+        example: scrub completed
+        type: string
+      size_bytes:
+        description: Capacity
+        example: 107374182400
+        type: integer
+      state:
+        description: '"ACTIVE", "EXPORTED", "DESTROYED", "SPARE", "L2CACHE"'
+        example: ACTIVE
+        type: string
+      timestamp:
+        type: string
+      vdevs:
+        description: VDEVs (Virtual Devices)
+        items:
+          $ref: '#/definitions/dto.ZFSVdev'
+        type: array
+      version:
+        description: ZFS pool version
+        example: "5000"
+        type: string
+      write_errors:
+        example: 0
+        type: integer
+    type: object
+  dto.ZFSSnapshot:
+    properties:
+      creation_time:
+        description: When snapshot was created
+        type: string
+      dataset:
+        description: Parent dataset
+        example: tank/media
+        type: string
+      name:
+        description: Snapshot name (dataset@snapshot)
+        example: tank/media@daily-2025-01-15
+        type: string
+      referenced_bytes:
+        description: Space referenced
+        example: 53687091200
+        type: integer
+      timestamp:
+        type: string
+      used_bytes:
+        description: Space used by snapshot
+        example: 1073741824
+        type: integer
+    type: object
+  dto.ZFSVdev:
+    properties:
+      checksum_errors:
+        example: 0
+        type: integer
+      devices:
+        description: Underlying devices (for mirror/raidz)
+        items:
+          $ref: '#/definitions/dto.ZFSDevice'
+        type: array
+      name:
+        description: vdev name (e.g., "raidz1-0", "mirror-1", or disk name)
+        example: raidz1-0
+        type: string
+      read_errors:
+        example: 0
+        type: integer
+      state:
+        description: '"ONLINE", "DEGRADED", "FAULTED", "OFFLINE"'
+        example: ONLINE
+        type: string
+      type:
+        description: '"disk", "mirror", "raidz1", "raidz2", "raidz3", "spare", "cache",
+          "log"'
+        example: raidz1
+        type: string
+      write_errors:
+        example: 0
+        type: integer
+    type: object
+host: localhost:8043
+info:
+  contact:
+    name: GitHub Issues
+    url: https://github.com/ruaan-deysel/unraid-management-agent/issues
+  description: |-
+    REST API and WebSocket interface for comprehensive Unraid system monitoring and control.
+    This is a third-party community plugin providing an alternative/complement to the official Unraid GraphQL API.
+  license:
+    name: MIT
+    url: https://github.com/ruaan-deysel/unraid-management-agent/blob/main/LICENSE
+  title: Unraid Management Agent API
+  version: 2025.12.1
+paths:
+  /array:
+    get:
+      description: Retrieve Unraid array status including parity information
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Array status
+          schema:
+            $ref: '#/definitions/dto.ArrayStatus'
+      summary: Get array status
+      tags:
+      - Array
+  /array/parity-check/history:
+    get:
+      description: Retrieve the history of parity check operations
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Parity check history
+          schema:
+            $ref: '#/definitions/dto.ParityCheckHistory'
+        "500":
+          description: Failed to get parity check history
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get parity check history
+      tags:
+      - Array
+  /array/parity-check/pause:
+    post:
+      description: Pause an in-progress parity check operation
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Parity check paused
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to pause parity check
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Pause parity check
+      tags:
+      - Array
+  /array/parity-check/resume:
+    post:
+      description: Resume a paused parity check operation
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Parity check resumed
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to resume parity check
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Resume parity check
+      tags:
+      - Array
+  /array/parity-check/start:
+    post:
+      description: Start a parity check operation, optionally with correction
+      parameters:
+      - description: Enable correcting mode
+        in: query
+        name: correcting
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Parity check started
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to start parity check
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Start parity check
+      tags:
+      - Array
+  /array/parity-check/stop:
+    post:
+      description: Stop an in-progress parity check operation
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Parity check stopped
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to stop parity check
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Stop parity check
+      tags:
+      - Array
+  /array/start:
+    post:
+      description: Start the Unraid array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Array started
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to start array
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Start array
+      tags:
+      - Array
+  /array/stop:
+    post:
+      description: Stop the Unraid array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Array stopped
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to stop array
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Stop array
+      tags:
+      - Array
+  /collectors/{name}:
+    get:
+      description: Retrieve status of a specific collector by name
+      parameters:
+      - description: Collector name (e.g., system, docker, vm)
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Collector status
+          schema:
+            $ref: '#/definitions/dto.CollectorResponse'
+        "404":
+          description: Collector not found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Collector management not available
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get specific collector status
+      tags:
+      - Collectors
+  /collectors/{name}/disable:
+    post:
+      description: Disable a specific collector at runtime
+      parameters:
+      - description: Collector name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Collector disabled
+          schema:
+            $ref: '#/definitions/dto.CollectorResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Collector not found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Collector management not available
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Disable collector
+      tags:
+      - Collectors
+  /collectors/{name}/enable:
+    post:
+      description: Enable a specific collector at runtime
+      parameters:
+      - description: Collector name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Collector enabled
+          schema:
+            $ref: '#/definitions/dto.CollectorResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Collector not found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Collector management not available
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Enable collector
+      tags:
+      - Collectors
+  /collectors/{name}/interval:
+    patch:
+      consumes:
+      - application/json
+      description: Update the collection interval for a specific collector
+      parameters:
+      - description: Collector name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: New interval in seconds
+        in: body
+        name: interval
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CollectorIntervalRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Interval updated
+          schema:
+            $ref: '#/definitions/dto.CollectorResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Collector not found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Collector management not available
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Update collector interval
+      tags:
+      - Collectors
+  /collectors/status:
+    get:
+      description: Retrieve status of all data collectors including enabled state
+        and intervals
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Collectors status
+          schema:
+            $ref: '#/definitions/dto.CollectorsStatusResponse'
+      summary: Get all collectors status
+      tags:
+      - Collectors
+  /disks:
+    get:
+      description: Retrieve information about all disks including SMART data
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of disks
+          schema:
+            items:
+              $ref: '#/definitions/dto.DiskInfo'
+            type: array
+      summary: Get all disks
+      tags:
+      - Disks
+  /disks/{id}:
+    get:
+      description: Retrieve information about a specific disk by ID, device name,
+        or name
+      parameters:
+      - description: Disk ID, device name (e.g., sda), or disk name (e.g., disk1)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Disk information
+          schema:
+            $ref: '#/definitions/dto.DiskInfo'
+        "404":
+          description: Disk not found
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get specific disk
+      tags:
+      - Disks
+  /docker:
+    get:
+      description: Retrieve information about all Docker containers including stats
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of containers
+          schema:
+            items:
+              $ref: '#/definitions/dto.ContainerInfo'
+            type: array
+      summary: Get all Docker containers
+      tags:
+      - Docker
+  /docker/{id}:
+    get:
+      description: Retrieve information about a specific Docker container by ID or
+        name
+      parameters:
+      - description: Container ID or name
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Container information
+          schema:
+            $ref: '#/definitions/dto.ContainerInfo'
+        "404":
+          description: Container not found
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get specific Docker container
+      tags:
+      - Docker
+  /docker/{id}/pause:
+    post:
+      description: Pause a specific Docker container by ID or name
+      parameters:
+      - description: Container ID or name
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Container paused
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid container ID
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to pause container
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Pause Docker container
+      tags:
+      - Docker
+  /docker/{id}/restart:
+    post:
+      description: Restart a specific Docker container by ID or name
+      parameters:
+      - description: Container ID or name
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Container restarted
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid container ID
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to restart container
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Restart Docker container
+      tags:
+      - Docker
+  /docker/{id}/start:
+    post:
+      description: Start a specific Docker container by ID or name
+      parameters:
+      - description: Container ID or name
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Container started
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid container ID
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to start container
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Start Docker container
+      tags:
+      - Docker
+  /docker/{id}/stop:
+    post:
+      description: Stop a specific Docker container by ID or name
+      parameters:
+      - description: Container ID or name
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Container stopped
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid container ID
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to stop container
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Stop Docker container
+      tags:
+      - Docker
+  /docker/{id}/unpause:
+    post:
+      description: Unpause a specific Docker container by ID or name
+      parameters:
+      - description: Container ID or name
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Container unpaused
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid container ID
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to unpause container
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Unpause Docker container
+      tags:
+      - Docker
+  /gpu:
+    get:
+      description: Retrieve GPU metrics for NVIDIA and AMD GPUs
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of GPU metrics
+          schema:
+            items:
+              $ref: '#/definitions/dto.GPUMetrics'
+            type: array
+      summary: Get GPU metrics
+      tags:
+      - GPU
+  /hardware/baseboard:
+    get:
+      description: Retrieve motherboard/baseboard information from DMI data
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Baseboard information
+          schema:
+            $ref: '#/definitions/dto.BaseboardInfo'
+        "404":
+          description: Baseboard info not available
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get baseboard information
+      tags:
+      - Hardware
+  /hardware/bios:
+    get:
+      description: Retrieve BIOS information from DMI data
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: BIOS information
+          schema:
+            $ref: '#/definitions/dto.BIOSInfo'
+        "404":
+          description: BIOS info not available
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get BIOS information
+      tags:
+      - Hardware
+  /hardware/cache:
+    get:
+      description: Retrieve CPU cache hierarchy information from DMI data
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: CPU cache information
+          schema:
+            items:
+              $ref: '#/definitions/dto.CPUCacheInfo'
+            type: array
+        "404":
+          description: Cache info not available
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get CPU cache information
+      tags:
+      - Hardware
+  /hardware/cpu:
+    get:
+      description: Retrieve CPU hardware information from DMI data
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: CPU information
+          schema:
+            $ref: '#/definitions/dto.CPUHardwareInfo'
+        "404":
+          description: CPU info not available
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get CPU hardware information
+      tags:
+      - Hardware
+  /hardware/full:
+    get:
+      description: Retrieve complete hardware information including BIOS, CPU, and
+        memory
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Hardware information
+          schema:
+            $ref: '#/definitions/dto.HardwareInfo'
+      summary: Get full hardware information
+      tags:
+      - Hardware
+  /hardware/memory-array:
+    get:
+      description: Retrieve physical memory array information from DMI data
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Memory array information
+          schema:
+            $ref: '#/definitions/dto.MemoryArrayInfo'
+        "404":
+          description: Memory array info not available
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get memory array information
+      tags:
+      - Hardware
+  /hardware/memory-devices:
+    get:
+      description: Retrieve individual memory device (DIMM) information from DMI data
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Memory device information
+          schema:
+            items:
+              $ref: '#/definitions/dto.MemoryDeviceInfo'
+            type: array
+        "404":
+          description: Memory device info not available
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get memory device information
+      tags:
+      - Hardware
+  /health:
+    get:
+      description: Check if the API server is running and healthy
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Server is healthy
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Health check
+      tags:
+      - System
+  /logs:
+    get:
+      description: List available log files or get log content with optional pagination
+      parameters:
+      - description: Log file path (if empty, lists all logs)
+        in: query
+        name: path
+        type: string
+      - description: Number of lines to return
+        in: query
+        name: lines
+        type: integer
+      - description: Starting line number
+        in: query
+        name: start
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Log content or list
+          schema:
+            $ref: '#/definitions/dto.LogFileContent'
+        "500":
+          description: Error reading logs
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get logs
+      tags:
+      - Logs
+  /logs/{filename}:
+    get:
+      description: Retrieve a specific log file by filename with optional pagination
+      parameters:
+      - description: Log filename
+        in: path
+        name: filename
+        required: true
+        type: string
+      - description: Number of lines to return
+        in: query
+        name: lines
+        type: integer
+      - description: Starting line number
+        in: query
+        name: start
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Log content
+          schema:
+            $ref: '#/definitions/dto.LogFileContent'
+        "400":
+          description: Invalid filename
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Log file not found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Error reading log
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get specific log file
+      tags:
+      - Logs
+  /network:
+    get:
+      description: Retrieve information about all network interfaces
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of network interfaces
+          schema:
+            items:
+              $ref: '#/definitions/dto.NetworkInfo'
+            type: array
+      summary: Get network interfaces
+      tags:
+      - Network
+  /network/{interface}/config:
+    get:
+      description: Retrieve configuration for a specific network interface
+      parameters:
+      - description: Interface name (e.g., eth0, bond0)
+        in: path
+        name: interface
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Network configuration
+          schema:
+            $ref: '#/definitions/dto.NetworkConfig'
+        "404":
+          description: Interface not found
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get network interface configuration
+      tags:
+      - Configuration
+  /network/access-urls:
+    get:
+      description: Returns all methods to access the Unraid server including LAN IP,
+        mDNS hostname, WireGuard VPN IPs, WAN IP, and IPv6 addresses
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Network access URLs
+          schema:
+            $ref: '#/definitions/dto.NetworkAccessURLs'
+      summary: Get network access URLs
+      tags:
+      - Network
+  /notifications:
+    get:
+      description: Retrieve all notifications with overview counts, optionally filtered
+        by importance
+      parameters:
+      - description: Filter by importance level (alert, warning, normal)
+        in: query
+        name: importance
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Notifications with overview
+          schema:
+            $ref: '#/definitions/dto.NotificationList'
+      summary: Get all notifications
+      tags:
+      - Notifications
+    post:
+      consumes:
+      - application/json
+      description: Create a new system notification
+      parameters:
+      - description: Notification data
+        in: body
+        name: notification
+        required: true
+        schema:
+          properties:
+            description:
+              type: string
+            importance:
+              type: string
+            link:
+              type: string
+            subject:
+              type: string
+            title:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Notification created
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Failed to create notification
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Create notification
+      tags:
+      - Notifications
+  /notifications/{id}:
+    delete:
+      description: Delete a specific notification by ID
+      parameters:
+      - description: Notification ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Whether notification is archived
+        in: query
+        name: archived
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Notification deleted
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Failed to delete
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Delete notification
+      tags:
+      - Notifications
+    get:
+      description: Retrieve a specific notification by its ID
+      parameters:
+      - description: Notification ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Notification details
+          schema:
+            $ref: '#/definitions/dto.Notification'
+        "404":
+          description: Notification not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get notification by ID
+      tags:
+      - Notifications
+  /notifications/{id}/archive:
+    post:
+      description: Archive a specific notification by ID
+      parameters:
+      - description: Notification ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Notification archived
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Failed to archive
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Archive notification
+      tags:
+      - Notifications
+  /notifications/{id}/unarchive:
+    post:
+      description: Unarchive a specific notification by ID
+      parameters:
+      - description: Notification ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Notification unarchived
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Failed to unarchive
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Unarchive notification
+      tags:
+      - Notifications
+  /notifications/archive:
+    get:
+      description: Retrieve only archived notifications
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Archived notifications with count
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get archived notifications
+      tags:
+      - Notifications
+  /notifications/archive/all:
+    post:
+      description: Archive all unread notifications
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: All notifications archived
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Failed to archive
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Archive all notifications
+      tags:
+      - Notifications
+  /notifications/overview:
+    get:
+      description: Retrieve only the notification overview counts
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Notification counts by category
+          schema:
+            $ref: '#/definitions/dto.NotificationOverview'
+      summary: Get notification counts
+      tags:
+      - Notifications
+  /notifications/unread:
+    get:
+      description: Retrieve only unread notifications
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Unread notifications with count
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get unread notifications
+      tags:
+      - Notifications
+  /nut:
+    get:
+      description: Retrieve Network UPS Tools (NUT) status information
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: NUT status
+          schema:
+            $ref: '#/definitions/dto.NUTResponse'
+      summary: Get NUT status
+      tags:
+      - UPS
+  /registration:
+    get:
+      description: Retrieve Unraid license/registration information
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Registration information
+          schema:
+            $ref: '#/definitions/dto.Registration'
+      summary: Get registration status
+      tags:
+      - System
+  /settings/disks:
+    get:
+      description: Retrieve disk configuration settings
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Disk settings
+          schema:
+            $ref: '#/definitions/dto.DiskSettings'
+        "500":
+          description: Failed to get settings
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get disk settings
+      tags:
+      - Configuration
+  /settings/docker:
+    get:
+      description: Retrieve Docker daemon settings
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Docker settings
+          schema:
+            $ref: '#/definitions/dto.DockerSettings'
+        "500":
+          description: Failed to get settings
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get Docker settings
+      tags:
+      - Configuration
+  /settings/system:
+    get:
+      description: Retrieve Unraid system settings
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: System settings
+          schema:
+            $ref: '#/definitions/dto.SystemSettings'
+        "500":
+          description: Failed to get settings
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get system settings
+      tags:
+      - Configuration
+    post:
+      consumes:
+      - application/json
+      description: Update Unraid system settings
+      parameters:
+      - description: System settings
+        in: body
+        name: settings
+        required: true
+        schema:
+          $ref: '#/definitions/dto.SystemSettings'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Settings updated
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to update
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Update system settings
+      tags:
+      - Configuration
+  /settings/vm:
+    get:
+      description: Retrieve virtual machine manager settings
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: VM settings
+          schema:
+            $ref: '#/definitions/dto.VMSettings'
+        "500":
+          description: Failed to get settings
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get VM settings
+      tags:
+      - Configuration
+  /shares:
+    get:
+      description: Retrieve information about all user shares
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of shares
+          schema:
+            items:
+              $ref: '#/definitions/dto.ShareInfo'
+            type: array
+      summary: Get all shares
+      tags:
+      - Shares
+  /shares/{name}/config:
+    get:
+      description: Retrieve configuration for a specific user share
+      parameters:
+      - description: Share name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Share configuration
+          schema:
+            $ref: '#/definitions/dto.ShareConfig'
+        "400":
+          description: Invalid share name
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Share not found
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get share configuration
+      tags:
+      - Configuration
+    post:
+      consumes:
+      - application/json
+      description: Update configuration for a specific user share
+      parameters:
+      - description: Share name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Share configuration
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/dto.ShareConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Configuration updated
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to update
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Update share configuration
+      tags:
+      - Configuration
+  /system:
+    get:
+      description: Retrieve comprehensive system metrics including CPU, RAM, temperatures,
+        and uptime
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: System information
+          schema:
+            $ref: '#/definitions/dto.SystemInfo'
+      summary: Get system information
+      tags:
+      - System
+  /system/reboot:
+    post:
+      description: Initiate a system reboot
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Reboot initiated
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to initiate reboot
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Reboot system
+      tags:
+      - System
+  /system/shutdown:
+    post:
+      description: Initiate a system shutdown
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Shutdown initiated
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to initiate shutdown
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Shutdown system
+      tags:
+      - System
+  /unassigned:
+    get:
+      description: Retrieve all unassigned devices and remote shares
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Unassigned devices and remote shares
+          schema:
+            $ref: '#/definitions/dto.UnassignedDeviceList'
+      summary: Get all unassigned devices
+      tags:
+      - Unassigned Devices
+  /unassigned/devices:
+    get:
+      description: Retrieve only unassigned devices (excludes remote shares)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Unassigned devices
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get unassigned devices only
+      tags:
+      - Unassigned Devices
+  /unassigned/remote-shares:
+    get:
+      description: Retrieve only remote shares (excludes local unassigned devices)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Remote shares
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get remote shares only
+      tags:
+      - Unassigned Devices
+  /ups:
+    get:
+      description: Retrieve UPS status information from apcupsd
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: UPS status
+          schema:
+            $ref: '#/definitions/dto.UPSStatus'
+      summary: Get UPS status
+      tags:
+      - UPS
+  /user-scripts:
+    get:
+      description: Retrieve a list of all available user scripts
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of user scripts
+          schema:
+            items:
+              $ref: '#/definitions/dto.UserScriptInfo'
+            type: array
+        "500":
+          description: Failed to list scripts
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get user scripts
+      tags:
+      - User Scripts
+  /user-scripts/{name}/execute:
+    post:
+      consumes:
+      - application/json
+      description: Execute a user script by name
+      parameters:
+      - description: Script name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Execution options
+        in: body
+        name: options
+        schema:
+          $ref: '#/definitions/dto.UserScriptExecuteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Execution result
+          schema:
+            $ref: '#/definitions/dto.UserScriptExecuteResponse'
+        "500":
+          description: Failed to execute
+          schema:
+            $ref: '#/definitions/dto.UserScriptExecuteResponse'
+      summary: Execute user script
+      tags:
+      - User Scripts
+  /vm:
+    get:
+      description: Retrieve information about all virtual machines
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of VMs
+          schema:
+            items:
+              $ref: '#/definitions/dto.VMInfo'
+            type: array
+      summary: Get all VMs
+      tags:
+      - VMs
+  /vm/{id}:
+    get:
+      description: Retrieve information about a specific virtual machine by ID or
+        name
+      parameters:
+      - description: VM ID or name
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: VM information
+          schema:
+            $ref: '#/definitions/dto.VMInfo'
+        "404":
+          description: VM not found
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get specific VM
+      tags:
+      - VMs
+  /vm/{name}/force-stop:
+    post:
+      description: Force stop a specific virtual machine by name (equivalent to pulling
+        the power cord)
+      parameters:
+      - description: VM name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: VM force stopped
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid VM name
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to force stop VM
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Force stop VM
+      tags:
+      - VMs
+  /vm/{name}/hibernate:
+    post:
+      description: Hibernate a specific virtual machine by name
+      parameters:
+      - description: VM name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: VM hibernated
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid VM name
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to hibernate VM
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Hibernate VM
+      tags:
+      - VMs
+  /vm/{name}/pause:
+    post:
+      description: Pause a specific virtual machine by name
+      parameters:
+      - description: VM name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: VM paused
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid VM name
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to pause VM
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Pause VM
+      tags:
+      - VMs
+  /vm/{name}/restart:
+    post:
+      description: Restart a specific virtual machine by name
+      parameters:
+      - description: VM name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: VM restarted
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid VM name
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to restart VM
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Restart VM
+      tags:
+      - VMs
+  /vm/{name}/resume:
+    post:
+      description: Resume a paused virtual machine by name
+      parameters:
+      - description: VM name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: VM resumed
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid VM name
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to resume VM
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Resume VM
+      tags:
+      - VMs
+  /vm/{name}/start:
+    post:
+      description: Start a specific virtual machine by name
+      parameters:
+      - description: VM name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: VM started
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid VM name
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to start VM
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Start VM
+      tags:
+      - VMs
+  /vm/{name}/stop:
+    post:
+      description: Gracefully stop a specific virtual machine by name
+      parameters:
+      - description: VM name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: VM stopped
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid VM name
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to stop VM
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Stop VM
+      tags:
+      - VMs
+  /ws:
+    get:
+      description: |-
+        Establish a WebSocket connection for real-time system updates
+
+        **Connection:** `ws://localhost:8043/api/v1/ws`
+
+        **Event Format:**
+        ```json
+        {
+        "event": "update",
+        "timestamp": "2025-01-01T00:00:00Z",
+        "data": { ... }
+        }
+        ```
+
+        **Supported Events:**
+        - system_update: System metrics (CPU, RAM, temps)
+        - array_status_update: Array status changes
+        - disk_list_update: Disk information updates
+        - container_list_update: Docker container updates
+        - vm_list_update: VM status updates
+        - ups_status_update: UPS status updates
+        - gpu_metrics_update: GPU metrics updates
+        - network_list_update: Network interface updates
+        - hardware_update: Hardware information updates
+        - notifications_update: Notification updates
+        - zfs_pools_update: ZFS pool updates
+      responses: {}
+      summary: WebSocket connection
+      tags:
+      - WebSocket
+  /zfs/arc:
+    get:
+      description: Retrieve ZFS Adaptive Replacement Cache (ARC) statistics
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ZFS ARC statistics
+          schema:
+            $ref: '#/definitions/dto.ZFSARCStats'
+      summary: Get ZFS ARC statistics
+      tags:
+      - ZFS
+  /zfs/datasets:
+    get:
+      description: Retrieve information about all ZFS datasets
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of ZFS datasets
+          schema:
+            items:
+              $ref: '#/definitions/dto.ZFSDataset'
+            type: array
+      summary: Get all ZFS datasets
+      tags:
+      - ZFS
+  /zfs/pools:
+    get:
+      description: Retrieve information about all ZFS pools
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of ZFS pools
+          schema:
+            items:
+              $ref: '#/definitions/dto.ZFSPool'
+            type: array
+      summary: Get all ZFS pools
+      tags:
+      - ZFS
+  /zfs/pools/{name}:
+    get:
+      description: Retrieve information about a specific ZFS pool by name
+      parameters:
+      - description: Pool name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ZFS pool information
+          schema:
+            $ref: '#/definitions/dto.ZFSPool'
+        "404":
+          description: Pool not found
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get specific ZFS pool
+      tags:
+      - ZFS
+  /zfs/snapshots:
+    get:
+      description: Retrieve information about all ZFS snapshots
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of ZFS snapshots
+          schema:
+            items:
+              $ref: '#/definitions/dto.ZFSSnapshot'
+            type: array
+      summary: Get all ZFS snapshots
+      tags:
+      - ZFS
+schemes:
+- http
+- https
+swagger: "2.0"
+tags:
+- description: System monitoring and control endpoints (CPU, RAM, temps, reboot/shutdown)
+  name: System
+- description: Unraid array status and parity check control
+  name: Array
+- description: Disk information and SMART data
+  name: Disks
+- description: Docker container monitoring and lifecycle control
+  name: Docker
+- description: Virtual machine monitoring and lifecycle control
+  name: VMs
+- description: Network interface information and access URLs
+  name: Network
+- description: User share information and configuration
+  name: Shares
+- description: Hardware information (BIOS, CPU, Memory) via DMI
+  name: Hardware
+- description: UPS/NUT status monitoring
+  name: UPS
+- description: GPU metrics (NVIDIA/AMD)
+  name: GPU
+- description: ZFS pool, dataset, snapshot, and ARC statistics
+  name: ZFS
+- description: System notification management
+  name: Notifications
+- description: Configuration endpoints for shares and system settings
+  name: Configuration
+- description: Log file access
+  name: Logs
+- description: User script management and execution
+  name: User Scripts
+- description: Runtime collector management (enable/disable/interval)
+  name: Collectors
+- description: Real-time event streaming via WebSocket
+  name: WebSocket
+- description: Unassigned devices and remote shares
+  name: Unassigned Devices

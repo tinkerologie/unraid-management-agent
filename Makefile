@@ -5,7 +5,7 @@ PLUGIN_DIR := meta/plugin
 DATE := $(shell date '+%Y.%m.%d')
 HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo "dev")
 
-.PHONY: all local release package clean test test-coverage deps
+.PHONY: all local release package clean test test-coverage deps swagger
 
 all: test local
 
@@ -14,11 +14,22 @@ deps:
 	go mod download
 	go mod tidy
 
-local: deps
+# Generate Swagger documentation
+swagger:
+	@echo "Generating Swagger documentation..."
+	@if command -v swag >/dev/null 2>&1; then \
+		swag init -g daemon/docs/swagger.go -o daemon/docs --parseDependency --parseInternal; \
+	else \
+		echo "swag not found, installing..."; \
+		go install github.com/swaggo/swag/cmd/swag@latest; \
+		swag init -g daemon/docs/swagger.go -o daemon/docs --parseDependency --parseInternal; \
+	fi
+
+local: deps swagger
 	@echo "Building for local architecture..."
 	go build -ldflags "-X main.Version=$(VERSION)-$(DATE)-$(HASH)" -o $(BINARY)
 
-release: deps
+release: deps swagger
 	@echo "Building for Linux/amd64..."
 	GOOS=linux GOARCH=amd64 go build -ldflags "-X main.Version=$(VERSION)" -o $(BUILD_DIR)/$(BINARY)
 

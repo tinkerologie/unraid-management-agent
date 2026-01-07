@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **OpenAPI/Swagger Documentation** (#29):
+  - Interactive API documentation available at `/swagger/`
+  - Full OpenAPI 2.0 specification with 76 documented endpoints
+  - Auto-generated from code annotations using swaggo/swag
+  - Includes request/response schemas with examples
+  - "Try it out" functionality for testing endpoints directly
+  - Organized by tags: System, Array, Docker, VMs, ZFS, Network, etc.
+  - Swagger JSON available at `/swagger/doc.json`
+  - Build integration: `make swagger` generates documentation
+  - CI/CD: Swagger docs auto-generated during release builds
+
 - **Low Power Mode** (`--low-power-mode` or `UNRAID_LOW_POWER=true`):
   - New option for resource-constrained/older hardware (e.g., HP N40L with AMD Turion)
   - Multiplies all collection intervals by 4x when enabled

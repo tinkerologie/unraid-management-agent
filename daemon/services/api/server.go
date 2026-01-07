@@ -8,6 +8,9 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
+
+	_ "github.com/ruaan-deysel/unraid-management-agent/daemon/docs" // Swagger docs
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
@@ -82,6 +85,14 @@ func (s *Server) setupRoutes() {
 	s.router.Use(corsMiddleware)
 	s.router.Use(loggingMiddleware)
 	s.router.Use(recoveryMiddleware)
+
+	// Swagger UI endpoint (accessible at /swagger/index.html)
+	s.router.PathPrefix("/swagger/").Handler(httpSwagger.Handler(
+		httpSwagger.URL("/swagger/doc.json"),
+		httpSwagger.DeepLinking(true),
+		httpSwagger.DocExpansion("none"),
+		httpSwagger.DomID("swagger-ui"),
+	))
 
 	api := s.router.PathPrefix("/api/v1").Subrouter()
 

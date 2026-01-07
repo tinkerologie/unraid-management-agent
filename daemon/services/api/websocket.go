@@ -104,6 +104,36 @@ func (h *WSHub) Broadcast(message interface{}) {
 	h.broadcast <- message
 }
 
+// handleWebSocket godoc
+//
+//	@Summary		WebSocket connection
+//	@Description	Establish a WebSocket connection for real-time system updates
+//	@Description
+//	@Description	**Connection:** `ws://localhost:8043/api/v1/ws`
+//	@Description
+//	@Description	**Event Format:**
+//	@Description	```json
+//	@Description	{
+//	@Description	  "event": "update",
+//	@Description	  "timestamp": "2025-01-01T00:00:00Z",
+//	@Description	  "data": { ... }
+//	@Description	}
+//	@Description	```
+//	@Description
+//	@Description	**Supported Events:**
+//	@Description	- system_update: System metrics (CPU, RAM, temps)
+//	@Description	- array_status_update: Array status changes
+//	@Description	- disk_list_update: Disk information updates
+//	@Description	- container_list_update: Docker container updates
+//	@Description	- vm_list_update: VM status updates
+//	@Description	- ups_status_update: UPS status updates
+//	@Description	- gpu_metrics_update: GPU metrics updates
+//	@Description	- network_list_update: Network interface updates
+//	@Description	- hardware_update: Hardware information updates
+//	@Description	- notifications_update: Notification updates
+//	@Description	- zfs_pools_update: ZFS pool updates
+//	@Tags			WebSocket
+//	@Router			/ws [get]
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {

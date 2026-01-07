@@ -1,0 +1,5257 @@
+{
+    "schemes": [
+        "http",
+        "https"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "REST API and WebSocket interface for comprehensive Unraid system monitoring and control.\nThis is a third-party community plugin providing an alternative/complement to the official Unraid GraphQL API.",
+        "title": "Unraid Management Agent API",
+        "contact": {
+            "name": "GitHub Issues",
+            "url": "https://github.com/ruaan-deysel/unraid-management-agent/issues"
+        },
+        "license": {
+            "name": "MIT",
+            "url": "https://github.com/ruaan-deysel/unraid-management-agent/blob/main/LICENSE"
+        },
+        "version": "2025.12.1"
+    },
+    "host": "localhost:8043",
+    "basePath": "/api/v1",
+    "paths": {
+        "/array": {
+            "get": {
+                "description": "Retrieve Unraid array status including parity information",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Array"
+                ],
+                "summary": "Get array status",
+                "responses": {
+                    "200": {
+                        "description": "Array status",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ArrayStatus"
+                        }
+                    }
+                }
+            }
+        },
+        "/array/parity-check/history": {
+            "get": {
+                "description": "Retrieve the history of parity check operations",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Array"
+                ],
+                "summary": "Get parity check history",
+                "responses": {
+                    "200": {
+                        "description": "Parity check history",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ParityCheckHistory"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get parity check history",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/array/parity-check/pause": {
+            "post": {
+                "description": "Pause an in-progress parity check operation",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Array"
+                ],
+                "summary": "Pause parity check",
+                "responses": {
+                    "200": {
+                        "description": "Parity check paused",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to pause parity check",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/array/parity-check/resume": {
+            "post": {
+                "description": "Resume a paused parity check operation",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Array"
+                ],
+                "summary": "Resume parity check",
+                "responses": {
+                    "200": {
+                        "description": "Parity check resumed",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to resume parity check",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/array/parity-check/start": {
+            "post": {
+                "description": "Start a parity check operation, optionally with correction",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Array"
+                ],
+                "summary": "Start parity check",
+                "parameters": [
+                    {
+                        "type": "boolean",
+                        "description": "Enable correcting mode",
+                        "name": "correcting",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Parity check started",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to start parity check",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/array/parity-check/stop": {
+            "post": {
+                "description": "Stop an in-progress parity check operation",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Array"
+                ],
+                "summary": "Stop parity check",
+                "responses": {
+                    "200": {
+                        "description": "Parity check stopped",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to stop parity check",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/array/start": {
+            "post": {
+                "description": "Start the Unraid array",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Array"
+                ],
+                "summary": "Start array",
+                "responses": {
+                    "200": {
+                        "description": "Array started",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to start array",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/array/stop": {
+            "post": {
+                "description": "Stop the Unraid array",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Array"
+                ],
+                "summary": "Stop array",
+                "responses": {
+                    "200": {
+                        "description": "Array stopped",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to stop array",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/collectors/status": {
+            "get": {
+                "description": "Retrieve status of all data collectors including enabled state and intervals",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Collectors"
+                ],
+                "summary": "Get all collectors status",
+                "responses": {
+                    "200": {
+                        "description": "Collectors status",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CollectorsStatusResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/collectors/{name}": {
+            "get": {
+                "description": "Retrieve status of a specific collector by name",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Collectors"
+                ],
+                "summary": "Get specific collector status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Collector name (e.g., system, docker, vm)",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Collector status",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CollectorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Collector not found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "503": {
+                        "description": "Collector management not available",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/collectors/{name}/disable": {
+            "post": {
+                "description": "Disable a specific collector at runtime",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Collectors"
+                ],
+                "summary": "Disable collector",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Collector name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Collector disabled",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CollectorResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Collector not found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "503": {
+                        "description": "Collector management not available",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/collectors/{name}/enable": {
+            "post": {
+                "description": "Enable a specific collector at runtime",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Collectors"
+                ],
+                "summary": "Enable collector",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Collector name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Collector enabled",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CollectorResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Collector not found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "503": {
+                        "description": "Collector management not available",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/collectors/{name}/interval": {
+            "patch": {
+                "description": "Update the collection interval for a specific collector",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Collectors"
+                ],
+                "summary": "Update collector interval",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Collector name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "New interval in seconds",
+                        "name": "interval",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CollectorIntervalRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Interval updated",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CollectorResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Collector not found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "503": {
+                        "description": "Collector management not available",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/disks": {
+            "get": {
+                "description": "Retrieve information about all disks including SMART data",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Disks"
+                ],
+                "summary": "Get all disks",
+                "responses": {
+                    "200": {
+                        "description": "List of disks",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.DiskInfo"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/disks/{id}": {
+            "get": {
+                "description": "Retrieve information about a specific disk by ID, device name, or name",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Disks"
+                ],
+                "summary": "Get specific disk",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Disk ID, device name (e.g., sda), or disk name (e.g., disk1)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Disk information",
+                        "schema": {
+                            "$ref": "#/definitions/dto.DiskInfo"
+                        }
+                    },
+                    "404": {
+                        "description": "Disk not found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/docker": {
+            "get": {
+                "description": "Retrieve information about all Docker containers including stats",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Docker"
+                ],
+                "summary": "Get all Docker containers",
+                "responses": {
+                    "200": {
+                        "description": "List of containers",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.ContainerInfo"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/docker/{id}": {
+            "get": {
+                "description": "Retrieve information about a specific Docker container by ID or name",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Docker"
+                ],
+                "summary": "Get specific Docker container",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container ID or name",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Container information",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ContainerInfo"
+                        }
+                    },
+                    "404": {
+                        "description": "Container not found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/docker/{id}/pause": {
+            "post": {
+                "description": "Pause a specific Docker container by ID or name",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Docker"
+                ],
+                "summary": "Pause Docker container",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container ID or name",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Container paused",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid container ID",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to pause container",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/docker/{id}/restart": {
+            "post": {
+                "description": "Restart a specific Docker container by ID or name",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Docker"
+                ],
+                "summary": "Restart Docker container",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container ID or name",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Container restarted",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid container ID",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to restart container",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/docker/{id}/start": {
+            "post": {
+                "description": "Start a specific Docker container by ID or name",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Docker"
+                ],
+                "summary": "Start Docker container",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container ID or name",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Container started",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid container ID",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to start container",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/docker/{id}/stop": {
+            "post": {
+                "description": "Stop a specific Docker container by ID or name",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Docker"
+                ],
+                "summary": "Stop Docker container",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container ID or name",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Container stopped",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid container ID",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to stop container",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/docker/{id}/unpause": {
+            "post": {
+                "description": "Unpause a specific Docker container by ID or name",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Docker"
+                ],
+                "summary": "Unpause Docker container",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container ID or name",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Container unpaused",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid container ID",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to unpause container",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/gpu": {
+            "get": {
+                "description": "Retrieve GPU metrics for NVIDIA and AMD GPUs",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "GPU"
+                ],
+                "summary": "Get GPU metrics",
+                "responses": {
+                    "200": {
+                        "description": "List of GPU metrics",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.GPUMetrics"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/hardware/baseboard": {
+            "get": {
+                "description": "Retrieve motherboard/baseboard information from DMI data",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Hardware"
+                ],
+                "summary": "Get baseboard information",
+                "responses": {
+                    "200": {
+                        "description": "Baseboard information",
+                        "schema": {
+                            "$ref": "#/definitions/dto.BaseboardInfo"
+                        }
+                    },
+                    "404": {
+                        "description": "Baseboard info not available",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/hardware/bios": {
+            "get": {
+                "description": "Retrieve BIOS information from DMI data",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Hardware"
+                ],
+                "summary": "Get BIOS information",
+                "responses": {
+                    "200": {
+                        "description": "BIOS information",
+                        "schema": {
+                            "$ref": "#/definitions/dto.BIOSInfo"
+                        }
+                    },
+                    "404": {
+                        "description": "BIOS info not available",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/hardware/cache": {
+            "get": {
+                "description": "Retrieve CPU cache hierarchy information from DMI data",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Hardware"
+                ],
+                "summary": "Get CPU cache information",
+                "responses": {
+                    "200": {
+                        "description": "CPU cache information",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.CPUCacheInfo"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Cache info not available",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/hardware/cpu": {
+            "get": {
+                "description": "Retrieve CPU hardware information from DMI data",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Hardware"
+                ],
+                "summary": "Get CPU hardware information",
+                "responses": {
+                    "200": {
+                        "description": "CPU information",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CPUHardwareInfo"
+                        }
+                    },
+                    "404": {
+                        "description": "CPU info not available",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/hardware/full": {
+            "get": {
+                "description": "Retrieve complete hardware information including BIOS, CPU, and memory",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Hardware"
+                ],
+                "summary": "Get full hardware information",
+                "responses": {
+                    "200": {
+                        "description": "Hardware information",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HardwareInfo"
+                        }
+                    }
+                }
+            }
+        },
+        "/hardware/memory-array": {
+            "get": {
+                "description": "Retrieve physical memory array information from DMI data",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Hardware"
+                ],
+                "summary": "Get memory array information",
+                "responses": {
+                    "200": {
+                        "description": "Memory array information",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MemoryArrayInfo"
+                        }
+                    },
+                    "404": {
+                        "description": "Memory array info not available",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/hardware/memory-devices": {
+            "get": {
+                "description": "Retrieve individual memory device (DIMM) information from DMI data",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Hardware"
+                ],
+                "summary": "Get memory device information",
+                "responses": {
+                    "200": {
+                        "description": "Memory device information",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.MemoryDeviceInfo"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Memory device info not available",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Check if the API server is running and healthy",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System"
+                ],
+                "summary": "Health check",
+                "responses": {
+                    "200": {
+                        "description": "Server is healthy",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/logs": {
+            "get": {
+                "description": "List available log files or get log content with optional pagination",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Logs"
+                ],
+                "summary": "Get logs",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Log file path (if empty, lists all logs)",
+                        "name": "path",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of lines to return",
+                        "name": "lines",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Starting line number",
+                        "name": "start",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Log content or list",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LogFileContent"
+                        }
+                    },
+                    "500": {
+                        "description": "Error reading logs",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/logs/{filename}": {
+            "get": {
+                "description": "Retrieve a specific log file by filename with optional pagination",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Logs"
+                ],
+                "summary": "Get specific log file",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Log filename",
+                        "name": "filename",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of lines to return",
+                        "name": "lines",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Starting line number",
+                        "name": "start",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Log content",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LogFileContent"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid filename",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Log file not found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Error reading log",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/network": {
+            "get": {
+                "description": "Retrieve information about all network interfaces",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Network"
+                ],
+                "summary": "Get network interfaces",
+                "responses": {
+                    "200": {
+                        "description": "List of network interfaces",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.NetworkInfo"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/network/access-urls": {
+            "get": {
+                "description": "Returns all methods to access the Unraid server including LAN IP, mDNS hostname, WireGuard VPN IPs, WAN IP, and IPv6 addresses",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Network"
+                ],
+                "summary": "Get network access URLs",
+                "responses": {
+                    "200": {
+                        "description": "Network access URLs",
+                        "schema": {
+                            "$ref": "#/definitions/dto.NetworkAccessURLs"
+                        }
+                    }
+                }
+            }
+        },
+        "/network/{interface}/config": {
+            "get": {
+                "description": "Retrieve configuration for a specific network interface",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Configuration"
+                ],
+                "summary": "Get network interface configuration",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Interface name (e.g., eth0, bond0)",
+                        "name": "interface",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Network configuration",
+                        "schema": {
+                            "$ref": "#/definitions/dto.NetworkConfig"
+                        }
+                    },
+                    "404": {
+                        "description": "Interface not found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications": {
+            "get": {
+                "description": "Retrieve all notifications with overview counts, optionally filtered by importance",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Get all notifications",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by importance level (alert, warning, normal)",
+                        "name": "importance",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Notifications with overview",
+                        "schema": {
+                            "$ref": "#/definitions/dto.NotificationList"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Create a new system notification",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Create notification",
+                "parameters": [
+                    {
+                        "description": "Notification data",
+                        "name": "notification",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "description": {
+                                    "type": "string"
+                                },
+                                "importance": {
+                                    "type": "string"
+                                },
+                                "link": {
+                                    "type": "string"
+                                },
+                                "subject": {
+                                    "type": "string"
+                                },
+                                "title": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Notification created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to create notification",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications/archive": {
+            "get": {
+                "description": "Retrieve only archived notifications",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Get archived notifications",
+                "responses": {
+                    "200": {
+                        "description": "Archived notifications with count",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications/archive/all": {
+            "post": {
+                "description": "Archive all unread notifications",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Archive all notifications",
+                "responses": {
+                    "200": {
+                        "description": "All notifications archived",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to archive",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications/overview": {
+            "get": {
+                "description": "Retrieve only the notification overview counts",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Get notification counts",
+                "responses": {
+                    "200": {
+                        "description": "Notification counts by category",
+                        "schema": {
+                            "$ref": "#/definitions/dto.NotificationOverview"
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications/unread": {
+            "get": {
+                "description": "Retrieve only unread notifications",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Get unread notifications",
+                "responses": {
+                    "200": {
+                        "description": "Unread notifications with count",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications/{id}": {
+            "get": {
+                "description": "Retrieve a specific notification by its ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Get notification by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Notification ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Notification details",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Notification"
+                        }
+                    },
+                    "404": {
+                        "description": "Notification not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Delete a specific notification by ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Delete notification",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Notification ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Whether notification is archived",
+                        "name": "archived",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Notification deleted",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to delete",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications/{id}/archive": {
+            "post": {
+                "description": "Archive a specific notification by ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Archive notification",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Notification ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Notification archived",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to archive",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications/{id}/unarchive": {
+            "post": {
+                "description": "Unarchive a specific notification by ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Unarchive notification",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Notification ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Notification unarchived",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to unarchive",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/nut": {
+            "get": {
+                "description": "Retrieve Network UPS Tools (NUT) status information",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "UPS"
+                ],
+                "summary": "Get NUT status",
+                "responses": {
+                    "200": {
+                        "description": "NUT status",
+                        "schema": {
+                            "$ref": "#/definitions/dto.NUTResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/registration": {
+            "get": {
+                "description": "Retrieve Unraid license/registration information",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System"
+                ],
+                "summary": "Get registration status",
+                "responses": {
+                    "200": {
+                        "description": "Registration information",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Registration"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/disks": {
+            "get": {
+                "description": "Retrieve disk configuration settings",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Configuration"
+                ],
+                "summary": "Get disk settings",
+                "responses": {
+                    "200": {
+                        "description": "Disk settings",
+                        "schema": {
+                            "$ref": "#/definitions/dto.DiskSettings"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get settings",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/docker": {
+            "get": {
+                "description": "Retrieve Docker daemon settings",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Configuration"
+                ],
+                "summary": "Get Docker settings",
+                "responses": {
+                    "200": {
+                        "description": "Docker settings",
+                        "schema": {
+                            "$ref": "#/definitions/dto.DockerSettings"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get settings",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/system": {
+            "get": {
+                "description": "Retrieve Unraid system settings",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Configuration"
+                ],
+                "summary": "Get system settings",
+                "responses": {
+                    "200": {
+                        "description": "System settings",
+                        "schema": {
+                            "$ref": "#/definitions/dto.SystemSettings"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get settings",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Update Unraid system settings",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Configuration"
+                ],
+                "summary": "Update system settings",
+                "parameters": [
+                    {
+                        "description": "System settings",
+                        "name": "settings",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.SystemSettings"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Settings updated",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to update",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/vm": {
+            "get": {
+                "description": "Retrieve virtual machine manager settings",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Configuration"
+                ],
+                "summary": "Get VM settings",
+                "responses": {
+                    "200": {
+                        "description": "VM settings",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VMSettings"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get settings",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/shares": {
+            "get": {
+                "description": "Retrieve information about all user shares",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Shares"
+                ],
+                "summary": "Get all shares",
+                "responses": {
+                    "200": {
+                        "description": "List of shares",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.ShareInfo"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/shares/{name}/config": {
+            "get": {
+                "description": "Retrieve configuration for a specific user share",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Configuration"
+                ],
+                "summary": "Get share configuration",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Share name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Share configuration",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ShareConfig"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid share name",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Share not found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Update configuration for a specific user share",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Configuration"
+                ],
+                "summary": "Update share configuration",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Share name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Share configuration",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.ShareConfig"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Configuration updated",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to update",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/system": {
+            "get": {
+                "description": "Retrieve comprehensive system metrics including CPU, RAM, temperatures, and uptime",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System"
+                ],
+                "summary": "Get system information",
+                "responses": {
+                    "200": {
+                        "description": "System information",
+                        "schema": {
+                            "$ref": "#/definitions/dto.SystemInfo"
+                        }
+                    }
+                }
+            }
+        },
+        "/system/reboot": {
+            "post": {
+                "description": "Initiate a system reboot",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System"
+                ],
+                "summary": "Reboot system",
+                "responses": {
+                    "200": {
+                        "description": "Reboot initiated",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to initiate reboot",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/system/shutdown": {
+            "post": {
+                "description": "Initiate a system shutdown",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System"
+                ],
+                "summary": "Shutdown system",
+                "responses": {
+                    "200": {
+                        "description": "Shutdown initiated",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to initiate shutdown",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/unassigned": {
+            "get": {
+                "description": "Retrieve all unassigned devices and remote shares",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Unassigned Devices"
+                ],
+                "summary": "Get all unassigned devices",
+                "responses": {
+                    "200": {
+                        "description": "Unassigned devices and remote shares",
+                        "schema": {
+                            "$ref": "#/definitions/dto.UnassignedDeviceList"
+                        }
+                    }
+                }
+            }
+        },
+        "/unassigned/devices": {
+            "get": {
+                "description": "Retrieve only unassigned devices (excludes remote shares)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Unassigned Devices"
+                ],
+                "summary": "Get unassigned devices only",
+                "responses": {
+                    "200": {
+                        "description": "Unassigned devices",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/unassigned/remote-shares": {
+            "get": {
+                "description": "Retrieve only remote shares (excludes local unassigned devices)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Unassigned Devices"
+                ],
+                "summary": "Get remote shares only",
+                "responses": {
+                    "200": {
+                        "description": "Remote shares",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/ups": {
+            "get": {
+                "description": "Retrieve UPS status information from apcupsd",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "UPS"
+                ],
+                "summary": "Get UPS status",
+                "responses": {
+                    "200": {
+                        "description": "UPS status",
+                        "schema": {
+                            "$ref": "#/definitions/dto.UPSStatus"
+                        }
+                    }
+                }
+            }
+        },
+        "/user-scripts": {
+            "get": {
+                "description": "Retrieve a list of all available user scripts",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User Scripts"
+                ],
+                "summary": "Get user scripts",
+                "responses": {
+                    "200": {
+                        "description": "List of user scripts",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.UserScriptInfo"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to list scripts",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/user-scripts/{name}/execute": {
+            "post": {
+                "description": "Execute a user script by name",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User Scripts"
+                ],
+                "summary": "Execute user script",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Script name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Execution options",
+                        "name": "options",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/dto.UserScriptExecuteRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Execution result",
+                        "schema": {
+                            "$ref": "#/definitions/dto.UserScriptExecuteResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to execute",
+                        "schema": {
+                            "$ref": "#/definitions/dto.UserScriptExecuteResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/vm": {
+            "get": {
+                "description": "Retrieve information about all virtual machines",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "VMs"
+                ],
+                "summary": "Get all VMs",
+                "responses": {
+                    "200": {
+                        "description": "List of VMs",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.VMInfo"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/vm/{id}": {
+            "get": {
+                "description": "Retrieve information about a specific virtual machine by ID or name",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "VMs"
+                ],
+                "summary": "Get specific VM",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "VM ID or name",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "VM information",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VMInfo"
+                        }
+                    },
+                    "404": {
+                        "description": "VM not found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/vm/{name}/force-stop": {
+            "post": {
+                "description": "Force stop a specific virtual machine by name (equivalent to pulling the power cord)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "VMs"
+                ],
+                "summary": "Force stop VM",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "VM name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "VM force stopped",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid VM name",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to force stop VM",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/vm/{name}/hibernate": {
+            "post": {
+                "description": "Hibernate a specific virtual machine by name",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "VMs"
+                ],
+                "summary": "Hibernate VM",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "VM name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "VM hibernated",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid VM name",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to hibernate VM",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/vm/{name}/pause": {
+            "post": {
+                "description": "Pause a specific virtual machine by name",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "VMs"
+                ],
+                "summary": "Pause VM",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "VM name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "VM paused",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid VM name",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to pause VM",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/vm/{name}/restart": {
+            "post": {
+                "description": "Restart a specific virtual machine by name",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "VMs"
+                ],
+                "summary": "Restart VM",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "VM name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "VM restarted",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid VM name",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to restart VM",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/vm/{name}/resume": {
+            "post": {
+                "description": "Resume a paused virtual machine by name",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "VMs"
+                ],
+                "summary": "Resume VM",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "VM name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "VM resumed",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid VM name",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to resume VM",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/vm/{name}/start": {
+            "post": {
+                "description": "Start a specific virtual machine by name",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "VMs"
+                ],
+                "summary": "Start VM",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "VM name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "VM started",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid VM name",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to start VM",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/vm/{name}/stop": {
+            "post": {
+                "description": "Gracefully stop a specific virtual machine by name",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "VMs"
+                ],
+                "summary": "Stop VM",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "VM name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "VM stopped",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid VM name",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to stop VM",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/ws": {
+            "get": {
+                "description": "Establish a WebSocket connection for real-time system updates\n\n**Connection:** `ws://localhost:8043/api/v1/ws`\n\n**Event Format:**\n```json\n{\n\"event\": \"update\",\n\"timestamp\": \"2025-01-01T00:00:00Z\",\n\"data\": { ... }\n}\n```\n\n**Supported Events:**\n- system_update: System metrics (CPU, RAM, temps)\n- array_status_update: Array status changes\n- disk_list_update: Disk information updates\n- container_list_update: Docker container updates\n- vm_list_update: VM status updates\n- ups_status_update: UPS status updates\n- gpu_metrics_update: GPU metrics updates\n- network_list_update: Network interface updates\n- hardware_update: Hardware information updates\n- notifications_update: Notification updates\n- zfs_pools_update: ZFS pool updates",
+                "tags": [
+                    "WebSocket"
+                ],
+                "summary": "WebSocket connection",
+                "responses": {}
+            }
+        },
+        "/zfs/arc": {
+            "get": {
+                "description": "Retrieve ZFS Adaptive Replacement Cache (ARC) statistics",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ZFS"
+                ],
+                "summary": "Get ZFS ARC statistics",
+                "responses": {
+                    "200": {
+                        "description": "ZFS ARC statistics",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ZFSARCStats"
+                        }
+                    }
+                }
+            }
+        },
+        "/zfs/datasets": {
+            "get": {
+                "description": "Retrieve information about all ZFS datasets",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ZFS"
+                ],
+                "summary": "Get all ZFS datasets",
+                "responses": {
+                    "200": {
+                        "description": "List of ZFS datasets",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.ZFSDataset"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/zfs/pools": {
+            "get": {
+                "description": "Retrieve information about all ZFS pools",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ZFS"
+                ],
+                "summary": "Get all ZFS pools",
+                "responses": {
+                    "200": {
+                        "description": "List of ZFS pools",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.ZFSPool"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/zfs/pools/{name}": {
+            "get": {
+                "description": "Retrieve information about a specific ZFS pool by name",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ZFS"
+                ],
+                "summary": "Get specific ZFS pool",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pool name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "ZFS pool information",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ZFSPool"
+                        }
+                    },
+                    "404": {
+                        "description": "Pool not found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/zfs/snapshots": {
+            "get": {
+                "description": "Retrieve information about all ZFS snapshots",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ZFS"
+                ],
+                "summary": "Get all ZFS snapshots",
+                "responses": {
+                    "200": {
+                        "description": "List of ZFS snapshots",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.ZFSSnapshot"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "dto.AccessURL": {
+            "type": "object",
+            "properties": {
+                "ipv4": {
+                    "type": "string"
+                },
+                "ipv6": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "type": {
+                    "description": "\"lan\", \"wan\", \"wireguard\", \"mdns\", \"ipv6\", \"other\"",
+                    "type": "string"
+                }
+            }
+        },
+        "dto.ArrayStatus": {
+            "type": "object",
+            "properties": {
+                "free_bytes": {
+                    "type": "integer",
+                    "example": 54975581388800
+                },
+                "num_data_disks": {
+                    "type": "integer",
+                    "example": 8
+                },
+                "num_disks": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "num_parity_disks": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "parity_check_progress": {
+                    "type": "number",
+                    "example": 0
+                },
+                "parity_check_status": {
+                    "type": "string",
+                    "example": "idle"
+                },
+                "parity_valid": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "state": {
+                    "type": "string",
+                    "example": "Started"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "total_bytes": {
+                    "type": "integer",
+                    "example": 100862164623360
+                },
+                "used_percent": {
+                    "type": "number",
+                    "example": 45.5
+                }
+            }
+        },
+        "dto.BIOSInfo": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string",
+                    "example": "0xF0000"
+                },
+                "characteristics": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "release_date": {
+                    "type": "string",
+                    "example": "12/25/2023"
+                },
+                "revision": {
+                    "type": "string",
+                    "example": "5.14"
+                },
+                "rom_size": {
+                    "type": "string",
+                    "example": "16 MB"
+                },
+                "runtime_size": {
+                    "type": "string",
+                    "example": "64 KB"
+                },
+                "vendor": {
+                    "type": "string",
+                    "example": "American Megatrends International, LLC."
+                },
+                "version": {
+                    "type": "string",
+                    "example": "1.4"
+                }
+            }
+        },
+        "dto.BaseboardInfo": {
+            "type": "object",
+            "properties": {
+                "asset_tag": {
+                    "type": "string",
+                    "example": "To be filled by O.E.M."
+                },
+                "features": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "location_in_chassis": {
+                    "type": "string",
+                    "example": "Default string"
+                },
+                "manufacturer": {
+                    "type": "string",
+                    "example": "Supermicro"
+                },
+                "product_name": {
+                    "type": "string",
+                    "example": "X11SCL-F"
+                },
+                "serial_number": {
+                    "type": "string",
+                    "example": "OM123456789"
+                },
+                "type": {
+                    "type": "string",
+                    "example": "Motherboard"
+                },
+                "version": {
+                    "type": "string",
+                    "example": "1.02"
+                }
+            }
+        },
+        "dto.CPUCacheInfo": {
+            "type": "object",
+            "properties": {
+                "associativity": {
+                    "type": "string"
+                },
+                "configuration": {
+                    "type": "string"
+                },
+                "error_correction_type": {
+                    "type": "string"
+                },
+                "installed_size": {
+                    "type": "string"
+                },
+                "installed_sram_type": {
+                    "type": "string"
+                },
+                "level": {
+                    "type": "integer"
+                },
+                "location": {
+                    "type": "string"
+                },
+                "maximum_size": {
+                    "type": "string"
+                },
+                "operational_mode": {
+                    "type": "string"
+                },
+                "socket_designation": {
+                    "type": "string"
+                },
+                "supported_sram_types": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "system_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.CPUHardwareInfo": {
+            "type": "object",
+            "properties": {
+                "asset_tag": {
+                    "type": "string",
+                    "example": "To Be Filled By O.E.M."
+                },
+                "characteristics": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "core_enabled": {
+                    "type": "integer",
+                    "example": 8
+                },
+                "current_speed_mhz": {
+                    "type": "integer",
+                    "example": 3600
+                },
+                "external_clock_mhz": {
+                    "type": "integer",
+                    "example": 100
+                },
+                "family": {
+                    "type": "string",
+                    "example": "Core i7"
+                },
+                "flags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "manufacturer": {
+                    "type": "string",
+                    "example": "Intel(R) Corporation"
+                },
+                "max_speed_mhz": {
+                    "type": "integer",
+                    "example": 4900
+                },
+                "part_number": {
+                    "type": "string",
+                    "example": "To Be Filled By O.E.M."
+                },
+                "serial_number": {
+                    "type": "string",
+                    "example": "To Be Filled By O.E.M."
+                },
+                "signature": {
+                    "type": "string",
+                    "example": "Type 0, Family 6, Model 158, Stepping 10"
+                },
+                "socket_designation": {
+                    "type": "string",
+                    "example": "CPU 1"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "Populated, Enabled"
+                },
+                "thread_count": {
+                    "type": "integer",
+                    "example": 8
+                },
+                "upgrade": {
+                    "type": "string",
+                    "example": "Socket LGA1151"
+                },
+                "voltage": {
+                    "type": "string",
+                    "example": "1.0 V"
+                }
+            }
+        },
+        "dto.CollectorIntervalRequest": {
+            "type": "object",
+            "properties": {
+                "interval": {
+                    "description": "seconds",
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.CollectorResponse": {
+            "type": "object",
+            "properties": {
+                "collector": {
+                    "$ref": "#/definitions/dto.CollectorStatus"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.CollectorStatus": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "error_count": {
+                    "type": "integer"
+                },
+                "interval_seconds": {
+                    "description": "0 if disabled",
+                    "type": "integer"
+                },
+                "last_run": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "required": {
+                    "description": "true if collector cannot be disabled",
+                    "type": "boolean"
+                },
+                "status": {
+                    "description": "\"running\", \"stopped\", \"disabled\", \"registered\"",
+                    "type": "string"
+                }
+            }
+        },
+        "dto.CollectorsStatusResponse": {
+            "type": "object",
+            "properties": {
+                "collectors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.CollectorStatus"
+                    }
+                },
+                "disabled_count": {
+                    "type": "integer"
+                },
+                "enabled_count": {
+                    "type": "integer"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.ContainerInfo": {
+            "type": "object",
+            "properties": {
+                "cpu_percent": {
+                    "type": "number",
+                    "example": 5.2
+                },
+                "id": {
+                    "type": "string",
+                    "example": "abc123def456"
+                },
+                "image": {
+                    "type": "string",
+                    "example": "plexinc/pms-docker:latest"
+                },
+                "ip_address": {
+                    "type": "string",
+                    "example": "172.17.0.2"
+                },
+                "memory_display": {
+                    "type": "string",
+                    "example": "1 GiB / 8 GiB"
+                },
+                "memory_limit_bytes": {
+                    "type": "integer",
+                    "example": 8589934592
+                },
+                "memory_usage_bytes": {
+                    "type": "integer",
+                    "example": 1073741824
+                },
+                "name": {
+                    "type": "string",
+                    "example": "plex"
+                },
+                "network_mode": {
+                    "type": "string",
+                    "example": "bridge"
+                },
+                "network_rx_bytes": {
+                    "type": "integer",
+                    "example": 104857600
+                },
+                "network_tx_bytes": {
+                    "type": "integer",
+                    "example": 52428800
+                },
+                "port_mappings": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "ports": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.PortMapping"
+                    }
+                },
+                "restart_policy": {
+                    "type": "string",
+                    "example": "unless-stopped"
+                },
+                "state": {
+                    "type": "string",
+                    "example": "running"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "Up 2 days"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "uptime": {
+                    "type": "string",
+                    "example": "2 days"
+                },
+                "version": {
+                    "type": "string",
+                    "example": "1.40.1"
+                },
+                "volume_mappings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.VolumeMapping"
+                    }
+                }
+            }
+        },
+        "dto.DiskInfo": {
+            "type": "object",
+            "properties": {
+                "device": {
+                    "type": "string",
+                    "example": "sda"
+                },
+                "filesystem": {
+                    "type": "string",
+                    "example": "xfs"
+                },
+                "free_bytes": {
+                    "type": "integer",
+                    "example": 6600076243764
+                },
+                "id": {
+                    "type": "string",
+                    "example": "disk1"
+                },
+                "io_utilization_percent": {
+                    "type": "number",
+                    "example": 5.2
+                },
+                "model": {
+                    "type": "string",
+                    "example": "WDC WD120EFBX-68B0EN0"
+                },
+                "mount_point": {
+                    "description": "Mount information",
+                    "type": "string",
+                    "example": "/mnt/disk1"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Disk 1"
+                },
+                "power_cycle_count": {
+                    "type": "integer",
+                    "example": 100
+                },
+                "power_on_hours": {
+                    "type": "integer",
+                    "example": 25000
+                },
+                "read_bytes": {
+                    "description": "I/O Statistics",
+                    "type": "integer",
+                    "example": 1073741824
+                },
+                "read_ops": {
+                    "type": "integer",
+                    "example": 100000
+                },
+                "role": {
+                    "description": "\"parity\", \"parity2\", \"data\", \"cache\", \"pool\"",
+                    "type": "string",
+                    "example": "data"
+                },
+                "serial_number": {
+                    "description": "Disk identification",
+                    "type": "string",
+                    "example": "WD-WMC4N0123456"
+                },
+                "size_bytes": {
+                    "type": "integer",
+                    "example": 12000138625024
+                },
+                "smart_attributes": {
+                    "description": "Enhanced SMART attributes",
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/dto.SMARTAttribute"
+                    }
+                },
+                "smart_errors": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "smart_status": {
+                    "type": "string",
+                    "example": "PASSED"
+                },
+                "spin_state": {
+                    "description": "\"active\", \"standby\", \"unknown\"",
+                    "type": "string",
+                    "example": "active"
+                },
+                "spindown_delay": {
+                    "type": "integer",
+                    "example": 30
+                },
+                "status": {
+                    "type": "string",
+                    "example": "OK"
+                },
+                "temperature_celsius": {
+                    "type": "number",
+                    "example": 35
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "usage_percent": {
+                    "type": "number",
+                    "example": 45
+                },
+                "used_bytes": {
+                    "type": "integer",
+                    "example": 5400062381260
+                },
+                "write_bytes": {
+                    "type": "integer",
+                    "example": 536870912
+                },
+                "write_ops": {
+                    "type": "integer",
+                    "example": 50000
+                }
+            }
+        },
+        "dto.DiskSettings": {
+            "type": "object",
+            "properties": {
+                "default_filesystem": {
+                    "description": "Default filesystem type (xfs, btrfs, etc.)",
+                    "type": "string"
+                },
+                "shutdown_timeout_seconds": {
+                    "description": "Shutdown timeout in seconds",
+                    "type": "integer"
+                },
+                "spindown_delay_minutes": {
+                    "description": "Default spin down delay in minutes",
+                    "type": "integer"
+                },
+                "spinup_groups": {
+                    "description": "Enable spinup groups",
+                    "type": "boolean"
+                },
+                "start_array": {
+                    "description": "Auto start array on boot",
+                    "type": "boolean"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.DockerSettings": {
+            "type": "object",
+            "properties": {
+                "custom_networks": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "default_network": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "image_path": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.FanInfo": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "example": "CPU Fan"
+                },
+                "rpm": {
+                    "type": "integer",
+                    "example": 1200
+                }
+            }
+        },
+        "dto.GPUMetrics": {
+            "type": "object",
+            "properties": {
+                "available": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "cpu_temperature_celsius": {
+                    "description": "CPU temp for Intel iGPUs (shares die with CPU)",
+                    "type": "number",
+                    "example": 45
+                },
+                "driver_version": {
+                    "type": "string",
+                    "example": "535.183.01"
+                },
+                "fan_max_rpm": {
+                    "description": "Max fan RPM (AMD discrete)",
+                    "type": "integer",
+                    "example": 3000
+                },
+                "fan_rpm": {
+                    "description": "Fan RPM (AMD discrete)",
+                    "type": "integer",
+                    "example": 2000
+                },
+                "fan_speed_percent": {
+                    "description": "Fan speed % (NVIDIA)",
+                    "type": "number",
+                    "example": 65
+                },
+                "index": {
+                    "description": "GPU index for multi-GPU systems",
+                    "type": "integer",
+                    "example": 0
+                },
+                "memory_total_bytes": {
+                    "type": "integer",
+                    "example": 10737418240
+                },
+                "memory_used_bytes": {
+                    "type": "integer",
+                    "example": 6442450944
+                },
+                "name": {
+                    "type": "string",
+                    "example": "NVIDIA GeForce RTX 3080"
+                },
+                "pci_id": {
+                    "description": "PCI bus ID (e.g., \"0000:01:00.0\")",
+                    "type": "string",
+                    "example": "0000:01:00.0"
+                },
+                "power_draw_watts": {
+                    "type": "number",
+                    "example": 250.5
+                },
+                "temperature_celsius": {
+                    "type": "number",
+                    "example": 55
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "utilization_gpu_percent": {
+                    "type": "number",
+                    "example": 75.5
+                },
+                "utilization_memory_percent": {
+                    "type": "number",
+                    "example": 60.2
+                },
+                "uuid": {
+                    "description": "Device UUID (NVIDIA only)",
+                    "type": "string",
+                    "example": "GPU-12345678-1234-1234-1234-123456789012"
+                },
+                "vendor": {
+                    "description": "\"nvidia\", \"intel\", \"amd\"",
+                    "type": "string",
+                    "example": "nvidia"
+                }
+            }
+        },
+        "dto.HardwareInfo": {
+            "type": "object",
+            "properties": {
+                "baseboard": {
+                    "$ref": "#/definitions/dto.BaseboardInfo"
+                },
+                "bios": {
+                    "$ref": "#/definitions/dto.BIOSInfo"
+                },
+                "cache": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.CPUCacheInfo"
+                    }
+                },
+                "cpu": {
+                    "$ref": "#/definitions/dto.CPUHardwareInfo"
+                },
+                "memory_array": {
+                    "$ref": "#/definitions/dto.MemoryArrayInfo"
+                },
+                "memory_devices": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.MemoryDeviceInfo"
+                    }
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.LogFileContent": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "end_line": {
+                    "type": "integer"
+                },
+                "lines": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "lines_returned": {
+                    "type": "integer"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "start_line": {
+                    "type": "integer"
+                },
+                "total_lines": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.MemoryArrayInfo": {
+            "type": "object",
+            "properties": {
+                "error_correction_type": {
+                    "type": "string"
+                },
+                "location": {
+                    "type": "string"
+                },
+                "maximum_capacity": {
+                    "type": "string"
+                },
+                "number_of_devices": {
+                    "type": "integer"
+                },
+                "use": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.MemoryDeviceInfo": {
+            "type": "object",
+            "properties": {
+                "asset_tag": {
+                    "type": "string"
+                },
+                "bank_locator": {
+                    "type": "string"
+                },
+                "configured_speed": {
+                    "type": "string"
+                },
+                "configured_voltage": {
+                    "type": "string"
+                },
+                "data_width": {
+                    "type": "integer"
+                },
+                "form_factor": {
+                    "type": "string"
+                },
+                "locator": {
+                    "type": "string"
+                },
+                "manufacturer": {
+                    "type": "string"
+                },
+                "maximum_voltage": {
+                    "type": "string"
+                },
+                "minimum_voltage": {
+                    "type": "string"
+                },
+                "part_number": {
+                    "type": "string"
+                },
+                "rank": {
+                    "type": "integer"
+                },
+                "serial_number": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "string"
+                },
+                "speed": {
+                    "type": "string"
+                },
+                "total_width": {
+                    "type": "integer"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "type_detail": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.NUTConfig": {
+            "type": "object",
+            "properties": {
+                "battery_level": {
+                    "description": "Low battery threshold",
+                    "type": "integer"
+                },
+                "driver": {
+                    "description": "e.g., \"usbhid-ups\"",
+                    "type": "string"
+                },
+                "ip_address": {
+                    "description": "For netclient mode",
+                    "type": "string"
+                },
+                "mode": {
+                    "description": "\"standalone\", \"netserver\", \"netclient\"",
+                    "type": "string"
+                },
+                "poll_interval": {
+                    "description": "Seconds between polls",
+                    "type": "integer"
+                },
+                "port": {
+                    "description": "e.g., \"auto\"",
+                    "type": "string"
+                },
+                "runtime_value": {
+                    "description": "Low runtime threshold",
+                    "type": "integer"
+                },
+                "service_enabled": {
+                    "type": "boolean"
+                },
+                "shutdown_mode": {
+                    "description": "e.g., \"sec_timer\", \"fsd\"",
+                    "type": "string"
+                },
+                "timeout": {
+                    "description": "Shutdown timeout",
+                    "type": "integer"
+                },
+                "ups_name": {
+                    "description": "e.g., \"ups\"",
+                    "type": "string"
+                }
+            }
+        },
+        "dto.NUTDevice": {
+            "type": "object",
+            "properties": {
+                "available": {
+                    "type": "boolean"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.NUTResponse": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "$ref": "#/definitions/dto.NUTConfig"
+                },
+                "devices": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.NUTDevice"
+                    }
+                },
+                "installed": {
+                    "description": "Is NUT plugin installed?",
+                    "type": "boolean"
+                },
+                "running": {
+                    "description": "Is NUT service running?",
+                    "type": "boolean"
+                },
+                "status": {
+                    "$ref": "#/definitions/dto.NUTStatus"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.NUTStatus": {
+            "type": "object",
+            "properties": {
+                "alarms": {
+                    "description": "Active alarms if any",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "apparent_power_nominal_va": {
+                    "type": "number"
+                },
+                "apparent_power_va": {
+                    "type": "number"
+                },
+                "battery_charge_low_percent": {
+                    "type": "number"
+                },
+                "battery_charge_percent": {
+                    "description": "Battery info",
+                    "type": "number"
+                },
+                "battery_charge_warning_percent": {
+                    "type": "number"
+                },
+                "battery_mfr_date": {
+                    "type": "string"
+                },
+                "battery_runtime_low_seconds": {
+                    "type": "integer"
+                },
+                "battery_runtime_seconds": {
+                    "type": "integer"
+                },
+                "battery_status": {
+                    "type": "string"
+                },
+                "battery_type": {
+                    "description": "e.g., \"PbAcid\"",
+                    "type": "string"
+                },
+                "battery_voltage": {
+                    "type": "number"
+                },
+                "battery_voltage_nominal": {
+                    "type": "number"
+                },
+                "beeper_status": {
+                    "description": "e.g., \"enabled\", \"disabled\"",
+                    "type": "string"
+                },
+                "connected": {
+                    "description": "Connection and detection info",
+                    "type": "boolean"
+                },
+                "delay_shutdown_seconds": {
+                    "description": "Timing",
+                    "type": "integer"
+                },
+                "delay_start_seconds": {
+                    "type": "integer"
+                },
+                "device_name": {
+                    "description": "e.g., \"ups\"",
+                    "type": "string"
+                },
+                "driver": {
+                    "description": "e.g., \"usbhid-ups\"",
+                    "type": "string"
+                },
+                "driver_state": {
+                    "description": "e.g., \"quiet\", \"running\"",
+                    "type": "string"
+                },
+                "driver_version": {
+                    "description": "Driver info",
+                    "type": "string"
+                },
+                "driver_version_data": {
+                    "type": "string"
+                },
+                "driver_version_usb": {
+                    "type": "string"
+                },
+                "host": {
+                    "description": "e.g., \"localhost\" or remote IP",
+                    "type": "string"
+                },
+                "input_current": {
+                    "type": "number"
+                },
+                "input_frequency": {
+                    "type": "number"
+                },
+                "input_transfer_high": {
+                    "type": "number"
+                },
+                "input_transfer_low": {
+                    "type": "number"
+                },
+                "input_voltage": {
+                    "description": "Input power",
+                    "type": "number"
+                },
+                "input_voltage_nominal": {
+                    "type": "number"
+                },
+                "load_percent": {
+                    "description": "Load and power",
+                    "type": "number"
+                },
+                "manufacturer": {
+                    "description": "UPS identification",
+                    "type": "string"
+                },
+                "model": {
+                    "type": "string"
+                },
+                "output_current": {
+                    "type": "number"
+                },
+                "output_frequency": {
+                    "type": "number"
+                },
+                "output_voltage": {
+                    "description": "Output power",
+                    "type": "number"
+                },
+                "product_id": {
+                    "type": "string"
+                },
+                "raw_variables": {
+                    "description": "Raw variables for advanced users",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "realpower_nominal_watts": {
+                    "type": "number"
+                },
+                "realpower_watts": {
+                    "type": "number"
+                },
+                "serial": {
+                    "type": "string"
+                },
+                "status": {
+                    "description": "UPS status",
+                    "type": "string"
+                },
+                "status_text": {
+                    "description": "Human-readable status",
+                    "type": "string"
+                },
+                "test_result": {
+                    "description": "Last test result",
+                    "type": "string"
+                },
+                "test_result_date": {
+                    "type": "string"
+                },
+                "timer_shutdown": {
+                    "type": "integer"
+                },
+                "timer_start": {
+                    "type": "integer"
+                },
+                "timestamp": {
+                    "description": "Metadata",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "e.g., \"ups\"",
+                    "type": "string"
+                },
+                "vendor_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.NetworkAccessURLs": {
+            "type": "object",
+            "properties": {
+                "timestamp": {
+                    "type": "string"
+                },
+                "urls": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.AccessURL"
+                    }
+                }
+            }
+        },
+        "dto.NetworkConfig": {
+            "type": "object",
+            "properties": {
+                "bond_slaves": {
+                    "description": "If bond",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "bonding_mode": {
+                    "description": "If bond",
+                    "type": "string"
+                },
+                "bridge_members": {
+                    "description": "If bridge",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "gateway": {
+                    "type": "string"
+                },
+                "interface": {
+                    "type": "string"
+                },
+                "ip_address": {
+                    "type": "string"
+                },
+                "netmask": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "type": {
+                    "description": "\"physical\", \"bond\", \"bridge\", \"vlan\"",
+                    "type": "string"
+                },
+                "vlan_id": {
+                    "description": "If VLAN",
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.NetworkInfo": {
+            "type": "object",
+            "properties": {
+                "advertised_auto_negotiation": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "advertised_fec_modes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "advertised_link_modes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "advertised_pause_frame": {
+                    "type": "string",
+                    "example": "Symmetric"
+                },
+                "auto_negotiation": {
+                    "type": "string",
+                    "example": "on"
+                },
+                "bytes_received": {
+                    "type": "integer",
+                    "example": 1073741824
+                },
+                "bytes_sent": {
+                    "type": "integer",
+                    "example": 536870912
+                },
+                "duplex": {
+                    "type": "string",
+                    "example": "Full"
+                },
+                "errors_received": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "errors_sent": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "ip_address": {
+                    "type": "string",
+                    "example": "192.168.1.100"
+                },
+                "link_detected": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "mac_address": {
+                    "type": "string",
+                    "example": "00:11:22:33:44:55"
+                },
+                "mdix": {
+                    "type": "string",
+                    "example": "auto"
+                },
+                "message_level": {
+                    "type": "string",
+                    "example": "0x0000003f"
+                },
+                "mtu": {
+                    "type": "integer",
+                    "example": 1500
+                },
+                "name": {
+                    "type": "string",
+                    "example": "eth0"
+                },
+                "packets_received": {
+                    "type": "integer",
+                    "example": 1000000
+                },
+                "packets_sent": {
+                    "type": "integer",
+                    "example": 500000
+                },
+                "phyad": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "port": {
+                    "type": "string",
+                    "example": "Twisted Pair"
+                },
+                "speed_mbps": {
+                    "type": "integer",
+                    "example": 1000
+                },
+                "state": {
+                    "type": "string",
+                    "example": "up"
+                },
+                "supported_fec_modes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "supported_link_modes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "supported_pause_frame": {
+                    "type": "string",
+                    "example": "Symmetric"
+                },
+                "supported_ports": {
+                    "description": "Enhanced ethtool information",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "supports_auto_negotiation": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "supports_wake_on": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "transceiver": {
+                    "type": "string",
+                    "example": "internal"
+                },
+                "wake_on": {
+                    "type": "string",
+                    "example": "g"
+                }
+            }
+        },
+        "dto.Notification": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "example": "The array has been successfully started"
+                },
+                "formatted_timestamp": {
+                    "type": "string",
+                    "example": "2025-01-15 10:30:00"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "notification_1234567890"
+                },
+                "importance": {
+                    "description": "\"alert\", \"warning\", \"info\"",
+                    "type": "string",
+                    "example": "info"
+                },
+                "link": {
+                    "type": "string",
+                    "example": "/Dashboard"
+                },
+                "subject": {
+                    "type": "string",
+                    "example": "Array Status"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Array Started"
+                },
+                "type": {
+                    "description": "\"unread\", \"archive\"",
+                    "type": "string",
+                    "example": "unread"
+                }
+            }
+        },
+        "dto.NotificationCounts": {
+            "type": "object",
+            "properties": {
+                "alert": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "info": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 7
+                },
+                "warning": {
+                    "type": "integer",
+                    "example": 2
+                }
+            }
+        },
+        "dto.NotificationList": {
+            "type": "object",
+            "properties": {
+                "notifications": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.Notification"
+                    }
+                },
+                "overview": {
+                    "$ref": "#/definitions/dto.NotificationOverview"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.NotificationOverview": {
+            "type": "object",
+            "properties": {
+                "archive": {
+                    "$ref": "#/definitions/dto.NotificationCounts"
+                },
+                "unread": {
+                    "$ref": "#/definitions/dto.NotificationCounts"
+                }
+            }
+        },
+        "dto.ParityCheckHistory": {
+            "type": "object",
+            "properties": {
+                "records": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.ParityCheckRecord"
+                    }
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.ParityCheckRecord": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "description": "\"Parity-Check\", \"Parity-Sync\", \"Read-Check\", \"Clear\"",
+                    "type": "string"
+                },
+                "date": {
+                    "description": "Date and time of the operation",
+                    "type": "string"
+                },
+                "duration_seconds": {
+                    "description": "Duration in seconds",
+                    "type": "integer"
+                },
+                "errors": {
+                    "description": "Number of errors found",
+                    "type": "integer"
+                },
+                "size_bytes": {
+                    "description": "Size of array checked in bytes",
+                    "type": "integer"
+                },
+                "speed_mbps": {
+                    "description": "Average speed in MB/s",
+                    "type": "number"
+                },
+                "status": {
+                    "description": "\"OK\", \"Canceled\", or error count",
+                    "type": "string"
+                }
+            }
+        },
+        "dto.PortMapping": {
+            "type": "object",
+            "properties": {
+                "private_port": {
+                    "type": "integer",
+                    "example": 32400
+                },
+                "public_port": {
+                    "type": "integer",
+                    "example": 32400
+                },
+                "type": {
+                    "type": "string",
+                    "example": "tcp"
+                }
+            }
+        },
+        "dto.Registration": {
+            "type": "object",
+            "properties": {
+                "expiration": {
+                    "description": "License expiration date",
+                    "type": "string"
+                },
+                "guid": {
+                    "description": "Registration GUID",
+                    "type": "string"
+                },
+                "server_name": {
+                    "description": "Server name from config",
+                    "type": "string"
+                },
+                "state": {
+                    "description": "\"valid\", \"expired\", \"invalid\", \"trial\"",
+                    "type": "string"
+                },
+                "timestamp": {
+                    "description": "Collection timestamp",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "\"trial\", \"basic\", \"plus\", \"pro\", \"lifetime\"",
+                    "type": "string"
+                },
+                "update_expiration": {
+                    "description": "Update expiration date",
+                    "type": "string"
+                }
+            }
+        },
+        "dto.Response": {
+            "type": "object",
+            "properties": {
+                "data": {},
+                "error": {
+                    "type": "string",
+                    "example": ""
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Operation completed successfully"
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.SMARTAttribute": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Reallocated_Sector_Ct"
+                },
+                "raw_value": {
+                    "type": "string",
+                    "example": "0"
+                },
+                "threshold": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "value": {
+                    "type": "integer",
+                    "example": 100
+                },
+                "when_failed": {
+                    "type": "string",
+                    "example": ""
+                },
+                "worst": {
+                    "type": "integer",
+                    "example": 100
+                }
+            }
+        },
+        "dto.ShareConfig": {
+            "type": "object",
+            "properties": {
+                "allocator": {
+                    "description": "\"highwater\", \"mostfree\", \"fillup\"",
+                    "type": "string"
+                },
+                "comment": {
+                    "type": "string"
+                },
+                "exclude_disks": {
+                    "description": "Disks to exclude",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "export": {
+                    "description": "SMB/NFS/AFP export settings",
+                    "type": "string"
+                },
+                "floor": {
+                    "description": "Minimum free space",
+                    "type": "string"
+                },
+                "include_disks": {
+                    "description": "Disks to include",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "security": {
+                    "description": "\"public\", \"private\", \"secure\"",
+                    "type": "string"
+                },
+                "split_level": {
+                    "description": "Directory depth for splitting",
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "use_cache": {
+                    "description": "\"yes\", \"no\", \"only\", \"prefer\"",
+                    "type": "string"
+                }
+            }
+        },
+        "dto.ShareInfo": {
+            "type": "object",
+            "properties": {
+                "comment": {
+                    "description": "Configuration fields from share config",
+                    "type": "string",
+                    "example": "Media storage share"
+                },
+                "free_bytes": {
+                    "type": "integer",
+                    "example": 5368709120000
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Media"
+                },
+                "nfs_export": {
+                    "description": "Is share exported via NFS?",
+                    "type": "boolean",
+                    "example": false
+                },
+                "path": {
+                    "type": "string",
+                    "example": "/mnt/user/Media"
+                },
+                "security": {
+                    "description": "\"public\", \"private\", \"secure\"",
+                    "type": "string",
+                    "example": "private"
+                },
+                "smb_export": {
+                    "description": "Is share exported via SMB?",
+                    "type": "boolean",
+                    "example": true
+                },
+                "storage": {
+                    "description": "\"cache\", \"array\", \"cache+array\", or \"unknown\"",
+                    "type": "string",
+                    "example": "cache+array"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "total_bytes": {
+                    "type": "integer",
+                    "example": 10737418240000
+                },
+                "usage_percent": {
+                    "type": "number",
+                    "example": 50
+                },
+                "use_cache": {
+                    "description": "\"yes\", \"no\", \"only\", \"prefer\"",
+                    "type": "string",
+                    "example": "prefer"
+                },
+                "used_bytes": {
+                    "type": "integer",
+                    "example": 5368709120000
+                }
+            }
+        },
+        "dto.SystemInfo": {
+            "type": "object",
+            "properties": {
+                "agent_version": {
+                    "type": "string",
+                    "example": "2025.12.1"
+                },
+                "bios_date": {
+                    "type": "string",
+                    "example": "12/25/2023"
+                },
+                "bios_version": {
+                    "type": "string",
+                    "example": "1.4"
+                },
+                "cpu_cores": {
+                    "type": "integer",
+                    "example": 8
+                },
+                "cpu_mhz": {
+                    "type": "number",
+                    "example": 4900
+                },
+                "cpu_model": {
+                    "type": "string",
+                    "example": "Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz"
+                },
+                "cpu_per_core_usage": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number"
+                    }
+                },
+                "cpu_temp_celsius": {
+                    "type": "number",
+                    "example": 45
+                },
+                "cpu_threads": {
+                    "type": "integer",
+                    "example": 8
+                },
+                "cpu_usage_percent": {
+                    "description": "CPU Information",
+                    "type": "number",
+                    "example": 45.2
+                },
+                "fans": {
+                    "description": "Additional Metrics",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.FanInfo"
+                    }
+                },
+                "hostname": {
+                    "type": "string",
+                    "example": "tower"
+                },
+                "hvm_enabled": {
+                    "description": "Virtualization Features",
+                    "type": "boolean",
+                    "example": true
+                },
+                "iommu_enabled": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "kernel_version": {
+                    "type": "string",
+                    "example": "6.1.64-Unraid"
+                },
+                "motherboard_temp_celsius": {
+                    "type": "number",
+                    "example": 35
+                },
+                "openssl_version": {
+                    "description": "Additional System Information",
+                    "type": "string",
+                    "example": "3.0.2"
+                },
+                "parity_check_speed": {
+                    "type": "string",
+                    "example": "100 MB/s"
+                },
+                "ram_buffers_bytes": {
+                    "type": "integer",
+                    "example": 1073741824
+                },
+                "ram_cached_bytes": {
+                    "type": "integer",
+                    "example": 8589934592
+                },
+                "ram_free_bytes": {
+                    "type": "integer",
+                    "example": 11811160064
+                },
+                "ram_total_bytes": {
+                    "type": "integer",
+                    "example": 34359738368
+                },
+                "ram_usage_percent": {
+                    "description": "Memory Information",
+                    "type": "number",
+                    "example": 65.5
+                },
+                "ram_used_bytes": {
+                    "type": "integer",
+                    "example": 22548578304
+                },
+                "server_model": {
+                    "description": "System Information",
+                    "type": "string",
+                    "example": "Supermicro X11SCL-F"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "uptime_seconds": {
+                    "type": "integer",
+                    "example": 86400
+                },
+                "version": {
+                    "type": "string",
+                    "example": "6.12.6"
+                }
+            }
+        },
+        "dto.SystemSettings": {
+            "type": "object",
+            "properties": {
+                "date_format": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "model": {
+                    "type": "string"
+                },
+                "security_mode": {
+                    "description": "\"public\", \"private\"",
+                    "type": "string"
+                },
+                "server_name": {
+                    "type": "string"
+                },
+                "time_format": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "timezone": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.UPSStatus": {
+            "type": "object",
+            "properties": {
+                "battery_charge_percent": {
+                    "type": "number",
+                    "example": 100
+                },
+                "connected": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "load_percent": {
+                    "type": "number",
+                    "example": 25.5
+                },
+                "model": {
+                    "type": "string",
+                    "example": "APC Smart-UPS 1500"
+                },
+                "nominal_power_watts": {
+                    "type": "number",
+                    "example": 1000
+                },
+                "power_watts": {
+                    "type": "number",
+                    "example": 250.5
+                },
+                "runtime_left_seconds": {
+                    "type": "integer",
+                    "example": 3600
+                },
+                "status": {
+                    "type": "string",
+                    "example": "OL"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.UnassignedDevice": {
+            "type": "object",
+            "properties": {
+                "auto_mount": {
+                    "description": "Configuration",
+                    "type": "boolean"
+                },
+                "device": {
+                    "description": "Device identification",
+                    "type": "string"
+                },
+                "disable_mount": {
+                    "type": "boolean"
+                },
+                "identification": {
+                    "description": "Friendly name/label",
+                    "type": "string"
+                },
+                "model": {
+                    "type": "string"
+                },
+                "partitions": {
+                    "description": "Partition information",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.UnassignedPartition"
+                    }
+                },
+                "pass_through": {
+                    "type": "boolean"
+                },
+                "reads": {
+                    "description": "I/O Statistics",
+                    "type": "integer"
+                },
+                "script_enabled": {
+                    "type": "boolean"
+                },
+                "script_path": {
+                    "type": "string"
+                },
+                "serial_number": {
+                    "type": "string"
+                },
+                "spin_state": {
+                    "description": "\"active\", \"standby\", \"unknown\"",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Status",
+                    "type": "string"
+                },
+                "temperature_celsius": {
+                    "type": "number"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "writes": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.UnassignedDeviceList": {
+            "type": "object",
+            "properties": {
+                "devices": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.UnassignedDevice"
+                    }
+                },
+                "remote_shares": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.UnassignedRemoteShare"
+                    }
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.UnassignedPartition": {
+            "type": "object",
+            "properties": {
+                "filesystem": {
+                    "description": "\"ntfs\", \"ext4\", \"xfs\", \"btrfs\", \"exfat\", \"hfsplus\", \"apfs\"",
+                    "type": "string"
+                },
+                "free_bytes": {
+                    "type": "integer"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "mount_point": {
+                    "type": "string"
+                },
+                "nfs_share": {
+                    "description": "Is shared via NFS?",
+                    "type": "boolean"
+                },
+                "partition_number": {
+                    "type": "integer"
+                },
+                "read_only": {
+                    "type": "boolean"
+                },
+                "size_bytes": {
+                    "type": "integer"
+                },
+                "smb_share": {
+                    "description": "Is shared via SMB?",
+                    "type": "boolean"
+                },
+                "status": {
+                    "description": "\"mounted\", \"unmounted\"",
+                    "type": "string"
+                },
+                "usage_percent": {
+                    "type": "number"
+                },
+                "used_bytes": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.UnassignedRemoteShare": {
+            "type": "object",
+            "properties": {
+                "auto_mount": {
+                    "description": "Configuration",
+                    "type": "boolean"
+                },
+                "free_bytes": {
+                    "type": "integer"
+                },
+                "mount_point": {
+                    "type": "string"
+                },
+                "nfs_export": {
+                    "type": "string"
+                },
+                "nfs_options": {
+                    "type": "string"
+                },
+                "nfs_server": {
+                    "description": "NFS-specific",
+                    "type": "string"
+                },
+                "read_only": {
+                    "type": "boolean"
+                },
+                "size_bytes": {
+                    "description": "Capacity (if mounted)",
+                    "type": "integer"
+                },
+                "smb_domain": {
+                    "type": "string"
+                },
+                "smb_server": {
+                    "description": "SMB-specific",
+                    "type": "string"
+                },
+                "smb_share": {
+                    "type": "string"
+                },
+                "smb_user": {
+                    "type": "string"
+                },
+                "source": {
+                    "description": "\"//server/share\", \"server:/export\", \"/path/file.iso\"",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Status",
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "type": {
+                    "description": "Share identification",
+                    "type": "string"
+                },
+                "usage_percent": {
+                    "type": "number"
+                },
+                "used_bytes": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.UserScriptExecuteRequest": {
+            "type": "object",
+            "properties": {
+                "background": {
+                    "type": "boolean"
+                },
+                "wait": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "dto.UserScriptExecuteResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "output": {
+                    "type": "string"
+                },
+                "pid": {
+                    "type": "integer"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "dto.UserScriptInfo": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "executable": {
+                    "type": "boolean"
+                },
+                "last_modified": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.VMInfo": {
+            "type": "object",
+            "properties": {
+                "autostart": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "cpu_count": {
+                    "type": "integer",
+                    "example": 4
+                },
+                "disk_path": {
+                    "type": "string",
+                    "example": "/mnt/user/domains/Windows 11/vdisk1.img"
+                },
+                "disk_read_bytes": {
+                    "type": "integer",
+                    "example": 1073741824
+                },
+                "disk_size_bytes": {
+                    "type": "integer",
+                    "example": 107374182400
+                },
+                "disk_write_bytes": {
+                    "type": "integer",
+                    "example": 536870912
+                },
+                "guest_cpu_percent": {
+                    "type": "number",
+                    "example": 25.5
+                },
+                "host_cpu_percent": {
+                    "type": "number",
+                    "example": 12.3
+                },
+                "id": {
+                    "type": "string",
+                    "example": "1"
+                },
+                "memory_allocated_bytes": {
+                    "type": "integer",
+                    "example": 8589934592
+                },
+                "memory_display": {
+                    "type": "string",
+                    "example": "4 GiB / 8 GiB"
+                },
+                "memory_used_bytes": {
+                    "type": "integer",
+                    "example": 4294967296
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Windows 11"
+                },
+                "network_rx_bytes": {
+                    "type": "integer",
+                    "example": 104857600
+                },
+                "network_tx_bytes": {
+                    "type": "integer",
+                    "example": 52428800
+                },
+                "persistent": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "state": {
+                    "type": "string",
+                    "example": "running"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.VMSettings": {
+            "type": "object",
+            "properties": {
+                "default_settings": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "pci_devices": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "usb_devices": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "dto.VolumeMapping": {
+            "type": "object",
+            "properties": {
+                "container_path": {
+                    "type": "string",
+                    "example": "/config"
+                },
+                "host_path": {
+                    "type": "string",
+                    "example": "/mnt/user/appdata/plex"
+                },
+                "mode": {
+                    "type": "string",
+                    "example": "rw"
+                }
+            }
+        },
+        "dto.ZFSARCStats": {
+            "type": "object",
+            "properties": {
+                "hit_ratio_percent": {
+                    "description": "Hit Ratios",
+                    "type": "number",
+                    "example": 95.5
+                },
+                "hits": {
+                    "description": "Hits and Misses",
+                    "type": "integer",
+                    "example": 1000000
+                },
+                "l2_hits": {
+                    "description": "L2ARC hits",
+                    "type": "integer",
+                    "example": 500000
+                },
+                "l2_misses": {
+                    "description": "L2ARC misses",
+                    "type": "integer",
+                    "example": 25000
+                },
+                "l2_size_bytes": {
+                    "description": "L2ARC (Level 2 ARC - SSD cache)",
+                    "type": "integer",
+                    "example": 107374182400
+                },
+                "max_size_bytes": {
+                    "description": "Maximum ARC size",
+                    "type": "integer",
+                    "example": 16106127360
+                },
+                "mfu_hit_ratio_percent": {
+                    "description": "Most Frequently Used hit ratio",
+                    "type": "number",
+                    "example": 97.8
+                },
+                "min_size_bytes": {
+                    "description": "Minimum ARC size",
+                    "type": "integer",
+                    "example": 2013265920
+                },
+                "misses": {
+                    "description": "Total cache misses",
+                    "type": "integer",
+                    "example": 50000
+                },
+                "mru_hit_ratio_percent": {
+                    "description": "Most Recently Used hit ratio",
+                    "type": "number",
+                    "example": 92.3
+                },
+                "size_bytes": {
+                    "description": "ARC Size",
+                    "type": "integer",
+                    "example": 8589934592
+                },
+                "target_size_bytes": {
+                    "description": "Target ARC size",
+                    "type": "integer",
+                    "example": 16106127360
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.ZFSDataset": {
+            "type": "object",
+            "properties": {
+                "available_bytes": {
+                    "description": "Space available",
+                    "type": "integer",
+                    "example": 53687091200
+                },
+                "compress_ratio": {
+                    "description": "Compression ratio",
+                    "type": "number",
+                    "example": 1.5
+                },
+                "compression": {
+                    "description": "Compression algorithm",
+                    "type": "string",
+                    "example": "lz4"
+                },
+                "mountpoint": {
+                    "description": "Mount point (if filesystem)",
+                    "type": "string",
+                    "example": "/mnt/tank/media"
+                },
+                "name": {
+                    "description": "Full dataset name (pool/dataset/child)",
+                    "type": "string",
+                    "example": "tank/media"
+                },
+                "quota_bytes": {
+                    "description": "Dataset quota (0 = none)",
+                    "type": "integer",
+                    "example": 107374182400
+                },
+                "readonly": {
+                    "description": "Read-only status",
+                    "type": "boolean",
+                    "example": false
+                },
+                "referenced_bytes": {
+                    "description": "Space referenced by dataset",
+                    "type": "integer",
+                    "example": 53687091200
+                },
+                "reservation_bytes": {
+                    "description": "Reserved space",
+                    "type": "integer",
+                    "example": 0
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "type": {
+                    "description": "\"filesystem\", \"volume\", \"snapshot\"",
+                    "type": "string",
+                    "example": "filesystem"
+                },
+                "used_bytes": {
+                    "description": "Space used",
+                    "type": "integer",
+                    "example": 53687091200
+                }
+            }
+        },
+        "dto.ZFSDevice": {
+            "type": "object",
+            "properties": {
+                "checksum_errors": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "name": {
+                    "description": "Device path (e.g., \"sda1\", \"nvme0n1p1\")",
+                    "type": "string",
+                    "example": "sda1"
+                },
+                "physical_path": {
+                    "description": "Physical device path",
+                    "type": "string",
+                    "example": "/dev/disk/by-id/ata-WDC_WD120EFBX-68B0EN0_WD-WMC4N0123456"
+                },
+                "read_errors": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "state": {
+                    "description": "\"ONLINE\", \"DEGRADED\", \"FAULTED\", \"OFFLINE\"",
+                    "type": "string",
+                    "example": "ONLINE"
+                },
+                "write_errors": {
+                    "type": "integer",
+                    "example": 0
+                }
+            }
+        },
+        "dto.ZFSPool": {
+            "type": "object",
+            "properties": {
+                "allocated_bytes": {
+                    "description": "Space allocated",
+                    "type": "integer",
+                    "example": 53687091200
+                },
+                "altroot": {
+                    "description": "Features",
+                    "type": "string",
+                    "example": "-"
+                },
+                "autoexpand": {
+                    "description": "Auto-expand on disk replacement",
+                    "type": "boolean",
+                    "example": true
+                },
+                "autotrim": {
+                    "description": "\"on\", \"off\"",
+                    "type": "string",
+                    "example": "on"
+                },
+                "capacity_percent": {
+                    "description": "Usage %",
+                    "type": "number",
+                    "example": 50
+                },
+                "checksum_errors": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "compress_ratio": {
+                    "description": "Compression ratio (e.g., 1.50 = 1.5x)",
+                    "type": "number",
+                    "example": 1.5
+                },
+                "dedup_ratio": {
+                    "description": "Deduplication and Compression",
+                    "type": "number",
+                    "example": 1
+                },
+                "fragmentation_percent": {
+                    "description": "Fragmentation %",
+                    "type": "number",
+                    "example": 5
+                },
+                "free_bytes": {
+                    "description": "Space available",
+                    "type": "integer",
+                    "example": 53687091200
+                },
+                "guid": {
+                    "description": "Unique pool GUID",
+                    "type": "string",
+                    "example": "1234567890123456789"
+                },
+                "health": {
+                    "description": "Health and Status",
+                    "type": "string",
+                    "example": "ONLINE"
+                },
+                "name": {
+                    "description": "Pool Identification",
+                    "type": "string",
+                    "example": "tank"
+                },
+                "read_errors": {
+                    "description": "Error Counters",
+                    "type": "integer",
+                    "example": 0
+                },
+                "readonly": {
+                    "description": "Read-only status",
+                    "type": "boolean",
+                    "example": false
+                },
+                "scan_end_time": {
+                    "description": "When scrub ended",
+                    "type": "string"
+                },
+                "scan_errors": {
+                    "description": "Errors found during last scrub",
+                    "type": "integer",
+                    "example": 0
+                },
+                "scan_progress_percent": {
+                    "description": "Scrub progress %",
+                    "type": "number",
+                    "example": 100
+                },
+                "scan_repaired_bytes": {
+                    "description": "Data repaired in last scrub",
+                    "type": "integer",
+                    "example": 0
+                },
+                "scan_start_time": {
+                    "description": "When scrub started",
+                    "type": "string"
+                },
+                "scan_state": {
+                    "description": "\"scanning\", \"finished\", \"canceled\"",
+                    "type": "string",
+                    "example": "finished"
+                },
+                "scan_status": {
+                    "description": "Scrub Information",
+                    "type": "string",
+                    "example": "scrub completed"
+                },
+                "size_bytes": {
+                    "description": "Capacity",
+                    "type": "integer",
+                    "example": 107374182400
+                },
+                "state": {
+                    "description": "\"ACTIVE\", \"EXPORTED\", \"DESTROYED\", \"SPARE\", \"L2CACHE\"",
+                    "type": "string",
+                    "example": "ACTIVE"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "vdevs": {
+                    "description": "VDEVs (Virtual Devices)",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.ZFSVdev"
+                    }
+                },
+                "version": {
+                    "description": "ZFS pool version",
+                    "type": "string",
+                    "example": "5000"
+                },
+                "write_errors": {
+                    "type": "integer",
+                    "example": 0
+                }
+            }
+        },
+        "dto.ZFSSnapshot": {
+            "type": "object",
+            "properties": {
+                "creation_time": {
+                    "description": "When snapshot was created",
+                    "type": "string"
+                },
+                "dataset": {
+                    "description": "Parent dataset",
+                    "type": "string",
+                    "example": "tank/media"
+                },
+                "name": {
+                    "description": "Snapshot name (dataset@snapshot)",
+                    "type": "string",
+                    "example": "tank/media@daily-2025-01-15"
+                },
+                "referenced_bytes": {
+                    "description": "Space referenced",
+                    "type": "integer",
+                    "example": 53687091200
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "used_bytes": {
+                    "description": "Space used by snapshot",
+                    "type": "integer",
+                    "example": 1073741824
+                }
+            }
+        },
+        "dto.ZFSVdev": {
+            "type": "object",
+            "properties": {
+                "checksum_errors": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "devices": {
+                    "description": "Underlying devices (for mirror/raidz)",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.ZFSDevice"
+                    }
+                },
+                "name": {
+                    "description": "vdev name (e.g., \"raidz1-0\", \"mirror-1\", or disk name)",
+                    "type": "string",
+                    "example": "raidz1-0"
+                },
+                "read_errors": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "state": {
+                    "description": "\"ONLINE\", \"DEGRADED\", \"FAULTED\", \"OFFLINE\"",
+                    "type": "string",
+                    "example": "ONLINE"
+                },
+                "type": {
+                    "description": "\"disk\", \"mirror\", \"raidz1\", \"raidz2\", \"raidz3\", \"spare\", \"cache\", \"log\"",
+                    "type": "string",
+                    "example": "raidz1"
+                },
+                "write_errors": {
+                    "type": "integer",
+                    "example": 0
+                }
+            }
+        }
+    },
+    "tags": [
+        {
+            "description": "System monitoring and control endpoints (CPU, RAM, temps, reboot/shutdown)",
+            "name": "System"
+        },
+        {
+            "description": "Unraid array status and parity check control",
+            "name": "Array"
+        },
+        {
+            "description": "Disk information and SMART data",
+            "name": "Disks"
+        },
+        {
+            "description": "Docker container monitoring and lifecycle control",
+            "name": "Docker"
+        },
+        {
+            "description": "Virtual machine monitoring and lifecycle control",
+            "name": "VMs"
+        },
+        {
+            "description": "Network interface information and access URLs",
+            "name": "Network"
+        },
+        {
+            "description": "User share information and configuration",
+            "name": "Shares"
+        },
+        {
+            "description": "Hardware information (BIOS, CPU, Memory) via DMI",
+            "name": "Hardware"
+        },
+        {
+            "description": "UPS/NUT status monitoring",
+            "name": "UPS"
+        },
+        {
+            "description": "GPU metrics (NVIDIA/AMD)",
+            "name": "GPU"
+        },
+        {
+            "description": "ZFS pool, dataset, snapshot, and ARC statistics",
+            "name": "ZFS"
+        },
+        {
+            "description": "System notification management",
+            "name": "Notifications"
+        },
+        {
+            "description": "Configuration endpoints for shares and system settings",
+            "name": "Configuration"
+        },
+        {
+            "description": "Log file access",
+            "name": "Logs"
+        },
+        {
+            "description": "User script management and execution",
+            "name": "User Scripts"
+        },
+        {
+            "description": "Runtime collector management (enable/disable/interval)",
+            "name": "Collectors"
+        },
+        {
+            "description": "Real-time event streaming via WebSocket",
+            "name": "WebSocket"
+        },
+        {
+            "description": "Unassigned devices and remote shares",
+            "name": "Unassigned Devices"
+        }
+    ]
+}

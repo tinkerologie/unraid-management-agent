@@ -68,6 +68,12 @@ jobs:
 
           echo "✅ VERSION file matches tag: $TAG_VERSION"
 
+      - name: Install swag CLI
+        run: |
+          echo "Installing swag for Swagger documentation generation..."
+          go install github.com/swaggo/swag/cmd/swag@latest
+          echo "✅ swag installed"
+
       - name: Build release package
         run: |
           echo "Building release package..."
