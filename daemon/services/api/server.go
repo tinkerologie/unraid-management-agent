@@ -14,6 +14,7 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/collectors"
 )
 
 // CollectorManagerInterface defines the methods required from CollectorManager
@@ -445,4 +446,320 @@ func (s *Server) broadcastEvents(ctx context.Context) {
 			s.wsHub.Broadcast(msg)
 		}
 	}
+}
+
+// CacheProvider interface implementation for MCP integration.
+// These methods provide read-only access to cached collector data.
+
+// GetSystemCache returns cached system information.
+func (s *Server) GetSystemCache() *dto.SystemInfo {
+	s.cacheMutex.RLock()
+	defer s.cacheMutex.RUnlock()
+	return s.systemCache
+}
+
+// GetArrayCache returns cached array status.
+func (s *Server) GetArrayCache() *dto.ArrayStatus {
+	s.cacheMutex.RLock()
+	defer s.cacheMutex.RUnlock()
+	return s.arrayCache
+}
+
+// GetDisksCache returns cached disk information.
+func (s *Server) GetDisksCache() []dto.DiskInfo {
+	s.cacheMutex.RLock()
+	defer s.cacheMutex.RUnlock()
+	return s.disksCache
+}
+
+// GetSharesCache returns cached share information.
+func (s *Server) GetSharesCache() []dto.ShareInfo {
+	s.cacheMutex.RLock()
+	defer s.cacheMutex.RUnlock()
+	return s.sharesCache
+}
+
+// GetDockerCache returns cached Docker container information.
+func (s *Server) GetDockerCache() []dto.ContainerInfo {
+	s.cacheMutex.RLock()
+	defer s.cacheMutex.RUnlock()
+	return s.dockerCache
+}
+
+// GetVMsCache returns cached VM information.
+func (s *Server) GetVMsCache() []dto.VMInfo {
+	s.cacheMutex.RLock()
+	defer s.cacheMutex.RUnlock()
+	return s.vmsCache
+}
+
+// GetUPSCache returns cached UPS status.
+func (s *Server) GetUPSCache() *dto.UPSStatus {
+	s.cacheMutex.RLock()
+	defer s.cacheMutex.RUnlock()
+	return s.upsCache
+}
+
+// GetGPUCache returns cached GPU metrics.
+func (s *Server) GetGPUCache() []*dto.GPUMetrics {
+	s.cacheMutex.RLock()
+	defer s.cacheMutex.RUnlock()
+	return s.gpuCache
+}
+
+// GetNetworkCache returns cached network information.
+func (s *Server) GetNetworkCache() []dto.NetworkInfo {
+	s.cacheMutex.RLock()
+	defer s.cacheMutex.RUnlock()
+	return s.networkCache
+}
+
+// GetHardwareCache returns cached hardware information.
+func (s *Server) GetHardwareCache() *dto.HardwareInfo {
+	s.cacheMutex.RLock()
+	defer s.cacheMutex.RUnlock()
+	return s.hardwareCache
+}
+
+// GetRegistrationCache returns cached registration information.
+func (s *Server) GetRegistrationCache() *dto.Registration {
+	s.cacheMutex.RLock()
+	defer s.cacheMutex.RUnlock()
+	return s.registrationCache
+}
+
+// GetNotificationsCache returns cached notifications.
+func (s *Server) GetNotificationsCache() *dto.NotificationList {
+	s.cacheMutex.RLock()
+	defer s.cacheMutex.RUnlock()
+	return s.notificationsCache
+}
+
+// GetZFSPoolsCache returns cached ZFS pool information.
+func (s *Server) GetZFSPoolsCache() []dto.ZFSPool {
+	s.cacheMutex.RLock()
+	defer s.cacheMutex.RUnlock()
+	return s.zfsPoolsCache
+}
+
+// GetZFSDatasetsCache returns cached ZFS dataset information.
+func (s *Server) GetZFSDatasetsCache() []dto.ZFSDataset {
+	s.cacheMutex.RLock()
+	defer s.cacheMutex.RUnlock()
+	return s.zfsDatasetsCache
+}
+
+// GetZFSSnapshotsCache returns cached ZFS snapshot information.
+func (s *Server) GetZFSSnapshotsCache() []dto.ZFSSnapshot {
+	s.cacheMutex.RLock()
+	defer s.cacheMutex.RUnlock()
+	return s.zfsSnapshotsCache
+}
+
+// GetZFSARCStatsCache returns cached ZFS ARC statistics.
+func (s *Server) GetZFSARCStatsCache() *dto.ZFSARCStats {
+	s.cacheMutex.RLock()
+	defer s.cacheMutex.RUnlock()
+	return s.zfsARCStatsCache
+}
+
+// GetUnassignedCache returns cached unassigned devices information.
+func (s *Server) GetUnassignedCache() *dto.UnassignedDeviceList {
+	s.cacheMutex.RLock()
+	defer s.cacheMutex.RUnlock()
+	return s.unassignedCache
+}
+
+// GetNUTCache returns cached NUT (Network UPS Tools) information.
+func (s *Server) GetNUTCache() *dto.NUTResponse {
+	s.cacheMutex.RLock()
+	defer s.cacheMutex.RUnlock()
+	return s.nutCache
+}
+
+// GetParityHistoryCache returns cached parity check history.
+// Note: This is dynamically loaded, not cached by a collector.
+func (s *Server) GetParityHistoryCache() *dto.ParityCheckHistory {
+	// Parity history is read from file on-demand, return nil for now
+	// The MCP server will call the controller directly for this data
+	return nil
+}
+
+// ListLogFiles returns a list of available log files.
+func (s *Server) ListLogFiles() []dto.LogFile {
+	return s.listLogFiles()
+}
+
+// GetLogContent retrieves log file content with optional pagination.
+func (s *Server) GetLogContent(path, lines, start string) (*dto.LogFileContent, error) {
+	return s.getLogContent(path, lines, start)
+}
+
+// GetCollectorsStatus returns the status of all collectors.
+func (s *Server) GetCollectorsStatus() dto.CollectorsStatusResponse {
+	if s.collectorManager == nil {
+		return dto.CollectorsStatusResponse{}
+	}
+	return s.collectorManager.GetAllStatus()
+}
+
+// GetCollectorStatus returns the status of a specific collector.
+func (s *Server) GetCollectorStatus(name string) (*dto.CollectorStatus, error) {
+	if s.collectorManager == nil {
+		return nil, fmt.Errorf("collector manager not available")
+	}
+	return s.collectorManager.GetStatus(name)
+}
+
+// EnableCollector enables a collector at runtime.
+func (s *Server) EnableCollector(name string) error {
+	if s.collectorManager == nil {
+		return fmt.Errorf("collector manager not available")
+	}
+	return s.collectorManager.EnableCollector(name)
+}
+
+// DisableCollector disables a collector at runtime.
+func (s *Server) DisableCollector(name string) error {
+	if s.collectorManager == nil {
+		return fmt.Errorf("collector manager not available")
+	}
+	return s.collectorManager.DisableCollector(name)
+}
+
+// UpdateCollectorInterval updates the collection interval for a collector.
+func (s *Server) UpdateCollectorInterval(name string, interval int) error {
+	if s.collectorManager == nil {
+		return fmt.Errorf("collector manager not available")
+	}
+	return s.collectorManager.UpdateInterval(name, interval)
+}
+
+// GetRouter returns the HTTP router for external integration.
+func (s *Server) GetRouter() *mux.Router {
+	return s.router
+}
+
+// GetContext returns the domain context for external access.
+func (s *Server) GetContext() *domain.Context {
+	return s.ctx
+}
+
+// GetSystemSettings returns system settings from config collector.
+func (s *Server) GetSystemSettings() *dto.SystemSettings {
+	configCollector := collectors.NewConfigCollector()
+	settings, err := configCollector.GetSystemSettings()
+	if err != nil {
+		logger.Error("Failed to get system settings: %v", err)
+		return nil
+	}
+	return settings
+}
+
+// GetDockerSettings returns Docker daemon settings from config collector.
+func (s *Server) GetDockerSettings() *dto.DockerSettings {
+	configCollector := collectors.NewConfigCollector()
+	settings, err := configCollector.GetDockerSettings()
+	if err != nil {
+		logger.Error("Failed to get Docker settings: %v", err)
+		return nil
+	}
+	return settings
+}
+
+// GetVMSettings returns VM manager settings from config collector.
+func (s *Server) GetVMSettings() *dto.VMSettings {
+	configCollector := collectors.NewConfigCollector()
+	settings, err := configCollector.GetVMSettings()
+	if err != nil {
+		logger.Error("Failed to get VM settings: %v", err)
+		return nil
+	}
+	return settings
+}
+
+// GetDiskSettings returns disk settings from config collector.
+func (s *Server) GetDiskSettings() *dto.DiskSettings {
+	configCollector := collectors.NewConfigCollector()
+	settings, err := configCollector.GetDiskSettings()
+	if err != nil {
+		logger.Error("Failed to get disk settings: %v", err)
+		return nil
+	}
+	return settings
+}
+
+// GetShareConfig returns configuration for a specific share.
+func (s *Server) GetShareConfig(name string) *dto.ShareConfig {
+	configCollector := collectors.NewConfigCollector()
+	config, err := configCollector.GetShareConfig(name)
+	if err != nil {
+		logger.Error("Failed to get share config for %s: %v", name, err)
+		return nil
+	}
+	return config
+}
+
+// GetNetworkAccessURLs returns all network access URLs for the server.
+func (s *Server) GetNetworkAccessURLs() *dto.NetworkAccessURLs {
+	accessURLs := collectors.CollectNetworkAccessURLs()
+	return accessURLs
+}
+
+// GetHealthStatus returns a map with system health metrics.
+func (s *Server) GetHealthStatus() map[string]interface{} {
+	health := make(map[string]interface{})
+
+	// System health
+	if sysInfo := s.GetSystemCache(); sysInfo != nil {
+		health["cpu_usage"] = sysInfo.CPUUsage
+		health["ram_usage"] = sysInfo.RAMUsage
+		health["cpu_temp"] = sysInfo.CPUTemp
+		health["uptime"] = sysInfo.Uptime
+	}
+
+	// Array health
+	if arrayStatus := s.GetArrayCache(); arrayStatus != nil {
+		health["array_state"] = arrayStatus.State
+		health["parity_valid"] = arrayStatus.ParityValid
+		health["array_used_percent"] = arrayStatus.UsedPercent
+	}
+
+	// Disk health summary
+	disks := s.GetDisksCache()
+	healthyDisks := 0
+	warningDisks := 0
+	for _, disk := range disks {
+		if disk.Status == "PASSED" && disk.Temperature <= 50 {
+			healthyDisks++
+		} else {
+			warningDisks++
+		}
+	}
+	health["healthy_disks"] = healthyDisks
+	health["warning_disks"] = warningDisks
+
+	// Container health
+	containers := s.GetDockerCache()
+	runningContainers := 0
+	for _, c := range containers {
+		if c.State == "running" {
+			runningContainers++
+		}
+	}
+	health["running_containers"] = runningContainers
+	health["total_containers"] = len(containers)
+
+	// VM health
+	vms := s.GetVMsCache()
+	runningVMs := 0
+	for _, vm := range vms {
+		if vm.State == "running" {
+			runningVMs++
+		}
+	}
+	health["running_vms"] = runningVMs
+	health["total_vms"] = len(vms)
+
+	return health
 }

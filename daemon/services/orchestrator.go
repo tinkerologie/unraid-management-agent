@@ -11,6 +11,7 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/api"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/mcp"
 )
 
 // Orchestrator coordinates the lifecycle of all collectors, API server, and handles graceful shutdown.
@@ -49,6 +50,27 @@ func (o *Orchestrator) Run() error {
 
 	// Small delay to ensure subscriptions are fully set up
 	time.Sleep(100 * time.Millisecond)
+
+	// Initialize MCP server for AI agent integration (HTTP transport)
+	mcpServer := mcp.NewServer(o.ctx, apiServer)
+	if err := mcpServer.Initialize(); err != nil {
+		logger.Error("Failed to initialize MCP server: %v", err)
+	} else {
+		// Register MCP endpoint on the API router
+		apiServer.GetRouter().HandleFunc("/mcp", mcpServer.GetHandler()).Methods("POST", "OPTIONS")
+		logger.Success("MCP server initialized at /mcp endpoint")
+	}
+
+	// Initialize SSE MCP server for VS Code and other SSE clients
+	mcpSSEServer := mcp.NewServerWithTransport(o.ctx, apiServer, mcp.TransportSSE)
+	if err := mcpSSEServer.Initialize(); err != nil {
+		logger.Error("Failed to initialize MCP SSE server: %v", err)
+	} else {
+		// Register SSE endpoints - GET for event stream, POST for messages
+		apiServer.GetRouter().HandleFunc("/mcp/sse", mcpSSEServer.GetSSEHandler()).Methods("GET")
+		apiServer.GetRouter().HandleFunc("/mcp/sse", mcpSSEServer.GetSSEPostHandler()).Methods("POST", "OPTIONS")
+		logger.Success("MCP SSE server initialized at /mcp/sse endpoint")
+	}
 
 	// Start all enabled collectors
 	enabledCount := o.collectorManager.StartAll()

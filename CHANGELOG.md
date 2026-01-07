@@ -11,7 +11,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Model Context Protocol (MCP) Support** - AI Agent Integration:
+
+  - New `/mcp` endpoint enables AI agents (Claude, GPT, etc.) to interact with Unraid
+  - Full MCP protocol implementation using mcp-golang v0.16.0
+  - **18 Monitoring Tools**:
+    - `get_system_info` - CPU, RAM, temperatures, uptime
+    - `get_array_status` - Array state, capacity, parity info
+    - `list_disks`/`get_disk_info` - Disk health and SMART data
+    - `list_shares` - Network shares configuration
+    - `list_containers`/`get_container_info` - Docker container status
+    - `list_vms`/`get_vm_info` - Virtual machine status
+    - `get_ups_status` - UPS battery and runtime info
+    - `get_gpu_metrics` - GPU utilization and temperature
+    - `get_network_info` - Network interface statistics
+    - `get_hardware_info` - Motherboard, CPU, memory details
+    - `get_registration` - License/registration information
+    - `get_notifications` - System alerts and warnings
+    - `get_zfs_pools`/`get_zfs_datasets` - ZFS pool and dataset info
+  - **7 Control Tools** (with confirmation for destructive actions):
+    - `container_action` - Start/stop/restart/pause Docker containers
+    - `vm_action` - Start/stop/restart/pause/hibernate VMs
+    - `array_action` - Start/stop Unraid array (requires confirmation)
+    - `parity_check_action` - Initiate parity checks
+    - `system_reboot`/`system_shutdown` - System power control (requires confirmation)
+  - **5 MCP Resources** for real-time data access:
+    - `unraid://system`, `unraid://array`, `unraid://containers`
+    - `unraid://vms`, `unraid://disks`
+  - **3 MCP Prompts** for guided AI interactions:
+    - `analyze_disk_health` - AI-guided disk health analysis
+    - `system_overview` - Comprehensive system status summary
+    - `troubleshoot_issue` - Interactive troubleshooting assistant
+  - Custom HTTP transport integrates with existing gorilla/mux router
+  - Thread-safe access to all cached collector data
+
 - **OpenAPI/Swagger Documentation** (#29):
+
   - Interactive API documentation available at `/swagger/`
   - Full OpenAPI 2.0 specification with 76 documented endpoints
   - Auto-generated from code annotations using swaggo/swag
@@ -23,12 +58,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - CI/CD: Swagger docs auto-generated during release builds
 
 - **Low Power Mode** (`--low-power-mode` or `UNRAID_LOW_POWER=true`):
+
   - New option for resource-constrained/older hardware (e.g., HP N40L with AMD Turion)
   - Multiplies all collection intervals by 4x when enabled
   - Reduces CPU wake-ups and allows deeper C-states
   - Ideal for users experiencing high CPU load from the plugin
 
 - **Runtime Collector Management API** (#35):
+
   - New endpoint `POST /api/v1/collectors/{name}/enable` - Enable a collector at runtime
   - New endpoint `POST /api/v1/collectors/{name}/disable` - Disable a collector at runtime
   - New endpoint `PATCH /api/v1/collectors/{name}/interval` - Update collection interval
@@ -56,6 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Performance
 
 - **Docker SDK Collector (NEW)** - Massive performance improvement:
+
   - Replaced CLI-based Docker collector with Docker SDK (socket API)
   - Uses `/var/run/docker.sock` directly instead of spawning `docker` processes
   - **~530x faster**: Container list from 5.8s → 10-15ms
@@ -64,6 +102,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Still reads memory stats from cgroup v2 filesystem for optimal performance
 
 - **VM Libvirt Collector (NEW)** - Native libvirt API integration:
+
   - Replaced CLI-based VM collector with libvirt Go bindings
   - Uses direct RPC to libvirt daemon instead of `virsh` commands
   - **~100-200x faster**: VM list from 1-2s → 6-7ms
@@ -71,6 +110,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Graceful fallback if libvirt is not available
 
 - **Docker Collector Optimizations** (Community feedback: HP N40L performance issue):
+
   - **Batched docker inspect calls**: Reduced from N separate calls to 1 batched call (3.5x faster)
   - **Skip inspect for stopped containers**: Only running containers get detailed inspection
   - Overall docker collection cycle reduced from ~8.8s to ~5.9s on test server

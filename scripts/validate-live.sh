@@ -347,6 +347,202 @@ else
     print_fail "HTTP $http_code | Failed"
 fi
 
+# 17. Hardware info endpoint
+print_test "17. Testing /hardware/full"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/hardware/full")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    bios=$(echo "$body" | jq -r '.bios.vendor // "N/A"')
+    print_pass "HTTP $http_code | ${time}s | BIOS Vendor: $bios"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
+
+# 18. Network access URLs endpoint
+print_test "18. Testing /network/access-urls"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/network/access-urls")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    count=$(echo "$body" | jq '.urls | length')
+    print_pass "HTTP $http_code | ${time}s | URLs: $count"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
+
+# 19. System settings endpoint
+print_test "19. Testing /settings/system"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/settings/system")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    server=$(echo "$body" | jq -r '.server_name // "N/A"')
+    print_pass "HTTP $http_code | ${time}s | Server: $server"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
+
+# 20. Docker settings endpoint
+print_test "20. Testing /settings/docker"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/settings/docker")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    enabled=$(echo "$body" | jq -r '.enabled // "N/A"')
+    print_pass "HTTP $http_code | ${time}s | Docker Enabled: $enabled"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
+
+# 21. VM settings endpoint
+print_test "21. Testing /settings/vm"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/settings/vm")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    enabled=$(echo "$body" | jq -r '.enabled // "N/A"')
+    print_pass "HTTP $http_code | ${time}s | VM Enabled: $enabled"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
+
+# 22. Disk settings endpoint
+print_test "22. Testing /settings/disks"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/settings/disks")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    spindown=$(echo "$body" | jq -r '.spindown_delay_minutes // "N/A"')
+    print_pass "HTTP $http_code | ${time}s | Spindown: ${spindown} min"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
+
+# 23. User scripts endpoint
+print_test "23. Testing /user-scripts"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/user-scripts")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    count=$(echo "$body" | jq 'length')
+    print_pass "HTTP $http_code | ${time}s | Scripts: $count"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
+
+# 24. Parity check history endpoint
+print_test "24. Testing /array/parity-check/history"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/array/parity-check/history")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    count=$(echo "$body" | jq '.records | length')
+    print_pass "HTTP $http_code | ${time}s | Records: $count"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
+
+# 25. ZFS pools endpoint
+print_test "25. Testing /zfs/pools"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/zfs/pools")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    count=$(echo "$body" | jq 'length')
+    print_pass "HTTP $http_code | ${time}s | ZFS Pools: $count"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
+
+# 26. ZFS datasets endpoint
+print_test "26. Testing /zfs/datasets"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/zfs/datasets")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    count=$(echo "$body" | jq 'length')
+    print_pass "HTTP $http_code | ${time}s | ZFS Datasets: $count"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
+
+# 27. ZFS snapshots endpoint
+print_test "27. Testing /zfs/snapshots"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/zfs/snapshots")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    count=$(echo "$body" | jq 'length')
+    print_pass "HTTP $http_code | ${time}s | ZFS Snapshots: $count"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
+
+# 28. ZFS ARC stats endpoint
+print_test "28. Testing /zfs/arc"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/zfs/arc")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    hitratio=$(echo "$body" | jq -r '.hit_ratio_percent // "N/A"')
+    print_pass "HTTP $http_code | ${time}s | ARC Hit Ratio: ${hitratio}%"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
+
+# 29. Notifications overview endpoint
+print_test "29. Testing /notifications/overview"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/notifications/overview")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    unread=$(echo "$body" | jq -r '.unread // 0')
+    print_pass "HTTP $http_code | ${time}s | Unread: $unread"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
+
+# 30. NUT endpoint
+print_test "30. Testing /nut"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/nut")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    installed=$(echo "$body" | jq -r '.installed // "N/A"')
+    print_pass "HTTP $http_code | ${time}s | NUT Installed: $installed"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
+
+# 31. Collectors status endpoint
+print_test "31. Testing /collectors/status"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/collectors/status")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    total=$(echo "$body" | jq -r '.total // 0')
+    enabled=$(echo "$body" | jq -r '.enabled_count // 0')
+    print_pass "HTTP $http_code | ${time}s | Total: $total | Enabled: $enabled"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
+
 # Performance monitoring
 print_header "3. PERFORMANCE MONITORING"
 print_test "Monitoring resource usage"

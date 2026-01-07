@@ -59,21 +59,28 @@ For information about the official Unraid GraphQL API, please refer to:
 - **Array Status**: Array state, parity status, disk counts
 - **Disk Information**: Per-disk metrics, SMART data, temperatures, space usage
 - **Network Interfaces**: Interface status, bandwidth, IP addresses, MAC addresses
-- **Docker Containers**: Container list, status, resource usage
-- **Virtual Machines**: VM list, state, resource allocation
+- **Docker Containers**: Container list, status, resource usage (via Docker SDK)
+- **Virtual Machines**: VM list, state, resource allocation (via libvirt API)
 - **UPS Status**: Battery level, runtime, power state
 - **GPU Metrics**: GPU utilization, memory, temperature
 - **User Shares**: Share list, space usage, paths
+- **ZFS Pools/Datasets**: ZFS pool health, datasets, snapshots, ARC stats
+- **Notifications**: System alerts, warnings, and info messages
 
 ### Control Operations
 
 - **Docker**: Start, stop, restart, pause, unpause containers
-- **Virtual Machines**: Start, stop, restart, pause, resume, hibernate VMs
+- **Virtual Machines**: Start, stop, restart, pause, resume, hibernate, force-stop VMs
+- **Array**: Start, stop array operations
+- **Parity**: Start, stop, pause, resume parity checks
+- **Disk**: Spin up, spin down individual disks
+- **User Scripts**: Execute User Scripts plugin scripts
 
 ### Communication Protocols
 
 - **REST API**: HTTP endpoints for synchronous queries
 - **WebSocket**: Real-time event streaming for live updates
+- **MCP (Model Context Protocol)**: AI agent integration for LLM-powered monitoring and control
 
 ## Architecture
 
@@ -83,9 +90,21 @@ The agent uses a pubsub event bus for decoupled, real-time data flow:
 
 ```
 Collectors → Event Bus → API Server Cache → REST Endpoints
+                        ↓                  ↓
+                 WebSocket Hub      MCP Server → AI Agents
                         ↓
-                 WebSocket Hub → Connected Clients
+                 Connected Clients
 ```
+
+### Native API Integration
+
+For optimal performance, collectors use native Go libraries instead of shell commands:
+
+| Component | Library | Description |
+|-----------|---------|-------------|
+| **Docker** | `github.com/moby/moby/client` | Docker Engine SDK for container data |
+| **VMs** | `github.com/digitalocean/go-libvirt` | Native libvirt bindings for VM data |
+| **System** | Direct `/proc`, `/sys` access | Kernel interfaces for metrics |
 
 ### Components
 
@@ -202,7 +221,7 @@ make package
 - **GPU Models and Drivers**: Different GPU vendors (NVIDIA, AMD, Intel), driver versions, and passthrough configurations
 - **Network Interfaces**: Various network cards, bonding configurations, VLANs, and bridge setups
 - **UPS Models and Monitoring Tools**: Different UPS brands, monitoring software (apcupsd, nut), and communication protocols
-- **Docker and VM Configurations**: Different Docker versions, libvirt configurations, and virtualization setups
+- **Docker and VM Configurations**: Different Docker API versions, libvirt socket configurations, and virtualization setups
 
 ### What This Means for You
 
@@ -285,6 +304,24 @@ ws.onmessage = (event) => {
   console.log("Event received:", data);
 };
 ```
+
+### MCP (Model Context Protocol)
+
+The agent includes an MCP endpoint for AI agent integration at `POST /mcp`:
+
+```bash
+# List available MCP tools
+curl -X POST http://localhost:8043/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'
+
+# Get system info via MCP
+curl -X POST http://localhost:8043/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_system_info","arguments":{}},"id":1}'
+```
+
+For full MCP documentation including all tools, resources, and prompts, see [docs/MCP_INTEGRATION.md](docs/MCP_INTEGRATION.md).
 
 ### Example API Usage
 
@@ -564,8 +601,9 @@ Comprehensive documentation is available in the `docs/` directory:
 
 - **[Documentation Index](docs/README.md)** - Complete documentation overview
 - **[API Reference](docs/api/API_REFERENCE.md)** - Detailed API endpoint reference (46 endpoints)
-- **[API Coverage Analysis](docs/api/API_COVERAGE_ANALYSIS.md)** - API coverage vs Unraid Web UI
-- **[WebSocket Events](docs/WEBSOCKET_EVENTS_DOCUMENTATION.md)** - WebSocket event system guide
+- **[MCP Integration](docs/MCP_INTEGRATION.md)** - Model Context Protocol for AI agents (54 tools)
+- **[WebSocket Events](docs/websocket/WEBSOCKET_EVENTS_DOCUMENTATION.md)** - WebSocket event system guide
+- **[System Requirements](docs/SYSTEM_REQUIREMENTS_AND_DEPENDENCIES.md)** - Dependencies and requirements
 - **[Changelog](CHANGELOG.md)** - Version history and release notes
 
 ## Support
