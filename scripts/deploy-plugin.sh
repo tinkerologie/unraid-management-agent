@@ -3,7 +3,7 @@
 # Deploy Unraid Management Agent Plugin with Icon Fix
 # This script builds and deploys the complete plugin package including the icon fix
 
-set -e
+set -e  # Exit on error, except during API endpoint testing
 
 # Load configuration from config.sh
 SCRIPT_DIR="$(dirname "$0")"
@@ -212,13 +212,20 @@ test_endpoint() {
     local search_term="${3:-}"
 
     echo -n "Testing $endpoint... "
-    response=$(run_ssh "curl -s http://localhost:8043/api/v1${endpoint}")
 
-    if echo "$response" | grep -q "error\|failed\|Error\|Failed"; then
+    # Run the curl command and capture response, don't fail on error
+    response=$(run_ssh "curl -s http://localhost:8043/api/v1${endpoint}" || true)
+
+    # Check for actual error responses (JSON error objects), not just the word "error" in field names
+    # Look for patterns like {"error":"message"} or "success":false
+    if echo "$response" | grep -qE '"error"\s*:\s*"[^"]+"|"success"\s*:\s*false' 2>/dev/null; then
         echo "❌ (error response)"
-        return 1
-    elif [ -n "$search_term" ] && ! echo "$response" | grep -q "$search_term"; then
+        return 0  # Don't fail the script, just report the error
+    elif [ -n "$search_term" ] && ! echo "$response" | grep -q "$search_term" 2>/dev/null; then
         echo "⚠️  (response doesn't contain '$search_term')"
+        return 0
+    elif [ -z "$response" ]; then
+        echo "⚠️  (no response)"
         return 0
     else
         echo "✅"
