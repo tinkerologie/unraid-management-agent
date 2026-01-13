@@ -28,7 +28,9 @@ func (vc *VMController) connect(vmName string) (*libvirt.Libvirt, libvirt.Domain
 
 	domain, err := l.DomainLookupByName(vmName)
 	if err != nil {
-		l.Disconnect()
+		if disconnectErr := l.Disconnect(); disconnectErr != nil {
+			logger.Debug("VM: Error disconnecting from libvirt: %v", disconnectErr)
+		}
 		return nil, libvirt.Domain{}, fmt.Errorf("VM '%s' not found: %w", vmName, err)
 	}
 

@@ -57,7 +57,9 @@ func (c *DockerCollector) Start(ctx context.Context, interval time.Duration) {
 	defer ticker.Stop()
 	defer func() {
 		if c.dockerClient != nil {
-			c.dockerClient.Close()
+			if err := c.dockerClient.Close(); err != nil {
+				logger.Debug("Docker: Error closing client: %v", err)
+			}
 		}
 	}()
 
@@ -221,19 +223,23 @@ func (c *DockerCollector) getMemoryFromCgroups(fullID string, cont *dto.Containe
 	cgroupPath := "/sys/fs/cgroup/docker/" + fullID
 
 	// Read memory.current
+	//nolint:gosec // G304: cgroupPath is constructed from trusted Docker container ID
 	if data, err := os.ReadFile(cgroupPath + "/memory.current"); err == nil {
 		var memUsage uint64
-		fmt.Sscanf(strings.TrimSpace(string(data)), "%d", &memUsage)
-		cont.MemoryUsage = memUsage
+		if _, err := fmt.Sscanf(strings.TrimSpace(string(data)), "%d", &memUsage); err == nil {
+			cont.MemoryUsage = memUsage
+		}
 	}
 
 	// Read memory.max
+	//nolint:gosec // G304: cgroupPath is constructed from trusted Docker container ID
 	if data, err := os.ReadFile(cgroupPath + "/memory.max"); err == nil {
 		content := strings.TrimSpace(string(data))
 		if content != "max" {
 			var memLimit uint64
-			fmt.Sscanf(content, "%d", &memLimit)
-			cont.MemoryLimit = memLimit
+			if _, err := fmt.Sscanf(content, "%d", &memLimit); err == nil {
+				cont.MemoryLimit = memLimit
+			}
 		} else {
 			// "max" means unlimited - use system memory
 			cont.MemoryLimit = dockerGetSystemMemoryTotal()
@@ -304,8 +310,9 @@ func dockerGetSystemMemoryTotal() uint64 {
 			fields := strings.Fields(line)
 			if len(fields) >= 2 {
 				var val uint64
-				fmt.Sscanf(fields[1], "%d", &val)
-				return val * 1024 // Convert from kB to bytes
+				if _, err := fmt.Sscanf(fields[1], "%d", &val); err == nil {
+					return val * 1024 // Convert from kB to bytes
+				}
 			}
 		}
 	}

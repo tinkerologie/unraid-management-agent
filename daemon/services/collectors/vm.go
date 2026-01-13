@@ -226,8 +226,13 @@ func (c *VMCollector) getBlockIO(l *libvirt.Libvirt, domain libvirt.Domain, vm *
 		if err != nil {
 			continue
 		}
-		totalRead += uint64(rdBytes)
-		totalWrite += uint64(wrBytes)
+		// Safe conversion: negative values indicate errors or unsupported
+		if rdBytes >= 0 {
+			totalRead += uint64(rdBytes) //nolint:gosec // G115: rdBytes checked >= 0
+		}
+		if wrBytes >= 0 {
+			totalWrite += uint64(wrBytes) //nolint:gosec // G115: wrBytes checked >= 0
+		}
 	}
 
 	vm.DiskReadBytes = totalRead
@@ -252,8 +257,13 @@ func (c *VMCollector) getNetworkIO(l *libvirt.Libvirt, domain libvirt.Domain, vm
 		if err != nil {
 			continue
 		}
-		totalRX += uint64(rxBytes)
-		totalTX += uint64(txBytes)
+		// Safe conversion: negative values indicate errors or unsupported
+		if rxBytes >= 0 {
+			totalRX += uint64(rxBytes) //nolint:gosec // G115: rxBytes checked >= 0
+		}
+		if txBytes >= 0 {
+			totalTX += uint64(txBytes) //nolint:gosec // G115: txBytes checked >= 0
+		}
 	}
 
 	vm.NetworkRXBytes = totalRX
