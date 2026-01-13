@@ -172,7 +172,6 @@ mkdir -p /boot/config/plugins/${PLUGIN_NAME}
 if [ ! -f /boot/config/plugins/${PLUGIN_NAME}/config.cfg ]; then
     cat > /boot/config/plugins/${PLUGIN_NAME}/config.cfg << EOF
 PORT=8043
-LOG_LEVEL=info
 EOF
     echo \"✅ Default configuration created\"
 else
@@ -282,4 +281,3 @@ echo "  3. Check browser console for errors (F12)"
 echo ""
 echo "========================================="
 echo ""
-

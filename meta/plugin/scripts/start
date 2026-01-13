@@ -10,7 +10,6 @@ mkdir -p /boot/config/plugins/unraid-management-agent
 if [ ! -f "$CONFIG_FILE" ]; then
     cat > "$CONFIG_FILE" << EOF
 PORT=8043
-LOG_LEVEL=info
 EOF
 fi
 
@@ -22,7 +21,7 @@ killall unraid-management-agent >/dev/null 2>&1
 
 # Set defaults for all values
 PORT="${PORT:-8043}"
-LOG_LEVEL="${LOG_LEVEL:-info}"
+# Log level is always info by default (use --debug or --log-level CLI flag to change)
 # Defaults follow industry standards (Zabbix, Prometheus, Datadog)
 INTERVAL_SYSTEM="${INTERVAL_SYSTEM:-15}"
 INTERVAL_ARRAY="${INTERVAL_ARRAY:-60}"
@@ -55,7 +54,7 @@ nohup sudo -H bash -c "
   INTERVAL_NOTIFICATION=$INTERVAL_NOTIFICATION \
   INTERVAL_REGISTRATION=$INTERVAL_REGISTRATION \
   INTERVAL_UNASSIGNED=$INTERVAL_UNASSIGNED \
-  $PROG --logs-dir $LOGS_DIR --port $PORT --log-level $LOG_LEVEL boot
+  $PROG --logs-dir $LOGS_DIR --port $PORT --log-level info boot
 " >/dev/null 2>&1 &
 
-echo "Unraid Management Agent started on port $PORT with log level $LOG_LEVEL"
+echo "Unraid Management Agent started on port $PORT"

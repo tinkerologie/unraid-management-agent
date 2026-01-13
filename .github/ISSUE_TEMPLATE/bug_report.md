@@ -71,6 +71,7 @@ If applicable, add screenshots to help explain your problem.
 ## Additional Context
 
 Add any other context about the problem here. For example:
+
 - Did this work in a previous version?
 - Does this only happen with specific configurations?
 - Are there any workarounds?

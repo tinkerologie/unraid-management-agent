@@ -63,13 +63,13 @@ print_info() {
 test_endpoint() {
     local endpoint=$1
     local description=$2
-    
+
     print_test "Testing ${endpoint} - ${description}"
-    
+
     local response=$(curl -s -w "\n%{http_code}" "${API_BASE}${endpoint}")
     local http_code=$(echo "$response" | tail -n1)
     local body=$(echo "$response" | sed '$d')
-    
+
     if [ "$http_code" = "200" ]; then
         print_pass "HTTP 200 OK"
         echo "$body"
@@ -596,4 +596,3 @@ echo -e "Passed: ${GREEN}${TESTS_PASSED}${NC}"
 echo -e "Failed: ${RED}${TESTS_FAILED}${NC}"
 echo ""
 echo "Completed: $(date)"
-

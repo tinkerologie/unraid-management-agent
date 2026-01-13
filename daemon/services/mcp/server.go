@@ -182,7 +182,7 @@ func (s *Server) GetHandler() http.HandlerFunc {
 			http.Error(w, "HTTP transport not configured", http.StatusInternalServerError)
 		}
 	}
-	return http.HandlerFunc(s.transport.Handler())
+	return s.transport.Handler()
 }
 
 // GetSSEHandler returns the SSE handler for Server-Sent Events connections.
@@ -223,7 +223,7 @@ func (s *Server) BroadcastSSE(event string, data interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal data: %w", err)
 	}
-	s.sseTransport.Broadcast(event, string(jsonData))
+	_ = s.sseTransport.Broadcast(event, string(jsonData))
 	return nil
 }
 
@@ -417,7 +417,7 @@ func (s *Server) registerMonitoringTools() error {
 		"Get GPU metrics including utilization, temperature, and memory usage for all GPUs",
 		func(args dto.MCPEmptyArgs) (*mcp.ToolResponse, error) {
 			gpus := s.cacheProvider.GetGPUCache()
-			if gpus == nil || len(gpus) == 0 {
+			if len(gpus) == 0 {
 				return mcp.NewToolResponse(mcp.NewTextContent("No GPUs detected or GPU information not available")), nil
 			}
 			return s.jsonResponse(gpus)
@@ -482,7 +482,7 @@ func (s *Server) registerMonitoringTools() error {
 		"Get ZFS pool information including health status, capacity, and configuration",
 		func(args dto.MCPZFSPoolArgs) (*mcp.ToolResponse, error) {
 			pools := s.cacheProvider.GetZFSPoolsCache()
-			if pools == nil || len(pools) == 0 {
+			if len(pools) == 0 {
 				return mcp.NewToolResponse(mcp.NewTextContent("No ZFS pools configured or ZFS information not available")), nil
 			}
 
@@ -505,7 +505,7 @@ func (s *Server) registerMonitoringTools() error {
 		"Get ZFS dataset information including snapshots, quotas, and usage",
 		func(args dto.MCPEmptyArgs) (*mcp.ToolResponse, error) {
 			datasets := s.cacheProvider.GetZFSDatasetsCache()
-			if datasets == nil || len(datasets) == 0 {
+			if len(datasets) == 0 {
 				return mcp.NewToolResponse(mcp.NewTextContent("No ZFS datasets found or ZFS information not available")), nil
 			}
 			return s.jsonResponse(datasets)
@@ -518,7 +518,7 @@ func (s *Server) registerMonitoringTools() error {
 		"Get ZFS snapshot information for all pools and datasets",
 		func(args dto.MCPEmptyArgs) (*mcp.ToolResponse, error) {
 			snapshots := s.cacheProvider.GetZFSSnapshotsCache()
-			if snapshots == nil || len(snapshots) == 0 {
+			if len(snapshots) == 0 {
 				return mcp.NewToolResponse(mcp.NewTextContent("No ZFS snapshots found or ZFS information not available")), nil
 			}
 			return s.jsonResponse(snapshots)

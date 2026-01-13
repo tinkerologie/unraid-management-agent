@@ -2187,40 +2187,7 @@ func (s *Server) handleCollectorStatus(w http.ResponseWriter, r *http.Request) {
 //	@Failure		503		{object}	dto.Response			"Collector management not available"
 //	@Router			/collectors/{name}/enable [post]
 func (s *Server) handleCollectorEnable(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	name := vars["name"]
-
-	if s.collectorManager == nil {
-		respondJSON(w, http.StatusServiceUnavailable, dto.Response{
-			Success:   false,
-			Message:   "collector management not available",
-			Timestamp: time.Now(),
-		})
-		return
-	}
-
-	logger.Info("Enabling collector: %s", name)
-
-	if err := s.collectorManager.EnableCollector(name); err != nil {
-		statusCode := http.StatusBadRequest
-		if err.Error() == fmt.Sprintf("unknown collector: %s", name) {
-			statusCode = http.StatusNotFound
-		}
-		respondJSON(w, statusCode, dto.Response{
-			Success:   false,
-			Message:   err.Error(),
-			Timestamp: time.Now(),
-		})
-		return
-	}
-
-	status, _ := s.collectorManager.GetStatus(name)
-	respondJSON(w, http.StatusOK, dto.CollectorResponse{
-		Success:   true,
-		Message:   fmt.Sprintf("%s collector enabled", name),
-		Collector: *status,
-		Timestamp: time.Now(),
-	})
+	s.handleCollectorStateChange(w, r, true)
 }
 
 // handleCollectorDisable godoc
@@ -2236,6 +2203,11 @@ func (s *Server) handleCollectorEnable(w http.ResponseWriter, r *http.Request) {
 //	@Failure		503		{object}	dto.Response			"Collector management not available"
 //	@Router			/collectors/{name}/disable [post]
 func (s *Server) handleCollectorDisable(w http.ResponseWriter, r *http.Request) {
+	s.handleCollectorStateChange(w, r, false)
+}
+
+// handleCollectorStateChange is a shared helper for enable/disable operations
+func (s *Server) handleCollectorStateChange(w http.ResponseWriter, r *http.Request, enable bool) {
 	vars := mux.Vars(r)
 	name := vars["name"]
 
@@ -2248,25 +2220,39 @@ func (s *Server) handleCollectorDisable(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	logger.Info("Disabling collector: %s", name)
+	action := "Enabling"
+	actionPast := "enabled"
+	var actionErr error
+	if enable {
+		logger.Info("Enabling collector: %s", name)
+		actionErr = s.collectorManager.EnableCollector(name)
+	} else {
+		action = "Disabling"
+		actionPast = "disabled"
+		logger.Info("Disabling collector: %s", name)
+		actionErr = s.collectorManager.DisableCollector(name)
+	}
 
-	if err := s.collectorManager.DisableCollector(name); err != nil {
+	if actionErr != nil {
 		statusCode := http.StatusBadRequest
-		if err.Error() == fmt.Sprintf("unknown collector: %s", name) {
+		if actionErr.Error() == fmt.Sprintf("unknown collector: %s", name) {
 			statusCode = http.StatusNotFound
 		}
 		respondJSON(w, statusCode, dto.Response{
 			Success:   false,
-			Message:   err.Error(),
+			Message:   actionErr.Error(),
 			Timestamp: time.Now(),
 		})
 		return
 	}
 
-	status, _ := s.collectorManager.GetStatus(name)
+	status, err := s.collectorManager.GetStatus(name)
+	if err != nil {
+		logger.Warning("%s collector %s succeeded but status retrieval failed: %v", action, name, err)
+	}
 	respondJSON(w, http.StatusOK, dto.CollectorResponse{
 		Success:   true,
-		Message:   fmt.Sprintf("%s collector disabled", name),
+		Message:   fmt.Sprintf("%s collector %s", name, actionPast),
 		Collector: *status,
 		Timestamp: time.Now(),
 	})

@@ -405,7 +405,6 @@ Configure the plugin through the Unraid web UI:
 2. Adjust settings as needed:
 
    - **Port**: API server port (default: 8043)
-   - **Log Level**: Logging verbosity (info, debug)
    - **Collection Intervals**: How often each data type is collected
 
 3. Click **Apply** to save changes (service restarts automatically)
@@ -444,11 +443,13 @@ The agent uses log rotation with the following settings:
 
 - **Location**: `/var/log/unraid-management-agent.log`
 - **Max Size**: 5 MB per file
-- **Backups**: None (only current log is kept)
-- **Age-based Retention**: None (logs are rotated based on size only)
-- **Log Levels**: DEBUG, INFO, WARNING, ERROR (configurable via `LOG_LEVEL` in config file)
+- **Backups**: 1 backup file (older backups are automatically deleted)
+- **Age-based Retention**: 1 day (backup files older than 1 day are deleted)
+- **Log Levels**: DEBUG, INFO, WARNING, ERROR (configurable via `--log-level` CLI flag)
+- **Default Level**: INFO
+- **Auto Cleanup**: On startup, old rotated log files from previous versions are automatically removed
 
-In debug mode (`--debug` or `LOG_LEVEL=debug`), logs are written to stdout for immediate visibility.
+In debug mode (`--debug` or `--log-level debug`), logs are written to stdout for immediate visibility.
 
 ## Troubleshooting
 
@@ -528,6 +529,39 @@ If endpoints return empty or default data:
 
 Contributions are welcome and greatly appreciated! This project benefits from community involvement, especially for improving hardware compatibility across different Unraid configurations.
 
+### Code Quality Standards
+
+This project enforces **zero tolerance** for code quality issues:
+
+- ✅ No linting warnings or errors
+- ✅ No security vulnerabilities (medium+ severity)
+- ✅ All tests must pass with race detection
+- ✅ Code must be properly formatted (gofmt/goimports)
+
+We use **pre-commit hooks** to automatically enforce these standards.
+
+#### Quick Setup
+
+```bash
+# Automated setup (recommended)
+./scripts/setup-pre-commit.sh
+
+# Or manual setup
+pip install pre-commit
+make pre-commit-install
+```
+
+Pre-commit will automatically run checks before each commit. See [docs/PRE_COMMIT_HOOKS.md](docs/PRE_COMMIT_HOOKS.md) for detailed documentation.
+
+#### Available Commands
+
+```bash
+make pre-commit-run   # Run all pre-commit checks
+make lint             # Run golangci-lint only
+make security-check   # Run security scans
+make test-coverage    # Run tests with coverage
+```
+
 ### How to Contribute
 
 #### General Contributions
@@ -536,8 +570,10 @@ Contributions are welcome and greatly appreciated! This project benefits from co
 2. Create a feature branch (`git checkout -b feature/your-feature-name`)
 3. Commit your changes with descriptive messages
 4. Add tests for new functionality
-5. Ensure all tests pass: `make test`
+5. Ensure all checks pass: `make pre-commit-run && make test-coverage`
 6. Submit a pull request with a clear description of your changes
+
+**Important**: Pre-commit hooks will block commits that don't meet quality standards. Fix all issues before committing.
 
 #### Hardware Compatibility Contributions
 

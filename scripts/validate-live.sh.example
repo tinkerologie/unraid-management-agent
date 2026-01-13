@@ -78,4 +78,3 @@ print_header "Validation Summary"
 echo "Tests Passed: $TESTS_PASSED"
 echo "Tests Failed: $TESTS_FAILED"
 echo "Total Tests:  $TESTS_TOTAL"
-

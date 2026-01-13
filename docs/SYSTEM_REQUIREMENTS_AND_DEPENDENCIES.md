@@ -3,11 +3,13 @@
 ## 1. Minimum System Requirements
 
 ### Unraid OS Version
+
 - **Minimum**: Unraid 6.9+
 - **Recommended**: Unraid 7.x (tested and verified)
 - **Architecture**: Linux/amd64 (x86-64)
 
 ### Hardware Requirements
+
 - **CPU**: Any x86-64 processor (Intel or AMD)
   - No specific core count or generation required
   - Works with older CPUs (tested on Intel i7-6700K and i7-8700K)
@@ -17,6 +19,7 @@
 - **Network**: Port 8043 available (configurable)
 
 ### Hardware Dependencies
+
 The agent does **NOT** require specific hardware. However, data availability depends on what hardware is present:
 
 | Hardware | Data Availability | Notes |
@@ -38,6 +41,7 @@ The agent does **NOT** require specific hardware. However, data availability dep
 **The Unraid Management Agent is completely independent and does NOT require any other Unraid plugins.**
 
 Specifically:
+
 - ❌ **Does NOT require** "Dynamix System Information" plugin
 - ❌ **Does NOT require** "Dynamix System Temperature" plugin
 - ❌ **Does NOT require** "GPU Statistics" plugin
@@ -61,6 +65,7 @@ The agent collects data **directly from system sources**:
 The agent collects data **independently** without relying on other plugins:
 
 #### System Metrics (System Collector - 5s interval)
+
 ```
 Data Source: /proc/stat, /proc/meminfo, /proc/uptime, /proc/cpuinfo
 Methods:
@@ -71,6 +76,7 @@ Methods:
 ```
 
 #### Temperature Data (System Collector - 5s interval)
+
 ```
 Data Source: /sys/class/hwmon/ or `sensors` command
 Methods:
@@ -84,6 +90,7 @@ Sensor Name Matching:
 ```
 
 #### Array Status (Array Collector - 10s interval)
+
 ```
 Data Source: /var/local/emhttp/var.ini, /var/local/emhttp/disks.ini
 Methods:
@@ -93,6 +100,7 @@ Methods:
 ```
 
 #### Disk Information (Disk Collector - 30s interval)
+
 ```
 Data Source: /var/local/emhttp/disks.ini, smartctl, /proc/diskstats
 Methods:
@@ -103,6 +111,7 @@ Methods:
 ```
 
 #### GPU Metrics (GPU Collector - 10s interval)
+
 ```
 Data Source: nvidia-smi, rocm-smi, radeontop, intel_gpu_top
 Methods:
@@ -112,6 +121,7 @@ Methods:
 ```
 
 #### Docker/VMs (Docker & VM Collectors - 10s interval)
+
 ```
 Data Source: Docker daemon, libvirt
 Methods:
@@ -120,6 +130,7 @@ Methods:
 ```
 
 #### UPS Status (UPS Collector - 10s interval)
+
 ```
 Data Source: apcupsd or NUT daemon
 Methods:
@@ -229,10 +240,10 @@ If both commands return nothing, **the hardware simply doesn't expose temperatur
 ### For Your Friend's System
 
 If temperatures are missing:
+
 1. Check if `sensors` command works
 2. Check if `/sys/class/hwmon/` has temperature files
 3. If both are empty, the hardware doesn't expose temperature sensors
 4. This is **NOT** a plugin dependency issue - it's a hardware limitation
 
 The agent will continue to work perfectly for all other metrics (CPU usage, RAM, array status, disks, Docker, VMs, etc.) even if temperature sensors are unavailable.
-

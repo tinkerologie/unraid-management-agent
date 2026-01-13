@@ -20,7 +20,7 @@ type DiskInfo struct {
 	// Disk identification
 	SerialNumber string `json:"serial_number,omitempty" example:"WD-WMC4N0123456"`
 	Model        string `json:"model,omitempty" example:"WDC WD120EFBX-68B0EN0"`
-	Role         string `json:"role,omitempty" example:"data"`       // "parity", "parity2", "data", "cache", "pool"
+	Role         string `json:"role,omitempty" example:"data"`         // "parity", "parity2", "data", "cache", "pool"
 	SpinState    string `json:"spin_state,omitempty" example:"active"` // "active", "standby", "unknown"
 
 	// Enhanced SMART attributes

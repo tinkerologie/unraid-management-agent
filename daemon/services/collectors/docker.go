@@ -190,7 +190,7 @@ func (c *DockerCollector) Collect() {
 					volumeMappings = append(volumeMappings, dto.VolumeMapping{
 						HostPath:      mount.Source,
 						ContainerPath: mount.Destination,
-						Mode:          string(mount.Mode),
+						Mode:          mount.Mode,
 					})
 				}
 				cont.VolumeMappings = volumeMappings

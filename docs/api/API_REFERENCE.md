@@ -92,24 +92,24 @@ All errors follow this structure:
 
 ### Common Error Codes
 
-| Error Code | HTTP Status | Description | Resolution |
-|------------|-------------|-------------|------------|
-| `ARRAY_ALREADY_STARTED` | 409 | Array is already running | Check array status before starting |
-| `ARRAY_ALREADY_STOPPED` | 409 | Array is already stopped | Check array status before stopping |
-| `ARRAY_NOT_STARTED` | 400 | Array must be started for this operation | Start the array first |
-| `PARITY_CHECK_RUNNING` | 409 | Parity check is already running | Stop current check before starting new one |
-| `PARITY_CHECK_NOT_RUNNING` | 400 | No parity check is running | Start a parity check first |
-| `DISK_NOT_FOUND` | 404 | Disk ID/name not found | Verify disk exists using GET /disks |
-| `CONTAINER_NOT_FOUND` | 404 | Docker container not found | Verify container name/ID using GET /docker |
-| `CONTAINER_ALREADY_RUNNING` | 409 | Container is already running | Check container state first |
-| `CONTAINER_ALREADY_STOPPED` | 409 | Container is already stopped | Check container state first |
-| `VM_NOT_FOUND` | 404 | Virtual machine not found | Verify VM name/ID using GET /vm |
-| `VM_ALREADY_RUNNING` | 409 | VM is already running | Check VM state first |
-| `VM_ALREADY_STOPPED` | 409 | VM is already stopped | Check VM state first |
-| `SHARE_NOT_FOUND` | 404 | Share not found | Verify share exists using GET /shares |
-| `NETWORK_INTERFACE_NOT_FOUND` | 404 | Network interface not found | Verify interface using GET /network |
-| `VALIDATION_ERROR` | 400 | Invalid request parameters | Check request body format and values |
-| `INTERNAL_ERROR` | 500 | Server error | Check server logs for details |
+| Error Code                    | HTTP Status | Description                              | Resolution                                 |
+| ----------------------------- | ----------- | ---------------------------------------- | ------------------------------------------ |
+| `ARRAY_ALREADY_STARTED`       | 409         | Array is already running                 | Check array status before starting         |
+| `ARRAY_ALREADY_STOPPED`       | 409         | Array is already stopped                 | Check array status before stopping         |
+| `ARRAY_NOT_STARTED`           | 400         | Array must be started for this operation | Start the array first                      |
+| `PARITY_CHECK_RUNNING`        | 409         | Parity check is already running          | Stop current check before starting new one |
+| `PARITY_CHECK_NOT_RUNNING`    | 400         | No parity check is running               | Start a parity check first                 |
+| `DISK_NOT_FOUND`              | 404         | Disk ID/name not found                   | Verify disk exists using GET /disks        |
+| `CONTAINER_NOT_FOUND`         | 404         | Docker container not found               | Verify container name/ID using GET /docker |
+| `CONTAINER_ALREADY_RUNNING`   | 409         | Container is already running             | Check container state first                |
+| `CONTAINER_ALREADY_STOPPED`   | 409         | Container is already stopped             | Check container state first                |
+| `VM_NOT_FOUND`                | 404         | Virtual machine not found                | Verify VM name/ID using GET /vm            |
+| `VM_ALREADY_RUNNING`          | 409         | VM is already running                    | Check VM state first                       |
+| `VM_ALREADY_STOPPED`          | 409         | VM is already stopped                    | Check VM state first                       |
+| `SHARE_NOT_FOUND`             | 404         | Share not found                          | Verify share exists using GET /shares      |
+| `NETWORK_INTERFACE_NOT_FOUND` | 404         | Network interface not found              | Verify interface using GET /network        |
+| `VALIDATION_ERROR`            | 400         | Invalid request parameters               | Check request body format and values       |
+| `INTERNAL_ERROR`              | 500         | Server error                             | Check server logs for details              |
 
 ### Validation Error Example
 
@@ -302,7 +302,7 @@ parity_disk = get_disk(BASE_URL, "parity")
 
 ```javascript
 // Configuration
-const UNRAID_HOST = '192.168.20.21';
+const UNRAID_HOST = "192.168.20.21";
 const UNRAID_PORT = 8043;
 const BASE_URL = `http://${UNRAID_HOST}:${UNRAID_PORT}/api/v1`;
 
@@ -324,7 +324,7 @@ async function getSystemInfo() {
 
     return systemInfo;
   } catch (error) {
-    console.error('Error fetching system info:', error);
+    console.error("Error fetching system info:", error);
     throw error;
   }
 }
@@ -334,9 +334,9 @@ async function checkHealth() {
   try {
     const response = await fetch(`${BASE_URL}/health`);
     const data = await response.json();
-    return data.status === 'ok';
+    return data.status === "ok";
   } catch (error) {
-    console.error('Health check failed:', error);
+    console.error("Health check failed:", error);
     return false;
   }
 }
@@ -345,7 +345,7 @@ async function checkHealth() {
 async function startArray() {
   try {
     const response = await fetch(`${BASE_URL}/array/start`, {
-      method: 'POST'
+      method: "POST",
     });
 
     if (!response.ok) {
@@ -362,43 +362,43 @@ async function startArray() {
     console.log(`Success: ${result.message}`);
     return true;
   } catch (error) {
-    console.error('Error starting array:', error);
+    console.error("Error starting array:", error);
     return false;
   }
 }
 
 // Usage
 getSystemInfo();
-checkHealth().then(healthy => {
-  console.log(`API is ${healthy ? 'healthy' : 'not responding'}`);
+checkHealth().then((healthy) => {
+  console.log(`API is ${healthy ? "healthy" : "not responding"}`);
 });
 ```
 
 #### Using Axios
 
 ```javascript
-const axios = require('axios');
+const axios = require("axios");
 
 // Configuration
-const BASE_URL = 'http://192.168.20.21:8043/api/v1';
+const BASE_URL = "http://192.168.20.21:8043/api/v1";
 
 // Create axios instance with default config
 const api = axios.create({
   baseURL: BASE_URL,
   timeout: 5000,
   headers: {
-    'Content-Type': 'application/json'
-  }
+    "Content-Type": "application/json",
+  },
 });
 
 // Get system information
 async function getSystemInfo() {
   try {
-    const { data } = await api.get('/system');
+    const { data } = await api.get("/system");
     console.log(`CPU Usage: ${data.cpu_usage_percent}%`);
     return data;
   } catch (error) {
-    console.error('Error:', error.message);
+    console.error("Error:", error.message);
     throw error;
   }
 }
@@ -406,7 +406,7 @@ async function getSystemInfo() {
 // Start array with error handling
 async function startArray() {
   try {
-    const { data } = await api.post('/array/start');
+    const { data } = await api.post("/array/start");
     console.log(data.message);
     return true;
   } catch (error) {
@@ -420,9 +420,9 @@ async function startArray() {
       }
     } else if (error.request) {
       // Request made but no response
-      console.error('No response from server');
+      console.error("No response from server");
     } else {
-      console.error('Error:', error.message);
+      console.error("Error:", error.message);
     }
     return false;
   }
@@ -431,13 +431,13 @@ async function startArray() {
 // List all disks
 async function listDisks() {
   try {
-    const { data } = await api.get('/disks');
-    data.forEach(disk => {
+    const { data } = await api.get("/disks");
+    data.forEach((disk) => {
       console.log(`${disk.name}: ${disk.spin_state}`);
     });
     return data;
   } catch (error) {
-    console.error('Error listing disks:', error.message);
+    console.error("Error listing disks:", error.message);
     return [];
   }
 }
@@ -468,7 +468,7 @@ interface SystemInfo {
 }
 
 interface ArrayStatus {
-  state: 'STARTED' | 'STOPPED' | 'STARTING' | 'STOPPING';
+  state: "STARTED" | "STOPPED" | "STARTING" | "STOPPING";
   total_disks: number;
   data_disks: number;
   parity_disks: number;
@@ -484,12 +484,19 @@ interface DiskInfo {
   id: string;
   device: string;
   name: string;
-  role: 'parity' | 'parity2' | 'data' | 'cache' | 'pool' | 'docker_vdisk' | 'log';
+  role:
+    | "parity"
+    | "parity2"
+    | "data"
+    | "cache"
+    | "pool"
+    | "docker_vdisk"
+    | "log";
   size_bytes: number;
   used_bytes: number;
   free_bytes: number;
   temperature_celsius: number;
-  spin_state: 'active' | 'standby' | 'idle';
+  spin_state: "active" | "standby" | "idle";
   serial_number: string;
   model: string;
   filesystem: string;
@@ -501,7 +508,7 @@ interface ContainerInfo {
   id: string;
   name: string;
   image: string;
-  state: 'running' | 'stopped' | 'paused';
+  state: "running" | "stopped" | "paused";
   status: string;
   cpu_usage_percent: number;
   memory_usage_bytes: number;
@@ -513,7 +520,7 @@ interface ContainerInfo {
 interface VMInfo {
   id: string;
   name: string;
-  state: 'running' | 'stopped' | 'paused';
+  state: "running" | "stopped" | "paused";
   cpu_count: number;
   memory_bytes: number;
   timestamp: string;
@@ -548,7 +555,7 @@ class UnraidAPIClient {
 
   private async request<T>(
     endpoint: string,
-    method: 'GET' | 'POST' = 'GET',
+    method: "GET" | "POST" = "GET",
     body?: any
   ): Promise<T> {
     const controller = new AbortController();
@@ -557,9 +564,9 @@ class UnraidAPIClient {
     try {
       const response = await fetch(`${this.baseURL}${endpoint}`, {
         method,
-        headers: body ? { 'Content-Type': 'application/json' } : {},
+        headers: body ? { "Content-Type": "application/json" } : {},
         body: body ? JSON.stringify(body) : undefined,
-        signal: controller.signal
+        signal: controller.signal,
       });
 
       clearTimeout(timeoutId);
@@ -577,23 +584,23 @@ class UnraidAPIClient {
   }
 
   async getSystemInfo(): Promise<SystemInfo> {
-    return this.request<SystemInfo>('/system');
+    return this.request<SystemInfo>("/system");
   }
 
   async getArrayStatus(): Promise<ArrayStatus> {
-    return this.request<ArrayStatus>('/array');
+    return this.request<ArrayStatus>("/array");
   }
 
   async startArray(): Promise<APISuccess> {
-    return this.request<APISuccess>('/array/start', 'POST');
+    return this.request<APISuccess>("/array/start", "POST");
   }
 
   async stopArray(): Promise<APISuccess> {
-    return this.request<APISuccess>('/array/stop', 'POST');
+    return this.request<APISuccess>("/array/stop", "POST");
   }
 
   async listDisks(): Promise<DiskInfo[]> {
-    return this.request<DiskInfo[]>('/disks');
+    return this.request<DiskInfo[]>("/disks");
   }
 
   async getDisk(id: string): Promise<DiskInfo> {
@@ -601,7 +608,7 @@ class UnraidAPIClient {
   }
 
   async listContainers(): Promise<ContainerInfo[]> {
-    return this.request<ContainerInfo[]>('/docker');
+    return this.request<ContainerInfo[]>("/docker");
   }
 
   async getContainer(id: string): Promise<ContainerInfo> {
@@ -609,15 +616,15 @@ class UnraidAPIClient {
   }
 
   async startContainer(id: string): Promise<APISuccess> {
-    return this.request<APISuccess>(`/docker/${id}/start`, 'POST');
+    return this.request<APISuccess>(`/docker/${id}/start`, "POST");
   }
 
   async stopContainer(id: string): Promise<APISuccess> {
-    return this.request<APISuccess>(`/docker/${id}/stop`, 'POST');
+    return this.request<APISuccess>(`/docker/${id}/stop`, "POST");
   }
 
   async listVMs(): Promise<VMInfo[]> {
-    return this.request<VMInfo[]>('/vm');
+    return this.request<VMInfo[]>("/vm");
   }
 
   async getVM(id: string): Promise<VMInfo> {
@@ -625,11 +632,11 @@ class UnraidAPIClient {
   }
 
   async startVM(id: string): Promise<APISuccess> {
-    return this.request<APISuccess>(`/vm/${id}/start`, 'POST');
+    return this.request<APISuccess>(`/vm/${id}/start`, "POST");
   }
 
   async stopVM(id: string): Promise<APISuccess> {
-    return this.request<APISuccess>(`/vm/${id}/stop`, 'POST');
+    return this.request<APISuccess>(`/vm/${id}/stop`, "POST");
   }
 }
 ```
@@ -638,7 +645,7 @@ class UnraidAPIClient {
 
 ```typescript
 // Create client instance
-const client = new UnraidAPIClient('192.168.20.21');
+const client = new UnraidAPIClient("192.168.20.21");
 
 // Get system information
 async function displaySystemInfo() {
@@ -649,7 +656,7 @@ async function displaySystemInfo() {
     console.log(`RAM Usage: ${systemInfo.ram_usage_percent}%`);
     console.log(`CPU Temp: ${systemInfo.cpu_temp_celsius}°C`);
   } catch (error) {
-    console.error('Error:', error);
+    console.error("Error:", error);
   }
 }
 
@@ -658,14 +665,14 @@ async function manageArray() {
   try {
     const status = await client.getArrayStatus();
 
-    if (status.state === 'STOPPED') {
-      console.log('Starting array...');
+    if (status.state === "STOPPED") {
+      console.log("Starting array...");
       await client.startArray();
     } else {
       console.log(`Array is ${status.state}`);
     }
   } catch (error) {
-    console.error('Error managing array:', error);
+    console.error("Error managing array:", error);
   }
 }
 
@@ -675,10 +682,12 @@ async function listDisks() {
     const disks = await client.listDisks();
 
     disks.forEach((disk: DiskInfo) => {
-      console.log(`${disk.name}: ${disk.spin_state} (${disk.temperature_celsius}°C)`);
+      console.log(
+        `${disk.name}: ${disk.spin_state} (${disk.temperature_celsius}°C)`
+      );
     });
   } catch (error) {
-    console.error('Error listing disks:', error);
+    console.error("Error listing disks:", error);
   }
 }
 
@@ -687,14 +696,14 @@ async function manageContainer(containerName: string) {
   try {
     const container = await client.getContainer(containerName);
 
-    if (container.state === 'stopped') {
+    if (container.state === "stopped") {
       console.log(`Starting ${containerName}...`);
       await client.startContainer(containerName);
     } else {
       console.log(`${containerName} is ${container.state}`);
     }
   } catch (error) {
-    console.error('Error managing container:', error);
+    console.error("Error managing container:", error);
   }
 }
 
@@ -703,14 +712,14 @@ async function manageVM(vmName: string) {
   try {
     const vm = await client.getVM(vmName);
 
-    if (vm.state === 'stopped') {
+    if (vm.state === "stopped") {
       console.log(`Starting ${vmName}...`);
       await client.startVM(vmName);
     } else {
       console.log(`${vmName} is ${vm.state}`);
     }
   } catch (error) {
-    console.error('Error managing VM:', error);
+    console.error("Error managing VM:", error);
   }
 }
 
@@ -718,15 +727,15 @@ async function manageVM(vmName: string) {
 displaySystemInfo();
 manageArray();
 listDisks();
-manageContainer('plex');
-manageVM('windows-10');
+manageContainer("plex");
+manageVM("windows-10");
 ```
 
 #### Error Handling with Type Guards
 
 ```typescript
 function isAPIError(response: any): response is APIError {
-  return response.success === false && 'error_code' in response;
+  return response.success === false && "error_code" in response;
 }
 
 async function safeAPICall<T>(apiCall: () => Promise<T>): Promise<T | null> {
@@ -734,7 +743,7 @@ async function safeAPICall<T>(apiCall: () => Promise<T>): Promise<T | null> {
     return await apiCall();
   } catch (error) {
     if (error instanceof Error) {
-      console.error('API Error:', error.message);
+      console.error("API Error:", error.message);
     }
     return null;
   }
@@ -756,6 +765,7 @@ if (systemInfo) {
 Health check endpoint.
 
 **Response**:
+
 ```json
 {
   "status": "ok"
@@ -763,6 +773,7 @@ Health check endpoint.
 ```
 
 **Example**:
+
 ```bash
 curl http://192.168.20.21:8043/api/v1/health
 ```
@@ -774,6 +785,7 @@ curl http://192.168.20.21:8043/api/v1/health
 Get system information including CPU, memory, temperatures, and uptime.
 
 **Response**:
+
 ```json
 {
   "hostname": "Cube",
@@ -815,6 +827,7 @@ Get system information including CPU, memory, temperatures, and uptime.
 ```
 
 **Field Descriptions**:
+
 - `hostname`: Server hostname
 - `version`: Unraid OS version
 - `agent_version`: Management Agent version
@@ -843,6 +856,7 @@ Get system information including CPU, memory, temperatures, and uptime.
 - `fans`: Array of fan information (optional)
 
 **Example**:
+
 ```bash
 curl http://192.168.20.21:8043/api/v1/system
 ```
@@ -858,6 +872,7 @@ Initiate a server reboot.
 **⚠️ Warning**: This is a destructive operation. The server will reboot immediately. Ensure all critical operations are complete before calling this endpoint.
 
 **Response**:
+
 ```json
 {
   "success": true,
@@ -866,6 +881,7 @@ Initiate a server reboot.
 ```
 
 **Error Response** (if reboot command fails):
+
 ```json
 {
   "success": false,
@@ -874,11 +890,13 @@ Initiate a server reboot.
 ```
 
 **Example**:
+
 ```bash
 curl -X POST http://192.168.20.21:8043/api/v1/system/reboot
 ```
 
 **Use Cases**:
+
 - Home Assistant integration for automated server power management
 - Remote server administration
 - Post-maintenance reboot automation
@@ -892,6 +910,7 @@ Initiate a server shutdown (power off).
 **⚠️ Warning**: This is a destructive operation. The server will shut down immediately. You will need physical access or out-of-band management (IPMI/iLO/iDRAC) to power the server back on.
 
 **Response**:
+
 ```json
 {
   "success": true,
@@ -900,6 +919,7 @@ Initiate a server shutdown (power off).
 ```
 
 **Error Response** (if shutdown command fails):
+
 ```json
 {
   "success": false,
@@ -908,11 +928,13 @@ Initiate a server shutdown (power off).
 ```
 
 **Example**:
+
 ```bash
 curl -X POST http://192.168.20.21:8043/api/v1/system/shutdown
 ```
 
 **Use Cases**:
+
 - Home Assistant integration for scheduled server shutdowns
 - Power-saving automation (shutdown during off-peak hours)
 - Emergency shutdown via remote access
@@ -926,6 +948,7 @@ curl -X POST http://192.168.20.21:8043/api/v1/system/shutdown
 Get array status and information.
 
 **Response**:
+
 ```json
 {
   "state": "STARTED",
@@ -943,6 +966,7 @@ Get array status and information.
 ```
 
 **Field Descriptions**:
+
 - `state`: Array state (`STARTED`, `STOPPED`, `STARTING`, `STOPPING`)
 - `used_percent`: Percentage of array capacity used
 - `free_bytes`: Free space in bytes
@@ -963,6 +987,7 @@ Get array status and information.
 Start the Unraid array.
 
 **Response**:
+
 ```json
 {
   "success": true,
@@ -972,6 +997,7 @@ Start the Unraid array.
 ```
 
 **Example**:
+
 ```bash
 curl -X POST http://192.168.20.21:8043/api/v1/array/start
 ```
@@ -983,6 +1009,7 @@ curl -X POST http://192.168.20.21:8043/api/v1/array/start
 Stop the Unraid array.
 
 **Response (Success)**:
+
 ```json
 {
   "success": true,
@@ -992,6 +1019,7 @@ Stop the Unraid array.
 ```
 
 **Response (Error - Array Already Stopped)**:
+
 ```json
 {
   "success": false,
@@ -1005,6 +1033,7 @@ Stop the Unraid array.
 ```
 
 **Example**:
+
 ```bash
 curl -X POST http://192.168.20.21:8043/api/v1/array/stop
 ```
@@ -1017,11 +1046,12 @@ Start a parity check.
 
 **Query Parameters**:
 
-| Parameter | Type | Required | Description | Valid Values | Default |
-|-----------|------|----------|-------------|--------------|---------|
-| `correcting` | boolean | No | Whether to perform correcting parity check | `true`, `false` | `false` |
+| Parameter    | Type    | Required | Description                                | Valid Values    | Default |
+| ------------ | ------- | -------- | ------------------------------------------ | --------------- | ------- |
+| `correcting` | boolean | No       | Whether to perform correcting parity check | `true`, `false` | `false` |
 
 **Response (Success)**:
+
 ```json
 {
   "success": true,
@@ -1034,6 +1064,7 @@ Start a parity check.
 ```
 
 **Response (Error - Parity Check Already Running)**:
+
 ```json
 {
   "success": false,
@@ -1047,6 +1078,7 @@ Start a parity check.
 ```
 
 **Example**:
+
 ```bash
 # Read-only parity check
 curl -X POST http://192.168.20.21:8043/api/v1/array/parity-check/start
@@ -1062,6 +1094,7 @@ curl -X POST "http://192.168.20.21:8043/api/v1/array/parity-check/start?correcti
 Stop the current parity check.
 
 **Response (Success)**:
+
 ```json
 {
   "success": true,
@@ -1071,6 +1104,7 @@ Stop the current parity check.
 ```
 
 **Response (Error - No Parity Check Running)**:
+
 ```json
 {
   "success": false,
@@ -1081,6 +1115,7 @@ Stop the current parity check.
 ```
 
 **Example**:
+
 ```bash
 curl -X POST http://192.168.20.21:8043/api/v1/array/parity-check/stop
 ```
@@ -1092,6 +1127,7 @@ curl -X POST http://192.168.20.21:8043/api/v1/array/parity-check/stop
 Pause the current parity check.
 
 **Response (Success)**:
+
 ```json
 {
   "success": true,
@@ -1101,6 +1137,7 @@ Pause the current parity check.
 ```
 
 **Response (Error - No Parity Check Running)**:
+
 ```json
 {
   "success": false,
@@ -1111,6 +1148,7 @@ Pause the current parity check.
 ```
 
 **Example**:
+
 ```bash
 curl -X POST http://192.168.20.21:8043/api/v1/array/parity-check/pause
 ```
@@ -1122,6 +1160,7 @@ curl -X POST http://192.168.20.21:8043/api/v1/array/parity-check/pause
 Resume a paused parity check.
 
 **Response (Success)**:
+
 ```json
 {
   "success": true,
@@ -1131,6 +1170,7 @@ Resume a paused parity check.
 ```
 
 **Response (Error - No Paused Parity Check)**:
+
 ```json
 {
   "success": false,
@@ -1141,6 +1181,7 @@ Resume a paused parity check.
 ```
 
 **Example**:
+
 ```bash
 curl -X POST http://192.168.20.21:8043/api/v1/array/parity-check/resume
 ```
@@ -1152,6 +1193,7 @@ curl -X POST http://192.168.20.21:8043/api/v1/array/parity-check/resume
 Get parity check history.
 
 **Response**:
+
 ```json
 {
   "records": [
@@ -1178,6 +1220,7 @@ Get parity check history.
 List all disks in the system.
 
 **Response**:
+
 ```json
 [
   {
@@ -1217,6 +1260,7 @@ List all disks in the system.
 ```
 
 **Field Descriptions**:
+
 - `id`: Unique disk identifier (model_serial)
 - `device`: Linux device name (e.g., `sdb`, `sdc`)
 - `name`: Unraid disk name (e.g., `parity`, `disk1`, `cache`)
@@ -1249,16 +1293,18 @@ Get a single disk by ID, device name, or disk name.
 
 **Path Parameters**:
 
-| Parameter | Type | Required | Description | Examples |
-|-----------|------|----------|-------------|----------|
-| `id` | string | Yes | Disk identifier | `sdb`, `parity`, `disk1`, `cache`, `WUH721816ALE6L4_2CGV0URP` |
+| Parameter | Type   | Required | Description     | Examples                                                      |
+| --------- | ------ | -------- | --------------- | ------------------------------------------------------------- |
+| `id`      | string | Yes      | Disk identifier | `sdb`, `parity`, `disk1`, `cache`, `WUH721816ALE6L4_2CGV0URP` |
 
 **Supported ID Formats**:
+
 - **Device name**: `sdb`, `sdc`, etc.
 - **Disk name**: `parity`, `disk1`, `disk2`, `cache`, etc.
 - **Disk ID**: Full disk ID like `WUH721816ALE6L4_2CGV0URP`
 
 **Response (Success)**:
+
 ```json
 {
   "id": "WUH721816ALE6L4_2CGV0URP",
@@ -1279,6 +1325,7 @@ Get a single disk by ID, device name, or disk name.
 ```
 
 **Response (Error - Disk Not Found)**:
+
 ```json
 {
   "success": false,
@@ -1289,6 +1336,7 @@ Get a single disk by ID, device name, or disk name.
 ```
 
 **Example**:
+
 ```bash
 # By device
 curl http://192.168.20.21:8043/api/v1/disks/sdb
@@ -1309,6 +1357,7 @@ curl http://192.168.20.21:8043/api/v1/disks/WUH721816ALE6L4_2CGV0URP
 List all user shares.
 
 **Response**:
+
 ```json
 [
   {
@@ -1330,11 +1379,12 @@ Get share configuration.
 
 **Path Parameters**:
 
-| Parameter | Type | Required | Description | Examples |
-|-----------|------|----------|-------------|----------|
-| `name` | string | Yes | Share name | `appdata`, `media`, `backups` |
+| Parameter | Type   | Required | Description | Examples                      |
+| --------- | ------ | -------- | ----------- | ----------------------------- |
+| `name`    | string | Yes      | Share name  | `appdata`, `media`, `backups` |
 
 **Response (Success)**:
+
 ```json
 {
   "name": "appdata",
@@ -1348,6 +1398,7 @@ Get share configuration.
 ```
 
 **Response (Error - Share Not Found)**:
+
 ```json
 {
   "success": false,
@@ -1358,6 +1409,7 @@ Get share configuration.
 ```
 
 **Example**:
+
 ```bash
 curl http://192.168.20.21:8043/api/v1/shares/appdata/config
 ```
@@ -1370,27 +1422,29 @@ Update share configuration.
 
 **Path Parameters**:
 
-| Parameter | Type | Required | Description | Examples |
-|-----------|------|----------|-------------|----------|
-| `name` | string | Yes | Share name | `appdata`, `media`, `backups` |
+| Parameter | Type   | Required | Description | Examples                      |
+| --------- | ------ | -------- | ----------- | ----------------------------- |
+| `name`    | string | Yes      | Share name  | `appdata`, `media`, `backups` |
 
 **Request Body Parameters**:
 
-| Parameter | Type | Required | Description | Valid Values | Default |
-|-----------|------|----------|-------------|--------------|---------|
-| `allocator` | string | No | Allocation method | `highwater`, `mostfree`, `fillup` | Current value |
-| `floor` | string | No | Minimum free space (bytes) | Numeric string (e.g., `50000000`) | `0` |
-| `use_cache` | string | No | Cache usage policy | `yes`, `no`, `only`, `prefer` | Current value |
-| `export` | string | No | Export protocol | `e` (SMB), `n` (NFS), `-` (none) | Current value |
-| `security` | string | No | Security mode | `public`, `secure`, `private` | Current value |
+| Parameter   | Type   | Required | Description                | Valid Values                      | Default       |
+| ----------- | ------ | -------- | -------------------------- | --------------------------------- | ------------- |
+| `allocator` | string | No       | Allocation method          | `highwater`, `mostfree`, `fillup` | Current value |
+| `floor`     | string | No       | Minimum free space (bytes) | Numeric string (e.g., `50000000`) | `0`           |
+| `use_cache` | string | No       | Cache usage policy         | `yes`, `no`, `only`, `prefer`     | Current value |
+| `export`    | string | No       | Export protocol            | `e` (SMB), `n` (NFS), `-` (none)  | Current value |
+| `security`  | string | No       | Security mode              | `public`, `secure`, `private`     | Current value |
 
 **Validation Rules**:
+
 - `allocator`: Must be one of the valid values
 - `floor`: Must be a valid numeric string
 - `use_cache`: Must be one of the valid values
 - At least one parameter must be provided
 
 **Request Body Example**:
+
 ```json
 {
   "allocator": "highwater",
@@ -1400,6 +1454,7 @@ Update share configuration.
 ```
 
 **Response (Success)**:
+
 ```json
 {
   "success": true,
@@ -1410,6 +1465,7 @@ Update share configuration.
 ```
 
 **Response (Error - Validation Error)**:
+
 ```json
 {
   "success": false,
@@ -1427,6 +1483,7 @@ Update share configuration.
 ```
 
 **Example**:
+
 ```bash
 # Update share configuration
 curl -X POST http://192.168.20.21:8043/api/v1/shares/appdata/config \
@@ -1447,6 +1504,7 @@ curl -X POST http://192.168.20.21:8043/api/v1/shares/appdata/config \
 List all Docker containers.
 
 **Response**:
+
 ```json
 [
   {
@@ -1472,11 +1530,12 @@ Get a single container by ID or name.
 
 **Path Parameters**:
 
-| Parameter | Type | Required | Description | Examples |
-|-----------|------|----------|-------------|----------|
-| `id` | string | Yes | Container ID or name | `jackett`, `plex`, `fedcb3e1ba1f` |
+| Parameter | Type   | Required | Description          | Examples                          |
+| --------- | ------ | -------- | -------------------- | --------------------------------- |
+| `id`      | string | Yes      | Container ID or name | `jackett`, `plex`, `fedcb3e1ba1f` |
 
 **Response (Success)**:
+
 ```json
 {
   "id": "fedcb3e1ba1f",
@@ -1493,6 +1552,7 @@ Get a single container by ID or name.
 ```
 
 **Response (Error - Container Not Found)**:
+
 ```json
 {
   "success": false,
@@ -1503,6 +1563,7 @@ Get a single container by ID or name.
 ```
 
 **Example**:
+
 ```bash
 curl http://192.168.20.21:8043/api/v1/docker/jackett
 ```
@@ -1515,11 +1576,12 @@ Start a Docker container.
 
 **Path Parameters**:
 
-| Parameter | Type | Required | Description | Examples |
-|-----------|------|----------|-------------|----------|
-| `id` | string | Yes | Container ID or name | `jackett`, `plex`, `fedcb3e1ba1f` |
+| Parameter | Type   | Required | Description          | Examples                          |
+| --------- | ------ | -------- | -------------------- | --------------------------------- |
+| `id`      | string | Yes      | Container ID or name | `jackett`, `plex`, `fedcb3e1ba1f` |
 
 **Response (Success)**:
+
 ```json
 {
   "success": true,
@@ -1531,6 +1593,7 @@ Start a Docker container.
 ```
 
 **Response (Error - Container Already Running)**:
+
 ```json
 {
   "success": false,
@@ -1541,6 +1604,7 @@ Start a Docker container.
 ```
 
 **Example**:
+
 ```bash
 curl -X POST http://192.168.20.21:8043/api/v1/docker/jackett/start
 ```
@@ -1553,11 +1617,12 @@ Stop a Docker container.
 
 **Path Parameters**:
 
-| Parameter | Type | Required | Description | Examples |
-|-----------|------|----------|-------------|----------|
-| `id` | string | Yes | Container ID or name | `jackett`, `plex`, `fedcb3e1ba1f` |
+| Parameter | Type   | Required | Description          | Examples                          |
+| --------- | ------ | -------- | -------------------- | --------------------------------- |
+| `id`      | string | Yes      | Container ID or name | `jackett`, `plex`, `fedcb3e1ba1f` |
 
 **Response (Success)**:
+
 ```json
 {
   "success": true,
@@ -1569,6 +1634,7 @@ Stop a Docker container.
 ```
 
 **Response (Error - Container Already Stopped)**:
+
 ```json
 {
   "success": false,
@@ -1579,6 +1645,7 @@ Stop a Docker container.
 ```
 
 **Example**:
+
 ```bash
 curl -X POST http://192.168.20.21:8043/api/v1/docker/jackett/stop
 ```
@@ -1591,11 +1658,12 @@ Restart a Docker container.
 
 **Path Parameters**:
 
-| Parameter | Type | Required | Description | Examples |
-|-----------|------|----------|-------------|----------|
-| `id` | string | Yes | Container ID or name | `jackett`, `plex`, `fedcb3e1ba1f` |
+| Parameter | Type   | Required | Description          | Examples                          |
+| --------- | ------ | -------- | -------------------- | --------------------------------- |
+| `id`      | string | Yes      | Container ID or name | `jackett`, `plex`, `fedcb3e1ba1f` |
 
 **Response (Success)**:
+
 ```json
 {
   "success": true,
@@ -1607,6 +1675,7 @@ Restart a Docker container.
 ```
 
 **Example**:
+
 ```bash
 curl -X POST http://192.168.20.21:8043/api/v1/docker/jackett/restart
 ```
@@ -1619,11 +1688,12 @@ Pause a Docker container.
 
 **Path Parameters**:
 
-| Parameter | Type | Required | Description | Examples |
-|-----------|------|----------|-------------|----------|
-| `id` | string | Yes | Container ID or name | `jackett`, `plex`, `fedcb3e1ba1f` |
+| Parameter | Type   | Required | Description          | Examples                          |
+| --------- | ------ | -------- | -------------------- | --------------------------------- |
+| `id`      | string | Yes      | Container ID or name | `jackett`, `plex`, `fedcb3e1ba1f` |
 
 **Response (Success)**:
+
 ```json
 {
   "success": true,
@@ -1635,6 +1705,7 @@ Pause a Docker container.
 ```
 
 **Example**:
+
 ```bash
 curl -X POST http://192.168.20.21:8043/api/v1/docker/jackett/pause
 ```
@@ -1647,11 +1718,12 @@ Unpause a Docker container.
 
 **Path Parameters**:
 
-| Parameter | Type | Required | Description | Examples |
-|-----------|------|----------|-------------|----------|
-| `id` | string | Yes | Container ID or name | `jackett`, `plex`, `fedcb3e1ba1f` |
+| Parameter | Type   | Required | Description          | Examples                          |
+| --------- | ------ | -------- | -------------------- | --------------------------------- |
+| `id`      | string | Yes      | Container ID or name | `jackett`, `plex`, `fedcb3e1ba1f` |
 
 **Response (Success)**:
+
 ```json
 {
   "success": true,
@@ -1663,6 +1735,7 @@ Unpause a Docker container.
 ```
 
 **Example**:
+
 ```bash
 curl -X POST http://192.168.20.21:8043/api/v1/docker/jackett/unpause
 ```
@@ -1676,6 +1749,7 @@ curl -X POST http://192.168.20.21:8043/api/v1/docker/jackett/unpause
 List all virtual machines.
 
 **Response**:
+
 ```json
 [
   {
@@ -1697,11 +1771,12 @@ Get a single VM by ID or name.
 
 **Path Parameters**:
 
-| Parameter | Type | Required | Description | Examples |
-|-----------|------|----------|-------------|----------|
-| `id` | string | Yes | VM ID or name | `windows-10`, `ubuntu-server` |
+| Parameter | Type   | Required | Description   | Examples                      |
+| --------- | ------ | -------- | ------------- | ----------------------------- |
+| `id`      | string | Yes      | VM ID or name | `windows-10`, `ubuntu-server` |
 
 **Response (Success)**:
+
 ```json
 {
   "id": "windows-10",
@@ -1714,6 +1789,7 @@ Get a single VM by ID or name.
 ```
 
 **Response (Error - VM Not Found)**:
+
 ```json
 {
   "success": false,
@@ -1724,6 +1800,7 @@ Get a single VM by ID or name.
 ```
 
 **Example**:
+
 ```bash
 curl http://192.168.20.21:8043/api/v1/vm/windows-10
 ```
@@ -1736,11 +1813,12 @@ Start a virtual machine.
 
 **Path Parameters**:
 
-| Parameter | Type | Required | Description | Examples |
-|-----------|------|----------|-------------|----------|
-| `id` | string | Yes | VM ID or name | `windows-10`, `ubuntu-server` |
+| Parameter | Type   | Required | Description   | Examples                      |
+| --------- | ------ | -------- | ------------- | ----------------------------- |
+| `id`      | string | Yes      | VM ID or name | `windows-10`, `ubuntu-server` |
 
 **Response (Success)**:
+
 ```json
 {
   "success": true,
@@ -1752,6 +1830,7 @@ Start a virtual machine.
 ```
 
 **Response (Error - VM Already Running)**:
+
 ```json
 {
   "success": false,
@@ -1762,6 +1841,7 @@ Start a virtual machine.
 ```
 
 **Example**:
+
 ```bash
 curl -X POST http://192.168.20.21:8043/api/v1/vm/windows-10/start
 ```
@@ -1774,11 +1854,12 @@ Stop a virtual machine (graceful shutdown).
 
 **Path Parameters**:
 
-| Parameter | Type | Required | Description | Examples |
-|-----------|------|----------|-------------|----------|
-| `id` | string | Yes | VM ID or name | `windows-10`, `ubuntu-server` |
+| Parameter | Type   | Required | Description   | Examples                      |
+| --------- | ------ | -------- | ------------- | ----------------------------- |
+| `id`      | string | Yes      | VM ID or name | `windows-10`, `ubuntu-server` |
 
 **Response (Success)**:
+
 ```json
 {
   "success": true,
@@ -1790,6 +1871,7 @@ Stop a virtual machine (graceful shutdown).
 ```
 
 **Response (Error - VM Already Stopped)**:
+
 ```json
 {
   "success": false,
@@ -1800,6 +1882,7 @@ Stop a virtual machine (graceful shutdown).
 ```
 
 **Example**:
+
 ```bash
 curl -X POST http://192.168.20.21:8043/api/v1/vm/windows-10/stop
 ```
@@ -1812,11 +1895,12 @@ Restart a virtual machine.
 
 **Path Parameters**:
 
-| Parameter | Type | Required | Description | Examples |
-|-----------|------|----------|-------------|----------|
-| `id` | string | Yes | VM ID or name | `windows-10`, `ubuntu-server` |
+| Parameter | Type   | Required | Description   | Examples                      |
+| --------- | ------ | -------- | ------------- | ----------------------------- |
+| `id`      | string | Yes      | VM ID or name | `windows-10`, `ubuntu-server` |
 
 **Response (Success)**:
+
 ```json
 {
   "success": true,
@@ -1828,6 +1912,7 @@ Restart a virtual machine.
 ```
 
 **Example**:
+
 ```bash
 curl -X POST http://192.168.20.21:8043/api/v1/vm/windows-10/restart
 ```
@@ -1840,11 +1925,12 @@ Pause a virtual machine.
 
 **Path Parameters**:
 
-| Parameter | Type | Required | Description | Examples |
-|-----------|------|----------|-------------|----------|
-| `id` | string | Yes | VM ID or name | `windows-10`, `ubuntu-server` |
+| Parameter | Type   | Required | Description   | Examples                      |
+| --------- | ------ | -------- | ------------- | ----------------------------- |
+| `id`      | string | Yes      | VM ID or name | `windows-10`, `ubuntu-server` |
 
 **Response (Success)**:
+
 ```json
 {
   "success": true,
@@ -1856,6 +1942,7 @@ Pause a virtual machine.
 ```
 
 **Example**:
+
 ```bash
 curl -X POST http://192.168.20.21:8043/api/v1/vm/windows-10/pause
 ```
@@ -1868,11 +1955,12 @@ Resume a paused virtual machine.
 
 **Path Parameters**:
 
-| Parameter | Type | Required | Description | Examples |
-|-----------|------|----------|-------------|----------|
-| `id` | string | Yes | VM ID or name | `windows-10`, `ubuntu-server` |
+| Parameter | Type   | Required | Description   | Examples                      |
+| --------- | ------ | -------- | ------------- | ----------------------------- |
+| `id`      | string | Yes      | VM ID or name | `windows-10`, `ubuntu-server` |
 
 **Response (Success)**:
+
 ```json
 {
   "success": true,
@@ -1884,6 +1972,7 @@ Resume a paused virtual machine.
 ```
 
 **Example**:
+
 ```bash
 curl -X POST http://192.168.20.21:8043/api/v1/vm/windows-10/resume
 ```
@@ -1896,11 +1985,12 @@ Hibernate a virtual machine.
 
 **Path Parameters**:
 
-| Parameter | Type | Required | Description | Examples |
-|-----------|------|----------|-------------|----------|
-| `id` | string | Yes | VM ID or name | `windows-10`, `ubuntu-server` |
+| Parameter | Type   | Required | Description   | Examples                      |
+| --------- | ------ | -------- | ------------- | ----------------------------- |
+| `id`      | string | Yes      | VM ID or name | `windows-10`, `ubuntu-server` |
 
 **Response (Success)**:
+
 ```json
 {
   "success": true,
@@ -1912,6 +2002,7 @@ Hibernate a virtual machine.
 ```
 
 **Example**:
+
 ```bash
 curl -X POST http://192.168.20.21:8043/api/v1/vm/windows-10/hibernate
 ```
@@ -1924,11 +2015,12 @@ Force stop a virtual machine (immediate shutdown).
 
 **Path Parameters**:
 
-| Parameter | Type | Required | Description | Examples |
-|-----------|------|----------|-------------|----------|
-| `id` | string | Yes | VM ID or name | `windows-10`, `ubuntu-server` |
+| Parameter | Type   | Required | Description   | Examples                      |
+| --------- | ------ | -------- | ------------- | ----------------------------- |
+| `id`      | string | Yes      | VM ID or name | `windows-10`, `ubuntu-server` |
 
 **Response (Success)**:
+
 ```json
 {
   "success": true,
@@ -1942,6 +2034,7 @@ Force stop a virtual machine (immediate shutdown).
 **Warning**: Force stop does not allow the guest OS to shut down gracefully. Use regular stop for graceful shutdown.
 
 **Example**:
+
 ```bash
 curl -X POST http://192.168.20.21:8043/api/v1/vm/windows-10/force-stop
 ```
@@ -1955,6 +2048,7 @@ curl -X POST http://192.168.20.21:8043/api/v1/vm/windows-10/force-stop
 Get UPS status and information.
 
 **Response**:
+
 ```json
 {
   "status": "ONLINE",
@@ -1974,6 +2068,7 @@ Get UPS status and information.
 Get GPU information and metrics.
 
 **Response**:
+
 ```json
 [
   {
@@ -1996,6 +2091,7 @@ Get GPU information and metrics.
 Get network interfaces and statistics.
 
 **Response**:
+
 ```json
 [
   {
@@ -2018,6 +2114,7 @@ Get network interfaces and statistics.
 Get all methods to access the Unraid server, including LAN IP, mDNS hostname, WireGuard VPN IPs, WAN IP, and IPv6 addresses.
 
 **Response**:
+
 ```json
 {
   "urls": [
@@ -2052,16 +2149,18 @@ Get all methods to access the Unraid server, including LAN IP, mDNS hostname, Wi
 ```
 
 **URL Types**:
-| Type | Description |
-|------|-------------|
-| `lan` | Local Area Network IPv4 addresses |
-| `mdns` | mDNS hostname (hostname.local) for Bonjour/Avahi discovery |
-| `wireguard` | WireGuard VPN interface addresses |
-| `wan` | Public WAN IP (if accessible) |
-| `ipv6` | IPv6 global unicast addresses |
-| `other` | Other access methods |
+
+| Type        | Description                                                |
+| ----------- | ---------------------------------------------------------- |
+| `lan`       | Local Area Network IPv4 addresses                          |
+| `mdns`      | mDNS hostname (hostname.local) for Bonjour/Avahi discovery |
+| `wireguard` | WireGuard VPN interface addresses                          |
+| `wan`       | Public WAN IP (if accessible)                              |
+| `ipv6`      | IPv6 global unicast addresses                              |
+| `other`     | Other access methods                                       |
 
 **Use Cases**:
+
 - Display all connection methods in a dashboard
 - Auto-discover server addresses for mobile apps
 - Generate connection links automatically
@@ -2078,6 +2177,7 @@ The agent runs multiple collectors that gather data at configurable intervals. T
 Get status of all collectors including enabled state, interval, and runtime information.
 
 **Response**:
+
 ```json
 {
   "collectors": [
@@ -2116,11 +2216,12 @@ Get status of all collectors including enabled state, interval, and runtime info
 ```
 
 **Status Values**:
-| Status | Description |
-|--------|-------------|
-| `running` | Collector is actively collecting data |
-| `stopped` | Collector has been disabled at runtime |
-| `disabled` | Collector was disabled at startup |
+
+| Status       | Description                                 |
+| ------------ | ------------------------------------------- |
+| `running`    | Collector is actively collecting data       |
+| `stopped`    | Collector has been disabled at runtime      |
+| `disabled`   | Collector was disabled at startup           |
 | `registered` | Collector is registered but not yet started |
 
 ---
@@ -2130,9 +2231,11 @@ Get status of all collectors including enabled state, interval, and runtime info
 Get status of a specific collector.
 
 **Path Parameters**:
+
 - `name` - Collector name (system, array, disk, docker, vm, ups, nut, gpu, shares, network, hardware, zfs, notification, registration, unassigned)
 
 **Response**:
+
 ```json
 {
   "success": true,
@@ -2151,6 +2254,7 @@ Get status of a specific collector.
 ```
 
 **Error Response (404)**:
+
 ```json
 {
   "success": false,
@@ -2166,9 +2270,11 @@ Get status of a specific collector.
 Enable a collector at runtime. The collector will start immediately using its configured interval.
 
 **Path Parameters**:
+
 - `name` - Collector name
 
 **Response**:
+
 ```json
 {
   "success": true,
@@ -2187,6 +2293,7 @@ Enable a collector at runtime. The collector will start immediately using its co
 ```
 
 **Notes**:
+
 - Enabling an already-enabled collector is a no-op (returns success)
 - If interval was 0, a default interval is used
 
@@ -2197,9 +2304,11 @@ Enable a collector at runtime. The collector will start immediately using its co
 Disable a collector at runtime. The collector will stop gracefully.
 
 **Path Parameters**:
+
 - `name` - Collector name
 
 **Response**:
+
 ```json
 {
   "success": true,
@@ -2218,6 +2327,7 @@ Disable a collector at runtime. The collector will stop gracefully.
 ```
 
 **Error Response (400)** - Required Collector:
+
 ```json
 {
   "success": false,
@@ -2227,6 +2337,7 @@ Disable a collector at runtime. The collector will stop gracefully.
 ```
 
 **Notes**:
+
 - The `system` collector cannot be disabled (it's required)
 - Disabling an already-disabled collector is a no-op (returns success)
 
@@ -2237,9 +2348,11 @@ Disable a collector at runtime. The collector will stop gracefully.
 Update the collection interval for a collector. If the collector is running, it will be restarted with the new interval.
 
 **Path Parameters**:
+
 - `name` - Collector name
 
 **Request Body**:
+
 ```json
 {
   "interval": 120
@@ -2247,6 +2360,7 @@ Update the collection interval for a collector. If the collector is running, it 
 ```
 
 **Response**:
+
 ```json
 {
   "success": true,
@@ -2265,9 +2379,11 @@ Update the collection interval for a collector. If the collector is running, it 
 ```
 
 **Validation**:
+
 - Interval must be between 5 and 3600 seconds
 
 **Error Response (400)** - Invalid Interval:
+
 ```json
 {
   "success": false,
@@ -2283,6 +2399,7 @@ Update the collection interval for a collector. If the collector is running, it 
 When a collector is enabled or disabled, a WebSocket event is broadcast to all connected clients.
 
 **Event Payload**:
+
 ```json
 {
   "event": "collector_state_change",
@@ -2303,11 +2420,13 @@ When a collector is enabled or disabled, a WebSocket event is broadcast to all c
 List available log files or retrieve log content.
 
 **Query Parameters**:
+
 - `path` (optional) - Full path to log file. If omitted, lists all available log files.
 - `lines` (optional) - Number of lines to return (tail behavior if start not specified)
 - `start` (optional) - Starting line number for range retrieval
 
 **List All Logs Response**:
+
 ```json
 {
   "logs": [
@@ -2328,6 +2447,7 @@ List available log files or retrieve log content.
 ```
 
 **Get Log Content Response** (with `?path=/var/log/syslog&lines=100`):
+
 ```json
 {
   "path": "/var/log/syslog",
@@ -2341,6 +2461,7 @@ List available log files or retrieve log content.
 ```
 
 **Available Log Files**:
+
 - `/var/log/syslog` - System log
 - `/var/log/dmesg` - Kernel ring buffer
 - `/var/log/messages` - System messages
@@ -2361,13 +2482,16 @@ List available log files or retrieve log content.
 Retrieve a specific log file by filename.
 
 **Path Parameters**:
+
 - `filename` - The name of the log file (e.g., `syslog`, `docker.log`)
 
 **Query Parameters**:
+
 - `lines` (optional) - Number of lines to return
 - `start` (optional) - Starting line number
 
 **Response**:
+
 ```json
 {
   "path": "/var/log/syslog",
@@ -2381,6 +2505,7 @@ Retrieve a specific log file by filename.
 ```
 
 **Error Response** (invalid filename):
+
 ```json
 {
   "success": false,
@@ -2390,6 +2515,7 @@ Retrieve a specific log file by filename.
 ```
 
 **Error Response** (not found):
+
 ```json
 {
   "success": false,
@@ -2404,10 +2530,10 @@ Retrieve a specific log file by filename.
 
 ### GET /settings/system
 
-
 Get system settings.
 
 **Response**:
+
 ```json
 {
   "server_name": "Cube",
@@ -2425,17 +2551,19 @@ Update system settings.
 
 **Request Body Parameters**:
 
-| Parameter | Type | Required | Description | Examples |
-|-----------|------|----------|-------------|----------|
-| `description` | string | No | Server description | `Home Server`, `Production Server` |
-| `server_name` | string | No | Server hostname | `Tower`, `Cube` |
+| Parameter     | Type   | Required | Description        | Examples                           |
+| ------------- | ------ | -------- | ------------------ | ---------------------------------- |
+| `description` | string | No       | Server description | `Home Server`, `Production Server` |
+| `server_name` | string | No       | Server hostname    | `Tower`, `Cube`                    |
 
 **Validation Rules**:
+
 - At least one parameter must be provided
 - `server_name`: Must be a valid hostname (alphanumeric, hyphens allowed)
 - `description`: Maximum 255 characters
 
 **Request Body Example**:
+
 ```json
 {
   "description": "Updated description",
@@ -2444,6 +2572,7 @@ Update system settings.
 ```
 
 **Response (Success)**:
+
 ```json
 {
   "success": true,
@@ -2454,6 +2583,7 @@ Update system settings.
 ```
 
 **Response (Error - Validation Error)**:
+
 ```json
 {
   "success": false,
@@ -2471,6 +2601,7 @@ Update system settings.
 ```
 
 **Example**:
+
 ```bash
 # Update system settings
 curl -X POST http://192.168.20.21:8043/api/v1/settings/system \
@@ -2488,6 +2619,7 @@ curl -X POST http://192.168.20.21:8043/api/v1/settings/system \
 Get Docker settings.
 
 **Response**:
+
 ```json
 {
   "enabled": true,
@@ -2504,6 +2636,7 @@ Get Docker settings.
 Get VM Manager settings.
 
 **Response**:
+
 ```json
 {
   "enabled": true,
@@ -2520,6 +2653,7 @@ Get VM Manager settings.
 Get disk settings including spindown delay.
 
 **Response**:
+
 ```json
 {
   "spindown_delay_minutes": 30,
@@ -2541,11 +2675,12 @@ Get network interface configuration.
 
 **Path Parameters**:
 
-| Parameter | Type | Required | Description | Examples |
-|-----------|------|----------|-------------|----------|
-| `interface` | string | Yes | Network interface name | `eth0`, `eth1`, `bond0`, `br0` |
+| Parameter   | Type   | Required | Description            | Examples                       |
+| ----------- | ------ | -------- | ---------------------- | ------------------------------ |
+| `interface` | string | Yes      | Network interface name | `eth0`, `eth1`, `bond0`, `br0` |
 
 **Response (Success)**:
+
 ```json
 {
   "interface": "eth0",
@@ -2560,6 +2695,7 @@ Get network interface configuration.
 ```
 
 **Response (Error - Interface Not Found)**:
+
 ```json
 {
   "success": false,
@@ -2570,6 +2706,7 @@ Get network interface configuration.
 ```
 
 **Example**:
+
 ```bash
 curl http://192.168.20.21:8043/api/v1/network/eth0/config
 ```
@@ -2585,6 +2722,7 @@ Real-time event stream.
 **URL**: `ws://YOUR_UNRAID_IP:8043/api/v1/ws`
 
 **Events**:
+
 - `system` - System metrics updates
 - `array` - Array status changes
 - `disk` - Disk status changes
@@ -2595,6 +2733,7 @@ Real-time event stream.
 - `network` - Network statistics updates
 
 **Example Event**:
+
 ```json
 {
   "type": "system",
@@ -2619,18 +2758,21 @@ See [WebSocket Events Documentation](../WEBSOCKET_EVENTS_DOCUMENTATION.md) for c
 #### Recommended Security Options
 
 **Option 1: VPN Access (Most Secure)**
+
 - Use WireGuard or OpenVPN to create a secure tunnel
 - Access API only through VPN connection
 - No direct internet exposure
 - Best for remote access scenarios
 
 **Option 2: Reverse Proxy with SSL/TLS**
+
 - Use nginx, Caddy, or Traefik as reverse proxy
 - Terminate SSL at the proxy
 - Add authentication layer
 - Enable rate limiting
 
 **Option 3: Firewall Rules**
+
 - Restrict access to trusted IP addresses
 - Use iptables or UFW
 - Block all other traffic
@@ -2755,11 +2897,11 @@ location /api/ {
 ```javascript
 // Configure axios with credentials
 const api = axios.create({
-  baseURL: 'https://unraid-api.example.com/api/v1',
+  baseURL: "https://unraid-api.example.com/api/v1",
   withCredentials: true,
   headers: {
-    'Content-Type': 'application/json'
-  }
+    "Content-Type": "application/json",
+  },
 });
 ```
 
@@ -2811,6 +2953,7 @@ HTTP/1.1 429 Too Many Requests
 **Current Status**: No authentication required
 
 **Future Plans**:
+
 - API key authentication
 - JWT token-based authentication
 - OAuth 2.0 support
@@ -2830,6 +2973,7 @@ location /api/ {
 ```
 
 Create password file:
+
 ```bash
 sudo htpasswd -c /etc/nginx/.htpasswd username
 ```
@@ -2910,6 +3054,7 @@ Currently, there is no rate limiting implemented in the API itself. Use responsi
 ### Recommended Limits
 
 **For Production Use**:
+
 - **GET requests**: 60 requests per minute per IP
 - **POST requests**: 20 requests per minute per IP
 - **WebSocket connections**: 5 concurrent connections per IP
@@ -2971,7 +3116,7 @@ class RateLimiter {
     const waitTime = this.minInterval - elapsed;
 
     if (waitTime > 0) {
-      await new Promise(resolve => setTimeout(resolve, waitTime));
+      await new Promise((resolve) => setTimeout(resolve, waitTime));
     }
 
     this.lastCalled = Date.now();
@@ -3009,6 +3154,7 @@ for (let i = 0; i < 10; i++) {
 WebSocket connections are more efficient than polling for real-time updates.
 
 **❌ Bad: Polling**
+
 ```python
 import time
 import requests
@@ -3022,6 +3168,7 @@ while True:
 ```
 
 **✅ Good: WebSocket**
+
 ```python
 import websocket
 import json
@@ -3106,29 +3253,35 @@ async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
 
       // Exponential backoff: 1s, 2s, 4s, 8s, ...
       const delay = Math.min(baseDelay * Math.pow(2, retries - 1), 60000);
-      console.log(`Request failed: ${error.message}. Retrying in ${delay}ms... (${retries}/${maxRetries})`);
+      console.log(
+        `Request failed: ${error.message}. Retrying in ${delay}ms... (${retries}/${maxRetries})`
+      );
 
-      await new Promise(resolve => setTimeout(resolve, delay));
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 }
 
 // Usage
 async function getSystemInfo() {
-  return retryWithBackoff(async () => {
-    const response = await fetch(`${BASE_URL}/system`);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    return response.json();
-  }, 3, 1000);
+  return retryWithBackoff(
+    async () => {
+      const response = await fetch(`${BASE_URL}/system`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      return response.json();
+    },
+    3,
+    1000
+  );
 }
 
 try {
   const info = await getSystemInfo();
   console.log(`CPU: ${info.cpu_usage_percent}%`);
 } catch (error) {
-  console.error('Failed after retries:', error);
+  console.error("Failed after retries:", error);
 }
 ```
 
@@ -3206,17 +3359,17 @@ info3 = client.get_system_info(use_cache=False)
 
 #### Recommended Cache TTLs
 
-| Endpoint | Recommended TTL | Reason |
-|----------|----------------|--------|
-| `/health` | 5 seconds | Fast-changing, health checks |
-| `/system` | 5-10 seconds | Frequently updated metrics |
-| `/array` | 10 seconds | Array state changes occasionally |
-| `/disks` | 30 seconds | Disk metrics update slowly |
-| `/docker` | 10 seconds | Container states change frequently |
-| `/vm` | 10 seconds | VM states change frequently |
-| `/settings/disks` | 5 minutes | Configuration rarely changes |
-| `/settings/system` | 5 minutes | Configuration rarely changes |
-| `/shares` | 1 minute | Share data updates slowly |
+| Endpoint           | Recommended TTL | Reason                             |
+| ------------------ | --------------- | ---------------------------------- |
+| `/health`          | 5 seconds       | Fast-changing, health checks       |
+| `/system`          | 5-10 seconds    | Frequently updated metrics         |
+| `/array`           | 10 seconds      | Array state changes occasionally   |
+| `/disks`           | 30 seconds      | Disk metrics update slowly         |
+| `/docker`          | 10 seconds      | Container states change frequently |
+| `/vm`              | 10 seconds      | VM states change frequently        |
+| `/settings/disks`  | 5 minutes       | Configuration rarely changes       |
+| `/settings/system` | 5 minutes       | Configuration rarely changes       |
+| `/shares`          | 1 minute        | Share data updates slowly          |
 
 ---
 
@@ -3226,13 +3379,13 @@ Different operations require different timeout values.
 
 #### Recommended Timeouts
 
-| Operation Type | Timeout | Reason |
-|---------------|---------|--------|
-| Health checks | 2-5 seconds | Should be fast |
-| GET requests | 5-10 seconds | Data retrieval |
+| Operation Type               | Timeout       | Reason                    |
+| ---------------------------- | ------------- | ------------------------- |
+| Health checks                | 2-5 seconds   | Should be fast            |
+| GET requests                 | 5-10 seconds  | Data retrieval            |
 | POST operations (start/stop) | 30-60 seconds | May take time to complete |
-| Parity check operations | 60 seconds | Long-running operations |
-| WebSocket connection | No timeout | Persistent connection |
+| Parity check operations      | 60 seconds    | Long-running operations   |
+| WebSocket connection         | No timeout    | Persistent connection     |
 
 #### Python Example
 
@@ -3261,14 +3414,18 @@ response = requests.post(f"{BASE_URL}/array/parity-check/start", timeout=60)
 // Create axios instance with default timeout
 const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 5000  // 5 seconds default
+  timeout: 5000, // 5 seconds default
 });
 
 // Override timeout for specific operations
 async function startArray() {
-  const { data } = await api.post('/array/start', {}, {
-    timeout: 30000  // 30 seconds for array start
-  });
+  const { data } = await api.post(
+    "/array/start",
+    {},
+    {
+      timeout: 30000, // 30 seconds for array start
+    }
+  );
   return data;
 }
 ```
@@ -3320,6 +3477,7 @@ else:
 Use specific resource endpoints instead of listing all resources when possible.
 
 **❌ Bad: List all then filter**
+
 ```python
 # Inefficient - fetches all disks
 disks = requests.get(f"{BASE_URL}/disks").json()
@@ -3327,6 +3485,7 @@ parity_disk = next(d for d in disks if d['name'] == 'parity')
 ```
 
 **✅ Good: Direct access**
+
 ```python
 # Efficient - fetches only the disk you need
 parity_disk = requests.get(f"{BASE_URL}/disks/parity").json()
@@ -3377,7 +3536,7 @@ const api = axios.create({
   // Connection pooling is automatic
   maxRedirects: 5,
   httpAgent: new http.Agent({ keepAlive: true }),
-  httpsAgent: new https.Agent({ keepAlive: true })
+  httpsAgent: new https.Agent({ keepAlive: true }),
 });
 ```
 
@@ -3530,4 +3689,3 @@ info = client.get_system_info()
 
 **Last Updated**: 2025-10-03
 **API Version**: 1.0.0
-

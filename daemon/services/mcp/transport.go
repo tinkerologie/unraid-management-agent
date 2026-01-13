@@ -116,7 +116,7 @@ func (t *StdHTTPTransport) Handler() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(jsonData)
+		_, _ = w.Write(jsonData)
 	}
 }
 
@@ -453,7 +453,7 @@ func (t *SSETransport) PostHandler() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Write(jsonData)
+		_, _ = w.Write(jsonData)
 	}
 }
 

@@ -19,11 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Log rotation now properly limits to 1 backup file maximum
 
 - **Dark Theme Support** - Fixed plugin UI not respecting Unraid's dark theme:
+
   - Replaced hardcoded CSS colors with Unraid CSS variables (`var(--line-color)`, `var(--text-secondary)`, `var(--input-background)`, etc.)
   - Status badges, tables, and form elements now properly adapt to light/dark themes
   - Uses `color: inherit` for text to match theme colors
 
 - **Parity Check Status Detection (Issue #41)**:
+
   - Fixed parity check status not detecting "paused" state - now correctly parses `mdResyncDt` field (0 = paused, >0 = running)
   - Fixed parity check progress percentage showing 0 - now calculates from `mdResyncPos / mdResyncSize * 100`
   - Added support for detecting clearing and reconstructing operations via `sbSyncAction` field
@@ -31,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Status values: `""` (idle), `"paused"`, `"running"`, `"clearing"`, `"reconstructing"`
 
 - **Disk Temperature Reporting**:
+
   - Improved handling of temperature value `"*"` which indicates spun-down disk
   - Temperature 0 is now documented expected behavior for standby disks (to avoid spinning up disks for temperature checks)
   - Enhanced debug logging for temperature parsing

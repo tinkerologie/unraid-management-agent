@@ -62,7 +62,7 @@ func (cm *CollectorManager) Register(name string, factory CollectorFactory, inte
 	defer cm.mu.Unlock()
 
 	enabled := interval > 0
-	status := "stopped"
+	var status string
 	if enabled {
 		status = "registered"
 	} else {

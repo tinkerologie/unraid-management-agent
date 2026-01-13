@@ -13,12 +13,15 @@ The Unraid Management Agent provides real-time updates via WebSocket connections
 ## Event Architecture
 
 ### Event Flow
+
 ```
 Collector → Event Bus (pubsub) → API Server Cache → WebSocket Hub → Connected Clients
 ```
 
 ### Event Structure
+
 All WebSocket events follow this structure:
+
 ```json
 {
   "event": "update",
@@ -28,6 +31,7 @@ All WebSocket events follow this structure:
 ```
 
 ### Event Identification
+
 Events do NOT have a `type` field. Event types are identified by inspecting the `data` structure and checking for specific field combinations.
 
 ---
@@ -43,6 +47,7 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 **Identification**: Contains `hostname` AND `cpu_usage_percent`
 
 **Data Structure**:
+
 ```json
 {
   "hostname": "Tower",
@@ -75,6 +80,7 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 ```
 
 **Key Fields**:
+
 - `hostname` - Server hostname
 - `cpu_usage_percent` - Overall CPU usage (0-100)
 - `cpu_temp_celsius` - CPU temperature
@@ -93,6 +99,7 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 **Identification**: Contains `state` AND `parity_check_status` AND `num_disks`
 
 **Data Structure**:
+
 ```json
 {
   "state": "STARTED",
@@ -109,6 +116,7 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 ```
 
 **Key Fields**:
+
 - `state` - Array state: "STARTED", "STOPPED", "STARTING", "STOPPING"
 - `parity_valid` - Parity validation status
 - `parity_check_running` - Whether parity check is active
@@ -125,6 +133,7 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 **Identification**: Contains `device` AND `mount_point`
 
 **Data Structure** (array of disks):
+
 ```json
 [
   {
@@ -155,6 +164,7 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 ```
 
 **Key Fields**:
+
 - `id` - Disk identifier (disk1, disk2, parity, cache)
 - `temperature_celsius` - Disk temperature (0 if spun down)
 - `smart_status` - SMART health status
@@ -172,6 +182,7 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 **Identification**: Contains `image` AND `ports` AND (`id` OR `container_id`)
 
 **Data Structure** (array of containers):
+
 ```json
 [
   {
@@ -198,6 +209,7 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 ```
 
 **Key Fields**:
+
 - `state` - Container state: "running", "paused", "stopped", "exited"
 - `cpu_percent` - CPU usage percentage
 - `memory_usage_bytes` - Memory usage in bytes
@@ -214,6 +226,7 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 **Identification**: Contains `state` AND `vcpus`
 
 **Data Structure** (array of VMs):
+
 ```json
 [
   {
@@ -233,6 +246,7 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 ```
 
 **Key Fields**:
+
 - `state` - VM state: "running", "paused", "shut off", "crashed"
 - `vcpus` - Number of virtual CPUs
 - `memory_allocated_bytes` - Allocated memory
@@ -249,6 +263,7 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 **Identification**: Contains `connected` AND `battery_charge_percent`
 
 **Data Structure**:
+
 ```json
 {
   "connected": true,
@@ -265,6 +280,7 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 ```
 
 **Key Fields**:
+
 - `connected` - Whether UPS is connected
 - `status` - UPS status: "ONLINE", "ONBATT", "LOWBATT"
 - `battery_charge_percent` - Battery charge (0-100)
@@ -282,6 +298,7 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 **Identification**: Contains `available` AND `driver_version` AND `utilization_gpu_percent`
 
 **Data Structure** (array of GPUs):
+
 ```json
 [
   {
@@ -301,6 +318,7 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 ```
 
 **Key Fields**:
+
 - `available` - Whether GPU is available
 - `name` - GPU model name
 - `driver_version` - GPU driver version
@@ -319,6 +337,7 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 **Identification**: Contains `mac_address` AND `bytes_received`
 
 **Data Structure** (array of interfaces):
+
 ```json
 [
   {
@@ -339,6 +358,7 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 ```
 
 **Key Fields**:
+
 - `name` - Interface name (eth0, br0, etc.)
 - `state` - Interface state: "up", "down"
 - `speed_mbps` - Link speed in Mbps
@@ -355,6 +375,7 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 **Identification**: Contains `name` AND `path` AND `size_bytes`
 
 **Data Structure** (array of shares):
+
 ```json
 [
   {
@@ -370,6 +391,7 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 ```
 
 **Key Fields**:
+
 - `name` - Share name
 - `path` - Mount path
 - `size_bytes` - Total size
@@ -396,13 +418,16 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 ## Connection Management
 
 ### WebSocket Settings
+
 - **Ping Interval**: 30 seconds
 - **Max Clients**: 10 concurrent connections
 - **Buffer Size**: 256 messages
 - **Read Deadline**: 60 seconds
 
 ### Reconnection Strategy
+
 The Home Assistant integration uses exponential backoff for reconnections:
+
 - Delays: 1s, 2s, 4s, 8s, 16s, 32s, 60s (max)
 - Max retries: 10
 - Automatic reconnection on disconnect
@@ -412,6 +437,7 @@ The Home Assistant integration uses exponential backoff for reconnections:
 ## Usage Examples
 
 ### Python WebSocket Client
+
 ```python
 import asyncio
 import aiohttp
@@ -442,6 +468,7 @@ asyncio.run(monitor_events())
 ```
 
 ### JavaScript WebSocket Client
+
 ```javascript
 const ws = new WebSocket('ws://192.168.1.100:8043/api/v1/ws');
 
@@ -467,18 +494,22 @@ function identifyEventType(data) {
 ## Testing & Monitoring
 
 ### Test Script
+
 A Python test script is available at `test_websocket.py`:
+
 ```bash
 python test_websocket.py ws://192.168.1.100:8043/api/v1/ws 120
 ```
 
 This will:
+
 - Connect to the WebSocket
 - Monitor events for 120 seconds
 - Count event types
 - Save examples to `websocket_test_results.json`
 
 ### Expected Event Counts (2 minutes)
+
 - system_update: ~24 events (every 5s)
 - array_status_update: ~12 events (every 10s)
 - disk_list_update: ~4 events (every 30s)
@@ -502,4 +533,3 @@ This will:
 
 **Last Updated**: 2025-10-02  
 **Version**: 1.1.0
-

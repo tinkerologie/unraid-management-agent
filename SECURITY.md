@@ -26,7 +26,7 @@ We take security vulnerabilities seriously and appreciate responsible disclosure
 
 Report security vulnerabilities privately via GitHub Security Advisories:
 
-**🔒 https://github.com/ruaan-deysel/unraid-management-agent/security/advisories/new**
+**🔒 <https://github.com/ruaan-deysel/unraid-management-agent/security/advisories/new>**
 
 This allows us to work on a fix before public disclosure, protecting users from potential exploitation.
 
@@ -34,7 +34,7 @@ This allows us to work on a fix before public disclosure, protecting users from 
 
 If you prefer public disclosure or the issue is low severity, you can report via GitHub Issues:
 
-**📋 https://github.com/ruaan-deysel/unraid-management-agent/issues**
+**📋 <https://github.com/ruaan-deysel/unraid-management-agent/issues>**
 
 ### Direct Contact
 
@@ -139,12 +139,11 @@ We follow **coordinated disclosure**:
 
 ## Additional Resources
 
-- **GitHub Repository**: https://github.com/ruaan-deysel/unraid-management-agent
-- **Security Advisories**: https://github.com/ruaan-deysel/unraid-management-agent/security/advisories
-- **Issue Tracker**: https://github.com/ruaan-deysel/unraid-management-agent/issues
+- **GitHub Repository**: <https://github.com/ruaan-deysel/unraid-management-agent>
+- **Security Advisories**: <https://github.com/ruaan-deysel/unraid-management-agent/security/advisories>
+- **Issue Tracker**: <https://github.com/ruaan-deysel/unraid-management-agent/issues>
 - **Changelog**: [CHANGELOG.md](CHANGELOG.md)
 
 ---
 
 **Last Updated**: 2025-11-18
-

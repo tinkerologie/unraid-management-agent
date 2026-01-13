@@ -120,6 +120,7 @@ which upsc
 - [ ] Internet connection (for plugin download)
 
 **Optional (for additional features):**
+
 - [ ] lm-sensors (for temperature data)
 - [ ] smartctl (for disk SMART data)
 - [ ] Docker (for container monitoring)
@@ -142,6 +143,7 @@ which upsc
 ### ✅ Why?
 
 The agent collects data **directly** from:
+
 - System files (`/proc/`, `/sys/`)
 - Unraid config files (`/var/local/emhttp/`)
 - System commands (`sensors`, `smartctl`, `docker`, `virsh`)
@@ -172,6 +174,7 @@ The agent collects data **directly** from:
 ### Issue: No temperature data on older server
 
 **Diagnosis:**
+
 ```bash
 sensors -u  # Returns nothing?
 ls /sys/class/hwmon/hwmon*/temp*_input  # Returns nothing?
@@ -182,6 +185,7 @@ ls /sys/class/hwmon/hwmon*/temp*_input  # Returns nothing?
 ### Issue: GPU metrics not showing
 
 **Diagnosis:**
+
 ```bash
 nvidia-smi  # Command not found?
 rocm-smi    # Command not found?
@@ -192,6 +196,7 @@ rocm-smi    # Command not found?
 ### Issue: Docker/VM data missing
 
 **Diagnosis:**
+
 ```bash
 docker ps   # Error?
 virsh list  # Error?
@@ -202,6 +207,7 @@ virsh list  # Error?
 ### Issue: Agent not running
 
 **Diagnosis:**
+
 ```bash
 ps aux | grep unraid-management-agent
 curl http://localhost:8043/api/v1/health
@@ -220,4 +226,3 @@ curl http://localhost:8043/api/v1/health
 3. The agent isn't running
 
 It's **never** because of missing plugin dependencies.
-

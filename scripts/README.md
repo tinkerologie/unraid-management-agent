@@ -9,11 +9,13 @@ This directory contains scripts for deploying and managing the Unraid Management
 ### Initial Setup
 
 1. **Create your configuration file**:
+
    ```bash
    cp scripts/config.sh.example scripts/config.sh
    ```
 
 2. **Edit `config.sh` with your server details**:
+
    ```bash
    # Edit the file with your favorite editor
    nano scripts/config.sh
@@ -26,6 +28,7 @@ This directory contains scripts for deploying and managing the Unraid Management
    - `UNRAID_PASSWORD`: Your Unraid root password
 
 4. **Verify the file is ignored by git**:
+
    ```bash
    git status
    # config.sh should NOT appear in the output
@@ -47,11 +50,13 @@ This directory contains scripts for deploying and managing the Unraid Management
 Deploy the agent binary to your Unraid server.
 
 **Usage**:
+
 ```bash
 ./scripts/deploy-to-unraid.sh <unraid_ip> [--test]
 ```
 
 **Examples**:
+
 ```bash
 # Standard deployment
 ./scripts/deploy-to-unraid.sh 192.168.1.100
@@ -69,11 +74,13 @@ Deploy the agent binary to your Unraid server.
 Build and deploy the complete plugin package.
 
 **Usage**:
+
 ```bash
 ./scripts/deploy-plugin.sh [unraid_ip] [password] [backup]
 ```
 
 **Examples**:
+
 ```bash
 # Use credentials from config.sh
 ./scripts/deploy-plugin.sh
@@ -86,6 +93,7 @@ Build and deploy the complete plugin package.
 ```
 
 **Features**:
+
 - Builds the plugin package
 - Verifies icon fix
 - Optionally creates backup
@@ -99,17 +107,20 @@ Build and deploy the complete plugin package.
 Comprehensive validation script that tests all API endpoints.
 
 **Usage**:
+
 ```bash
 ./scripts/validate-live.sh
 ```
 
 **Features**:
+
 - Tests all API endpoints
 - Compares API responses with actual system state
 - Validates data accuracy
 - Provides detailed test results
 
 **Requirements**:
+
 - `config.sh` must be configured
 - `curl` must be installed
 - `sshpass` must be installed for SSH automation
@@ -121,11 +132,13 @@ Comprehensive validation script that tests all API endpoints.
 Remove old plugin backups from the Unraid server.
 
 **Usage**:
+
 ```bash
 ./scripts/cleanup-backups.sh [unraid_ip] [password]
 ```
 
 **Examples**:
+
 ```bash
 # Use credentials from config.sh
 ./scripts/cleanup-backups.sh
@@ -143,11 +156,13 @@ Remove old plugin backups from the Unraid server.
 Generate plugin icons in various sizes.
 
 **Usage**:
+
 ```bash
 ./scripts/generate-icon.sh
 ```
 
 **Features**:
+
 - Generates icons in multiple sizes (48x48, 64x64, 96x96, 128x128)
 - Creates both PNG and SVG formats
 - No credentials required
@@ -159,6 +174,7 @@ Generate plugin icons in various sizes.
 ### Required Tools
 
 1. **sshpass** - For automated SSH authentication
+
    ```bash
    # macOS
    brew install hudochenkov/sshpass/sshpass
@@ -173,6 +189,7 @@ Generate plugin icons in various sizes.
 2. **curl** - For API testing (usually pre-installed)
 
 3. **jq** - For JSON parsing (optional, but recommended)
+
    ```bash
    # macOS
    brew install jq
@@ -188,12 +205,14 @@ Generate plugin icons in various sizes.
 ### "Configuration file not found" Error
 
 If you see this error:
+
 ```
 ERROR: Configuration file not found!
 Please create scripts/config.sh from scripts/config.sh.example
 ```
 
 **Solution**:
+
 ```bash
 cp scripts/config.sh.example scripts/config.sh
 # Edit config.sh with your server details
@@ -204,16 +223,19 @@ cp scripts/config.sh.example scripts/config.sh
 If SSH connections fail:
 
 1. **Verify server is reachable**:
+
    ```bash
    ping 192.168.1.100
    ```
 
 2. **Test SSH manually**:
+
    ```bash
    ssh root@192.168.1.100
    ```
 
 3. **Check sshpass is installed**:
+
    ```bash
    which sshpass
    ```
@@ -269,4 +291,3 @@ Before pushing to GitHub:
 - [Unraid Management Agent Documentation](../docs/)
 - [API Reference](../docs/api/API_REFERENCE.md)
 - [Changelog](../CHANGELOG.md)
-

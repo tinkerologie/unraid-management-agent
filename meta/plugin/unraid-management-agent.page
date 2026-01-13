@@ -3,7 +3,7 @@ Title="Unraid Management Agent"
 Icon="/plugins/unraid-management-agent/images/unraid-management-agent.png"
 ---
 <?PHP
-/* Copyright 2025, Home Assistant Unraid Management Agent.
+/* Copyright 2026, Home Assistant Unraid Management Agent.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version 2,
@@ -25,7 +25,6 @@ if (file_exists($config_file)) {
 
 // Default values
 $port = $config['PORT'] ?? '8043';
-$log_level = $config['LOG_LEVEL'] ?? 'info';
 
 // Collection interval defaults (industry-standard: Zabbix, Prometheus, Datadog)
 $interval_system = $config['INTERVAL_SYSTEM'] ?? '15';
@@ -57,7 +56,7 @@ $status_text = $running ? "<span style='color:green;'>RUNNING</span>" : "<span s
 // All types now include Disabled option and extended ranges up to 24 hours
 function intervalOptions($selected, $type = 'standard') {
     $options = [];
-    
+
     // Common extended options (up to 24 hours)
     $extended = [
         '3600' => '1 hour',
@@ -67,7 +66,7 @@ function intervalOptions($selected, $type = 'standard') {
         '43200' => '12 hours',
         '86400' => '24 hours',
     ];
-    
+
     if ($type === 'fast') {
         // For system metrics that can update quickly
         $options = [
@@ -109,7 +108,7 @@ function intervalOptions($selected, $type = 'standard') {
             '1800' => '30 minutes',
         ] + $extended;
     }
-    
+
     $html = '';
     foreach ($options as $value => $label) {
         $isSelected = ($selected == $value) ? 'selected' : '';
@@ -130,8 +129,7 @@ if ($_POST) {
         // Save configuration
         $new_config = "# Unraid Management Agent Configuration\n\n";
         $new_config .= "# API Server Configuration\n";
-        $new_config .= "PORT=" . $_POST['port'] . "\n";
-        $new_config .= "LOG_LEVEL=" . $_POST['log_level'] . "\n\n";
+        $new_config .= "PORT=" . $_POST['port'] . "\n\n";
         $new_config .= "# Collection Intervals in seconds\n";
         $new_config .= "INTERVAL_SYSTEM=" . $_POST['interval_system'] . "\n";
         $new_config .= "INTERVAL_ARRAY=" . $_POST['interval_array'] . "\n";
@@ -158,8 +156,7 @@ if ($_POST) {
         // Reset to defaults - power-optimized values
         $default_config = "# Unraid Management Agent Configuration\n\n";
         $default_config .= "# API Server Configuration\n";
-        $default_config .= "PORT=8043\n";
-        $default_config .= "LOG_LEVEL=info\n\n";
+        $default_config .= "PORT=8043\n\n";
         $default_config .= "# Collection Intervals in seconds - Industry-standard defaults\n";
         $default_config .= "INTERVAL_SYSTEM=15\n";
         $default_config .= "INTERVAL_ARRAY=60\n";
@@ -177,13 +174,13 @@ if ($_POST) {
         $default_config .= "INTERVAL_REGISTRATION=600\n";
         $default_config .= "INTERVAL_UNASSIGNED=60\n";
         file_put_contents($config_file, $default_config);
-        
+
         // Restart service in background if running
         if ($running) {
             exec("/usr/local/emhttp/plugins/$plugin/scripts/stop > /dev/null 2>&1 && sleep 1 && /usr/local/emhttp/plugins/$plugin/scripts/start > /dev/null 2>&1 &");
         }
     }
-    
+
     // Redirect using JavaScript (more reliable in Unraid's PHP environment)
     echo "<script>window.location.href = window.location.pathname;</script>";
     exit;
@@ -197,14 +194,13 @@ if ($_POST) {
 .status-box {
     padding: 15px;
     margin-bottom: 20px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--line-color, #ccc);
     border-radius: 5px;
-    background-color: #f9f9f9;
 }
 .config-box {
     padding: 15px;
     margin-bottom: 20px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--line-color, #ccc);
     border-radius: 5px;
 }
 .form-row {
@@ -222,7 +218,7 @@ if ($_POST) {
 .button-row {
     margin-top: 20px;
     padding-top: 20px;
-    border-top: 1px solid #ccc;
+    border-top: 1px solid var(--line-color, #ccc);
 }
 .btn {
     padding: 10px 20px;
@@ -249,18 +245,18 @@ if ($_POST) {
     color: white;
 }
 .btn-default {
-    background-color: #e7e7e7;
-    color: black;
+    background-color: var(--button-background, #e7e7e7);
+    color: inherit;
 }
 .help-text {
     font-size: 12px;
-    color: #666;
+    color: var(--text-secondary, #666);
     margin-top: 5px;
 }
 .interval-section {
     margin-top: 8px;
     padding-top: 8px;
-    border-top: 1px solid #eee;
+    border-top: 1px solid var(--line-color, #eee);
 }
 .interval-section:first-of-type {
     margin-top: 0;
@@ -270,7 +266,7 @@ if ($_POST) {
 .section-header {
     font-size: 11px;
     font-weight: bold;
-    color: #666;
+    color: var(--text-secondary, #666);
     margin-bottom: 4px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -288,24 +284,26 @@ if ($_POST) {
 }
 .interval-label {
     font-size: 13px;
-    color: #333;
+    color: inherit;
     min-width: 120px;
 }
 .interval-select {
     width: 110px;
     padding: 3px 6px;
     font-size: 12px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--line-color, #ccc);
     border-radius: 3px;
-    background-color: #fff;
+    background-color: var(--input-background, #fff);
+    color: inherit;
 }
 .power-warning {
-    background-color: #fff3cd;
-    border: 1px solid #ffc107;
+    background-color: var(--notice-background, #fff3cd);
+    border: 1px solid var(--notice-border, #ffc107);
     border-radius: 5px;
     padding: 10px;
     margin-top: 15px;
     font-size: 12px;
+    color: inherit;
 }
 .interval-select option[value="0"] {
     color: #d32f2f;
@@ -313,7 +311,7 @@ if ($_POST) {
 }
 .interval-select.is-disabled {
     border-color: #d32f2f;
-    background-color: #ffebee;
+    background-color: var(--error-background, #ffebee);
 }
 </style>
 
@@ -328,7 +326,7 @@ if ($_POST) {
             <p><strong>API Endpoint:</strong> http://<?= $_SERVER['SERVER_ADDR'] ?>:<?= $port ?>/api/v1</p>
             <p><strong>WebSocket:</strong> ws://<?= $_SERVER['SERVER_ADDR'] ?>:<?= $port ?>/api/v1/ws</p>
         <?php endif; ?>
-        
+
         <form method="post" style="margin-top: 15px;">
             <?php if ($running): ?>
                 <button type="submit" name="stop" class="btn btn-danger">Stop</button>
@@ -342,23 +340,13 @@ if ($_POST) {
     <form method="post">
         <div class="config-box">
             <h3>Configuration</h3>
-            
+
             <div class="form-row">
                 <label class="form-label">API Port:</label>
                 <input type="number" name="port" value="<?= htmlspecialchars($port) ?>" class="form-input" min="1024" max="65535">
                 <div class="help-text">Port number for the API server (default: 8043)</div>
             </div>
 
-            <div class="form-row">
-                <label class="form-label">Log Level:</label>
-                <select name="log_level" class="form-input">
-                    <option value="debug" <?= $log_level === 'debug' ? 'selected' : '' ?>>Debug</option>
-                    <option value="info" <?= $log_level === 'info' ? 'selected' : '' ?>>Info</option>
-                    <option value="warn" <?= $log_level === 'warn' ? 'selected' : '' ?>>Warning</option>
-                    <option value="error" <?= $log_level === 'error' ? 'selected' : '' ?>>Error</option>
-                </select>
-                <div class="help-text">Logging verbosity level</div>
-            </div>
         </div>
 
         <div class="config-box">

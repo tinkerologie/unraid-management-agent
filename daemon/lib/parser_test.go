@@ -238,8 +238,8 @@ func TestParseINIFileWithWhitespace(t *testing.T) {
 
 	content := `key1 = value1
   key2=value2
-key3=value3  
-  key4  =  value4  
+key3=value3
+  key4  =  value4
 `
 	iniPath := filepath.Join(tmpDir, "whitespace.ini")
 	if err := os.WriteFile(iniPath, []byte(content), 0644); err != nil {

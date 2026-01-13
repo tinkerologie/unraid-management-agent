@@ -120,7 +120,7 @@ docker run -d \
 #### Option B: Standalone Server
 
 Follow the official Grafana installation guide for your platform:
-https://grafana.com/docs/grafana/latest/setup-grafana/installation/
+<https://grafana.com/docs/grafana/latest/setup-grafana/installation/>
 
 ### Step 2: Install Required Plugins
 
@@ -208,6 +208,7 @@ grafana-cli plugins install simpod-json-datasource
 **Panel Type**: Gauge
 
 **Query Configuration**:
+
 - **Type**: JSON
 - **Parser**: Backend
 - **Source**: URL
@@ -215,11 +216,13 @@ grafana-cli plugins install simpod-json-datasource
 - **Method**: GET
 
 **Data Transformation**:
+
 - **Fields**: Select `cpu_usage_percent`
 - **Display Name**: CPU Usage
 - **Unit**: Percent (0-100)
 
 **Thresholds**:
+
 - Green: 0-60
 - Yellow: 60-80
 - Red: 80-100
@@ -229,12 +232,14 @@ grafana-cli plugins install simpod-json-datasource
 **Panel Type**: Stat
 
 **Query Configuration**:
+
 - **Type**: JSON
 - **Source**: URL
 - **URL**: `/system`
 - **Method**: GET
 
 **Data Transformation**:
+
 ```
 Fields to extract:
 - ram_usage_percent (display as percentage)
@@ -243,6 +248,7 @@ Fields to extract:
 ```
 
 **Calculation** (using Grafana transformations):
+
 ```
 Add field from calculation:
 - Mode: Binary operation
@@ -256,6 +262,7 @@ Add field from calculation:
 ```
 
 **Display**:
+
 - **Value**: `ram_usage_percent`
 - **Unit**: Percent (0-100)
 - **Decimals**: 1
@@ -265,6 +272,7 @@ Add field from calculation:
 **Panel Type**: Gauge
 
 **Query Configuration**:
+
 - **Type**: JSON
 - **Source**: URL
 - **URL**: `/system`
@@ -272,11 +280,13 @@ Add field from calculation:
 - **Field**: `cpu_temp_celsius`
 
 **Thresholds**:
+
 - Green: 0-60°C
 - Yellow: 60-75°C
 - Red: 75-100°C
 
 **Display**:
+
 - **Unit**: Temperature (°C)
 - **Min**: 0
 - **Max**: 100
@@ -286,12 +296,14 @@ Add field from calculation:
 **Panel Type**: Stat (multiple stats)
 
 **Query Configuration**:
+
 - **Type**: JSON
 - **Source**: URL
 - **URL**: `/array`
 - **Method**: GET
 
 **Fields to Display**:
+
 1. **Array State**:
    - Field: `state`
    - Display: Text
@@ -318,6 +330,7 @@ Add field from calculation:
 **Panel Type**: Table
 
 **Query Configuration**:
+
 - **Type**: JSON
 - **Source**: URL
 - **URL**: `/disks`
@@ -325,6 +338,7 @@ Add field from calculation:
 - **Format**: Table
 
 **Columns to Display**:
+
 - `name` → Disk Name
 - `device` → Device
 - `role` → Role
@@ -333,6 +347,7 @@ Add field from calculation:
 - `size_bytes` → Size (convert to TB)
 
 **Transformation**:
+
 ```
 Organize fields:
 - name
@@ -350,6 +365,7 @@ Add field from calculation:
 ```
 
 **Conditional Formatting**:
+
 - Temperature > 45°C → Yellow
 - Temperature > 55°C → Red
 - Spin State = "standby" → Gray
@@ -359,18 +375,21 @@ Add field from calculation:
 **Panel Type**: Table
 
 **Query Configuration**:
+
 - **Type**: JSON
 - **Source**: URL
 - **URL**: `/docker`
 - **Method**: GET
 
 **Columns**:
+
 - `name` → Container Name
 - `state` → Status
 - `cpu_percent` → CPU %
 - `memory_usage_bytes` → Memory (convert to MB)
 
 **Transformation**:
+
 ```
 Add field from calculation:
 - Mode: Binary operation
@@ -380,6 +399,7 @@ Add field from calculation:
 ```
 
 **Conditional Formatting**:
+
 - State = "running" → Green
 - State = "stopped" → Red
 - State = "paused" → Yellow
@@ -389,6 +409,7 @@ Add field from calculation:
 **Panel Type**: Time series
 
 **Query Configuration**:
+
 - **Type**: JSON
 - **Source**: URL
 - **URL**: `/array`
@@ -396,11 +417,13 @@ Add field from calculation:
 - **Refresh**: 30s
 
 **Fields**:
+
 - `total_bytes` → Total Capacity
 - `free_bytes` → Free Space
 - Calculate: `used_bytes = total_bytes - free_bytes`
 
 **Transformation**:
+
 ```
 Add field from calculation:
 - Mode: Binary operation
@@ -419,6 +442,7 @@ Add field from calculation:
 ```
 
 **Display**:
+
 - **Unit**: Data (IEC)
 - **Legend**: Show
 - **Tooltip**: All series
@@ -485,6 +509,7 @@ The WebSocket sends events in this format:
 ### Polling Intervals
 
 **Recommended refresh rates**:
+
 - **System metrics** (CPU, RAM, temps): 5-10 seconds
 - **Array status**: 30 seconds
 - **Disk information**: 1-5 minutes
@@ -492,6 +517,7 @@ The WebSocket sends events in this format:
 - **Network stats**: 10-30 seconds
 
 **Why not faster?**
+
 - Reduces load on Unraid server
 - Most metrics don't change that rapidly
 - Grafana can interpolate between data points
@@ -529,22 +555,27 @@ Configure Grafana to store historical data:
 **Problem**: "Data source is not working"
 
 **Solutions**:
+
 1. Verify Unraid Management Agent is running:
+
    ```bash
    ps aux | grep unraid-management-agent
    ```
 
 2. Test API endpoint manually:
+
    ```bash
    curl http://YOUR_UNRAID_IP:8043/api/v1/health
    ```
 
 3. Check firewall rules:
+
    ```bash
    iptables -L -n | grep 8043
    ```
 
 4. Verify Grafana can reach Unraid:
+
    ```bash
    # From Grafana container/server
    curl http://YOUR_UNRAID_IP:8043/api/v1/health
@@ -555,6 +586,7 @@ Configure Grafana to store historical data:
 **Problem**: Panel shows "No data"
 
 **Solutions**:
+
 1. Check query syntax in panel editor
 2. Verify field names match API response
 3. Check time range (use "Last 5 minutes" for testing)
@@ -565,6 +597,7 @@ Configure Grafana to store historical data:
 **Problem**: WebSocket connection fails
 
 **Solutions**:
+
 1. Verify WebSocket URL: `ws://` not `http://`
 2. Check browser console for errors
 3. Test WebSocket manually using a WebSocket client
@@ -575,6 +608,7 @@ Configure Grafana to store historical data:
 **Problem**: Values don't match Unraid UI
 
 **Solutions**:
+
 1. Verify field names (use `_bytes` not `_gb`, `_celsius` not `_temp`)
 2. Check unit conversions (bytes to GB: divide by 1073741824)
 3. Ensure transformations are applied correctly
@@ -587,6 +621,7 @@ Configure Grafana to store historical data:
 Below is a complete Grafana dashboard JSON that you can import directly into Grafana.
 
 **To Import**:
+
 1. Copy the JSON below
 2. In Grafana, click **+** → **Import**
 3. Paste JSON
@@ -780,6 +815,7 @@ Below is a complete Grafana dashboard JSON that you can import directly into Gra
 Add variables for dynamic filtering:
 
 **Variable: disk_role**
+
 - **Type**: Query
 - **Data source**: Unraid Management Agent
 - **Query**: `/disks`
@@ -788,6 +824,7 @@ Add variables for dynamic filtering:
 - **Include All**: Yes
 
 **Variable: container_state**
+
 - **Type**: Query
 - **Data source**: Unraid Management Agent
 - **Query**: `/docker`
@@ -842,13 +879,14 @@ Transformation: Add field from calculation
 
 ### Official Documentation
 
-- **Grafana Documentation**: https://grafana.com/docs/
-- **Infinity Plugin**: https://grafana.com/grafana/plugins/yesoreyeram-infinity-datasource/
+- **Grafana Documentation**: <https://grafana.com/docs/>
+- **Infinity Plugin**: <https://grafana.com/grafana/plugins/yesoreyeram-infinity-datasource/>
 - **Unraid Management Agent API**: [API Reference](../api/API_REFERENCE.md)
 
 ### Community Dashboards
 
 Share your dashboards with the community:
+
 1. Export dashboard JSON
 2. Create GitHub Gist
 3. Share link in Unraid forums
@@ -871,6 +909,7 @@ You now have a complete Grafana integration for monitoring your Unraid server! K
 ✅ **Consider WebSocket** for real-time dashboards
 
 **Next Steps**:
+
 1. Import the sample dashboard
 2. Customize panels for your needs
 3. Set up alerting rules
@@ -881,5 +920,3 @@ You now have a complete Grafana integration for monitoring your Unraid server! K
 **Last Updated**: 2025-11-17
 **Version**: 2025.11.23
 **Feedback**: Report issues on GitHub
-
-

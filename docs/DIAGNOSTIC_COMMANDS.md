@@ -5,6 +5,7 @@ Use these commands to diagnose issues and verify data collection capabilities.
 ## System Information
 
 ### Check Unraid Version
+
 ```bash
 cat /etc/unraid-version
 # or
@@ -12,18 +13,21 @@ cat /var/local/emhttp/var.ini | grep version
 ```
 
 ### Check CPU Information
+
 ```bash
 cat /proc/cpuinfo | head -20
 # Shows: processor count, model name, cores, threads
 ```
 
 ### Check RAM
+
 ```bash
 cat /proc/meminfo | head -5
 # Shows: MemTotal, MemFree, MemAvailable
 ```
 
 ### Check Uptime
+
 ```bash
 cat /proc/uptime
 # Shows: uptime in seconds
@@ -34,12 +38,14 @@ cat /proc/uptime
 ## Temperature Sensors
 
 ### Check if lm-sensors is Installed
+
 ```bash
 which sensors
 # If not found: opkg install lm-sensors
 ```
 
 ### Read Sensors
+
 ```bash
 sensors -u
 # Shows all available temperature sensors
@@ -47,6 +53,7 @@ sensors -u
 ```
 
 ### Check hwmon Directly
+
 ```bash
 ls -la /sys/class/hwmon/
 # Lists available hwmon devices
@@ -66,6 +73,7 @@ done
 ```
 
 ### Check CPU Temperature Specifically
+
 ```bash
 # Look for coretemp
 for d in /sys/class/hwmon/hwmon*; do
@@ -77,6 +85,7 @@ done
 ```
 
 ### Check Motherboard Temperature
+
 ```bash
 # Look for MB_Temp or similar
 sensors -u | grep -i "mb_temp\|motherboard"
@@ -87,18 +96,21 @@ sensors -u | grep -i "mb_temp\|motherboard"
 ## Disk Information
 
 ### Check Disks Configuration
+
 ```bash
 cat /var/local/emhttp/disks.ini
 # Shows all configured disks
 ```
 
 ### Check Array Status
+
 ```bash
 cat /var/local/emhttp/var.ini | grep -E "mdState|mdResync"
 # Shows array state and parity info
 ```
 
 ### Check Disk Space
+
 ```bash
 df -h /mnt/user
 # Shows array capacity and usage
@@ -108,6 +120,7 @@ stat -f /mnt/user
 ```
 
 ### Check SMART Data
+
 ```bash
 which smartctl
 # If not found: opkg install smartmontools
@@ -118,6 +131,7 @@ smartctl -a /dev/sda
 ```
 
 ### Check Disk I/O Stats
+
 ```bash
 cat /proc/diskstats
 # Shows I/O statistics for all disks
@@ -128,6 +142,7 @@ cat /proc/diskstats
 ## GPU Information
 
 ### Check NVIDIA GPU
+
 ```bash
 which nvidia-smi
 # If found, GPU is available
@@ -137,6 +152,7 @@ nvidia-smi --query-gpu=index,name,temperature.gpu,utilization.gpu,memory.used,me
 ```
 
 ### Check AMD GPU
+
 ```bash
 which rocm-smi
 # or
@@ -147,6 +163,7 @@ rocm-smi
 ```
 
 ### Check Intel GPU
+
 ```bash
 which intel_gpu_top
 # or check hwmon for i915
@@ -158,6 +175,7 @@ ls /sys/class/drm/card*/device/hwmon/hwmon*/temp*_input 2>/dev/null
 ## Docker Information
 
 ### Check Docker Installation
+
 ```bash
 which docker
 # If not found, Docker is not installed
@@ -176,6 +194,7 @@ docker stats --no-stream
 ## Virtual Machines
 
 ### Check libvirt Installation
+
 ```bash
 which virsh
 # If not found, libvirt is not installed
@@ -192,6 +211,7 @@ virsh domstats --raw
 ## UPS Information
 
 ### Check APC UPS
+
 ```bash
 which apcaccess
 # If found, APC UPS monitoring is available
@@ -201,6 +221,7 @@ apcaccess
 ```
 
 ### Check NUT UPS
+
 ```bash
 which upsc
 # If found, NUT UPS monitoring is available
@@ -210,6 +231,7 @@ upsc ups@localhost
 ```
 
 ### Check UPS Daemon Status
+
 ```bash
 # APC
 ps aux | grep apcupsd
@@ -223,12 +245,14 @@ ps aux | grep upsmon
 ## Agent Status
 
 ### Check if Agent is Running
+
 ```bash
 ps aux | grep unraid-management-agent
 # Should show the running agent process
 ```
 
 ### Check Agent Logs
+
 ```bash
 tail -f /var/log/unraid-management-agent.log
 # Shows real-time logs
@@ -241,6 +265,7 @@ grep -i temperature /var/log/unraid-management-agent.log
 ```
 
 ### Test API Endpoints
+
 ```bash
 # Health check
 curl http://localhost:8043/api/v1/health
@@ -321,6 +346,7 @@ tail -10 /var/log/unraid-management-agent.log 2>/dev/null || echo "Log file not 
 ```
 
 Save as `/tmp/diagnose.sh` and run:
+
 ```bash
 bash /tmp/diagnose.sh
 ```
@@ -329,23 +355,26 @@ bash /tmp/diagnose.sh
 
 ## Interpreting Results
 
-### If temperatures are 0 or missing:
+### If temperatures are 0 or missing
+
 1. Run: `sensors -u`
 2. If empty → hardware doesn't expose sensors
 3. If populated → check agent logs for parsing errors
 
-### If Docker/VM data is missing:
+### If Docker/VM data is missing
+
 1. Run: `docker ps` or `virsh list`
 2. If command not found → component not installed
 3. If error → component not running
 
-### If GPU data is missing:
+### If GPU data is missing
+
 1. Run: `nvidia-smi` or `rocm-smi`
 2. If command not found → drivers not installed
 3. If error → GPU not detected
 
-### If API is not responding:
+### If API is not responding
+
 1. Check: `ps aux | grep unraid-management-agent`
 2. Check logs: `tail -f /var/log/unraid-management-agent.log`
 3. Check port: `netstat -tlnp | grep 8043`
-

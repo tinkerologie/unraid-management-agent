@@ -37,6 +37,7 @@ Defined in `daemon/constants/const.go`:
 ### Adding a New Collector
 
 1. Create collector in `daemon/services/collectors/` following `system.go` pattern:
+
    ```go
    type NewCollector struct { ctx *domain.Context }
    func (c *NewCollector) Start(ctx context.Context, interval time.Duration) {
@@ -45,12 +46,14 @@ Defined in `daemon/constants/const.go`:
        // Call c.ctx.Hub.Pub(data, "new_topic_update")
    }
    ```
+
 2. Define DTO in `daemon/dto/` (e.g., `NewInfo struct`)
 3. Add subscription in `api/server.go` `subscribeToEvents()`:
    - Add `"new_topic_update"` to `Hub.Sub()` call (~line 234)
    - Add `case` in switch statement to update cache (~line 265+)
 4. Add cache field in `api/server.go` `Server` struct (e.g., `newCache *dto.NewInfo`)
 5. Add handler in `api/handlers.go`:
+
    ```go
    func (s *Server) handleNew(w http.ResponseWriter, _ *http.Request) {
        s.cacheMutex.RLock()
@@ -59,6 +62,7 @@ Defined in `daemon/constants/const.go`:
        respondJSON(w, http.StatusOK, data)
    }
    ```
+
 6. Register route in `server.go` `setupRoutes()` (~line 69+)
 7. Initialize and start in `orchestrator.go` (~line 62+): add to WaitGroup, create collector, launch goroutine
 

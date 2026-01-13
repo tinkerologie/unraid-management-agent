@@ -2,7 +2,7 @@
 
 # Unraid Server Configuration Template
 # Copy this file to config.sh and update with your server details
-# 
+#
 # IMPORTANT: config.sh is in .gitignore and will NOT be committed to git
 #
 # Usage:
@@ -27,4 +27,3 @@ API_BASE="http://${UNRAID_IP}:${API_PORT}/api/v1"
 
 # Plugin name
 PLUGIN_NAME="unraid-management-agent"
-

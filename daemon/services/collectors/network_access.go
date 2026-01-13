@@ -375,7 +375,10 @@ func GetPrimaryLANIP() string {
 		}
 	}()
 
-	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	localAddr, ok := conn.LocalAddr().(*net.UDPAddr)
+	if !ok {
+		return ""
+	}
 	return localAddr.IP.String()
 }
 

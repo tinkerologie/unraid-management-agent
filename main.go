@@ -44,7 +44,7 @@ var cli struct {
 	LogsDir  string `default:"/var/log" help:"directory to store logs"`
 	Port     int    `default:"8043" help:"HTTP server port"`
 	Debug    bool   `default:"false" help:"enable debug mode with stdout logging"`
-	LogLevel string `default:"warning" help:"log level: debug, info, warning, error"`
+	LogLevel string `default:"info" help:"log level: debug, info, warning, error"`
 
 	// Low power mode - multiplies all intervals for resource-constrained systems
 	LowPowerMode bool `default:"false" env:"UNRAID_LOW_POWER" help:"enable low power mode (4x longer intervals for old/slow hardware)"`
@@ -74,6 +74,20 @@ var cli struct {
 	Boot cmd.Boot `cmd:"" default:"1" help:"start the management agent"`
 }
 
+// cleanupOldLogs removes old rotated log files from previous versions
+// This is needed because lumberjack's MaxBackups only prevents new backups,
+// it doesn't clean up existing ones from before the setting was changed
+func cleanupOldLogs(logsDir, baseName string) {
+	pattern := filepath.Join(logsDir, baseName+"-*.log")
+	files, err := filepath.Glob(pattern)
+	if err != nil {
+		return
+	}
+	for _, f := range files {
+		_ = os.Remove(f)
+	}
+}
+
 func main() {
 	ctx := kong.Parse(&cli)
 
@@ -88,7 +102,7 @@ func main() {
 	case "error":
 		logger.SetLevel(logger.LevelError)
 	default:
-		logger.SetLevel(logger.LevelWarning)
+		logger.SetLevel(logger.LevelInfo)
 	}
 
 	// Set up logging
@@ -99,12 +113,16 @@ func main() {
 		logger.SetLevel(logger.LevelDebug)
 		log.Println("Debug mode enabled - logging to stdout")
 	} else {
-		// Production mode: log rotation with 5MB max size, NO backups
+		// Clean up old rotated log files from previous versions
+		cleanupOldLogs(cli.LogsDir, "unraid-management-agent")
+
+		// Production mode: log rotation with 5MB max size
+		// MaxAge=1 ensures old backup files are deleted after 1 day
 		fileLogger := &lumberjack.Logger{
 			Filename:   filepath.Join(cli.LogsDir, "unraid-management-agent.log"),
 			MaxSize:    5,     // 5 MB max file size
-			MaxBackups: 0,     // No backup files - only keep current log
-			MaxAge:     0,     // No age-based retention
+			MaxBackups: 1,     // Keep only 1 backup file
+			MaxAge:     1,     // Delete backups older than 1 day
 			Compress:   false, // No compression
 		}
 		// Write to both file and stdout

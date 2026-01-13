@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-The Unraid Management Agent is a Go-based plugin for Unraid that exposes comprehensive system monitoring and control via REST API and WebSockets. This is a **third-party community plugin**, not an official Unraid product. It provides a REST API + WebSocket interface as an alternative/complement to the official Unraid GraphQL API.
+The Unraid Management Agent is a Go-based plugin for Unraid that exposes comprehensive system monitoring and control via REST API, WebSockets, and MCP (Model Context Protocol). This is a **third-party community plugin**, not an official Unraid product. It provides a REST API + WebSocket interface as an alternative/complement to the official Unraid GraphQL API.
 
 **Language:** Go 1.24
 **Target Platform:** Linux/amd64 (Unraid OS)
@@ -52,34 +52,81 @@ make clean
 ./unraid-management-agent boot --port 8043
 ```
 
-### Development Workflow
+### Deployment to Unraid
 
-The project uses semantic versioning with date-based releases (e.g., `2025.11.25`). When creating a release:
+Use the provided deployment scripts for building and testing on actual hardware:
 
-1. Update the `VERSION` file with the new version number
-2. Update `CHANGELOG.md` with release notes
-3. Create and push a git tag: `git tag v2025.11.25 && git push origin v2025.11.25`
-4. GitHub Actions will automatically build and release the package
+```bash
+# 1. Create config with Unraid SSH credentials
+cp scripts/config.sh.example scripts/config.sh
+# Edit config.sh with actual Unraid server IP, username, and password
+
+# 2. Deploy and test
+./scripts/deploy-plugin.sh
+```
+
+### Pre-commit Hooks
+
+The project enforces code quality via pre-commit hooks:
+
+```bash
+# Automated setup
+./scripts/setup-pre-commit.sh
+
+# Or manual setup
+pip install pre-commit
+make pre-commit-install
+
+# Run checks manually
+make pre-commit-run
+make lint
+make security-check
+```
+
+### Release Workflow
+
+The project uses date-based versioning: `YYYY.MM.DD` (e.g., `2025.12.01`).
+
+1. Update `CHANGELOG.md` with changes (required for every change)
+2. Update `VERSION` file with new version number
+3. Update `.plg` files (both root and `meta/template/`):
+   - Set `<!ENTITY version "YYYY.MM.DD">`
+   - Set `<!ENTITY md5 "...">` with checksum **from GitHub release** (not local build)
+4. Create and push tag: `git tag vYYYY.MM.DD && git push origin vYYYY.MM.DD`
+5. GitHub Actions builds and releases automatically
+6. Verify MD5 matches published release artifact
 
 ## Architecture
 
 ### Event-Driven Design with PubSub
 
-The agent uses an event bus pattern for decoupled, real-time data flow:
+The agent uses an event bus pattern (`github.com/cskr/pubsub`) for decoupled, real-time data flow:
 
 ```
 Collectors → Event Bus (PubSub) → API Server Cache → REST Endpoints
+                                ↓                   ↓
+                         WebSocket Hub        MCP Server → AI Agents
                                 ↓
-                         WebSocket Hub → Connected Clients
+                         Connected Clients
 ```
 
-**Critical Initialization Order:**
+**Critical Initialization Order (in `orchestrator.go`):**
 
-1. API server subscriptions are started FIRST (before collectors)
-2. Small delay (100ms) to ensure subscriptions are ready
-3. Then collectors start publishing events
+1. API server creates subscriptions via `Hub.Sub()` FIRST
+2. 100ms delay ensures subscriptions are ready
+3. Then collectors start publishing via `Hub.Pub(data, "topic_name")`
 
-This order is crucial to avoid race conditions where collectors publish events before the API server is ready to receive them.
+**Never change this order** — collectors publishing before subscriptions causes lost events.
+
+### Native API Integration
+
+For optimal performance, collectors use native Go libraries instead of shell commands:
+
+| Component | Library | Purpose |
+|-----------|---------|---------|
+| Docker | `github.com/moby/moby/client` | Docker Engine SDK |
+| VMs | `github.com/digitalocean/go-libvirt` | Native libvirt bindings |
+| System | Direct `/proc`, `/sys` access | Kernel interfaces |
 
 ### Core Components
 
@@ -99,80 +146,67 @@ All data structures shared between collectors, API, and WebSocket clients:
 
 #### 3. Collectors (`daemon/services/collectors/`)
 
-Independent goroutines that collect data at fixed intervals and publish to the event bus:
+Independent goroutines that collect data at fixed intervals (defined in `daemon/constants/const.go`):
 
-| Collector | Interval | Event Topic | Purpose |
-|-----------|----------|-------------|---------|
-| System | 5s | `system_update` | CPU, RAM, temps, uptime |
-| Array | 10s | `array_status_update` | Array state, parity info |
-| Disk | 30s | `disk_list_update` | Per-disk metrics, SMART data |
-| Network | 15s | `network_list_update` | Interface status, bandwidth |
-| Docker | 10s | `container_list_update` | Container information |
-| VM | 10s | `vm_list_update` | Virtual machine data |
-| UPS | 10s | `ups_status_update` | UPS status (if available) |
-| GPU | 10s | `gpu_metrics_update` | GPU metrics (if available) |
+| Collector | Interval | Event Topic | Notes |
+|-----------|----------|-------------|-------|
+| System | 15s | `system_update` | CPU/RAM/temps - sensors command is CPU intensive |
+| Array | 30s | `array_status_update` | Array state rarely changes |
+| Disk | 30s | `disk_list_update` | Per-disk SMART data |
+| Network | 30s | `network_list_update` | Interface status |
+| Docker | 30s | `container_list_update` | Very CPU intensive with many containers |
+| VM | 30s | `vm_list_update` | virsh commands spawn multiple processes |
+| UPS | 60s | `ups_status_update` | UPS status rarely changes |
+| GPU | 60s | `gpu_metrics_update` | intel_gpu_top is extremely CPU intensive |
 | Share | 60s | `share_list_update` | User share information |
-| Hardware | 300s | `hardware_update` | BIOS, baseboard, CPU, memory |
-| Registration | 300s | `registration_update` | License/registration status |
-| Notification | 15s | `notifications_update` | System notifications |
-| Unassigned | 30s | `unassigned_devices_update` | Unassigned devices/shares |
-| ZFS | 30s | `zfs_*_update` | ZFS pools, datasets, snapshots |
+| Notification | 30s | `notifications_update` | System notifications |
+| Unassigned | 60s | `unassigned_devices_update` | Unassigned devices |
+| ZFS | 30s | `zfs_*_update` | Pools, datasets, snapshots |
+| Hardware | 300s | `hardware_update` | Rarely changes |
+| Registration | 300s | `registration_update` | License info |
+
+**Intervals optimized for power efficiency** — lower intervals increase CPU usage and power consumption.
 
 Each collector:
 
 - Runs in its own goroutine with context cancellation support
-- Has panic recovery to prevent crashes
+- **Must wrap work in defer/recover** for panic recovery
 - Publishes events via `ctx.Hub.Pub(data, topic)`
-- Reads system data from Unraid-specific files or commands
 
 #### 4. API Server (`daemon/services/api/`)
 
-**server.go:**
+- **server.go**: Maintains in-memory cache, subscribes to event topics, broadcasts to WebSocket clients. Uses `sync.RWMutex` for thread-safe cache access.
+- **handlers.go**: REST endpoint handlers. **Always use RLock/RUnlock** for cache reads.
+- **websocket.go**: WebSocket hub with client registration and ping/pong health checks.
+- **middleware.go**: CORS, logging, and recovery middleware.
 
-- Maintains in-memory cache of latest collector data
-- Subscribes to all event topics to update cache
-- Broadcasts events to WebSocket clients
-- Uses `sync.RWMutex` for thread-safe cache access
+#### 5. MCP Server (`daemon/services/mcp/`)
 
-**handlers.go:**
+Model Context Protocol endpoint at `POST /mcp` for AI agent integration:
 
-- REST endpoint handlers that return cached data
-- Control endpoints that execute Docker/VM/Array commands
-- Configuration endpoints (read and write)
+- **server.go**: MCP server with tools for monitoring and control
+- **transport.go**: HTTP transport for JSON-RPC requests
+- Tools expose system info, Docker/VM control, notifications, etc.
+- See `docs/MCP_INTEGRATION.md` for full documentation (54 tools available)
 
-**websocket.go:**
+#### 6. Controllers (`daemon/services/controllers/`)
 
-- WebSocket hub managing connected clients
-- Broadcasts events to all connected clients
-- Client registration/unregistration
-- Ping/pong for connection health
+Execute control operations via `lib.ExecuteShellCommand()`:
 
-**middleware.go:**
+- `docker.go`: Container start/stop/restart/pause/unpause
+- `vm.go`: VM start/stop/restart/pause/resume/hibernate
+- `array.go`: Array start/stop, parity check
+- `notification.go`: Notification create/archive/delete
+- `userscripts.go`: User script execution
 
-- CORS middleware for API access
-- Logging middleware for request/response
-- Recovery middleware for panic handling
-
-#### 5. Controllers (`daemon/services/controllers/`)
-
-Execute control operations:
-
-- `docker.go`: Start, stop, restart, pause, unpause containers
-- `vm.go`: Start, stop, restart, pause, resume, hibernate VMs
-- `array.go`: Start/stop array, parity check operations
-- `notification.go`: Create, archive, delete notifications
-- `userscripts.go`: Execute user scripts
-
-#### 6. Library Utilities (`daemon/lib/`)
+#### 7. Library Utilities (`daemon/lib/`)
 
 - `shell.go`: Execute shell commands with error handling
 - `parser.go`: Parse Unraid-specific file formats (.ini files)
-- `utils.go`: Common utility functions
-- `validation.go`: Input validation for API requests (CWE-22 path traversal protection)
-- `dmidecode.go`: DMI/SMBIOS data parsing for hardware info
-- `ethtool.go`: Network interface tool parsing
+- `validation.go`: Input validation (CWE-22 path traversal protection)
+- `dmidecode.go`, `ethtool.go`: Hardware info parsing
 
-#### 7. Orchestrator (`daemon/services/orchestrator.go`)
+#### 8. Orchestrator (`daemon/services/orchestrator.go`)
 
 Coordinates the entire application lifecycle:
 
@@ -222,49 +256,26 @@ The agent reads from Unraid-specific locations (see `daemon/constants/const.go`)
 
 Base URL: `http://localhost:8043/api/v1`
 
-### Monitoring Endpoints (GET)
+See `docs/api/API_REFERENCE.md` for complete endpoint documentation (46 endpoints).
 
-- `/health`, `/system`, `/array`, `/disks`, `/disks/{id}`
-- `/network`, `/shares`, `/ups`, `/gpu`
-- `/docker`, `/docker/{id}`, `/vm`, `/vm/{id}`
-- `/hardware/*`, `/registration`, `/logs`
-- `/notifications`, `/notifications/{id}`, `/unassigned`
-- `/zfs/pools`, `/zfs/datasets`, `/zfs/snapshots`, `/zfs/arc`
+**Key endpoint patterns:**
 
-### Control Endpoints (POST)
-
-- `/docker/{id}/{action}` - start, stop, restart, pause, unpause
-- `/vm/{id}/{action}` - start, stop, restart, pause, resume, hibernate, force-stop
-- `/array/{action}` - start, stop
-- `/array/parity-check/{action}` - start, stop, pause, resume
-- `/notifications` - create, archive, delete notifications
-- `/user-scripts/{name}/execute` - execute user scripts
-
-### Configuration Endpoints
-
-- GET: `/shares/{name}/config`, `/network/{interface}/config`, `/settings/{subsystem}`
-- POST: `/shares/{name}/config`, `/settings/system`
-
-### WebSocket
-
-- `/ws` - Real-time event streaming
+- `GET /system`, `/array`, `/disks`, `/docker`, `/vm`, etc. — monitoring data
+- `POST /docker/{id}/{action}`, `/vm/{id}/{action}` — control operations
+- `GET /ws` — WebSocket real-time events
+- `POST /mcp` — MCP JSON-RPC endpoint for AI agents
 
 ## Testing
 
-**Test Locations:**
+```bash
+make test           # Run all tests
+make test-coverage  # Generate coverage.html report
 
-- `daemon/dto/system_test.go` - DTO tests
-- `daemon/lib/shell_test.go`, `daemon/lib/validation_test.go` - Library tests
-- `daemon/services/api/handlers_test.go` - API handler tests
-- `daemon/services/collectors/config_security_test.go` - Config security tests
-- `daemon/services/controllers/notification_security_test.go` - Notification security tests
+# Run specific test
+go test -v ./daemon/services/api/handlers_test.go
+```
 
-**Test Conventions:**
-
-- Use table-driven tests where appropriate
-- Mock external dependencies (file system, command execution)
-- Test both success and error paths
-- Coverage target: Generate reports with `make test-coverage`
+Use **table-driven tests** with security cases (path traversal, command injection). Tests located alongside source (`*_test.go`).
 
 ## Logging
 
@@ -323,47 +334,86 @@ Common hardware variation areas:
 - `github.com/cskr/pubsub` - Event bus (PubSub pattern)
 - `github.com/gorilla/mux` - HTTP router
 - `github.com/gorilla/websocket` - WebSocket implementation
+- `github.com/moby/moby/client` - Docker Engine SDK (native API)
+- `github.com/digitalocean/go-libvirt` - Native libvirt bindings for VMs
+- `github.com/metoro-io/mcp-golang` - Model Context Protocol server
 - `gopkg.in/ini.v1` - INI file parsing
 - `gopkg.in/natefinch/lumberjack.v2` - Log rotation
-- `github.com/fsnotify/fsnotify` - File system notifications
 
 ## Common Patterns
 
+### Panic Recovery in Collectors
+
+**All collector loops MUST wrap work in defer/recover:**
+
+```go
+func (c *Collector) Start(ctx context.Context, interval time.Duration) {
+    // Run once immediately with recovery
+    func() {
+        defer func() {
+            if r := recover(); r != nil {
+                logger.Error("Collector PANIC on startup: %v", r)
+            }
+        }()
+        c.Collect()
+    }()
+
+    ticker := time.NewTicker(interval)
+    defer ticker.Stop()
+
+    for {
+        select {
+        case <-ctx.Done():
+            return
+        case <-ticker.C:
+            func() {
+                defer func() {
+                    if r := recover(); r != nil {
+                        logger.Error("Collector PANIC in loop: %v", r)
+                    }
+                }()
+                c.Collect()
+            }()
+        }
+    }
+}
+```
+
 ### Adding a New Collector
 
-1. Create collector in `daemon/services/collectors/`
+1. Create collector in `daemon/services/collectors/` following pattern above
 2. Define DTO in `daemon/dto/`
-3. Add event topic constant
-4. Implement `Start(ctx context.Context, interval time.Duration)` method
-5. Publish data: `ctx.Hub.Pub(data, "topic_name")`
-6. Add subscription in `api/server.go` `subscribeToEvents()`
-7. Add cache field and update logic
-8. Create REST endpoint handler
-9. Register collector in `orchestrator.go`
+3. Add subscription in `api/server.go` `subscribeToEvents()` — add topic to `Hub.Sub()` call and case in switch
+4. Add cache field in `Server` struct and handler in `handlers.go`
+5. Register in `orchestrator.go` — add to WaitGroup, create collector, launch goroutine
 
-### Adding a New REST Endpoint
+### Adding a REST Endpoint
 
-1. Define route in `api/server.go` `setupRoutes()`
-2. Create handler function in `api/handlers.go`
-3. Use `s.cacheMutex.RLock()` / `s.cacheMutex.RUnlock()` for cache access
-4. Return JSON: `respondWithJSON(w, http.StatusOK, data)`
-5. Handle errors: `respondWithError(w, http.StatusInternalServerError, message)`
+```go
+func (s *Server) handleNew(w http.ResponseWriter, _ *http.Request) {
+    s.cacheMutex.RLock()
+    data := s.newCache
+    s.cacheMutex.RUnlock()
+    respondJSON(w, http.StatusOK, data)
+}
+```
 
-### Adding a New Control Operation
+Register route in `server.go` `setupRoutes()`.
 
-1. Create controller function in `daemon/services/controllers/`
-2. Use `lib.ExecuteShellCommand()` for command execution
-3. Validate input with `lib.ValidateContainerName()` or similar
-4. Add endpoint handler in `api/handlers.go`
-5. Return appropriate HTTP status codes
+### Control Operations
+
+Use `lib.ExecuteShellCommand()` for all shell commands — never use `exec.Command` directly. Always validate input with `lib.ValidateContainerID()`, `lib.ValidateVMName()`, etc.
 
 ## Important Notes
 
-- **Never skip the initialization order** in orchestrator.go (API subscriptions before collectors)
-- **Always use mutex locks** when accessing API server cache
-- **Always validate user input** on control endpoints to prevent command injection and path traversal
-- **Test on actual Unraid** if possible, as local development differs from production
-- **Handle graceful shutdown** by respecting context cancellation in goroutines
-- **Panic recovery** is built into collectors and middleware, but avoid panics when possible
-- **Use Context7** Always use context7 when I need code generation, setup or configuration steps, or library/API documentation. This means you should automatically use the Context7 MCP tools to resolve library id and get library docs without me having to explicitly ask.
-- **Always use Sequential Thinking** internally reason step-by-step before answering, ensuring each solution is planned, validated, and logically sequenced, while keeping the reasoning hidden unless explicitly requested.
+- **Initialization order is critical** — API subscriptions must start before collectors in orchestrator.go
+- **Always use mutex locks** — RLock/RUnlock for cache reads, Lock/Unlock for writes
+- **Always validate user input** — use `lib.Validate*()` functions to prevent injection and path traversal
+- **Test on actual Unraid** — local development differs from production; use deployment scripts
+- **Context cancellation** — respect `ctx.Done()` in goroutines for graceful shutdown
+- **Keep CHANGELOG.md updated** — every change must be documented before release
+
+### Claude-Specific Instructions
+
+- **Use Context7** — automatically use Context7 MCP tools to get library documentation without explicit prompting
+- **Sequential Thinking** — reason step-by-step internally before answering, keeping reasoning hidden unless requested

@@ -14,7 +14,7 @@ Fixed 5 CodeQL-identified path traversal vulnerabilities in the Unraid Managemen
 
 ## Affected Files and Lines
 
-### Before Fix:
+### Before Fix
 
 1. **daemon/services/controllers/notification.go:43**
    - Function: `CreateNotification()` - Line 43 (WriteFile)
@@ -35,18 +35,21 @@ Fixed 5 CodeQL-identified path traversal vulnerabilities in the Unraid Managemen
 Without validation, attackers could:
 
 1. **Read arbitrary files:**
+
    ```
    GET /api/v1/notifications/../../../etc/passwd.notify
    GET /api/v1/shares/../../etc/shadow/config
    ```
 
 2. **Write to arbitrary locations:**
+
    ```
    POST /api/v1/shares/../../../tmp/malicious/config
    DELETE /api/v1/notifications/../../../important/file.notify
    ```
 
 3. **Escape directory restrictions:**
+
    ```
    /api/v1/shares/..%2F..%2F..%2Fetc%2Fpasswd
    ```
@@ -60,6 +63,7 @@ Without validation, attackers could:
 **Added:** `validateNotificationID()` function
 
 **Validation Checks:**
+
 - ✅ Rejects empty IDs
 - ✅ Blocks parent directory references (`..`)
 - ✅ Blocks absolute paths (`/`, `\`)
@@ -68,11 +72,13 @@ Without validation, attackers could:
 - ✅ Verifies resolved path stays within notifications directory
 
 **Protected Functions:**
+
 - `ArchiveNotification(id string)` - Line 55
 - `UnarchiveNotification(id string)` - Line 85
 - `DeleteNotification(id string, isArchived bool)` - Line 109
 
 **Example Validation:**
+
 ```go
 func validateNotificationID(id string) error {
     if id == "" {
@@ -103,6 +109,7 @@ func validateNotificationID(id string) error {
 **Added:** `validateShareName()` function
 
 **Validation Checks:**
+
 - ✅ Rejects empty names
 - ✅ Enforces max length (255 characters)
 - ✅ Blocks parent directory references (`..`)
@@ -111,10 +118,12 @@ func validateNotificationID(id string) error {
 - ✅ Verifies resolved path stays within shares directory
 
 **Protected Functions:**
+
 - `GetShareConfig(shareName string)` - Line 26
 - `UpdateShareConfig(config *dto.ShareConfig)` - Line 379
 
 **Example Validation:**
+
 ```go
 func validateShareName(name string) error {
     if name == "" {
@@ -186,11 +195,13 @@ go test -v ./daemon/services/collectors/ -run Security
 ## Impact
 
 **Before Fix:**
+
 - Attackers could read arbitrary files (e.g., `/etc/passwd`, `/etc/shadow`)
 - Attackers could write to arbitrary locations
 - Attackers could delete critical system files
 
 **After Fix:**
+
 - All user-controlled paths are validated before use
 - Path traversal attempts are rejected with clear error messages
 - Paths are confined to their intended directories
@@ -210,7 +221,6 @@ go test -v ./daemon/services/collectors/ -run Security
 
 ## References
 
-- **CWE-22:** https://cwe.mitre.org/data/definitions/22.html
-- **OWASP Path Traversal:** https://owasp.org/www-community/attacks/Path_Traversal
-- **GitHub Security Scanning:** https://github.com/ruaan-deysel/unraid-management-agent/security/code-scanning
-
+- **CWE-22:** <https://cwe.mitre.org/data/definitions/22.html>
+- **OWASP Path Traversal:** <https://owasp.org/www-community/attacks/Path_Traversal>
+- **GitHub Security Scanning:** <https://github.com/ruaan-deysel/unraid-management-agent/security/code-scanning>

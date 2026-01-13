@@ -83,6 +83,7 @@ type WSEvent struct {
 ### Complex Types
 
 #### Array Types
+
 - **Disk List**: `[]dto.DiskInfo`
 - **Container List**: `[]dto.ContainerInfo`
 - **VM List**: `[]dto.VMInfo`
@@ -91,6 +92,7 @@ type WSEvent struct {
 - **Share List**: `[]dto.ShareInfo`
 
 #### Object Types
+
 - **System Info**: `dto.SystemInfo`
 - **Array Status**: `dto.ArrayStatus`
 - **UPS Status**: `dto.UPSStatus`
@@ -357,12 +359,14 @@ def identify_event_type(data):
 ### Enum Values
 
 #### Array State
+
 - `STARTED` - Array is running
 - `STOPPED` - Array is stopped
 - `STARTING` - Array is starting
 - `STOPPING` - Array is stopping
 
 #### Parity Check Status
+
 - `idle` - No check running
 - `running` - Check in progress
 - `paused` - Check paused
@@ -370,17 +374,20 @@ def identify_event_type(data):
 - `error` - Check failed
 
 #### Disk Status
+
 - `DISK_OK` - Disk healthy
 - `DISK_DSBL` - Disk disabled
 - `DISK_NP` - Disk not present
 - `DISK_INVALID` - Disk invalid
 
 #### SMART Status
+
 - `PASSED` - SMART passed
 - `FAILED` - SMART failed
 - `UNKNOWN` - Status unknown
 
 #### Container State
+
 - `running` - Container running
 - `paused` - Container paused
 - `stopped` - Container stopped
@@ -389,6 +396,7 @@ def identify_event_type(data):
 - `restarting` - Container restarting
 
 #### VM State
+
 - `running` - VM running
 - `paused` - VM paused
 - `shut off` - VM stopped
@@ -396,12 +404,14 @@ def identify_event_type(data):
 - `pmsuspended` - VM suspended
 
 #### UPS Status
+
 - `ONLINE` - On line power
 - `ONBATT` - On battery
 - `LOWBATT` - Low battery
 - `REPLACEBATT` - Replace battery
 
 #### Network State
+
 - `up` - Interface up
 - `down` - Interface down
 
@@ -622,11 +632,13 @@ def parse_event(raw_event: dict) -> Optional[WSEvent]:
 ### 1. Assuming Type Field Exists
 
 ❌ **Wrong**:
+
 ```python
 event_type = data['type']  # This field doesn't exist!
 ```
 
 ✅ **Correct**:
+
 ```python
 event_type = identify_event_type(data['data'])
 ```
@@ -634,11 +646,13 @@ event_type = identify_event_type(data['data'])
 ### 2. Not Checking Array vs Object
 
 ❌ **Wrong**:
+
 ```python
 hostname = data['data']['hostname']  # Fails if data is array!
 ```
 
 ✅ **Correct**:
+
 ```python
 if isinstance(data['data'], dict):
     hostname = data['data'].get('hostname')
@@ -649,6 +663,7 @@ elif isinstance(data['data'], list) and data['data']:
 ### 3. Ignoring Nullable Fields
 
 ❌ **Wrong**:
+
 ```python
 temp = data['cpu_temp_celsius']  # May be null!
 if temp > 50:
@@ -656,6 +671,7 @@ if temp > 50:
 ```
 
 ✅ **Correct**:
+
 ```python
 temp = data.get('cpu_temp_celsius')
 if temp is not None and temp > 50:
@@ -665,12 +681,14 @@ if temp is not None and temp > 50:
 ### 4. Not Validating Enums
 
 ❌ **Wrong**:
+
 ```python
 if state == 'RUNNING':  # Wrong case!
     process()
 ```
 
 ✅ **Correct**:
+
 ```python
 VALID_STATES = ['STARTED', 'STOPPED', 'STARTING', 'STOPPING']
 if state in VALID_STATES:
@@ -680,6 +698,7 @@ if state in VALID_STATES:
 ### 5. Hardcoding Event Frequencies
 
 ❌ **Wrong**:
+
 ```python
 # Assuming events arrive exactly every 5 seconds
 time.sleep(5)
@@ -687,6 +706,7 @@ expect_event()
 ```
 
 ✅ **Correct**:
+
 ```python
 # Events may arrive slightly off schedule
 # Use event-driven processing, not timing assumptions
@@ -701,9 +721,11 @@ async for event in websocket:
 ### Current Version: 1.1.0
 
 **Breaking Changes from 1.0.0**:
+
 - None (fully backward compatible)
 
 **New Fields in 1.1.0**:
+
 - `motherboard_temp_celsius` in SystemInfo
 - `fans[]` array in SystemInfo
 - Additional disk metrics (power_on_hours, power_cycle_count, etc.)
@@ -711,6 +733,7 @@ async for event in websocket:
 ### Forward Compatibility
 
 Clients should be designed to handle:
+
 1. **New Fields**: Ignore unknown fields gracefully
 2. **New Event Types**: Handle unknown events without crashing
 3. **Field Type Changes**: Validate types before using
@@ -719,6 +742,7 @@ Clients should be designed to handle:
 ### Backward Compatibility
 
 The server maintains backward compatibility by:
+
 1. Never removing required fields
 2. Adding new fields as optional
 3. Maintaining existing field types
@@ -823,4 +847,3 @@ Complete reference implementations are available in:
 
 **Version**: 1.1.0
 **Last Updated**: 2025-10-02
-

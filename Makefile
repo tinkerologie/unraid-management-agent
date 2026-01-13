@@ -5,7 +5,7 @@ PLUGIN_DIR := meta/plugin
 DATE := $(shell date '+%Y.%m.%d')
 HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo "dev")
 
-.PHONY: all local release package clean test test-coverage deps swagger
+.PHONY: all local release package clean test test-coverage deps swagger pre-commit-install pre-commit-run lint security-check
 
 all: test local
 
@@ -64,3 +64,51 @@ install: local
 deploy: package
 	@echo "Deploying to Unraid..."
 	./meta/scripts/deploy
+# Pre-commit hooks
+pre-commit-install:
+	@echo "Installing pre-commit hooks..."
+	@if command -v pre-commit >/dev/null 2>&1; then \
+		pre-commit install; \
+		pre-commit install --hook-type commit-msg; \
+		echo "✓ Pre-commit hooks installed successfully"; \
+	else \
+		echo "❌ pre-commit not found. Install with: pip install pre-commit"; \
+		exit 1; \
+	fi
+
+pre-commit-run:
+	@echo "Running pre-commit checks on all files..."
+	@if command -v pre-commit >/dev/null 2>&1; then \
+		pre-commit run --all-files; \
+	else \
+		echo "❌ pre-commit not found. Install with: pip install pre-commit"; \
+		exit 1; \
+	fi
+
+# Linting
+lint:
+	@echo "Running golangci-lint..."
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint run --config .golangci.yml --max-issues-per-linter 0 --max-same-issues 0 ./...; \
+	else \
+		echo "❌ golangci-lint not found. Install from: https://golangci-lint.run/usage/install/"; \
+		exit 1; \
+	fi
+
+# Security checks
+security-check:
+	@echo "Running security checks..."
+	@echo "→ Running gosec..."
+	@if command -v gosec >/dev/null 2>&1; then \
+		gosec -fmt=text -exclude-dir=vendor -exclude-dir=tests -severity=medium -confidence=medium ./...; \
+	else \
+		echo "⚠️  gosec not found. Install with: go install github.com/securego/gosec/v2/cmd/gosec@latest"; \
+	fi
+	@echo "→ Running govulncheck..."
+	@if command -v govulncheck >/dev/null 2>&1; then \
+		govulncheck ./...; \
+	else \
+		echo "⚠️  govulncheck not found. Install with: go install golang.org/x/vuln/cmd/govulncheck@latest"; \
+	fi
+	@echo "→ Running go mod verify..."
+	@go mod verify

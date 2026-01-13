@@ -1,0 +1,214 @@
+---
+# Pre-commit hooks configuration
+# See https://pre-commit.com for more information
+# Install: pip install pre-commit
+# Setup: pre-commit install
+# Run manually: pre-commit run --all-files
+
+default_language_version:
+  python: python3
+
+repos:
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '^(.*\.md|.*\.txt)$'
+      - id: end-of-file-fixer
+        exclude: '^(.*\.txt)$'
+      - id: check-yaml
+        args: ["--unsafe"] # Allow custom YAML tags
+      - id: check-json
+      - id: check-toml
+      - id: check-added-large-files
+        args: ["--maxkb=1000"]
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+      - id: detect-private-key
+      # Disabled: File permission issues are tracked in git index
+      # These would need `git add --chmod=-x` to fix properly
+      # - id: check-executables-have-shebangs
+      # - id: check-shebang-scripts-are-executable
+
+  # Go formatting - gofmt
+  - repo: https://github.com/dnephin/pre-commit-golang
+    rev: v0.5.1
+    hooks:
+      - id: go-fmt
+        name: Go Format (gofmt)
+        description: Run gofmt to format Go code
+        args: ["-s", "-w"]
+        files: '\.go$'
+        exclude: "^vendor/"
+
+      - id: go-imports
+        name: Go Imports (goimports)
+        description: Run goimports to organize imports
+        files: '\.go$'
+        exclude: "^vendor/"
+
+      - id: go-vet
+        name: Go Vet
+        description: Run go vet for static analysis
+        files: '\.go$'
+        exclude: "^(vendor/|tests/)"
+
+  # Local Go build hook for better control
+  - repo: local
+    hooks:
+      - id: go-build
+        name: Go Build
+        description: Verify code compiles
+        entry: bash -c 'go build -o /dev/null .'
+        language: system
+        pass_filenames: false
+        files: '\.go$'
+
+  # Go mod tidy
+  - repo: https://github.com/dnephin/pre-commit-golang
+    rev: v0.5.1
+    hooks:
+      - id: go-mod-tidy
+        name: Go Mod Tidy
+        description: Ensure go.mod and go.sum are up to date
+
+  # Go unit tests - Skip in pre-commit, run in CI
+  # Some tests require Unraid-specific system paths
+  # - repo: https://github.com/dnephin/pre-commit-golang
+  #   rev: v0.5.1
+  #   hooks:
+  #     - id: go-unit-tests
+  #       name: Go Unit Tests
+  #       description: Run all Go unit tests
+  #       files: '\.go$'
+  #       exclude: '^vendor/'
+  #       args: ['-race', '-timeout=60s']
+
+  # golangci-lint - comprehensive linting with zero tolerance
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v1.62.2
+    hooks:
+      - id: golangci-lint
+        name: golangci-lint (Zero Tolerance)
+        description: Run golangci-lint with strict configuration
+        entry: golangci-lint run
+        types: [go]
+        language: golang
+        pass_filenames: false
+        args:
+          - --timeout=5m
+          - --config=.golangci.yml
+          - --max-issues-per-linter=0
+          - --max-same-issues=0
+          - --issues-exit-code=1
+          - ./...
+
+  # gosec - Security scanning with zero tolerance (local hook)
+  - repo: local
+    hooks:
+      - id: gosec
+        name: GoSec Security Scanner
+        description: Security scanner for Go code
+        entry: bash -c 'if command -v gosec >/dev/null 2>&1; then gosec -fmt=text -exclude-dir=vendor -exclude-dir=tests -exclude=G115,G304,G301,G306 -severity=medium -confidence=medium ./...; else echo "gosec not installed. Run go install github.com/securego/gosec/v2/cmd/gosec@latest"; exit 0; fi'
+        language: system
+        pass_filenames: false
+        files: '\.go$'
+
+  # Markdown linting
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.43.0
+    hooks:
+      - id: markdownlint
+        name: Markdown Lint
+        args: ["--fix", "--disable", "MD013", "MD025", "MD003", "--"]
+        files: '\.md$'
+        exclude: '^(\.specify/|\.claude/|\.github/agents/|CODE_OF_CONDUCT\.md)'
+
+  # Shell script linting
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
+    hooks:
+      - id: shellcheck
+        name: ShellCheck
+        description: Shell script analysis tool
+        args: ["--severity=error"]
+        exclude: '^(\.specify/|scripts/config\.sh\.example|scripts/validate-live\.sh\.example)'
+
+  # Detect secrets and credentials
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        name: Detect Secrets
+        args: ["--baseline", ".secrets.baseline"]
+        exclude: '^(go\.sum|.*\.lock)$'
+
+  # Spell checking
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.3.0
+    hooks:
+      - id: codespell
+        name: Code Spell Checker
+        args:
+          - --ignore-words-list=crate,nd,sav,fo,ue,numer,unexpect,aNULL,socio,socio-economic
+          - --skip="*.sum,*.lock,*.json,*.mod,coverage.html,CODE_OF_CONDUCT.md"
+          - --quiet-level=2
+
+  # Go vulnerability check
+  - repo: local
+    hooks:
+      - id: govulncheck
+        name: Go Vulnerability Check
+        description: Check for known vulnerabilities in Go dependencies
+        entry: bash -c 'if command -v govulncheck >/dev/null 2>&1; then govulncheck ./...; else echo "govulncheck not installed. Run go install golang.org/x/vuln/cmd/govulncheck@latest"; exit 0; fi'
+        language: system
+        pass_filenames: false
+        files: '(\.go$|go\.mod$)'
+
+  # Go mod verify
+  - repo: local
+    hooks:
+      - id: go-mod-verify
+        name: Go Mod Verify
+        description: Verify dependencies have expected content
+        entry: go mod verify
+        language: system
+        pass_filenames: false
+        files: '^go\.(mod|sum)$'
+
+  # Custom: Check VERSION file format
+  - repo: local
+    hooks:
+      - id: check-version-format
+        name: Check VERSION Format
+        description: Ensure VERSION file follows YYYY.MM.DD format
+        entry: bash -c 'if [[ -f VERSION ]]; then version=$(cat VERSION); if ! [[ $version =~ ^[0-9]{4}\.[0-9]{2}\.[0-9]{2}$ ]]; then echo "VERSION file must follow YYYY.MM.DD format (found $version)"; exit 1; fi; fi'
+        language: system
+        pass_filenames: false
+        files: "^VERSION$"
+
+  # Custom: Ensure CHANGELOG is updated
+  - repo: local
+    hooks:
+      - id: check-changelog-updated
+        name: Check CHANGELOG Updated
+        description: Warn if CHANGELOG.md hasn't been updated
+        entry: bash -c 'if git diff --cached --name-only | grep -qE "\.go$|\.yml$|\.yaml$|Makefile|go\.mod"; then if ! git diff --cached --name-only | grep -q "CHANGELOG.md"; then echo "Warning - You may need to update CHANGELOG.md"; fi; fi'
+        language: system
+        pass_filenames: false
+        verbose: true
+        stages: [pre-commit]
+
+  # Custom: No debug prints
+  - repo: local
+    hooks:
+      - id: no-debug-prints
+        name: No Debug Print Statements
+        description: Prevent committing debug print statements
+        entry: bash -c 'if git diff --cached --name-only | grep -qE "\.go$"; then if git diff --cached | grep -E "^\+.*(fmt\.Print(ln|f)|log\.Print(ln|f))\("; then echo "Debug print statements found. Use logger package instead."; exit 1; fi; fi'
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
