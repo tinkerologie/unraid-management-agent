@@ -10,6 +10,10 @@
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+coverage.html
+*.prof
+*.cpu
+*.mem
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
@@ -73,3 +77,11 @@ PHASE_1_COMPLETION_SUMMARY.md
 PHASE_2_COMPLETION_SUMMARY.md
 # Pre-commit
 .pre-commit-cache/
+
+# Claude/AI Assistant local settings
+.claude/settings.local.json
+.claude/*.local.json
+
+# Specify tool cache/memory (if it generates local state)
+.specify/memory/
+.specify/.cache/
