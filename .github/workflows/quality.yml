@@ -1,0 +1,159 @@
+name: Code Quality & Security
+
+# This workflow provides a CI safety net for pre-commit hooks.
+# Since pre-commit runs locally before every commit, this mainly catches:
+# 1. Contributors who skip pre-commit installation
+# 2. Direct pushes via GitHub web interface
+# 3. Force pushes that bypass hooks
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  security-events: write
+
+jobs:
+  # Run the same pre-commit checks that run locally
+  # This is the primary quality gate - all other jobs depend on this
+  pre-commit:
+    name: Pre-commit Checks (All Quality Gates)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: true
+
+      - name: Install Go tools (required by pre-commit hooks)
+        run: |
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Install pre-commit
+        run: |
+          pip install pre-commit
+          pre-commit install-hooks
+
+      - name: Run pre-commit (includes lint, security, tests, formatting)
+        run: pre-commit run --all-files --show-diff-on-failure
+
+  # Additional validation: Run tests with coverage reporting
+  test-coverage:
+    name: Test Coverage Report
+    runs-on: ubuntu-latest
+    needs: pre-commit
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: true
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Run tests with coverage
+        run: |
+          go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+          go tool cover -func=coverage.out
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: ./coverage.out
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      - name: Generate coverage report
+        if: always()
+        run: |
+          go tool cover -html=coverage.out -o coverage.html
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage.html
+          retention-days: 30
+
+  # Verify build succeeds for target architecture
+  build:
+    name: Build Verification
+    runs-on: ubuntu-latest
+    needs: pre-commit
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: true
+
+      - name: Install dependencies
+        run: make deps
+
+      - name: Build for Linux/amd64 (Unraid target)
+        run: make release
+
+      - name: Verify build artifacts
+        run: |
+          ls -lh build/
+          file build/unraid-management-agent
+
+  # Summary of all checks
+  summary:
+    name: Quality Summary
+    runs-on: ubuntu-latest
+    needs: [pre-commit, test-coverage, build]
+    if: always()
+    steps:
+      - name: Check job results
+        run: |
+          echo "## Code Quality & Security Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "ℹ️ **Pre-commit hooks run all quality checks locally before commit.**" >> $GITHUB_STEP_SUMMARY
+          echo "This CI workflow provides a safety net for contributors." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Pre-commit (Lint, Security, Format) | ${{ needs.pre-commit.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Coverage | ${{ needs.test-coverage.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ${{ needs.build.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "${{ needs.pre-commit.result }}" != "success" ]] || \
+             [[ "${{ needs.test-coverage.result }}" != "success" ]] || \
+             [[ "${{ needs.build.result }}" != "success" ]]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ **One or more checks failed. Please review the logs above.**" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **All quality checks passed!**" >> $GITHUB_STEP_SUMMARY
