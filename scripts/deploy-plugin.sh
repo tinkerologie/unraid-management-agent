@@ -205,29 +205,80 @@ echo "----------------------------------------"
 # Wait a moment for API to be ready
 sleep 2
 
-# Test health endpoint
-echo -n "Testing /api/v1/health... "
-if run_ssh "curl -s http://localhost:8043/api/v1/health" | grep -q "ok"; then
-    echo "✅"
-else
-    echo "❌"
-fi
+# Helper function to test endpoint
+test_endpoint() {
+    local endpoint="$1"
+    local description="$2"
+    local search_term="${3:-}"
 
-# Test system endpoint
-echo -n "Testing /api/v1/system... "
-if run_ssh "curl -s http://localhost:8043/api/v1/system" | grep -q "hostname"; then
-    echo "✅"
-else
-    echo "❌"
-fi
+    echo -n "Testing $endpoint... "
+    response=$(run_ssh "curl -s http://localhost:8043/api/v1${endpoint}")
 
-# Test array endpoint
-echo -n "Testing /api/v1/array... "
-if run_ssh "curl -s http://localhost:8043/api/v1/array" | grep -q "state"; then
-    echo "✅"
-else
-    echo "❌"
-fi
+    if echo "$response" | grep -q "error\|failed\|Error\|Failed"; then
+        echo "❌ (error response)"
+        return 1
+    elif [ -n "$search_term" ] && ! echo "$response" | grep -q "$search_term"; then
+        echo "⚠️  (response doesn't contain '$search_term')"
+        return 0
+    else
+        echo "✅"
+        return 0
+    fi
+}
+
+# Core System Endpoints
+echo "Core System Endpoints:"
+test_endpoint "/health" "Health check" "ok"
+test_endpoint "/system" "System info" "hostname"
+test_endpoint "/logs" "Logs"
+test_endpoint "/notifications" "Notifications"
+test_endpoint "/notifications/overview" "Notifications overview"
+test_endpoint "/registration" "Registration"
+
+echo ""
+echo "Array & Storage Endpoints:"
+test_endpoint "/array" "Array status" "state"
+test_endpoint "/disks" "Disks list"
+test_endpoint "/shares" "Shares list"
+test_endpoint "/unassigned" "Unassigned devices"
+test_endpoint "/unassigned/devices" "Unassigned devices detail"
+
+echo ""
+echo "Containers & VMs Endpoints:"
+test_endpoint "/docker" "Docker containers"
+test_endpoint "/vm" "Virtual machines"
+
+echo ""
+echo "Network & Hardware Endpoints:"
+test_endpoint "/network" "Network interfaces"
+test_endpoint "/network/access-urls" "Network access URLs"
+test_endpoint "/hardware/full" "Full hardware info"
+test_endpoint "/hardware/cpu" "CPU info"
+test_endpoint "/hardware/memory-devices" "Memory devices"
+
+echo ""
+echo "Monitoring Endpoints:"
+test_endpoint "/gpu" "GPU metrics"
+test_endpoint "/ups" "UPS status"
+test_endpoint "/nut" "NUT status"
+test_endpoint "/user-scripts" "User scripts"
+
+echo ""
+echo "ZFS Endpoints:"
+test_endpoint "/zfs/pools" "ZFS pools"
+test_endpoint "/zfs/datasets" "ZFS datasets"
+test_endpoint "/zfs/arc" "ZFS ARC"
+
+echo ""
+echo "Collector Status:"
+test_endpoint "/collectors/status" "Collectors status"
+
+echo ""
+echo "Settings Endpoints:"
+test_endpoint "/settings/system" "System settings"
+test_endpoint "/settings/disks" "Disks settings"
+test_endpoint "/settings/docker" "Docker settings"
+test_endpoint "/settings/vm" "VM settings"
 
 echo ""
 
@@ -265,9 +316,18 @@ echo ""
 echo "Restart service:"
 echo "  ssh root@$UNRAID_IP 'killall ${PLUGIN_NAME} && nohup /usr/local/emhttp/plugins/${PLUGIN_NAME}/${PLUGIN_NAME} --port 8043 boot > /dev/null 2>&1 &'"
 echo ""
-echo "Test API:"
+echo "Test specific API endpoints:"
 echo "  curl -s http://$UNRAID_IP:8043/api/v1/health | jq"
 echo "  curl -s http://$UNRAID_IP:8043/api/v1/system | jq"
+echo "  curl -s http://$UNRAID_IP:8043/api/v1/array | jq"
+echo "  curl -s http://$UNRAID_IP:8043/api/v1/docker | jq"
+echo "  curl -s http://$UNRAID_IP:8043/api/v1/vm | jq"
+echo ""
+echo "Test WebSocket connection:"
+echo "  wscat -c ws://$UNRAID_IP:8043/api/v1/ws"
+echo ""
+echo "List all available endpoints:"
+echo "  curl -s http://$UNRAID_IP:8043/swagger/doc.json | jq '.paths | keys[]'"
 echo ""
 echo "🎯 Icon Fix Verification:"
 echo "----------------------------------------"
