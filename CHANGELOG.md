@@ -9,7 +9,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Log File Accumulation** - Fixed issue where log files were accumulating and consuming excessive disk space (80MB+):
+
+  - Changed lumberjack `MaxBackups` from 0 to 1 (0 means "keep all", not "keep none")
+  - Changed lumberjack `MaxAge` from 0 to 1 day
+  - Added `cleanupOldLogs()` function that runs on startup to remove old `.gz` backup files
+  - Log rotation now properly limits to 1 backup file maximum
+
+- **Dark Theme Support** - Fixed plugin UI not respecting Unraid's dark theme:
+  - Replaced hardcoded CSS colors with Unraid CSS variables (`var(--line-color)`, `var(--text-secondary)`, `var(--input-background)`, etc.)
+  - Status badges, tables, and form elements now properly adapt to light/dark themes
+  - Uses `color: inherit` for text to match theme colors
+
+- **Parity Check Status Detection (Issue #41)**:
+  - Fixed parity check status not detecting "paused" state - now correctly parses `mdResyncDt` field (0 = paused, >0 = running)
+  - Fixed parity check progress percentage showing 0 - now calculates from `mdResyncPos / mdResyncSize * 100`
+  - Added support for detecting clearing and reconstructing operations via `sbSyncAction` field
+  - Added debug logging for parity check operations to aid troubleshooting
+  - Status values: `""` (idle), `"paused"`, `"running"`, `"clearing"`, `"reconstructing"`
+
+- **Disk Temperature Reporting**:
+  - Improved handling of temperature value `"*"` which indicates spun-down disk
+  - Temperature 0 is now documented expected behavior for standby disks (to avoid spinning up disks for temperature checks)
+  - Enhanced debug logging for temperature parsing
+
+- **Power Consumption Optimization** (Issue #8):
+  - Increased default collection intervals to reduce CPU wakeups
+  - System: 5s → 15s, Array: 10s → 30s, Docker: 10s → 30s
+  - VM: 10s → 30s, UPS: 10s → 60s, GPU: 10s → 60s
+  - Optimized Docker stats to batch all containers in single command
+  - Reduced intel_gpu_top timeout (5s → 2s) and samples (2 → 1)
+  - Expected power savings: 15-20W on affected systems
+
+### Changed
+
+- **Default Log Level** - Changed default log level from "warning" to "info" for better visibility
+- **Removed Log Level UI Option** - Log level is now set via CLI only (`--log-level` flag), removed from plugin settings page
+- **Industry-Standard Default Intervals**:
+  - Updated defaults to follow industry monitoring standards (Zabbix, Prometheus, Datadog)
+  - Disk Health: 30s → 300s (5 min) - SMART data rarely changes
+  - ZFS Pools: 30s → 300s (5 min) - pool health rarely changes
+  - Array Status: 30s → 60s - array state changes infrequently
+  - Hardware Info: 300s → 600s (10 min) - static hardware info
+  - VM Monitoring: 30s → 60s - VMs typically have stable state
+  - Network: 30s → 60s - interface config rarely changes
+  - Registration: 300s → 600s (10 min) - license info is static
+- **Start Script**: Fixed environment variable passing to Go binary through sudo
+
 ### Added
+
+- **Pre-commit Hooks for Code Quality** (#XX):
+
+  - Comprehensive pre-commit configuration with zero tolerance for linting warnings and errors
+  - Automatic code formatting (gofmt, goimports)
+  - Static analysis (go vet, golangci-lint)
+  - Security scanning (gosec, govulncheck)
+  - Secret detection (detect-secrets)
+  - Unit test execution with race detection
+  - Custom checks: VERSION format validation, CHANGELOG reminder, debug print detection
+  - GitHub Actions workflow for CI enforcement
+  - Documentation in [docs/PRE_COMMIT_HOOKS.md](docs/PRE_COMMIT_HOOKS.md)
+  - Setup script: `scripts/setup-pre-commit.sh`
+  - Makefile targets: `pre-commit-install`, `pre-commit-run`, `lint`, `security-check`
 
 - **Model Context Protocol (MCP) Support** - AI Agent Integration:
 
@@ -191,45 +254,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - All 14 collection intervals now configurable via UI or config file
   - Environment variables properly passed to Go binary on service start
   - Config file persists settings across reboots at `/boot/config/plugins/unraid-management-agent/config.cfg`
-
-### Changed
-
-- **Industry-Standard Default Intervals**:
-
-  - Updated defaults to follow industry monitoring standards (Zabbix, Prometheus, Datadog)
-  - Disk Health: 30s → 300s (5 min) - SMART data rarely changes
-  - ZFS Pools: 30s → 300s (5 min) - pool health rarely changes
-  - Array Status: 30s → 60s - array state changes infrequently
-  - Hardware Info: 300s → 600s (10 min) - static hardware info
-  - VM Monitoring: 30s → 60s - VMs typically have stable state
-  - Network: 30s → 60s - interface config rarely changes
-  - Registration: 300s → 600s (10 min) - license info is static
-
-- **Start Script**: Fixed environment variable passing to Go binary through sudo
-
-### Fixed
-
-- **Parity Check Status Detection (Issue #41)**:
-
-  - Fixed parity check status not detecting "paused" state - now correctly parses `mdResyncDt` field (0 = paused, >0 = running)
-  - Fixed parity check progress percentage showing 0 - now calculates from `mdResyncPos / mdResyncSize * 100`
-  - Added support for detecting clearing and reconstructing operations via `sbSyncAction` field
-  - Added debug logging for parity check operations to aid troubleshooting
-  - Status values: `""` (idle), `"paused"`, `"running"`, `"clearing"`, `"reconstructing"`
-
-- **Disk Temperature Reporting**:
-
-  - Improved handling of temperature value `"*"` which indicates spun-down disk
-  - Temperature 0 is now documented expected behavior for standby disks (to avoid spinning up disks for temperature checks)
-  - Enhanced debug logging for temperature parsing
-
-- **Power Consumption Optimization** (Issue #8):
-  - Increased default collection intervals to reduce CPU wakeups
-  - System: 5s → 15s, Array: 10s → 30s, Docker: 10s → 30s
-  - VM: 10s → 30s, UPS: 10s → 60s, GPU: 10s → 60s
-  - Optimized Docker stats to batch all containers in single command
-  - Reduced intel_gpu_top timeout (5s → 2s) and samples (2 → 1)
-  - Expected power savings: 15-20W on affected systems
 
 ### Removed
 

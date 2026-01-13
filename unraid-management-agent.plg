@@ -3,7 +3,7 @@
 <!DOCTYPE PLUGIN [
     <!ENTITY name        "unraid-management-agent">
     <!ENTITY author      "ruaan-deysel">
-    <!ENTITY version     "2025.12.1">
+    <!ENTITY version     "2026.01.00">
     <!ENTITY gitURL      "https://github.com/&author;/&name;">
     <!ENTITY pluginURL   "&gitURL;/raw/main/&name;.plg">
     <!ENTITY supportURL  "https://forums.unraid.net/topic/178262-home-assistant-unraid-integration">
@@ -20,276 +20,17 @@ This Unraid plugin provides REST API and WebSocket interfaces for real-time syst
 </DESCRIPTION>
 
 <CHANGES>
-###2025.12.1 (2025-12-27)
-- Power Consumption Optimization (Issue #8)
-- New Web UI settings page for configurable collection intervals
-- Dropdown menus with predefined interval options (5 seconds to 30 minutes)
-- 14 configurable collection intervals via UI or config file
-- Industry-standard default intervals to reduce CPU wakeups and power consumption
-- Disk Health: 30s to 300s (5 min), ZFS Pools: 30s to 300s (5 min)
-- Hardware Info: 300s to 600s (10 min), Array Status: 30s to 60s
-- VM, Network, UPS, GPU intervals optimized for power savings
-- Optimized Docker stats to batch all containers in single command
-- Reduced intel_gpu_top timeout and samples for lower power usage
-- Expected power savings: 15-20W on affected systems
-- Automatic service restart when applying interval changes
-- Config persists at /boot/config/plugins/unraid-management-agent/config.cfg
-
-###2025.12.0 (2025-12-18)
-- Bug Fix (Issue #30)
-- Fixed array disk counts inverted: num_data_disks and num_parity_disks were swapped
-- Removed incorrect use of mdNumDisabled field for data disk count
-- Data disks now correctly calculated as total disks minus active parity count
-- Parity disk count now only includes active parity disks (excludes disabled/missing)
-- Affects Home Assistant integration and other API clients
-
-###2025.11.26 (2025-11-28)
-- Enhanced Log API (Issue #28)
-- Expanded log file coverage from 4 to 30+ common Unraid log paths
-- New log files: dmesg, messages, cron, debug, graphql-api.log, nginx logs, samba logs, and more
-- New REST endpoint: GET /api/v1/logs/{filename} for direct log file access by name
-- Added lines_returned field to log content response for pagination clarity
-- Includes proper path traversal protection (CWE-22) on new endpoint
-- Matches Unraid GraphQL API log coverage
-- System Reboot and Shutdown API (Issue #20)
-- New REST endpoint: POST /api/v1/system/reboot to initiate server reboot
-- New REST endpoint: POST /api/v1/system/shutdown to initiate server shutdown
-- Enables Home Assistant integration for server power management
-- Graceful shutdown/reboot using standard Linux shutdown command
-
-###2025.11.25 (2025-11-18)
-- CRITICAL SECURITY UPDATE - All users should upgrade immediately
-- Fixed 5 CWE-22 path traversal vulnerabilities (High Severity)
-- Added comprehensive input validation for file paths in notification controller and config collector
-- Implemented defense-in-depth validation strategy with multiple protection layers
-- Added 48 security test cases to prevent path traversal attacks
-- Blocks parent directory references (..), absolute paths, and path separators
-- Prevents attackers from reading or writing arbitrary files on the system
-- CWE-22: Improper Limitation of a Pathname to a Restricted Directory
-- See SECURITY_FIX_PATH_TRAVERSAL.md for detailed information
-
-###2025.11.24 (2025-11-18)
-- ZFS Storage Pool Support (Issue #9)
-- Complete ZFS integration for monitoring ZFS storage pools on Unraid
-- New REST API endpoints: /api/v1/zfs/pools, /api/v1/zfs/pools/{name}, /api/v1/zfs/datasets, /api/v1/zfs/snapshots, /api/v1/zfs/arc
-- ZFS collector with 30-second collection interval
-- Pool metrics: size, allocated space, free space, fragmentation, capacity, dedup ratio, compression ratio
-- Pool health: state, health status, read/write/checksum errors
-- VDEVs: virtual device information (mirrors, raidz, disks)
-- Datasets: filesystem and volume information with compression and quota details
-- Snapshots: point-in-time snapshots with creation time and space usage
-- ARC statistics: cache hit ratios, size metrics, L2ARC stats
-- Automatic detection of ZFS availability (gracefully handles systems without ZFS)
-- Full support for ZFS pool properties: autoexpand, autotrim, readonly, altroot
-- Scrub/resilver status tracking
-- Real-time WebSocket events for ZFS pool, dataset, snapshot, and ARC stats updates
-
-###2025.11.23 (2025-11-17)
-- Dependency Updates
-- Updated github.com/alecthomas/kong from v0.9.0 to v1.13.0
-- Updated golang.org/x/sys from v0.13.0 to v0.38.0
-- Upgraded Go language version from 1.23 to 1.24.0 (required by golang.org/x/sys v0.38.0)
-- Migrated from deprecated github.com/vaughan0/go-ini (last updated 2013) to gopkg.in/ini.v1 v1.67.0
-- Code Quality Improvements
-- Fixed all pre-existing linting issues (6 issues resolved)
-- Achieved zero-tolerance linting policy compliance (0 errors, 0 warnings)
-- Fixed 3 gocritic warnings (converted if-else chains to switch statements)
-- Fixed 2 gocyclo warnings (reduced cyclomatic complexity from 30+ to &lt;20)
-- Fixed 1 revive warning (renamed package from daemon/common to daemon/constants)
-- All tests pass successfully
-- Builds verified for local and release targets
-
-###2025.11.22 (2025-11-17)
-- New Feature (Issue #26)
-- Added agent_version field to /api/v1/system endpoint
-- Returns Management Agent plugin version (e.g., "2025.11.22")
-- Enables agent-specific compatibility checks and feature detection
-- Improves diagnostics with complete version information
-- Enhances Home Assistant integration and other API clients
-
-###2025.11.21 (2025-11-17)
-- Bug Fixes (Issues #24 and #25)
-- Fixed motherboard temperature API returning 0 instead of actual value (Issue #24)
-- Improved sensor parser to capture sensor labels from sensors -u output
-- Motherboard temperature now displays actual readings (e.g., 37°C)
-- Fixed system API returning empty string for version field (Issue #25)
-- Added getUnraidVersion() function to read Unraid OS version
-- Version field now correctly displays Unraid OS version (e.g., "7.2.0")
-- Affects Home Assistant integration and other API clients
-
-###2025.11.20 (2025-11-16)
-- Bug Fixes (Issues #21 and #22)
-- Fixed VM endpoint returning empty string for id field (Issue #22)
-- VM IDs now use stable UUIDs instead of runtime IDs
-- Fixed incorrect parity status reporting (Issue #21)
-- Array endpoint now correctly reports parity_valid and num_parity_disks
-- Improved parity validity logic to check timestamp-based sync status
-
-###2025.11.19 (2025-11-16)
-- Code Quality Improvements
-- Resolved all critical linting warnings across the entire codebase (93% reduction from 302 to 22 warnings)
-- Added comprehensive godoc comments to all exported types, functions, and methods
-- Fixed all gosec security warnings with proper justifications
-- Fixed revive, staticcheck, unconvert, and ineffassign warnings
-- Achieved zero tolerance policy compliance for all critical linting issues
-
-###2025.11.18 (2025-11-16)
-- Unassigned Devices Plugin Support (Issue #7)
-- Complete support for Unassigned Devices plugin integration
-- New /api/v1/unassigned endpoint to list all unassigned devices and remote shares
-- New /api/v1/unassigned/devices endpoint for unassigned devices only
-- New /api/v1/unassigned/remote-shares endpoint for remote shares only
-- Automatic detection of unassigned disk devices (USB drives, eSATA, internal disks not in array)
-- Support for remote SMB/NFS shares and ISO file mounts
-- Per-device information: serial number, model, partitions, mount status, spin state
-- Per-partition information: label, filesystem, mount point, size, usage, SMB/NFS share status
-- Automatic filtering of array disks, loop devices, md devices, and zram
-- Real-time monitoring with 30-second collection interval
-- WebSocket real-time updates when unassigned devices change
-
-###2025.11.17 (2025-11-16)
-- Unraid Notifications System (Issue #10)
-- Complete notification management system with real-time file monitoring
-- New /api/v1/notifications endpoint to list all notifications with overview counts
-- New /api/v1/notifications/unread endpoint for unread notifications only
-- New /api/v1/notifications/archive endpoint for archived notifications only
-- New /api/v1/notifications/overview endpoint for notification counts by importance
-- New /api/v1/notifications/{id} endpoint to get specific notification
-- Create custom notifications via POST /api/v1/notifications
-- Archive notifications via POST /api/v1/notifications/{id}/archive
-- Unarchive notifications via POST /api/v1/notifications/{id}/unarchive
-- Delete notifications via DELETE /api/v1/notifications/{id}
-- Archive all unread notifications via POST /api/v1/notifications/archive/all
-- Real-time file monitoring with fsnotify for instant notification updates
-- Support for all importance levels: alert, warning, info
-- Filter notifications by importance level via query parameter
-- WebSocket real-time updates when notifications change
-
-###2025.11.16 (2025-11-16)
-- System Log File Access API (Issue #15)
-- New /api/v1/logs endpoint to list all available log files
-- Log content retrieval with pagination support
-- Tail behavior: ?path=/var/log/syslog&amp;lines=100 returns last 100 lines
-- Range retrieval: ?path=/var/log/syslog&amp;start=500&amp;lines=100 returns lines 500-600
-- Automatic discovery of common Unraid logs (syslog, docker, libvirt, agent)
-- Plugin log file discovery from /boot/config/plugins/*/logs/*.log
-- Directory traversal protection for secure log file access
-
-###2025.11.15 (2025-11-16)
-- Registration/License Information API (Issue #18)
-- New /api/v1/registration endpoint for Unraid license information
-- Returns license type (trial, basic, plus, pro, lifetime), state, expiration, server name, GUID
-- Automatically determines license state based on expiration date and type
-- Real-time updates via WebSocket when registration information changes
-- Graceful handling of missing or invalid registration data
-
-###2025.11.14 (2025-11-16)
-- Enhanced GPU monitoring and multi-GPU support (Issue #8 - High Priority)
-- Added GPU identification fields: Index, PCIID, Vendor, UUID
-- Added fan speed monitoring for NVIDIA (%) and AMD (RPM)
-- Fixed AMD GPU detection: switched to radeontop for broader compatibility
-- Fixed multiple Intel GPU detection (removed break statement)
-- NVIDIA: Added UUID, PCI ID, fan speed monitoring
-- AMD: Support for consumer Radeon GPUs (RX series), fallback to rocm-smi
-- Intel: Detect all Intel GPUs (iGPU + Arc discrete)
-- Backward compatible with omitempty JSON tags
-
-###2025.11.13 (2025-11-16)
-- Enhanced share list API with configuration details (Issue #6)
-- Eliminated N+1 query problem - single API call provides complete share info
-- New share fields: comment, smb_export, nfs_export, storage, use_cache, security
-- Automatic SMB/NFS export detection based on config settings
-- Storage location determined from UseCache setting
-- Backward compatible with omitempty tags
-
-###2025.11.12 (2025-11-16)
-- Added comprehensive hardware information API (Issue #5)
-- New /api/v1/hardware/* endpoints (BIOS, motherboard, CPU, cache, memory)
-- Enhanced system information (HVM/IOMMU detection, OpenSSL/kernel versions)
-- Enhanced network information via ethtool (link modes, duplex, auto-negotiation)
-- Hardware collector runs every 5 minutes
-- All hardware data cached and broadcast via WebSocket
-
-###2025.11.11 (2025-11-08)
-- Fixed: VM CPU percentage tracking now returns real values instead of 0
-- Fixed: Guest CPU % calculated from virsh domstats CPU time deltas
-- Fixed: Host CPU % calculated from QEMU process CPU usage via /proc/[pid]/stat
-- Added: Historical CPU tracking with automatic cleanup when VMs are shut off
-- Changed: VM collector now tracks CPU usage over time for accurate percentage calculation
-
-###2025.11.10 (2025-11-08)
-- Added: Enhanced VM statistics - disk I/O (read/write bytes), network I/O (RX/TX bytes), memory display
-- Added: Enhanced Docker statistics - version, network mode, IP address, port mappings, volume mappings, restart policy, uptime
-- Added: Human-readable memory display for VMs and containers (e.g., "1.17 GB / 4.00 GB")
-- Added: Container uptime display in human-readable format (e.g., "2d 5h 30m")
-- Changed: VM collector now uses virsh domblkstat and domifstat for I/O metrics
-- Changed: Docker collector now uses docker inspect for comprehensive container metadata
-
-###2025.11.9 (2025-11-08)
-- Fixed: VM collector now correctly parses VM names containing spaces
-- Fixed: VM control API endpoints now work with VM names containing spaces
-- Changed: VM collector uses `virsh list --all --name` for robust name parsing
-- Changed: VM name validation now allows spaces in addition to alphanumeric, hyphens, underscores, and dots
-- Fixed: Route parameter mismatch in VM control endpoints (changed from {id} to {name})
-
-###2025.11.8 (2025-11-08)
-- Added: User Scripts API - REST endpoints for discovering and executing Unraid User Scripts
-- Added: GET /api/v1/user-scripts - List all available scripts with metadata
-- Added: POST /api/v1/user-scripts/{name}/execute - Execute scripts with background/wait options
-- Enables automation tools like Home Assistant to remotely execute Unraid maintenance scripts
-
-###2025.11.7 (2025-11-08)
-- Changed: Simplified README.md to essential information only (reduced file size)
-
-###2025.11.6 (2025-11-08)
-- Fixed: Plugin now displays as "Unraid Management Agent" in Plugin Manager (instead of "unraid-management-agent")
-- Added: README.md file following Unraid plugin naming conventions
-
-###2025.11.5 (2025-11-08)
-- Added: USB flash drive detection - skips SMART checks on USB devices (including boot drive)
-- Added: NVMe-specific SMART handling - optimized for NVMe drives (no standby check)
-- Changed: Enhanced device type detection with detailed debug logging
-- Aligned with ha-unraid best practices for disk spin-down compatibility
-
-###2025.11.4 (2025-11-08)
-- CRITICAL FIX: Disk spin-down compatibility - plugin now respects Unraid's disk spin-down settings
-- Changed: SMART data collection now uses `smartctl -n standby` flag
-- Fixed: Disks in standby mode are no longer woken up for SMART health checks
-
-###2025.11.3 (2025-11-07)
-- Fixed: Plugin icon now clickable in Unraid UI
-- Fixed: Settings page URL corrected
-
-###2025.11.2 (2025-11-06)
-- Fixed: All physical disks now report correct SMART health status (was showing "UNKNOWN")
-- Changed: Direct execution of smartctl command for reliable SMART data collection
-
-###2025.11.0 (2025-11-03)
-- Security: Fixed path injection vulnerabilities in share config endpoints (HIGH severity)
-- Added: Enhanced System Information Collector with CPU model, BIOS info, per-core CPU usage
-- Added: Detailed Disk Metrics with I/O statistics and spin state detection
-- Added: Input validation for share names, container IDs, VM names, and disk IDs
-- Changed: Implemented automatic log rotation (5 MB max file size)
-- Changed: Added configurable log levels (DEBUG, INFO, WARNING, ERROR)
-- Changed: Service now auto-starts when Unraid array starts
-- Fixed: Configuration synchronization issues
-- Fixed: LOG_LEVEL not being read from config file
-- Testing: All 66 tests passing (100% pass rate)
-
-###2025.10.03 (Initial Release)
-- Initial release with REST API and WebSocket support
-- 20+ REST API endpoints for system monitoring and control
-- WebSocket support for real-time events
-- Docker container control (start, stop, restart, pause, unpause)
-- Virtual machine control (start, stop, restart, pause, resume)
-- System monitoring (CPU, RAM, temperatures, fans)
-- Array status monitoring and control
-- Disk health and SMART data
-- UPS status monitoring (if available)
-- GPU metrics (if available)
-- Parity check control and history
-- Configuration endpoints (read-only and write)
-- Home Assistant integration ready
+###2026.01.00 (2026-01-12)
+- Fixed: Log file accumulation (MaxBackups=1, MaxAge=1 day, cleanupOldLogs to remove old .gz files)
+- Fixed: Dark theme support (UI now uses Unraid CSS variables and inherits colors)
+- Changed: Default log level set to "info"; log level now CLI-only (UI option removed)
+- Added: Model Context Protocol (MCP) support with 18 monitoring tools, 7 control tools, 5 resources, 3 prompts, new /mcp endpoint
+- Added: OpenAPI/Swagger docs with 76 endpoints and "Try it out" at /swagger
+- Added: Runtime collector management API (enable/disable/update interval, per-collector status, events)
+- Added: Network access URLs endpoint (LAN, mDNS, WireGuard, WAN, IPv6)
+- Performance: Docker SDK collector (~530x faster), VM libvirt collector (~100-200x faster), docker batching and skip stopped, UPS/NUT improvements, collectors status API, disable collectors feature, env/CLI flags to disable collectors, extended intervals up to 24h, web UI for intervals, configurable intervals persisted
+- Changed: Industry-standard default intervals; start script env passthrough fix
+- Fixed: Parity check status detection; disk temperature reporting; power consumption optimization (interval increases, docker batching, intel_gpu_top tuning)
 </CHANGES>
 
 <!--
@@ -371,22 +112,33 @@ exit 0
 # Unraid Management Agent Configuration
 # This file is automatically created if it doesn't exist
 
+# Service configuration
+SERVICE="enable"
+
 # API Server Configuration
-PORT=8043
-LOG_LEVEL=info
+PORT="8043"
+ENABLE_CORS="yes"
 
 # Feature Toggles
-ENABLE_UPS=yes
-ENABLE_GPU=yes
+ENABLE_UPS="yes"
+ENABLE_GPU="yes"
 
-# Collection Intervals (seconds)
-INTERVAL_SYSTEM=5
-INTERVAL_DISK=30
-INTERVAL_ARRAY=10
-INTERVAL_DOCKER=10
-INTERVAL_VM=10
-INTERVAL_UPS=10
-INTERVAL_SHARES=60
+# Collection intervals (seconds) - Power-optimized defaults
+# Higher intervals reduce CPU wakeups and power consumption
+INTERVAL_SYSTEM="15"
+INTERVAL_ARRAY="30"
+INTERVAL_DISK="30"
+INTERVAL_DOCKER="30"
+INTERVAL_VM="30"
+INTERVAL_UPS="60"
+INTERVAL_GPU="60"
+INTERVAL_SHARES="60"
+INTERVAL_NETWORK="30"
+INTERVAL_ZFS="30"
+INTERVAL_NOTIFICATION="30"
+INTERVAL_HARDWARE="300"
+INTERVAL_REGISTRATION="300"
+INTERVAL_UNASSIGNED="60"
 ]]>
 </INLINE>
 </FILE>
@@ -472,7 +224,7 @@ if [ $running -ge 1 ] || [ ! -f "${CONFIG_DIR}/.installed" ]; then
     echo "Starting service..."
     ${INSTALL_DIR}/scripts/start
     sleep 2
-    
+
     # Verify service started
     if pidof ${PLUGIN_NAME} > /dev/null; then
         echo "✓ Service started successfully"
@@ -602,4 +354,3 @@ echo ""
 </FILE>
 
 </PLUGIN>
-
