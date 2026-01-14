@@ -1,152 +1,68 @@
 # Copilot Instructions
 
-## Project Overview
+Go-based Unraid plugin exposing system monitoring/control via REST API, WebSockets, and MCP. **Language:** Go 1.24, **Target:** Linux/amd64 (Unraid OS).
 
-Go-based Unraid plugin exposing system monitoring/control via REST API and WebSockets. **Language:** Go 1.24, **Target:** Linux/amd64 (Unraid OS). This is a **third-party community plugin** providing REST/WebSocket interface as alternative to official Unraid GraphQL API.
+**Follow Go best practices**: idiomatic Go style, proper error handling with wrapped errors (`fmt.Errorf("context: %w", err)`), context propagation, and effective use of interfaces. Code must pass `golangci-lint` and `go vet`.
 
-## Important Notes
+**Run pre-commit before committing**: `make pre-commit-run` to verify linting, security checks, and formatting pass.
 
-- **Context7**: Always use Context7 MCP tools to resolve library IDs and get docs for code generation, setup, or API documentation—without explicit prompting.
-- **PubSub Library**: Uses `github.com/cskr/pubsub` v1.0.2 for event bus (see `daemon/domain/context.go`).
+**Keep Swagger docs updated**: Run `make swagger` after modifying API endpoints. Docs are in [daemon/docs/](daemon/docs/) and served at `/swagger/`.
 
 ## Architecture: Event-Driven PubSub
 
 ```
-Collectors (goroutines) → Event Bus (github.com/cskr/pubsub) → API Server Cache → REST/WebSocket
-                                      ↓
-                              WebSocket Hub → Connected Clients
+Collectors → Event Bus (github.com/cskr/pubsub) → API Server Cache → REST/WebSocket/MCP
+                                                        ↓
+                                                 WebSocket Hub → Clients
 ```
 
-**Critical initialization order in `orchestrator.go`:**
+**Critical initialization order** (in [orchestrator.go](daemon/services/orchestrator.go)):
 
-1. API server creates subscriptions via `Hub.Sub()` FIRST (see `server.go` line ~234)
-2. 100ms delay ensures subscriptions are ready (prevents lost events)
+1. API server creates subscriptions via `Hub.Sub()` **FIRST**
+2. 100ms delay ensures subscriptions are ready
 3. Then collectors start publishing via `Hub.Pub(data, "topic_name")`
-4. **Never change this order**—collectors publishing before subscriptions causes race conditions.
 
-## Key Patterns
+⚠️ **Never change this order** — collectors publishing before subscriptions causes lost events.
 
-### Collector Intervals
+## Commands
 
-Defined in `daemon/constants/const.go`:
+```bash
+make deps           # Install dependencies
+make local          # Build for current architecture
+make release        # Build for Linux/amd64 (Unraid)
+make test           # Run all tests with race detection
+make test-coverage  # Generate coverage.html
+make package        # Create plugin .tgz
 
-- System: 5s, Array: 10s, Disk: 30s, Docker: 10s, VM: 10s
-- UPS: 10s, GPU: 10s, Network: 15s, Shares: 60s
-- Adjust based on data volatility and performance impact
-
-### Adding a New Collector
-
-1. Create collector in `daemon/services/collectors/` following `system.go` pattern:
-
-   ```go
-   type NewCollector struct { ctx *domain.Context }
-   func (c *NewCollector) Start(ctx context.Context, interval time.Duration) {
-       // Run once immediately with panic recovery (wrap in defer/recover)
-       // Use ticker loop, select on ctx.Done() and ticker.C
-       // Call c.ctx.Hub.Pub(data, "new_topic_update")
-   }
-   ```
-
-2. Define DTO in `daemon/dto/` (e.g., `NewInfo struct`)
-3. Add subscription in `api/server.go` `subscribeToEvents()`:
-   - Add `"new_topic_update"` to `Hub.Sub()` call (~line 234)
-   - Add `case` in switch statement to update cache (~line 265+)
-4. Add cache field in `api/server.go` `Server` struct (e.g., `newCache *dto.NewInfo`)
-5. Add handler in `api/handlers.go`:
-
-   ```go
-   func (s *Server) handleNew(w http.ResponseWriter, _ *http.Request) {
-       s.cacheMutex.RLock()
-       data := s.newCache
-       s.cacheMutex.RUnlock()
-       respondJSON(w, http.StatusOK, data)
-   }
-   ```
-
-6. Register route in `server.go` `setupRoutes()` (~line 69+)
-7. Initialize and start in `orchestrator.go` (~line 62+): add to WaitGroup, create collector, launch goroutine
-
-### Adding REST Endpoints
-
-**Always use RLock/RUnlock** for cache reads, **Lock/Unlock** for writes:
-
-```go
-// Read-only endpoint
-func (s *Server) handleNewEndpoint(w http.ResponseWriter, _ *http.Request) {
-    s.cacheMutex.RLock()
-    data := s.newCache
-    s.cacheMutex.RUnlock()
-    respondJSON(w, http.StatusOK, data)
-}
+./unraid-management-agent boot --debug --port 8043  # Run agent
 ```
 
-### Control Operations
+## Adding a New Collector
 
-Use `lib.ExecCommand()` for all shell commands (never use `exec.Command` directly):
+1. Create collector in `daemon/services/collectors/` following [system.go](daemon/services/collectors/system.go) pattern
+2. Define DTO in `daemon/dto/`
+3. Register in [collector_manager.go](daemon/services/collector_manager.go) `RegisterAllCollectors()`
+4. Add subscription topic in [server.go](daemon/services/api/server.go) `subscribeToEvents()` (both `Hub.Sub()` and switch case)
+5. Add cache field and handler in [handlers.go](daemon/services/api/handlers.go)
+6. Register route in `setupRoutes()`
 
-```go
-// From daemon/services/controllers/docker.go
-output, err := lib.ExecCommand(constants.DockerBin, "start", containerID)
-if err != nil {
-    return fmt.Errorf("failed to start container: %w", err)
-}
-```
-
-**Always validate user input before passing to commands** (see Security Requirements).
-
-### Error Handling & Responses
-
-Use `respondJSON()` helper for all HTTP responses (located in `handlers.go`):
-
-```go
-// Success response with data
-respondJSON(w, http.StatusOK, data)
-
-// Error response with message
-respondJSON(w, http.StatusBadRequest, dto.Response{
-    Success:   false,
-    Message:   "error description",
-    Timestamp: time.Now(),
-})
-```
-
-**Control endpoint pattern** (see `handlers.go` Docker/VM handlers):
-
-1. Validate input (container ID, VM name, etc.)
-2. Log the operation with `logger.Info()`
-3. Call controller method
-4. Return `dto.Response` with success/failure
-
-### Panic Recovery
-
-**All collector loops MUST wrap work in defer/recover** to prevent crashes:
+**Collector pattern** (panic recovery is required):
 
 ```go
 func (c *Collector) Start(ctx context.Context, interval time.Duration) {
     // Run once immediately with recovery
     func() {
-        defer func() {
-            if r := recover(); r != nil {
-                logger.Error("Collector PANIC on startup: %v", r)
-            }
-        }()
+        defer func() { if r := recover(); r != nil { logger.Error("PANIC: %v", r) } }()
         c.Collect()
     }()
-
     ticker := time.NewTicker(interval)
     defer ticker.Stop()
-
     for {
         select {
-        case <-ctx.Done():
-            return
+        case <-ctx.Done(): return
         case <-ticker.C:
             func() {
-                defer func() {
-                    if r := recover(); r != nil {
-                        logger.Error("Collector PANIC in loop: %v", r)
-                    }
-                }()
+                defer func() { if r := recover(); r != nil { logger.Error("PANIC: %v", r) } }()
                 c.Collect()
             }()
         }
@@ -156,202 +72,95 @@ func (c *Collector) Start(ctx context.Context, interval time.Duration) {
 
 ## Security Requirements
 
-**Always validate user input** using functions from `daemon/lib/validation.go`:
+**Always validate user input** using [validation.go](daemon/lib/validation.go):
 
-- `ValidateContainerID()` - Docker container IDs
-- `ValidateVMName()` - VM names
-- `ValidateConfigPath()` - File paths (CWE-22 protection)
-- `ValidateNotificationFilename()` - Notification files
+- `ValidateContainerID()` — Docker container IDs (12 or 64 hex chars)
+- `ValidateVMName()` — VM names (alphanumeric, spaces, hyphens, underscores, dots)
+- `ValidateShareName()` — Share names (path traversal protection)
+- `ValidateLogFilename()` — Log filenames (CWE-22 protection)
 
-**Never** interpolate user input directly into shell commands.
+**Never** use `exec.Command` directly — use `lib.ExecCommand()` or `lib.ExecCommandOutput()` from [shell.go](daemon/lib/shell.go).
 
-## Commands
+## Key Patterns
 
-```bash
-make deps          # Install dependencies
-make local         # Build for current architecture
-make release       # Build for Linux/amd64 (Unraid)
-make test          # Run all tests
-make test-coverage # Coverage report → coverage.html
-make package       # Create plugin .tgz
+### Cache Access (thread-safe)
 
-# Run agent
-./unraid-management-agent boot --debug --port 8043
+```go
+s.cacheMutex.RLock()  // Read lock for GET handlers
+data := s.someCache
+s.cacheMutex.RUnlock()
+respondJSON(w, http.StatusOK, data)
 ```
 
-## Deployment to Unraid Server
+### HTTP Responses
 
-**IMPORTANT**: Always use the provided deployment scripts for building and testing:
+Use `respondJSON()` helper for all responses. Control endpoints return `dto.Response`.
 
-1. **Prepare credentials**: Create `scripts/config.sh` with Unraid server SSH credentials
+### Controller Pattern (Docker/VM/Array operations)
 
-   ```bash
-   cp scripts/config.sh.example scripts/config.sh
-   # Edit config.sh with actual Unraid server IP, username, and password
-   ```
+Controllers in `daemon/services/controllers/` execute system operations:
 
-2. **Deploy and test**: Use `scripts/deploy-plugin.sh`
+```go
+// Validate → Execute → Return response
+func (c *DockerController) StartContainer(id string) error {
+    if err := lib.ValidateContainerID(id); err != nil {
+        return err
+    }
+    _, err := lib.ExecCommand(constants.DockerBin, "start", id)
+    return err
+}
+```
 
-   ```bash
-   ./scripts/deploy-plugin.sh
-   ```
+### MCP Integration
 
-   This script:
+The agent exposes 54+ tools via Model Context Protocol at `POST /mcp` and `/mcp/sse` for AI agents. See [MCP_INTEGRATION.md](docs/MCP_INTEGRATION.md) and [mcp/server.go](daemon/services/mcp/server.go).
 
-   - Builds the plugin using `make release`
-   - Uses `sshpass` to SSH into Unraid server without interactive password prompt
-   - Uploads the plugin package
-   - Tests deployment on the actual Unraid system
+### Native APIs (preferred over shell commands)
 
-3. **Verify deployment**: After deployment, test the plugin on the Unraid server:
-   - Check plugin UI loads at `https://<unraid-ip>:8043`
-   - Verify WebSocket connections work
-   - Test REST API endpoints
-   - Monitor logs at `/var/log/unraid-management-agent.log`
-
-**Do NOT** use manual SSH commands or skip automated deployment scripts. Always verify changes work on actual Unraid hardware before merging PRs.
+- Docker: `github.com/moby/moby/client` — Docker Engine SDK
+- VMs: `github.com/digitalocean/go-libvirt` — Native libvirt bindings
+- System: Direct `/proc`, `/sys` access
 
 ## Project Structure
 
-| Directory                      | Purpose                                    |
-| ------------------------------ | ------------------------------------------ |
-| `daemon/constants/`            | System paths, binary locations, intervals  |
-| `daemon/dto/`                  | Data transfer objects (shared structs)     |
-| `daemon/lib/`                  | Utilities: shell exec, parsing, validation |
-| `daemon/services/collectors/`  | Data collection goroutines                 |
-| `daemon/services/controllers/` | Control operations (Docker, VM, Array)     |
-| `daemon/services/api/`         | HTTP server, handlers, WebSocket hub       |
-
-## Unraid-Specific Paths
-
-Collectors read from Unraid files defined in `daemon/constants/const.go`:
-
-- `/var/local/emhttp/*.ini` - Configuration files
-- `/proc/*` and `/sys/class/hwmon/` - System metrics
-- Binaries: `/usr/bin/docker`, `/usr/bin/virsh`, `/usr/sbin/smartctl`, etc.
+| Directory                      | Purpose                                              |
+| ------------------------------ | ---------------------------------------------------- |
+| `daemon/constants/`            | System paths, binary locations, collection intervals |
+| `daemon/dto/`                  | Data transfer objects (shared structs)               |
+| `daemon/lib/`                  | Utilities: shell exec, parsing, validation           |
+| `daemon/services/collectors/`  | Data collection goroutines                           |
+| `daemon/services/controllers/` | Control operations (Docker, VM, Array)               |
+| `daemon/services/api/`         | HTTP server, handlers, WebSocket hub                 |
+| `daemon/services/mcp/`         | Model Context Protocol for AI agents                 |
 
 ## Testing
 
-Use **table-driven tests** for comprehensive coverage (see `daemon/lib/validation_test.go`):
+Use **table-driven tests** with security cases. See [validation_test.go](daemon/lib/validation_test.go) for pattern.
+Tests are located alongside source files (`*_test.go`).
 
-```go
-func TestValidateContainerID(t *testing.T) {
-    tests := []struct {
-        name    string
-        id      string
-        wantErr bool
-        errMsg  string
-    }{
-        {name: "valid short ID", id: "bbb57ffa3c50", wantErr: false},
-        {name: "empty ID", id: "", wantErr: true, errMsg: "cannot be empty"},
-        // ... more cases
-    }
+## Release Process
 
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            err := ValidateContainerID(tt.id)
-            if (err != nil) != tt.wantErr {
-                t.Errorf("error = %v, wantErr %v", err, tt.wantErr)
-            }
-        })
-    }
-}
+Uses date-based versioning: `YYYY.MM.DD`
+
+1. **Update `CHANGELOG.md`** — required for every change
+2. Update `VERSION` file
+3. Update `.plg` files (root + `meta/template/`) — version and MD5 from GitHub release
+4. Tag and push: `git tag vYYYY.MM.DD && git push origin vYYYY.MM.DD`
+
+## Deployment
+
+Use `scripts/deploy-plugin.sh` for testing on actual Unraid hardware:
+
+```bash
+cp scripts/config.sh.example scripts/config.sh  # Add SSH credentials
+./scripts/deploy-plugin.sh                       # Build and deploy
 ```
-
-**Test guidelines:**
-
-- Include security test cases (SQL injection, command injection, path traversal)
-- Mock file system access and external commands
-- Tests located alongside source files (`*_test.go`)
-- Use `daemon/lib/testutil/` for shared test utilities
-
-## WebSocket Events
-
-Events broadcast via `/ws` endpoint use `dto.WSEvent` structure:
-
-```go
-type WSEvent struct {
-    Event     string      `json:"event"`     // e.g., "update"
-    Timestamp time.Time   `json:"timestamp"`
-    Data      interface{} `json:"data"`      // Collector-specific DTO
-}
-```
-
-**Event topics** (from collectors → WebSocket clients):
-
-- `system_update`, `array_status_update`, `disk_list_update`
-- `container_list_update`, `vm_list_update`, `network_list_update`
-- `ups_status_update`, `gpu_metrics_update`, `share_list_update`
-- `hardware_update`, `registration_update`, `notifications_update`
-- `unassigned_devices_update`, `zfs_pools_update`, `zfs_datasets_update`
-
-## Logging
-
-Use `daemon/logger/logger.go` with these levels:
-
-- `logger.Debug()` - Detailed diagnostics (requires `--debug` flag)
-- `logger.Info()` - General operations
-- `logger.Success()` - Successful operations (green output)
-- `logger.Warning()` - Warning conditions (yellow output)
-- `logger.Error()` - Error conditions (red output)
-
-Log file: `/var/log/unraid-management-agent.log` (5MB max, auto-rotated)
-
-## Versioning & Releases
-
-Uses date-based semantic versioning: `YYYY.MM.DD` (e.g., `2025.11.25`)
-
-**Release process:**
-
-1. **Update `CHANGELOG.md`** - ALWAYS keep this file up to date with every change:
-
-   - Add entry at the top under new version section
-   - Follow existing format: `## [YYYY.MM.DD]` with date
-   - Include all bug fixes, features, and improvements
-   - Link to relevant issues/PRs: `(#123)`
-   - Group changes: Features, Bug Fixes, Security, Performance, etc.
-   - **Example entry**:
-
-     ```markdown
-     ## [2025.12.22]
-
-     ### Added
-
-     - New ZFS pool monitoring feature (#85)
-     - WebSocket reconnection logic
-
-     ### Fixed
-
-     - Memory leak in Docker collector (#92)
-     - CPU usage calculation on ARM systems (#88)
-
-     ### Changed
-
-     - Increased default collection intervals for performance
-     ```
-
-   - **DO NOT** skip or delay CHANGELOG updates—these must be kept current at all times
-
-2. Update `VERSION` file with new version
-
-3. **Update `.plg` files** (both root and `meta/template/` directory):
-
-   - Update `<!ENTITY version "2025.11.26">` with new version
-   - Update `<!ENTITY md5 "...">` with checksum **from GitHub release** (not local build)
-   - **CRITICAL**: MD5 must match the GitHub release artifact or users cannot download updates
-   - Get MD5 from GitHub release page or via: `curl -sL <release-url> | md5sum`
-
-4. Create and push tag: `git tag v2025.11.25 && git push origin v2025.11.25`
-
-5. GitHub Actions builds and releases automatically
-
-6. Verify MD5 checksum matches the published release artifact
 
 ## Hardware Compatibility
 
-This runs on varied hardware. When fixing hardware-specific issues:
+When fixing hardware-specific issues:
 
 1. Identify the failing collector
 2. Update parsing in `daemon/lib/` (parser.go, dmidecode.go, ethtool.go)
-3. Add fallback logic for variations
+3. Add fallback logic for hardware variations
 4. Document hardware details in PR

@@ -590,7 +590,10 @@ func (c *SystemCollector) getCPUSpecs() (string, int, int, float64) {
 
 	var cpuModel string
 	var cpuMHz float64
-	physicalIDs := make(map[string]bool)
+	// Track unique core IDs per physical socket to get true physical core count
+	// Key: "physical_id:core_id", used to count unique physical cores
+	coreIDs := make(map[string]bool)
+	var currentPhysicalID string
 	processors := 0
 
 	scanner := bufio.NewScanner(file)
@@ -618,13 +621,17 @@ func (c *SystemCollector) getCPUSpecs() (string, int, int, float64) {
 				cpuMHz = mhz
 			}
 		case "physical id":
-			physicalIDs[value] = true
+			currentPhysicalID = value
+		case "core id":
+			// Track unique physical cores using "physical_id:core_id" combination
+			coreKey := currentPhysicalID + ":" + value
+			coreIDs[coreKey] = true
 		case "processor":
 			processors++
 		}
 	}
 
-	cpuCores := len(physicalIDs)
+	cpuCores := len(coreIDs)
 	if cpuCores == 0 {
 		cpuCores = 1 // Fallback to at least 1 core
 	}
