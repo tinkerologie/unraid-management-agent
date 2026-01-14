@@ -43,7 +43,7 @@ func (c *ParityCollector) GetParityHistory() (*dto.ParityCheckHistory, error) {
 		}
 	}()
 
-	var records []dto.ParityCheckRecord
+	records := []dto.ParityCheckRecord{}
 	scanner := bufio.NewScanner(file)
 
 	for scanner.Scan() {
@@ -74,162 +74,160 @@ func (c *ParityCollector) GetParityHistory() (*dto.ParityCheckHistory, error) {
 }
 
 // parseLine parses a single line from parity-checks.log
-// Format examples:
-// Parity-Check|2024-11-30, 00:30:26 (Saturday)|10 TB|1 day, 4 hr, 1 min, 28 sec|99.1 MB/s|OK|1348756140
-// Parity-Sync|2025-05-04, 07:55:41 (Sunday)|16 TB|9 min, 3 sec|Unavailable|Canceled|0
+// Supports multiple Unraid log formats across different versions:
+//
+// Format 1 (5 fields - older Unraid before ~2022):
+//
+//	2022 May 22 20:17:49|73068|54.8 MB/s|0|0
+//	Fields: Date|Duration|Speed|ExitCode|Errors
+//
+// Format 2 (7 fields - standard format):
+//
+//	2024 Nov 30 00:30:26|100888|99128056|0|1348756140|check P|9766436812
+//	Fields: Date|Duration|Speed(bytes/s)|ExitCode|Errors|Action|Size
+//
+// Format 3 (10 fields - with parity check plugin):
+//
+//	2024 Sep 9 02:23:50|18548|25.9 MB/s|0|0|check P Q|468850520|95023|2|Scheduled Non-Correcting Parity-Check
+//	Fields: Date|Duration|Speed|ExitCode|Errors|Action|Size|ElapsedTime|Increments|Description
+//
+// Speed can be either raw bytes/second (integer) or human-readable format (e.g., "25.9 MB/s")
 func (c *ParityCollector) parseLine(line string) (dto.ParityCheckRecord, error) {
 	parts := strings.Split(line, "|")
-	if len(parts) < 7 {
-		return dto.ParityCheckRecord{}, fmt.Errorf("invalid line format: expected 7 parts, got %d", len(parts))
+	if len(parts) < 5 {
+		return dto.ParityCheckRecord{}, fmt.Errorf("invalid line format: expected at least 5 parts, got %d", len(parts))
 	}
 
-	record := dto.ParityCheckRecord{
-		Action: strings.TrimSpace(parts[0]),
+	record := dto.ParityCheckRecord{}
+
+	// Parse date (format: "2024 Nov 30 00:30:26" or "2025 Jan  2 06:25:17" with double space for single-digit days)
+	dateStr := strings.TrimSpace(parts[0])
+	// Normalize multiple spaces to single space for parsing
+	for strings.Contains(dateStr, "  ") {
+		dateStr = strings.ReplaceAll(dateStr, "  ", " ")
 	}
 
-	// Parse date (format: "2024-11-30, 00:30:26 (Saturday)")
-	dateStr := strings.TrimSpace(parts[1])
-	// Remove day of week in parentheses
-	if idx := strings.Index(dateStr, "("); idx > 0 {
-		dateStr = strings.TrimSpace(dateStr[:idx])
-	}
-
-	date, err := time.Parse("2006-01-02, 15:04:05", dateStr)
+	date, err := time.Parse("2006 Jan 2 15:04:05", dateStr)
 	if err != nil {
 		return dto.ParityCheckRecord{}, fmt.Errorf("failed to parse date '%s': %w", dateStr, err)
 	}
 	record.Date = date
 
-	// Parse size (format: "10 TB" or "16 TB")
-	sizeStr := strings.TrimSpace(parts[2])
-	size, err := c.parseSize(sizeStr)
-	if err != nil {
-		logger.Debug("Parity: Failed to parse size '%s': %v", sizeStr, err)
-		record.Size = 0
-	} else {
-		record.Size = size
-	}
-
-	// Parse duration (format: "1 day, 4 hr, 1 min, 28 sec" or "9 min, 3 sec")
-	durationStr := strings.TrimSpace(parts[3])
-	duration, err := c.parseDuration(durationStr)
-	if err != nil {
-		logger.Debug("Parity: Failed to parse duration '%s': %v", durationStr, err)
-		record.Duration = 0
-	} else {
+	// Parse duration in seconds (field 1)
+	durationStr := strings.TrimSpace(parts[1])
+	if duration, err := strconv.ParseInt(durationStr, 10, 64); err == nil {
 		record.Duration = duration
 	}
 
-	// Parse speed (format: "99.1 MB/s" or "Unavailable")
-	speedStr := strings.TrimSpace(parts[4])
-	if speedStr == "Unavailable" || speedStr == "" {
-		record.Speed = 0
-	} else {
-		speed, err := c.parseSpeed(speedStr)
-		if err != nil {
-			logger.Debug("Parity: Failed to parse speed '%s': %v", speedStr, err)
-			record.Speed = 0
-		} else {
-			record.Speed = speed
-		}
-	}
+	// Parse speed (field 2) - can be raw bytes/second or human-readable format
+	speedStr := strings.TrimSpace(parts[2])
+	record.Speed = c.parseSpeed(speedStr)
 
-	// Parse status (format: "OK", "Canceled", or error count like "3572342875")
-	statusStr := strings.TrimSpace(parts[5])
-	record.Status = statusStr
-	if statusStr != "OK" && statusStr != "Canceled" {
-		// Try to parse as error count
-		if errors, err := strconv.ParseInt(statusStr, 10, 64); err == nil {
-			record.Errors = errors
-			record.Status = fmt.Sprintf("%d errors", errors)
-		}
-	}
+	// Parse exit code (field 3): 0=OK, -4=Canceled
+	exitCodeStr := strings.TrimSpace(parts[3])
+	exitCode, _ := strconv.ParseInt(exitCodeStr, 10, 64)
 
-	// Parse errors (last field - error count)
-	errorsStr := strings.TrimSpace(parts[6])
+	// Parse error count (field 4)
+	errorsStr := strings.TrimSpace(parts[4])
 	if errors, err := strconv.ParseInt(errorsStr, 10, 64); err == nil {
 		record.Errors = errors
+	}
+
+	// Handle different format lengths
+	if len(parts) >= 7 {
+		// Parse action (field 5): "check P"=Parity-Check, "check P Q"=Dual Parity-Check, "recon P"=Parity-Sync/Rebuild
+		actionStr := strings.TrimSpace(parts[5])
+		record.Action = c.parseAction(actionStr)
+
+		// Parse size in bytes (field 6)
+		sizeStr := strings.TrimSpace(parts[6])
+		if size, err := strconv.ParseUint(sizeStr, 10, 64); err == nil {
+			record.Size = size
+		}
+	} else {
+		// 5-field format - no action or size, default to Parity-Check
+		record.Action = "Parity-Check"
+		record.Size = 0
+	}
+
+	// Determine status based on exit code and errors
+	switch exitCode {
+	case 0:
+		if record.Errors > 0 {
+			record.Status = fmt.Sprintf("%d errors", record.Errors)
+		} else {
+			record.Status = "OK"
+		}
+	case -4:
+		record.Status = "Canceled"
+	default:
+		record.Status = fmt.Sprintf("Exit code %d", exitCode)
 	}
 
 	return record, nil
 }
 
-// parseSize converts size string like "10 TB" to bytes
-func (c *ParityCollector) parseSize(sizeStr string) (uint64, error) {
-	parts := strings.Fields(sizeStr)
+// parseSpeed parses speed from either raw bytes/second or human-readable format
+// Examples: "99128056" (bytes/sec), "54.8 MB/s", "Unavailable"
+func (c *ParityCollector) parseSpeed(speedStr string) float64 {
+	speedStr = strings.TrimSpace(speedStr)
+
+	// Handle unavailable/empty speed
+	if speedStr == "" || strings.EqualFold(speedStr, "Unavailable") {
+		return 0
+	}
+
+	// Try parsing as raw bytes/second first
+	if speed, err := strconv.ParseFloat(speedStr, 64); err == nil {
+		// It's a raw number - convert bytes/sec to MB/s
+		return speed / (1024 * 1024)
+	}
+
+	// Try parsing human-readable format (e.g., "54.8 MB/s", "1.2 GB/s")
+	speedStr = strings.TrimSuffix(speedStr, "/s")
+	speedStr = strings.TrimSpace(speedStr)
+
+	parts := strings.Fields(speedStr)
 	if len(parts) != 2 {
-		return 0, fmt.Errorf("invalid size format: %s", sizeStr)
+		return 0
 	}
 
 	value, err := strconv.ParseFloat(parts[0], 64)
 	if err != nil {
-		return 0, fmt.Errorf("invalid size value: %s", parts[0])
+		return 0
 	}
 
 	unit := strings.ToUpper(parts[1])
-	var multiplier uint64
-
 	switch unit {
 	case "B":
-		multiplier = 1
+		return value / (1024 * 1024)
 	case "KB":
-		multiplier = 1024
+		return value / 1024
 	case "MB":
-		multiplier = 1024 * 1024
+		return value
 	case "GB":
-		multiplier = 1024 * 1024 * 1024
+		return value * 1024
 	case "TB":
-		multiplier = 1024 * 1024 * 1024 * 1024
+		return value * 1024 * 1024
 	default:
-		return 0, fmt.Errorf("unknown size unit: %s", unit)
+		return value // Assume MB/s if unit not recognized
 	}
-
-	return uint64(value * float64(multiplier)), nil
 }
 
-// parseDuration converts duration string like "1 day, 4 hr, 1 min, 28 sec" to seconds
-func (c *ParityCollector) parseDuration(durationStr string) (int64, error) {
-	var totalSeconds int64
-
-	parts := strings.Split(durationStr, ",")
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		fields := strings.Fields(part)
-		if len(fields) != 2 {
-			continue
-		}
-
-		value, err := strconv.ParseInt(fields[0], 10, 64)
-		if err != nil {
-			continue
-		}
-
-		unit := strings.ToLower(fields[1])
-		switch {
-		case strings.HasPrefix(unit, "day"):
-			totalSeconds += value * 86400
-		case strings.HasPrefix(unit, "hr") || strings.HasPrefix(unit, "hour"):
-			totalSeconds += value * 3600
-		case strings.HasPrefix(unit, "min"):
-			totalSeconds += value * 60
-		case strings.HasPrefix(unit, "sec"):
-			totalSeconds += value
-		}
+// parseAction converts action codes to human-readable format
+func (c *ParityCollector) parseAction(actionStr string) string {
+	switch {
+	case strings.HasPrefix(actionStr, "check P Q"):
+		return "Dual Parity-Check"
+	case strings.HasPrefix(actionStr, "check"):
+		return "Parity-Check"
+	case strings.HasPrefix(actionStr, "recon P Q"):
+		return "Dual Parity-Sync"
+	case strings.HasPrefix(actionStr, "recon"):
+		return "Parity-Sync"
+	case strings.HasPrefix(actionStr, "clear"):
+		return "Parity-Clear"
+	default:
+		return actionStr
 	}
-
-	return totalSeconds, nil
-}
-
-// parseSpeed converts speed string like "99.1 MB/s" to MB/s
-func (c *ParityCollector) parseSpeed(speedStr string) (float64, error) {
-	// Remove " MB/s" suffix
-	speedStr = strings.TrimSuffix(speedStr, " MB/s")
-	speedStr = strings.TrimSpace(speedStr)
-
-	speed, err := strconv.ParseFloat(speedStr, 64)
-	if err != nil {
-		return 0, fmt.Errorf("invalid speed value: %s", speedStr)
-	}
-
-	return speed, nil
 }

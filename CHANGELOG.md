@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parity Check History Null Records (Issue #44)**:
+
+  - Fixed parity history endpoint returning `null` for records when parity check history exists
+  - Rewrote `parseLine()` to correctly parse the actual Unraid parity log format
+  - Fixed JSON marshaling issue: empty records now return `[]` instead of `null`
+  - Added multi-format support for backward compatibility with older Unraid versions:
+    - 5-field legacy format (pre-2022 Unraid versions)
+    - 7-field current format (2022-present)
+    - 10-field extended format (with parity check tuning plugin)
+  - Added `parseSpeed()` helper to handle both numeric bytes/sec and human-readable "XX.X MB/s" formats
+  - Added comprehensive tests for all parity log format variations
+
 - **Log File Accumulation** - Fixed issue where log files were accumulating and consuming excessive disk space (80MB+):
 
   - Changed lumberjack `MaxBackups` from 0 to 1 (0 means "keep all", not "keep none")

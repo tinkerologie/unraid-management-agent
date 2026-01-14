@@ -3,7 +3,7 @@
 <!DOCTYPE PLUGIN [
     <!ENTITY name        "unraid-management-agent">
     <!ENTITY author      "ruaan-deysel">
-    <!ENTITY version     "2026.01.00">
+    <!ENTITY version     "2026.01.01">
     <!ENTITY gitURL      "https://github.com/&author;/&name;">
     <!ENTITY pluginURL   "&gitURL;/raw/main/&name;.plg">
     <!ENTITY supportURL  "https://forums.unraid.net/topic/178262-home-assistant-unraid-integration">
@@ -20,6 +20,8 @@ This Unraid plugin provides REST API and WebSocket interfaces for real-time syst
 </DESCRIPTION>
 
 <CHANGES>
+###2026.01.01 (2026-01-15)
+- Fixed: Parity history endpoint returning `null` for records when parity check history exists
 ###2026.01.00 (2026-01-12)
 - Fixed: Log file accumulation (MaxBackups=1, MaxAge=1 day, cleanupOldLogs to remove old .gz files)
 - Fixed: Dark theme support (UI now uses Unraid CSS variables and inherits colors)
