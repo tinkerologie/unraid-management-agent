@@ -725,13 +725,6 @@ As a single maintainer, it's challenging to:
 
 MIT License - see [LICENSE](LICENSE) file for details
 
-## Support
-
-For issues, questions, or feature requests:
-
-- Check existing documentation in the `docs/` directory
-- Review the [Documentation Index](docs/README.md) for comprehensive guides
-
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history and release notes.
