@@ -151,6 +151,13 @@ func (c *ShareCollector) collectShares() ([]dto.ShareInfo, error) {
 				if used, err := strconv.ParseUint(value, 10, 64); err == nil {
 					currentShare.Used = used
 				}
+			// Cache settings from shares.ini (Issue #53)
+			case "useCache":
+				currentShare.UseCache = value
+			case "cachePool":
+				currentShare.CachePool = value
+			case "cachePool2":
+				currentShare.CachePool2 = value
 			}
 		}
 	}
@@ -205,13 +212,19 @@ func (c *ShareCollector) enrichShareWithConfig(share *dto.ShareInfo, configColle
 
 	// Populate configuration fields
 	share.Comment = config.Comment
-	share.UseCache = config.UseCache
+	// Only override UseCache if not already set from shares.ini
+	if share.UseCache == "" {
+		share.UseCache = config.UseCache
+	}
 	share.Security = config.Security
-	share.Storage = c.determineStorage(config.UseCache)
+	share.Storage = c.determineStorage(share.UseCache)
 	share.SMBExport = c.isSMBExported(config.Export, config.Security)
 	share.NFSExport = c.isNFSExported(config.Export)
 
-	logger.Debug("Share: Enriched %s - Storage: %s, SMB: %v, NFS: %v", share.Name, share.Storage, share.SMBExport, share.NFSExport)
+	// Determine mover action based on cache settings (Issue #53)
+	share.MoverAction = c.determineMoverAction(share.UseCache, share.CachePool, share.CachePool2)
+
+	logger.Debug("Share: Enriched %s - Storage: %s, SMB: %v, NFS: %v, Cache: %s", share.Name, share.Storage, share.SMBExport, share.NFSExport, share.UseCache)
 }
 
 // determineStorage determines storage location based on UseCache setting
@@ -247,4 +260,29 @@ func (c *ShareCollector) isSMBExported(export string, security string) bool {
 func (c *ShareCollector) isNFSExported(export string) bool {
 	// Check export field for NFS indicators
 	return strings.Contains(export, "nfs") || strings.Contains(export, "-n")
+}
+
+// determineMoverAction determines the mover action based on cache settings
+// This addresses Issue #53: Expose share cache settings via API
+func (c *ShareCollector) determineMoverAction(useCache, cachePool, cachePool2 string) string {
+	// If cachePool2 is set, there's a secondary destination (pool-to-pool movement)
+	if cachePool2 != "" && cachePool != "" {
+		return cachePool + "->" + cachePool2
+	}
+
+	switch useCache {
+	case "yes", "prefer":
+		// Cache preferred - mover moves from cache to array
+		if cachePool != "" {
+			return "cache->array"
+		}
+	case "only":
+		// Cache only - no mover action (data stays on cache)
+		return ""
+	case "no":
+		// Array only - no mover action (data never on cache)
+		return ""
+	}
+
+	return ""
 }

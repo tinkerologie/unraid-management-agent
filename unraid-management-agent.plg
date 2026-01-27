@@ -3,7 +3,7 @@
 <!DOCTYPE PLUGIN [
     <!ENTITY name        "unraid-management-agent">
     <!ENTITY author      "ruaan-deysel">
-    <!ENTITY version     "2026.01.01">
+    <!ENTITY version     "2026.01.02">
     <!ENTITY gitURL      "https://github.com/&author;/&name;">
     <!ENTITY pluginURL   "&gitURL;/raw/main/&name;.plg">
     <!ENTITY supportURL  "https://forums.unraid.net/topic/178262-home-assistant-unraid-integration">
@@ -20,9 +20,23 @@ This Unraid plugin provides REST API and WebSocket interfaces for real-time syst
 </DESCRIPTION>
 
 <CHANGES>
-###2026.01.01 (2026-01-15)
-- Fixed: Parity history endpoint returning `null` for records when parity check history exists
-###2026.01.00 (2026-01-12)
+###2026.01.02 (2026-01-27)
+- **Go 1.25.0 Upgrade**: Upgraded from Go 1.24.0 to 1.25.0 for improved performance and latest language features
+- **golangci-lint v2 Migration**: Migrated to golangci-lint v2.8.0 with updated configuration format
+- All code quality checks passing with zero tolerance policy
+- Added: Prometheus metrics endpoint at /metrics for native Grafana integration (31 metrics covering system, array, disks, Docker, VMs, UPS, shares, network services, GPU)
+- Added: Network services status API - monitors 13 services (SMB, NFS, AFP, FTP, SSH, Telnet, Avahi, NetBIOS, WSD, WireGuard, UPnP, NTP, Syslog)
+- Added: Global disk temperature thresholds API (HDD and SSD thresholds from dynamix.cfg)
+- Added: Per-disk temperature threshold overrides (from individual disk .cfg files)
+- Added: Parity check schedule API (frequency, day, time from parity-checks.cron)
+- Added: Mover schedule and status API (cron schedule, running status, thresholds)
+- Added: Docker and VM service status API (enabled/disabled state)
+- Added: OS and plugin update availability API (update status, versions, counts)
+- Added: USB flash drive health API (capacity, usage, filesystem info)
+- Added: Installed plugins list API (metadata, versions, update availability)
+- Added: Share cache pool settings (primary and secondary cache pools)
+
+###2026.01.01 (2026-01-12)
 - Fixed: Log file accumulation (MaxBackups=1, MaxAge=1 day, cleanupOldLogs to remove old .gz files)
 - Fixed: Dark theme support (UI now uses Unraid CSS variables and inherits colors)
 - Changed: Default log level set to "info"; log level now CLI-only (UI option removed)

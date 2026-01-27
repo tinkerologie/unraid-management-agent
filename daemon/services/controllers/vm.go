@@ -45,7 +45,7 @@ func (vc *VMController) Start(vmName string) error {
 	if err != nil {
 		return err
 	}
-	defer l.Disconnect()
+	defer l.Disconnect() //nolint:errcheck
 
 	if err := l.DomainCreate(domain); err != nil {
 		return fmt.Errorf("failed to start VM %s: %w", vmName, err)
@@ -63,7 +63,7 @@ func (vc *VMController) Stop(vmName string) error {
 	if err != nil {
 		return err
 	}
-	defer l.Disconnect()
+	defer l.Disconnect() //nolint:errcheck
 
 	if err := l.DomainShutdown(domain); err != nil {
 		return fmt.Errorf("failed to shutdown VM %s: %w", vmName, err)
@@ -81,7 +81,7 @@ func (vc *VMController) Restart(vmName string) error {
 	if err != nil {
 		return err
 	}
-	defer l.Disconnect()
+	defer l.Disconnect() //nolint:errcheck
 
 	// Reboot with default flags
 	if err := l.DomainReboot(domain, 0); err != nil {
@@ -100,7 +100,7 @@ func (vc *VMController) Pause(vmName string) error {
 	if err != nil {
 		return err
 	}
-	defer l.Disconnect()
+	defer l.Disconnect() //nolint:errcheck
 
 	if err := l.DomainSuspend(domain); err != nil {
 		return fmt.Errorf("failed to suspend VM %s: %w", vmName, err)
@@ -118,7 +118,7 @@ func (vc *VMController) Resume(vmName string) error {
 	if err != nil {
 		return err
 	}
-	defer l.Disconnect()
+	defer l.Disconnect() //nolint:errcheck
 
 	if err := l.DomainResume(domain); err != nil {
 		return fmt.Errorf("failed to resume VM %s: %w", vmName, err)
@@ -136,7 +136,7 @@ func (vc *VMController) Hibernate(vmName string) error {
 	if err != nil {
 		return err
 	}
-	defer l.Disconnect()
+	defer l.Disconnect() //nolint:errcheck
 
 	// ManagedSave saves the domain state to a file then stops it
 	if err := l.DomainManagedSave(domain, 0); err != nil {
@@ -155,7 +155,7 @@ func (vc *VMController) ForceStop(vmName string) error {
 	if err != nil {
 		return err
 	}
-	defer l.Disconnect()
+	defer l.Disconnect() //nolint:errcheck
 
 	// Destroy immediately terminates the domain
 	if err := l.DomainDestroy(domain); err != nil {

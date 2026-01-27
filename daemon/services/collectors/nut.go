@@ -124,7 +124,7 @@ func (c *NUTCollector) loadNUTConfig() (*dto.NUTConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer file.Close() //nolint:errcheck // Error checking not needed for defer Close
 
 	config := &dto.NUTConfig{}
 	scanner := bufio.NewScanner(file)

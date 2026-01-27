@@ -54,3 +54,7 @@ package docs
 //	@tag.description			Real-time event streaming via WebSocket
 //	@tag.name					Unassigned Devices
 //	@tag.description			Unassigned devices and remote shares
+//	@tag.name					Plugins
+//	@tag.description			Installed plugin list and versions
+//	@tag.name					Updates
+//	@tag.description			Unraid OS and plugin update availability

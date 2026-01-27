@@ -2,13 +2,14 @@
 ARG BASE_IMAGE=mcr.microsoft.com/devcontainers/base:bookworm
 FROM ${BASE_IMAGE}
 
-ARG GO_VERSION=1.24.0
+ARG GO_VERSION=1.25.0
 ARG NODE_VERSION=20
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Base tooling and build dependencies
 # Added development tools: php-cli (plugin page validation), shellcheck (bash linting), yamllint (YAML validation)
+# Added sshpass (SSH passwordless authentication), pre-commit (git hooks framework), mosquitto-clients (MQTT testing)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
@@ -31,7 +32,15 @@ RUN apt-get update \
         php-cli \
         shellcheck \
         yamllint \
+        sshpass \
+        python3-pip \
+        python3-venv \
+        python3-dev \
+        mosquitto-clients \
     && rm -rf /var/lib/apt/lists/*
+
+# Install pre-commit framework using pip (must be after python3-pip is installed)
+RUN pip3 install --no-cache-dir --break-system-packages pre-commit 2>/dev/null || pip3 install --no-cache-dir pre-commit
 
 # Install Go (matches go.mod requirement) for linux/amd64 (deployment target)
 RUN curl -fsSL https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz -o /tmp/go.tgz \

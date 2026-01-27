@@ -39,6 +39,11 @@ type DiskInfo struct {
 	MountPoint   string  `json:"mount_point,omitempty" example:"/mnt/disk1"`
 	UsagePercent float64 `json:"usage_percent,omitempty" example:"45.0"`
 
+	// Per-disk temperature thresholds (Issue #46)
+	// If set, these override the global defaults. Null/omitted means use global defaults.
+	TempWarning  *int `json:"temp_warning_celsius,omitempty" example:"50"`  // Per-disk warning threshold override
+	TempCritical *int `json:"temp_critical_celsius,omitempty" example:"60"` // Per-disk critical threshold override
+
 	Timestamp time.Time `json:"timestamp"`
 }
 

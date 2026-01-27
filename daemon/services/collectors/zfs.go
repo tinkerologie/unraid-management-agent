@@ -526,7 +526,7 @@ func (c *ZFSCollector) collectARCStats() (dto.ZFSARCStats, error) {
 	if err != nil {
 		return stats, fmt.Errorf("failed to open ARC stats file: %w", err)
 	}
-	defer file.Close()
+	defer file.Close() //nolint:errcheck // Error checking not needed for defer Close
 
 	// Parse ARC stats (format: "name type data")
 	scanner := bufio.NewScanner(file)

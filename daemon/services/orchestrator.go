@@ -2,6 +2,7 @@
 package services
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"sync"
@@ -9,9 +10,11 @@ import (
 	"time"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/api"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/mcp"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/mqtt"
 )
 
 // Orchestrator coordinates the lifecycle of all collectors, API server, and handles graceful shutdown.
@@ -19,6 +22,7 @@ import (
 type Orchestrator struct {
 	ctx              *domain.Context
 	collectorManager *CollectorManager
+	mqttClient       *mqtt.Client
 }
 
 // CreateOrchestrator creates a new orchestrator with the given context.
@@ -33,6 +37,10 @@ func (o *Orchestrator) Run() error {
 
 	// WaitGroup to track all goroutines
 	var wg sync.WaitGroup
+
+	// Create context for cancellation
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// Initialize collector manager
 	o.collectorManager = NewCollectorManager(o.ctx, &wg)
@@ -50,6 +58,11 @@ func (o *Orchestrator) Run() error {
 
 	// Small delay to ensure subscriptions are fully set up
 	time.Sleep(100 * time.Millisecond)
+
+	// Initialize MQTT client if enabled
+	if o.ctx.MQTTConfig.Enabled {
+		o.initializeMQTT(ctx, &wg, apiServer)
+	}
 
 	// Initialize MCP server for AI agent integration (HTTP transport)
 	mcpServer := mcp.NewServer(o.ctx, apiServer)
@@ -106,18 +119,151 @@ func (o *Orchestrator) Run() error {
 
 	logger.Warning("Received %s signal, shutting down...", sig)
 
+	// Cancel the context to stop all goroutines
+	cancel()
+
 	// Graceful shutdown
-	// 1. Stop all collectors via manager
+	// 1. Stop MQTT client if running
+	if o.mqttClient != nil {
+		o.mqttClient.Disconnect()
+		logger.Info("MQTT client disconnected")
+	}
+
+	// 2. Stop all collectors via manager
 	o.collectorManager.StopAll()
 
-	// 2. Stop API server (which also cancels its internal goroutines)
+	// 3. Stop API server (which also cancels its internal goroutines)
 	apiServer.Stop()
 
-	// 3. Wait for all goroutines to complete
+	// 4. Wait for all goroutines to complete
 	logger.Info("Waiting for all goroutines to complete...")
 	wg.Wait()
 
 	logger.Info("Shutdown complete")
 
 	return nil
+}
+
+// initializeMQTT sets up the MQTT client and starts publishing events.
+func (o *Orchestrator) initializeMQTT(ctx context.Context, wg *sync.WaitGroup, apiServer *api.Server) {
+	// Get hostname for MQTT client
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = "unraid"
+	}
+
+	// Convert domain config to DTO config
+	mqttConfig := o.ctx.MQTTConfig.ToDTOConfig()
+
+	// Create MQTT client
+	o.mqttClient = mqtt.NewClient(mqttConfig, hostname, o.ctx.Version)
+
+	// Connect to broker
+	if err := o.mqttClient.Connect(ctx); err != nil {
+		logger.Error("Failed to connect to MQTT broker: %v", err)
+		return
+	}
+
+	logger.Success("MQTT client connected to %s", o.ctx.MQTTConfig.Broker)
+
+	// Set MQTT client on API server for REST endpoints
+	apiServer.SetMQTTClient(o.mqttClient)
+
+	// Start MQTT event subscriber
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		o.subscribeMQTTEvents(ctx, apiServer)
+	}()
+}
+
+// subscribeMQTTEvents subscribes to collector events and publishes them via MQTT.
+func (o *Orchestrator) subscribeMQTTEvents(ctx context.Context, apiServer *api.Server) {
+	logger.Info("MQTT: Starting event subscription...")
+
+	// Subscribe to all relevant events
+	ch := o.ctx.Hub.Sub(
+		"system_update",
+		"array_status_update",
+		"disk_list_update",
+		"share_list_update",
+		"container_list_update",
+		"vm_list_update",
+		"ups_status_update",
+		"gpu_metrics_update",
+		"network_list_update",
+		"notifications_update",
+	)
+
+	defer o.ctx.Hub.Unsub(ch)
+
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Info("MQTT: Event subscription stopping")
+			return
+		case msg := <-ch:
+			o.handleMQTTEvent(msg)
+		}
+	}
+}
+
+// handleMQTTEvent processes an event and publishes it via MQTT.
+func (o *Orchestrator) handleMQTTEvent(msg interface{}) {
+	if o.mqttClient == nil || !o.mqttClient.IsConnected() {
+		return
+	}
+
+	switch v := msg.(type) {
+	case *dto.SystemInfo:
+		if err := o.mqttClient.PublishSystemInfo(v); err != nil {
+			logger.Debug("MQTT: Failed to publish system info: %v", err)
+		}
+	case *dto.ArrayStatus:
+		if err := o.mqttClient.PublishArrayStatus(v); err != nil {
+			logger.Debug("MQTT: Failed to publish array status: %v", err)
+		}
+	case []dto.DiskInfo:
+		if err := o.mqttClient.PublishDisks(v); err != nil {
+			logger.Debug("MQTT: Failed to publish disks: %v", err)
+		}
+	case []dto.ShareInfo:
+		if err := o.mqttClient.PublishShares(v); err != nil {
+			logger.Debug("MQTT: Failed to publish shares: %v", err)
+		}
+	case []*dto.ContainerInfo:
+		// Convert pointer slice to value slice
+		containers := make([]dto.ContainerInfo, len(v))
+		for i, c := range v {
+			containers[i] = *c
+		}
+		if err := o.mqttClient.PublishContainers(containers); err != nil {
+			logger.Debug("MQTT: Failed to publish containers: %v", err)
+		}
+	case []*dto.VMInfo:
+		// Convert pointer slice to value slice
+		vms := make([]dto.VMInfo, len(v))
+		for i, vm := range v {
+			vms[i] = *vm
+		}
+		if err := o.mqttClient.PublishVMs(vms); err != nil {
+			logger.Debug("MQTT: Failed to publish VMs: %v", err)
+		}
+	case *dto.UPSStatus:
+		if err := o.mqttClient.PublishUPSStatus(v); err != nil {
+			logger.Debug("MQTT: Failed to publish UPS status: %v", err)
+		}
+	case []*dto.GPUMetrics:
+		if err := o.mqttClient.PublishGPUMetrics(v); err != nil {
+			logger.Debug("MQTT: Failed to publish GPU metrics: %v", err)
+		}
+	case []dto.NetworkInfo:
+		if err := o.mqttClient.PublishNetworkInfo(v); err != nil {
+			logger.Debug("MQTT: Failed to publish network info: %v", err)
+		}
+	case *dto.NotificationList:
+		if err := o.mqttClient.PublishNotifications(v); err != nil {
+			logger.Debug("MQTT: Failed to publish notifications: %v", err)
+		}
+	}
 }

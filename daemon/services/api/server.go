@@ -26,6 +26,14 @@ type CollectorManagerInterface interface {
 	GetAllStatus() dto.CollectorsStatusResponse
 }
 
+// MQTTClientInterface defines the methods required from MQTT client for API integration
+type MQTTClientInterface interface {
+	IsConnected() bool
+	GetStatus() *dto.MQTTStatus
+	TestConnection() error
+	PublishCustom(topic string, payload interface{}, retain bool) error
+}
+
 // Server represents the HTTP API server that handles REST endpoints and WebSocket connections.
 // It maintains an in-memory cache of data from collectors and broadcasts updates to WebSocket clients.
 type Server struct {
@@ -36,6 +44,7 @@ type Server struct {
 	cancelCtx        context.Context
 	cancelFunc       context.CancelFunc
 	collectorManager CollectorManagerInterface
+	mqttClient       MQTTClientInterface
 
 	// Cache for latest data from collectors
 	cacheMutex         sync.RWMutex
@@ -87,6 +96,9 @@ func (s *Server) setupRoutes() {
 	s.router.Use(loggingMiddleware)
 	s.router.Use(recoveryMiddleware)
 
+	// Prometheus metrics endpoint (at root level, no /api/v1 prefix)
+	s.router.HandleFunc("/metrics", s.handleMetrics).Methods("GET")
+
 	// Swagger UI endpoint (accessible at /swagger/index.html)
 	s.router.PathPrefix("/swagger/").Handler(httpSwagger.Handler(
 		httpSwagger.URL("/swagger/doc.json"),
@@ -117,6 +129,7 @@ func (s *Server) setupRoutes() {
 	// System control endpoints
 	api.HandleFunc("/system/reboot", s.handleSystemReboot).Methods("POST")
 	api.HandleFunc("/system/shutdown", s.handleSystemShutdown).Methods("POST")
+	api.HandleFunc("/system/flash", s.handleFlashHealth).Methods("GET") // Issue #51
 	api.HandleFunc("/network", s.handleNetwork).Methods("GET")
 	api.HandleFunc("/network/access-urls", s.handleNetworkAccessURLs).Methods("GET")
 
@@ -159,6 +172,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/array/parity-check/pause", s.handleParityCheckPause).Methods("POST")
 	api.HandleFunc("/array/parity-check/resume", s.handleParityCheckResume).Methods("POST")
 	api.HandleFunc("/array/parity-check/history", s.handleParityCheckHistory).Methods("GET")
+	api.HandleFunc("/array/parity-check/schedule", s.handleParitySchedule).Methods("GET") // Issue #47
 
 	// Configuration endpoints (read-only)
 	api.HandleFunc("/shares/{name}/config", s.handleShareConfig).Methods("GET")
@@ -167,6 +181,16 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/settings/docker", s.handleDockerSettings).Methods("GET")
 	api.HandleFunc("/settings/vm", s.handleVMSettings).Methods("GET")
 	api.HandleFunc("/settings/disks", s.handleDiskSettings).Methods("GET")
+	api.HandleFunc("/settings/disk-thresholds", s.handleDiskSettingsExtended).Methods("GET") // Issue #45
+	api.HandleFunc("/settings/mover", s.handleMoverSettings).Methods("GET")                  // Issue #48
+	api.HandleFunc("/settings/services", s.handleServiceStatus).Methods("GET")               // Issue #49
+	api.HandleFunc("/settings/network-services", s.handleNetworkServices).Methods("GET")     // Network services status
+
+	// Plugin endpoints (Issue #52)
+	api.HandleFunc("/plugins", s.handlePluginList).Methods("GET")
+
+	// Update status endpoint (Issue #50)
+	api.HandleFunc("/updates", s.handleUpdateStatus).Methods("GET")
 
 	// Configuration endpoints (write)
 	api.HandleFunc("/shares/{name}/config", s.handleUpdateShareConfig).Methods("POST")
@@ -208,6 +232,11 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/collectors/{name}/disable", s.handleCollectorDisable).Methods("POST")
 	api.HandleFunc("/collectors/{name}/interval", s.handleCollectorInterval).Methods("PATCH")
 	api.HandleFunc("/collectors/{name}", s.handleCollectorStatus).Methods("GET")
+
+	// MQTT endpoints
+	api.HandleFunc("/mqtt/status", s.handleMQTTStatus).Methods("GET")
+	api.HandleFunc("/mqtt/test", s.handleMQTTTest).Methods("POST")
+	api.HandleFunc("/mqtt/publish", s.handleMQTTPublish).Methods("POST")
 
 	// WebSocket endpoint
 	api.HandleFunc("/ws", s.handleWebSocket)
@@ -762,4 +791,9 @@ func (s *Server) GetHealthStatus() map[string]interface{} {
 	health["total_vms"] = len(vms)
 
 	return health
+}
+
+// SetMQTTClient sets the MQTT client for API integration.
+func (s *Server) SetMQTTClient(client MQTTClientInterface) {
+	s.mqttClient = client
 }

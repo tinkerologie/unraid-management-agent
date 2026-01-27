@@ -120,6 +120,32 @@ const docTemplate = `{
                 }
             }
         },
+        "/array/parity-check/schedule": {
+            "get": {
+                "description": "Retrieve parity check schedule configuration",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Array"
+                ],
+                "summary": "Get parity check schedule",
+                "responses": {
+                    "200": {
+                        "description": "Parity check schedule",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ParitySchedule"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get schedule",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/array/parity-check/start": {
             "post": {
                 "description": "Start a parity check operation, optionally with correction",
@@ -1121,6 +1147,118 @@ const docTemplate = `{
                 }
             }
         },
+        "/metrics": {
+            "get": {
+                "description": "Returns metrics in Prometheus exposition format for Grafana integration",
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "Monitoring"
+                ],
+                "summary": "Prometheus metrics endpoint",
+                "responses": {
+                    "200": {
+                        "description": "Prometheus metrics",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/mqtt/publish": {
+            "post": {
+                "description": "Publish a custom message to a specific MQTT topic",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "MQTT"
+                ],
+                "summary": "Publish custom MQTT message",
+                "parameters": [
+                    {
+                        "description": "Message to publish",
+                        "name": "message",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.MQTTPublishRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Message published",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to publish",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/mqtt/status": {
+            "get": {
+                "description": "Retrieve MQTT connection status and configuration",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "MQTT"
+                ],
+                "summary": "Get MQTT status",
+                "responses": {
+                    "200": {
+                        "description": "MQTT status",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MQTTStatus"
+                        }
+                    }
+                }
+            }
+        },
+        "/mqtt/test": {
+            "post": {
+                "description": "Test the MQTT broker connection",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "MQTT"
+                ],
+                "summary": "Test MQTT connection",
+                "responses": {
+                    "200": {
+                        "description": "Test successful",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MQTTTestResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Test failed",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MQTTTestResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/network": {
             "get": {
                 "description": "Retrieve information about all network interfaces",
@@ -1576,6 +1714,32 @@ const docTemplate = `{
                 }
             }
         },
+        "/plugins": {
+            "get": {
+                "description": "Retrieve list of installed plugins with their versions and update status",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Plugins"
+                ],
+                "summary": "Get installed plugins list",
+                "responses": {
+                    "200": {
+                        "description": "List of installed plugins",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PluginList"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get plugins",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/registration": {
             "get": {
                 "description": "Retrieve Unraid license/registration information",
@@ -1591,6 +1755,32 @@ const docTemplate = `{
                         "description": "Registration information",
                         "schema": {
                             "$ref": "#/definitions/dto.Registration"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/disk-thresholds": {
+            "get": {
+                "description": "Retrieve disk configuration settings including global temperature thresholds for HDD and SSD",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Configuration"
+                ],
+                "summary": "Get extended disk settings with temperature thresholds",
+                "responses": {
+                    "200": {
+                        "description": "Extended disk settings with temp thresholds",
+                        "schema": {
+                            "$ref": "#/definitions/dto.DiskSettingsExtended"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get settings",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
                         }
                     }
                 }
@@ -1641,6 +1831,84 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Failed to get settings",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/mover": {
+            "get": {
+                "description": "Retrieve mover configuration, schedule, and current running status",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Configuration"
+                ],
+                "summary": "Get mover schedule and status",
+                "responses": {
+                    "200": {
+                        "description": "Mover settings and status",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MoverSettings"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get settings",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/network-services": {
+            "get": {
+                "description": "Retrieve status of all network services including SMB, NFS, FTP, SSH, Telnet, Avahi, WireGuard, etc.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Configuration"
+                ],
+                "summary": "Get network services status",
+                "responses": {
+                    "200": {
+                        "description": "Network services status",
+                        "schema": {
+                            "$ref": "#/definitions/dto.NetworkServicesStatus"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get network services status",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/services": {
+            "get": {
+                "description": "Retrieve whether Docker and VM Manager services are enabled in Unraid settings",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Configuration"
+                ],
+                "summary": "Get Docker and VM service enabled status",
+                "responses": {
+                    "200": {
+                        "description": "Service enabled status",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ServiceStatus"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get status",
                         "schema": {
                             "$ref": "#/definitions/dto.Response"
                         }
@@ -1879,6 +2147,32 @@ const docTemplate = `{
                 }
             }
         },
+        "/system/flash": {
+            "get": {
+                "description": "Retrieve health information for the USB flash boot drive",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System"
+                ],
+                "summary": "Get USB flash drive health",
+                "responses": {
+                    "200": {
+                        "description": "Flash drive health information",
+                        "schema": {
+                            "$ref": "#/definitions/dto.FlashDriveHealth"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get flash health",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/system/reboot": {
             "post": {
                 "description": "Initiate a system reboot",
@@ -1988,6 +2282,32 @@ const docTemplate = `{
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/updates": {
+            "get": {
+                "description": "Retrieve Unraid OS and plugin update availability information",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Updates"
+                ],
+                "summary": "Get update availability status",
+                "responses": {
+                    "200": {
+                        "description": "Update availability status",
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateStatus"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get update status",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
                         }
                     }
                 }
@@ -3097,6 +3417,16 @@ const docTemplate = `{
                     "type": "string",
                     "example": "OK"
                 },
+                "temp_critical_celsius": {
+                    "description": "Per-disk critical threshold override",
+                    "type": "integer",
+                    "example": 60
+                },
+                "temp_warning_celsius": {
+                    "description": "Per-disk temperature thresholds (Issue #46)\nIf set, these override the global defaults. Null/omitted means use global defaults.",
+                    "type": "integer",
+                    "example": 50
+                },
                 "temperature_celsius": {
                     "type": "number",
                     "example": 35
@@ -3150,6 +3480,75 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.DiskSettingsExtended": {
+            "description": "Extended disk settings with temperature thresholds from Unraid configuration",
+            "type": "object",
+            "properties": {
+                "critical_utilization_percent": {
+                    "description": "Disk utilization critical threshold",
+                    "type": "integer",
+                    "example": 90
+                },
+                "default_filesystem": {
+                    "description": "Default filesystem type",
+                    "type": "string",
+                    "example": "xfs"
+                },
+                "hdd_temp_critical_celsius": {
+                    "description": "HDD critical temperature threshold",
+                    "type": "integer",
+                    "example": 55
+                },
+                "hdd_temp_warning_celsius": {
+                    "description": "Temperature thresholds from dynamix.cfg (Issue #45)",
+                    "type": "integer",
+                    "example": 45
+                },
+                "nvme_power_monitoring": {
+                    "description": "NVME power monitoring setting",
+                    "type": "boolean",
+                    "example": false
+                },
+                "shutdown_timeout_seconds": {
+                    "description": "Shutdown timeout in seconds",
+                    "type": "integer",
+                    "example": 90
+                },
+                "spindown_delay_minutes": {
+                    "description": "Basic disk settings (from disk.cfg)",
+                    "type": "integer",
+                    "example": 30
+                },
+                "spinup_groups": {
+                    "description": "Enable spinup groups",
+                    "type": "boolean",
+                    "example": false
+                },
+                "ssd_temp_critical_celsius": {
+                    "description": "SSD critical temperature threshold",
+                    "type": "integer",
+                    "example": 70
+                },
+                "ssd_temp_warning_celsius": {
+                    "description": "SSD warning temperature threshold",
+                    "type": "integer",
+                    "example": 60
+                },
+                "start_array": {
+                    "description": "Auto start array on boot",
+                    "type": "boolean",
+                    "example": true
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "warning_utilization_percent": {
+                    "description": "Disk utilization warning threshold",
+                    "type": "integer",
+                    "example": 70
+                }
+            }
+        },
         "dto.DockerSettings": {
             "type": "object",
             "properties": {
@@ -3183,6 +3582,65 @@ const docTemplate = `{
                 "rpm": {
                     "type": "integer",
                     "example": 1200
+                }
+            }
+        },
+        "dto.FlashDriveHealth": {
+            "description": "USB flash boot drive health information",
+            "type": "object",
+            "properties": {
+                "device": {
+                    "description": "Device path",
+                    "type": "string",
+                    "example": "/dev/sda"
+                },
+                "free_bytes": {
+                    "description": "Free space in bytes",
+                    "type": "integer",
+                    "example": 28752636928
+                },
+                "guid": {
+                    "description": "Flash GUID",
+                    "type": "string",
+                    "example": "0781-5583-..."
+                },
+                "model": {
+                    "description": "Device model",
+                    "type": "string",
+                    "example": "SanDisk Ultra Fit"
+                },
+                "size_bytes": {
+                    "description": "Size and usage",
+                    "type": "integer",
+                    "example": 30752636928
+                },
+                "smart_available": {
+                    "description": "SMART status (may be limited for USB)",
+                    "type": "boolean",
+                    "example": false
+                },
+                "smart_status": {
+                    "description": "SMART status if available",
+                    "type": "string",
+                    "example": "PASSED"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "usage_percent": {
+                    "description": "Usage percentage",
+                    "type": "number",
+                    "example": 6.5
+                },
+                "used_bytes": {
+                    "description": "Used space in bytes",
+                    "type": "integer",
+                    "example": 2000000000
+                },
+                "vendor": {
+                    "description": "Device vendor",
+                    "type": "string",
+                    "example": "SanDisk"
                 }
             }
         },
@@ -3331,6 +3789,105 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.MQTTPublishRequest": {
+            "type": "object",
+            "properties": {
+                "payload": {},
+                "qos": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "retained": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "topic": {
+                    "type": "string",
+                    "example": "custom/topic"
+                }
+            }
+        },
+        "dto.MQTTStatus": {
+            "type": "object",
+            "properties": {
+                "broker": {
+                    "type": "string",
+                    "example": "tcp://localhost:1883"
+                },
+                "client_id": {
+                    "type": "string",
+                    "example": "unraid-agent"
+                },
+                "connected": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "enabled": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "last_connected": {
+                    "type": "string"
+                },
+                "last_disconnect": {
+                    "type": "string"
+                },
+                "last_error": {
+                    "type": "string",
+                    "example": ""
+                },
+                "messages_errors": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "messages_sent": {
+                    "type": "integer",
+                    "example": 1234
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "topic_prefix": {
+                    "type": "string",
+                    "example": "unraid"
+                },
+                "uptime_seconds": {
+                    "type": "integer",
+                    "example": 3600
+                }
+            }
+        },
+        "dto.MQTTTestResponse": {
+            "type": "object",
+            "properties": {
+                "broker_info": {
+                    "type": "string"
+                },
+                "latency_ms": {
+                    "type": "integer",
+                    "example": 15
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Connection successful"
+                },
+                "protocol_version": {
+                    "type": "string",
+                    "example": "3.1.1"
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "tls_enabled": {
+                    "type": "boolean",
+                    "example": false
+                }
+            }
+        },
         "dto.MemoryArrayInfo": {
             "type": "object",
             "properties": {
@@ -3406,6 +3963,35 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "type_detail": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.MoverSettings": {
+            "description": "Mover configuration, schedule, and current status",
+            "type": "object",
+            "properties": {
+                "active": {
+                    "description": "Mover status",
+                    "type": "boolean",
+                    "example": false
+                },
+                "cache_floor_kb": {
+                    "description": "Cache floor in KB",
+                    "type": "integer",
+                    "example": 2000000
+                },
+                "logging": {
+                    "description": "Additional mover settings",
+                    "type": "boolean",
+                    "example": false
+                },
+                "schedule": {
+                    "description": "Mover schedule (cron format)",
+                    "type": "string",
+                    "example": "0 12 * * *"
+                },
+                "timestamp": {
                     "type": "string"
                 }
             }
@@ -3887,6 +4473,165 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.NetworkServiceInfo": {
+            "description": "Status information for a single network service",
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "Service description",
+                    "type": "string",
+                    "example": "Windows file sharing"
+                },
+                "enabled": {
+                    "description": "Is service enabled in configuration",
+                    "type": "boolean",
+                    "example": true
+                },
+                "name": {
+                    "description": "Service name",
+                    "type": "string",
+                    "example": "SMB"
+                },
+                "port": {
+                    "description": "Primary port (if applicable)",
+                    "type": "integer",
+                    "example": 445
+                },
+                "running": {
+                    "description": "Is service currently running",
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "dto.NetworkServicesStatus": {
+            "description": "Status of all Unraid network services (SMB, NFS, FTP, SSH, etc.)",
+            "type": "object",
+            "properties": {
+                "afp": {
+                    "description": "Apple Filing Protocol (via Avahi)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.NetworkServiceInfo"
+                        }
+                    ]
+                },
+                "avahi": {
+                    "description": "Discovery Services",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.NetworkServiceInfo"
+                        }
+                    ]
+                },
+                "enabled_services": {
+                    "description": "Services enabled",
+                    "type": "integer",
+                    "example": 8
+                },
+                "ftp": {
+                    "description": "FTP server",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.NetworkServiceInfo"
+                        }
+                    ]
+                },
+                "netbios": {
+                    "description": "NetBIOS name service",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.NetworkServiceInfo"
+                        }
+                    ]
+                },
+                "nfs": {
+                    "description": "NFS file sharing",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.NetworkServiceInfo"
+                        }
+                    ]
+                },
+                "ntp": {
+                    "description": "NTP time sync",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.NetworkServiceInfo"
+                        }
+                    ]
+                },
+                "running_services": {
+                    "description": "Services currently running",
+                    "type": "integer",
+                    "example": 6
+                },
+                "smb": {
+                    "description": "File Sharing Services",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.NetworkServiceInfo"
+                        }
+                    ]
+                },
+                "ssh": {
+                    "description": "Remote Access Services",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.NetworkServiceInfo"
+                        }
+                    ]
+                },
+                "syslog_server": {
+                    "description": "Syslog remote server",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.NetworkServiceInfo"
+                        }
+                    ]
+                },
+                "telnet": {
+                    "description": "Telnet server",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.NetworkServiceInfo"
+                        }
+                    ]
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "total_services": {
+                    "description": "Summary",
+                    "type": "integer",
+                    "example": 13
+                },
+                "upnp": {
+                    "description": "System Services",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.NetworkServiceInfo"
+                        }
+                    ]
+                },
+                "wireguard": {
+                    "description": "VPN Services",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.NetworkServiceInfo"
+                        }
+                    ]
+                },
+                "wsd": {
+                    "description": "Web Services Discovery",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.NetworkServiceInfo"
+                        }
+                    ]
+                }
+            }
+        },
         "dto.Notification": {
             "type": "object",
             "properties": {
@@ -4025,6 +4770,138 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.ParitySchedule": {
+            "description": "Parity check schedule configuration",
+            "type": "object",
+            "properties": {
+                "correcting": {
+                    "description": "Correcting vs non-correcting check",
+                    "type": "boolean",
+                    "example": true
+                },
+                "cumulative": {
+                    "description": "Resume paused checks",
+                    "type": "boolean",
+                    "example": true
+                },
+                "day": {
+                    "description": "Day of week (0-6) or day of month (1-31)",
+                    "type": "integer",
+                    "example": 0
+                },
+                "day_of_month": {
+                    "description": "Day of month for monthly schedule",
+                    "type": "integer",
+                    "example": 1
+                },
+                "duration_hours": {
+                    "description": "Max duration in hours (0 = unlimited)",
+                    "type": "integer",
+                    "example": 6
+                },
+                "frequency": {
+                    "description": "Frequency multiplier",
+                    "type": "integer",
+                    "example": 1
+                },
+                "hour": {
+                    "description": "Hour to run (0-23)",
+                    "type": "integer",
+                    "example": 0
+                },
+                "mode": {
+                    "description": "Schedule settings",
+                    "type": "string",
+                    "example": "manual"
+                },
+                "pause_hour": {
+                    "description": "Pause/resume schedule",
+                    "type": "integer",
+                    "example": 6
+                },
+                "resume_hour": {
+                    "description": "Hour to resume (if scheduled)",
+                    "type": "integer",
+                    "example": 0
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.PluginInfo": {
+            "description": "Information about an installed Unraid plugin",
+            "type": "object",
+            "properties": {
+                "author": {
+                    "description": "Plugin author",
+                    "type": "string",
+                    "example": "Lime Technology"
+                },
+                "enabled": {
+                    "description": "Is plugin enabled",
+                    "type": "boolean",
+                    "example": true
+                },
+                "icon": {
+                    "description": "Plugin icon",
+                    "type": "string",
+                    "example": "users"
+                },
+                "latest_version": {
+                    "description": "Latest available version",
+                    "type": "string",
+                    "example": "2025.10.28"
+                },
+                "name": {
+                    "description": "Plugin name",
+                    "type": "string",
+                    "example": "community.applications"
+                },
+                "support_url": {
+                    "description": "Support forum URL",
+                    "type": "string"
+                },
+                "update_available": {
+                    "description": "Is update available",
+                    "type": "boolean",
+                    "example": false
+                },
+                "url": {
+                    "description": "Plugin URL",
+                    "type": "string",
+                    "example": "https://..."
+                },
+                "version": {
+                    "description": "Current installed version",
+                    "type": "string",
+                    "example": "2025.10.27"
+                }
+            }
+        },
+        "dto.PluginList": {
+            "description": "List of installed Unraid plugins",
+            "type": "object",
+            "properties": {
+                "plugins": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.PluginInfo"
+                    }
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "total_count": {
+                    "type": "integer",
+                    "example": 18
+                },
+                "updates_available": {
+                    "type": "integer",
+                    "example": 2
+                }
+            }
+        },
         "dto.PortMapping": {
             "type": "object",
             "properties": {
@@ -4129,6 +5006,35 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.ServiceStatus": {
+            "description": "Docker and VM Manager service enabled status",
+            "type": "object",
+            "properties": {
+                "docker_autostart": {
+                    "description": "Docker autostart on boot",
+                    "type": "boolean",
+                    "example": true
+                },
+                "docker_enabled": {
+                    "description": "Docker service enabled",
+                    "type": "boolean",
+                    "example": true
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "vm_autostart": {
+                    "description": "VM autostart on boot",
+                    "type": "boolean",
+                    "example": false
+                },
+                "vm_manager_enabled": {
+                    "description": "VM Manager service enabled",
+                    "type": "boolean",
+                    "example": false
+                }
+            }
+        },
         "dto.ShareConfig": {
             "type": "object",
             "properties": {
@@ -4184,6 +5090,16 @@ const docTemplate = `{
         "dto.ShareInfo": {
             "type": "object",
             "properties": {
+                "cache_pool": {
+                    "description": "Cache pool settings (Issue #53)",
+                    "type": "string",
+                    "example": "cache"
+                },
+                "cache_pool2": {
+                    "description": "Secondary cache pool (for mover destination)",
+                    "type": "string",
+                    "example": ""
+                },
                 "comment": {
                     "description": "Configuration fields from share config",
                     "type": "string",
@@ -4192,6 +5108,11 @@ const docTemplate = `{
                 "free_bytes": {
                     "type": "integer",
                     "example": 5368709120000
+                },
+                "mover_action": {
+                    "description": "Mover action: \"cache-\u003earray\", \"array-\u003ecache\", or empty",
+                    "type": "string",
+                    "example": "cache-\u003earray"
                 },
                 "name": {
                     "type": "string",
@@ -4273,7 +5194,8 @@ const docTemplate = `{
                 "cpu_per_core_usage": {
                     "type": "object",
                     "additionalProperties": {
-                        "type": "number"
+                        "type": "number",
+                        "format": "float64"
                     }
                 },
                 "cpu_temp_celsius": {
@@ -4630,6 +5552,43 @@ const docTemplate = `{
                 },
                 "used_bytes": {
                     "type": "integer"
+                }
+            }
+        },
+        "dto.UpdateStatus": {
+            "description": "Unraid OS and plugin update availability",
+            "type": "object",
+            "properties": {
+                "current_version": {
+                    "description": "Unraid OS update status",
+                    "type": "string",
+                    "example": "7.2.3"
+                },
+                "latest_version": {
+                    "type": "string",
+                    "example": "7.2.4"
+                },
+                "os_update_available": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "plugin_updates_count": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "plugins_with_updates": {
+                    "description": "Plugin update status",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.PluginInfo"
+                    }
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "total_plugins": {
+                    "type": "integer",
+                    "example": 18
                 }
             }
         },
@@ -5254,6 +6213,14 @@ const docTemplate = `{
         {
             "description": "Unassigned devices and remote shares",
             "name": "Unassigned Devices"
+        },
+        {
+            "description": "Installed plugin list and versions",
+            "name": "Plugins"
+        },
+        {
+            "description": "Unraid OS and plugin update availability",
+            "name": "Updates"
         }
     ]
 }`

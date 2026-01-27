@@ -103,8 +103,6 @@ To maximize security when using this plugin:
 
 **Impact**: All users should upgrade immediately to v2025.11.25
 
-**Details**: See [SECURITY_FIX_PATH_TRAVERSAL.md](SECURITY_FIX_PATH_TRAVERSAL.md) for comprehensive information
-
 ## Scope and Limitations
 
 ### In Scope

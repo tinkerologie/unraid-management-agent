@@ -23,7 +23,8 @@ type Intervals struct {
 
 // Context holds the application runtime context including the event hub and configuration.
 type Context struct {
-	Hub       *pubsub.PubSub
-	Intervals Intervals
+	Hub        *pubsub.PubSub
+	Intervals  Intervals
+	MQTTConfig MQTTConfig
 	Config
 }

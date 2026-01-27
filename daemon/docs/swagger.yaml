@@ -377,6 +377,16 @@ definitions:
       status:
         example: OK
         type: string
+      temp_critical_celsius:
+        description: Per-disk critical threshold override
+        example: 60
+        type: integer
+      temp_warning_celsius:
+        description: |-
+          Per-disk temperature thresholds (Issue #46)
+          If set, these override the global defaults. Null/omitted means use global defaults.
+        example: 50
+        type: integer
       temperature_celsius:
         example: 35
         type: number
@@ -415,6 +425,60 @@ definitions:
       timestamp:
         type: string
     type: object
+  dto.DiskSettingsExtended:
+    description: Extended disk settings with temperature thresholds from Unraid configuration
+    properties:
+      critical_utilization_percent:
+        description: Disk utilization critical threshold
+        example: 90
+        type: integer
+      default_filesystem:
+        description: Default filesystem type
+        example: xfs
+        type: string
+      hdd_temp_critical_celsius:
+        description: HDD critical temperature threshold
+        example: 55
+        type: integer
+      hdd_temp_warning_celsius:
+        description: 'Temperature thresholds from dynamix.cfg (Issue #45)'
+        example: 45
+        type: integer
+      nvme_power_monitoring:
+        description: NVME power monitoring setting
+        example: false
+        type: boolean
+      shutdown_timeout_seconds:
+        description: Shutdown timeout in seconds
+        example: 90
+        type: integer
+      spindown_delay_minutes:
+        description: Basic disk settings (from disk.cfg)
+        example: 30
+        type: integer
+      spinup_groups:
+        description: Enable spinup groups
+        example: false
+        type: boolean
+      ssd_temp_critical_celsius:
+        description: SSD critical temperature threshold
+        example: 70
+        type: integer
+      ssd_temp_warning_celsius:
+        description: SSD warning temperature threshold
+        example: 60
+        type: integer
+      start_array:
+        description: Auto start array on boot
+        example: true
+        type: boolean
+      timestamp:
+        type: string
+      warning_utilization_percent:
+        description: Disk utilization warning threshold
+        example: 70
+        type: integer
+    type: object
   dto.DockerSettings:
     properties:
       custom_networks:
@@ -438,6 +502,52 @@ definitions:
       rpm:
         example: 1200
         type: integer
+    type: object
+  dto.FlashDriveHealth:
+    description: USB flash boot drive health information
+    properties:
+      device:
+        description: Device path
+        example: /dev/sda
+        type: string
+      free_bytes:
+        description: Free space in bytes
+        example: 28752636928
+        type: integer
+      guid:
+        description: Flash GUID
+        example: 0781-5583-...
+        type: string
+      model:
+        description: Device model
+        example: SanDisk Ultra Fit
+        type: string
+      size_bytes:
+        description: Size and usage
+        example: 30752636928
+        type: integer
+      smart_available:
+        description: SMART status (may be limited for USB)
+        example: false
+        type: boolean
+      smart_status:
+        description: SMART status if available
+        example: PASSED
+        type: string
+      timestamp:
+        type: string
+      usage_percent:
+        description: Usage percentage
+        example: 6.5
+        type: number
+      used_bytes:
+        description: Used space in bytes
+        example: 2000000000
+        type: integer
+      vendor:
+        description: Device vendor
+        example: SanDisk
+        type: string
     type: object
   dto.GPUMetrics:
     properties:
@@ -543,6 +653,77 @@ definitions:
       total_lines:
         type: integer
     type: object
+  dto.MQTTPublishRequest:
+    properties:
+      payload: {}
+      qos:
+        example: 1
+        type: integer
+      retained:
+        example: false
+        type: boolean
+      topic:
+        example: custom/topic
+        type: string
+    type: object
+  dto.MQTTStatus:
+    properties:
+      broker:
+        example: tcp://localhost:1883
+        type: string
+      client_id:
+        example: unraid-agent
+        type: string
+      connected:
+        example: true
+        type: boolean
+      enabled:
+        example: true
+        type: boolean
+      last_connected:
+        type: string
+      last_disconnect:
+        type: string
+      last_error:
+        example: ""
+        type: string
+      messages_errors:
+        example: 0
+        type: integer
+      messages_sent:
+        example: 1234
+        type: integer
+      timestamp:
+        type: string
+      topic_prefix:
+        example: unraid
+        type: string
+      uptime_seconds:
+        example: 3600
+        type: integer
+    type: object
+  dto.MQTTTestResponse:
+    properties:
+      broker_info:
+        type: string
+      latency_ms:
+        example: 15
+        type: integer
+      message:
+        example: Connection successful
+        type: string
+      protocol_version:
+        example: 3.1.1
+        type: string
+      success:
+        example: true
+        type: boolean
+      timestamp:
+        type: string
+      tls_enabled:
+        example: false
+        type: boolean
+    type: object
   dto.MemoryArrayInfo:
     properties:
       error_correction_type:
@@ -593,6 +774,28 @@ definitions:
       type:
         type: string
       type_detail:
+        type: string
+    type: object
+  dto.MoverSettings:
+    description: Mover configuration, schedule, and current status
+    properties:
+      active:
+        description: Mover status
+        example: false
+        type: boolean
+      cache_floor_kb:
+        description: Cache floor in KB
+        example: 2000000
+        type: integer
+      logging:
+        description: Additional mover settings
+        example: false
+        type: boolean
+      schedule:
+        description: Mover schedule (cron format)
+        example: 0 12 * * *
+        type: string
+      timestamp:
         type: string
     type: object
   dto.NUTConfig:
@@ -932,6 +1135,100 @@ definitions:
         example: g
         type: string
     type: object
+  dto.NetworkServiceInfo:
+    description: Status information for a single network service
+    properties:
+      description:
+        description: Service description
+        example: Windows file sharing
+        type: string
+      enabled:
+        description: Is service enabled in configuration
+        example: true
+        type: boolean
+      name:
+        description: Service name
+        example: SMB
+        type: string
+      port:
+        description: Primary port (if applicable)
+        example: 445
+        type: integer
+      running:
+        description: Is service currently running
+        example: true
+        type: boolean
+    type: object
+  dto.NetworkServicesStatus:
+    description: Status of all Unraid network services (SMB, NFS, FTP, SSH, etc.)
+    properties:
+      afp:
+        allOf:
+        - $ref: '#/definitions/dto.NetworkServiceInfo'
+        description: Apple Filing Protocol (via Avahi)
+      avahi:
+        allOf:
+        - $ref: '#/definitions/dto.NetworkServiceInfo'
+        description: Discovery Services
+      enabled_services:
+        description: Services enabled
+        example: 8
+        type: integer
+      ftp:
+        allOf:
+        - $ref: '#/definitions/dto.NetworkServiceInfo'
+        description: FTP server
+      netbios:
+        allOf:
+        - $ref: '#/definitions/dto.NetworkServiceInfo'
+        description: NetBIOS name service
+      nfs:
+        allOf:
+        - $ref: '#/definitions/dto.NetworkServiceInfo'
+        description: NFS file sharing
+      ntp:
+        allOf:
+        - $ref: '#/definitions/dto.NetworkServiceInfo'
+        description: NTP time sync
+      running_services:
+        description: Services currently running
+        example: 6
+        type: integer
+      smb:
+        allOf:
+        - $ref: '#/definitions/dto.NetworkServiceInfo'
+        description: File Sharing Services
+      ssh:
+        allOf:
+        - $ref: '#/definitions/dto.NetworkServiceInfo'
+        description: Remote Access Services
+      syslog_server:
+        allOf:
+        - $ref: '#/definitions/dto.NetworkServiceInfo'
+        description: Syslog remote server
+      telnet:
+        allOf:
+        - $ref: '#/definitions/dto.NetworkServiceInfo'
+        description: Telnet server
+      timestamp:
+        type: string
+      total_services:
+        description: Summary
+        example: 13
+        type: integer
+      upnp:
+        allOf:
+        - $ref: '#/definitions/dto.NetworkServiceInfo'
+        description: System Services
+      wireguard:
+        allOf:
+        - $ref: '#/definitions/dto.NetworkServiceInfo'
+        description: VPN Services
+      wsd:
+        allOf:
+        - $ref: '#/definitions/dto.NetworkServiceInfo'
+        description: Web Services Discovery
+    type: object
   dto.Notification:
     properties:
       description:
@@ -1029,6 +1326,107 @@ definitions:
         description: '"OK", "Canceled", or error count'
         type: string
     type: object
+  dto.ParitySchedule:
+    description: Parity check schedule configuration
+    properties:
+      correcting:
+        description: Correcting vs non-correcting check
+        example: true
+        type: boolean
+      cumulative:
+        description: Resume paused checks
+        example: true
+        type: boolean
+      day:
+        description: Day of week (0-6) or day of month (1-31)
+        example: 0
+        type: integer
+      day_of_month:
+        description: Day of month for monthly schedule
+        example: 1
+        type: integer
+      duration_hours:
+        description: Max duration in hours (0 = unlimited)
+        example: 6
+        type: integer
+      frequency:
+        description: Frequency multiplier
+        example: 1
+        type: integer
+      hour:
+        description: Hour to run (0-23)
+        example: 0
+        type: integer
+      mode:
+        description: Schedule settings
+        example: manual
+        type: string
+      pause_hour:
+        description: Pause/resume schedule
+        example: 6
+        type: integer
+      resume_hour:
+        description: Hour to resume (if scheduled)
+        example: 0
+        type: integer
+      timestamp:
+        type: string
+    type: object
+  dto.PluginInfo:
+    description: Information about an installed Unraid plugin
+    properties:
+      author:
+        description: Plugin author
+        example: Lime Technology
+        type: string
+      enabled:
+        description: Is plugin enabled
+        example: true
+        type: boolean
+      icon:
+        description: Plugin icon
+        example: users
+        type: string
+      latest_version:
+        description: Latest available version
+        example: 2025.10.28
+        type: string
+      name:
+        description: Plugin name
+        example: community.applications
+        type: string
+      support_url:
+        description: Support forum URL
+        type: string
+      update_available:
+        description: Is update available
+        example: false
+        type: boolean
+      url:
+        description: Plugin URL
+        example: https://...
+        type: string
+      version:
+        description: Current installed version
+        example: 2025.10.27
+        type: string
+    type: object
+  dto.PluginList:
+    description: List of installed Unraid plugins
+    properties:
+      plugins:
+        items:
+          $ref: '#/definitions/dto.PluginInfo'
+        type: array
+      timestamp:
+        type: string
+      total_count:
+        example: 18
+        type: integer
+      updates_available:
+        example: 2
+        type: integer
+    type: object
   dto.PortMapping:
     properties:
       private_port:
@@ -1104,6 +1502,28 @@ definitions:
         example: 100
         type: integer
     type: object
+  dto.ServiceStatus:
+    description: Docker and VM Manager service enabled status
+    properties:
+      docker_autostart:
+        description: Docker autostart on boot
+        example: true
+        type: boolean
+      docker_enabled:
+        description: Docker service enabled
+        example: true
+        type: boolean
+      timestamp:
+        type: string
+      vm_autostart:
+        description: VM autostart on boot
+        example: false
+        type: boolean
+      vm_manager_enabled:
+        description: VM Manager service enabled
+        example: false
+        type: boolean
+    type: object
   dto.ShareConfig:
     properties:
       allocator:
@@ -1143,6 +1563,14 @@ definitions:
     type: object
   dto.ShareInfo:
     properties:
+      cache_pool:
+        description: 'Cache pool settings (Issue #53)'
+        example: cache
+        type: string
+      cache_pool2:
+        description: Secondary cache pool (for mover destination)
+        example: ""
+        type: string
       comment:
         description: Configuration fields from share config
         example: Media storage share
@@ -1150,6 +1578,10 @@ definitions:
       free_bytes:
         example: 5368709120000
         type: integer
+      mover_action:
+        description: 'Mover action: "cache->array", "array->cache", or empty'
+        example: cache->array
+        type: string
       name:
         example: Media
         type: string
@@ -1210,6 +1642,7 @@ definitions:
         type: string
       cpu_per_core_usage:
         additionalProperties:
+          format: float64
           type: number
         type: object
       cpu_temp_celsius:
@@ -1463,6 +1896,33 @@ definitions:
       usage_percent:
         type: number
       used_bytes:
+        type: integer
+    type: object
+  dto.UpdateStatus:
+    description: Unraid OS and plugin update availability
+    properties:
+      current_version:
+        description: Unraid OS update status
+        example: 7.2.3
+        type: string
+      latest_version:
+        example: 7.2.4
+        type: string
+      os_update_available:
+        example: false
+        type: boolean
+      plugin_updates_count:
+        example: 2
+        type: integer
+      plugins_with_updates:
+        description: Plugin update status
+        items:
+          $ref: '#/definitions/dto.PluginInfo'
+        type: array
+      timestamp:
+        type: string
+      total_plugins:
+        example: 18
         type: integer
     type: object
   dto.UserScriptExecuteRequest:
@@ -1951,6 +2411,23 @@ paths:
           schema:
             $ref: '#/definitions/dto.Response'
       summary: Resume parity check
+      tags:
+      - Array
+  /array/parity-check/schedule:
+    get:
+      description: Retrieve parity check schedule configuration
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Parity check schedule
+          schema:
+            $ref: '#/definitions/dto.ParitySchedule'
+        "500":
+          description: Failed to get schedule
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get parity check schedule
       tags:
       - Array
   /array/parity-check/start:
@@ -2614,6 +3091,79 @@ paths:
       summary: Get specific log file
       tags:
       - Logs
+  /metrics:
+    get:
+      description: Returns metrics in Prometheus exposition format for Grafana integration
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: Prometheus metrics
+          schema:
+            type: string
+      summary: Prometheus metrics endpoint
+      tags:
+      - Monitoring
+  /mqtt/publish:
+    post:
+      consumes:
+      - application/json
+      description: Publish a custom message to a specific MQTT topic
+      parameters:
+      - description: Message to publish
+        in: body
+        name: message
+        required: true
+        schema:
+          $ref: '#/definitions/dto.MQTTPublishRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Message published
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to publish
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Publish custom MQTT message
+      tags:
+      - MQTT
+  /mqtt/status:
+    get:
+      description: Retrieve MQTT connection status and configuration
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: MQTT status
+          schema:
+            $ref: '#/definitions/dto.MQTTStatus'
+      summary: Get MQTT status
+      tags:
+      - MQTT
+  /mqtt/test:
+    post:
+      description: Test the MQTT broker connection
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Test successful
+          schema:
+            $ref: '#/definitions/dto.MQTTTestResponse'
+        "500":
+          description: Test failed
+          schema:
+            $ref: '#/definitions/dto.MQTTTestResponse'
+      summary: Test MQTT connection
+      tags:
+      - MQTT
   /network:
     get:
       description: Retrieve information about all network interfaces
@@ -2915,6 +3465,24 @@ paths:
       summary: Get NUT status
       tags:
       - UPS
+  /plugins:
+    get:
+      description: Retrieve list of installed plugins with their versions and update
+        status
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of installed plugins
+          schema:
+            $ref: '#/definitions/dto.PluginList'
+        "500":
+          description: Failed to get plugins
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get installed plugins list
+      tags:
+      - Plugins
   /registration:
     get:
       description: Retrieve Unraid license/registration information
@@ -2928,6 +3496,24 @@ paths:
       summary: Get registration status
       tags:
       - System
+  /settings/disk-thresholds:
+    get:
+      description: Retrieve disk configuration settings including global temperature
+        thresholds for HDD and SSD
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Extended disk settings with temp thresholds
+          schema:
+            $ref: '#/definitions/dto.DiskSettingsExtended'
+        "500":
+          description: Failed to get settings
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get extended disk settings with temperature thresholds
+      tags:
+      - Configuration
   /settings/disks:
     get:
       description: Retrieve disk configuration settings
@@ -2960,6 +3546,59 @@ paths:
           schema:
             $ref: '#/definitions/dto.Response'
       summary: Get Docker settings
+      tags:
+      - Configuration
+  /settings/mover:
+    get:
+      description: Retrieve mover configuration, schedule, and current running status
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Mover settings and status
+          schema:
+            $ref: '#/definitions/dto.MoverSettings'
+        "500":
+          description: Failed to get settings
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get mover schedule and status
+      tags:
+      - Configuration
+  /settings/network-services:
+    get:
+      description: Retrieve status of all network services including SMB, NFS, FTP,
+        SSH, Telnet, Avahi, WireGuard, etc.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Network services status
+          schema:
+            $ref: '#/definitions/dto.NetworkServicesStatus'
+        "500":
+          description: Failed to get network services status
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get network services status
+      tags:
+      - Configuration
+  /settings/services:
+    get:
+      description: Retrieve whether Docker and VM Manager services are enabled in
+        Unraid settings
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Service enabled status
+          schema:
+            $ref: '#/definitions/dto.ServiceStatus'
+        "500":
+          description: Failed to get status
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get Docker and VM service enabled status
       tags:
       - Configuration
   /settings/system:
@@ -3115,6 +3754,23 @@ paths:
       summary: Get system information
       tags:
       - System
+  /system/flash:
+    get:
+      description: Retrieve health information for the USB flash boot drive
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Flash drive health information
+          schema:
+            $ref: '#/definitions/dto.FlashDriveHealth'
+        "500":
+          description: Failed to get flash health
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get USB flash drive health
+      tags:
+      - System
   /system/reboot:
     post:
       description: Initiate a system reboot
@@ -3190,6 +3846,23 @@ paths:
       summary: Get remote shares only
       tags:
       - Unassigned Devices
+  /updates:
+    get:
+      description: Retrieve Unraid OS and plugin update availability information
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Update availability status
+          schema:
+            $ref: '#/definitions/dto.UpdateStatus'
+        "500":
+          description: Failed to get update status
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get update availability status
+      tags:
+      - Updates
   /ups:
     get:
       description: Retrieve UPS status information from apcupsd
@@ -3635,3 +4308,7 @@ tags:
   name: WebSocket
 - description: Unassigned devices and remote shares
   name: Unassigned Devices
+- description: Installed plugin list and versions
+  name: Plugins
+- description: Unraid OS and plugin update availability
+  name: Updates

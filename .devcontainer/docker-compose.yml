@@ -8,9 +8,50 @@ services:
       context: ..
       dockerfile: .devcontainer/Dockerfile
       args:
-        GO_VERSION: 1.24.0
+        GO_VERSION: 1.25.0
         NODE_VERSION: 20
     volumes:
       - ..:/workspaces/unraid-management-agent:cached
+    networks:
+      - unraid-dev-network
+    depends_on:
+      - mosquitto
     init: true
     tty: true
+
+  # Mosquitto MQTT Broker for testing MQTT functionality
+  mosquitto:
+    image: eclipse-mosquitto:2.0.18-alpine
+    container_name: unraid-mqtt-broker
+    platform: linux/amd64
+    ports:
+      - "1883:1883" # MQTT broker port
+      - "9001:9001" # WebSocket port (optional)
+    volumes:
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-logs:/mosquitto/log
+      - ./.devcontainer/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    networks:
+      - unraid-dev-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mosquitto_sub",
+          "-h",
+          "localhost",
+          "-t",
+          "$SYS/broker/clients/connected",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: mosquitto -c /mosquitto/config/mosquitto.conf
+
+volumes:
+  mosquitto-data:
+  mosquitto-logs:
+
+networks:
+  unraid-dev-network:
+    driver: bridge

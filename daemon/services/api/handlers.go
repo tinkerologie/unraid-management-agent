@@ -2318,3 +2318,362 @@ func (s *Server) handleCollectorInterval(w http.ResponseWriter, r *http.Request)
 		Timestamp: time.Now(),
 	})
 }
+
+// =============================================================================
+// Settings Endpoints - Issues #45, #46, #47, #48, #49, #50, #51, #52, #53
+// =============================================================================
+
+// handleDiskSettingsExtended godoc
+//
+//	@Summary		Get extended disk settings with temperature thresholds
+//	@Description	Retrieve disk configuration settings including global temperature thresholds for HDD and SSD
+//	@Tags			Configuration
+//	@Produce		json
+//	@Success		200	{object}	dto.DiskSettingsExtended	"Extended disk settings with temp thresholds"
+//	@Failure		500	{object}	dto.Response				"Failed to get settings"
+//	@Router			/settings/disk-thresholds [get]
+func (s *Server) handleDiskSettingsExtended(w http.ResponseWriter, _ *http.Request) {
+	logger.Debug("API: Getting extended disk settings with temperature thresholds")
+
+	settingsCollector := collectors.NewSettingsCollector()
+	settings, err := settingsCollector.GetDiskSettingsExtended()
+
+	if err != nil {
+		logger.Error("API: Failed to get extended disk settings: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to get extended disk settings: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, settings)
+}
+
+// handleMoverSettings godoc
+//
+//	@Summary		Get mover schedule and status
+//	@Description	Retrieve mover configuration, schedule, and current running status
+//	@Tags			Configuration
+//	@Produce		json
+//	@Success		200	{object}	dto.MoverSettings	"Mover settings and status"
+//	@Failure		500	{object}	dto.Response		"Failed to get settings"
+//	@Router			/settings/mover [get]
+func (s *Server) handleMoverSettings(w http.ResponseWriter, _ *http.Request) {
+	logger.Debug("API: Getting mover settings")
+
+	settingsCollector := collectors.NewSettingsCollector()
+	settings, err := settingsCollector.GetMoverSettings()
+
+	if err != nil {
+		logger.Error("API: Failed to get mover settings: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to get mover settings: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, settings)
+}
+
+// handleParitySchedule godoc
+//
+//	@Summary		Get parity check schedule
+//	@Description	Retrieve parity check schedule configuration
+//	@Tags			Array
+//	@Produce		json
+//	@Success		200	{object}	dto.ParitySchedule	"Parity check schedule"
+//	@Failure		500	{object}	dto.Response		"Failed to get schedule"
+//	@Router			/array/parity-check/schedule [get]
+func (s *Server) handleParitySchedule(w http.ResponseWriter, _ *http.Request) {
+	logger.Debug("API: Getting parity check schedule")
+
+	settingsCollector := collectors.NewSettingsCollector()
+	schedule, err := settingsCollector.GetParitySchedule()
+
+	if err != nil {
+		logger.Error("API: Failed to get parity schedule: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to get parity schedule: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, schedule)
+}
+
+// handleServiceStatus godoc
+//
+//	@Summary		Get Docker and VM service enabled status
+//	@Description	Retrieve whether Docker and VM Manager services are enabled in Unraid settings
+//	@Tags			Configuration
+//	@Produce		json
+//	@Success		200	{object}	dto.ServiceStatus	"Service enabled status"
+//	@Failure		500	{object}	dto.Response		"Failed to get status"
+//	@Router			/settings/services [get]
+func (s *Server) handleServiceStatus(w http.ResponseWriter, _ *http.Request) {
+	logger.Debug("API: Getting service status")
+
+	settingsCollector := collectors.NewSettingsCollector()
+	status, err := settingsCollector.GetServiceStatus()
+
+	if err != nil {
+		logger.Error("API: Failed to get service status: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to get service status: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, status)
+}
+
+// handlePluginList godoc
+//
+//	@Summary		Get installed plugins list
+//	@Description	Retrieve list of installed plugins with their versions and update status
+//	@Tags			Plugins
+//	@Produce		json
+//	@Success		200	{object}	dto.PluginList	"List of installed plugins"
+//	@Failure		500	{object}	dto.Response	"Failed to get plugins"
+//	@Router			/plugins [get]
+func (s *Server) handlePluginList(w http.ResponseWriter, _ *http.Request) {
+	logger.Debug("API: Getting plugin list")
+
+	settingsCollector := collectors.NewSettingsCollector()
+	plugins, err := settingsCollector.GetPluginList()
+
+	if err != nil {
+		logger.Error("API: Failed to get plugin list: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to get plugin list: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, plugins)
+}
+
+// handleUpdateStatus godoc
+//
+//	@Summary		Get update availability status
+//	@Description	Retrieve Unraid OS and plugin update availability information
+//	@Tags			Updates
+//	@Produce		json
+//	@Success		200	{object}	dto.UpdateStatus	"Update availability status"
+//	@Failure		500	{object}	dto.Response		"Failed to get update status"
+//	@Router			/updates [get]
+func (s *Server) handleUpdateStatus(w http.ResponseWriter, _ *http.Request) {
+	logger.Debug("API: Getting update status")
+
+	settingsCollector := collectors.NewSettingsCollector()
+	status, err := settingsCollector.GetUpdateStatus()
+
+	if err != nil {
+		logger.Error("API: Failed to get update status: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to get update status: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, status)
+}
+
+// handleFlashHealth godoc
+//
+//	@Summary		Get USB flash drive health
+//	@Description	Retrieve health information for the USB flash boot drive
+//	@Tags			System
+//	@Produce		json
+//	@Success		200	{object}	dto.FlashDriveHealth	"Flash drive health information"
+//	@Failure		500	{object}	dto.Response			"Failed to get flash health"
+//	@Router			/system/flash [get]
+func (s *Server) handleFlashHealth(w http.ResponseWriter, _ *http.Request) {
+	logger.Debug("API: Getting flash drive health")
+
+	settingsCollector := collectors.NewSettingsCollector()
+	health, err := settingsCollector.GetFlashDriveHealth()
+
+	if err != nil {
+		logger.Error("API: Failed to get flash drive health: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to get flash drive health: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, health)
+}
+
+// handleNetworkServices godoc
+//
+//	@Summary		Get network services status
+//	@Description	Retrieve status of all network services including SMB, NFS, FTP, SSH, Telnet, Avahi, WireGuard, etc.
+//	@Tags			Configuration
+//	@Produce		json
+//	@Success		200	{object}	dto.NetworkServicesStatus	"Network services status"
+//	@Failure		500	{object}	dto.Response				"Failed to get network services status"
+//	@Router			/settings/network-services [get]
+func (s *Server) handleNetworkServices(w http.ResponseWriter, _ *http.Request) {
+	logger.Debug("API: Getting network services status")
+
+	settingsCollector := collectors.NewSettingsCollector()
+	status, err := settingsCollector.GetNetworkServicesStatus()
+
+	if err != nil {
+		logger.Error("API: Failed to get network services status: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to get network services status: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, status)
+}
+
+// =============================================================================
+// MQTT Endpoints
+// =============================================================================
+
+// handleMQTTStatus godoc
+//
+//	@Summary		Get MQTT status
+//	@Description	Retrieve MQTT connection status and configuration
+//	@Tags			MQTT
+//	@Produce		json
+//	@Success		200	{object}	dto.MQTTStatus	"MQTT status"
+//	@Router			/mqtt/status [get]
+func (s *Server) handleMQTTStatus(w http.ResponseWriter, _ *http.Request) {
+	logger.Debug("API: Getting MQTT status")
+
+	// Check if MQTT is configured
+	if s.mqttClient == nil {
+		respondJSON(w, http.StatusOK, dto.MQTTStatus{
+			Connected: false,
+			Enabled:   s.ctx.MQTTConfig.Enabled,
+			Broker:    s.ctx.MQTTConfig.Broker,
+			LastError: "MQTT client not initialized",
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	status := s.mqttClient.GetStatus()
+	respondJSON(w, http.StatusOK, status)
+}
+
+// handleMQTTTest godoc
+//
+//	@Summary		Test MQTT connection
+//	@Description	Test the MQTT broker connection
+//	@Tags			MQTT
+//	@Produce		json
+//	@Success		200	{object}	dto.MQTTTestResponse	"Test successful"
+//	@Failure		500	{object}	dto.MQTTTestResponse	"Test failed"
+//	@Router			/mqtt/test [post]
+func (s *Server) handleMQTTTest(w http.ResponseWriter, _ *http.Request) {
+	logger.Info("API: Testing MQTT connection")
+
+	if s.mqttClient == nil {
+		respondJSON(w, http.StatusServiceUnavailable, dto.MQTTTestResponse{
+			Success:   false,
+			Message:   "MQTT client not initialized. Enable MQTT in configuration.",
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	err := s.mqttClient.TestConnection()
+	if err != nil {
+		logger.Error("API: MQTT test failed: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.MQTTTestResponse{
+			Success:   false,
+			Message:   fmt.Sprintf("MQTT connection test failed: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.MQTTTestResponse{
+		Success:   true,
+		Message:   "MQTT connection test successful",
+		Timestamp: time.Now(),
+	})
+}
+
+// handleMQTTPublish godoc
+//
+//	@Summary		Publish custom MQTT message
+//	@Description	Publish a custom message to a specific MQTT topic
+//	@Tags			MQTT
+//	@Accept			json
+//	@Produce		json
+//	@Param			message	body		dto.MQTTPublishRequest	true	"Message to publish"
+//	@Success		200		{object}	dto.Response			"Message published"
+//	@Failure		400		{object}	dto.Response			"Invalid request"
+//	@Failure		500		{object}	dto.Response			"Failed to publish"
+//	@Router			/mqtt/publish [post]
+func (s *Server) handleMQTTPublish(w http.ResponseWriter, r *http.Request) {
+	logger.Info("API: Publishing custom MQTT message")
+
+	if s.mqttClient == nil {
+		respondJSON(w, http.StatusServiceUnavailable, dto.Response{
+			Success:   false,
+			Message:   "MQTT client not initialized. Enable MQTT in configuration.",
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	var req dto.MQTTPublishRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Invalid request body: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	if req.Topic == "" {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   "Topic is required",
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	err := s.mqttClient.PublishCustom(req.Topic, req.Payload, req.Retained)
+	if err != nil {
+		logger.Error("API: Failed to publish MQTT message: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to publish message: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   fmt.Sprintf("Message published to topic: %s", req.Topic),
+		Timestamp: time.Now(),
+	})
+}

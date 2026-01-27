@@ -209,6 +209,21 @@ func (c *DiskCollector) parseDiskKeyValue(disk *dto.DiskInfo, line string) {
 		}
 	case "format":
 		disk.FileSystem = value
+	// Per-disk temperature threshold overrides (Issue #46)
+	case "warning":
+		// Per-disk warning temperature override
+		if value != "" {
+			if temp, err := strconv.Atoi(value); err == nil {
+				disk.TempWarning = &temp
+			}
+		}
+	case "critical":
+		// Per-disk critical temperature override
+		if value != "" {
+			if temp, err := strconv.Atoi(value); err == nil {
+				disk.TempCritical = &temp
+			}
+		}
 	}
 }
 

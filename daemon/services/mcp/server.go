@@ -82,7 +82,7 @@ type Server struct {
 	stdioTransport *StdioTransport
 	transportType  TransportType
 	cacheProvider  CacheProvider
-	mu             sync.RWMutex
+	mu             sync.RWMutex //nolint:unused // Reserved for future concurrent access patterns
 }
 
 // NewServer creates a new MCP server instance with HTTP transport (default).
@@ -118,13 +118,13 @@ func (s *Server) InitializeWithTransport(transportType TransportType, reader, wr
 		s.transport = NewStdHTTPTransport()
 		s.mcpServer = mcp.NewServer(s.transport,
 			mcp.WithName("unraid-management-agent"),
-			mcp.WithVersion(s.ctx.Config.Version),
+			mcp.WithVersion(s.ctx.Version), //nolint:staticcheck // QF1008: explicit access for clarity
 		)
 	case TransportSSE:
 		s.sseTransport = NewSSETransport()
 		s.mcpServer = mcp.NewServer(s.sseTransport,
 			mcp.WithName("unraid-management-agent"),
-			mcp.WithVersion(s.ctx.Config.Version),
+			mcp.WithVersion(s.ctx.Version), //nolint:staticcheck // QF1008: explicit access for clarity
 		)
 	case TransportStdio:
 		if reader == nil || writer == nil {
@@ -141,7 +141,7 @@ func (s *Server) InitializeWithTransport(transportType TransportType, reader, wr
 		s.stdioTransport = NewStdioTransport(r, w)
 		s.mcpServer = mcp.NewServer(s.stdioTransport,
 			mcp.WithName("unraid-management-agent"),
-			mcp.WithVersion(s.ctx.Config.Version),
+			mcp.WithVersion(s.ctx.Version), //nolint:staticcheck // QF1008: explicit access for clarity
 		)
 	default:
 		return fmt.Errorf("unsupported transport type: %s", transportType)

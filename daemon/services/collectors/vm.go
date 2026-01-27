@@ -18,7 +18,7 @@ import (
 // vmCPUStats holds CPU usage tracking data for a VM
 type vmCPUStats struct {
 	guestCPUTime uint64    // Cumulative guest CPU time in nanoseconds
-	hostCPUTime  uint64    // Cumulative host CPU time in clock ticks
+	hostCPUTime  uint64    //nolint:unused // Reserved for future CPU tracking features
 	timestamp    time.Time // When this measurement was taken
 }
 
@@ -69,7 +69,7 @@ func (c *VMCollector) Collect() {
 		c.appCtx.Hub.Pub([]*dto.VMInfo{}, "vm_list_update")
 		return
 	}
-	defer l.Disconnect()
+	defer l.Disconnect() //nolint:errcheck
 
 	// List all domains (active and inactive)
 	flags := libvirt.ConnectListDomainsActive | libvirt.ConnectListDomainsInactive

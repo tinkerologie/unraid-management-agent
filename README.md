@@ -80,7 +80,9 @@ For information about the official Unraid GraphQL API, please refer to:
 
 - **REST API**: HTTP endpoints for synchronous queries
 - **WebSocket**: Real-time event streaming for live updates
-- **MCP (Model Context Protocol)**: AI agent integration for LLM-powered monitoring and control
+- **Prometheus**: Native `/metrics` endpoint for Grafana/monitoring integration (41 metrics)
+- **MQTT**: Event publishing to MQTT brokers for IoT integration and Home Assistant
+- **MCP (Model Context Protocol)**: AI agent integration for LLM-powered monitoring and control (54 tools)
 
 ## Architecture
 
@@ -277,6 +279,17 @@ Base URL: `http://localhost:8043/api/v1`
 - `GET /logs` - List log files or get log content
 - `GET /logs/{filename}` - Get specific log file by name
 
+#### Settings & Configuration Endpoints
+
+- `GET /settings/disk-thresholds` - Global disk temperature warning/critical thresholds
+- `GET /settings/mover` - Mover schedule, thresholds, and running status
+- `GET /settings/services` - Docker and VM Manager enabled/disabled status
+- `GET /settings/network-services` - Network services status (SMB, NFS, FTP, SSH, VPN, etc.)
+- `GET /array/parity-check/schedule` - Parity check schedule configuration
+- `GET /plugins` - List installed plugins with versions and update status
+- `GET /updates` - OS and plugin update availability
+- `GET /system/flash` - USB flash boot drive health statistics
+
 #### Control Endpoints
 
 - `POST /docker/{id}/start` - Start container
@@ -305,6 +318,88 @@ ws.onmessage = (event) => {
 };
 ```
 
+### Prometheus Metrics
+
+The agent exposes **41 metrics** in Prometheus format at `/metrics`:
+
+```bash
+# Scrape metrics
+curl http://localhost:8043/metrics
+```
+
+Available metrics include:
+
+- **Array**: state, capacity, usage, parity status
+- **CPU**: usage, temperature
+- **Memory**: total, used, usage percentage
+- **Disks**: size, free space, temperature, SMART status, standby state
+- **Docker**: container counts, states
+- **VMs**: VM counts, states
+- **GPU**: utilization, temperature, memory, power
+- **UPS**: battery charge, load, runtime, status
+- **Shares**: share counts, usage
+- **Services**: service states
+- **Parity**: parity validity, check progress
+- **System**: uptime, info labels
+
+For Grafana integration, see [docs/integrations/GRAFANA.md](docs/integrations/GRAFANA.md).
+
+### MQTT Publishing
+
+Publish system events to MQTT brokers for IoT integration and Home Assistant:
+
+```bash
+# Enable MQTT publishing
+./unraid-management-agent boot \
+  --mqtt-enabled \
+  --mqtt-broker "192.168.1.100" \
+  --mqtt-port 1883 \
+  --mqtt-topic-prefix "unraid/tower"
+
+# With authentication
+./unraid-management-agent boot \
+  --mqtt-enabled \
+  --mqtt-broker "mqtt.example.com" \
+  --mqtt-port 1883 \
+  --mqtt-username "unraid" \
+  --mqtt-password "secret" \
+  --mqtt-use-tls \
+  --mqtt-topic-prefix "homelab/unraid"
+
+# Home Assistant auto-discovery
+./unraid-management-agent boot \
+  --mqtt-enabled \
+  --mqtt-broker "192.168.1.100" \
+  --mqtt-home-assistant
+```
+
+**Published Events:**
+
+- System metrics (CPU, RAM, temperatures)
+- Array status and capacity
+- Disk information and health
+- Container and VM states
+- Share usage
+- UPS status
+- GPU metrics
+- Network statistics
+- Notifications
+
+**Configuration via REST API:**
+
+```bash
+# Check MQTT status
+curl http://localhost:8043/api/v1/mqtt/status
+
+# Test MQTT connection
+curl -X POST http://localhost:8043/api/v1/mqtt/test
+
+# Publish custom message
+curl -X POST http://localhost:8043/api/v1/mqtt/publish \
+  -H "Content-Type: application/json" \
+  -d '{"topic":"custom/topic","payload":{"message":"hello"},"retained":false}'
+```
+
 ### MCP (Model Context Protocol)
 
 The agent includes an MCP endpoint for AI agent integration at `POST /mcp`:
@@ -321,7 +416,7 @@ curl -X POST http://localhost:8043/mcp \
   -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_system_info","arguments":{}},"id":1}'
 ```
 
-For full MCP documentation including all tools, resources, and prompts, see [docs/MCP_INTEGRATION.md](docs/MCP_INTEGRATION.md).
+For full MCP documentation including all 54 tools, 5 resources, and 3 prompts, see [docs/MCP_INTEGRATION.md](docs/MCP_INTEGRATION.md).
 
 ### Example API Usage
 
@@ -391,7 +486,7 @@ make clean
 - Prereqs: Docker (or compatible), VS Code with Dev Containers extension.
 - Open the repo in VS Code and run `Dev Containers: Reopen in Container`.
 - Builds image and container named `unraid-management-agent-dev` via `.devcontainer/docker-compose.yml`.
-- Tooling baked in: Go 1.24, Node.js 20, GitHub CLI (`gh`), Copilot CLI, make, gcc, jq.
+- Tooling baked in: Go 1.25, Node.js 20, GitHub CLI (`gh`), Copilot CLI, make, gcc, jq.
 - VS Code extensions auto-installed: Go, Makefile Tools, Prettier, GitHub (PRs, Codespaces, Actions, Copilot, Copilot Chat, RemoteHub, theme), and Claude Dev.
 - Post-create runs `go mod download`; run `make test` to verify after attach.
 
@@ -403,7 +498,6 @@ Configure the plugin through the Unraid web UI:
 
 1. Navigate to **Settings** → **Unraid Management Agent**
 2. Adjust settings as needed:
-
    - **Port**: API server port (default: 8043)
    - **Collection Intervals**: How often each data type is collected
 
@@ -631,61 +725,12 @@ As a single maintainer, it's challenging to:
 
 MIT License - see [LICENSE](LICENSE) file for details
 
-## Documentation
-
-Comprehensive documentation is available in the `docs/` directory:
-
-- **[Documentation Index](docs/README.md)** - Complete documentation overview
-- **[API Reference](docs/api/API_REFERENCE.md)** - Detailed API endpoint reference (46 endpoints)
-- **[MCP Integration](docs/MCP_INTEGRATION.md)** - Model Context Protocol for AI agents (54 tools)
-- **[WebSocket Events](docs/websocket/WEBSOCKET_EVENTS_DOCUMENTATION.md)** - WebSocket event system guide
-- **[System Requirements](docs/SYSTEM_REQUIREMENTS_AND_DEPENDENCIES.md)** - Dependencies and requirements
-- **[Changelog](CHANGELOG.md)** - Version history and release notes
-
 ## Support
 
 For issues, questions, or feature requests:
 
 - Check existing documentation in the `docs/` directory
 - Review the [Documentation Index](docs/README.md) for comprehensive guides
-
-## Roadmap
-
-### Planned Enhancements
-
-The following features are planned for future releases:
-
-- **User Management Collector**
-
-  - User account listing and information
-  - User permissions and group membership
-  - Active user sessions monitoring
-
-- **Network Statistics Trending**
-
-  - Historical network bandwidth tracking
-  - Time-series data for network metrics
-  - Bandwidth usage trends and analysis
-
-- **Alerting and Notification System**
-
-  - Configurable alert rules and thresholds
-  - Notification delivery (email, webhook, etc.)
-  - Alert history and acknowledgment
-  - Integration with monitoring platforms
-
-- **Historical Data Storage**
-
-  - Time-series database integration
-  - Long-term metrics retention
-  - Historical data querying and analysis
-  - Data export capabilities
-
-- **Plugin Management Endpoints**
-  - Plugin installation and removal
-  - Plugin listing and status
-  - Plugin configuration management
-  - Plugin update notifications
 
 ## Changelog
 

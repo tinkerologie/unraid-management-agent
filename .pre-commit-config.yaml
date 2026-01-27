@@ -88,15 +88,14 @@ repos:
   #       args: ['-race', '-timeout=60s']
 
   # golangci-lint - comprehensive linting with zero tolerance
-  - repo: https://github.com/golangci/golangci-lint
-    rev: v1.62.2
+  - repo: local
     hooks:
       - id: golangci-lint
         name: golangci-lint (Zero Tolerance)
         description: Run golangci-lint with strict configuration
         entry: golangci-lint run
         types: [go]
-        language: golang
+        language: system
         pass_filenames: false
         args:
           - --timeout=5m
@@ -112,10 +111,18 @@ repos:
       - id: gosec
         name: GoSec Security Scanner
         description: Security scanner for Go code
-        entry: bash -c 'if command -v gosec >/dev/null 2>&1; then gosec -fmt=text -exclude-dir=vendor -exclude-dir=tests -exclude=G115,G304,G301,G306 -severity=medium -confidence=medium ./...; else echo "gosec not installed. Run go install github.com/securego/gosec/v2/cmd/gosec@latest"; exit 0; fi'
+        entry: gosec
         language: system
         pass_filenames: false
         files: '\.go$'
+        args:
+          - -fmt=text
+          - -exclude-dir=vendor
+          - -exclude-dir=tests
+          - -exclude=G115,G304,G301,G306
+          - -severity=medium
+          - -confidence=medium
+          - ./...
 
   # Markdown linting
   - repo: https://github.com/igorshubovych/markdownlint-cli

@@ -52,6 +52,21 @@ var cli struct {
 	// Collector disable flag (alternative to setting interval=0)
 	DisableCollectors string `default:"" env:"UNRAID_DISABLE_COLLECTORS" help:"comma-separated list of collectors to disable (e.g., gpu,ups,zfs)"`
 
+	// MQTT Configuration
+	MQTTEnabled            bool   `default:"false" env:"MQTT_ENABLED" help:"enable MQTT publishing"`
+	MQTTBroker             string `default:"" env:"MQTT_BROKER" help:"MQTT broker hostname or IP"`
+	MQTTPort               int    `default:"1883" env:"MQTT_PORT" help:"MQTT broker port"`
+	MQTTUsername           string `default:"" env:"MQTT_USERNAME" help:"MQTT username"`
+	MQTTPassword           string `default:"" env:"MQTT_PASSWORD" help:"MQTT password"`
+	MQTTClientID           string `default:"unraid-management-agent" env:"MQTT_CLIENT_ID" help:"MQTT client ID"`
+	MQTTTopicPrefix        string `default:"unraid" env:"MQTT_TOPIC_PREFIX" help:"MQTT topic prefix"`
+	MQTTUseTLS             bool   `default:"false" env:"MQTT_USE_TLS" help:"use TLS for MQTT connection"`
+	MQTTInsecureSkipVerify bool   `default:"false" env:"MQTT_INSECURE_SKIP_VERIFY" help:"skip TLS certificate verification"`
+	MQTTQoS                int    `default:"0" env:"MQTT_QOS" help:"MQTT QoS level (0, 1, or 2)"`
+	MQTTRetain             bool   `default:"true" env:"MQTT_RETAIN" help:"retain MQTT messages"`
+	MQTTHomeAssistant      bool   `default:"false" env:"MQTT_HOME_ASSISTANT" help:"enable Home Assistant MQTT discovery"`
+	MQTTHAPrefix           string `default:"homeassistant" env:"MQTT_HA_PREFIX" help:"Home Assistant discovery prefix"`
+
 	// Collection intervals (overridable via environment variables)
 	// Use 0 to disable a collector completely
 	// Maximum interval: 86400 seconds (24 hours)
@@ -176,6 +191,22 @@ func main() {
 			Port:    cli.Port,
 		},
 		Hub: pubsub.New(1024), // Buffer size for event bus
+		MQTTConfig: domain.MQTTConfig{
+			Enabled:             cli.MQTTEnabled,
+			Broker:              cli.MQTTBroker,
+			Port:                cli.MQTTPort,
+			Username:            cli.MQTTUsername,
+			Password:            cli.MQTTPassword,
+			ClientID:            cli.MQTTClientID,
+			UseTLS:              cli.MQTTUseTLS,
+			InsecureSkipVerify:  cli.MQTTInsecureSkipVerify,
+			TopicPrefix:         cli.MQTTTopicPrefix,
+			QoS:                 cli.MQTTQoS,
+			RetainMessages:      cli.MQTTRetain,
+			HomeAssistantMode:   cli.MQTTHomeAssistant,
+			HomeAssistantPrefix: cli.MQTTHAPrefix,
+			DiscoveryEnabled:    cli.MQTTHomeAssistant, // Enable discovery when HA mode is enabled
+		},
 		Intervals: domain.Intervals{
 			System:       getInterval("system", cli.IntervalSystem),
 			Array:        getInterval("array", cli.IntervalArray),

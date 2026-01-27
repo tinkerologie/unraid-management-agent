@@ -4,7 +4,7 @@ Complete reference for all Unraid Management Agent API endpoints.
 
 **Base URL**: `http://YOUR_UNRAID_IP:8043/api/v1`  
 **Version**: 1.0.0  
-**Total Endpoints**: 49
+**Total Endpoints**: 57
 
 ---
 
@@ -27,6 +27,7 @@ Complete reference for all Unraid Management Agent API endpoints.
 - [Log Files](#log-files)
 - [Configuration](#configuration)
 - [WebSocket](#websocket)
+- [Prometheus Metrics](#prometheus-metrics)
 - [Security Best Practices](#security-best-practices)
 - [Rate Limiting](#rate-limiting)
 - [Best Practices](#best-practices)
@@ -556,7 +557,7 @@ class UnraidAPIClient {
   private async request<T>(
     endpoint: string,
     method: "GET" | "POST" = "GET",
-    body?: any
+    body?: any,
   ): Promise<T> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
@@ -683,7 +684,7 @@ async function listDisks() {
 
     disks.forEach((disk: DiskInfo) => {
       console.log(
-        `${disk.name}: ${disk.spin_state} (${disk.temperature_celsius}°C)`
+        `${disk.name}: ${disk.spin_state} (${disk.temperature_celsius}°C)`,
       );
     });
   } catch (error) {
@@ -2669,6 +2670,318 @@ Get disk settings including spindown delay.
 
 ---
 
+### GET /settings/disk-thresholds
+
+Get global disk temperature warning and critical thresholds.
+
+**Response**:
+
+```json
+{
+  "hot_threshold": 45,
+  "max_threshold": 55,
+  "hot_ssd_threshold": 50,
+  "max_ssd_threshold": 60,
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Fields**:
+
+| Field               | Type | Description                   |
+| ------------------- | ---- | ----------------------------- |
+| `hot_threshold`     | int  | HDD warning temperature (°C)  |
+| `max_threshold`     | int  | HDD critical temperature (°C) |
+| `hot_ssd_threshold` | int  | SSD warning temperature (°C)  |
+| `max_ssd_threshold` | int  | SSD critical temperature (°C) |
+
+**Use Case**: Monitoring tools (Grafana, Home Assistant) can use these thresholds to set appropriate alert levels for disk temperature monitoring.
+
+---
+
+### GET /settings/mover
+
+Get mover schedule, thresholds, and current running status.
+
+**Response**:
+
+```json
+{
+  "schedule": "0 3 * * *",
+  "enabled": true,
+  "running": false,
+  "fill_up_threshold": 70,
+  "age_days": 0,
+  "action_on_share_fill": "move_all",
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Fields**:
+
+| Field                  | Type   | Description                                          |
+| ---------------------- | ------ | ---------------------------------------------------- |
+| `schedule`             | string | Cron-style schedule expression                       |
+| `enabled`              | bool   | Whether scheduled mover runs are enabled             |
+| `running`              | bool   | Whether mover is currently running                   |
+| `fill_up_threshold`    | int    | Percentage threshold to trigger cache->array moves   |
+| `age_days`             | int    | Move files older than this many days (0 = all files) |
+| `action_on_share_fill` | string | Action when share fills up                           |
+
+---
+
+### GET /settings/services
+
+Get Docker and VM Manager service status.
+
+**Response**:
+
+```json
+{
+  "docker_enabled": true,
+  "vm_enabled": true,
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Use Case**: Determine whether to display Docker or VM-related UI elements, or to skip queries for disabled services.
+
+---
+
+### GET /settings/network-services
+
+Get comprehensive status of all Unraid network services.
+
+**Response**:
+
+```json
+{
+  "smb": {
+    "name": "SMB",
+    "enabled": true,
+    "running": true,
+    "port": 445,
+    "description": "Windows/SMB file sharing"
+  },
+  "nfs": {
+    "name": "NFS",
+    "enabled": false,
+    "running": false,
+    "port": 2049,
+    "description": "NFS file sharing"
+  },
+  "afp": {
+    "name": "AFP",
+    "enabled": false,
+    "running": false,
+    "port": 548,
+    "description": "Apple Filing Protocol (legacy)"
+  },
+  "ftp": {
+    "name": "FTP",
+    "enabled": false,
+    "running": false,
+    "port": 21,
+    "description": "FTP file transfer"
+  },
+  "ssh": {
+    "name": "SSH",
+    "enabled": true,
+    "running": true,
+    "port": 22,
+    "description": "Secure Shell remote access"
+  },
+  "telnet": {
+    "name": "Telnet",
+    "enabled": false,
+    "running": false,
+    "port": 23,
+    "description": "Telnet remote access (insecure)"
+  },
+  "avahi": {
+    "name": "Avahi",
+    "enabled": true,
+    "running": true,
+    "port": 5353,
+    "description": "mDNS/DNS-SD service discovery"
+  },
+  "netbios": {
+    "name": "NetBIOS",
+    "enabled": true,
+    "running": true,
+    "port": 137,
+    "description": "NetBIOS name service"
+  },
+  "wsd": {
+    "name": "WSD",
+    "enabled": true,
+    "running": false,
+    "port": 3702,
+    "description": "Web Services Discovery for Windows"
+  },
+  "wireguard": {
+    "name": "WireGuard",
+    "enabled": false,
+    "running": false,
+    "port": 51820,
+    "description": "WireGuard VPN"
+  },
+  "upnp": {
+    "name": "UPnP",
+    "enabled": false,
+    "running": false,
+    "port": 1900,
+    "description": "UPnP/IGD port forwarding"
+  },
+  "ntp": {
+    "name": "NTP",
+    "enabled": true,
+    "running": false,
+    "port": 123,
+    "description": "Network Time Protocol"
+  },
+  "syslog_server": {
+    "name": "Syslog",
+    "enabled": false,
+    "running": true,
+    "port": 514,
+    "description": "Syslog daemon"
+  },
+  "total_services": 13,
+  "enabled_services": 6,
+  "running_services": 5,
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Fields (per service)**:
+
+| Field         | Type   | Description                          |
+| ------------- | ------ | ------------------------------------ |
+| `name`        | string | Service display name                 |
+| `enabled`     | bool   | Whether service is enabled in config |
+| `running`     | bool   | Whether service is currently running |
+| `port`        | int    | Primary network port (if applicable) |
+| `description` | string | Human-readable service description   |
+
+**Summary Fields**:
+
+| Field              | Type | Description                          |
+| ------------------ | ---- | ------------------------------------ |
+| `total_services`   | int  | Total number of monitored services   |
+| `enabled_services` | int  | Number of services enabled in config |
+| `running_services` | int  | Number of services currently running |
+
+**Use Case**: Monitor network service availability, build status dashboards, detect service outages.
+
+---
+
+### GET /array/parity-check/schedule
+
+Get parity check schedule configuration.
+
+**Response**:
+
+```json
+{
+  "enabled": true,
+  "frequency": "monthly",
+  "day_of_week": 0,
+  "day_of_month": 1,
+  "hour": 3,
+  "minute": 0,
+  "write_corrections": true,
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Fields**:
+
+| Field               | Type   | Description                                                |
+| ------------------- | ------ | ---------------------------------------------------------- |
+| `enabled`           | bool   | Whether scheduled parity checks are enabled                |
+| `frequency`         | string | Schedule frequency: "daily", "weekly", "monthly", "custom" |
+| `day_of_week`       | int    | Day of week for weekly checks (0 = Sunday)                 |
+| `day_of_month`      | int    | Day of month for monthly checks                            |
+| `hour`              | int    | Hour to start check (24-hour format)                       |
+| `minute`            | int    | Minute to start check                                      |
+| `write_corrections` | bool   | Whether to automatically write corrections                 |
+
+---
+
+### GET /plugins
+
+Get list of installed plugins with version and update information.
+
+**Response**:
+
+```json
+{
+  "plugins": [
+    {
+      "name": "unassigned.devices",
+      "version": "2024.08.09",
+      "author": "dlandon",
+      "icon": "/plugins/unassigned.devices/images/unassigned.devices.png",
+      "support_url": "https://forums.unraid.net/topic/...",
+      "update_available": true,
+      "update_version": "2024.10.15"
+    }
+  ],
+  "total_plugins": 12,
+  "plugin_updates_count": 3,
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+---
+
+### GET /updates
+
+Get OS and plugin update availability.
+
+**Response**:
+
+```json
+{
+  "os_update_available": true,
+  "current_version": "6.12.10",
+  "available_version": "6.12.11",
+  "plugin_updates_count": 3,
+  "plugins_with_updates": [
+    "unassigned.devices",
+    "dynamix.docker.manager",
+    "user.scripts"
+  ],
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+---
+
+### GET /system/flash
+
+Get USB flash boot drive health information.
+
+**Response**:
+
+```json
+{
+  "device": "/dev/sda1",
+  "mount_point": "/boot",
+  "filesystem": "vfat",
+  "total_bytes": 32019734528,
+  "used_bytes": 1073741824,
+  "free_bytes": 30945992704,
+  "used_percent": 3.4,
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+**Use Case**: Monitor flash drive space usage to prevent boot issues from a full flash drive.
+
+---
+
 ### GET /network/{interface}/config
 
 Get network interface configuration.
@@ -2746,6 +3059,127 @@ Real-time event stream.
 ```
 
 See [WebSocket Events Documentation](../WEBSOCKET_EVENTS_DOCUMENTATION.md) for complete details.
+
+---
+
+## Prometheus Metrics
+
+### GET /metrics
+
+Prometheus exposition format endpoint for native Grafana integration.
+
+**URL**: `http://YOUR_UNRAID_IP:8043/metrics`
+
+**Note**: This endpoint is at the root level (`/metrics`), not under `/api/v1/`.
+
+**Response Format**: `text/plain; version=0.0.4; charset=utf-8` (Prometheus exposition format)
+
+#### Available Metrics
+
+| Category     | Metric                              | Type  | Labels                     | Description                        |
+| ------------ | ----------------------------------- | ----- | -------------------------- | ---------------------------------- |
+| **System**   | `unraid_system_info`                | Gauge | version, hostname          | Unraid system information          |
+|              | `unraid_system_uptime_seconds`      | Gauge | -                          | System uptime in seconds           |
+|              | `unraid_cpu_usage_percent`          | Gauge | -                          | Current CPU usage percentage       |
+|              | `unraid_cpu_temperature_celsius`    | Gauge | -                          | CPU temperature                    |
+|              | `unraid_memory_total_bytes`         | Gauge | -                          | Total system memory                |
+|              | `unraid_memory_used_bytes`          | Gauge | -                          | Used system memory                 |
+|              | `unraid_memory_free_bytes`          | Gauge | -                          | Free system memory                 |
+|              | `unraid_memory_usage_percent`       | Gauge | -                          | Memory usage percentage            |
+| **Array**    | `unraid_array_state`                | Gauge | state                      | Array state (1=started, 0=stopped) |
+|              | `unraid_array_total_bytes`          | Gauge | -                          | Total array capacity               |
+|              | `unraid_array_used_bytes`           | Gauge | -                          | Used array space                   |
+|              | `unraid_array_free_bytes`           | Gauge | -                          | Free array space                   |
+|              | `unraid_parity_check_running`       | Gauge | -                          | Whether parity check is running    |
+|              | `unraid_parity_check_progress`      | Gauge | -                          | Parity check progress (0-100)      |
+|              | `unraid_parity_check_errors`        | Gauge | -                          | Number of parity errors found      |
+| **Disks**    | `unraid_disk_temperature_celsius`   | Gauge | name, device, type         | Disk temperature                   |
+|              | `unraid_disk_size_bytes`            | Gauge | name, device, type         | Disk total size                    |
+|              | `unraid_disk_used_bytes`            | Gauge | name, device, type         | Disk used space                    |
+|              | `unraid_disk_status`                | Gauge | name, device, type, status | Disk status (1=healthy, 0=problem) |
+|              | `unraid_disk_standby`               | Gauge | name, device, type         | Disk standby state                 |
+|              | `unraid_disk_smart_status`          | Gauge | name, device, type         | SMART status (1=passed, 0=failed)  |
+| **Docker**   | `unraid_docker_container_state`     | Gauge | name, id, image            | Container state (1=running)        |
+|              | `unraid_docker_containers_total`    | Gauge | -                          | Total number of containers         |
+|              | `unraid_docker_containers_running`  | Gauge | -                          | Number of running containers       |
+| **VMs**      | `unraid_vm_state`                   | Gauge | name, id                   | VM state (1=running, 2=paused)     |
+|              | `unraid_vms_total`                  | Gauge | -                          | Total number of VMs                |
+|              | `unraid_vms_running`                | Gauge | -                          | Number of running VMs              |
+| **UPS**      | `unraid_ups_status`                 | Gauge | status                     | UPS status (1=online)              |
+|              | `unraid_ups_battery_charge_percent` | Gauge | -                          | Battery charge percentage          |
+|              | `unraid_ups_load_percent`           | Gauge | -                          | UPS load percentage                |
+|              | `unraid_ups_runtime_seconds`        | Gauge | -                          | Remaining runtime                  |
+| **Shares**   | `unraid_share_used_bytes`           | Gauge | name                       | Share used space                   |
+|              | `unraid_shares_total`               | Gauge | -                          | Total number of shares             |
+| **Services** | `unraid_service_enabled`            | Gauge | service                    | Service enabled state              |
+|              | `unraid_service_running`            | Gauge | service                    | Service running state              |
+| **GPU**      | `unraid_gpu_temperature_celsius`    | Gauge | name, index                | GPU temperature                    |
+|              | `unraid_gpu_utilization_percent`    | Gauge | name, index                | GPU utilization                    |
+|              | `unraid_gpu_memory_used_bytes`      | Gauge | name, index                | GPU memory used                    |
+|              | `unraid_gpu_memory_total_bytes`     | Gauge | name, index                | GPU memory total                   |
+|              | `unraid_gpu_power_watts`            | Gauge | name, index                | GPU power draw                     |
+
+#### Example Response
+
+```
+# HELP unraid_system_info Unraid system information
+# TYPE unraid_system_info gauge
+unraid_system_info{hostname="Tower",version="7.1.0"} 1
+# HELP unraid_cpu_usage_percent Current CPU usage percentage
+# TYPE unraid_cpu_usage_percent gauge
+unraid_cpu_usage_percent 12.5
+# HELP unraid_array_state Array state (1=started, 0=stopped)
+# TYPE unraid_array_state gauge
+unraid_array_state{state="started"} 1
+# HELP unraid_disk_temperature_celsius Disk temperature in Celsius
+# TYPE unraid_disk_temperature_celsius gauge
+unraid_disk_temperature_celsius{device="sda",name="disk1",type="data"} 35
+unraid_disk_temperature_celsius{device="sdb",name="disk2",type="data"} 36
+unraid_disk_temperature_celsius{device="sdc",name="parity",type="parity"} 38
+# HELP unraid_docker_container_state Container state (1=running, 0=stopped)
+# TYPE unraid_docker_container_state gauge
+unraid_docker_container_state{id="abc123",image="linuxserver/plex",name="plex"} 1
+unraid_docker_container_state{id="def456",image="linuxserver/sonarr",name="sonarr"} 0
+```
+
+#### Grafana Integration
+
+1. Add Prometheus data source in Grafana pointing to `http://YOUR_UNRAID_IP:9090`
+2. Configure Prometheus to scrape the Unraid endpoint:
+
+```yaml
+# prometheus.yml
+scrape_configs:
+  - job_name: "unraid"
+    static_configs:
+      - targets: ["YOUR_UNRAID_IP:8043"]
+    metrics_path: /metrics
+    scrape_interval: 15s
+```
+
+1. Import or create dashboards using the available metrics
+
+#### Example Grafana Queries
+
+```promql
+# CPU usage over time
+rate(unraid_cpu_usage_percent[5m])
+
+# Disk temperatures by disk
+unraid_disk_temperature_celsius
+
+# Container status
+unraid_docker_container_state{name="plex"}
+
+# Array usage percentage
+(unraid_array_used_bytes / unraid_array_total_bytes) * 100
+
+# Running containers count
+unraid_docker_containers_running
+
+# UPS battery level
+unraid_ups_battery_charge_percent
+```
 
 ---
 
@@ -3254,7 +3688,7 @@ async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
       // Exponential backoff: 1s, 2s, 4s, 8s, ...
       const delay = Math.min(baseDelay * Math.pow(2, retries - 1), 60000);
       console.log(
-        `Request failed: ${error.message}. Retrying in ${delay}ms... (${retries}/${maxRetries})`
+        `Request failed: ${error.message}. Retrying in ${delay}ms... (${retries}/${maxRetries})`,
       );
 
       await new Promise((resolve) => setTimeout(resolve, delay));
@@ -3273,7 +3707,7 @@ async function getSystemInfo() {
       return response.json();
     },
     3,
-    1000
+    1000,
   );
 }
 
@@ -3424,7 +3858,7 @@ async function startArray() {
     {},
     {
       timeout: 30000, // 30 seconds for array start
-    }
+    },
   );
   return data;
 }

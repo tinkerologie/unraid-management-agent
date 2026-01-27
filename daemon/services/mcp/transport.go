@@ -393,7 +393,7 @@ func (t *SSETransport) SSEHandler() http.HandlerFunc {
 		messageEndpoint := fmt.Sprintf("%s://%s/mcp/sse?clientId=%s", scheme, r.Host, clientID)
 
 		// Send initial endpoint event (MCP SSE protocol requires this)
-		fmt.Fprintf(w, "event: endpoint\ndata: %s\n\n", messageEndpoint)
+		_, _ = fmt.Fprintf(w, "event: endpoint\ndata: %s\n\n", messageEndpoint) //nolint:errcheck
 		flusher.Flush()
 
 		// Stream events
@@ -404,7 +404,7 @@ func (t *SSETransport) SSEHandler() http.HandlerFunc {
 			case <-client.done:
 				return
 			case msg := <-client.messages:
-				fmt.Fprintf(w, "event: message\ndata: %s\n\n", msg)
+				_, _ = fmt.Fprintf(w, "event: message\ndata: %s\n\n", msg) //nolint:errcheck
 				flusher.Flush()
 			}
 		}

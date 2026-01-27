@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The Unraid Management Agent is a Go-based plugin for Unraid that exposes comprehensive system monitoring and control via REST API, WebSockets, and MCP (Model Context Protocol). This is a **third-party community plugin**, not an official Unraid product. It provides a REST API + WebSocket interface as an alternative/complement to the official Unraid GraphQL API.
 
-**Language:** Go 1.24
+**Language:** Go 1.25
 **Target Platform:** Linux/amd64 (Unraid OS)
 
 ## Essential Commands
@@ -122,11 +122,11 @@ Collectors → Event Bus (PubSub) → API Server Cache → REST Endpoints
 
 For optimal performance, collectors use native Go libraries instead of shell commands:
 
-| Component | Library | Purpose |
-|-----------|---------|---------|
-| Docker | `github.com/moby/moby/client` | Docker Engine SDK |
-| VMs | `github.com/digitalocean/go-libvirt` | Native libvirt bindings |
-| System | Direct `/proc`, `/sys` access | Kernel interfaces |
+| Component | Library                              | Purpose                 |
+| --------- | ------------------------------------ | ----------------------- |
+| Docker    | `github.com/moby/moby/client`        | Docker Engine SDK       |
+| VMs       | `github.com/digitalocean/go-libvirt` | Native libvirt bindings |
+| System    | Direct `/proc`, `/sys` access        | Kernel interfaces       |
 
 ### Core Components
 
@@ -148,22 +148,22 @@ All data structures shared between collectors, API, and WebSocket clients:
 
 Independent goroutines that collect data at fixed intervals (defined in `daemon/constants/const.go`):
 
-| Collector | Interval | Event Topic | Notes |
-|-----------|----------|-------------|-------|
-| System | 15s | `system_update` | CPU/RAM/temps - sensors command is CPU intensive |
-| Array | 30s | `array_status_update` | Array state rarely changes |
-| Disk | 30s | `disk_list_update` | Per-disk SMART data |
-| Network | 30s | `network_list_update` | Interface status |
-| Docker | 30s | `container_list_update` | Very CPU intensive with many containers |
-| VM | 30s | `vm_list_update` | virsh commands spawn multiple processes |
-| UPS | 60s | `ups_status_update` | UPS status rarely changes |
-| GPU | 60s | `gpu_metrics_update` | intel_gpu_top is extremely CPU intensive |
-| Share | 60s | `share_list_update` | User share information |
-| Notification | 30s | `notifications_update` | System notifications |
-| Unassigned | 60s | `unassigned_devices_update` | Unassigned devices |
-| ZFS | 30s | `zfs_*_update` | Pools, datasets, snapshots |
-| Hardware | 300s | `hardware_update` | Rarely changes |
-| Registration | 300s | `registration_update` | License info |
+| Collector    | Interval | Event Topic                 | Notes                                            |
+| ------------ | -------- | --------------------------- | ------------------------------------------------ |
+| System       | 15s      | `system_update`             | CPU/RAM/temps - sensors command is CPU intensive |
+| Array        | 30s      | `array_status_update`       | Array state rarely changes                       |
+| Disk         | 30s      | `disk_list_update`          | Per-disk SMART data                              |
+| Network      | 30s      | `network_list_update`       | Interface status                                 |
+| Docker       | 30s      | `container_list_update`     | Very CPU intensive with many containers          |
+| VM           | 30s      | `vm_list_update`            | virsh commands spawn multiple processes          |
+| UPS          | 60s      | `ups_status_update`         | UPS status rarely changes                        |
+| GPU          | 60s      | `gpu_metrics_update`        | intel_gpu_top is extremely CPU intensive         |
+| Share        | 60s      | `share_list_update`         | User share information                           |
+| Notification | 30s      | `notifications_update`      | System notifications                             |
+| Unassigned   | 60s      | `unassigned_devices_update` | Unassigned devices                               |
+| ZFS          | 30s      | `zfs_*_update`              | Pools, datasets, snapshots                       |
+| Hardware     | 300s     | `hardware_update`           | Rarely changes                                   |
+| Registration | 300s     | `registration_update`       | License info                                     |
 
 **Intervals optimized for power efficiency** — lower intervals increase CPU usage and power consumption.
 

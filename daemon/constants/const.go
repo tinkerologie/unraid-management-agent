@@ -13,6 +13,30 @@ const (
 	// NginxIni is the path to the Unraid nginx.ini configuration file.
 	NginxIni = "/var/local/emhttp/nginx.ini"
 
+	// DiskCfg is the path to the disk configuration file (boot config).
+	DiskCfg = "/boot/config/disk.cfg"
+	// DockerCfg is the path to the Docker configuration file.
+	DockerCfg = "/boot/config/docker.cfg"
+	// DomainCfg is the path to the VM Manager configuration file.
+	DomainCfg = "/boot/config/domain.cfg"
+	// ShareCfg is the path to the global share configuration file.
+	ShareCfg = "/boot/config/share.cfg"
+	// IdentCfg is the path to the server identity configuration file.
+	IdentCfg = "/boot/config/ident.cfg"
+	// SharesConfigDir is the directory containing per-share configuration files.
+	SharesConfigDir = "/boot/config/shares"
+	// PluginsConfigDir is the directory containing plugin files.
+	PluginsConfigDir = "/boot/config/plugins"
+	// PluginsTempDir is the directory containing downloaded plugin updates.
+	PluginsTempDir = "/tmp/plugins"
+
+	// DynamixCfg is the path to the dynamix plugin configuration (contains temp thresholds).
+	DynamixCfg = "/boot/config/plugins/dynamix/dynamix.cfg"
+	// ParityCheckCron is the path to the parity check schedule cron file.
+	ParityCheckCron = "/boot/config/plugins/dynamix/parity-check.cron"
+	// ParityChecksLog is the path to the parity check history log.
+	ParityChecksLog = "/boot/config/parity-checks.log"
+
 	// ProcCPUInfo is the path to the /proc/cpuinfo file.
 	ProcCPUInfo = "/proc/cpuinfo"
 	// ProcMemInfo is the path to the /proc/meminfo file.

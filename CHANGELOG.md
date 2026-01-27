@@ -9,6 +9,124 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [2026.01.02] - 2026-01-27
+
+### Changed
+
+- **Go 1.25.0 Upgrade**:
+  - Upgraded from Go 1.24.0 to Go 1.25.0 for improved performance and latest language features
+  - Updated development container, documentation, and CI/CD configurations
+  - All dependencies tested and compatible with Go 1.25
+
+- **golangci-lint v2 Migration**:
+  - Upgraded golangci-lint to v2.8.0 (built with Go 1.25.5)
+  - Migrated configuration to v2 format (.golangci.yml)
+  - Moved gofmt and goimports from linters to formatters section per v2 requirements
+  - Pre-commit hooks updated and re-enabled after migration
+  - All code quality checks passing with zero tolerance policy
+
+---
+
+## [2026.01.01] - 2026-01-22
+
+### Added
+
+- **Prometheus Metrics Endpoint** (#54):
+  - New endpoint `GET /metrics` exposes all Unraid data in Prometheus exposition format
+  - Comprehensive metrics covering: System, Array, Disks, Docker, VMs, UPS, Shares, Network Services, GPU
+  - 40+ metrics with proper labels for multi-dimensional querying
+  - Custom Prometheus registry to isolate Unraid metrics from default Go metrics
+  - Enables native Grafana integration via Prometheus data source
+  - Key metrics include:
+    - `unraid_system_info`, `unraid_cpu_usage_percent`, `unraid_memory_*`
+    - `unraid_array_state`, `unraid_array_*_bytes`, `unraid_parity_*`
+    - `unraid_disk_temperature_celsius`, `unraid_disk_status`, `unraid_disk_smart_status`
+    - `unraid_docker_container_state`, `unraid_docker_containers_*`
+    - `unraid_vm_state`, `unraid_vms_*`
+    - `unraid_ups_*`, `unraid_share_*`, `unraid_service_*`, `unraid_gpu_*`
+
+- **Network Services Status API**:
+  - New endpoint `GET /api/v1/settings/network-services` returns comprehensive status of all Unraid network services
+  - Monitors 13 network services: SMB, NFS, AFP, FTP, SSH, Telnet, Avahi, NetBIOS, WSD, WireGuard, UPnP, NTP, Syslog
+  - Each service includes: `name`, `enabled`, `running`, `port`, `description`
+  - Summary counts: `total_services`, `enabled_services`, `running_services`
+  - Parses configuration from `var.ini`, `ident.cfg`, and `tips.and.tweaks.cfg`
+  - Runtime status via process detection in `/proc`
+  - Useful for monitoring dashboards and home automation integrations
+
+- **Global Disk Temperature Thresholds API** (#45):
+  - New endpoint `GET /api/v1/settings/disk-thresholds` returns system-wide temperature warning/critical thresholds
+  - Includes separate thresholds for HDDs (hot/max) and SSDs (hotssd/maxssd) from `dynamix.cfg`
+  - Useful for monitoring integrations (Grafana, Home Assistant) that need threshold context
+
+- **Per-Disk Temperature Threshold Overrides** (#46):
+  - Extended `DiskInfo` DTO with `temp_warning` and `temp_critical` fields
+  - Parses per-disk overrides from individual disk `.cfg` files
+  - Returns `null` when using global defaults, integer when overridden
+
+- **Parity Check Schedule API** (#47):
+  - New endpoint `GET /api/v1/array/parity-check/schedule` returns complete parity schedule configuration
+  - Includes: enabled status, frequency (daily/weekly/monthly/custom), scheduled day/time
+  - Parses from `/boot/config/plugins/dynamix/parity-checks.cron`
+
+- **Mover Schedule & Status API** (#48):
+  - New endpoint `GET /api/v1/settings/mover` returns mover configuration and status
+  - Includes: schedule (cron-style), enabled status, whether currently running
+  - Source/destination thresholds, action on share fill, and current operation status
+
+- **Docker & VM Service Status API** (#49):
+  - New endpoint `GET /api/v1/settings/services` returns enabled/disabled status
+  - `docker_enabled`: whether Docker service is enabled in Unraid settings
+  - `vm_enabled`: whether VM Manager (libvirt) is enabled
+
+- **OS Update Availability API** (#50):
+  - New endpoint `GET /api/v1/updates` returns Unraid OS and plugin update status
+  - Includes: `os_update_available`, `current_version`, `available_version`
+  - Plugin update counts: `plugin_updates_count`, `plugins_with_updates` array
+
+- **USB Flash Drive Health API** (#51):
+  - New endpoint `GET /api/v1/system/flash` returns flash boot drive health
+  - Includes: `device`, `total_bytes`, `used_bytes`, `free_bytes`, `used_percent`
+  - `mount_point` and `filesystem` type for diagnostics
+
+- **Installed Plugins List API** (#52):
+  - New endpoint `GET /api/v1/plugins` returns all installed plugins with metadata
+  - Each plugin includes: `name`, `version`, `author`, `icon`, `support_url`
+  - `update_available` and `update_version` fields for upgrade awareness
+
+- **Share Cache Pool Settings** (#53):
+  - Extended `ShareInfo` DTO with cache pool configuration fields
+  - `cache_pool`: primary cache pool name (or empty for "no")
+  - `cache_pool2`: secondary cache pool for prefer destinations
+  - `mover_action`: computed action ("no_cache", "cache_only", "cache_to_array", "array_to_cache", "cache_prefer")
+
+- **Pre-commit Hooks for Code Quality**:
+  - Comprehensive pre-commit configuration with zero tolerance for linting warnings and errors
+  - Automatic code formatting (gofmt, goimports)
+  - Static analysis (go vet, golangci-lint)
+  - Security scanning (gosec, govulncheck)
+  - Secret detection (detect-secrets)
+  - Unit test execution with race detection
+  - Custom checks: VERSION format validation, CHANGELOG reminder, debug print detection
+  - GitHub Actions workflow for CI enforcement
+  - Setup script: `scripts/setup-pre-commit.sh`
+  - Makefile targets: `pre-commit-install`, `pre-commit-run`, `lint`, `security-check`
+
+- **Model Context Protocol (MCP) Support** - AI Agent Integration:
+  - New `/mcp` endpoint enables AI agents (Claude, GPT, etc.) to interact with Unraid
+  - Full MCP protocol implementation using mcp-golang v0.16.0
+  - **18 Monitoring Tools**: system info, array status, disk health, containers, VMs, UPS, GPU, network, notifications, ZFS
+  - **7 Control Tools** (with confirmation for destructive actions): container/VM actions, array control, parity check, reboot/shutdown
+  - **5 MCP Resources** for real-time data access
+  - **3 MCP Prompts** for guided AI interactions
+
+- **OpenAPI/Swagger Documentation**:
+  - Interactive API documentation available at `/swagger/`
+  - Full OpenAPI 2.0 specification with 76+ documented endpoints
+  - Auto-generated from code annotations using swaggo/swag
+
 ### Fixed
 
 - **Parity Check History Null Records (Issue #44)**:
@@ -24,20 +142,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added comprehensive tests for all parity log format variations
 
 - **Log File Accumulation** - Fixed issue where log files were accumulating and consuming excessive disk space (80MB+):
-
   - Changed lumberjack `MaxBackups` from 0 to 1 (0 means "keep all", not "keep none")
   - Changed lumberjack `MaxAge` from 0 to 1 day
   - Added `cleanupOldLogs()` function that runs on startup to remove old `.gz` backup files
   - Log rotation now properly limits to 1 backup file maximum
 
 - **Dark Theme Support** - Fixed plugin UI not respecting Unraid's dark theme:
-
   - Replaced hardcoded CSS colors with Unraid CSS variables (`var(--line-color)`, `var(--text-secondary)`, `var(--input-background)`, etc.)
   - Status badges, tables, and form elements now properly adapt to light/dark themes
   - Uses `color: inherit` for text to match theme colors
 
 - **Parity Check Status Detection (Issue #41)**:
-
   - Fixed parity check status not detecting "paused" state - now correctly parses `mdResyncDt` field (0 = paused, >0 = running)
   - Fixed parity check progress percentage showing 0 - now calculates from `mdResyncPos / mdResyncSize * 100`
   - Added support for detecting clearing and reconstructing operations via `sbSyncAction` field
@@ -45,7 +160,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Status values: `""` (idle), `"paused"`, `"running"`, `"clearing"`, `"reconstructing"`
 
 - **Disk Temperature Reporting**:
-
   - Improved handling of temperature value `"*"` which indicates spun-down disk
   - Temperature 0 is now documented expected behavior for standby disks (to avoid spinning up disks for temperature checks)
   - Enhanced debug logging for temperature parsing
@@ -73,77 +187,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Registration: 300s → 600s (10 min) - license info is static
 - **Start Script**: Fixed environment variable passing to Go binary through sudo
 
-### Added
-
-- **Pre-commit Hooks for Code Quality** (#XX):
-
-  - Comprehensive pre-commit configuration with zero tolerance for linting warnings and errors
-  - Automatic code formatting (gofmt, goimports)
-  - Static analysis (go vet, golangci-lint)
-  - Security scanning (gosec, govulncheck)
-  - Secret detection (detect-secrets)
-  - Unit test execution with race detection
-  - Custom checks: VERSION format validation, CHANGELOG reminder, debug print detection
-  - GitHub Actions workflow for CI enforcement
-  - Documentation in [docs/PRE_COMMIT_HOOKS.md](docs/PRE_COMMIT_HOOKS.md)
-  - Setup script: `scripts/setup-pre-commit.sh`
-  - Makefile targets: `pre-commit-install`, `pre-commit-run`, `lint`, `security-check`
-
-- **Model Context Protocol (MCP) Support** - AI Agent Integration:
-
-  - New `/mcp` endpoint enables AI agents (Claude, GPT, etc.) to interact with Unraid
-  - Full MCP protocol implementation using mcp-golang v0.16.0
-  - **18 Monitoring Tools**:
-    - `get_system_info` - CPU, RAM, temperatures, uptime
-    - `get_array_status` - Array state, capacity, parity info
-    - `list_disks`/`get_disk_info` - Disk health and SMART data
-    - `list_shares` - Network shares configuration
-    - `list_containers`/`get_container_info` - Docker container status
-    - `list_vms`/`get_vm_info` - Virtual machine status
-    - `get_ups_status` - UPS battery and runtime info
-    - `get_gpu_metrics` - GPU utilization and temperature
-    - `get_network_info` - Network interface statistics
-    - `get_hardware_info` - Motherboard, CPU, memory details
-    - `get_registration` - License/registration information
-    - `get_notifications` - System alerts and warnings
-    - `get_zfs_pools`/`get_zfs_datasets` - ZFS pool and dataset info
-  - **7 Control Tools** (with confirmation for destructive actions):
-    - `container_action` - Start/stop/restart/pause Docker containers
-    - `vm_action` - Start/stop/restart/pause/hibernate VMs
-    - `array_action` - Start/stop Unraid array (requires confirmation)
-    - `parity_check_action` - Initiate parity checks
-    - `system_reboot`/`system_shutdown` - System power control (requires confirmation)
-  - **5 MCP Resources** for real-time data access:
-    - `unraid://system`, `unraid://array`, `unraid://containers`
-    - `unraid://vms`, `unraid://disks`
-  - **3 MCP Prompts** for guided AI interactions:
-    - `analyze_disk_health` - AI-guided disk health analysis
-    - `system_overview` - Comprehensive system status summary
-    - `troubleshoot_issue` - Interactive troubleshooting assistant
-  - Custom HTTP transport integrates with existing gorilla/mux router
-  - Thread-safe access to all cached collector data
-
-- **OpenAPI/Swagger Documentation** (#29):
-
-  - Interactive API documentation available at `/swagger/`
-  - Full OpenAPI 2.0 specification with 76 documented endpoints
-  - Auto-generated from code annotations using swaggo/swag
-  - Includes request/response schemas with examples
-  - "Try it out" functionality for testing endpoints directly
-  - Organized by tags: System, Array, Docker, VMs, ZFS, Network, etc.
-  - Swagger JSON available at `/swagger/doc.json`
-  - Build integration: `make swagger` generates documentation
-  - CI/CD: Swagger docs auto-generated during release builds
-
 - **Low Power Mode** (`--low-power-mode` or `UNRAID_LOW_POWER=true`):
-
   - New option for resource-constrained/older hardware (e.g., HP N40L with AMD Turion)
   - Multiplies all collection intervals by 4x when enabled
   - Reduces CPU wake-ups and allows deeper C-states
   - Ideal for users experiencing high CPU load from the plugin
 
 - **Runtime Collector Management API** (#35):
-
   - New endpoint `POST /api/v1/collectors/{name}/enable` - Enable a collector at runtime
   - New endpoint `POST /api/v1/collectors/{name}/disable` - Disable a collector at runtime
   - New endpoint `PATCH /api/v1/collectors/{name}/interval` - Update collection interval
@@ -171,7 +221,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Performance
 
 - **Docker SDK Collector (NEW)** - Massive performance improvement:
-
   - Replaced CLI-based Docker collector with Docker SDK (socket API)
   - Uses `/var/run/docker.sock` directly instead of spawning `docker` processes
   - **~530x faster**: Container list from 5.8s → 10-15ms
@@ -180,7 +229,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Still reads memory stats from cgroup v2 filesystem for optimal performance
 
 - **VM Libvirt Collector (NEW)** - Native libvirt API integration:
-
   - Replaced CLI-based VM collector with libvirt Go bindings
   - Uses direct RPC to libvirt daemon instead of `virsh` commands
   - **~100-200x faster**: VM list from 1-2s → 6-7ms
@@ -188,14 +236,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Graceful fallback if libvirt is not available
 
 - **Docker Collector Optimizations** (Community feedback: HP N40L performance issue):
-
   - **Batched docker inspect calls**: Reduced from N separate calls to 1 batched call (3.5x faster)
   - **Skip inspect for stopped containers**: Only running containers get detailed inspection
   - Overall docker collection cycle reduced from ~8.8s to ~5.9s on test server
   - Significantly reduces CPU spikes on older hardware
 
 - **NUT (Network UPS Tools) Support** (`GET /api/v1/nut`):
-
   - Full support for the [NUT-unRAID plugin](https://github.com/desertwitch/NUT-unRAID)
   - New dedicated `/api/v1/nut` endpoint with comprehensive UPS data
   - Detects NUT plugin installation and running state
@@ -211,13 +257,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - WebSocket broadcast support for real-time NUT updates
 
 - **Improved UPS Collector NUT Detection**:
-
   - Fixed `upsc` command to properly use `@localhost` suffix
   - UPS endpoint (`/api/v1/ups`) now correctly falls back to NUT when apcupsd unavailable
   - Both `/api/v1/ups` (basic) and `/api/v1/nut` (detailed) work simultaneously
 
 - **Collectors Status API Endpoint** (`GET /api/v1/collectors/status`):
-
   - New endpoint to view status of all 14 collectors
   - Shows enabled/disabled state for each collector
   - Shows configured interval (in seconds) for each collector
@@ -226,7 +270,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Useful for monitoring and debugging collector configuration
 
 - **Disable Collectors Feature**:
-
   - Added "Disabled" option to all collection interval dropdowns
   - Setting interval to 0 completely stops the collector (no CPU/memory usage)
   - Useful for disabling collectors for hardware you don't have (GPU, UPS, ZFS)
@@ -234,7 +277,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Backend logs which collectors are disabled at startup
 
 - **Environment Variable to Disable Collectors** (`UNRAID_DISABLE_COLLECTORS`):
-
   - New environment variable for disabling collectors without UI
   - Comma-separated list of collector names (e.g., `UNRAID_DISABLE_COLLECTORS='gpu,ups,zfs'`)
   - Validates collector names and warns about unknown names
@@ -242,21 +284,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Ideal for Docker deployments or automated setups
 
 - **CLI Flag to Disable Collectors** (`--disable-collectors`):
-
   - New command-line flag for disabling collectors at startup
   - Usage: `--disable-collectors=gpu,ups,zfs`
   - Same validation as environment variable
   - Both env var and CLI flag work (CLI flag populates from env var)
 
 - **Extended Collection Intervals (up to 24 hours)**:
-
   - All collectors now support intervals from 5 seconds to 24 hours (86400 seconds)
   - New interval options: 1 hour, 2 hours, 4 hours, 6 hours, 12 hours, 24 hours
   - Ideal for static data that rarely changes (hardware info, registration/license)
   - Reduces power consumption significantly for infrequently-changing data
 
 - **Web UI for Collection Intervals** (Issue #8):
-
   - New settings page accessible from Unraid Settings → Unraid Management Agent
   - Dropdown menus with predefined interval options (5 seconds to 30 minutes)
   - Organized into logical sections: System Monitoring, Containers & VMs, Hardware, Storage, Other
@@ -293,7 +332,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Enhanced Log API** (Issue #28):
-
   - Expanded `commonLogPaths` from 4 to 30+ common Unraid log file paths
   - New log files include: dmesg, messages, cron, debug, btmp, lastlog, wtmp, graphql-api.log, unraid-api.log, recycle.log, dhcplog, mover.log, apcupsd.events, nohup.out, nginx error/access logs, vfsd.log, smbd.log, nfsd.log, samba logs, and more
   - New REST endpoint: `GET /api/v1/logs/{filename}` for direct log file access by filename
@@ -374,20 +412,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Technical Details
 
 - **New Files**:
-
   - `daemon/dto/zfs.go`: ZFS data transfer objects (ZFSPool, ZFSVdev, ZFSDevice, ZFSDataset, ZFSSnapshot, ZFSARCStats, ZFSIOStats)
   - `daemon/services/collectors/zfs.go`: ZFS collector implementation with parsers for zpool/zfs command output
   - `docs/ZFS_INVESTIGATION_FINDINGS.md`: Complete investigation findings and implementation documentation
 
 - **Modified Files**:
-
   - `daemon/constants/const.go`: Added ZFS binary paths and collection interval constants
   - `daemon/services/orchestrator.go`: Integrated ZFS collector into application lifecycle
   - `daemon/services/api/server.go`: Added ZFS cache fields and event subscriptions
   - `daemon/services/api/handlers.go`: Implemented ZFS endpoint handlers
 
 - **ZFS Data Sources**:
-
   - `/usr/sbin/zpool list -Hp`: Pool metrics (parseable format)
   - `/usr/sbin/zpool status -v`: Pool status, vdev tree, error counters
   - `/usr/sbin/zpool get all`: Pool properties
@@ -407,7 +442,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Dependency Updates**:
-
   - Updated `github.com/alecthomas/kong` from v0.9.0 to v1.13.0
   - Updated `golang.org/x/sys` from v0.13.0 to v0.38.0
   - Upgraded Go language version from 1.23 to 1.24.0 (required by golang.org/x/sys v0.38.0)
@@ -424,7 +458,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Technical Details
 
 - **Linting Fixes**:
-
   - `daemon/lib/dmidecode.go`: Converted cache level parsing to switch statement
   - `daemon/lib/ethtool.go`: Extracted `parseEthtoolKeyValue()` helper (complexity 34 → 18)
   - `daemon/services/collectors/disk.go`: Extracted `parseDisksINI()`, `parseDiskKeyValue()`, `enrichDisks()` helpers (complexity 32 → 12)
@@ -464,7 +497,6 @@ All tests pass successfully. Builds verified for local and release targets.
 ### Fixed
 
 - **Motherboard Temperature API** (Issue #24):
-
   - Fixed motherboard temperature returning 0 instead of actual value
   - Improved sensor parser to capture sensor labels (e.g., "MB Temp") from `sensors -u` output
   - Updated temperature matching logic to correctly identify motherboard temperature sensor
@@ -486,7 +518,6 @@ All tests pass successfully. Builds verified for local and release targets.
 ### Fixed
 
 - **VM Endpoint ID Field** (Issue #22):
-
   - Fixed VM endpoint returning empty string for `id` field
   - Changed from using `virsh domid` (runtime ID) to `virsh domuuid` (persistent UUID)
   - VM IDs are now stable, unique identifiers that work for all VM states (running, shut off, paused)
@@ -761,7 +792,6 @@ All tests pass successfully. Builds verified for local and release targets.
 ### Added
 
 - **Hardware Information API** (Issue #5): Comprehensive hardware details via dmidecode and ethtool
-
   - New `/api/v1/hardware/*` endpoints exposing detailed hardware information
   - `/api/v1/hardware/full` - Complete hardware information
   - `/api/v1/hardware/bios` - BIOS information (vendor, version, release date, characteristics)
@@ -774,7 +804,6 @@ All tests pass successfully. Builds verified for local and release targets.
   - All hardware data is cached and broadcast via WebSocket for real-time updates
 
 - **Enhanced System Information**:
-
   - `HVMEnabled` - Hardware virtualization support (Intel VT-x/AMD-V detection via /proc/cpuinfo)
   - `IOMMUEnabled` - IOMMU support detection (kernel command line and /sys/class/iommu/)
   - `OpenSSLVersion` - OpenSSL version information
@@ -782,7 +811,6 @@ All tests pass successfully. Builds verified for local and release targets.
   - `ParityCheckSpeed` - Current parity check speed from var.ini
 
 - **Enhanced Network Information** via ethtool:
-
   - `SupportedPorts` - Supported port types (TP, AUI, MII, Fibre, etc.)
   - `SupportedLinkModes` - Supported link speeds and modes
   - `SupportedPauseFrame` - Pause frame support
@@ -805,7 +833,6 @@ All tests pass successfully. Builds verified for local and release targets.
   - `MTU` - Maximum Transmission Unit
 
 - **New Libraries**:
-
   - `daemon/lib/dmidecode.go` - Parser for dmidecode output (SMBIOS/DMI types 0, 2, 4, 7, 16, 17)
   - `daemon/lib/ethtool.go` - Parser for ethtool output with comprehensive network interface details
 
@@ -821,7 +848,6 @@ All tests pass successfully. Builds verified for local and release targets.
 ### Changed
 
 - **System Collector**: Enhanced with virtualization and additional system information
-
   - Added `isHVMEnabled()` method to detect hardware virtualization support
   - Added `isIOMMUEnabled()` method to detect IOMMU support
   - Added `getOpenSSLVersion()` method to retrieve OpenSSL version
@@ -829,13 +855,11 @@ All tests pass successfully. Builds verified for local and release targets.
   - Added `getParityCheckSpeed()` method to parse parity check speed from var.ini
 
 - **Network Collector**: Enhanced with ethtool integration
-
   - Added `enrichWithEthtool()` method to populate network interface details
   - Network information now includes comprehensive ethtool data when available
   - Gracefully handles cases where ethtool is not available or fails
 
 - **Orchestrator**: Updated to manage hardware collector
-
   - Increased collector count from 9 to 10
   - Hardware collector initialized and started with 5-minute interval
 
@@ -886,7 +910,6 @@ All tests pass successfully. Builds verified for local and release targets.
 ### Added
 
 - **Enhanced VM Statistics**: Added comprehensive VM monitoring metrics
-
   - Guest CPU usage percentage (placeholder for future implementation with historical data)
   - Host CPU usage percentage (placeholder for future implementation with historical data)
   - Memory display in human-readable format (e.g., "1.17 GB / 4.00 GB")
@@ -908,7 +931,6 @@ All tests pass successfully. Builds verified for local and release targets.
 ### Changed
 
 - **VM Collector**: Enhanced data collection using additional virsh commands
-
   - Added `getVMCPUUsage()` method using `virsh cpu-stats` (returns 0 pending historical data implementation)
   - Added `getVMDiskIO()` method using `virsh domblklist` and `virsh domblkstat`
   - Added `getVMNetworkIO()` method using `virsh domiflist` and `virsh domifstat`
@@ -927,7 +949,6 @@ All tests pass successfully. Builds verified for local and release targets.
 ### Fixed
 
 - **VM Collector**: Fixed parsing of VM names containing spaces
-
   - Changed from parsing `virsh list --all` column-based output to using `virsh list --all --name`
   - Added `getVMState()` helper method to get VM state using `virsh domstate <name>`
   - Added `getVMID()` helper method to get VM ID using `virsh domid <name>`
@@ -1067,7 +1088,6 @@ All tests pass successfully. Builds verified for local and release targets.
 ### Added
 
 - Docker vDisk usage monitoring in `/api/v1/disks` endpoint (#2)
-
   - Automatically detects Docker vDisk at `/var/lib/docker` mount point
   - Reports size, used, free bytes, and usage percentage
   - Identifies vDisk file path (e.g., `/mnt/user/system/docker/docker.vdisk`)

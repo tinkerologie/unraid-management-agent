@@ -19,5 +19,10 @@ type ShareInfo struct {
 	UseCache  string `json:"use_cache,omitempty" example:"prefer"`            // "yes", "no", "only", "prefer"
 	Security  string `json:"security,omitempty" example:"private"`            // "public", "private", "secure"
 
+	// Cache pool settings (Issue #53)
+	CachePool   string `json:"cache_pool,omitempty" example:"cache"`          // Primary cache pool name
+	CachePool2  string `json:"cache_pool2,omitempty" example:""`              // Secondary cache pool (for mover destination)
+	MoverAction string `json:"mover_action,omitempty" example:"cache->array"` // Mover action: "cache->array", "array->cache", or empty
+
 	Timestamp time.Time `json:"timestamp"`
 }

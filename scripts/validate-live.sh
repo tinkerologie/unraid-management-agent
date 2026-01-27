@@ -3,7 +3,7 @@
 # Live Validation Script for Unraid Management Agent
 # Tests all endpoints and compares with actual system state
 
-set -e
+# Don't use set -e as some commands may return non-zero for valid conditions
 
 # Load configuration from config.sh
 SCRIPT_DIR="$(dirname "$0")"
@@ -539,6 +539,25 @@ if [ "$http_code" = "200" ]; then
     total=$(echo "$body" | jq -r '.total // 0')
     enabled=$(echo "$body" | jq -r '.enabled_count // 0')
     print_pass "HTTP $http_code | ${time}s | Total: $total | Enabled: $enabled"
+else
+    print_fail "HTTP $http_code | Failed"
+fi
+
+# 32. Network services status endpoint
+print_test "32. Testing /settings/network-services"
+response=$(curl -s -w "\n%{http_code}|%{time_total}" "${API_BASE}/settings/network-services")
+http_code=$(echo "$response" | tail -n1 | cut -d'|' -f1)
+time=$(echo "$response" | tail -n1 | cut -d'|' -f2)
+body=$(echo "$response" | sed '$d')
+if [ "$http_code" = "200" ]; then
+    total=$(echo "$body" | jq -r '.total_services // 0')
+    enabled=$(echo "$body" | jq -r '.enabled_services // 0')
+    running=$(echo "$body" | jq -r '.running_services // 0')
+    smb_enabled=$(echo "$body" | jq -r '.smb.enabled // false')
+    nfs_enabled=$(echo "$body" | jq -r '.nfs.enabled // false')
+    ssh_enabled=$(echo "$body" | jq -r '.ssh.enabled // false')
+    print_pass "HTTP $http_code | ${time}s | Total: $total | Enabled: $enabled | Running: $running"
+    print_info "  SMB: $smb_enabled | NFS: $nfs_enabled | SSH: $ssh_enabled"
 else
     print_fail "HTTP $http_code | Failed"
 fi

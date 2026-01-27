@@ -109,7 +109,7 @@ If the plugin doesn't work correctly on your hardware, see the [Hardware Compati
 
 ### Prerequisites
 
-- Go 1.23 or later
+- Go 1.25 or later
 - Git
 - Access to an Unraid system for testing (recommended)
 - Make
@@ -207,9 +207,11 @@ See [CLAUDE.md](CLAUDE.md) for detailed architecture documentation.
 
 ```markdown
 ## Description
+
 Brief description of what this PR does
 
 ## Type of Change
+
 - [ ] Bug fix (non-breaking change that fixes an issue)
 - [ ] New feature (non-breaking change that adds functionality)
 - [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
@@ -217,6 +219,7 @@ Brief description of what this PR does
 - [ ] Hardware compatibility fix
 
 ## Hardware Configuration (if applicable)
+
 - **CPU:**
 - **Disk Controller:**
 - **GPU:**
@@ -224,18 +227,22 @@ Brief description of what this PR does
 - **Other:**
 
 ## Testing Performed
+
 - [ ] Unit tests pass
 - [ ] Tested on actual Unraid system
 - [ ] Verified affected API endpoints work correctly
 - [ ] Tested WebSocket events (if applicable)
 
 ## Test Results
+
 Describe what you tested and the results
 
 ## Related Issues
+
 Fixes #(issue number)
 
 ## Screenshots/Logs (if applicable)
+
 Include relevant screenshots or log excerpts
 ```
 
@@ -375,29 +382,35 @@ In your pull request, include:
 
 ```markdown
 ## Description
+
 Add support for AMD GPU temperature monitoring via `rocm-smi`
 
 ## Hardware Configuration
+
 - **GPU:** AMD Radeon RX 6800 XT
 - **Unraid Version:** 7.2
 
 ## Issue
+
 GPU collector only supported NVIDIA GPUs via `nvidia-smi`. AMD GPUs
 returned empty metrics.
 
 ## Solution
+
 - Added AMD GPU detection via `rocm-smi` command
 - Implemented parser for `rocm-smi` output format
 - Added fallback: try NVIDIA first, then AMD
 - Updated GPU collector to handle both vendors
 
 ## Testing
+
 - ✅ AMD GPU temp/utilization correctly reported
 - ✅ Existing NVIDIA support still works (tested on RTX 3080)
 - ✅ All unit tests pass
 - ✅ WebSocket events broadcast GPU metrics correctly
 
 ## Related Issues
+
 Fixes #42
 ```
 
