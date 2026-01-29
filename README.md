@@ -51,6 +51,42 @@ For information about the official Unraid GraphQL API, please refer to:
 
 ---
 
+## 📚 Documentation
+
+**[→ Complete Documentation](docs/README.md)** - Start here for guides, API reference, and integration examples
+
+### Quick Links
+
+- **Getting Started**
+  - [Installation Guide](docs/guides/installation.md) - Install the plugin
+  - [Quick Start](docs/guides/quick-start.md) - First API calls
+  - [Configuration](docs/guides/configuration.md) - Customize settings
+  - [System Requirements](docs/guides/system-requirements.md) - Requirements & dependencies
+
+- **API Reference**
+  - [REST API](docs/api/rest-api.md) - Complete HTTP API reference (57 endpoints)
+  - [WebSocket Events](docs/api/websocket-events.md) - Real-time events
+  - [Prometheus Metrics](docs/api/prometheus.md) - Metrics endpoint (41 metrics)
+
+- **Integrations**
+  - [MCP (AI Agents)](docs/integrations/mcp.md) - Model Context Protocol (54 tools)
+  - [MQTT](docs/integrations/mqtt.md) - MQTT publishing for IoT
+  - [Grafana Dashboards](docs/integrations/grafana.md) - Monitoring dashboards
+  - [Home Assistant](docs/integrations/home-assistant.md) - Smart home integration
+
+- **Development**
+  - [Contributing](docs/development/contributing.md) - Contribution guidelines
+  - [Code Quality](docs/development/code-quality.md) - Linting & pre-commit hooks
+  - [Testing](docs/development/testing.md) - Test suite documentation
+  - [Architecture](docs/development/architecture.md) - Technical architecture
+
+- **Troubleshooting**
+  - [Common Issues](docs/troubleshooting/common-issues.md) - Solutions to common problems
+  - [Diagnostics](docs/troubleshooting/diagnostics.md) - Diagnostic commands
+  - [Hardware Compatibility](docs/troubleshooting/hardware-compatibility.md) - Hardware-specific fixes
+
+---
+
 ## Features
 
 ### Real-time Monitoring
@@ -147,9 +183,9 @@ Coordinates the entire application lifecycle:
 
 For detailed information, see:
 
-- **[System Requirements & Dependencies](docs/SYSTEM_REQUIREMENTS_AND_DEPENDENCIES.md)** - Complete requirements and data collection methods
-- **[Quick Reference](docs/QUICK_REFERENCE_DEPENDENCIES.md)** - TL;DR version
-- **[Diagnostic Commands](docs/DIAGNOSTIC_COMMANDS.md)** - Troubleshooting guide
+- **[System Requirements & Dependencies](docs/guides/system-requirements.md)** - Complete requirements and data collection methods
+- **[Quick Start Guide](docs/guides/quick-start.md)** - Get started quickly
+- **[Diagnostic Commands](docs/troubleshooting/diagnostics.md)** - Troubleshooting guide
 
 ### Quick Prerequisites
 
@@ -342,7 +378,7 @@ Available metrics include:
 - **Parity**: parity validity, check progress
 - **System**: uptime, info labels
 
-For Grafana integration, see [docs/integrations/GRAFANA.md](docs/integrations/GRAFANA.md).
+For Grafana integration, see [docs/integrations/grafana.md](docs/integrations/grafana.md).
 
 ### MQTT Publishing
 
@@ -416,7 +452,7 @@ curl -X POST http://localhost:8043/mcp \
   -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_system_info","arguments":{}},"id":1}'
 ```
 
-For full MCP documentation including all 54 tools, 5 resources, and 3 prompts, see [docs/MCP_INTEGRATION.md](docs/MCP_INTEGRATION.md).
+For full MCP documentation including all 54 tools, 5 resources, and 3 prompts, see [docs/integrations/mcp.md](docs/integrations/mcp.md).
 
 ### Example API Usage
 
@@ -645,7 +681,7 @@ pip install pre-commit
 make pre-commit-install
 ```
 
-Pre-commit will automatically run checks before each commit. See [docs/PRE_COMMIT_HOOKS.md](docs/PRE_COMMIT_HOOKS.md) for detailed documentation.
+Pre-commit will automatically run checks before each commit. See [docs/development/code-quality.md](docs/development/code-quality.md) for detailed documentation.
 
 #### Available Commands
 

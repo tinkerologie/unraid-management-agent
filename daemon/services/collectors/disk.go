@@ -230,6 +230,9 @@ func (c *DiskCollector) parseDiskKeyValue(disk *dto.DiskInfo, line string) {
 // enrichDisks enhances each disk with additional statistics
 func (c *DiskCollector) enrichDisks(disks []dto.DiskInfo) {
 	for i := range disks {
+		// Get model and serial number
+		c.enrichWithModelAndSerial(&disks[i])
+
 		// Get I/O statistics
 		c.enrichWithIOStats(&disks[i])
 
@@ -248,6 +251,86 @@ func (c *DiskCollector) enrichDisks(disks []dto.DiskInfo) {
 		if disks[i].Device != "" {
 			c.enrichWithSpinState(&disks[i])
 		}
+	}
+}
+
+// enrichWithModelAndSerial extracts model and serial number from sysfs and disk ID.
+// The disk ID in Unraid follows the pattern: {model}_{serial} where spaces in model are replaced with underscores.
+// Examples:
+//   - WUH721816ALE6L4_2CGV0URP → Model: WUH721816ALE6L4, Serial: 2CGV0URP
+//   - WDC_WD100EFAX-68LHPN0_JEKV15MZ → Model: WDC WD100EFAX-68LHPN0, Serial: JEKV15MZ
+//   - SPCC_M.2_PCIe_SSD_A240910N4M051200021 → Model: SPCC M.2 PCIe SSD, Serial: A240910N4M051200021
+func (c *DiskCollector) enrichWithModelAndSerial(disk *dto.DiskInfo) {
+	// Skip if no ID to parse
+	if disk.ID == "" {
+		return
+	}
+
+	// Try to read model from sysfs first (most reliable)
+	if disk.Device != "" {
+		modelPath := "/sys/block/" + disk.Device + "/device/model"
+		//nolint:gosec // G304: Path is constructed from /sys/block system directory, device name from trusted source
+		if data, err := os.ReadFile(modelPath); err == nil {
+			model := strings.TrimSpace(string(data))
+			if model != "" {
+				disk.Model = model
+				// Extract serial by removing model prefix from ID
+				// Model in sysfs has spaces, but ID has underscores instead of spaces
+				modelInID := strings.ReplaceAll(model, " ", "_")
+				if strings.HasPrefix(disk.ID, modelInID+"_") {
+					disk.SerialNumber = strings.TrimPrefix(disk.ID, modelInID+"_")
+					logger.Debug("Disk: Extracted model='%s' serial='%s' for device %s from sysfs",
+						disk.Model, disk.SerialNumber, disk.Device)
+					return
+				}
+			}
+		}
+	}
+
+	// Fallback: parse ID field directly
+	// The ID format is {model}_{serial} where serial is typically the last underscore-separated segment
+	// However, some models contain underscores (e.g., SPCC_M.2_PCIe_SSD), so we need to be careful
+	c.parseModelSerialFromID(disk)
+}
+
+// parseModelSerialFromID attempts to parse model and serial from the disk ID.
+// This is a fallback when sysfs model is not available.
+func (c *DiskCollector) parseModelSerialFromID(disk *dto.DiskInfo) {
+	id := disk.ID
+
+	// Find the last underscore - serial is typically the last segment
+	lastUnderscore := strings.LastIndex(id, "_")
+	if lastUnderscore == -1 {
+		// No underscore found, ID might just be a name (e.g., "Ultra_Fit" for USB)
+		// or a single value - can't reliably split
+		logger.Debug("Disk: Cannot parse model/serial from ID '%s' (no underscore pattern)", id)
+		return
+	}
+
+	// Serial numbers are typically alphanumeric, 6-20 characters
+	// Models often contain hyphens, dots, or additional underscores
+	potentialSerial := id[lastUnderscore+1:]
+	potentialModel := id[:lastUnderscore]
+
+	// Validate that the potential serial looks like a serial number
+	// Serial numbers are typically alphanumeric without special characters like dots or hyphens
+	isValidSerial := len(potentialSerial) >= 4 && len(potentialSerial) <= 30
+	for _, ch := range potentialSerial {
+		isAlphaNumeric := (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9')
+		if !isAlphaNumeric {
+			isValidSerial = false
+			break
+		}
+	}
+
+	if isValidSerial {
+		disk.SerialNumber = potentialSerial
+		// Convert underscores back to spaces for the model
+		disk.Model = strings.ReplaceAll(potentialModel, "_", " ")
+		logger.Debug("Disk: Parsed model='%s' serial='%s' from ID '%s'",
+			disk.Model, disk.SerialNumber, id)
+	} else {
+		logger.Debug("Disk: Cannot reliably parse model/serial from ID '%s'", id)
 	}
 }
 

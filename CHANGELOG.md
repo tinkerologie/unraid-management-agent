@@ -11,6 +11,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2026.02.00] - 2026-01-29
+
+### Fixed
+
+- **Disk Model and Serial Number Population** (GitHub Issue #56):
+  - Fixed `serial_number` and `model` fields in `/api/v1/disks` endpoint returning null
+  - Added `enrichWithModelAndSerial()` function to extract model from sysfs and serial from disk ID
+  - Added `parseModelSerialFromID()` fallback parser for when sysfs is unavailable
+  - Disk ID format discovered: `{model}_{serial}` where spaces in model name are replaced with underscores
+  - Examples: `WUH721816ALE6L4_2CGV0URP`, `WDC_WD100EFAX-68LHPN0_JEKV15MZ`, `SPCC_M.2_PCIe_SSD_A240910N4M051200021`
+  - Serial number validation: alphanumeric, 4-30 characters
+  - Model name restoration: underscores converted back to spaces in output
+  - Handles various disk types: WDC drives, Seagate drives, NVMe SSDs, USB drives
+  - Returns null for unassigned/empty disk slots (correct behavior)
+  - Added comprehensive unit tests: `TestParseModelSerialFromID`, `TestEnrichWithModelAndSerialNoDevice`, `TestEnrichWithModelAndSerialEmptyID`
+  - All tests passing, covering edge cases and various disk ID formats
+
+---
+
 ## [2026.01.02] - 2026-01-27
 
 ### Changed

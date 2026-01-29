@@ -491,3 +491,150 @@ func TestDiskSMARTStatus(t *testing.T) {
 		})
 	}
 }
+
+// TestParseModelSerialFromID tests parsing of model and serial from disk ID (Issue #56)
+func TestParseModelSerialFromID(t *testing.T) {
+	hub := pubsub.New(10)
+	ctx := &domain.Context{Hub: hub}
+	collector := NewDiskCollector(ctx)
+
+	tests := []struct {
+		name        string
+		diskID      string
+		wantModel   string
+		wantSerial  string
+		shouldParse bool // whether we expect successful parsing
+	}{
+		{
+			name:        "simple model_serial format",
+			diskID:      "WUH721816ALE6L4_2CGV0URP",
+			wantModel:   "WUH721816ALE6L4",
+			wantSerial:  "2CGV0URP",
+			shouldParse: true,
+		},
+		{
+			name:        "model with vendor prefix",
+			diskID:      "WDC_WD100EFAX-68LHPN0_JEKV15MZ",
+			wantModel:   "WDC WD100EFAX-68LHPN0",
+			wantSerial:  "JEKV15MZ",
+			shouldParse: true,
+		},
+		{
+			name:        "Seagate disk",
+			diskID:      "ST8000VN004-2M2101_WKD08FP6",
+			wantModel:   "ST8000VN004-2M2101",
+			wantSerial:  "WKD08FP6",
+			shouldParse: true,
+		},
+		{
+			name:        "NVMe SSD with underscores in model",
+			diskID:      "SPCC_M.2_PCIe_SSD_A240910N4M051200021",
+			wantModel:   "SPCC M.2 PCIe SSD",
+			wantSerial:  "A240910N4M051200021",
+			shouldParse: true,
+		},
+		{
+			name:        "USB drive with simple name",
+			diskID:      "Ultra_Fit",
+			wantModel:   "", // Can't reliably parse - "Fit" doesn't look like a serial
+			wantSerial:  "",
+			shouldParse: false,
+		},
+		{
+			name:        "empty ID",
+			diskID:      "",
+			wantModel:   "",
+			wantSerial:  "",
+			shouldParse: false,
+		},
+		{
+			name:        "ID without underscore",
+			diskID:      "SingleWord",
+			wantModel:   "",
+			wantSerial:  "",
+			shouldParse: false,
+		},
+		{
+			name:        "Samsung NVMe",
+			diskID:      "Samsung_SSD_980_PRO_1TB_S5GXNF0T123456K",
+			wantModel:   "Samsung SSD 980 PRO 1TB",
+			wantSerial:  "S5GXNF0T123456K",
+			shouldParse: true,
+		},
+		{
+			name:        "HGST disk",
+			diskID:      "HGST_HUH721212ALE604_8HJ8XXXX",
+			wantModel:   "HGST HUH721212ALE604",
+			wantSerial:  "8HJ8XXXX",
+			shouldParse: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			disk := &dto.DiskInfo{ID: tt.diskID}
+			collector.parseModelSerialFromID(disk)
+
+			if tt.shouldParse {
+				if disk.Model != tt.wantModel {
+					t.Errorf("Model = %q, want %q", disk.Model, tt.wantModel)
+				}
+				if disk.SerialNumber != tt.wantSerial {
+					t.Errorf("SerialNumber = %q, want %q", disk.SerialNumber, tt.wantSerial)
+				}
+			} else {
+				// When parsing should fail, model and serial should remain empty
+				if disk.Model != "" && disk.Model != tt.wantModel {
+					t.Errorf("Model = %q, expected empty or %q for unparsable ID", disk.Model, tt.wantModel)
+				}
+				if disk.SerialNumber != "" && disk.SerialNumber != tt.wantSerial {
+					t.Errorf("SerialNumber = %q, expected empty or %q for unparsable ID", disk.SerialNumber, tt.wantSerial)
+				}
+			}
+		})
+	}
+}
+
+// TestEnrichWithModelAndSerialNoDevice tests enrichment when device is empty
+func TestEnrichWithModelAndSerialNoDevice(t *testing.T) {
+	hub := pubsub.New(10)
+	ctx := &domain.Context{Hub: hub}
+	collector := NewDiskCollector(ctx)
+
+	// Test with empty device - should still try to parse from ID
+	disk := &dto.DiskInfo{
+		ID:     "WUH721816ALE6L4_2CGV0URP",
+		Device: "", // No device, can't read from sysfs
+	}
+
+	collector.enrichWithModelAndSerial(disk)
+
+	// Should fall back to parsing from ID
+	if disk.Model != "WUH721816ALE6L4" {
+		t.Errorf("Model = %q, want %q", disk.Model, "WUH721816ALE6L4")
+	}
+	if disk.SerialNumber != "2CGV0URP" {
+		t.Errorf("SerialNumber = %q, want %q", disk.SerialNumber, "2CGV0URP")
+	}
+}
+
+// TestEnrichWithModelAndSerialEmptyID tests enrichment when ID is empty
+func TestEnrichWithModelAndSerialEmptyID(t *testing.T) {
+	hub := pubsub.New(10)
+	ctx := &domain.Context{Hub: hub}
+	collector := NewDiskCollector(ctx)
+
+	disk := &dto.DiskInfo{
+		ID:     "",
+		Device: "sda",
+	}
+
+	collector.enrichWithModelAndSerial(disk)
+
+	// With empty ID, model and serial should remain empty (sysfs read will likely fail in test env)
+	// This test just ensures no panic occurs
+	if disk.Model != "" && disk.SerialNumber != "" {
+		// If both are populated, sysfs read worked (unlikely in test environment)
+		t.Logf("Sysfs read succeeded: Model=%q, Serial=%q", disk.Model, disk.SerialNumber)
+	}
+}
