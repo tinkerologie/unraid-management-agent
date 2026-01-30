@@ -20,7 +20,7 @@ This Unraid plugin provides REST API and WebSocket interfaces for real-time syst
 </DESCRIPTION>
 
 <CHANGES>
-###2026.02.00 (2026-01-29)
+###2026.02.00 (2026-01-30)
 - **Disk Model and Serial Number Population** 
 
 ###2026.01.02 (2026-01-27)
