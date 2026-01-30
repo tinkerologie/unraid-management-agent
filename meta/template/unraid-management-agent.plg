@@ -8,7 +8,7 @@
 <!ENTITY gitURL      "https://github.com/ruaandeysel/&name;">
 <!ENTITY pluginURL   "&gitURL;/releases/latest/download/&name;.plg">
 <!ENTITY bundle      "&name;-&version;.tgz">
-<!ENTITY md5         "76528ddb5f4d428d86d5778906fd61ef">
+<!ENTITY md5         "a63fe7ff7ab08cf2851ae66a789a09ba">
 ]>
 
 <PLUGIN  name="&name;"
