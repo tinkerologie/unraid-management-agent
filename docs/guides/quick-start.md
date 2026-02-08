@@ -9,9 +9,11 @@ Get up and running with the Unraid Management Agent in under 5 minutes.
 1. Open Unraid Web UI
 2. Navigate to **Plugins** → **Install Plugin**
 3. Paste plugin URL:
+
    ```
    https://raw.githubusercontent.com/ruaan-deysel/unraid-management-agent/main/unraid-management-agent.plg
    ```
+
 4. Click **Install**
 5. Wait for installation to complete
 6. Service starts automatically on port 8043
@@ -42,6 +44,7 @@ curl http://localhost:8043/api/v1/array
 ```
 
 Expected response:
+
 ```json
 {
   "status": "ok"

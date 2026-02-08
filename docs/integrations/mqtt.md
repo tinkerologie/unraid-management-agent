@@ -5,6 +5,7 @@ Publish Unraid server events to MQTT brokers for IoT integration and Home Assist
 ## Overview
 
 The Unraid Management Agent can publish system events to MQTT brokers in real-time, enabling:
+
 - **Home Assistant** integration for smart home automation
 - **IoT dashboards** like Node-RED
 - **Custom automation** scripts
@@ -75,6 +76,7 @@ All messages are published as JSON payloads with QoS 1 (at least once delivery).
 **Topic**: `unraid/system`
 
 **Payload**:
+
 ```json
 {
   "hostname": "Tower",
@@ -98,6 +100,7 @@ All messages are published as JSON payloads with QoS 1 (at least once delivery).
 **Topic**: `unraid/array`
 
 **Payload**:
+
 ```json
 {
   "state": "STARTED",
@@ -116,6 +119,7 @@ All messages are published as JSON payloads with QoS 1 (at least once delivery).
 **Topic**: `unraid/containers`
 
 **Payload**:
+
 ```json
 [
   {
@@ -331,6 +335,7 @@ MQTT_TOPIC_PREFIX=homelab/tower2
 ```
 
 Topics become:
+
 - `homelab/tower1/system`
 - `homelab/tower2/system`
 
@@ -415,6 +420,7 @@ docker exec mosquitto mosquitto_passwd -c /mosquitto/config/passwd username
 ### Message Rate
 
 With default collection intervals:
+
 - **Fast topics** (5-10s): system, array, containers, vms
 - **Moderate topics** (30-60s): disks, shares, network
 - **Total message rate**: ~10-15 messages/minute
@@ -422,6 +428,7 @@ With default collection intervals:
 ### Bandwidth
 
 Typical bandwidth usage:
+
 - **Average message size**: 200-500 bytes
 - **Peak bandwidth**: <1 KB/s
 - **Daily data**: <50 MB
@@ -429,6 +436,7 @@ Typical bandwidth usage:
 ### Broker Load
 
 Impact on MQTT broker:
+
 - **CPU**: Negligible
 - **Memory**: ~5-10 MB per client
 - **Connections**: 1 persistent connection

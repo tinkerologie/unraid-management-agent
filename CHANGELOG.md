@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **MCP Streamable HTTP Transport** (GitHub Issue #59):
+  - Implemented MCP 2025-06-18 Streamable HTTP transport specification
+  - `/mcp` endpoint now supports POST, GET, DELETE, and OPTIONS methods
+  - Session management via `Mcp-Session-Id` header
+  - `MCP-Protocol-Version` header validation (supports 2025-06-18 and 2025-03-26)
+  - POST handles both JSON-RPC requests (with response) and notifications (202 Accepted)
+  - GET opens SSE stream for server-initiated messages
+  - DELETE terminates sessions cleanly (404 for unknown sessions per spec)
+  - Full CORS support with proper header exposure
+  - Fixes "No server info found" error in Cursor
+  - Supports Cursor, Claude Desktop, GitHub Copilot, Codex, Windsurf, and Gemini CLI
+  - Legacy `/mcp/sse` endpoint preserved for backward compatibility
+  - Comprehensive test suite with race condition detection (25+ tests)
+
 ---
 
 ## [2026.02.00] - 2026-01-29

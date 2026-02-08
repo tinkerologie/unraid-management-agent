@@ -64,16 +64,19 @@ Future versions will include a web UI for configuration.
 ### Method 2: Edit Config File
 
 1. **Stop the service**:
+
    ```bash
    /etc/rc.d/rc.unraid-management-agent stop
    ```
 
 2. **Edit config**:
+
    ```bash
    nano /boot/config/plugins/unraid-management-agent/unraid-management-agent.cfg
    ```
 
 3. **Example configuration**:
+
    ```bash
    # Unraid Management Agent Configuration
    PORT=8043
@@ -98,6 +101,7 @@ Future versions will include a web UI for configuration.
    ```
 
 4. **Start the service**:
+
    ```bash
    /etc/rc.d/rc.unraid-management-agent start
    ```
@@ -229,6 +233,7 @@ MQTT_TOPIC_PREFIX=homelab/unraid
 ```
 
 Topics will be:
+
 - `homelab/unraid/system`
 - `homelab/unraid/array`
 - `homelab/unraid/containers`
@@ -253,6 +258,7 @@ Collection intervals affect CPU usage:
 ### Memory Usage
 
 Typical memory footprint:
+
 - Base: ~20-30 MB
 - Per collector: ~5-10 MB
 - WebSocket clients: ~1 MB per connection
@@ -260,6 +266,7 @@ Typical memory footprint:
 ### Network Bandwidth
 
 With default intervals:
+
 - REST API: Negligible (on-demand)
 - WebSocket: ~5-10 KB/s per client
 - MQTT: ~2-5 KB/s
@@ -301,6 +308,7 @@ grep DEBUG /var/log/unraid-management-agent.log
 ### Network Security
 
 **Recommendations**:
+
 - Keep port 8043 on internal network only
 - Use WireGuard VPN for remote access
 - Use reverse proxy with authentication (nginx, Traefik)

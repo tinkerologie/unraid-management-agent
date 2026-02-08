@@ -174,6 +174,7 @@ unraid_gpu_temperature_celsius > 80
 ### Grafana Dashboard Panels
 
 #### System Overview Panel
+
 ```promql
 # CPU Usage
 unraid_cpu_usage_percent{hostname="$hostname"}
@@ -186,6 +187,7 @@ unraid_uptime_seconds{hostname="$hostname"} / 86400
 ```
 
 #### Disk Health Panel
+
 ```promql
 # Hottest disk
 max(unraid_disk_temperature_celsius{hostname="$hostname"})
@@ -200,6 +202,7 @@ count(unraid_disk_smart_status{hostname="$hostname"} == 0)
 ## Grafana Integration
 
 See [Grafana Dashboard Guide](grafana.md) for:
+
 - Pre-built dashboard JSON
 - Dashboard setup instructions
 - Alert configuration
@@ -233,6 +236,7 @@ curl -s http://localhost:8043/metrics | grep -c "^unraid_"
 ## Metric Updates
 
 Metrics reflect current cached values from collectors:
+
 - **Fast metrics** (15s): CPU, memory, temperatures
 - **Standard metrics** (30s): Array, disks, containers
 - **Moderate metrics** (60s): UPS, GPU
@@ -257,6 +261,7 @@ tail -f /var/log/unraid-management-agent.log
 ### Missing Metrics
 
 Some metrics only appear when relevant:
+
 - **GPU metrics**: Only if GPU detected
 - **UPS metrics**: Only if UPS configured
 - **Disk metrics**: Only for discovered disks

@@ -71,18 +71,22 @@ const (
 	TransportSSE TransportType = "sse"
 	// TransportStdio is the stdio transport (for local AI client integrations like Claude Desktop).
 	TransportStdio TransportType = "stdio"
+	// TransportStreamableHTTP is the MCP 2025-03-26 Streamable HTTP transport.
+	// This is the modern transport compatible with Cursor, Claude, GitHub Copilot, Codex, Windsurf, Gemini, etc.
+	TransportStreamableHTTP TransportType = "streamable-http"
 )
 
 // Server represents the MCP server that exposes Unraid capabilities to AI agents.
 type Server struct {
-	ctx            *domain.Context
-	mcpServer      *mcp.Server
-	transport      *StdHTTPTransport
-	sseTransport   *SSETransport
-	stdioTransport *StdioTransport
-	transportType  TransportType
-	cacheProvider  CacheProvider
-	mu             sync.RWMutex //nolint:unused // Reserved for future concurrent access patterns
+	ctx                     *domain.Context
+	mcpServer               *mcp.Server
+	transport               *StdHTTPTransport
+	sseTransport            *SSETransport
+	stdioTransport          *StdioTransport
+	streamableHTTPTransport *StreamableHTTPTransport
+	transportType           TransportType
+	cacheProvider           CacheProvider
+	mu                      sync.RWMutex //nolint:unused // Reserved for future concurrent access patterns
 }
 
 // NewServer creates a new MCP server instance with HTTP transport (default).
@@ -123,6 +127,12 @@ func (s *Server) InitializeWithTransport(transportType TransportType, reader, wr
 	case TransportSSE:
 		s.sseTransport = NewSSETransport()
 		s.mcpServer = mcp.NewServer(s.sseTransport,
+			mcp.WithName("unraid-management-agent"),
+			mcp.WithVersion(s.ctx.Version), //nolint:staticcheck // QF1008: explicit access for clarity
+		)
+	case TransportStreamableHTTP:
+		s.streamableHTTPTransport = NewStreamableHTTPTransport()
+		s.mcpServer = mcp.NewServer(s.streamableHTTPTransport,
 			mcp.WithName("unraid-management-agent"),
 			mcp.WithVersion(s.ctx.Version), //nolint:staticcheck // QF1008: explicit access for clarity
 		)
@@ -183,6 +193,18 @@ func (s *Server) GetHandler() http.HandlerFunc {
 		}
 	}
 	return s.transport.Handler()
+}
+
+// GetStreamableHTTPHandler returns the handler for the Streamable HTTP transport.
+// This single handler supports POST, GET, DELETE, and OPTIONS on the MCP endpoint,
+// conforming to the MCP 2025-03-26 Streamable HTTP transport specification.
+func (s *Server) GetStreamableHTTPHandler() http.HandlerFunc {
+	if s.streamableHTTPTransport == nil {
+		return func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, "Streamable HTTP transport not configured", http.StatusInternalServerError)
+		}
+	}
+	return s.streamableHTTPTransport.Handler()
 }
 
 // GetSSEHandler returns the SSE handler for Server-Sent Events connections.

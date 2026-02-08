@@ -103,23 +103,27 @@ For now, create panels manually using the queries below.
 ### System Overview
 
 #### CPU Usage Panel
+
 - **Type**: Graph/Time series
 - **Query**: `unraid_cpu_usage_percent{hostname="$hostname"}`
 - **Unit**: Percent (0-100)
 - **Thresholds**: Warning: 80, Critical: 90
 
 #### Memory Usage Panel
+
 - **Type**: Graph/Time series
 - **Query**: `(unraid_memory_used_bytes{hostname="$hostname"} / unraid_memory_total_bytes{hostname="$hostname"}) * 100`
 - **Unit**: Percent (0-100)
 
 #### CPU Temperature Panel
+
 - **Type**: Gauge
 - **Query**: `unraid_cpu_temperature_celsius{hostname="$hostname"}`
 - **Unit**: Celsius
 - **Thresholds**: Warning: 70, Critical: 85
 
 #### Uptime Panel
+
 - **Type**: Stat
 - **Query**: `unraid_uptime_seconds{hostname="$hostname"} / 86400`
 - **Unit**: Days
@@ -128,24 +132,28 @@ For now, create panels manually using the queries below.
 ### Array & Storage
 
 #### Array Usage Panel
+
 - **Type**: Gauge
 - **Query**: `unraid_array_used_percent{hostname="$hostname"}`
 - **Unit**: Percent (0-100)
 - **Thresholds**: Warning: 80, Critical: 90
 
 #### Array Capacity Panel
+
 - **Type**: Stat
 - **Query A** (Used): `(unraid_array_size_bytes{hostname="$hostname"} - unraid_array_free_bytes{hostname="$hostname"}) / 1e12`
 - **Query B** (Total): `unraid_array_size_bytes{hostname="$hostname"} / 1e12`
 - **Unit**: TB
 
 #### Parity Status Panel
+
 - **Type**: Stat
 - **Query**: `unraid_array_parity_valid{hostname="$hostname"}`
 - **Value Mappings**: 0=Invalid, 1=Valid
 - **Thresholds**: 0=Red, 1=Green
 
 #### Disk Temperatures Panel
+
 - **Type**: Bar gauge
 - **Query**: `unraid_disk_temperature_celsius{hostname="$hostname"}`
 - **Legend**: `{{disk_name}}`
@@ -155,12 +163,14 @@ For now, create panels manually using the queries below.
 ### Docker Containers
 
 #### Container Status Panel
+
 - **Type**: Stat
 - **Query A** (Running): `unraid_containers_running{hostname="$hostname"}`
 - **Query B** (Stopped): `unraid_containers_stopped{hostname="$hostname"}`
 - **Query C** (Total): `unraid_containers_total{hostname="$hostname"}`
 
 #### Container States Pie Chart
+
 - **Type**: Pie chart
 - **Query A** (Running): `unraid_containers_running{hostname="$hostname"}`
 - **Query B** (Stopped): `unraid_containers_stopped{hostname="$hostname"}`
@@ -169,6 +179,7 @@ For now, create panels manually using the queries below.
 ### Virtual Machines
 
 #### VM Status Panel
+
 - **Type**: Stat
 - **Query A** (Running): `unraid_vms_running{hostname="$hostname"}`
 - **Query B** (Stopped): `unraid_vms_stopped{hostname="$hostname"}`
@@ -177,18 +188,21 @@ For now, create panels manually using the queries below.
 ### GPU Monitoring
 
 #### GPU Utilization Panel
+
 - **Type**: Graph
 - **Query**: `unraid_gpu_utilization_percent{hostname="$hostname"}`
 - **Legend**: `{{gpu_name}}`
 - **Unit**: Percent (0-100)
 
 #### GPU Temperature Panel
+
 - **Type**: Gauge
 - **Query**: `unraid_gpu_temperature_celsius{hostname="$hostname"}`
 - **Unit**: Celsius
 - **Thresholds**: Warning: 75, Critical: 85
 
 #### GPU Memory Panel
+
 - **Type**: Graph
 - **Query**: `(unraid_gpu_memory_used_bytes{hostname="$hostname"} / unraid_gpu_memory_total_bytes{hostname="$hostname"}) * 100`
 - **Unit**: Percent (0-100)
@@ -196,17 +210,20 @@ For now, create panels manually using the queries below.
 ### UPS Monitoring
 
 #### Battery Charge Panel
+
 - **Type**: Gauge
 - **Query**: `unraid_ups_battery_charge_percent{hostname="$hostname"}`
 - **Unit**: Percent (0-100)
 - **Thresholds**: Critical: 20, Warning: 40, OK: 80
 
 #### UPS Load Panel
+
 - **Type**: Gauge
 - **Query**: `unraid_ups_load_percent{hostname="$hostname"}`
 - **Unit**: Percent (0-100)
 
 #### Runtime Remaining Panel
+
 - **Type**: Stat
 - **Query**: `unraid_ups_time_left_seconds{hostname="$hostname"} / 60`
 - **Unit**: Minutes
@@ -305,6 +322,7 @@ rule_files:
 Create dashboard variables for dynamic filtering:
 
 ### Hostname Variable
+
 - **Name**: hostname
 - **Type**: Query
 - **Query**: `label_values(unraid_cpu_usage_percent, hostname)`
@@ -314,16 +332,19 @@ Create dashboard variables for dynamic filtering:
 ## Tips & Best Practices
 
 ### Performance
+
 - Set appropriate scrape intervals (15-30s recommended)
 - Use recording rules for complex queries
 - Limit retention time to manage storage
 
 ### Organization
+
 - Group related panels in rows
 - Use consistent color schemes
 - Add descriptive panel titles
 
 ### Alerts
+
 - Set appropriate thresholds for your hardware
 - Use "for" duration to avoid false positives
 - Configure notification channels (email, Slack, etc.)
@@ -339,12 +360,14 @@ For now, use the panel configurations above to build your custom dashboard.
 ### No Data in Panels
 
 1. Verify Prometheus is scraping:
+
    ```bash
    # Check Prometheus targets
    curl http://prometheus:9090/api/v1/targets
    ```
 
 2. Check metrics endpoint:
+
    ```bash
    curl http://UNRAID_IP:8043/metrics
    ```

@@ -1,6 +1,10 @@
 # Model Context Protocol (MCP) Integration
 
-The Unraid Management Agent includes support for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/), enabling AI agents like Claude, GitHub Copilot, ChatGPT, and other LLM-based systems to interact with your Unraid server programmatically.
+The Unraid Management Agent includes support for the
+[Model Context Protocol (MCP)](https://modelcontextprotocol.io/),
+enabling AI agents like Claude, Cursor, GitHub Copilot, Codex,
+Windsurf, Gemini CLI, and other LLM-based systems to interact
+with your Unraid server programmatically.
 
 ## Overview
 
@@ -15,10 +19,14 @@ MCP is an open protocol that standardizes how AI applications can securely conne
 
 The MCP server provides two transport options:
 
-| Transport | Endpoint                                   | Description                                  |
-| --------- | ------------------------------------------ | -------------------------------------------- |
-| **HTTP**  | `POST http://<unraid-ip>:8043/mcp`         | Standard HTTP transport for request/response |
-| **SSE**   | `GET/POST http://<unraid-ip>:8043/mcp/sse` | Server-Sent Events for real-time streaming   |
+| Transport              | Endpoint                                       | Description                                                                  |
+| ---------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------- |
+| **Streamable HTTP** ⭐ | `POST/GET/DELETE http://<unraid-ip>:8043/mcp`  | Modern MCP transport (spec 2025-03-26) — **recommended for all AI clients**  |
+| **SSE (Legacy)**       | `GET/POST http://<unraid-ip>:8043/mcp/sse`     | Deprecated HTTP+SSE transport (spec 2024-11-05) for backward compatibility   |
+
+> **Note:** The Streamable HTTP transport at `/mcp` is the primary endpoint and supports all modern AI clients
+> including Cursor, Claude Desktop, GitHub Copilot, Codex, Windsurf, and Gemini CLI.
+> The legacy `/mcp/sse` endpoint is maintained for backward compatibility with older clients.
 
 ## Available Tools (54 total)
 
@@ -176,43 +184,81 @@ Add to your VS Code workspace (`.vscode/mcp.json`):
 }
 ```
 
-Or for SSE transport (real-time streaming):
-
-```json
-{
-  "servers": {
-    "unraid": {
-      "type": "sse",
-      "url": "http://your-unraid-ip:8043/mcp/sse"
-    }
-  }
-}
-```
-
 After configuration, restart the MCP server in VS Code:
 
 1. Open Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
 2. Run **"MCP: List Servers"** to verify configuration
 3. Run **"MCP: Restart Server"** if needed
 
-### Using with Claude Desktop
+### Using with Cursor
 
-Add to your Claude Desktop configuration (`claude_desktop_config.json`):
+Add to your Cursor MCP configuration (Settings → MCP → Add Server):
 
 ```json
 {
   "mcpServers": {
     "unraid": {
-      "command": "curl",
-      "args": [
-        "-X",
-        "POST",
-        "http://your-unraid-ip:8043/mcp",
-        "-H",
-        "Content-Type: application/json",
-        "-d",
-        "@-"
-      ]
+      "type": "http",
+      "url": "http://your-unraid-ip:8043/mcp"
+    }
+  }
+}
+```
+
+### Using with Claude Desktop
+
+Since the Unraid Management Agent runs as a **remote** MCP server (over the network),
+configure it via the Claude.ai web UI:
+
+1. Go to [claude.ai/settings/connectors](https://claude.ai/settings/connectors)
+2. Click **"Add Connector"**
+3. Enter the URL: `http://your-unraid-ip:8043/mcp`
+
+> **Note:** Claude Desktop does **not** connect to remote servers configured
+> directly via `claude_desktop_config.json` — that file is only for local
+> servers using the stdio transport. Remote servers must be added via
+> Settings → Connectors.
+
+Claude Desktop supports both Streamable HTTP and SSE transports (Pro, Max, Team, and Enterprise plans).
+
+### Using with Windsurf
+
+Add to your Windsurf MCP configuration (`~/.codeium/windsurf/mcp_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "unraid": {
+      "serverUrl": "http://your-unraid-ip:8043/mcp"
+    }
+  }
+}
+```
+
+### Using with Codex (OpenAI)
+
+Codex supports HTTP streaming transports. Configure via:
+
+```json
+{
+  "mcpServers": {
+    "unraid": {
+      "type": "http",
+      "url": "http://your-unraid-ip:8043/mcp"
+    }
+  }
+}
+```
+
+### Using with Gemini CLI
+
+Add to your Gemini CLI MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "unraid": {
+      "url": "http://your-unraid-ip:8043/mcp"
     }
   }
 }
@@ -341,11 +387,36 @@ print(f"Result: {result['result']['content'][0]['text']}")
 
 ## Transport Types
 
-| Transport | Best For                     | Features                         |
-| --------- | ---------------------------- | -------------------------------- |
-| **HTTP**  | Simple integrations, scripts | Request/response, stateless      |
-| **SSE**   | Real-time AI agents          | Streaming responses, server push |
-| **Stdio** | Local CLI tools              | Direct process communication     |
+| Transport              | Best For                          | Features                                                  |
+| ---------------------- | --------------------------------- | --------------------------------------------------------- |
+| **Streamable HTTP** ⭐ | All modern AI clients             | Request/response, SSE streaming, session management       |
+| **SSE (Legacy)**       | Older clients (pre-2025)          | Streaming responses, server push (deprecated)             |
+| **Stdio**              | Local CLI tools                   | Direct process communication                              |
+
+### Streamable HTTP Transport Details (MCP Spec 2025-03-26)
+
+The Streamable HTTP transport at `/mcp` supports:
+
+- **POST**: Send JSON-RPC requests and notifications
+  - Requests return `Content-Type: application/json` responses
+  - Notifications return `202 Accepted` with no body
+- **GET**: Open an SSE stream for server-initiated messages (requires `Accept: text/event-stream` header)
+- **DELETE**: Terminate the session (requires `Mcp-Session-Id` header)
+- **OPTIONS**: CORS preflight handling
+
+**Session Management:** The server assigns an `Mcp-Session-Id` on initialization. Clients should include this header in subsequent requests.
+
+**Client Compatibility:**
+
+| Client         | Transport Used  | Status       |
+| -------------- | --------------- | ------------ |
+| Cursor         | Streamable HTTP | ✅ Supported |
+| Claude Desktop | Streamable HTTP | ✅ Supported |
+| GitHub Copilot | HTTP            | ✅ Supported |
+| Codex          | HTTP Streaming  | ✅ Supported |
+| Windsurf       | Streamable HTTP | ✅ Supported |
+| Gemini CLI     | HTTP            | ✅ Supported |
+| VS Code MCP    | HTTP / SSE      | ✅ Supported |
 
 ## Troubleshooting
 
@@ -367,13 +438,18 @@ print(f"Result: {result['result']['content'][0]['text']}")
 
 - Ensure the agent is running and accessible from your machine
 - Check firewall rules allow connections to port 8043
-- Try using HTTP transport instead of SSE
 - Restart the MCP server: Command Palette → "MCP: Restart Server"
+
+**Cursor "No server info found":**
+
+- Use the Streamable HTTP endpoint: `http://your-unraid-ip:8043/mcp`
+- Ensure your config uses `"type": "http"` (not `"sse"`)
+- Update to the latest version of the agent which supports the MCP 2025-03-26 spec
 
 **404 on /mcp/sse:**
 
-- Ensure you're using the latest version of the agent (2025.01.07+)
-- The SSE endpoint requires both GET and POST methods
+- The SSE endpoint is for legacy clients only. Modern clients should use `/mcp`
+- Ensure you're using the latest version of the agent
 
 ## Related Documentation
 

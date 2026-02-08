@@ -7,17 +7,20 @@ The Unraid Management Agent is a lightweight Go-based plugin with **NO external 
 ## Minimum Requirements
 
 ### Operating System
+
 - **Unraid OS**: Version 6.9 or higher
 - **Architecture**: Linux/amd64 (x86_64)
 - **Kernel**: Linux 4.4+ (included in Unraid 6.9+)
 
 ### Hardware
+
 - **CPU**: Any x64 processor (Intel or AMD)
 - **RAM**: 50MB available memory
 - **Storage**: 20MB disk space for plugin files
 - **Network**: 1 available TCP port (default: 8043)
 
 ### Tested Configurations
+
 - **Primary Testing**: Unraid 7.x
 - **Architecture**: Linux/amd64
 - **Plugin Version**: 2025.11.0+
@@ -58,10 +61,13 @@ These features require additional Unraid plugins or hardware:
 ## Port Requirements
 
 ### Default Port
+
 - **API/WebSocket/MCP**: TCP 8043 (configurable)
 
 ### Port Conflicts
+
 If port 8043 is in use:
+
 1. Check running services: `netstat -tulpn | grep 8043`
 2. Change port in plugin settings
 3. Restart the agent service
@@ -77,11 +83,13 @@ The agent runs with standard Unraid plugin permissions and requires:
 ## Network Configuration
 
 ### Firewall Considerations
+
 - Agent listens on `0.0.0.0` (all interfaces) by default
 - Access control via network firewall/router recommended
 - No built-in authentication (trust network-based security)
 
 ### Recommended Security
+
 1. **Internal Network Only**: Do not expose to public internet
 2. **VPN Access**: Use WireGuard/OpenVPN for remote access
 3. **Reverse Proxy**: Use nginx/Traefik with auth if needed
@@ -89,12 +97,14 @@ The agent runs with standard Unraid plugin permissions and requires:
 ## Performance Impact
 
 ### Resource Usage
+
 - **Idle CPU**: <0.5% on modern systems
 - **Memory**: ~50MB RSS
 - **Network**: Minimal (<1KB/s average)
 - **Disk I/O**: Negligible (mostly reads)
 
 ### Collection Intervals
+
 Default intervals optimize for low power consumption:
 
 | Category | Default | Impact |
@@ -109,7 +119,9 @@ Default intervals optimize for low power consumption:
 ## Hardware Compatibility
 
 ### Known Compatible Hardware
+
 The plugin was developed and tested on:
+
 - **CPU**: Modern Intel/AMD x64 processors
 - **Storage**: Standard SATA, NVMe, SAS controllers
 - **Network**: Most Ethernet adapters
@@ -118,6 +130,7 @@ The plugin was developed and tested on:
 ### Potential Compatibility Issues
 
 The plugin may not work correctly with:
+
 - **Exotic disk controllers**: Uncommon RAID/HBA cards
 - **Non-standard sensors**: Custom temperature monitoring
 - **Unusual network configs**: Complex bonding/VLAN setups
@@ -126,6 +139,7 @@ The plugin may not work correctly with:
 ### If You Encounter Issues
 
 Hardware variations can cause compatibility problems. See:
+
 - [Hardware Compatibility Guide](../troubleshooting/hardware-compatibility.md)
 - [Contributing Guide](../development/contributing.md) - Help improve compatibility
 

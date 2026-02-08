@@ -24,11 +24,13 @@ The Unraid Management Agent is installed as a **Community Applications** plugin 
 3. **Click Install** and wait for completion
 
 4. **Verify Installation**:
+
    ```bash
    ps aux | grep unraid-management-agent
    ```
 
 5. **Access API**:
+
    ```bash
    curl http://localhost:8043/api/v1/health
    ```
@@ -36,16 +38,19 @@ The Unraid Management Agent is installed as a **Community Applications** plugin 
 ### Method 2: Manual Installation
 
 1. **Download the .plg file** from GitHub releases:
+
    ```bash
    wget https://github.com/ruaan-deysel/unraid-management-agent/releases/latest/download/unraid-management-agent.plg
    ```
 
 2. **Install via command line**:
+
    ```bash
    /usr/local/emhttp/plugins/dynamix.plugin.manager/scripts/plugin install /boot/config/plugins/unraid-management-agent.plg
    ```
 
 3. **Start the service**:
+
    ```bash
    /etc/rc.d/rc.unraid-management-agent start
    ```
@@ -88,6 +93,7 @@ curl http://localhost:8043/api/v1/health
 ```
 
 Expected response:
+
 ```json
 {
   "status": "ok"
@@ -251,8 +257,8 @@ ls -la /var/log/unraid-management-agent.log
 
 ## Support
 
-- **GitHub Issues**: https://github.com/ruaan-deysel/unraid-management-agent/issues
-- **Documentation**: https://github.com/ruaan-deysel/unraid-management-agent/tree/main/docs
+- **GitHub Issues**: <https://github.com/ruaan-deysel/unraid-management-agent/issues>
+- **Documentation**: <https://github.com/ruaan-deysel/unraid-management-agent/tree/main/docs>
 - **Community**: Unraid Forums
 
 ---

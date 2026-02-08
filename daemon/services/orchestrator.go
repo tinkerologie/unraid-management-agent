@@ -64,17 +64,20 @@ func (o *Orchestrator) Run() error {
 		o.initializeMQTT(ctx, &wg, apiServer)
 	}
 
-	// Initialize MCP server for AI agent integration (HTTP transport)
-	mcpServer := mcp.NewServer(o.ctx, apiServer)
-	if err := mcpServer.Initialize(); err != nil {
-		logger.Error("Failed to initialize MCP server: %v", err)
+	// Initialize Streamable HTTP MCP server (MCP spec 2025-03-26) for modern AI clients
+	// This is the primary MCP endpoint supporting Cursor, Claude, GitHub Copilot, Codex, Windsurf, Gemini, etc.
+	mcpStreamableServer := mcp.NewServerWithTransport(o.ctx, apiServer, mcp.TransportStreamableHTTP)
+	if err := mcpStreamableServer.Initialize(); err != nil {
+		logger.Error("Failed to initialize MCP Streamable HTTP server: %v", err)
 	} else {
-		// Register MCP endpoint on the API router
-		apiServer.GetRouter().HandleFunc("/mcp", mcpServer.GetHandler()).Methods("POST", "OPTIONS")
-		logger.Success("MCP server initialized at /mcp endpoint")
+		// Single endpoint supporting POST, GET, DELETE, OPTIONS per the Streamable HTTP spec
+		apiServer.GetRouter().HandleFunc("/mcp", mcpStreamableServer.GetStreamableHTTPHandler()).
+			Methods("POST", "GET", "DELETE", "OPTIONS")
+		logger.Success("MCP Streamable HTTP server initialized at /mcp endpoint")
 	}
 
-	// Initialize SSE MCP server for VS Code and other SSE clients
+	// Initialize legacy SSE MCP server for backward compatibility with older clients
+	// Clients using the deprecated HTTP+SSE transport (spec 2024-11-05) connect here
 	mcpSSEServer := mcp.NewServerWithTransport(o.ctx, apiServer, mcp.TransportSSE)
 	if err := mcpSSEServer.Initialize(); err != nil {
 		logger.Error("Failed to initialize MCP SSE server: %v", err)
@@ -82,7 +85,7 @@ func (o *Orchestrator) Run() error {
 		// Register SSE endpoints - GET for event stream, POST for messages
 		apiServer.GetRouter().HandleFunc("/mcp/sse", mcpSSEServer.GetSSEHandler()).Methods("GET")
 		apiServer.GetRouter().HandleFunc("/mcp/sse", mcpSSEServer.GetSSEPostHandler()).Methods("POST", "OPTIONS")
-		logger.Success("MCP SSE server initialized at /mcp/sse endpoint")
+		logger.Success("MCP SSE server initialized at /mcp/sse endpoint (legacy)")
 	}
 
 	// Start all enabled collectors
