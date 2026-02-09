@@ -19,7 +19,8 @@ import (
 // SystemCollector collects overall system information including CPU, memory, uptime, and temperatures.
 // It provides high-level system metrics and status information.
 type SystemCollector struct {
-	ctx *domain.Context
+	ctx      *domain.Context
+	prevRAPL *lib.RAPLReading // Previous RAPL reading for power delta calculation
 }
 
 // NewSystemCollector creates a new system information collector with the given context.
@@ -191,6 +192,11 @@ func (c *SystemCollector) collectSystemInfo() (*dto.SystemInfo, error) {
 	info.OpenSSLVersion = c.getOpenSSLVersion()
 	info.KernelVersion = c.getKernelVersion()
 	info.ParityCheckSpeed = c.getParityCheckSpeed()
+
+	// Get CPU power consumption from Intel RAPL
+	cpuPower, dramPower := c.getCPUPower()
+	info.CPUPowerWatts = cpuPower
+	info.DRAMPowerWatts = dramPower
 
 	// Set timestamp
 	info.Timestamp = time.Now()
@@ -885,4 +891,31 @@ func (c *SystemCollector) getParityCheckSpeed() string {
 	}
 
 	return ""
+}
+
+// getCPUPower reads CPU power consumption from Intel RAPL (Running Average Power Limit).
+// It requires two consecutive readings to calculate power in watts.
+// Returns nil pointers if RAPL is not available or on the first collection cycle.
+func (c *SystemCollector) getCPUPower() (cpuPower *float64, dramPower *float64) {
+	currRAPL := lib.ReadRAPLEnergy()
+	if currRAPL == nil {
+		c.prevRAPL = nil
+		return nil, nil
+	}
+
+	// Calculate power from delta between previous and current readings
+	power := lib.CalculateRAPLPower(c.prevRAPL, currRAPL)
+
+	// Store current reading for next cycle
+	c.prevRAPL = currRAPL
+
+	if power == nil {
+		// First reading — no delta available yet
+		logger.Debug("RAPL: first reading captured, power will be available on next collection")
+		return nil, nil
+	}
+
+	logger.Debug("CPU Power: %.2f W, DRAM Power: %.2f W", power.PackageWatts, power.DRAMWatts)
+
+	return &power.PackageWatts, &power.DRAMWatts
 }

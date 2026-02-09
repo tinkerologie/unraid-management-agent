@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CPU Power Consumption Monitoring** (GitHub Issue #60):
+  - Added Intel RAPL (Running Average Power Limit) support via `/sys/class/powercap`
+  - New `cpu_power_watts` and `dram_power_watts` fields in SystemInfo DTO
+  - Real-time CPU package and DRAM power readings in watts
+  - Multi-socket support — power values summed across all CPU packages
+  - Energy counter wraparound handling for long-running systems
+  - Graceful degradation: fields omitted (null) when RAPL is unavailable (AMD, VMs, older hardware)
+  - New Prometheus gauges: `unraid_cpu_power_watts`, `unraid_dram_power_watts`
+  - Automatically exposed via REST API, WebSocket events, and MCP `get_system_info` tool
+  - Comprehensive test suite with 9 tests covering single/multi-socket, wraparound, edge cases
+
 - **MCP Streamable HTTP Transport** (GitHub Issue #59):
   - Implemented MCP 2025-06-18 Streamable HTTP transport specification
   - `/mcp` endpoint now supports POST, GET, DELETE, and OPTIONS methods
@@ -22,8 +33,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Full CORS support with proper header exposure
   - Fixes "No server info found" error in Cursor
   - Supports Cursor, Claude Desktop, GitHub Copilot, Codex, Windsurf, and Gemini CLI
-  - Legacy `/mcp/sse` endpoint preserved for backward compatibility
   - Comprehensive test suite with race condition detection (25+ tests)
+
+### Removed
+
+- **Legacy SSE MCP Transport**: Removed the deprecated `/mcp/sse` endpoint and old HTTP transport.
+  All clients should use the Streamable HTTP transport at `/mcp` (spec 2025-06-18).
 
 ---
 

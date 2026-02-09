@@ -64,28 +64,15 @@ func (o *Orchestrator) Run() error {
 		o.initializeMQTT(ctx, &wg, apiServer)
 	}
 
-	// Initialize Streamable HTTP MCP server (MCP spec 2025-03-26) for modern AI clients
-	// This is the primary MCP endpoint supporting Cursor, Claude, GitHub Copilot, Codex, Windsurf, Gemini, etc.
-	mcpStreamableServer := mcp.NewServerWithTransport(o.ctx, apiServer, mcp.TransportStreamableHTTP)
-	if err := mcpStreamableServer.Initialize(); err != nil {
-		logger.Error("Failed to initialize MCP Streamable HTTP server: %v", err)
+	// Initialize MCP server with Streamable HTTP transport (MCP spec 2025-06-18)
+	// Uses the official MCP Go SDK for protocol compliance with Claude, ChatGPT, Cursor, Copilot, etc.
+	mcpServer := mcp.NewServer(o.ctx, apiServer)
+	if err := mcpServer.Initialize(); err != nil {
+		logger.Error("Failed to initialize MCP server: %v", err)
 	} else {
-		// Single endpoint supporting POST, GET, DELETE, OPTIONS per the Streamable HTTP spec
-		apiServer.GetRouter().HandleFunc("/mcp", mcpStreamableServer.GetStreamableHTTPHandler()).
-			Methods("POST", "GET", "DELETE", "OPTIONS")
-		logger.Success("MCP Streamable HTTP server initialized at /mcp endpoint")
-	}
-
-	// Initialize legacy SSE MCP server for backward compatibility with older clients
-	// Clients using the deprecated HTTP+SSE transport (spec 2024-11-05) connect here
-	mcpSSEServer := mcp.NewServerWithTransport(o.ctx, apiServer, mcp.TransportSSE)
-	if err := mcpSSEServer.Initialize(); err != nil {
-		logger.Error("Failed to initialize MCP SSE server: %v", err)
-	} else {
-		// Register SSE endpoints - GET for event stream, POST for messages
-		apiServer.GetRouter().HandleFunc("/mcp/sse", mcpSSEServer.GetSSEHandler()).Methods("GET")
-		apiServer.GetRouter().HandleFunc("/mcp/sse", mcpSSEServer.GetSSEPostHandler()).Methods("POST", "OPTIONS")
-		logger.Success("MCP SSE server initialized at /mcp/sse endpoint (legacy)")
+		// Mount as PathPrefix handler — the StreamableHTTPHandler manages all HTTP methods internally
+		apiServer.GetRouter().PathPrefix("/mcp").Handler(mcpServer.GetHTTPHandler())
+		logger.Success("MCP server initialized at /mcp endpoint (official SDK, protocol 2025-06-18)")
 	}
 
 	// Start all enabled collectors

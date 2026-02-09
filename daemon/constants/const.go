@@ -47,6 +47,8 @@ const (
 	ProcStat = "/proc/stat"
 	// SysHwmon is the path to the /sys/class/hwmon directory.
 	SysHwmon = "/sys/class/hwmon"
+	// SysPowercap is the path to the /sys/class/powercap directory (Intel RAPL).
+	SysPowercap = "/sys/class/powercap"
 
 	// SensorsBin is the path to the sensors binary.
 	SensorsBin = "/usr/bin/sensors"

@@ -5198,6 +5198,10 @@ const docTemplate = `{
                         "format": "float64"
                     }
                 },
+                "cpu_power_watts": {
+                    "type": "number",
+                    "example": 65.5
+                },
                 "cpu_temp_celsius": {
                     "type": "number",
                     "example": 45
@@ -5210,6 +5214,10 @@ const docTemplate = `{
                     "description": "CPU Information",
                     "type": "number",
                     "example": 45.2
+                },
+                "dram_power_watts": {
+                    "type": "number",
+                    "example": 5.2
                 },
                 "fans": {
                     "description": "Additional Metrics",

@@ -1,5 +1,9 @@
 # Model Context Protocol (MCP) Integration
 
+> **Status: Production-Ready (GA)** — Built on the
+> [official MCP Go SDK](https://github.com/modelcontextprotocol/go-sdk) v1.2.0
+> with protocol version 2025-06-18.
+
 The Unraid Management Agent includes support for the
 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/),
 enabling AI agents like Claude, Cursor, GitHub Copilot, Codex,
@@ -17,16 +21,14 @@ MCP is an open protocol that standardizes how AI applications can securely conne
 
 ## Endpoints
 
-The MCP server provides two transport options:
+The MCP server uses the Streamable HTTP transport:
 
 | Transport              | Endpoint                                       | Description                                                                  |
 | ---------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------- |
-| **Streamable HTTP** ⭐ | `POST/GET/DELETE http://<unraid-ip>:8043/mcp`  | Modern MCP transport (spec 2025-03-26) — **recommended for all AI clients**  |
-| **SSE (Legacy)**       | `GET/POST http://<unraid-ip>:8043/mcp/sse`     | Deprecated HTTP+SSE transport (spec 2024-11-05) for backward compatibility   |
+| **Streamable HTTP** ⭐ | `POST/GET/DELETE http://<unraid-ip>:8043/mcp`  | Modern MCP transport (spec 2025-06-18) — **used by all AI clients**          |
 
-> **Note:** The Streamable HTTP transport at `/mcp` is the primary endpoint and supports all modern AI clients
+> The Streamable HTTP transport at `/mcp` supports all modern AI clients
 > including Cursor, Claude Desktop, GitHub Copilot, Codex, Windsurf, and Gemini CLI.
-> The legacy `/mcp/sse` endpoint is maintained for backward compatibility with older clients.
 
 ## Available Tools (54 total)
 
@@ -144,6 +146,60 @@ The MCP server provides two transport options:
 | `system_shutdown`           | Shutdown the server (**requires confirmation**)   | -                                                          |
 
 > **⚠️ Warning:** Destructive actions (array stop, reboot, shutdown, user scripts) require explicit confirmation via the `confirm: true` parameter.
+
+## Tool Safety Annotations
+
+All 54 tools include MCP safety annotations to help AI agents make safe decisions automatically:
+
+### Read-Only Tools (40 tools)
+
+All monitoring and query tools are annotated with `readOnlyHint: true`, signaling to AI agents that these tools are safe to call without side effects:
+
+```
+get_system_info, get_array_status, get_hardware_info, get_health_status,
+get_diagnostic_summary, get_registration, get_network_info, get_network_access_urls,
+get_ups_status, get_nut_status, get_gpu_metrics, list_disks, get_disk_info,
+get_disk_settings, list_shares, get_share_config, get_unassigned_devices,
+get_zfs_pools, get_zfs_datasets, get_zfs_snapshots, get_zfs_arc_stats,
+list_containers, get_container_info, search_containers, get_docker_settings,
+list_vms, get_vm_info, search_vms, get_vm_settings, get_notifications,
+get_notifications_overview, list_log_files, get_log_content, get_syslog,
+get_docker_log, get_parity_history, list_user_scripts, list_collectors,
+get_collector_status, get_system_settings
+```
+
+### Destructive Tools (6 tools) — `destructiveHint: true`
+
+These tools make changes that may be difficult or impossible to reverse:
+
+| Tool                  | Additional Hints       | Confirmation Required |
+| --------------------- | ---------------------- | --------------------- |
+| `container_action`    | `idempotentHint: true` | No                    |
+| `vm_action`           | `idempotentHint: true` | No                    |
+| `array_action`        | `idempotentHint: true` | Yes (`confirm: true`) |
+| `execute_user_script` | —                      | Yes (`confirm: true`) |
+| `system_reboot`       | —                      | Yes (`confirm: true`) |
+| `system_shutdown`     | —                      | Yes (`confirm: true`) |
+
+### Non-Destructive Control Tools (8 tools) — `destructiveHint: false`
+
+These tools make changes that are safe and easily reversible:
+
+| Tool                        | Additional Hints       |
+| --------------------------- | ---------------------- |
+| `parity_check_action`       | `idempotentHint: true` |
+| `parity_check_stop`         | `idempotentHint: true` |
+| `parity_check_pause`        | `idempotentHint: true` |
+| `parity_check_resume`       | `idempotentHint: true` |
+| `disk_spin_down`            | `idempotentHint: true` |
+| `disk_spin_up`              | `idempotentHint: true` |
+| `collector_action`          | `idempotentHint: true` |
+| `update_collector_interval` | `idempotentHint: true` |
+
+> **How AI agents use annotations:** When an AI agent receives these annotations,
+> it can automatically decide whether to ask for user confirmation before calling
+> a tool. Tools with `readOnlyHint: true` can be called freely, while tools with
+> `destructiveHint: true` should prompt the user first.
 
 ## MCP Resources
 
@@ -266,23 +322,35 @@ Add to your Gemini CLI MCP settings:
 
 ### Direct API Calls
 
-**List all tools:**
+The MCP endpoint uses Streamable HTTP transport. All requests require proper
+initialization with a session. Here are complete working examples:
+
+**Example 1: Initialize a session and get system info**
 
 ```bash
-curl -X POST http://your-unraid-ip:8043/mcp \
+# Step 1: Initialize and capture session ID
+curl -s -D /tmp/mcp-headers -X POST http://your-unraid-ip:8043/mcp \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   -d '{
     "jsonrpc": "2.0",
-    "method": "tools/list",
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2025-06-18",
+      "capabilities": {},
+      "clientInfo": { "name": "my-client", "version": "1.0.0" }
+    },
     "id": 1
   }'
-```
 
-**Get system information:**
+# Extract session ID from response headers
+SESSION_ID=$(grep -i "Mcp-Session-Id" /tmp/mcp-headers | tr -d '\r' | awk '{print $2}')
 
-```bash
-curl -X POST http://your-unraid-ip:8043/mcp \
+# Step 2: Call a tool using the session
+curl -s -X POST http://your-unraid-ip:8043/mcp \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Mcp-Session-Id: $SESSION_ID" \
   -d '{
     "jsonrpc": "2.0",
     "method": "tools/call",
@@ -290,15 +358,93 @@ curl -X POST http://your-unraid-ip:8043/mcp \
       "name": "get_system_info",
       "arguments": {}
     },
-    "id": 1
+    "id": 2
   }'
 ```
 
-**Start a Docker container:**
+**Example 2: List all available tools with annotations**
 
 ```bash
-curl -X POST http://your-unraid-ip:8043/mcp \
+curl -s -X POST http://your-unraid-ip:8043/mcp \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Mcp-Session-Id: $SESSION_ID" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "tools/list",
+    "id": 3
+  }'
+```
+
+Each tool in the response includes an `annotations` object with safety hints:
+
+```json
+{
+  "name": "get_system_info",
+  "annotations": { "readOnlyHint": true },
+  "description": "...",
+  "inputSchema": { ... }
+}
+```
+
+**Example 3: Read a resource (real-time system data)**
+
+```bash
+curl -s -X POST http://your-unraid-ip:8043/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Mcp-Session-Id: $SESSION_ID" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "resources/read",
+    "params": { "uri": "unraid://system" },
+    "id": 4
+  }'
+```
+
+**Example 4: List running Docker containers**
+
+```bash
+curl -s -X POST http://your-unraid-ip:8043/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Mcp-Session-Id: $SESSION_ID" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "list_containers",
+      "arguments": { "state": "running" }
+    },
+    "id": 5
+  }'
+```
+
+**Example 5: Get a diagnostic summary (comprehensive health check)**
+
+```bash
+curl -s -X POST http://your-unraid-ip:8043/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Mcp-Session-Id: $SESSION_ID" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "get_diagnostic_summary",
+      "arguments": {}
+    },
+    "id": 6
+  }'
+```
+
+**Example 6: Restart a Docker container (destructive, no confirmation needed)**
+
+```bash
+curl -s -X POST http://your-unraid-ip:8043/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Mcp-Session-Id: $SESSION_ID" \
   -d '{
     "jsonrpc": "2.0",
     "method": "tools/call",
@@ -306,18 +452,20 @@ curl -X POST http://your-unraid-ip:8043/mcp \
       "name": "container_action",
       "arguments": {
         "container_id": "plex",
-        "action": "start"
+        "action": "restart"
       }
     },
-    "id": 1
+    "id": 7
   }'
 ```
 
-**Stop the array (requires confirmation):**
+**Example 7: Stop the array (destructive, confirmation required)**
 
 ```bash
-curl -X POST http://your-unraid-ip:8043/mcp \
+curl -s -X POST http://your-unraid-ip:8043/mcp \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Mcp-Session-Id: $SESSION_ID" \
   -d '{
     "jsonrpc": "2.0",
     "method": "tools/call",
@@ -328,8 +476,15 @@ curl -X POST http://your-unraid-ip:8043/mcp \
         "confirm": true
       }
     },
-    "id": 1
+    "id": 8
   }'
+```
+
+**Example 8: Terminate a session**
+
+```bash
+curl -s -X DELETE http://your-unraid-ip:8043/mcp \
+  -H "Mcp-Session-Id: $SESSION_ID"
 ```
 
 ### Python Client Example
@@ -338,36 +493,109 @@ curl -X POST http://your-unraid-ip:8043/mcp \
 import json
 import requests
 
-def call_mcp_tool(tool_name: str, arguments: dict = None):
-    """Call an MCP tool on the Unraid server."""
-    response = requests.post(
-        "http://your-unraid-ip:8043/mcp",
-        json={
+class UnraidMCPClient:
+    """MCP client for the Unraid Management Agent."""
+
+    def __init__(self, base_url: str = "http://your-unraid-ip:8043/mcp"):
+        self.base_url = base_url
+        self.session_id = None
+        self._request_id = 0
+
+    def _next_id(self) -> int:
+        self._request_id += 1
+        return self._request_id
+
+    def _headers(self) -> dict:
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+        }
+        if self.session_id:
+            headers["Mcp-Session-Id"] = self.session_id
+        return headers
+
+    def _parse_sse(self, text: str) -> dict:
+        """Parse SSE response to extract JSON data."""
+        for line in text.strip().split("\n"):
+            if line.startswith("data: "):
+                return json.loads(line[6:])
+        return json.loads(text)
+
+    def initialize(self) -> dict:
+        """Initialize the MCP session."""
+        resp = requests.post(self.base_url, headers=self._headers(), json={
+            "jsonrpc": "2.0",
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-06-18",
+                "capabilities": {},
+                "clientInfo": {"name": "python-client", "version": "1.0.0"},
+            },
+            "id": self._next_id(),
+        })
+        self.session_id = resp.headers.get("Mcp-Session-Id")
+        return self._parse_sse(resp.text)
+
+    def call_tool(self, name: str, arguments: dict = None) -> dict:
+        """Call an MCP tool."""
+        resp = requests.post(self.base_url, headers=self._headers(), json={
             "jsonrpc": "2.0",
             "method": "tools/call",
-            "params": {
-                "name": tool_name,
-                "arguments": arguments or {}
-            },
-            "id": 1
-        }
-    )
-    return response.json()
+            "params": {"name": name, "arguments": arguments or {}},
+            "id": self._next_id(),
+        })
+        return self._parse_sse(resp.text)
+
+    def read_resource(self, uri: str) -> dict:
+        """Read an MCP resource."""
+        resp = requests.post(self.base_url, headers=self._headers(), json={
+            "jsonrpc": "2.0",
+            "method": "resources/read",
+            "params": {"uri": uri},
+            "id": self._next_id(),
+        })
+        return self._parse_sse(resp.text)
+
+    def list_tools(self) -> list:
+        """List all available tools."""
+        resp = requests.post(self.base_url, headers=self._headers(), json={
+            "jsonrpc": "2.0",
+            "method": "tools/list",
+            "id": self._next_id(),
+        })
+        result = self._parse_sse(resp.text)
+        return result.get("result", {}).get("tools", [])
+
+    def close(self):
+        """Terminate the MCP session."""
+        if self.session_id:
+            requests.delete(self.base_url, headers=self._headers())
+
+# Usage
+client = UnraidMCPClient("http://192.168.1.100:8043/mcp")
+client.initialize()
 
 # Get system info
-system = call_mcp_tool("get_system_info")
-print(f"Hostname: {system['result']['content'][0]['text']}")
+system = client.call_tool("get_system_info")
+data = json.loads(system["result"]["content"][0]["text"])
+print(f"Hostname: {data['hostname']}, CPU: {data['cpu_usage_percent']:.1f}%")
 
 # List running containers
-containers = call_mcp_tool("list_containers", {"state": "running"})
-print(f"Running containers: {containers['result']['content'][0]['text']}")
+containers = client.call_tool("list_containers", {"state": "running"})
+for c in json.loads(containers["result"]["content"][0]["text"]):
+    print(f"  {c['name']}: {c['state']} ({c['memory_display']})")
 
-# Restart a container
-result = call_mcp_tool("container_action", {
-    "container_id": "plex",
-    "action": "restart"
-})
-print(f"Result: {result['result']['content'][0]['text']}")
+# Read system resource directly
+resource = client.read_resource("unraid://system")
+print(f"Resource: {resource['result']['contents'][0]['uri']}")
+
+# List tools with safety annotations
+tools = client.list_tools()
+read_only = [t["name"] for t in tools if t.get("annotations", {}).get("readOnlyHint")]
+destructive = [t["name"] for t in tools if t.get("annotations", {}).get("destructiveHint")]
+print(f"Read-only tools: {len(read_only)}, Destructive tools: {len(destructive)}")
+
+client.close()
 ```
 
 ## Security Considerations
@@ -389,13 +617,12 @@ print(f"Result: {result['result']['content'][0]['text']}")
 
 | Transport              | Best For                          | Features                                                  |
 | ---------------------- | --------------------------------- | --------------------------------------------------------- |
-| **Streamable HTTP** ⭐ | All modern AI clients             | Request/response, SSE streaming, session management       |
-| **SSE (Legacy)**       | Older clients (pre-2025)          | Streaming responses, server push (deprecated)             |
-| **Stdio**              | Local CLI tools                   | Direct process communication                              |
+| **Streamable HTTP** ⭐ | All AI clients                    | Request/response, SSE streaming, session management       |
 
-### Streamable HTTP Transport Details (MCP Spec 2025-03-26)
+### Streamable HTTP Transport Details (MCP Spec 2025-06-18)
 
-The Streamable HTTP transport at `/mcp` supports:
+Built on the [official MCP Go SDK](https://github.com/modelcontextprotocol/go-sdk) v1.2.0,
+the Streamable HTTP transport at `/mcp` supports:
 
 - **POST**: Send JSON-RPC requests and notifications
   - Requests return `Content-Type: application/json` responses
@@ -444,12 +671,7 @@ The Streamable HTTP transport at `/mcp` supports:
 
 - Use the Streamable HTTP endpoint: `http://your-unraid-ip:8043/mcp`
 - Ensure your config uses `"type": "http"` (not `"sse"`)
-- Update to the latest version of the agent which supports the MCP 2025-03-26 spec
-
-**404 on /mcp/sse:**
-
-- The SSE endpoint is for legacy clients only. Modern clients should use `/mcp`
-- Ensure you're using the latest version of the agent
+- Update to the latest version of the agent which supports the MCP 2025-06-18 spec
 
 ## Related Documentation
 

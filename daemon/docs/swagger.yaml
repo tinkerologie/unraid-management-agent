@@ -1645,6 +1645,9 @@ definitions:
           format: float64
           type: number
         type: object
+      cpu_power_watts:
+        example: 65.5
+        type: number
       cpu_temp_celsius:
         example: 45
         type: number
@@ -1654,6 +1657,9 @@ definitions:
       cpu_usage_percent:
         description: CPU Information
         example: 45.2
+        type: number
+      dram_power_watts:
+        example: 5.2
         type: number
       fans:
         description: Additional Metrics
