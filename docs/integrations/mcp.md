@@ -1,6 +1,14 @@
 # Model Context Protocol (MCP) Integration
 
-The Unraid Management Agent includes support for the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/), enabling AI agents like Claude, GitHub Copilot, ChatGPT, and other LLM-based systems to interact with your Unraid server programmatically.
+> **Status: Production-Ready (GA)** — Built on the
+> [official MCP Go SDK](https://github.com/modelcontextprotocol/go-sdk) v1.2.0
+> with protocol version 2025-06-18.
+
+The Unraid Management Agent includes support for the
+[Model Context Protocol (MCP)](https://modelcontextprotocol.io/),
+enabling AI agents like Claude, Cursor, GitHub Copilot, Codex,
+Windsurf, Gemini CLI, and other LLM-based systems to interact
+with your Unraid server programmatically.
 
 ## Overview
 
@@ -11,14 +19,19 @@ MCP is an open protocol that standardizes how AI applications can securely conne
 - **Analyze** disk health, system performance, and troubleshoot issues
 - **Automate** routine tasks with AI-powered workflows
 
-## Endpoints
+## Transports
 
-The MCP server provides two transport options:
+The MCP server supports two transports — use the one that fits your deployment:
 
-| Transport | Endpoint                                   | Description                                  |
-| --------- | ------------------------------------------ | -------------------------------------------- |
-| **HTTP**  | `POST http://<unraid-ip>:8043/mcp`         | Standard HTTP transport for request/response |
-| **SSE**   | `GET/POST http://<unraid-ip>:8043/mcp/sse` | Server-Sent Events for real-time streaming   |
+| Transport              | Endpoint / Command                                       | Best For                                                                     |
+| ---------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| **Streamable HTTP** ⭐ | `POST/GET/DELETE http://<unraid-ip>:8043/mcp`            | Remote connections from any machine on the network                           |
+| **STDIO**              | `unraid-management-agent mcp-stdio`                      | Local AI clients running directly on the Unraid server                       |
+
+> **Which transport should I use?**
+>
+> - Use **Streamable HTTP** if the AI client (Cursor, VS Code, etc.) runs on a different machine than the Unraid server.
+> - Use **STDIO** if the AI client (Claude Desktop, Cursor) runs locally on the Unraid server itself — it has zero network overhead and requires no authentication.
 
 ## Available Tools (54 total)
 
@@ -137,6 +150,60 @@ The MCP server provides two transport options:
 
 > **⚠️ Warning:** Destructive actions (array stop, reboot, shutdown, user scripts) require explicit confirmation via the `confirm: true` parameter.
 
+## Tool Safety Annotations
+
+All 54 tools include MCP safety annotations to help AI agents make safe decisions automatically:
+
+### Read-Only Tools (40 tools)
+
+All monitoring and query tools are annotated with `readOnlyHint: true`, signaling to AI agents that these tools are safe to call without side effects:
+
+```
+get_system_info, get_array_status, get_hardware_info, get_health_status,
+get_diagnostic_summary, get_registration, get_network_info, get_network_access_urls,
+get_ups_status, get_nut_status, get_gpu_metrics, list_disks, get_disk_info,
+get_disk_settings, list_shares, get_share_config, get_unassigned_devices,
+get_zfs_pools, get_zfs_datasets, get_zfs_snapshots, get_zfs_arc_stats,
+list_containers, get_container_info, search_containers, get_docker_settings,
+list_vms, get_vm_info, search_vms, get_vm_settings, get_notifications,
+get_notifications_overview, list_log_files, get_log_content, get_syslog,
+get_docker_log, get_parity_history, list_user_scripts, list_collectors,
+get_collector_status, get_system_settings
+```
+
+### Destructive Tools (6 tools) — `destructiveHint: true`
+
+These tools make changes that may be difficult or impossible to reverse:
+
+| Tool                  | Additional Hints       | Confirmation Required |
+| --------------------- | ---------------------- | --------------------- |
+| `container_action`    | `idempotentHint: true` | No                    |
+| `vm_action`           | `idempotentHint: true` | No                    |
+| `array_action`        | `idempotentHint: true` | Yes (`confirm: true`) |
+| `execute_user_script` | —                      | Yes (`confirm: true`) |
+| `system_reboot`       | —                      | Yes (`confirm: true`) |
+| `system_shutdown`     | —                      | Yes (`confirm: true`) |
+
+### Non-Destructive Control Tools (8 tools) — `destructiveHint: false`
+
+These tools make changes that are safe and easily reversible:
+
+| Tool                        | Additional Hints       |
+| --------------------------- | ---------------------- |
+| `parity_check_action`       | `idempotentHint: true` |
+| `parity_check_stop`         | `idempotentHint: true` |
+| `parity_check_pause`        | `idempotentHint: true` |
+| `parity_check_resume`       | `idempotentHint: true` |
+| `disk_spin_down`            | `idempotentHint: true` |
+| `disk_spin_up`              | `idempotentHint: true` |
+| `collector_action`          | `idempotentHint: true` |
+| `update_collector_interval` | `idempotentHint: true` |
+
+> **How AI agents use annotations:** When an AI agent receives these annotations,
+> it can automatically decide whether to ask for user confirmation before calling
+> a tool. Tools with `readOnlyHint: true` can be called freely, while tools with
+> `destructiveHint: true` should prompt the user first.
+
 ## MCP Resources
 
 Resources provide real-time data streams that AI agents can subscribe to:
@@ -176,43 +243,98 @@ Add to your VS Code workspace (`.vscode/mcp.json`):
 }
 ```
 
-Or for SSE transport (real-time streaming):
-
-```json
-{
-  "servers": {
-    "unraid": {
-      "type": "sse",
-      "url": "http://your-unraid-ip:8043/mcp/sse"
-    }
-  }
-}
-```
-
 After configuration, restart the MCP server in VS Code:
 
 1. Open Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
 2. Run **"MCP: List Servers"** to verify configuration
 3. Run **"MCP: Restart Server"** if needed
 
-### Using with Claude Desktop
+### Using with Cursor
 
-Add to your Claude Desktop configuration (`claude_desktop_config.json`):
+Add to your Cursor MCP configuration (Settings → MCP → Add Server):
 
 ```json
 {
   "mcpServers": {
     "unraid": {
-      "command": "curl",
-      "args": [
-        "-X",
-        "POST",
-        "http://your-unraid-ip:8043/mcp",
-        "-H",
-        "Content-Type: application/json",
-        "-d",
-        "@-"
-      ]
+      "type": "http",
+      "url": "http://your-unraid-ip:8043/mcp"
+    }
+  }
+}
+```
+
+### Using with Claude Desktop
+
+**Option A: Remote (Streamable HTTP)** — when Claude Desktop runs on a different machine:
+
+Configure via the Claude.ai web UI:
+
+1. Go to [claude.ai/settings/connectors](https://claude.ai/settings/connectors)
+2. Click **"Add Connector"**
+3. Enter the URL: `http://your-unraid-ip:8043/mcp`
+
+> **Note:** Claude Desktop does **not** connect to remote servers configured
+> directly via `claude_desktop_config.json` — that file is only for local
+> servers using the stdio transport. Remote servers must be added via
+> Settings → Connectors.
+
+**Option B: Local (STDIO)** — when Claude Desktop runs directly on the Unraid server:
+
+Add to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "unraid": {
+      "command": "/usr/local/emhttp/plugins/unraid-management-agent/unraid-management-agent",
+      "args": ["mcp-stdio"]
+    }
+  }
+}
+```
+
+> STDIO is preferred for local use — zero network overhead, no port/firewall
+> configuration, and the OS process model provides implicit security.
+
+### Using with Windsurf
+
+Add to your Windsurf MCP configuration (`~/.codeium/windsurf/mcp_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "unraid": {
+      "serverUrl": "http://your-unraid-ip:8043/mcp"
+    }
+  }
+}
+```
+
+### Using with Codex (OpenAI)
+
+Codex supports HTTP streaming transports. Configure via:
+
+```json
+{
+  "mcpServers": {
+    "unraid": {
+      "type": "http",
+      "url": "http://your-unraid-ip:8043/mcp"
+    }
+  }
+}
+```
+
+### Using with Gemini CLI
+
+Add to your Gemini CLI MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "unraid": {
+      "url": "http://your-unraid-ip:8043/mcp"
     }
   }
 }
@@ -220,23 +342,35 @@ Add to your Claude Desktop configuration (`claude_desktop_config.json`):
 
 ### Direct API Calls
 
-**List all tools:**
+The MCP endpoint uses Streamable HTTP transport. All requests require proper
+initialization with a session. Here are complete working examples:
+
+**Example 1: Initialize a session and get system info**
 
 ```bash
-curl -X POST http://your-unraid-ip:8043/mcp \
+# Step 1: Initialize and capture session ID
+curl -s -D /tmp/mcp-headers -X POST http://your-unraid-ip:8043/mcp \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   -d '{
     "jsonrpc": "2.0",
-    "method": "tools/list",
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2025-06-18",
+      "capabilities": {},
+      "clientInfo": { "name": "my-client", "version": "1.0.0" }
+    },
     "id": 1
   }'
-```
 
-**Get system information:**
+# Extract session ID from response headers
+SESSION_ID=$(grep -i "Mcp-Session-Id" /tmp/mcp-headers | tr -d '\r' | awk '{print $2}')
 
-```bash
-curl -X POST http://your-unraid-ip:8043/mcp \
+# Step 2: Call a tool using the session
+curl -s -X POST http://your-unraid-ip:8043/mcp \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Mcp-Session-Id: $SESSION_ID" \
   -d '{
     "jsonrpc": "2.0",
     "method": "tools/call",
@@ -244,15 +378,93 @@ curl -X POST http://your-unraid-ip:8043/mcp \
       "name": "get_system_info",
       "arguments": {}
     },
-    "id": 1
+    "id": 2
   }'
 ```
 
-**Start a Docker container:**
+**Example 2: List all available tools with annotations**
 
 ```bash
-curl -X POST http://your-unraid-ip:8043/mcp \
+curl -s -X POST http://your-unraid-ip:8043/mcp \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Mcp-Session-Id: $SESSION_ID" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "tools/list",
+    "id": 3
+  }'
+```
+
+Each tool in the response includes an `annotations` object with safety hints:
+
+```json
+{
+  "name": "get_system_info",
+  "annotations": { "readOnlyHint": true },
+  "description": "...",
+  "inputSchema": { ... }
+}
+```
+
+**Example 3: Read a resource (real-time system data)**
+
+```bash
+curl -s -X POST http://your-unraid-ip:8043/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Mcp-Session-Id: $SESSION_ID" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "resources/read",
+    "params": { "uri": "unraid://system" },
+    "id": 4
+  }'
+```
+
+**Example 4: List running Docker containers**
+
+```bash
+curl -s -X POST http://your-unraid-ip:8043/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Mcp-Session-Id: $SESSION_ID" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "list_containers",
+      "arguments": { "state": "running" }
+    },
+    "id": 5
+  }'
+```
+
+**Example 5: Get a diagnostic summary (comprehensive health check)**
+
+```bash
+curl -s -X POST http://your-unraid-ip:8043/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Mcp-Session-Id: $SESSION_ID" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "get_diagnostic_summary",
+      "arguments": {}
+    },
+    "id": 6
+  }'
+```
+
+**Example 6: Restart a Docker container (destructive, no confirmation needed)**
+
+```bash
+curl -s -X POST http://your-unraid-ip:8043/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Mcp-Session-Id: $SESSION_ID" \
   -d '{
     "jsonrpc": "2.0",
     "method": "tools/call",
@@ -260,18 +472,20 @@ curl -X POST http://your-unraid-ip:8043/mcp \
       "name": "container_action",
       "arguments": {
         "container_id": "plex",
-        "action": "start"
+        "action": "restart"
       }
     },
-    "id": 1
+    "id": 7
   }'
 ```
 
-**Stop the array (requires confirmation):**
+**Example 7: Stop the array (destructive, confirmation required)**
 
 ```bash
-curl -X POST http://your-unraid-ip:8043/mcp \
+curl -s -X POST http://your-unraid-ip:8043/mcp \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Mcp-Session-Id: $SESSION_ID" \
   -d '{
     "jsonrpc": "2.0",
     "method": "tools/call",
@@ -282,8 +496,15 @@ curl -X POST http://your-unraid-ip:8043/mcp \
         "confirm": true
       }
     },
-    "id": 1
+    "id": 8
   }'
+```
+
+**Example 8: Terminate a session**
+
+```bash
+curl -s -X DELETE http://your-unraid-ip:8043/mcp \
+  -H "Mcp-Session-Id: $SESSION_ID"
 ```
 
 ### Python Client Example
@@ -292,36 +513,109 @@ curl -X POST http://your-unraid-ip:8043/mcp \
 import json
 import requests
 
-def call_mcp_tool(tool_name: str, arguments: dict = None):
-    """Call an MCP tool on the Unraid server."""
-    response = requests.post(
-        "http://your-unraid-ip:8043/mcp",
-        json={
+class UnraidMCPClient:
+    """MCP client for the Unraid Management Agent."""
+
+    def __init__(self, base_url: str = "http://your-unraid-ip:8043/mcp"):
+        self.base_url = base_url
+        self.session_id = None
+        self._request_id = 0
+
+    def _next_id(self) -> int:
+        self._request_id += 1
+        return self._request_id
+
+    def _headers(self) -> dict:
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+        }
+        if self.session_id:
+            headers["Mcp-Session-Id"] = self.session_id
+        return headers
+
+    def _parse_sse(self, text: str) -> dict:
+        """Parse SSE response to extract JSON data."""
+        for line in text.strip().split("\n"):
+            if line.startswith("data: "):
+                return json.loads(line[6:])
+        return json.loads(text)
+
+    def initialize(self) -> dict:
+        """Initialize the MCP session."""
+        resp = requests.post(self.base_url, headers=self._headers(), json={
+            "jsonrpc": "2.0",
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-06-18",
+                "capabilities": {},
+                "clientInfo": {"name": "python-client", "version": "1.0.0"},
+            },
+            "id": self._next_id(),
+        })
+        self.session_id = resp.headers.get("Mcp-Session-Id")
+        return self._parse_sse(resp.text)
+
+    def call_tool(self, name: str, arguments: dict = None) -> dict:
+        """Call an MCP tool."""
+        resp = requests.post(self.base_url, headers=self._headers(), json={
             "jsonrpc": "2.0",
             "method": "tools/call",
-            "params": {
-                "name": tool_name,
-                "arguments": arguments or {}
-            },
-            "id": 1
-        }
-    )
-    return response.json()
+            "params": {"name": name, "arguments": arguments or {}},
+            "id": self._next_id(),
+        })
+        return self._parse_sse(resp.text)
+
+    def read_resource(self, uri: str) -> dict:
+        """Read an MCP resource."""
+        resp = requests.post(self.base_url, headers=self._headers(), json={
+            "jsonrpc": "2.0",
+            "method": "resources/read",
+            "params": {"uri": uri},
+            "id": self._next_id(),
+        })
+        return self._parse_sse(resp.text)
+
+    def list_tools(self) -> list:
+        """List all available tools."""
+        resp = requests.post(self.base_url, headers=self._headers(), json={
+            "jsonrpc": "2.0",
+            "method": "tools/list",
+            "id": self._next_id(),
+        })
+        result = self._parse_sse(resp.text)
+        return result.get("result", {}).get("tools", [])
+
+    def close(self):
+        """Terminate the MCP session."""
+        if self.session_id:
+            requests.delete(self.base_url, headers=self._headers())
+
+# Usage
+client = UnraidMCPClient("http://192.168.1.100:8043/mcp")
+client.initialize()
 
 # Get system info
-system = call_mcp_tool("get_system_info")
-print(f"Hostname: {system['result']['content'][0]['text']}")
+system = client.call_tool("get_system_info")
+data = json.loads(system["result"]["content"][0]["text"])
+print(f"Hostname: {data['hostname']}, CPU: {data['cpu_usage_percent']:.1f}%")
 
 # List running containers
-containers = call_mcp_tool("list_containers", {"state": "running"})
-print(f"Running containers: {containers['result']['content'][0]['text']}")
+containers = client.call_tool("list_containers", {"state": "running"})
+for c in json.loads(containers["result"]["content"][0]["text"]):
+    print(f"  {c['name']}: {c['state']} ({c['memory_display']})")
 
-# Restart a container
-result = call_mcp_tool("container_action", {
-    "container_id": "plex",
-    "action": "restart"
-})
-print(f"Result: {result['result']['content'][0]['text']}")
+# Read system resource directly
+resource = client.read_resource("unraid://system")
+print(f"Resource: {resource['result']['contents'][0]['uri']}")
+
+# List tools with safety annotations
+tools = client.list_tools()
+read_only = [t["name"] for t in tools if t.get("annotations", {}).get("readOnlyHint")]
+destructive = [t["name"] for t in tools if t.get("annotations", {}).get("destructiveHint")]
+print(f"Read-only tools: {len(read_only)}, Destructive tools: {len(destructive)}")
+
+client.close()
 ```
 
 ## Security Considerations
@@ -341,11 +635,59 @@ print(f"Result: {result['result']['content'][0]['text']}")
 
 ## Transport Types
 
-| Transport | Best For                     | Features                         |
-| --------- | ---------------------------- | -------------------------------- |
-| **HTTP**  | Simple integrations, scripts | Request/response, stateless      |
-| **SSE**   | Real-time AI agents          | Streaming responses, server push |
-| **Stdio** | Local CLI tools              | Direct process communication     |
+| Transport              | Best For                           | Features                                                |
+| ---------------------- | ---------------------------------- | ------------------------------------------------------- |
+| **Streamable HTTP** ⭐ | Remote AI clients over the network | Request/response, SSE streaming, session management     |
+| **STDIO**              | Local AI clients on the server     | Newline-delimited JSON over stdin/stdout, zero overhead |
+
+### Streamable HTTP Transport Details (MCP Spec 2025-06-18)
+
+Built on the [official MCP Go SDK](https://github.com/modelcontextprotocol/go-sdk) v1.2.0,
+the Streamable HTTP transport at `/mcp` supports:
+
+- **POST**: Send JSON-RPC requests and notifications
+  - Requests return `Content-Type: application/json` responses
+  - Notifications return `202 Accepted` with no body
+- **GET**: Open an SSE stream for server-initiated messages (requires `Accept: text/event-stream` header)
+- **DELETE**: Terminate the session (requires `Mcp-Session-Id` header)
+- **OPTIONS**: CORS preflight handling
+
+**Session Management:** The server assigns an `Mcp-Session-Id` on initialization. Clients should include this header in subsequent requests.
+
+### STDIO Transport Details
+
+The STDIO transport runs the MCP server over stdin/stdout using newline-delimited JSON.
+It is started via the `mcp-stdio` CLI subcommand:
+
+```bash
+/usr/local/emhttp/plugins/unraid-management-agent/unraid-management-agent mcp-stdio
+```
+
+**Key characteristics:**
+
+- **No HTTP server started** — communicates exclusively via stdin/stdout
+- **Logs go to stderr + file** — stdout is reserved for MCP JSON-RPC protocol messages
+- **Collectors run internally** — the STDIO process starts its own data collectors so all tools return live data
+- **Graceful shutdown** — responds to SIGTERM/SIGINT with full collector cleanup
+- **Designed for process spawning** — MCP clients like Claude Desktop launch the process and manage its lifecycle
+
+**When to use STDIO:**
+
+- The AI client runs on the same machine as the Unraid server
+- You want zero network overhead and no port/firewall configuration
+- The MCP client supports STDIO spawning (Claude Desktop, Cursor local mode)
+
+**Client Compatibility:**
+
+| Client         | Streamable HTTP | STDIO        | Notes                                  |
+| -------------- | --------------- | ------------ | -------------------------------------- |
+| Cursor         | ✅ Supported    | ✅ Supported | Use HTTP for remote, STDIO for local   |
+| Claude Desktop | ✅ Supported    | ✅ Supported | STDIO via `claude_desktop_config.json` |
+| GitHub Copilot | ✅ Supported    | —            | HTTP only                              |
+| Codex          | ✅ Supported    | ✅ Supported | Supports both transports               |
+| Windsurf       | ✅ Supported    | ✅ Supported | Supports both transports               |
+| Gemini CLI     | ✅ Supported    | ✅ Supported | Supports both transports               |
+| VS Code MCP    | ✅ Supported    | ✅ Supported | HTTP for remote, STDIO for local       |
 
 ## Troubleshooting
 
@@ -367,13 +709,13 @@ print(f"Result: {result['result']['content'][0]['text']}")
 
 - Ensure the agent is running and accessible from your machine
 - Check firewall rules allow connections to port 8043
-- Try using HTTP transport instead of SSE
 - Restart the MCP server: Command Palette → "MCP: Restart Server"
 
-**404 on /mcp/sse:**
+**Cursor "No server info found":**
 
-- Ensure you're using the latest version of the agent (2025.01.07+)
-- The SSE endpoint requires both GET and POST methods
+- Use the Streamable HTTP endpoint: `http://your-unraid-ip:8043/mcp`
+- Ensure your config uses `"type": "http"` (not `"sse"`)
+- Update to the latest version of the agent which supports the MCP 2025-06-18 spec
 
 ## Related Documentation
 

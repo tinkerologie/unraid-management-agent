@@ -3,6 +3,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"sync"
@@ -64,25 +65,15 @@ func (o *Orchestrator) Run() error {
 		o.initializeMQTT(ctx, &wg, apiServer)
 	}
 
-	// Initialize MCP server for AI agent integration (HTTP transport)
+	// Initialize MCP server with Streamable HTTP transport (MCP spec 2025-06-18)
+	// Uses the official MCP Go SDK for protocol compliance with Claude, ChatGPT, Cursor, Copilot, etc.
 	mcpServer := mcp.NewServer(o.ctx, apiServer)
 	if err := mcpServer.Initialize(); err != nil {
 		logger.Error("Failed to initialize MCP server: %v", err)
 	} else {
-		// Register MCP endpoint on the API router
-		apiServer.GetRouter().HandleFunc("/mcp", mcpServer.GetHandler()).Methods("POST", "OPTIONS")
-		logger.Success("MCP server initialized at /mcp endpoint")
-	}
-
-	// Initialize SSE MCP server for VS Code and other SSE clients
-	mcpSSEServer := mcp.NewServerWithTransport(o.ctx, apiServer, mcp.TransportSSE)
-	if err := mcpSSEServer.Initialize(); err != nil {
-		logger.Error("Failed to initialize MCP SSE server: %v", err)
-	} else {
-		// Register SSE endpoints - GET for event stream, POST for messages
-		apiServer.GetRouter().HandleFunc("/mcp/sse", mcpSSEServer.GetSSEHandler()).Methods("GET")
-		apiServer.GetRouter().HandleFunc("/mcp/sse", mcpSSEServer.GetSSEPostHandler()).Methods("POST", "OPTIONS")
-		logger.Success("MCP SSE server initialized at /mcp/sse endpoint")
+		// Mount as PathPrefix handler — the StreamableHTTPHandler manages all HTTP methods internally
+		apiServer.GetRouter().PathPrefix("/mcp").Handler(mcpServer.GetHTTPHandler())
+		logger.Success("MCP server initialized at /mcp endpoint (official SDK, protocol 2025-06-18)")
 	}
 
 	// Start all enabled collectors
@@ -142,6 +133,66 @@ func (o *Orchestrator) Run() error {
 	logger.Info("Shutdown complete")
 
 	return nil
+}
+
+// RunMCPStdio starts the agent with MCP over STDIO transport for local AI client integration.
+// It starts collectors and the API server's cache (for data) but does NOT start the HTTP server.
+// The MCP server communicates exclusively via stdin/stdout using newline-delimited JSON.
+// This is designed to be spawned by MCP clients like Claude Desktop running locally on the Unraid server.
+func (o *Orchestrator) RunMCPStdio() error {
+	logger.Info("Starting Unraid Management Agent v%s (MCP STDIO mode)", o.ctx.Version)
+
+	var wg sync.WaitGroup
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Initialize collector manager and register all collectors
+	o.collectorManager = NewCollectorManager(o.ctx, &wg)
+	o.collectorManager.RegisterAllCollectors()
+
+	// Initialize API server for cache/subscriptions only (no HTTP)
+	apiServer := api.NewServerWithCollectorManager(o.ctx, o.collectorManager)
+	apiServer.StartSubscriptions()
+	logger.Success("API server subscriptions ready (cache mode)")
+
+	// Wait for subscriptions to be fully set up
+	time.Sleep(100 * time.Millisecond)
+
+	// Start all enabled collectors so cache gets populated
+	enabledCount := o.collectorManager.StartAll()
+	logger.Success("%d collectors started for MCP STDIO", enabledCount)
+
+	// Initialize MCP server
+	mcpServer := mcp.NewServer(o.ctx, apiServer)
+	if err := mcpServer.Initialize(); err != nil {
+		cancel()
+		o.collectorManager.StopAll()
+		apiServer.Stop()
+		wg.Wait()
+		return fmt.Errorf("failed to initialize MCP server: %w", err)
+	}
+
+	// Handle shutdown signals
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
+	go func() {
+		sig := <-sigChan
+		logger.Warning("Received %s signal, shutting down MCP STDIO...", sig)
+		cancel()
+	}()
+
+	// Run MCP over STDIO (blocks until context cancelled or pipe closed)
+	logger.Info("MCP STDIO transport ready — waiting for client")
+	err := mcpServer.RunSTDIO(ctx)
+
+	// Graceful cleanup
+	logger.Info("MCP STDIO transport stopped, cleaning up...")
+	o.collectorManager.StopAll()
+	apiServer.Stop()
+	wg.Wait()
+	logger.Info("MCP STDIO shutdown complete")
+
+	return err
 }
 
 // initializeMQTT sets up the MQTT client and starts publishing events.

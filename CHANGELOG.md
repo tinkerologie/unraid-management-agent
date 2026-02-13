@@ -9,6 +9,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.02.01] - 2026-02-14
+
+### Added
+
+- **CPU Power Consumption Monitoring** (GitHub Issue #60):
+  - Added Intel RAPL (Running Average Power Limit) support via `/sys/class/powercap`
+  - New `cpu_power_watts` and `dram_power_watts` fields in SystemInfo DTO
+  - Real-time CPU package and DRAM power readings in watts
+  - Multi-socket support — power values summed across all CPU packages
+  - Energy counter wraparound handling for long-running systems
+  - Graceful degradation: fields omitted (null) when RAPL is unavailable (AMD, VMs, older hardware)
+  - New Prometheus gauges: `unraid_cpu_power_watts`, `unraid_dram_power_watts`
+  - Automatically exposed via REST API, WebSocket events, and MCP `get_system_info` tool
+  - Comprehensive test suite with 9 tests covering single/multi-socket, wraparound, edge cases
+
+- **MCP Streamable HTTP Transport** (GitHub Issue #59):
+  - Implemented MCP 2025-06-18 Streamable HTTP transport specification
+  - `/mcp` endpoint now supports POST, GET, DELETE, and OPTIONS methods
+  - Session management via `Mcp-Session-Id` header
+  - `MCP-Protocol-Version` header validation (supports 2025-06-18 and 2025-03-26)
+  - POST handles both JSON-RPC requests (with response) and notifications (202 Accepted)
+  - GET opens SSE stream for server-initiated messages
+  - DELETE terminates sessions cleanly (404 for unknown sessions per spec)
+  - Full CORS support with proper header exposure
+  - Fixes "No server info found" error in Cursor
+  - Supports Cursor, Claude Desktop, GitHub Copilot, Codex, Windsurf, and Gemini CLI
+  - Comprehensive test suite with race condition detection (25+ tests)
+
+- **MCP STDIO Transport**:
+  - New `mcp-stdio` CLI subcommand for local AI client integration
+  - Uses newline-delimited JSON over stdin/stdout (MCP spec 2025-06-18)
+  - Preferred transport for MCP clients running directly on the Unraid server (zero network overhead, no auth needed)
+  - Starts collectors internally for live data — no dependency on running HTTP daemon
+  - STDIO-safe logging: all logs go to file + stderr (stdout reserved for MCP protocol)
+  - Graceful shutdown on SIGTERM/SIGINT with full collector cleanup
+  - Compatible with Claude Desktop, Cursor, and any MCP client that supports STDIO spawning
+  - Hardened `api.Server.Stop()` to handle nil HTTP server in cache-only mode
+  - Unit tests for STDIO transport initialization, error handling, and context cancellation
+
+### Removed
+
+- **Legacy SSE MCP Transport**: Removed the deprecated `/mcp/sse` endpoint and old HTTP transport.
+  All clients should use the Streamable HTTP transport at `/mcp` (spec 2025-06-18).
+
 ---
 
 ## [2026.02.00] - 2026-01-29

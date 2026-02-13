@@ -20,6 +20,7 @@ cd unraid-management-agent
 ```
 
 This script:
+
 1. Installs Python and pip (if needed)
 2. Installs pre-commit via pip
 3. Configures pre-commit hooks
@@ -47,11 +48,13 @@ The project uses the following pre-commit hooks (configured in `.pre-commit-conf
 Automatically formats Go code to match Go standards.
 
 **What it checks**:
+
 - Proper indentation (tabs)
 - Consistent spacing
 - Import organization
 
 **How to run manually**:
+
 ```bash
 gofmt -w .
 ```
@@ -61,11 +64,13 @@ gofmt -w .
 Manages Go import statements automatically.
 
 **What it checks**:
+
 - Unused imports
 - Import grouping (stdlib, external, internal)
 - Alphabetical ordering
 
 **How to run manually**:
+
 ```bash
 goimports -w .
 ```
@@ -75,6 +80,7 @@ goimports -w .
 Comprehensive linter running 50+ checks.
 
 **What it checks**:
+
 - Code complexity
 - Dead code
 - Inefficient assignments
@@ -86,6 +92,7 @@ Comprehensive linter running 50+ checks.
 **Configuration**: `.golangci.yml`
 
 **How to run manually**:
+
 ```bash
 make lint
 # Or directly:
@@ -97,6 +104,7 @@ golangci-lint run
 Security-focused static analysis tool.
 
 **What it checks**:
+
 - SQL injection vulnerabilities
 - Command injection risks
 - Path traversal attacks
@@ -105,6 +113,7 @@ Security-focused static analysis tool.
 - File permission issues
 
 **How to run manually**:
+
 ```bash
 make security-check
 # Or directly:
@@ -116,6 +125,7 @@ gosec ./...
 Official Go static analysis tool.
 
 **What it checks**:
+
 - Suspicious constructs
 - Printf format strings
 - Unreachable code
@@ -123,6 +133,7 @@ Official Go static analysis tool.
 - Invalid interface implementations
 
 **How to run manually**:
+
 ```bash
 go vet ./...
 ```
@@ -254,6 +265,7 @@ if err := someFunction(); err != nil {
 From `.github/copilot-instructions.md`:
 
 1. **Always validate user input** using `lib/validation.go`:
+
    ```go
    if err := lib.ValidateContainerID(containerID); err != nil {
        return err
@@ -263,6 +275,7 @@ From `.github/copilot-instructions.md`:
 2. **Never use `exec.Command` directly** — use `lib.ExecCommand()` or `lib.ExecCommandOutput()`
 
 3. **Path traversal protection** — validate all file paths:
+
    ```go
    if err := lib.ValidateShareName(shareName); err != nil {
        return err

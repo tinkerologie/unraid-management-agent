@@ -32,6 +32,14 @@ var (
 		Name: "unraid_cpu_temperature_celsius",
 		Help: "CPU temperature in Celsius",
 	})
+	cpuPowerWatts = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "unraid_cpu_power_watts",
+		Help: "CPU package power consumption in watts (from Intel RAPL)",
+	})
+	dramPowerWatts = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "unraid_dram_power_watts",
+		Help: "DRAM power consumption in watts (from Intel RAPL)",
+	})
 	memoryTotal = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "unraid_memory_total_bytes",
 		Help: "Total memory in bytes",
@@ -317,6 +325,9 @@ func init() {
 		gpuMemoryUsed,
 		gpuMemoryTotal,
 		gpuPowerWatts,
+		// CPU Power
+		cpuPowerWatts,
+		dramPowerWatts,
 	)
 }
 
@@ -340,6 +351,18 @@ func (s *Server) updateMetrics() {
 		memoryTotal.Set(float64(s.systemCache.RAMTotal))
 		memoryUsed.Set(float64(s.systemCache.RAMUsed))
 		memoryUsagePercent.Set(s.systemCache.RAMUsage)
+
+		// CPU power from Intel RAPL
+		if s.systemCache.CPUPowerWatts != nil {
+			cpuPowerWatts.Set(*s.systemCache.CPUPowerWatts)
+		} else {
+			cpuPowerWatts.Set(0)
+		}
+		if s.systemCache.DRAMPowerWatts != nil {
+			dramPowerWatts.Set(*s.systemCache.DRAMPowerWatts)
+		} else {
+			dramPowerWatts.Set(0)
+		}
 	}
 
 	// Update array metrics

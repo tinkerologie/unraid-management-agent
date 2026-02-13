@@ -113,7 +113,7 @@ func (c *DockerController) StartContainer(id string) error {
 
 ### MCP Integration
 
-The agent exposes 54+ tools via Model Context Protocol at `POST /mcp` and `/mcp/sse` for AI agents. See [MCP_INTEGRATION.md](../docs/MCP_INTEGRATION.md) and [mcp/server.go](../daemon/services/mcp/server.go).
+The agent exposes 54+ tools via Model Context Protocol at `/mcp` (Streamable HTTP transport, spec 2025-06-18) for AI agents. See [MCP Integration](../docs/integrations/mcp.md) and [mcp/server.go](../daemon/services/mcp/server.go).
 
 ### Native APIs (preferred over shell commands)
 

@@ -5,6 +5,7 @@ Complete guide for integrating Unraid Management Agent with Home Assistant for s
 ## Overview
 
 The Unraid Management Agent enables deep Home Assistant integration via MQTT, allowing you to:
+
 - **Monitor** server health, array status, and resource usage
 - **Control** Docker containers and VMs from HA dashboards
 - **Automate** actions based on server events (high CPU, parity errors, UPS status)
@@ -225,7 +226,7 @@ mqtt:
       icon: mdi:plex
 ```
 
-**Note**: This requires a custom MQTT command handler. See [REST API Control](#rest-api-control) for the recommended approach.
+**Note**: This requires a custom MQTT command handler. See [REST API Control](#rest-api-control-recommended) for the recommended approach.
 
 ## REST API Control (Recommended)
 
@@ -600,12 +601,14 @@ card:
 ### Sensors Not Updating
 
 1. **Check MQTT connection**:
+
    ```bash
    # In Home Assistant, check logs
    ha su logs
    ```
 
 2. **Verify MQTT messages**:
+
    ```bash
    # Subscribe to all Unraid topics
    mosquitto_sub -h localhost -t "unraid/#" -v
@@ -629,6 +632,7 @@ If you see `TemplateError` in logs:
 For RESTful commands:
 
 1. **Test endpoint directly**:
+
    ```bash
    curl -X POST http://unraid-server:8043/api/v1/docker/plex/start
    ```

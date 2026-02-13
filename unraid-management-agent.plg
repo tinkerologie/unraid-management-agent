@@ -21,7 +21,7 @@ This Unraid plugin provides REST API and WebSocket interfaces for real-time syst
 
 <CHANGES>
 ###2026.02.00 (2026-01-30)
-- **Disk Model and Serial Number Population** 
+- **Disk Model and Serial Number Population**
 
 ###2026.01.02 (2026-01-27)
 - **Go 1.25.0 Upgrade**: Upgraded from Go 1.24.0 to 1.25.0 for improved performance and latest language features
