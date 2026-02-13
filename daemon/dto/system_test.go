@@ -2,7 +2,6 @@ package dto
 
 import (
 	"encoding/json"
-	"strings"
 	"testing"
 	"time"
 )
@@ -108,11 +107,14 @@ func TestSystemInfoPowerFieldsOmitEmpty(t *testing.T) {
 		t.Fatalf("Failed to marshal SystemInfo: %v", err)
 	}
 
-	jsonStr := string(data)
-	if strings.Contains(jsonStr, `"cpu_power_watts"`) {
+	var m map[string]any
+	if err := json.Unmarshal(data, &m); err != nil {
+		t.Fatalf("Failed to unmarshal SystemInfo JSON: %v", err)
+	}
+	if _, ok := m["cpu_power_watts"]; ok {
 		t.Error("cpu_power_watts should be omitted when nil")
 	}
-	if strings.Contains(jsonStr, `"dram_power_watts"`) {
+	if _, ok := m["dram_power_watts"]; ok {
 		t.Error("dram_power_watts should be omitted when nil")
 	}
 }

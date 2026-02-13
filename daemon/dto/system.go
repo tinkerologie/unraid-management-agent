@@ -17,8 +17,8 @@ type SystemInfo struct {
 	CPUMHz         float64            `json:"cpu_mhz" example:"4900.0"`
 	CPUPerCore     map[string]float64 `json:"cpu_per_core_usage,omitempty"`
 	CPUTemp        float64            `json:"cpu_temp_celsius" example:"45.0"`
-	CPUPowerWatts  *float64           `json:"cpu_power_watts,omitempty" example:"65.5"`
-	DRAMPowerWatts *float64           `json:"dram_power_watts,omitempty" example:"5.2"`
+	CPUPowerWatts  *float64           `json:"cpu_power_watts,omitempty" example:"65.5"` // CPU package power in watts (only present when Intel RAPL is available)
+	DRAMPowerWatts *float64           `json:"dram_power_watts,omitempty" example:"5.2"` // DRAM power in watts (only present when Intel RAPL is available)
 
 	// Memory Information
 	RAMUsage   float64 `json:"ram_usage_percent" example:"65.5"`

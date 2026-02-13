@@ -1646,6 +1646,7 @@ definitions:
           type: number
         type: object
       cpu_power_watts:
+        description: CPU package power in watts (only present when Intel RAPL is available)
         example: 65.5
         type: number
       cpu_temp_celsius:
@@ -1659,6 +1660,7 @@ definitions:
         example: 45.2
         type: number
       dram_power_watts:
+        description: DRAM power in watts (only present when Intel RAPL is available)
         example: 5.2
         type: number
       fans:

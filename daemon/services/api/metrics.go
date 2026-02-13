@@ -355,9 +355,13 @@ func (s *Server) updateMetrics() {
 		// CPU power from Intel RAPL
 		if s.systemCache.CPUPowerWatts != nil {
 			cpuPowerWatts.Set(*s.systemCache.CPUPowerWatts)
+		} else {
+			cpuPowerWatts.Set(0)
 		}
 		if s.systemCache.DRAMPowerWatts != nil {
 			dramPowerWatts.Set(*s.systemCache.DRAMPowerWatts)
+		} else {
+			dramPowerWatts.Set(0)
 		}
 	}
 

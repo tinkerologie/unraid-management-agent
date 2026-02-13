@@ -915,7 +915,16 @@ func (c *SystemCollector) getCPUPower() (cpuPower *float64, dramPower *float64) 
 		return nil, nil
 	}
 
+	cpu := power.PackageWatts
 	logger.Debug("CPU Power: %.2f W, DRAM Power: %.2f W", power.PackageWatts, power.DRAMWatts)
 
-	return &power.PackageWatts, &power.DRAMWatts
+	// Only expose DRAM watts when DRAM zones actually exist.
+	// Otherwise keep it nil rather than reporting a misleading 0.
+	var dram *float64
+	if len(currRAPL.DRAM) > 0 {
+		d := power.DRAMWatts
+		dram = &d
+	}
+
+	return &cpu, dram
 }

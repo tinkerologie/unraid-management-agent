@@ -5199,6 +5199,7 @@ const docTemplate = `{
                     }
                 },
                 "cpu_power_watts": {
+                    "description": "CPU package power in watts (only present when Intel RAPL is available)",
                     "type": "number",
                     "example": 65.5
                 },
@@ -5216,6 +5217,7 @@ const docTemplate = `{
                     "example": 45.2
                 },
                 "dram_power_watts": {
+                    "description": "DRAM power in watts (only present when Intel RAPL is available)",
                     "type": "number",
                     "example": 5.2
                 },

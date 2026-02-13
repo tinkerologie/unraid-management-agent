@@ -54,6 +54,8 @@ volumes:
 | `unraid_memory_total_bytes` | Gauge | Total memory in bytes |
 | `unraid_memory_usage_percent` | Gauge | Memory usage percentage (0-100) |
 | `unraid_uptime_seconds` | Gauge | System uptime in seconds |
+| `unraid_cpu_power_watts` | Gauge | CPU package power consumption in watts (Intel RAPL, 0 when unavailable) |
+| `unraid_dram_power_watts` | Gauge | DRAM power consumption in watts (Intel RAPL, 0 when unavailable) |
 
 **Labels**: `hostname`, `version`
 

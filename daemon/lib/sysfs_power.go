@@ -94,7 +94,7 @@ func ReadRAPLEnergy() *RAPLReading {
 }
 
 // readSubZones reads the sub-zones of a RAPL package.
-func readSubZones(reading *RAPLReading, parentName, parentSuffix string) {
+func readSubZones(reading *RAPLReading, _ string, parentSuffix string) {
 	subEntries, err := os.ReadDir(SysPowercapPath)
 	if err != nil {
 		return
@@ -181,7 +181,8 @@ func CalculateRAPLPower(prev, curr *RAPLReading) *RAPLPower {
 	return power
 }
 
-// calculateZonePower computes total power for a set of zones by matching them by name.
+// calculateZonePower computes total power for a set of zones matched by position.
+// This is safe because Linux sysfs enumerates powercap zones in deterministic order.
 func calculateZonePower(prev, curr []RAPLZone, elapsedSeconds float64) float64 {
 	var totalWatts float64
 
@@ -190,8 +191,8 @@ func calculateZonePower(prev, curr []RAPLZone, elapsedSeconds float64) float64 {
 			break
 		}
 
-		energyDelta := energyDelta(prev[i].EnergyUJ, curr[i].EnergyUJ, curr[i].MaxRange)
-		watts := float64(energyDelta) / (elapsedSeconds * 1_000_000) // µJ → J/s (watts)
+		deltaUJ := energyDelta(prev[i].EnergyUJ, curr[i].EnergyUJ, curr[i].MaxRange)
+		watts := float64(deltaUJ) / (elapsedSeconds * 1_000_000) // µJ → J/s (watts)
 		totalWatts += watts
 	}
 
