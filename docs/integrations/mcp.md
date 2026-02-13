@@ -19,16 +19,19 @@ MCP is an open protocol that standardizes how AI applications can securely conne
 - **Analyze** disk health, system performance, and troubleshoot issues
 - **Automate** routine tasks with AI-powered workflows
 
-## Endpoints
+## Transports
 
-The MCP server uses the Streamable HTTP transport:
+The MCP server supports two transports — use the one that fits your deployment:
 
-| Transport              | Endpoint                                       | Description                                                                  |
-| ---------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------- |
-| **Streamable HTTP** ⭐ | `POST/GET/DELETE http://<unraid-ip>:8043/mcp`  | Modern MCP transport (spec 2025-06-18) — **used by all AI clients**          |
+| Transport              | Endpoint / Command                                       | Best For                                                                     |
+| ---------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| **Streamable HTTP** ⭐ | `POST/GET/DELETE http://<unraid-ip>:8043/mcp`            | Remote connections from any machine on the network                           |
+| **STDIO**              | `unraid-management-agent mcp-stdio`                      | Local AI clients running directly on the Unraid server                       |
 
-> The Streamable HTTP transport at `/mcp` supports all modern AI clients
-> including Cursor, Claude Desktop, GitHub Copilot, Codex, Windsurf, and Gemini CLI.
+> **Which transport should I use?**
+>
+> - Use **Streamable HTTP** if the AI client (Cursor, VS Code, etc.) runs on a different machine than the Unraid server.
+> - Use **STDIO** if the AI client (Claude Desktop, Cursor) runs locally on the Unraid server itself — it has zero network overhead and requires no authentication.
 
 ## Available Tools (54 total)
 
@@ -263,8 +266,9 @@ Add to your Cursor MCP configuration (Settings → MCP → Add Server):
 
 ### Using with Claude Desktop
 
-Since the Unraid Management Agent runs as a **remote** MCP server (over the network),
-configure it via the Claude.ai web UI:
+**Option A: Remote (Streamable HTTP)** — when Claude Desktop runs on a different machine:
+
+Configure via the Claude.ai web UI:
 
 1. Go to [claude.ai/settings/connectors](https://claude.ai/settings/connectors)
 2. Click **"Add Connector"**
@@ -275,7 +279,23 @@ configure it via the Claude.ai web UI:
 > servers using the stdio transport. Remote servers must be added via
 > Settings → Connectors.
 
-Claude Desktop supports both Streamable HTTP and SSE transports (Pro, Max, Team, and Enterprise plans).
+**Option B: Local (STDIO)** — when Claude Desktop runs directly on the Unraid server:
+
+Add to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "unraid": {
+      "command": "/usr/local/emhttp/plugins/unraid-management-agent/unraid-management-agent",
+      "args": ["mcp-stdio"]
+    }
+  }
+}
+```
+
+> STDIO is preferred for local use — zero network overhead, no port/firewall
+> configuration, and the OS process model provides implicit security.
 
 ### Using with Windsurf
 
@@ -615,9 +635,10 @@ client.close()
 
 ## Transport Types
 
-| Transport              | Best For                          | Features                                                  |
-| ---------------------- | --------------------------------- | --------------------------------------------------------- |
-| **Streamable HTTP** ⭐ | All AI clients                    | Request/response, SSE streaming, session management       |
+| Transport              | Best For                           | Features                                                |
+| ---------------------- | ---------------------------------- | ------------------------------------------------------- |
+| **Streamable HTTP** ⭐ | Remote AI clients over the network | Request/response, SSE streaming, session management     |
+| **STDIO**              | Local AI clients on the server     | Newline-delimited JSON over stdin/stdout, zero overhead |
 
 ### Streamable HTTP Transport Details (MCP Spec 2025-06-18)
 
@@ -633,17 +654,40 @@ the Streamable HTTP transport at `/mcp` supports:
 
 **Session Management:** The server assigns an `Mcp-Session-Id` on initialization. Clients should include this header in subsequent requests.
 
+### STDIO Transport Details
+
+The STDIO transport runs the MCP server over stdin/stdout using newline-delimited JSON.
+It is started via the `mcp-stdio` CLI subcommand:
+
+```bash
+/usr/local/emhttp/plugins/unraid-management-agent/unraid-management-agent mcp-stdio
+```
+
+**Key characteristics:**
+
+- **No HTTP server started** — communicates exclusively via stdin/stdout
+- **Logs go to stderr + file** — stdout is reserved for MCP JSON-RPC protocol messages
+- **Collectors run internally** — the STDIO process starts its own data collectors so all tools return live data
+- **Graceful shutdown** — responds to SIGTERM/SIGINT with full collector cleanup
+- **Designed for process spawning** — MCP clients like Claude Desktop launch the process and manage its lifecycle
+
+**When to use STDIO:**
+
+- The AI client runs on the same machine as the Unraid server
+- You want zero network overhead and no port/firewall configuration
+- The MCP client supports STDIO spawning (Claude Desktop, Cursor local mode)
+
 **Client Compatibility:**
 
-| Client         | Transport Used  | Status       |
-| -------------- | --------------- | ------------ |
-| Cursor         | Streamable HTTP | ✅ Supported |
-| Claude Desktop | Streamable HTTP | ✅ Supported |
-| GitHub Copilot | HTTP            | ✅ Supported |
-| Codex          | HTTP Streaming  | ✅ Supported |
-| Windsurf       | Streamable HTTP | ✅ Supported |
-| Gemini CLI     | HTTP            | ✅ Supported |
-| VS Code MCP    | HTTP / SSE      | ✅ Supported |
+| Client         | Streamable HTTP | STDIO        | Notes                                  |
+| -------------- | --------------- | ------------ | -------------------------------------- |
+| Cursor         | ✅ Supported    | ✅ Supported | Use HTTP for remote, STDIO for local   |
+| Claude Desktop | ✅ Supported    | ✅ Supported | STDIO via `claude_desktop_config.json` |
+| GitHub Copilot | ✅ Supported    | —            | HTTP only                              |
+| Codex          | ✅ Supported    | ✅ Supported | Supports both transports               |
+| Windsurf       | ✅ Supported    | ✅ Supported | Supports both transports               |
+| Gemini CLI     | ✅ Supported    | ✅ Supported | Supports both transports               |
+| VS Code MCP    | ✅ Supported    | ✅ Supported | HTTP for remote, STDIO for local       |
 
 ## Troubleshooting
 

@@ -1,10 +1,12 @@
 package mcp
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
@@ -588,5 +590,109 @@ func TestServerPort(t *testing.T) {
 
 	if server.ctx.Config.Port != 9999 {
 		t.Errorf("expected port 9999, got %d", server.ctx.Config.Port)
+	}
+}
+
+// --- STDIO Transport Tests ---
+
+func TestRunSTDIO_NotInitialized(t *testing.T) {
+	server, _ := setupTestMCPServer()
+	// Don't call Initialize() — server.mcpServer is nil
+
+	err := server.RunSTDIO(context.Background())
+	if err == nil {
+		t.Error("expected error when RunSTDIO called on uninitialized server")
+	}
+
+	expectedMsg := "MCP server not initialized"
+	if err != nil && err.Error() != expectedMsg {
+		t.Errorf("expected error message %q, got %q", expectedMsg, err.Error())
+	}
+}
+
+func TestRunSTDIO_CancelledContext(t *testing.T) {
+	server, _ := setupTestMCPServer()
+
+	err := server.Initialize()
+	if err != nil {
+		t.Fatalf("failed to initialize server: %v", err)
+	}
+
+	// Create an already-cancelled context
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	// RunSTDIO with cancelled context should return promptly (not hang)
+	done := make(chan error, 1)
+	go func() {
+		done <- server.RunSTDIO(ctx)
+	}()
+
+	select {
+	case <-done:
+		// Returned promptly — success (error value doesn't matter, context was cancelled)
+	case <-time.After(5 * time.Second):
+		t.Fatal("RunSTDIO did not return within 5 seconds on cancelled context")
+	}
+}
+
+func TestGetMCPServer_BeforeInitialize(t *testing.T) {
+	server, _ := setupTestMCPServer()
+
+	if server.GetMCPServer() != nil {
+		t.Error("expected GetMCPServer to return nil before Initialize()")
+	}
+}
+
+func TestGetMCPServer_AfterInitialize(t *testing.T) {
+	server, _ := setupTestMCPServer()
+
+	err := server.Initialize()
+	if err != nil {
+		t.Fatalf("failed to initialize server: %v", err)
+	}
+
+	mcpSrv := server.GetMCPServer()
+	if mcpSrv == nil {
+		t.Error("expected GetMCPServer to return non-nil after Initialize()")
+	}
+}
+
+func TestServerSupportsBothTransports(t *testing.T) {
+	server, _ := setupTestMCPServer()
+
+	err := server.Initialize()
+	if err != nil {
+		t.Fatalf("failed to initialize server: %v", err)
+	}
+
+	// HTTP handler should be available
+	httpHandler := server.GetHTTPHandler()
+	if httpHandler == nil {
+		t.Error("expected HTTP handler to be available")
+	}
+
+	// MCP server instance should be available (for STDIO transport)
+	mcpSrv := server.GetMCPServer()
+	if mcpSrv == nil {
+		t.Error("expected MCP server to be available for STDIO transport")
+	}
+}
+
+func TestGetHTTPHandler_NilBeforeInit(t *testing.T) {
+	server, _ := setupTestMCPServer()
+
+	// Before Initialize, handler returns a fallback that responds with 500
+	handler := server.GetHTTPHandler()
+	if handler == nil {
+		t.Fatal("expected GetHTTPHandler to return a fallback handler")
+	}
+
+	req, _ := http.NewRequest("POST", "/mcp", nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Errorf("expected status 500 from uninitialized handler, got %d", rr.Code)
 	}
 }

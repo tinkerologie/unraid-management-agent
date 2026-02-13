@@ -35,6 +35,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Supports Cursor, Claude Desktop, GitHub Copilot, Codex, Windsurf, and Gemini CLI
   - Comprehensive test suite with race condition detection (25+ tests)
 
+- **MCP STDIO Transport**:
+  - New `mcp-stdio` CLI subcommand for local AI client integration
+  - Uses newline-delimited JSON over stdin/stdout (MCP spec 2025-06-18)
+  - Preferred transport for MCP clients running directly on the Unraid server (zero network overhead, no auth needed)
+  - Starts collectors internally for live data — no dependency on running HTTP daemon
+  - STDIO-safe logging: all logs go to file + stderr (stdout reserved for MCP protocol)
+  - Graceful shutdown on SIGTERM/SIGINT with full collector cleanup
+  - Compatible with Claude Desktop, Cursor, and any MCP client that supports STDIO spawning
+  - Hardened `api.Server.Stop()` to handle nil HTTP server in cache-only mode
+  - Unit tests for STDIO transport initialization, error handling, and context cancellation
+
 ### Removed
 
 - **Legacy SSE MCP Transport**: Removed the deprecated `/mcp/sse` endpoint and old HTTP transport.

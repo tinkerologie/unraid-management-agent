@@ -2,7 +2,9 @@
 // It exposes Unraid system monitoring and control capabilities to AI agents via the standardized MCP protocol.
 //
 // Uses the official MCP Go SDK (github.com/modelcontextprotocol/go-sdk) implementing protocol version 2025-06-18.
-// Supports Streamable HTTP transport for Claude, ChatGPT, Cursor, Copilot, Codex, Windsurf, Gemini, etc.
+// Supports two transports:
+//   - Streamable HTTP: for remote connections (Claude, ChatGPT, Cursor, Copilot, Codex, Windsurf, Gemini, etc.)
+//   - STDIO: for local connections on the Unraid server (newline-delimited JSON over stdin/stdout)
 package mcp
 
 import (
@@ -120,6 +122,24 @@ func (s *Server) GetHTTPHandler() http.Handler {
 		})
 	}
 	return s.httpHandler
+}
+
+// GetMCPServer returns the underlying MCP server instance.
+// Returns nil if Initialize() has not been called.
+func (s *Server) GetMCPServer() *mcp.Server {
+	return s.mcpServer
+}
+
+// RunSTDIO runs the MCP server over stdin/stdout using newline-delimited JSON.
+// This is the preferred transport for local AI clients (e.g., Claude Desktop) running
+// directly on the Unraid server, as it requires no network overhead or authentication.
+// The method blocks until the context is cancelled or the STDIO connection is closed.
+func (s *Server) RunSTDIO(ctx context.Context) error {
+	if s.mcpServer == nil {
+		return fmt.Errorf("MCP server not initialized")
+	}
+	logger.Info("MCP STDIO transport starting (stdin/stdout)")
+	return s.mcpServer.Run(ctx, &mcp.StdioTransport{})
 }
 
 // registerMonitoringTools registers all read-only monitoring tools.

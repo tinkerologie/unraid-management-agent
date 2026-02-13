@@ -284,12 +284,14 @@ func (s *Server) Stop() {
 	// Cancel all background goroutines
 	s.cancelFunc()
 
-	// Shutdown HTTP server with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	// Shutdown HTTP server with timeout (only if it was started)
+	if s.httpServer != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 
-	if err := s.httpServer.Shutdown(ctx); err != nil {
-		logger.Error("Server shutdown error: %v", err)
+		if err := s.httpServer.Shutdown(ctx); err != nil {
+			logger.Error("Server shutdown error: %v", err)
+		}
 	}
 }
 

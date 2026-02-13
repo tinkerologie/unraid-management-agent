@@ -86,7 +86,8 @@ var cli struct {
 	IntervalRegistration int `default:"600" env:"INTERVAL_REGISTRATION" help:"registration interval (seconds, 0=disabled, max 86400)"`
 	IntervalUnassigned   int `default:"60" env:"INTERVAL_UNASSIGNED" help:"unassigned devices interval (seconds, 0=disabled, max 86400)"`
 
-	Boot cmd.Boot `cmd:"" default:"1" help:"start the management agent"`
+	Boot     cmd.Boot     `cmd:"" default:"1" help:"start the management agent"`
+	MCPStdio cmd.MCPStdio `cmd:"mcp-stdio" help:"run MCP server over stdin/stdout for local AI clients"`
 }
 
 // cleanupOldLogs removes old rotated log files from previous versions
@@ -106,6 +107,9 @@ func cleanupOldLogs(logsDir, baseName string) {
 func main() {
 	ctx := kong.Parse(&cli)
 
+	// Detect STDIO mode — stdout is reserved for MCP JSON-RPC
+	isStdio := ctx.Command() == "mcp-stdio"
+
 	// Set log level based on CLI flag
 	switch strings.ToLower(cli.LogLevel) {
 	case "debug":
@@ -121,7 +125,21 @@ func main() {
 	}
 
 	// Set up logging
-	if cli.Debug {
+	if isStdio {
+		// STDIO mode: stdout is reserved for MCP JSON-RPC protocol.
+		// Log to file + stderr so MCP communication is not corrupted.
+		cleanupOldLogs(cli.LogsDir, "unraid-management-agent")
+
+		fileLogger := &lumberjack.Logger{
+			Filename:   filepath.Join(cli.LogsDir, "unraid-management-agent.log"),
+			MaxSize:    5,
+			MaxBackups: 1,
+			MaxAge:     1,
+			Compress:   false,
+		}
+		multiWriter := io.MultiWriter(fileLogger, os.Stderr)
+		log.SetOutput(multiWriter)
+	} else if cli.Debug {
 		// Debug mode: direct stdout/stderr with no buffering
 		log.SetOutput(os.Stdout)
 		log.SetFlags(log.LstdFlags | log.Lshortfile)
