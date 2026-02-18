@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **VM cannot be resumed/started via API when pmsuspended** (GitHub Issue #65):
+  - Fixed `POST /api/v1/vm/{name}/resume` and `POST /api/v1/vm/{name}/start` failing when VM is in pmsuspended state (Windows sleep)
+  - libvirt DomainResume fails with "domain is pmsuspended"; DomainCreate fails with "domain is already running"
+  - VM controller now detects pmsuspended state and uses `virsh dompmwakeup` to wake the VM, equivalent to pressing Start in Unraid web UI
+
 ## [2026.02.01] - 2026-02-14
 
 ### Added

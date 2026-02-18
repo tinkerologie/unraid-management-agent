@@ -6,6 +6,8 @@ import (
 
 	"github.com/digitalocean/go-libvirt"
 
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
@@ -37,7 +39,18 @@ func (vc *VMController) connect(vmName string) (*libvirt.Libvirt, libvirt.Domain
 	return l, domain, nil
 }
 
+// pmWakeup wakes a VM from pmsuspended state (e.g. Windows sleep) using virsh dompmwakeup.
+// libvirt DomainResume and DomainCreate do not work for pmsuspended domains.
+func (vc *VMController) pmWakeup(vmName string) error {
+	_, err := lib.ExecCommand(constants.VirshBin, "dompmwakeup", vmName)
+	if err != nil {
+		return fmt.Errorf("failed to wake VM from pmsuspended: %w", err)
+	}
+	return nil
+}
+
 // Start starts a virtual machine by name using the libvirt API.
+// If the VM is pmsuspended (e.g. Windows sleep), uses virsh dompmwakeup instead.
 func (vc *VMController) Start(vmName string) error {
 	logger.Info("Starting VM: %s", vmName)
 
@@ -46,6 +59,15 @@ func (vc *VMController) Start(vmName string) error {
 		return err
 	}
 	defer l.Disconnect() //nolint:errcheck
+
+	state, _, err := l.DomainGetState(domain, 0)
+	if err == nil && libvirt.DomainState(state) == libvirt.DomainPmsuspended {
+		if err := vc.pmWakeup(vmName); err != nil {
+			return err
+		}
+		logger.Info("Successfully woke VM from pmsuspended: %s", vmName)
+		return nil
+	}
 
 	if err := l.DomainCreate(domain); err != nil {
 		return fmt.Errorf("failed to start VM %s: %w", vmName, err)
@@ -111,6 +133,7 @@ func (vc *VMController) Pause(vmName string) error {
 }
 
 // Resume resumes a paused virtual machine by name using the libvirt API.
+// If the VM is pmsuspended (e.g. Windows sleep), uses virsh dompmwakeup instead.
 func (vc *VMController) Resume(vmName string) error {
 	logger.Info("Resuming VM: %s", vmName)
 
@@ -119,6 +142,15 @@ func (vc *VMController) Resume(vmName string) error {
 		return err
 	}
 	defer l.Disconnect() //nolint:errcheck
+
+	state, _, err := l.DomainGetState(domain, 0)
+	if err == nil && libvirt.DomainState(state) == libvirt.DomainPmsuspended {
+		if err := vc.pmWakeup(vmName); err != nil {
+			return err
+		}
+		logger.Info("Successfully woke VM from pmsuspended: %s", vmName)
+		return nil
+	}
 
 	if err := l.DomainResume(domain); err != nil {
 		return fmt.Errorf("failed to resume VM %s: %w", vmName, err)
