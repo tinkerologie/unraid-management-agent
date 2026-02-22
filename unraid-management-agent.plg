@@ -3,7 +3,7 @@
 <!DOCTYPE PLUGIN [
     <!ENTITY name        "unraid-management-agent">
     <!ENTITY author      "ruaan-deysel">
-    <!ENTITY version     "2026.02.01">
+    <!ENTITY version     "2026.02.02">
     <!ENTITY gitURL      "https://github.com/&author;/&name;">
     <!ENTITY pluginURL   "&gitURL;/raw/main/&name;.plg">
     <!ENTITY supportURL  "https://forums.unraid.net/topic/178262-home-assistant-unraid-integration">
@@ -13,13 +13,16 @@
     <!ENTITY md5         "5f0606dd5f45af61a553ee00e69756ae">
 ]>
 
-<PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" icon="server" min="6.9.0" pluginURL="&pluginURL;" support="&supportURL;">
+<PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" icon="server" min="7.2.0" pluginURL="&pluginURL;" support="&supportURL;">
 
 <DESCRIPTION>
-This Unraid plugin provides REST API and WebSocket interfaces for real-time system monitoring, Docker/VM control, and comprehensive hardware metrics.
+Monitor and control your Unraid system via REST API, WebSocket, MCP, Prometheus, and MQTT. Supports Docker/VM control, real-time metrics, Home Assistant integration, and AI agent tooling.
 </DESCRIPTION>
 
 <CHANGES>
+###2026.02.02 (2026-02-17)
+- 16 New MCP Tools (9 monitoring, 9 control)
+
 ###2026.02.01 (2026-02-14)
 - CPU Power Consumption Monitoring
 - MCP Streamable HTTP Transport

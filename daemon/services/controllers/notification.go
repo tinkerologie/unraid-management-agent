@@ -11,7 +11,8 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
-const (
+// Package-level variables for notification directories (overridable in tests)
+var (
 	notificationsDir        = "/usr/local/emhttp/state/notifications"
 	notificationsArchiveDir = "/usr/local/emhttp/state/notifications/archive"
 )

@@ -12,6 +12,32 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 )
 
+// setupNotificationCollectorTestDirs overrides the package-level notification directory
+// variables with temp dirs and returns a cleanup function.
+func setupNotificationCollectorTestDirs(t *testing.T) (string, string, func()) {
+	t.Helper()
+	tmpDir := t.TempDir()
+	tmpUnread := filepath.Join(tmpDir, "notifications")
+	tmpArchive := filepath.Join(tmpUnread, "archive")
+
+	if err := os.MkdirAll(tmpUnread, 0755); err != nil {
+		t.Fatalf("Failed to create temp notification dir: %v", err)
+	}
+	if err := os.MkdirAll(tmpArchive, 0755); err != nil {
+		t.Fatalf("Failed to create temp archive dir: %v", err)
+	}
+
+	oldNotifDir := notificationsDir
+	oldArchiveDir := notificationsArchiveDir
+	notificationsDir = tmpUnread
+	notificationsArchiveDir = tmpArchive
+
+	return tmpUnread, tmpArchive, func() {
+		notificationsDir = oldNotifDir
+		notificationsArchiveDir = oldArchiveDir
+	}
+}
+
 func TestNewNotificationCollector(t *testing.T) {
 	hub := pubsub.New(10)
 	ctx := &domain.Context{Hub: hub}
@@ -101,21 +127,13 @@ func TestNotificationCollectorStart(t *testing.T) {
 }
 
 func TestNotificationCollectorCollect(t *testing.T) {
-	tmpDir := t.TempDir()
-	tmpUnread := filepath.Join(tmpDir, "unread")
-	tmpArchive := filepath.Join(tmpDir, "archive")
-
-	if err := os.MkdirAll(tmpUnread, 0755); err != nil {
-		t.Fatalf("Failed to create temp directory: %v", err)
-	}
-	if err := os.MkdirAll(tmpArchive, 0755); err != nil {
-		t.Fatalf("Failed to create temp directory: %v", err)
-	}
+	tmpUnread, _, cleanup := setupNotificationCollectorTestDirs(t)
+	defer cleanup()
 
 	// Create multiple notification files
 	for i := 1; i <= 2; i++ {
-		content := "title=Test\nsubject=Subject\nimportance=normal\n"
-		file := filepath.Join(tmpUnread, "test"+string(rune('0'+i))+".notification")
+		content := "title=Test\nsubject=Subject\nimportance=info\n"
+		file := filepath.Join(tmpUnread, "test"+string(rune('0'+i))+".notify")
 		if err := os.WriteFile(file, []byte(content), 0644); err != nil {
 			t.Fatalf("Failed to create notification file: %v", err)
 		}
@@ -152,16 +170,8 @@ func TestNotificationCollectorCollect(t *testing.T) {
 }
 
 func TestNotificationCollectorEmptyDirectories(t *testing.T) {
-	tmpDir := t.TempDir()
-	tmpUnread := filepath.Join(tmpDir, "unread")
-	tmpArchive := filepath.Join(tmpDir, "archive")
-
-	if err := os.MkdirAll(tmpUnread, 0755); err != nil {
-		t.Fatalf("Failed to create temp directory: %v", err)
-	}
-	if err := os.MkdirAll(tmpArchive, 0755); err != nil {
-		t.Fatalf("Failed to create temp directory: %v", err)
-	}
+	_, _, cleanup := setupNotificationCollectorTestDirs(t)
+	defer cleanup()
 
 	hub := pubsub.New(10)
 	ctx := &domain.Context{Hub: hub}
@@ -201,14 +211,14 @@ func TestParseNotificationFile(t *testing.T) {
 	}{
 		{
 			name:    "valid notification",
-			content: "title=Test\nsubject=Test Subject\ndescription=Test Desc\nimportance=normal\n",
+			content: "event=Test\nsubject=Test Subject\ndescription=Test Desc\nimportance=info\n",
 			checkFunc: func(n *dto.Notification) bool {
 				return n != nil && n.Title != "" && n.Subject != ""
 			},
 		},
 		{
 			name:    "minimal valid notification",
-			content: "title=Array\nsubject=Min\n",
+			content: "event=Array\nsubject=Min\n",
 			checkFunc: func(n *dto.Notification) bool {
 				return n != nil && n.Title == "Array"
 			},
@@ -266,7 +276,7 @@ func TestCalculateOverview(t *testing.T) {
 		{
 			name: "with unread",
 			unread: []dto.Notification{
-				{Title: "System", Importance: "normal"},
+				{Title: "System", Importance: "info"},
 				{Title: "Array", Importance: "warning"},
 			},
 			archived: []dto.Notification{},
@@ -302,10 +312,10 @@ func TestCountByImportance(t *testing.T) {
 	collector := NewNotificationCollector(ctx)
 
 	notifications := []dto.Notification{
-		{Title: "System", Importance: "normal"},
+		{Title: "System", Importance: "info"},
 		{Title: "Array", Importance: "warning"},
 		{Title: "Disk", Importance: "alert"},
-		{Title: "Share", Importance: "normal"},
+		{Title: "Share", Importance: "info"},
 	}
 
 	counts := collector.countByImportance(notifications)

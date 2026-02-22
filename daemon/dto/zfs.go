@@ -38,8 +38,8 @@ type ZFSPool struct {
 	ScanState         string    `json:"scan_state,omitempty" example:"finished"`         // "scanning", "finished", "canceled"
 	ScanErrors        int       `json:"scan_errors" example:"0"`                         // Errors found during last scrub
 	ScanRepairedBytes uint64    `json:"scan_repaired_bytes" example:"0"`                 // Data repaired in last scrub
-	ScanStartTime     time.Time `json:"scan_start_time,omitempty"`                       // When scrub started
-	ScanEndTime       time.Time `json:"scan_end_time,omitempty"`                         // When scrub ended
+	ScanStartTime     time.Time `json:"scan_start_time"`                                 // When scrub started
+	ScanEndTime       time.Time `json:"scan_end_time"`                                   // When scrub ended
 	ScanProgressPct   float64   `json:"scan_progress_percent" example:"100"`             // Scrub progress %
 
 	// Error Counters

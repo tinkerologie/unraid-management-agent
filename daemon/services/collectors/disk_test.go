@@ -310,7 +310,7 @@ func TestParseDiskKeyValue(t *testing.T) {
 		name       string
 		line       string
 		checkField string
-		expected   interface{}
+		expected   any
 	}{
 		{
 			name:       "parse name",

@@ -45,87 +45,87 @@ func GetLevel() LogLevel {
 }
 
 // Info logs informational messages in blue
-func Info(format string, v ...interface{}) {
+func Info(format string, v ...any) {
 	if currentLevel <= LevelInfo {
 		log.Printf(ColorBlue+format+ColorReset, v...)
 	}
 }
 
 // Success logs success messages in green
-func Success(format string, v ...interface{}) {
+func Success(format string, v ...any) {
 	if currentLevel <= LevelInfo {
 		log.Printf(ColorGreen+format+ColorReset, v...)
 	}
 }
 
 // Warning logs warning messages in yellow
-func Warning(format string, v ...interface{}) {
+func Warning(format string, v ...any) {
 	if currentLevel <= LevelWarning {
 		log.Printf(ColorYellow+"WARNING: "+format+ColorReset, v...)
 	}
 }
 
 // Error logs error messages in red
-func Error(format string, v ...interface{}) {
+func Error(format string, v ...any) {
 	if currentLevel <= LevelError {
 		log.Printf(ColorRed+"ERROR: "+format+ColorReset, v...)
 	}
 }
 
 // Debug logs debug messages in cyan (only if debug level is enabled)
-func Debug(format string, v ...interface{}) {
+func Debug(format string, v ...any) {
 	if currentLevel <= LevelDebug {
 		log.Printf(ColorCyan+"DEBUG: "+format+ColorReset, v...)
 	}
 }
 
 // Fatal logs fatal error and exits
-func Fatal(format string, v ...interface{}) {
+func Fatal(format string, v ...any) {
 	log.Fatalf(ColorRed+"FATAL: "+format+ColorReset, v...)
 }
 
 // Plain logs without color
-func Plain(format string, v ...interface{}) {
+func Plain(format string, v ...any) {
 	log.Printf(format, v...)
 }
 
 // Blue alias for Info
-func Blue(format string, v ...interface{}) {
+func Blue(format string, v ...any) {
 	Info(format, v...)
 }
 
 // Yellow alias for Warning
-func Yellow(format string, v ...interface{}) {
+func Yellow(format string, v ...any) {
 	Warning(format, v...)
 }
 
 // Green alias for Success
-func Green(format string, v ...interface{}) {
+func Green(format string, v ...any) {
 	Success(format, v...)
 }
 
 // LightGreen logs in light green
-func LightGreen(format string, v ...interface{}) {
+func LightGreen(format string, v ...any) {
 	if currentLevel <= LevelInfo {
 		log.Printf("\033[92m"+format+ColorReset, v...)
 	}
 }
 
 // Printf is a wrapper for standard log.Printf
-func Printf(format string, v ...interface{}) {
+func Printf(format string, v ...any) {
 	if currentLevel <= LevelInfo {
 		log.Printf(format, v...)
 	}
 }
 
 // Println is a wrapper for standard log.Println
-func Println(v ...interface{}) {
+func Println(v ...any) {
 	if currentLevel <= LevelInfo {
 		log.Println(v...)
 	}
 }
 
 // Sprintf formats and returns a string
-func Sprintf(format string, v ...interface{}) string {
+func Sprintf(format string, v ...any) string {
 	return fmt.Sprintf(format, v...)
 }

@@ -168,7 +168,7 @@ func main() {
 	// Parse disabled collectors from CLI/env and create a map
 	disabledCollectors := make(map[string]bool)
 	if cli.DisableCollectors != "" {
-		for _, name := range strings.Split(cli.DisableCollectors, ",") {
+		for name := range strings.SplitSeq(cli.DisableCollectors, ",") {
 			name = strings.TrimSpace(strings.ToLower(name))
 			if name == "" {
 				continue

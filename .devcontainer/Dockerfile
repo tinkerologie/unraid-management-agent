@@ -2,7 +2,7 @@
 ARG BASE_IMAGE=mcr.microsoft.com/devcontainers/base:bookworm
 FROM ${BASE_IMAGE}
 
-ARG GO_VERSION=1.25.0
+ARG GO_VERSION=1.26.0
 ARG NODE_VERSION=20
 
 ENV DEBIAN_FRONTEND=noninteractive

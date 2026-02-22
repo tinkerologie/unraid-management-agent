@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -1474,7 +1475,7 @@ func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
 	// If no path specified, list all available logs
 	if path == "" {
 		logs := s.listLogFiles()
-		respondJSON(w, http.StatusOK, map[string]interface{}{"logs": logs})
+		respondJSON(w, http.StatusOK, map[string]any{"logs": logs})
 		return
 	}
 
@@ -1556,7 +1557,7 @@ func (s *Server) handleLogFile(w http.ResponseWriter, r *http.Request) {
 }
 
 // Helper function to respond with JSON
-func respondJSON(w http.ResponseWriter, status int, payload interface{}) {
+func respondJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(payload); err != nil {
@@ -1623,7 +1624,7 @@ func (s *Server) handleNotificationsUnread(w http.ResponseWriter, _ *http.Reques
 	s.cacheMutex.RUnlock()
 
 	if notificationList == nil {
-		respondJSON(w, http.StatusOK, map[string]interface{}{
+		respondJSON(w, http.StatusOK, map[string]any{
 			"notifications": []dto.Notification{},
 			"count":         0,
 		})
@@ -1637,7 +1638,7 @@ func (s *Server) handleNotificationsUnread(w http.ResponseWriter, _ *http.Reques
 		}
 	}
 
-	respondJSON(w, http.StatusOK, map[string]interface{}{
+	respondJSON(w, http.StatusOK, map[string]any{
 		"notifications": unread,
 		"count":         len(unread),
 	})
@@ -1657,7 +1658,7 @@ func (s *Server) handleNotificationsArchive(w http.ResponseWriter, _ *http.Reque
 	s.cacheMutex.RUnlock()
 
 	if notificationList == nil {
-		respondJSON(w, http.StatusOK, map[string]interface{}{
+		respondJSON(w, http.StatusOK, map[string]any{
 			"notifications": []dto.Notification{},
 			"count":         0,
 		})
@@ -1671,7 +1672,7 @@ func (s *Server) handleNotificationsArchive(w http.ResponseWriter, _ *http.Reque
 		}
 	}
 
-	respondJSON(w, http.StatusOK, map[string]interface{}{
+	respondJSON(w, http.StatusOK, map[string]any{
 		"notifications": archived,
 		"count":         len(archived),
 	})
@@ -1878,9 +1879,9 @@ func (s *Server) handleUnassignedDevices(w http.ResponseWriter, _ *http.Request)
 	defer s.cacheMutex.RUnlock()
 
 	if s.unassignedCache == nil {
-		respondJSON(w, http.StatusOK, map[string]interface{}{
-			"devices":       []interface{}{},
-			"remote_shares": []interface{}{},
+		respondJSON(w, http.StatusOK, map[string]any{
+			"devices":       []any{},
+			"remote_shares": []any{},
 			"timestamp":     time.Now(),
 		})
 		return
@@ -1902,14 +1903,14 @@ func (s *Server) handleUnassignedDevicesList(w http.ResponseWriter, _ *http.Requ
 	defer s.cacheMutex.RUnlock()
 
 	if s.unassignedCache == nil {
-		respondJSON(w, http.StatusOK, map[string]interface{}{
-			"devices":   []interface{}{},
+		respondJSON(w, http.StatusOK, map[string]any{
+			"devices":   []any{},
 			"timestamp": time.Now(),
 		})
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]interface{}{
+	respondJSON(w, http.StatusOK, map[string]any{
 		"devices":   s.unassignedCache.Devices,
 		"timestamp": s.unassignedCache.Timestamp,
 	})
@@ -1928,14 +1929,14 @@ func (s *Server) handleUnassignedRemoteShares(w http.ResponseWriter, _ *http.Req
 	defer s.cacheMutex.RUnlock()
 
 	if s.unassignedCache == nil {
-		respondJSON(w, http.StatusOK, map[string]interface{}{
-			"remote_shares": []interface{}{},
+		respondJSON(w, http.StatusOK, map[string]any{
+			"remote_shares": []any{},
 			"timestamp":     time.Now(),
 		})
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]interface{}{
+	respondJSON(w, http.StatusOK, map[string]any{
 		"remote_shares": s.unassignedCache.RemoteShares,
 		"timestamp":     s.unassignedCache.Timestamp,
 	})
@@ -2676,4 +2677,1262 @@ func (s *Server) handleMQTTPublish(w http.ResponseWriter, r *http.Request) {
 		Message:   fmt.Sprintf("Message published to topic: %s", req.Topic),
 		Timestamp: time.Now(),
 	})
+}
+
+// ===== Container Update Handlers =====
+
+// handleDockerCheckUpdates godoc
+//
+//	@Summary		Check all containers for updates
+//	@Description	Pull latest images and check if any containers have updates available
+//	@Tags			Docker
+//	@Produce		json
+//	@Success		200	{object}	dto.ContainerUpdatesResult	"Container update status"
+//	@Failure		500	{object}	dto.Response				"Failed to check updates"
+//	@Router			/docker/updates [get]
+func (s *Server) handleDockerCheckUpdates(w http.ResponseWriter, _ *http.Request) {
+	logger.Info("API: Checking all containers for updates")
+
+	controller := controllers.NewDockerController()
+	defer controller.Close() //nolint:errcheck
+
+	result, err := controller.CheckAllContainerUpdates()
+	if err != nil {
+		logger.Error("API: Failed to check container updates: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to check for updates: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+// handleDockerCheckUpdate godoc
+//
+//	@Summary		Check a specific container for updates
+//	@Description	Pull latest image and check if a specific container has an update available
+//	@Tags			Docker
+//	@Produce		json
+//	@Param			id	path		string						true	"Container ID or name"
+//	@Success		200	{object}	dto.ContainerUpdateInfo		"Container update status"
+//	@Failure		400	{object}	dto.Response				"Invalid container reference"
+//	@Failure		500	{object}	dto.Response				"Failed to check update"
+//	@Router			/docker/{id}/check-update [get]
+func (s *Server) handleDockerCheckUpdate(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	containerRef := vars["id"]
+
+	if err := lib.ValidateContainerRef(containerRef); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   err.Error(),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	controller := controllers.NewDockerController()
+	defer controller.Close() //nolint:errcheck
+
+	result, err := controller.CheckContainerUpdate(containerRef)
+	if err != nil {
+		logger.Error("API: Failed to check container update for %s: %v", containerRef, err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to check for update: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+// handleDockerSize godoc
+//
+//	@Summary		Get container size
+//	@Description	Get size information for a specific Docker container
+//	@Tags			Docker
+//	@Produce		json
+//	@Param			id	path		string					true	"Container ID or name"
+//	@Success		200	{object}	dto.ContainerSizeInfo	"Container size information"
+//	@Failure		400	{object}	dto.Response			"Invalid container reference"
+//	@Failure		500	{object}	dto.Response			"Failed to get container size"
+//	@Router			/docker/{id}/size [get]
+func (s *Server) handleDockerSize(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	containerRef := vars["id"]
+
+	if err := lib.ValidateContainerRef(containerRef); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   err.Error(),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	controller := controllers.NewDockerController()
+	defer controller.Close() //nolint:errcheck
+
+	result, err := controller.GetContainerSize(containerRef)
+	if err != nil {
+		logger.Error("API: Failed to get container size for %s: %v", containerRef, err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to get container size: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+// handleDockerUpdate godoc
+//
+//	@Summary		Update a specific container
+//	@Description	Pull latest image and recreate the container with the updated image
+//	@Tags			Docker
+//	@Produce		json
+//	@Param			id	path		string						true	"Container ID or name"
+//	@Success		200	{object}	dto.ContainerUpdateResult	"Container update result"
+//	@Failure		400	{object}	dto.Response				"Invalid container reference"
+//	@Failure		500	{object}	dto.Response				"Failed to update container"
+//	@Router			/docker/{id}/update [post]
+func (s *Server) handleDockerUpdate(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	containerRef := vars["id"]
+
+	if err := lib.ValidateContainerRef(containerRef); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   err.Error(),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	// Check for force parameter
+	force := r.URL.Query().Get("force") == "true"
+
+	controller := controllers.NewDockerController()
+	defer controller.Close() //nolint:errcheck
+
+	result, err := controller.UpdateContainer(containerRef, force)
+	if err != nil {
+		logger.Error("API: Failed to update container %s: %v", containerRef, err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to update container: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+// handleDockerUpdateAll godoc
+//
+//	@Summary		Update all containers
+//	@Description	Check all containers for updates and update those that have updates available
+//	@Tags			Docker
+//	@Produce		json
+//	@Success		200	{object}	dto.ContainerBulkUpdateResult	"Bulk update results"
+//	@Failure		500	{object}	dto.Response					"Failed to update containers"
+//	@Router			/docker/update-all [post]
+func (s *Server) handleDockerUpdateAll(w http.ResponseWriter, _ *http.Request) {
+	logger.Info("API: Updating all containers")
+
+	controller := controllers.NewDockerController()
+	defer controller.Close() //nolint:errcheck
+
+	result, err := controller.UpdateAllContainers()
+	if err != nil {
+		logger.Error("API: Failed to update all containers: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to update containers: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+// ===== Plugin Update Handlers =====
+
+// handlePluginCheckUpdates godoc
+//
+//	@Summary		Check for plugin updates
+//	@Description	Check all installed plugins for available updates
+//	@Tags			Plugins
+//	@Produce		json
+//	@Success		200	{array}		dto.PluginInfo	"Plugins with available updates"
+//	@Failure		500	{object}	dto.Response	"Failed to check updates"
+//	@Router			/plugins/check-updates [get]
+func (s *Server) handlePluginCheckUpdates(w http.ResponseWriter, _ *http.Request) {
+	logger.Info("API: Checking for plugin updates")
+
+	controller := controllers.NewPluginController()
+	updates, err := controller.CheckPluginUpdates()
+	if err != nil {
+		logger.Error("API: Failed to check plugin updates: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to check for plugin updates: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]any{
+		"plugins_with_updates": updates,
+		"count":                len(updates),
+		"timestamp":            time.Now(),
+	})
+}
+
+// handlePluginUpdate godoc
+//
+//	@Summary		Update a specific plugin
+//	@Description	Update a specific plugin by name
+//	@Tags			Plugins
+//	@Produce		json
+//	@Param			name	path		string			true	"Plugin name"
+//	@Success		200		{object}	dto.Response	"Plugin updated"
+//	@Failure		400		{object}	dto.Response	"Invalid plugin name"
+//	@Failure		500		{object}	dto.Response	"Failed to update plugin"
+//	@Router			/plugins/{name}/update [post]
+func (s *Server) handlePluginUpdate(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	pluginName := vars["name"]
+
+	if err := lib.ValidatePluginName(pluginName); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   err.Error(),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	controller := controllers.NewPluginController()
+	err := controller.UpdatePlugin(pluginName)
+	if err != nil {
+		logger.Error("API: Failed to update plugin %s: %v", pluginName, err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to update plugin: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   fmt.Sprintf("Plugin %s updated successfully", pluginName),
+		Timestamp: time.Now(),
+	})
+}
+
+// handlePluginUpdateAll godoc
+//
+//	@Summary		Update all plugins
+//	@Description	Update all plugins that have updates available
+//	@Tags			Plugins
+//	@Produce		json
+//	@Success		200	{object}	dto.PluginBulkUpdateResult	"Plugin update results"
+//	@Failure		500	{object}	dto.Response				"Failed to update plugins"
+//	@Router			/plugins/update-all [post]
+func (s *Server) handlePluginUpdateAll(w http.ResponseWriter, _ *http.Request) {
+	logger.Info("API: Updating all plugins")
+
+	controller := controllers.NewPluginController()
+	results, err := controller.UpdateAllPlugins()
+	if err != nil {
+		logger.Error("API: Failed to update all plugins: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to update plugins: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	succeeded := 0
+	failed := 0
+	for _, r := range results {
+		if r.Success {
+			succeeded++
+		} else {
+			failed++
+		}
+	}
+
+	respondJSON(w, http.StatusOK, dto.PluginBulkUpdateResult{
+		Results:   results,
+		Succeeded: succeeded,
+		Failed:    failed,
+		Timestamp: time.Now(),
+	})
+}
+
+// ===== VM Clone & Snapshot Handlers =====
+
+// handleVMClone godoc
+//
+//	@Summary		Clone a virtual machine
+//	@Description	Clone a VM including disk images (source VM must be shut off)
+//	@Tags			VMs
+//	@Produce		json
+//	@Param			name		path		string			true	"Source VM name"
+//	@Param			clone_name	query		string			true	"Name for the cloned VM"
+//	@Success		200			{object}	dto.Response	"VM cloned successfully"
+//	@Failure		400			{object}	dto.Response	"Invalid parameters"
+//	@Failure		500			{object}	dto.Response	"Failed to clone VM"
+//	@Router			/vm/{name}/clone [post]
+func (s *Server) handleVMClone(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	vmName := vars["name"]
+
+	if err := lib.ValidateVMName(vmName); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   err.Error(),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	cloneName := r.URL.Query().Get("clone_name")
+	if cloneName == "" {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   "clone_name query parameter is required",
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	if err := lib.ValidateVMName(cloneName); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Invalid clone name: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	controller := controllers.NewVMController()
+	err := controller.CloneVM(vmName, cloneName)
+	if err != nil {
+		logger.Error("API: Failed to clone VM %s: %v", vmName, err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to clone VM: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   fmt.Sprintf("VM '%s' cloned as '%s'", vmName, cloneName),
+		Timestamp: time.Now(),
+	})
+}
+
+// handleVMCreateSnapshot godoc
+//
+//	@Summary		Create a VM snapshot
+//	@Description	Create a snapshot of a virtual machine
+//	@Tags			VMs
+//	@Produce		json
+//	@Param			name			path		string			true	"VM name"
+//	@Param			snapshot_name	query		string			true	"Snapshot name"
+//	@Param			description		query		string			false	"Snapshot description"
+//	@Success		200				{object}	dto.Response	"Snapshot created"
+//	@Failure		400				{object}	dto.Response	"Invalid parameters"
+//	@Failure		500				{object}	dto.Response	"Failed to create snapshot"
+//	@Router			/vm/{name}/snapshot [post]
+func (s *Server) handleVMCreateSnapshot(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	vmName := vars["name"]
+
+	if err := lib.ValidateVMName(vmName); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   err.Error(),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	snapshotName := r.URL.Query().Get("snapshot_name")
+	if snapshotName == "" {
+		// Auto-generate snapshot name
+		snapshotName = fmt.Sprintf("snapshot-%d", time.Now().Unix())
+	} else {
+		if err := lib.ValidateSnapshotName(snapshotName); err != nil {
+			respondJSON(w, http.StatusBadRequest, dto.Response{
+				Success:   false,
+				Message:   fmt.Sprintf("Invalid snapshot name: %v", err),
+				Timestamp: time.Now(),
+			})
+			return
+		}
+	}
+
+	description := r.URL.Query().Get("description")
+
+	controller := controllers.NewVMController()
+	err := controller.CreateSnapshot(vmName, snapshotName, description)
+	if err != nil {
+		logger.Error("API: Failed to create snapshot for VM %s: %v", vmName, err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to create snapshot: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   fmt.Sprintf("Snapshot '%s' created for VM '%s'", snapshotName, vmName),
+		Timestamp: time.Now(),
+	})
+}
+
+// handleVMListSnapshots godoc
+//
+//	@Summary		List VM snapshots
+//	@Description	List all snapshots for a virtual machine
+//	@Tags			VMs
+//	@Produce		json
+//	@Param			name	path		string				true	"VM name"
+//	@Success		200		{object}	dto.VMSnapshotList	"Snapshot list"
+//	@Failure		400		{object}	dto.Response		"Invalid VM name"
+//	@Failure		500		{object}	dto.Response		"Failed to list snapshots"
+//	@Router			/vm/{name}/snapshots [get]
+func (s *Server) handleVMListSnapshots(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	vmName := vars["name"]
+
+	if err := lib.ValidateVMName(vmName); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   err.Error(),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	controller := controllers.NewVMController()
+	result, err := controller.ListSnapshots(vmName)
+	if err != nil {
+		logger.Error("API: Failed to list snapshots for VM %s: %v", vmName, err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to list snapshots: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+// handleVMDeleteSnapshot godoc
+//
+//	@Summary		Delete a VM snapshot
+//	@Description	Delete a specific snapshot of a virtual machine
+//	@Tags			VMs
+//	@Produce		json
+//	@Param			name			path		string			true	"VM name"
+//	@Param			snapshot_name	path		string			true	"Snapshot name"
+//	@Success		200				{object}	dto.Response	"Snapshot deleted"
+//	@Failure		400				{object}	dto.Response	"Invalid parameters"
+//	@Failure		500				{object}	dto.Response	"Failed to delete snapshot"
+//	@Router			/vm/{name}/snapshots/{snapshot_name} [delete]
+func (s *Server) handleVMDeleteSnapshot(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	vmName := vars["name"]
+	snapshotName := vars["snapshot_name"]
+
+	if err := lib.ValidateVMName(vmName); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   err.Error(),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	if err := lib.ValidateSnapshotName(snapshotName); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Invalid snapshot name: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	controller := controllers.NewVMController()
+	err := controller.DeleteSnapshot(vmName, snapshotName)
+	if err != nil {
+		logger.Error("API: Failed to delete snapshot %s for VM %s: %v", snapshotName, vmName, err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to delete snapshot: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   fmt.Sprintf("Snapshot '%s' deleted from VM '%s'", snapshotName, vmName),
+		Timestamp: time.Now(),
+	})
+}
+
+// handleVMRestoreSnapshot godoc
+//
+//	@Summary		Restore a VM snapshot
+//	@Description	Restore a virtual machine to a previously created snapshot. WARNING: This reverts the VM to the snapshot state.
+//	@Tags			VMs
+//	@Produce		json
+//	@Param			name			path		string			true	"VM name"
+//	@Param			snapshot_name	path		string			true	"Snapshot name"
+//	@Success		200				{object}	dto.Response	"Snapshot restored"
+//	@Failure		400				{object}	dto.Response	"Invalid parameters"
+//	@Failure		500				{object}	dto.Response	"Failed to restore snapshot"
+//	@Router			/vm/{name}/snapshots/{snapshot_name}/restore [post]
+func (s *Server) handleVMRestoreSnapshot(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	vmName := vars["name"]
+	snapshotName := vars["snapshot_name"]
+
+	if err := lib.ValidateVMName(vmName); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   err.Error(),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	if err := lib.ValidateSnapshotName(snapshotName); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Invalid snapshot name: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	controller := controllers.NewVMController()
+	err := controller.RestoreSnapshot(vmName, snapshotName)
+	if err != nil {
+		logger.Error("API: Failed to restore snapshot %s for VM %s: %v", snapshotName, vmName, err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to restore snapshot: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   fmt.Sprintf("Snapshot '%s' restored for VM '%s'", snapshotName, vmName),
+		Timestamp: time.Now(),
+	})
+}
+
+// handleDockerLogs godoc
+//
+//	@Summary		Get Docker container logs
+//	@Description	Retrieve stdout/stderr logs from a specific Docker container (equivalent to docker logs)
+//	@Tags			Docker
+//	@Produce		json
+//	@Param			id			path		string				true	"Container ID or name"
+//	@Param			tail		query		int					false	"Number of recent lines (default: 100, max: 5000)"
+//	@Param			since		query		string				false	"Only logs since this timestamp (RFC3339)"
+//	@Param			timestamps	query		bool				false	"Include timestamps in output"
+//	@Success		200			{object}	dto.ContainerLogs	"Container logs"
+//	@Failure		400			{object}	dto.Response		"Invalid container reference"
+//	@Failure		500			{object}	dto.Response		"Failed to get logs"
+//	@Router			/docker/{id}/logs [get]
+func (s *Server) handleDockerLogs(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	containerRef := vars["id"]
+
+	if err := lib.ValidateContainerRef(containerRef); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   err.Error(),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	tail := 100
+	if tailStr := r.URL.Query().Get("tail"); tailStr != "" {
+		if v, err := strconv.Atoi(tailStr); err == nil && v > 0 {
+			tail = v
+		}
+	}
+
+	since := r.URL.Query().Get("since")
+	timestamps := r.URL.Query().Get("timestamps") == "true"
+
+	controller := controllers.NewDockerController()
+	defer controller.Close() //nolint:errcheck
+
+	result, err := controller.ContainerLogs(containerRef, tail, since, timestamps)
+	if err != nil {
+		logger.Error("API: Failed to get logs for container %s: %v", containerRef, err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to get container logs: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+// ===== Service Management Handlers =====
+
+// handleServiceAction godoc
+//
+//	@Summary		Control an Unraid service
+//	@Description	Start, stop, or restart an Unraid system service
+//	@Tags			Services
+//	@Produce		json
+//	@Param			name	path		string			true	"Service name (docker, libvirt, smb, nfs, ftp, sshd, nginx, syslog, ntpd, avahi, wireguard)"
+//	@Param			action	path		string			true	"Action (start, stop, restart)"
+//	@Success		200		{object}	dto.Response	"Service action completed"
+//	@Failure		400		{object}	dto.Response	"Invalid service or action"
+//	@Failure		500		{object}	dto.Response	"Failed to execute action"
+//	@Router			/services/{name}/{action} [post]
+func (s *Server) handleServiceAction(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	serviceName := vars["name"]
+	action := vars["action"]
+
+	if err := lib.ValidateServiceName(serviceName); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   err.Error(),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	if action != "start" && action != "stop" && action != "restart" {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   "Invalid action: must be start, stop, or restart",
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	controller := controllers.NewServiceController()
+	var err error
+	switch action {
+	case "start":
+		err = controller.StartService(serviceName)
+	case "stop":
+		err = controller.StopService(serviceName)
+	case "restart":
+		err = controller.RestartService(serviceName)
+	}
+
+	if err != nil {
+		logger.Error("API: Failed to %s service %s: %v", action, serviceName, err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to %s service %s: %v", action, serviceName, err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   fmt.Sprintf("Service %s %sed successfully", serviceName, action),
+		Timestamp: time.Now(),
+	})
+}
+
+// handleServiceList godoc
+//
+//	@Summary		List available services
+//	@Description	List all managed Unraid system services and their status
+//	@Tags			Services
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}	"Service list with status"
+//	@Router			/services [get]
+func (s *Server) handleServiceList(w http.ResponseWriter, _ *http.Request) {
+	serviceNames := controllers.ValidServiceNames()
+	controller := controllers.NewServiceController()
+
+	type serviceInfo struct {
+		Name    string `json:"name"`
+		Running bool   `json:"running"`
+	}
+
+	services := make([]serviceInfo, 0)
+	for _, name := range serviceNames {
+		running, _ := controller.GetServiceStatus(name)
+		services = append(services, serviceInfo{Name: name, Running: running})
+	}
+
+	respondJSON(w, http.StatusOK, map[string]any{
+		"services":  services,
+		"count":     len(services),
+		"timestamp": time.Now(),
+	})
+}
+
+// ===== Process Handlers =====
+
+// handleProcessList godoc
+//
+//	@Summary		List running processes
+//	@Description	Get all running processes on the Unraid server
+//	@Tags			System
+//	@Produce		json
+//	@Param			sort_by	query		string				false	"Sort by: cpu, memory, or pid (default: cpu)"
+//	@Param			limit	query		int					false	"Max processes to return (default: 50)"
+//	@Success		200		{object}	dto.ProcessList		"Process list"
+//	@Failure		500		{object}	dto.Response		"Failed to list processes"
+//	@Router			/processes [get]
+func (s *Server) handleProcessList(w http.ResponseWriter, r *http.Request) {
+	sortBy := r.URL.Query().Get("sort_by")
+	if sortBy == "" {
+		sortBy = "cpu"
+	}
+
+	limit := 50
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsed, err := fmt.Sscanf(l, "%d", &limit); parsed != 1 || err != nil {
+			limit = 50
+		}
+	}
+	if limit > 500 {
+		limit = 500
+	}
+
+	controller := controllers.NewProcessController()
+	result, err := controller.ListProcesses(sortBy, limit)
+	if err != nil {
+		logger.Error("API: Failed to list processes: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to list processes: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+// =============================================================================
+// Alert Rule Management Handlers
+// =============================================================================
+
+// handleListAlertRules godoc
+//
+//	@Summary		List all alert rules
+//	@Description	Retrieve all configured alert rules
+//	@Tags			Alerts
+//	@Produce		json
+//	@Success		200	{array}	dto.AlertRule	"List of alert rules"
+//	@Router			/alerts/rules [get]
+func (s *Server) handleListAlertRules(w http.ResponseWriter, _ *http.Request) {
+	if s.alertStore == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Alerting engine not initialized")
+		return
+	}
+	respondJSON(w, http.StatusOK, s.alertStore.GetRules())
+}
+
+// handleGetAlertRule godoc
+//
+//	@Summary		Get a specific alert rule
+//	@Description	Retrieve a single alert rule by ID
+//	@Tags			Alerts
+//	@Produce		json
+//	@Param			id	path		string	true	"Alert rule ID"
+//	@Success		200	{object}	dto.AlertRule	"Alert rule"
+//	@Failure		404	{object}	map[string]string	"Rule not found"
+//	@Router			/alerts/rules/{id} [get]
+func (s *Server) handleGetAlertRule(w http.ResponseWriter, r *http.Request) {
+	if s.alertStore == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Alerting engine not initialized")
+		return
+	}
+
+	id := mux.Vars(r)["id"]
+	rule, err := s.alertStore.GetRule(id)
+	if err != nil {
+		respondJSON(w, http.StatusNotFound, dto.Response{
+			Success:   false,
+			Message:   err.Error(),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+	respondJSON(w, http.StatusOK, rule)
+}
+
+// handleCreateAlertRule godoc
+//
+//	@Summary		Create a new alert rule
+//	@Description	Create a new alert rule with an expr-lang expression
+//	@Tags			Alerts
+//	@Accept			json
+//	@Produce		json
+//	@Param			rule	body		dto.AlertRule	true	"Alert rule to create"
+//	@Success		201		{object}	dto.Response	"Rule created successfully"
+//	@Failure		400		{object}	map[string]string	"Invalid request"
+//	@Failure		500		{object}	map[string]string	"Internal error"
+//	@Router			/alerts/rules [post]
+func (s *Server) handleCreateAlertRule(w http.ResponseWriter, r *http.Request) {
+	if s.alertStore == nil || s.alertEngine == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Alerting engine not initialized")
+		return
+	}
+
+	var rule dto.AlertRule
+	if err := json.NewDecoder(r.Body).Decode(&rule); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	// Validate required fields
+	if rule.ID == "" {
+		respondWithError(w, http.StatusBadRequest, "Rule ID is required")
+		return
+	}
+	if rule.Name == "" {
+		respondWithError(w, http.StatusBadRequest, "Rule name is required")
+		return
+	}
+	if rule.Expression == "" {
+		respondWithError(w, http.StatusBadRequest, "Rule expression is required")
+		return
+	}
+	if rule.Severity == "" {
+		rule.Severity = "warning"
+	}
+	if rule.Severity != "info" && rule.Severity != "warning" && rule.Severity != "critical" {
+		respondWithError(w, http.StatusBadRequest, "Severity must be 'info', 'warning', or 'critical'")
+		return
+	}
+
+	if err := s.alertStore.CreateRule(rule); err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Recompile rules so the engine picks up the new rule
+	s.alertEngine.RecompileRules()
+
+	respondJSON(w, http.StatusCreated, dto.Response{
+		Success:   true,
+		Message:   fmt.Sprintf("Alert rule '%s' created successfully", rule.Name),
+		Timestamp: time.Now(),
+	})
+}
+
+// handleUpdateAlertRule godoc
+//
+//	@Summary		Update an existing alert rule
+//	@Description	Update an alert rule by ID
+//	@Tags			Alerts
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		string		true	"Alert rule ID"
+//	@Param			rule	body		dto.AlertRule	true	"Updated alert rule"
+//	@Success		200		{object}	dto.Response	"Rule updated successfully"
+//	@Failure		400		{object}	map[string]string	"Invalid request"
+//	@Failure		404		{object}	map[string]string	"Rule not found"
+//	@Router			/alerts/rules/{id} [put]
+func (s *Server) handleUpdateAlertRule(w http.ResponseWriter, r *http.Request) {
+	if s.alertStore == nil || s.alertEngine == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Alerting engine not initialized")
+		return
+	}
+
+	id := mux.Vars(r)["id"]
+
+	var rule dto.AlertRule
+	if err := json.NewDecoder(r.Body).Decode(&rule); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	// Ensure the ID from the URL is used
+	rule.ID = id
+
+	if rule.Name == "" {
+		respondWithError(w, http.StatusBadRequest, "Rule name is required")
+		return
+	}
+	if rule.Expression == "" {
+		respondWithError(w, http.StatusBadRequest, "Rule expression is required")
+		return
+	}
+	if rule.Severity != "" && rule.Severity != "info" && rule.Severity != "warning" && rule.Severity != "critical" {
+		respondWithError(w, http.StatusBadRequest, "Severity must be 'info', 'warning', or 'critical'")
+		return
+	}
+
+	if err := s.alertStore.UpdateRule(rule); err != nil {
+		respondWithError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	s.alertEngine.RecompileRules()
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   fmt.Sprintf("Alert rule '%s' updated successfully", rule.Name),
+		Timestamp: time.Now(),
+	})
+}
+
+// handleDeleteAlertRule godoc
+//
+//	@Summary		Delete an alert rule
+//	@Description	Delete an alert rule by ID
+//	@Tags			Alerts
+//	@Produce		json
+//	@Param			id	path		string	true	"Alert rule ID"
+//	@Success		200	{object}	dto.Response	"Rule deleted successfully"
+//	@Failure		404	{object}	map[string]string	"Rule not found"
+//	@Router			/alerts/rules/{id} [delete]
+func (s *Server) handleDeleteAlertRule(w http.ResponseWriter, r *http.Request) {
+	if s.alertStore == nil || s.alertEngine == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Alerting engine not initialized")
+		return
+	}
+
+	id := mux.Vars(r)["id"]
+
+	if err := s.alertStore.DeleteRule(id); err != nil {
+		respondJSON(w, http.StatusNotFound, dto.Response{
+			Success:   false,
+			Message:   err.Error(),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	s.alertEngine.RecompileRules()
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   fmt.Sprintf("Alert rule '%s' deleted successfully", id),
+		Timestamp: time.Now(),
+	})
+}
+
+// handleAlertStatus godoc
+//
+//	@Summary		Get alert status
+//	@Description	Get the current evaluation status of all enabled alert rules
+//	@Tags			Alerts
+//	@Produce		json
+//	@Success		200	{object}	dto.AlertsStatusResponse	"Alert statuses"
+//	@Router			/alerts/status [get]
+func (s *Server) handleAlertStatus(w http.ResponseWriter, _ *http.Request) {
+	if s.alertEngine == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Alerting engine not initialized")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.AlertsStatusResponse{
+		Statuses: s.alertEngine.GetStatuses(),
+	})
+}
+
+// handleAlertHistory godoc
+//
+//	@Summary		Get alert history
+//	@Description	Get recent alert events (last 100)
+//	@Tags			Alerts
+//	@Produce		json
+//	@Success		200	{object}	dto.AlertHistoryResponse	"Alert event history"
+//	@Router			/alerts/history [get]
+func (s *Server) handleAlertHistory(w http.ResponseWriter, _ *http.Request) {
+	if s.alertEngine == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Alerting engine not initialized")
+		return
+	}
+
+	events := s.alertEngine.GetHistory()
+	respondJSON(w, http.StatusOK, dto.AlertHistoryResponse{
+		Events: events,
+		Total:  len(events),
+	})
+}
+
+// handleFiringAlerts godoc
+//
+//	@Summary		Get firing alerts
+//	@Description	Get only alert rules currently in the firing state
+//	@Tags			Alerts
+//	@Produce		json
+//	@Success		200	{array}	dto.AlertStatus	"Firing alerts"
+//	@Router			/alerts/firing [get]
+func (s *Server) handleFiringAlerts(w http.ResponseWriter, _ *http.Request) {
+	if s.alertEngine == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Alerting engine not initialized")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, s.alertEngine.GetFiringAlerts())
+}
+
+// ============================================================================
+// Health Check / Watchdog Handlers
+// ============================================================================
+
+// handleListHealthChecks godoc
+//
+//	@Summary		List health checks
+//	@Description	Get all configured health checks
+//	@Tags			HealthChecks
+//	@Produce		json
+//	@Success		200	{array}	dto.HealthCheck	"List of health checks"
+//	@Router			/healthchecks [get]
+func (s *Server) handleListHealthChecks(w http.ResponseWriter, _ *http.Request) {
+	if s.watchdogStore == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Watchdog not initialized")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, s.watchdogStore.GetChecks())
+}
+
+// handleGetHealthCheck godoc
+//
+//	@Summary		Get health check
+//	@Description	Get a specific health check by ID
+//	@Tags			HealthChecks
+//	@Produce		json
+//	@Param			id	path		string			true	"Health check ID"
+//	@Success		200	{object}	dto.HealthCheck	"Health check details"
+//	@Failure		404	{object}	dto.Response	"Health check not found"
+//	@Router			/healthchecks/{id} [get]
+func (s *Server) handleGetHealthCheck(w http.ResponseWriter, r *http.Request) {
+	if s.watchdogStore == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Watchdog not initialized")
+		return
+	}
+
+	id := mux.Vars(r)["id"]
+	check, err := s.watchdogStore.GetCheck(id)
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, check)
+}
+
+// handleCreateHealthCheck godoc
+//
+//	@Summary		Create health check
+//	@Description	Create a new health check probe
+//	@Tags			HealthChecks
+//	@Accept			json
+//	@Produce		json
+//	@Param			check	body		dto.HealthCheck	true	"Health check configuration"
+//	@Success		201		{object}	dto.Response	"Created"
+//	@Failure		400		{object}	dto.Response	"Invalid request"
+//	@Router			/healthchecks [post]
+func (s *Server) handleCreateHealthCheck(w http.ResponseWriter, r *http.Request) {
+	if s.watchdogStore == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Watchdog not initialized")
+		return
+	}
+
+	var check dto.HealthCheck
+	if err := json.NewDecoder(r.Body).Decode(&check); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid JSON: "+err.Error())
+		return
+	}
+
+	if check.ID == "" {
+		respondWithError(w, http.StatusBadRequest, "id is required")
+		return
+	}
+	if check.Name == "" {
+		respondWithError(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	if check.Type == "" {
+		respondWithError(w, http.StatusBadRequest, "type is required (http, tcp, or container)")
+		return
+	}
+	if check.Target == "" {
+		respondWithError(w, http.StatusBadRequest, "target is required")
+		return
+	}
+
+	if err := s.watchdogStore.CreateCheck(check); err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusCreated, dto.Response{Success: true, Message: "Health check created", Timestamp: time.Now()})
+}
+
+// handleUpdateHealthCheck godoc
+//
+//	@Summary		Update health check
+//	@Description	Update an existing health check configuration
+//	@Tags			HealthChecks
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		string			true	"Health check ID"
+//	@Param			check	body		dto.HealthCheck	true	"Updated health check configuration"
+//	@Success		200		{object}	dto.Response	"Updated"
+//	@Failure		400		{object}	dto.Response	"Invalid request"
+//	@Failure		404		{object}	dto.Response	"Not found"
+//	@Router			/healthchecks/{id} [put]
+func (s *Server) handleUpdateHealthCheck(w http.ResponseWriter, r *http.Request) {
+	if s.watchdogStore == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Watchdog not initialized")
+		return
+	}
+
+	id := mux.Vars(r)["id"]
+	var check dto.HealthCheck
+	if err := json.NewDecoder(r.Body).Decode(&check); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid JSON: "+err.Error())
+		return
+	}
+
+	check.ID = id // URL ID takes precedence
+
+	if err := s.watchdogStore.UpdateCheck(check); err != nil {
+		respondWithError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{Success: true, Message: "Health check updated", Timestamp: time.Now()})
+}
+
+// handleDeleteHealthCheck godoc
+//
+//	@Summary		Delete health check
+//	@Description	Delete a health check by ID
+//	@Tags			HealthChecks
+//	@Produce		json
+//	@Param			id	path		string		true	"Health check ID"
+//	@Success		200	{object}	dto.Response	"Deleted"
+//	@Failure		404	{object}	dto.Response	"Not found"
+//	@Router			/healthchecks/{id} [delete]
+func (s *Server) handleDeleteHealthCheck(w http.ResponseWriter, r *http.Request) {
+	if s.watchdogStore == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Watchdog not initialized")
+		return
+	}
+
+	id := mux.Vars(r)["id"]
+
+	if err := s.watchdogStore.DeleteCheck(id); err != nil {
+		respondWithError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	// Clean up runner state for deleted check
+	if s.watchdogRunner != nil {
+		s.watchdogRunner.CleanupCheck(id)
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{Success: true, Message: "Health check deleted", Timestamp: time.Now()})
+}
+
+// handleHealthCheckStatus godoc
+//
+//	@Summary		Get health check statuses
+//	@Description	Get the current status of all health checks
+//	@Tags			HealthChecks
+//	@Produce		json
+//	@Success		200	{object}	dto.HealthChecksStatusResponse	"Health check statuses"
+//	@Router			/healthchecks/status [get]
+func (s *Server) handleHealthCheckStatus(w http.ResponseWriter, _ *http.Request) {
+	if s.watchdogRunner == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Watchdog not initialized")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.HealthChecksStatusResponse{
+		Checks: s.watchdogRunner.GetStatuses(),
+	})
+}
+
+// handleHealthCheckHistory godoc
+//
+//	@Summary		Get health check history
+//	@Description	Get recent health check state change events
+//	@Tags			HealthChecks
+//	@Produce		json
+//	@Success		200	{object}	dto.HealthCheckHistoryResponse	"Health check events"
+//	@Router			/healthchecks/history [get]
+func (s *Server) handleHealthCheckHistory(w http.ResponseWriter, _ *http.Request) {
+	if s.watchdogRunner == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Watchdog not initialized")
+		return
+	}
+
+	events := s.watchdogRunner.GetHistory()
+	respondJSON(w, http.StatusOK, dto.HealthCheckHistoryResponse{
+		Events: events,
+	})
+}
+
+// handleRunHealthCheck godoc
+//
+//	@Summary		Run health check
+//	@Description	Manually trigger a specific health check and return the result
+//	@Tags			HealthChecks
+//	@Produce		json
+//	@Param			id	path		string					true	"Health check ID"
+//	@Success		200	{object}	dto.HealthCheckStatus	"Check result"
+//	@Failure		404	{object}	dto.Response			"Not found"
+//	@Router			/healthchecks/{id}/run [post]
+func (s *Server) handleRunHealthCheck(w http.ResponseWriter, r *http.Request) {
+	if s.watchdogRunner == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Watchdog not initialized")
+		return
+	}
+
+	id := mux.Vars(r)["id"]
+
+	status, err := s.watchdogRunner.RunSingleCheck(r.Context(), id)
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, status)
 }

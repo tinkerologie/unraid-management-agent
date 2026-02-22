@@ -20,6 +20,273 @@
     "host": "localhost:8043",
     "basePath": "/api/v1",
     "paths": {
+        "/alerts/firing": {
+            "get": {
+                "description": "Get only alert rules currently in the firing state",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Alerts"
+                ],
+                "summary": "Get firing alerts",
+                "responses": {
+                    "200": {
+                        "description": "Firing alerts",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.AlertStatus"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/alerts/history": {
+            "get": {
+                "description": "Get recent alert events (last 100)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Alerts"
+                ],
+                "summary": "Get alert history",
+                "responses": {
+                    "200": {
+                        "description": "Alert event history",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AlertHistoryResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/alerts/rules": {
+            "get": {
+                "description": "Retrieve all configured alert rules",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Alerts"
+                ],
+                "summary": "List all alert rules",
+                "responses": {
+                    "200": {
+                        "description": "List of alert rules",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.AlertRule"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Create a new alert rule with an expr-lang expression",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Alerts"
+                ],
+                "summary": "Create a new alert rule",
+                "parameters": [
+                    {
+                        "description": "Alert rule to create",
+                        "name": "rule",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.AlertRule"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Rule created successfully",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/alerts/rules/{id}": {
+            "get": {
+                "description": "Retrieve a single alert rule by ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Alerts"
+                ],
+                "summary": "Get a specific alert rule",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Alert rule ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Alert rule",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AlertRule"
+                        }
+                    },
+                    "404": {
+                        "description": "Rule not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "Update an alert rule by ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Alerts"
+                ],
+                "summary": "Update an existing alert rule",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Alert rule ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Updated alert rule",
+                        "name": "rule",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.AlertRule"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Rule updated successfully",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Rule not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Delete an alert rule by ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Alerts"
+                ],
+                "summary": "Delete an alert rule",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Alert rule ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Rule deleted successfully",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Rule not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/alerts/status": {
+            "get": {
+                "description": "Get the current evaluation status of all enabled alert rules",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Alerts"
+                ],
+                "summary": "Get alert status",
+                "responses": {
+                    "200": {
+                        "description": "Alert statuses",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AlertsStatusResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/array": {
             "get": {
                 "description": "Retrieve Unraid array status including parity information",
@@ -551,6 +818,58 @@
                 }
             }
         },
+        "/docker/update-all": {
+            "post": {
+                "description": "Check all containers for updates and update those that have updates available",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Docker"
+                ],
+                "summary": "Update all containers",
+                "responses": {
+                    "200": {
+                        "description": "Bulk update results",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ContainerBulkUpdateResult"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to update containers",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/docker/updates": {
+            "get": {
+                "description": "Pull latest images and check if any containers have updates available",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Docker"
+                ],
+                "summary": "Check all containers for updates",
+                "responses": {
+                    "200": {
+                        "description": "Container update status",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ContainerUpdatesResult"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to check updates",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/docker/{id}": {
             "get": {
                 "description": "Retrieve information about a specific Docker container by ID or name",
@@ -579,6 +898,106 @@
                     },
                     "404": {
                         "description": "Container not found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/docker/{id}/check-update": {
+            "get": {
+                "description": "Pull latest image and check if a specific container has an update available",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Docker"
+                ],
+                "summary": "Check a specific container for updates",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container ID or name",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Container update status",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ContainerUpdateInfo"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid container reference",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to check update",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/docker/{id}/logs": {
+            "get": {
+                "description": "Retrieve stdout/stderr logs from a specific Docker container (equivalent to docker logs)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Docker"
+                ],
+                "summary": "Get Docker container logs",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container ID or name",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of recent lines (default: 100, max: 5000)",
+                        "name": "tail",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Only logs since this timestamp (RFC3339)",
+                        "name": "since",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Include timestamps in output",
+                        "name": "timestamps",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Container logs",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ContainerLogs"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid container reference",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get logs",
                         "schema": {
                             "$ref": "#/definitions/dto.Response"
                         }
@@ -661,6 +1080,47 @@
                     },
                     "500": {
                         "description": "Failed to restart container",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/docker/{id}/size": {
+            "get": {
+                "description": "Get size information for a specific Docker container",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Docker"
+                ],
+                "summary": "Get container size",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container ID or name",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Container size information",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ContainerSizeInfo"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid container reference",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get container size",
                         "schema": {
                             "$ref": "#/definitions/dto.Response"
                         }
@@ -784,6 +1244,47 @@
                     },
                     "500": {
                         "description": "Failed to unpause container",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/docker/{id}/update": {
+            "post": {
+                "description": "Pull latest image and recreate the container with the updated image",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Docker"
+                ],
+                "summary": "Update a specific container",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container ID or name",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Container update result",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ContainerUpdateResult"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid container reference",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to update container",
                         "schema": {
                             "$ref": "#/definitions/dto.Response"
                         }
@@ -1032,6 +1533,261 @@
                             "additionalProperties": {
                                 "type": "string"
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/healthchecks": {
+            "get": {
+                "description": "Get all configured health checks",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "HealthChecks"
+                ],
+                "summary": "List health checks",
+                "responses": {
+                    "200": {
+                        "description": "List of health checks",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.HealthCheck"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Create a new health check probe",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "HealthChecks"
+                ],
+                "summary": "Create health check",
+                "parameters": [
+                    {
+                        "description": "Health check configuration",
+                        "name": "check",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.HealthCheck"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/healthchecks/history": {
+            "get": {
+                "description": "Get recent health check state change events",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "HealthChecks"
+                ],
+                "summary": "Get health check history",
+                "responses": {
+                    "200": {
+                        "description": "Health check events",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HealthCheckHistoryResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/healthchecks/status": {
+            "get": {
+                "description": "Get the current status of all health checks",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "HealthChecks"
+                ],
+                "summary": "Get health check statuses",
+                "responses": {
+                    "200": {
+                        "description": "Health check statuses",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HealthChecksStatusResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/healthchecks/{id}": {
+            "get": {
+                "description": "Get a specific health check by ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "HealthChecks"
+                ],
+                "summary": "Get health check",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Health check ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Health check details",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HealthCheck"
+                        }
+                    },
+                    "404": {
+                        "description": "Health check not found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "Update an existing health check configuration",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "HealthChecks"
+                ],
+                "summary": "Update health check",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Health check ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Updated health check configuration",
+                        "name": "check",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.HealthCheck"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Updated",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Delete a health check by ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "HealthChecks"
+                ],
+                "summary": "Delete health check",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Health check ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Deleted",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/healthchecks/{id}/run": {
+            "post": {
+                "description": "Manually trigger a specific health check and return the result",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "HealthChecks"
+                ],
+                "summary": "Run health check",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Health check ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Check result",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HealthCheckStatus"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
                         }
                     }
                 }
@@ -1738,6 +2494,142 @@
                 }
             }
         },
+        "/plugins/check-updates": {
+            "get": {
+                "description": "Check all installed plugins for available updates",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Plugins"
+                ],
+                "summary": "Check for plugin updates",
+                "responses": {
+                    "200": {
+                        "description": "Plugins with available updates",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.PluginInfo"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to check updates",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/plugins/update-all": {
+            "post": {
+                "description": "Update all plugins that have updates available",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Plugins"
+                ],
+                "summary": "Update all plugins",
+                "responses": {
+                    "200": {
+                        "description": "Plugin update results",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PluginBulkUpdateResult"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to update plugins",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/plugins/{name}/update": {
+            "post": {
+                "description": "Update a specific plugin by name",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Plugins"
+                ],
+                "summary": "Update a specific plugin",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Plugin name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Plugin updated",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid plugin name",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to update plugin",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/processes": {
+            "get": {
+                "description": "Get all running processes on the Unraid server",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System"
+                ],
+                "summary": "List running processes",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Sort by: cpu, memory, or pid (default: cpu)",
+                        "name": "sort_by",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Max processes to return (default: 50)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Process list",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ProcessList"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to list processes",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/registration": {
             "get": {
                 "description": "Retrieve Unraid license/registration information",
@@ -1753,6 +2645,75 @@
                         "description": "Registration information",
                         "schema": {
                             "$ref": "#/definitions/dto.Registration"
+                        }
+                    }
+                }
+            }
+        },
+        "/services": {
+            "get": {
+                "description": "List all managed Unraid system services and their status",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Services"
+                ],
+                "summary": "List available services",
+                "responses": {
+                    "200": {
+                        "description": "Service list with status",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/services/{name}/{action}": {
+            "post": {
+                "description": "Start, stop, or restart an Unraid system service",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Services"
+                ],
+                "summary": "Control an Unraid service",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Service name (docker, libvirt, smb, nfs, ftp, sshd, nginx, syslog, ntpd, avahi, wireguard)",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Action (start, stop, restart)",
+                        "name": "action",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Service action completed",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid service or action",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to execute action",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
                         }
                     }
                 }
@@ -2464,6 +3425,54 @@
                 }
             }
         },
+        "/vm/{name}/clone": {
+            "post": {
+                "description": "Clone a VM including disk images (source VM must be shut off)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "VMs"
+                ],
+                "summary": "Clone a virtual machine",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Source VM name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Name for the cloned VM",
+                        "name": "clone_name",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "VM cloned successfully",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid parameters",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to clone VM",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/vm/{name}/force-stop": {
             "post": {
                 "description": "Force stop a specific virtual machine by name (equivalent to pulling the power cord)",
@@ -2662,6 +3671,197 @@
                     },
                     "500": {
                         "description": "Failed to resume VM",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/vm/{name}/snapshot": {
+            "post": {
+                "description": "Create a snapshot of a virtual machine",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "VMs"
+                ],
+                "summary": "Create a VM snapshot",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "VM name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Snapshot name",
+                        "name": "snapshot_name",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Snapshot description",
+                        "name": "description",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Snapshot created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid parameters",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to create snapshot",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/vm/{name}/snapshots": {
+            "get": {
+                "description": "List all snapshots for a virtual machine",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "VMs"
+                ],
+                "summary": "List VM snapshots",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "VM name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Snapshot list",
+                        "schema": {
+                            "$ref": "#/definitions/dto.VMSnapshotList"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid VM name",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to list snapshots",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/vm/{name}/snapshots/{snapshot_name}": {
+            "delete": {
+                "description": "Delete a specific snapshot of a virtual machine",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "VMs"
+                ],
+                "summary": "Delete a VM snapshot",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "VM name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Snapshot name",
+                        "name": "snapshot_name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Snapshot deleted",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid parameters",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to delete snapshot",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/vm/{name}/snapshots/{snapshot_name}/restore": {
+            "post": {
+                "description": "Restore a virtual machine to a previously created snapshot. WARNING: This reverts the VM to the snapshot state.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "VMs"
+                ],
+                "summary": "Restore a VM snapshot",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "VM name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Snapshot name",
+                        "name": "snapshot_name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Snapshot restored",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid parameters",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to restore snapshot",
                         "schema": {
                             "$ref": "#/definitions/dto.Response"
                         }
@@ -2902,6 +4102,122 @@
                 "type": {
                     "description": "\"lan\", \"wan\", \"wireguard\", \"mdns\", \"ipv6\", \"other\"",
                     "type": "string"
+                }
+            }
+        },
+        "dto.AlertEvent": {
+            "type": "object",
+            "properties": {
+                "fired_at": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "resolved_at": {
+                    "type": "string"
+                },
+                "rule_id": {
+                    "type": "string"
+                },
+                "rule_name": {
+                    "type": "string"
+                },
+                "severity": {
+                    "type": "string"
+                },
+                "state": {
+                    "description": "\"firing\" or \"resolved\"",
+                    "type": "string"
+                }
+            }
+        },
+        "dto.AlertHistoryResponse": {
+            "type": "object",
+            "properties": {
+                "events": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.AlertEvent"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.AlertRule": {
+            "type": "object",
+            "properties": {
+                "channels": {
+                    "description": "shoutrrr URLs or \"unraid\" for local notification",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "cooldown_minutes": {
+                    "description": "Minutes between re-fires (default 5)",
+                    "type": "integer"
+                },
+                "duration_seconds": {
+                    "description": "Must be true for this many seconds before firing (0 = immediate)",
+                    "type": "integer"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "expression": {
+                    "description": "expr-lang expression, e.g. \"CPU \u003e 90 \u0026\u0026 ArrayState == 'Started'\"",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "severity": {
+                    "description": "\"info\", \"warning\", \"critical\"",
+                    "type": "string"
+                }
+            }
+        },
+        "dto.AlertStatus": {
+            "type": "object",
+            "properties": {
+                "eval_count": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "rule_id": {
+                    "type": "string"
+                },
+                "rule_name": {
+                    "type": "string"
+                },
+                "severity": {
+                    "type": "string"
+                },
+                "since": {
+                    "type": "string"
+                },
+                "state": {
+                    "description": "\"ok\", \"pending\", \"firing\"",
+                    "type": "string"
+                }
+            }
+        },
+        "dto.AlertsStatusResponse": {
+            "type": "object",
+            "properties": {
+                "statuses": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.AlertStatus"
+                    }
                 }
             }
         },
@@ -3230,6 +4546,32 @@
                 }
             }
         },
+        "dto.ContainerBulkUpdateResult": {
+            "type": "object",
+            "properties": {
+                "failed": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.ContainerUpdateResult"
+                    }
+                },
+                "skipped": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "succeeded": {
+                    "type": "integer",
+                    "example": 8
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.ContainerInfo": {
             "type": "object",
             "properties": {
@@ -3317,6 +4659,155 @@
                     "items": {
                         "$ref": "#/definitions/dto.VolumeMapping"
                     }
+                }
+            }
+        },
+        "dto.ContainerLogs": {
+            "type": "object",
+            "properties": {
+                "container_id": {
+                    "type": "string",
+                    "example": "abc123def456"
+                },
+                "container_name": {
+                    "type": "string",
+                    "example": "plex"
+                },
+                "line_count": {
+                    "type": "integer",
+                    "example": 100
+                },
+                "logs": {
+                    "type": "string"
+                },
+                "since": {
+                    "type": "string",
+                    "example": "2026-02-17T00:00:00Z"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.ContainerSizeInfo": {
+            "type": "object",
+            "properties": {
+                "container_id": {
+                    "type": "string",
+                    "example": "abc123def456"
+                },
+                "container_name": {
+                    "type": "string",
+                    "example": "plex"
+                },
+                "image_size_bytes": {
+                    "type": "integer",
+                    "example": 536870912
+                },
+                "size_display": {
+                    "type": "string",
+                    "example": "1.0 GiB"
+                },
+                "size_root_fs_bytes": {
+                    "type": "integer",
+                    "example": 1073741824
+                },
+                "size_rw_bytes": {
+                    "type": "integer",
+                    "example": 104857600
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.ContainerUpdateInfo": {
+            "type": "object",
+            "properties": {
+                "container_id": {
+                    "type": "string",
+                    "example": "abc123def456"
+                },
+                "container_name": {
+                    "type": "string",
+                    "example": "plex"
+                },
+                "current_digest": {
+                    "type": "string"
+                },
+                "image": {
+                    "type": "string",
+                    "example": "plexinc/pms-docker:latest"
+                },
+                "latest_digest": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "update_available": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "dto.ContainerUpdateResult": {
+            "type": "object",
+            "properties": {
+                "container_id": {
+                    "type": "string",
+                    "example": "abc123def456"
+                },
+                "container_name": {
+                    "type": "string",
+                    "example": "plex"
+                },
+                "image": {
+                    "type": "string",
+                    "example": "plexinc/pms-docker:latest"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Container updated successfully"
+                },
+                "new_digest": {
+                    "type": "string"
+                },
+                "previous_digest": {
+                    "type": "string"
+                },
+                "recreated": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "updated": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "dto.ContainerUpdatesResult": {
+            "type": "object",
+            "properties": {
+                "containers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.ContainerUpdateInfo"
+                    }
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "total_count": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "updates_available": {
+                    "type": "integer",
+                    "example": 2
                 }
             }
         },
@@ -3755,6 +5246,164 @@
                 },
                 "timestamp": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.HealthCheck": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "description": "Enabled determines whether this health check is active.",
+                    "type": "boolean"
+                },
+                "id": {
+                    "description": "ID is the unique identifier for this health check.",
+                    "type": "string"
+                },
+                "interval_seconds": {
+                    "description": "IntervalSeconds is how often the check runs (minimum 10, default 30).",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "Name is a human-readable name for this health check.",
+                    "type": "string"
+                },
+                "on_fail": {
+                    "description": "OnFail is the remediation action: \"notify\", \"restart_container:\u003cname\u003e\", or \"webhook:\u003curl\u003e\".",
+                    "type": "string"
+                },
+                "success_code": {
+                    "description": "SuccessCode is the expected HTTP status code (HTTP probes only, default 200).",
+                    "type": "integer"
+                },
+                "target": {
+                    "description": "Target is the probe target: URL for HTTP, host:port for TCP, container ID/name for container.",
+                    "type": "string"
+                },
+                "timeout_seconds": {
+                    "description": "TimeoutSeconds is the probe timeout (minimum 1, default 5).",
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "Type is the probe type: \"http\", \"tcp\", or \"container\".",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.HealthCheckType"
+                        }
+                    ]
+                }
+            }
+        },
+        "dto.HealthCheckEvent": {
+            "type": "object",
+            "properties": {
+                "check_id": {
+                    "description": "CheckID is the health check identifier.",
+                    "type": "string"
+                },
+                "check_name": {
+                    "description": "CheckName is the human-readable check name.",
+                    "type": "string"
+                },
+                "message": {
+                    "description": "Message describes the event.",
+                    "type": "string"
+                },
+                "remediation_taken": {
+                    "description": "RemediationTaken is the action that was executed, if any.",
+                    "type": "string"
+                },
+                "state": {
+                    "description": "State is \"healthy\" or \"unhealthy\".",
+                    "type": "string"
+                },
+                "timestamp": {
+                    "description": "Timestamp is when the event occurred.",
+                    "type": "string"
+                }
+            }
+        },
+        "dto.HealthCheckHistoryResponse": {
+            "type": "object",
+            "properties": {
+                "events": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.HealthCheckEvent"
+                    }
+                }
+            }
+        },
+        "dto.HealthCheckStatus": {
+            "type": "object",
+            "properties": {
+                "check_id": {
+                    "description": "CheckID is the health check identifier.",
+                    "type": "string"
+                },
+                "check_name": {
+                    "description": "CheckName is the human-readable check name.",
+                    "type": "string"
+                },
+                "check_type": {
+                    "description": "CheckType is the probe type.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.HealthCheckType"
+                        }
+                    ]
+                },
+                "consecutive_fails": {
+                    "description": "ConsecutiveFails is the number of consecutive probe failures.",
+                    "type": "integer"
+                },
+                "healthy": {
+                    "description": "Healthy is true when the last probe succeeded.",
+                    "type": "boolean"
+                },
+                "last_check": {
+                    "description": "LastCheck is the timestamp of the last probe execution.",
+                    "type": "string"
+                },
+                "last_error": {
+                    "description": "LastError is the error message from the last failed probe, empty if healthy.",
+                    "type": "string"
+                },
+                "last_remediation": {
+                    "description": "LastRemediation is the timestamp of the last remediation action taken.",
+                    "type": "string"
+                },
+                "remediation_action": {
+                    "description": "RemediationAction is the configured on_fail action.",
+                    "type": "string"
+                },
+                "target": {
+                    "description": "Target is the probe target.",
+                    "type": "string"
+                }
+            }
+        },
+        "dto.HealthCheckType": {
+            "type": "string",
+            "enum": [
+                "http",
+                "tcp",
+                "container"
+            ],
+            "x-enum-varnames": [
+                "HealthCheckHTTP",
+                "HealthCheckTCP",
+                "HealthCheckContainer"
+            ]
+        },
+        "dto.HealthChecksStatusResponse": {
+            "type": "object",
+            "properties": {
+                "checks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.HealthCheckStatus"
+                    }
                 }
             }
         },
@@ -4827,6 +6476,28 @@
                 }
             }
         },
+        "dto.PluginBulkUpdateResult": {
+            "type": "object",
+            "properties": {
+                "failed": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.PluginUpdateResult"
+                    }
+                },
+                "succeeded": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.PluginInfo": {
             "description": "Information about an installed Unraid plugin",
             "type": "object",
@@ -4900,6 +6571,34 @@
                 }
             }
         },
+        "dto.PluginUpdateResult": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "example": "Updated successfully"
+                },
+                "new_version": {
+                    "type": "string",
+                    "example": "2025.10.28"
+                },
+                "plugin_name": {
+                    "type": "string",
+                    "example": "community.applications"
+                },
+                "previous_version": {
+                    "type": "string",
+                    "example": "2025.10.27"
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.PortMapping": {
             "type": "object",
             "properties": {
@@ -4914,6 +6613,73 @@
                 "type": {
                     "type": "string",
                     "example": "tcp"
+                }
+            }
+        },
+        "dto.ProcessInfo": {
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "example": "/usr/bin/docker"
+                },
+                "cpu_percent": {
+                    "type": "number",
+                    "example": 5.2
+                },
+                "memory_percent": {
+                    "type": "number",
+                    "example": 2.1
+                },
+                "pid": {
+                    "type": "integer",
+                    "example": 1234
+                },
+                "rss_bytes": {
+                    "type": "integer",
+                    "example": 536870912
+                },
+                "started": {
+                    "type": "string",
+                    "example": "Jan01"
+                },
+                "state": {
+                    "type": "string",
+                    "example": "S"
+                },
+                "time": {
+                    "type": "string",
+                    "example": "0:05"
+                },
+                "tty": {
+                    "type": "string",
+                    "example": "?"
+                },
+                "user": {
+                    "type": "string",
+                    "example": "root"
+                },
+                "vsz_bytes": {
+                    "type": "integer",
+                    "example": 1073741824
+                }
+            }
+        },
+        "dto.ProcessList": {
+            "type": "object",
+            "properties": {
+                "processes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.ProcessInfo"
+                    }
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "total_count": {
+                    "type": "integer",
+                    "example": 150
                 }
             }
         },
@@ -5753,6 +7519,61 @@
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "dto.VMSnapshot": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string",
+                    "example": "2025-02-16T10:30:00Z"
+                },
+                "description": {
+                    "type": "string",
+                    "example": "Snapshot before Windows update"
+                },
+                "is_current": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "name": {
+                    "type": "string",
+                    "example": "pre-update"
+                },
+                "parent": {
+                    "type": "string",
+                    "example": "base"
+                },
+                "state": {
+                    "type": "string",
+                    "example": "shutoff"
+                },
+                "vm_name": {
+                    "type": "string",
+                    "example": "Windows 11"
+                }
+            }
+        },
+        "dto.VMSnapshotList": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "snapshots": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.VMSnapshot"
+                    }
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "vm_name": {
+                    "type": "string",
+                    "example": "Windows 11"
                 }
             }
         },

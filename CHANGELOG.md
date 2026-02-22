@@ -9,12 +9,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Go 1.26.0 Upgrade**:
+  - Upgraded from Go 1.25.0 to Go 1.26.0 for improved performance and latest language features
+  - **Green Tea GC**: 10–40% lower garbage collection overhead (enabled automatically by runtime)
+  - **~30% faster cgo**: Faster native Docker/libvirt operations
+  - **`io.ReadAll` ~2x faster**: Improved `/proc` and `/sys` file reading in all collectors
+  - **Stack-allocated slices**: Fewer heap allocations in hot paths
+  - Modernized 39 Go files via `go fix`:
+    - `interface{}` → `any` across 20 files (98 occurrences)
+    - C-style `for` loops → `for i := range n` across 21 files
+    - `strings.Split` in range → `strings.SplitSeq` (zero-allocation iteration)
+    - `sort.Slice` → `slices.SortFunc` (type-safe sorting)
+    - `t.Context()` in test files (cleaner test contexts)
+  - Refactored `sync.WaitGroup` patterns to use `wg.Go()` (Go 1.26) — eliminates `wg.Add(1); go func() { defer wg.Done()... }` boilerplate in orchestrator and controllers
+  - Refactored `RunMCPStdio()` signal handling to use `signal.NotifyContext` — replaces manual goroutine + channel pattern
+  - Updated CI workflow, devcontainer, and documentation references to Go 1.26
+  - All dependencies tested and compatible with Go 1.26
+
 ### Fixed
 
 - **VM cannot be resumed/started via API when pmsuspended** (GitHub Issue #65):
   - Fixed `POST /api/v1/vm/{name}/resume` and `POST /api/v1/vm/{name}/start` failing when VM is in pmsuspended state (Windows sleep)
   - libvirt DomainResume fails with "domain is pmsuspended"; DomainCreate fails with "domain is already running"
   - VM controller now detects pmsuspended state and uses `virsh dompmwakeup` to wake the VM, equivalent to pressing Start in Unraid web UI
+
+## [2026.02.02] - 2026-02-17
+
+### Added
+
+- **Docker Container Update Management**:
+  - Check individual container for image updates (`GET /docker/{id}/check-update`)
+  - Check all containers for available updates (`GET /docker/updates`)
+  - Get container disk size info (`GET /docker/{id}/size`)
+  - Update individual container to latest image (`POST /docker/{id}/update`, supports `?force=true`)
+  - Bulk update all containers with available updates (`POST /docker/update-all`)
+  - MCP tools: `check_container_updates`, `check_container_update`, `get_container_size`, `update_container`, `update_all_containers`
+
+- **Plugin Update Management**:
+  - Check all installed plugins for available updates (`GET /plugins/check-updates`)
+  - Update individual plugin (`POST /plugins/{name}/update`)
+  - Bulk update all plugins (`POST /plugins/update-all`)
+  - MCP tools: `check_plugin_updates`, `update_plugin`, `update_all_plugins`
+
+- **VM Snapshots & Cloning**:
+  - Create VM snapshot (`POST /vm/{name}/snapshot`)
+  - List VM snapshots (`GET /vm/{name}/snapshots`)
+  - Delete VM snapshot (`DELETE /vm/{name}/snapshots/{snapshot_name}`)
+  - Restore VM snapshot (`POST /vm/{name}/snapshots/{snapshot_name}/restore`) (GitHub Issue #63)
+  - Clone virtual machine (`POST /vm/{name}/clone?clone_name=...`)
+  - MCP tools: `list_vm_snapshots`, `create_vm_snapshot`, `delete_vm_snapshot`, `restore_vm_snapshot`, `clone_vm`
+
+- **Docker Container Logs** (GitHub Issue #64):
+  - Retrieve per-container stdout/stderr logs equivalent to `docker logs` (`GET /docker/{id}/logs`)
+  - Supports `tail`, `since` (RFC3339), and `timestamps` query parameters
+  - MCP tool: `get_container_logs`
+
+- **Service Management**:
+  - List all managed services and their status (`GET /services`)
+  - Start/stop/restart system services (`POST /services/{name}/{action}`)
+  - Supported services: docker, libvirt, smb, nfs, ftp, sshd, nginx, syslog, ntpd, avahi, wireguard
+  - MCP tools: `list_services`, `get_service_status`, `service_action`
+
+- **Process Listing**:
+  - List running processes sorted by CPU/memory/PID (`GET /processes?sort_by=cpu&limit=50`)
+  - MCP tool: `list_processes`
+
+- **New Validation Functions**:
+  - `ValidateContainerRef` — validates Docker container ID or name
+  - `ValidatePluginName` — validates Unraid plugin names
+  - `ValidateServiceName` — validates system service names
+  - `ValidateSnapshotName` — validates VM snapshot names
+
+- **16 New MCP Tools** (9 monitoring, 9 control) with proper annotations
 
 ## [2026.02.01] - 2026-02-14
 

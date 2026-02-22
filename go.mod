@@ -1,20 +1,20 @@
 module github.com/ruaan-deysel/unraid-management-agent
 
-go 1.25.0
-
-toolchain go1.25.7
+go 1.26.0
 
 require (
 	github.com/alecthomas/kong v1.13.0
 	github.com/cskr/pubsub v1.0.2
 	github.com/digitalocean/go-libvirt v0.0.0-20260126183639-bb11c33248dc
 	github.com/eclipse/paho.mqtt.golang v1.5.1
+	github.com/expr-lang/expr v1.17.8
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/moby/moby/api v1.53.0
 	github.com/moby/moby/client v0.2.2
 	github.com/modelcontextprotocol/go-sdk v1.2.0
+	github.com/nicholas-fedor/shoutrrr v0.13.2
 	github.com/prometheus/client_golang v1.23.2
 	github.com/swaggo/http-swagger/v2 v2.0.2
 	github.com/swaggo/swag v1.16.6
@@ -46,6 +46,8 @@ require (
 	github.com/go-openapi/swag/typeutils v0.25.4 // indirect
 	github.com/go-openapi/swag/yamlutils v0.25.4 // indirect
 	github.com/google/jsonschema-go v0.3.0 // indirect
+	github.com/mattn/go-colorable v0.1.14 // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
@@ -65,9 +67,10 @@ require (
 	golang.org/x/crypto v0.47.0 // indirect
 	golang.org/x/mod v0.32.0 // indirect
 	golang.org/x/net v0.49.0 // indirect
-	golang.org/x/oauth2 v0.30.0 // indirect
+	golang.org/x/oauth2 v0.34.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect
+	golang.org/x/term v0.39.0 // indirect
 	golang.org/x/tools v0.41.0 // indirect
-	google.golang.org/protobuf v1.36.8 // indirect
+	google.golang.org/protobuf v1.36.11 // indirect
 )

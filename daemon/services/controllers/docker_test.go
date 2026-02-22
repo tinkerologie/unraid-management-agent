@@ -120,3 +120,80 @@ func TestDockerControllerClose(t *testing.T) {
 		t.Errorf("Close() returned error: %v", err)
 	}
 }
+
+func TestStripDockerStreamHeaders(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []byte
+		expected string
+	}{
+		{
+			name:     "plain text without headers",
+			input:    []byte("hello world\n"),
+			expected: "hello world\n",
+		},
+		{
+			name: "stdout frame",
+			input: func() []byte {
+				msg := []byte("hello from stdout\n")
+				header := []byte{1, 0, 0, 0, 0, 0, 0, byte(len(msg))}
+				return append(header, msg...)
+			}(),
+			expected: "hello from stdout\n",
+		},
+		{
+			name: "stderr frame",
+			input: func() []byte {
+				msg := []byte("error message\n")
+				header := []byte{2, 0, 0, 0, 0, 0, 0, byte(len(msg))}
+				return append(header, msg...)
+			}(),
+			expected: "error message\n",
+		},
+		{
+			name: "multiple frames",
+			input: func() []byte {
+				msg1 := []byte("line1\n")
+				msg2 := []byte("line2\n")
+				h1 := []byte{1, 0, 0, 0, 0, 0, 0, byte(len(msg1))}
+				h2 := []byte{1, 0, 0, 0, 0, 0, 0, byte(len(msg2))}
+				result := append(h1, msg1...)
+				result = append(result, h2...)
+				result = append(result, msg2...)
+				return result
+			}(),
+			expected: "line1\nline2\n",
+		},
+		{
+			name:     "empty input",
+			input:    []byte{},
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := stripDockerStreamHeaders(tt.input)
+			if got != tt.expected {
+				t.Errorf("stripDockerStreamHeaders() = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestDockerControllerContainerLogs(t *testing.T) {
+	dc := NewDockerController()
+	defer dc.Close()
+
+	t.Run("has ContainerLogs method", func(t *testing.T) {
+		_ = dc.ContainerLogs
+	})
+
+	t.Run("ContainerLogs with nonexistent container", func(t *testing.T) {
+		_, err := dc.ContainerLogs("nonexistent-container-99999", 100, "", false)
+		// Should return an error (container doesn't exist or Docker not available)
+		if err == nil {
+			t.Log("Note: No error returned - Docker socket might not be available")
+		}
+	})
+}

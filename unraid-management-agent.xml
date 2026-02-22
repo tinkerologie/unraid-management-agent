@@ -5,15 +5,15 @@
     <PluginAuthor>ruaan-deysel</PluginAuthor>
     <Beta>False</Beta>
     <Category>Tools:System</Category>
-    <Date>2026-02-14</Date>
+    <Date>2026-02-17</Date>
     <Name>Unraid Management Agent</Name>
     <Description>
-        This Unraid plugin provides REST API and WebSocket interfaces for real-time system monitoring, Docker/VM control, and comprehensive hardware metrics. Monitor CPU, RAM, temperatures, disks, network, Docker containers, VMs, UPS, GPU, ZFS pools, and user shares. Control Docker containers and VMs via REST API. Real-time WebSocket event streaming for live updates.
+        Monitor and control your Unraid system via REST API, WebSocket, MCP, Prometheus, and MQTT. Supports Docker/VM control, real-time metrics, Home Assistant integration, and AI agent tooling.
     </Description>
     <Requires>
         **No external plugin dependencies** - All data is collected directly from system sources.
     </Requires>
-    <MinVer>6.9.0</MinVer>
+    <MinVer>7.2.0</MinVer>
     <Project>https://github.com/ruaan-deysel/unraid-management-agent</Project>
     <Support>https://forums.unraid.net/topic/178262-home-assistant-unraid-integration</Support>
     <Icon>https://raw.githubusercontent.com/ruaan-deysel/unraid-management-agent/main/icon.png</Icon>

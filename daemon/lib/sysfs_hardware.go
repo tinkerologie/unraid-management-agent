@@ -7,8 +7,9 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 )
 
-// SysfsDMIPath is the path to DMI information in sysfs
-const SysfsDMIPath = "/sys/class/dmi/id"
+// SysfsDMIPath is the path to DMI information in sysfs.
+// It is a var (not const) so tests can override it with a temp directory.
+var SysfsDMIPath = "/sys/class/dmi/id"
 
 // readSysfsFile reads a file from sysfs and returns its trimmed content
 // This function only reads from /sys paths which are safe system directories

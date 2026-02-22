@@ -110,7 +110,7 @@ func (c *GPUCollector) collectIntelGPU() ([]*dto.GPUMetrics, error) {
 	}
 	intelGPUs := make([]intelGPUInfo, 0)
 
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		if (strings.Contains(line, "VGA") || strings.Contains(line, "Display")) && strings.Contains(line, "Intel Corporation") {
 			logger.Debug("Intel GPU: Found Intel GPU line: %s", line)
 			// Parse PCI ID and model name using a more robust approach
@@ -243,7 +243,7 @@ func (c *GPUCollector) collectSingleIntelGPU(pciID, model string, index int) *dt
 	logger.Debug("Intel GPU: Extracted JSON object of %d chars", len(sampleJSON))
 
 	// Parse the sample
-	var intelData map[string]interface{}
+	var intelData map[string]any
 	if err := json.Unmarshal([]byte(sampleJSON), &intelData); err != nil {
 		logger.Debug("Intel GPU: Failed to parse sample: %v", err)
 		return nil
@@ -266,12 +266,12 @@ func (c *GPUCollector) collectSingleIntelGPU(pciID, model string, index int) *dt
 	}
 
 	// Extract utilization from engines
-	if engines, ok := intelData["engines"].(map[string]interface{}); ok {
+	if engines, ok := intelData["engines"].(map[string]any); ok {
 		// Sum up all engine utilizations for overall GPU usage
 		totalUtil := 0.0
 		engineCount := 0
 		for engineName, engineData := range engines {
-			if engineMap, ok := engineData.(map[string]interface{}); ok {
+			if engineMap, ok := engineData.(map[string]any); ok {
 				if busy, ok := engineMap["busy"].(float64); ok {
 					totalUtil += busy
 					engineCount++
@@ -285,7 +285,7 @@ func (c *GPUCollector) collectSingleIntelGPU(pciID, model string, index int) *dt
 	}
 
 	// Extract power consumption (GPU power, not package power)
-	if power, ok := intelData["power"].(map[string]interface{}); ok {
+	if power, ok := intelData["power"].(map[string]any); ok {
 		if gpuPower, ok := power["GPU"].(float64); ok {
 			gpu.PowerDraw = gpuPower
 			logger.Debug("Intel GPU power: %.3f W", gpuPower)
@@ -294,7 +294,7 @@ func (c *GPUCollector) collectSingleIntelGPU(pciID, model string, index int) *dt
 
 	// Extract memory info (Note: Intel iGPU shares system RAM, intel_gpu_top doesn't report memory usage)
 	// The "memory" field is not present in intel_gpu_top JSON output for integrated GPUs
-	if memory, ok := intelData["memory"].(map[string]interface{}); ok {
+	if memory, ok := intelData["memory"].(map[string]any); ok {
 		if total, ok := memory["total"].(float64); ok {
 			gpu.MemoryTotal = uint64(total)
 		}
@@ -368,8 +368,8 @@ func (c *GPUCollector) getIntelDriverVersion() (string, error) {
 	}
 
 	// Parse vermagic line: "vermagic:       6.12.24-Unraid SMP preempt mod_unload"
-	lines := strings.Split(output, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(output, "\n")
+	for line := range lines {
 		if strings.HasPrefix(line, "vermagic:") {
 			// Extract kernel version from vermagic
 			parts := strings.Fields(line)
@@ -516,7 +516,7 @@ func (c *GPUCollector) collectAMDGPUWithRadeontop() ([]*dto.GPUMetrics, error) {
 	}
 	amdGPUs := make([]amdGPUInfo, 0)
 
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		if (strings.Contains(line, "VGA") || strings.Contains(line, "Display")) &&
 			(strings.Contains(line, "AMD") || strings.Contains(line, "Advanced Micro Devices") || strings.Contains(line, "ATI")) {
 
@@ -684,7 +684,7 @@ func (c *GPUCollector) getAMDDriverVersion() (string, error) {
 	}
 
 	// Parse modinfo output for version
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		if strings.HasPrefix(line, "version:") {
 			parts := strings.SplitN(line, ":", 2)
 			if len(parts) == 2 {
@@ -704,7 +704,7 @@ func (c *GPUCollector) collectAMDGPUWithROCm() ([]*dto.GPUMetrics, error) {
 		return nil, fmt.Errorf("rocm-smi query failed: %w", err)
 	}
 
-	var rocmData map[string]interface{}
+	var rocmData map[string]any
 	if err := json.Unmarshal([]byte(output), &rocmData); err != nil {
 		return nil, fmt.Errorf("failed to parse rocm-smi JSON: %w", err)
 	}
@@ -718,7 +718,7 @@ func (c *GPUCollector) collectAMDGPUWithROCm() ([]*dto.GPUMetrics, error) {
 			continue
 		}
 
-		gpuData, ok := gpuDataInterface.(map[string]interface{})
+		gpuData, ok := gpuDataInterface.(map[string]any)
 		if !ok {
 			continue
 		}

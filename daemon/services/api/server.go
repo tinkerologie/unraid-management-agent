@@ -14,7 +14,9 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/alerting"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/collectors"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/watchdog"
 )
 
 // CollectorManagerInterface defines the methods required from CollectorManager
@@ -31,7 +33,7 @@ type MQTTClientInterface interface {
 	IsConnected() bool
 	GetStatus() *dto.MQTTStatus
 	TestConnection() error
-	PublishCustom(topic string, payload interface{}, retain bool) error
+	PublishCustom(topic string, payload any, retain bool) error
 }
 
 // Server represents the HTTP API server that handles REST endpoints and WebSocket connections.
@@ -45,6 +47,10 @@ type Server struct {
 	cancelFunc       context.CancelFunc
 	collectorManager CollectorManagerInterface
 	mqttClient       MQTTClientInterface
+	alertEngine      *alerting.Engine
+	alertStore       *alerting.Store
+	watchdogRunner   *watchdog.Runner
+	watchdogStore    *watchdog.Store
 
 	// Cache for latest data from collectors
 	cacheMutex         sync.RWMutex
@@ -119,7 +125,13 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/disks/{id}", s.handleDisk).Methods("GET")
 	api.HandleFunc("/shares", s.handleShares).Methods("GET")
 	api.HandleFunc("/docker", s.handleDockerList).Methods("GET")
+	api.HandleFunc("/docker/updates", s.handleDockerCheckUpdates).Methods("GET")
+	api.HandleFunc("/docker/update-all", s.handleDockerUpdateAll).Methods("POST")
 	api.HandleFunc("/docker/{id}", s.handleDockerInfo).Methods("GET")
+	api.HandleFunc("/docker/{id}/check-update", s.handleDockerCheckUpdate).Methods("GET")
+	api.HandleFunc("/docker/{id}/size", s.handleDockerSize).Methods("GET")
+	api.HandleFunc("/docker/{id}/logs", s.handleDockerLogs).Methods("GET")
+	api.HandleFunc("/docker/{id}/update", s.handleDockerUpdate).Methods("POST")
 	api.HandleFunc("/vm", s.handleVMList).Methods("GET")
 	api.HandleFunc("/vm/{id}", s.handleVMInfo).Methods("GET")
 	api.HandleFunc("/ups", s.handleUPS).Methods("GET")
@@ -163,6 +175,11 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/vm/{name}/resume", s.handleVMResume).Methods("POST")
 	api.HandleFunc("/vm/{name}/hibernate", s.handleVMHibernate).Methods("POST")
 	api.HandleFunc("/vm/{name}/force-stop", s.handleVMForceStop).Methods("POST")
+	api.HandleFunc("/vm/{name}/clone", s.handleVMClone).Methods("POST")
+	api.HandleFunc("/vm/{name}/snapshot", s.handleVMCreateSnapshot).Methods("POST")
+	api.HandleFunc("/vm/{name}/snapshots", s.handleVMListSnapshots).Methods("GET")
+	api.HandleFunc("/vm/{name}/snapshots/{snapshot_name}", s.handleVMDeleteSnapshot).Methods("DELETE")
+	api.HandleFunc("/vm/{name}/snapshots/{snapshot_name}/restore", s.handleVMRestoreSnapshot).Methods("POST")
 
 	// Array control endpoints
 	api.HandleFunc("/array/start", s.handleArrayStart).Methods("POST")
@@ -188,6 +205,9 @@ func (s *Server) setupRoutes() {
 
 	// Plugin endpoints (Issue #52)
 	api.HandleFunc("/plugins", s.handlePluginList).Methods("GET")
+	api.HandleFunc("/plugins/check-updates", s.handlePluginCheckUpdates).Methods("GET")
+	api.HandleFunc("/plugins/update-all", s.handlePluginUpdateAll).Methods("POST")
+	api.HandleFunc("/plugins/{name}/update", s.handlePluginUpdate).Methods("POST")
 
 	// Update status endpoint (Issue #50)
 	api.HandleFunc("/updates", s.handleUpdateStatus).Methods("GET")
@@ -237,6 +257,33 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/mqtt/status", s.handleMQTTStatus).Methods("GET")
 	api.HandleFunc("/mqtt/test", s.handleMQTTTest).Methods("POST")
 	api.HandleFunc("/mqtt/publish", s.handleMQTTPublish).Methods("POST")
+
+	// Service management endpoints
+	api.HandleFunc("/services", s.handleServiceList).Methods("GET")
+	api.HandleFunc("/services/{name}/{action}", s.handleServiceAction).Methods("POST")
+
+	// Process listing endpoint
+	api.HandleFunc("/processes", s.handleProcessList).Methods("GET")
+
+	// Health check / Watchdog endpoints
+	api.HandleFunc("/healthchecks", s.handleListHealthChecks).Methods("GET")
+	api.HandleFunc("/healthchecks", s.handleCreateHealthCheck).Methods("POST")
+	api.HandleFunc("/healthchecks/status", s.handleHealthCheckStatus).Methods("GET")
+	api.HandleFunc("/healthchecks/history", s.handleHealthCheckHistory).Methods("GET")
+	api.HandleFunc("/healthchecks/{id}", s.handleGetHealthCheck).Methods("GET")
+	api.HandleFunc("/healthchecks/{id}", s.handleUpdateHealthCheck).Methods("PUT")
+	api.HandleFunc("/healthchecks/{id}", s.handleDeleteHealthCheck).Methods("DELETE")
+	api.HandleFunc("/healthchecks/{id}/run", s.handleRunHealthCheck).Methods("POST")
+
+	// Alerting endpoints
+	api.HandleFunc("/alerts/rules", s.handleListAlertRules).Methods("GET")
+	api.HandleFunc("/alerts/rules", s.handleCreateAlertRule).Methods("POST")
+	api.HandleFunc("/alerts/rules/{id}", s.handleGetAlertRule).Methods("GET")
+	api.HandleFunc("/alerts/rules/{id}", s.handleUpdateAlertRule).Methods("PUT")
+	api.HandleFunc("/alerts/rules/{id}", s.handleDeleteAlertRule).Methods("DELETE")
+	api.HandleFunc("/alerts/status", s.handleAlertStatus).Methods("GET")
+	api.HandleFunc("/alerts/history", s.handleAlertHistory).Methods("GET")
+	api.HandleFunc("/alerts/firing", s.handleFiringAlerts).Methods("GET")
 
 	// WebSocket endpoint
 	api.HandleFunc("/ws", s.handleWebSocket)
@@ -738,8 +785,8 @@ func (s *Server) GetNetworkAccessURLs() *dto.NetworkAccessURLs {
 }
 
 // GetHealthStatus returns a map with system health metrics.
-func (s *Server) GetHealthStatus() map[string]interface{} {
-	health := make(map[string]interface{})
+func (s *Server) GetHealthStatus() map[string]any {
+	health := make(map[string]any)
 
 	// System health
 	if sysInfo := s.GetSystemCache(); sysInfo != nil {
@@ -798,4 +845,16 @@ func (s *Server) GetHealthStatus() map[string]interface{} {
 // SetMQTTClient sets the MQTT client for API integration.
 func (s *Server) SetMQTTClient(client MQTTClientInterface) {
 	s.mqttClient = client
+}
+
+// SetAlertEngine sets the alerting engine and store for alert API endpoints.
+func (s *Server) SetAlertEngine(engine *alerting.Engine, store *alerting.Store) {
+	s.alertEngine = engine
+	s.alertStore = store
+}
+
+// SetWatchdog sets the watchdog runner and store for health check API endpoints.
+func (s *Server) SetWatchdog(runner *watchdog.Runner, store *watchdog.Store) {
+	s.watchdogRunner = runner
+	s.watchdogStore = store
 }

@@ -144,8 +144,8 @@ func (c *UnassignedCollector) getArrayDisks() map[string]bool {
 	}
 
 	// Parse the INI file to extract device names
-	lines := strings.Split(string(data), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(string(data), "\n")
+	for line := range lines {
 		line = strings.TrimSpace(line)
 		if device, found := strings.CutPrefix(line, "device="); found {
 			device = strings.Trim(device, "\"")
@@ -320,8 +320,8 @@ func (c *UnassignedCollector) parseISOMounts() []dto.UnassignedRemoteShare {
 	}
 
 	var isoShares []dto.UnassignedRemoteShare
-	lines := strings.Split(string(mounts), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(string(mounts), "\n")
+	for line := range lines {
 		fields := strings.Fields(line)
 		if len(fields) < 3 {
 			continue

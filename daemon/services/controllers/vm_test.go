@@ -46,6 +46,26 @@ func TestVMControllerInterface(t *testing.T) {
 	t.Run("has ForceStop method", func(t *testing.T) {
 		_ = vc.ForceStop
 	})
+
+	t.Run("has CreateSnapshot method", func(t *testing.T) {
+		_ = vc.CreateSnapshot
+	})
+
+	t.Run("has ListSnapshots method", func(t *testing.T) {
+		_ = vc.ListSnapshots
+	})
+
+	t.Run("has DeleteSnapshot method", func(t *testing.T) {
+		_ = vc.DeleteSnapshot
+	})
+
+	t.Run("has RestoreSnapshot method", func(t *testing.T) {
+		_ = vc.RestoreSnapshot
+	})
+
+	t.Run("has CloneVM method", func(t *testing.T) {
+		_ = vc.CloneVM
+	})
 }
 
 func TestVMControllerWithInvalidVM(t *testing.T) {

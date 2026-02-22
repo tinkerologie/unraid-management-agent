@@ -3,10 +3,13 @@ package controllers
 import (
 	"fmt"
 	"net/url"
+	"strings"
+	"time"
 
 	"github.com/digitalocean/go-libvirt"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
@@ -195,5 +198,171 @@ func (vc *VMController) ForceStop(vmName string) error {
 	}
 
 	logger.Info("Successfully force stopped VM: %s", vmName)
+	return nil
+}
+
+// CreateSnapshot creates a snapshot of a virtual machine using the libvirt API.
+func (vc *VMController) CreateSnapshot(vmName, snapshotName, description string) error {
+	logger.Info("Creating snapshot '%s' for VM: %s", snapshotName, vmName)
+
+	l, domain, err := vc.connect(vmName)
+	if err != nil {
+		return err
+	}
+	defer l.Disconnect() //nolint:errcheck
+
+	// Build snapshot XML
+	descXML := ""
+	if description != "" {
+		descXML = fmt.Sprintf("<description>%s</description>", description)
+	}
+
+	xmlDesc := fmt.Sprintf(`<domainsnapshot><name>%s</name>%s</domainsnapshot>`, snapshotName, descXML)
+
+	// Create the snapshot (flags=0 for default behavior)
+	_, err = l.DomainSnapshotCreateXML(domain, xmlDesc, 0)
+	if err != nil {
+		return fmt.Errorf("failed to create snapshot '%s' for VM %s: %w", snapshotName, vmName, err)
+	}
+
+	logger.Info("Successfully created snapshot '%s' for VM: %s", snapshotName, vmName)
+	return nil
+}
+
+// ListSnapshots lists all snapshots for a virtual machine.
+func (vc *VMController) ListSnapshots(vmName string) (*dto.VMSnapshotList, error) {
+	logger.Debug("Listing snapshots for VM: %s", vmName)
+
+	// Use virsh snapshot-list to get snapshot details
+	lines, err := lib.ExecCommand(constants.VirshBin, "snapshot-list", vmName, "--name")
+	if err != nil {
+		return nil, fmt.Errorf("failed to list snapshots for VM %s: %w", vmName, err)
+	}
+
+	result := &dto.VMSnapshotList{
+		VMName:    vmName,
+		Snapshots: make([]dto.VMSnapshot, 0),
+		Timestamp: time.Now(),
+	}
+
+	// Get current snapshot name
+	currentLines, _ := lib.ExecCommand(constants.VirshBin, "snapshot-current", vmName, "--name")
+	currentSnapshot := ""
+	if len(currentLines) > 0 {
+		currentSnapshot = strings.TrimSpace(currentLines[0])
+	}
+
+	for _, line := range lines {
+		name := strings.TrimSpace(line)
+		if name == "" {
+			continue
+		}
+
+		snapshot := dto.VMSnapshot{
+			Name:      name,
+			VMName:    vmName,
+			IsCurrent: name == currentSnapshot,
+		}
+
+		// Get snapshot details via virsh snapshot-info
+		infoLines, err := lib.ExecCommand(constants.VirshBin, "snapshot-info", vmName, name)
+		if err == nil {
+			for _, infoLine := range infoLines {
+				parts := strings.SplitN(infoLine, ":", 2)
+				if len(parts) != 2 {
+					continue
+				}
+				key := strings.TrimSpace(parts[0])
+				value := strings.TrimSpace(parts[1])
+
+				switch key {
+				case "Description":
+					snapshot.Description = value
+				case "State":
+					snapshot.State = value
+				case "Creation Time":
+					snapshot.CreatedAt = value
+				case "Parent":
+					snapshot.Parent = value
+				}
+			}
+		}
+
+		result.Snapshots = append(result.Snapshots, snapshot)
+	}
+
+	result.Count = len(result.Snapshots)
+	logger.Debug("Found %d snapshots for VM: %s", result.Count, vmName)
+	return result, nil
+}
+
+// DeleteSnapshot deletes a snapshot of a virtual machine.
+func (vc *VMController) DeleteSnapshot(vmName, snapshotName string) error {
+	logger.Info("Deleting snapshot '%s' for VM: %s", snapshotName, vmName)
+
+	l, domain, err := vc.connect(vmName)
+	if err != nil {
+		return err
+	}
+	defer l.Disconnect() //nolint:errcheck
+
+	// Look up the snapshot
+	snapshot, err := l.DomainSnapshotLookupByName(domain, snapshotName, 0)
+	if err != nil {
+		return fmt.Errorf("snapshot '%s' not found for VM %s: %w", snapshotName, vmName, err)
+	}
+
+	// Delete the snapshot (flags=0 for default behavior)
+	if err := l.DomainSnapshotDelete(snapshot, 0); err != nil {
+		return fmt.Errorf("failed to delete snapshot '%s' for VM %s: %w", snapshotName, vmName, err)
+	}
+
+	logger.Info("Successfully deleted snapshot '%s' for VM: %s", snapshotName, vmName)
+	return nil
+}
+
+// RestoreSnapshot restores a virtual machine to a previously created snapshot.
+// WARNING: This is a destructive operation — the VM's current state is lost and replaced with the snapshot state.
+func (vc *VMController) RestoreSnapshot(vmName, snapshotName string) error {
+	logger.Info("Restoring snapshot '%s' for VM: %s", snapshotName, vmName)
+
+	l, domain, err := vc.connect(vmName)
+	if err != nil {
+		return err
+	}
+	defer l.Disconnect() //nolint:errcheck
+
+	// Look up the snapshot
+	snapshot, err := l.DomainSnapshotLookupByName(domain, snapshotName, 0)
+	if err != nil {
+		return fmt.Errorf("snapshot '%s' not found for VM %s: %w", snapshotName, vmName, err)
+	}
+
+	// Revert to snapshot (flags=0 for default behavior)
+	if err := l.DomainRevertToSnapshot(snapshot, 0); err != nil {
+		return fmt.Errorf("failed to restore snapshot '%s' for VM %s: %w", snapshotName, vmName, err)
+	}
+
+	logger.Info("Successfully restored snapshot '%s' for VM: %s", snapshotName, vmName)
+	return nil
+}
+
+// CloneVM clones a virtual machine using virt-clone.
+// The source VM must be shut off before cloning.
+func (vc *VMController) CloneVM(vmName, cloneName string) error {
+	logger.Info("Cloning VM '%s' as '%s'", vmName, cloneName)
+
+	// virt-clone handles copying disk images and generating new UUIDs/MACs
+	output, err := lib.ExecCommandOutput(
+		constants.VirtCloneBin,
+		"--original", vmName,
+		"--name", cloneName,
+		"--auto-clone",
+	)
+	if err != nil {
+		return fmt.Errorf("failed to clone VM '%s' as '%s': %w (output: %s)", vmName, cloneName, err, output)
+	}
+
+	logger.Info("Successfully cloned VM '%s' as '%s'", vmName, cloneName)
 	return nil
 }

@@ -22,10 +22,10 @@ func TestNewSystemController(t *testing.T) {
 
 func TestSystemControllerInterface(t *testing.T) {
 	ctx := &domain.Context{}
-	controller := NewSystemController(ctx)
+	_ = NewSystemController(ctx)
 
 	// Verify the controller has the expected methods
-	controllerType := reflect.TypeOf(controller)
+	controllerType := reflect.TypeFor[*SystemController]()
 
 	methods := []string{"Reboot", "Shutdown"}
 

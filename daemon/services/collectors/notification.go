@@ -14,7 +14,8 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
-const (
+// Package-level variables for notification directories (overridable in tests)
+var (
 	notificationsDir        = "/usr/local/emhttp/state/notifications"
 	notificationsArchiveDir = "/usr/local/emhttp/state/notifications/archive"
 )
@@ -153,8 +154,8 @@ func (c *NotificationCollector) parseNotificationFile(path string, notifType str
 		Type: notifType,
 	}
 
-	lines := strings.Split(string(content), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(string(content), "\n")
+	for line := range lines {
 		parts := strings.SplitN(line, "=", 2)
 		if len(parts) != 2 {
 			continue

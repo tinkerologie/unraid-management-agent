@@ -238,7 +238,7 @@ func TestMQTTMessage(t *testing.T) {
 func TestMQTTPublishRequest(t *testing.T) {
 	req := MQTTPublishRequest{
 		Topic:    "custom/topic",
-		Payload:  map[string]interface{}{"key": "value", "num": 42},
+		Payload:  map[string]any{"key": "value", "num": 42},
 		Retained: true,
 	}
 

@@ -12,6 +12,84 @@ definitions:
         description: '"lan", "wan", "wireguard", "mdns", "ipv6", "other"'
         type: string
     type: object
+  dto.AlertEvent:
+    properties:
+      fired_at:
+        type: string
+      message:
+        type: string
+      resolved_at:
+        type: string
+      rule_id:
+        type: string
+      rule_name:
+        type: string
+      severity:
+        type: string
+      state:
+        description: '"firing" or "resolved"'
+        type: string
+    type: object
+  dto.AlertHistoryResponse:
+    properties:
+      events:
+        items:
+          $ref: '#/definitions/dto.AlertEvent'
+        type: array
+      total:
+        type: integer
+    type: object
+  dto.AlertRule:
+    properties:
+      channels:
+        description: shoutrrr URLs or "unraid" for local notification
+        items:
+          type: string
+        type: array
+      cooldown_minutes:
+        description: Minutes between re-fires (default 5)
+        type: integer
+      duration_seconds:
+        description: Must be true for this many seconds before firing (0 = immediate)
+        type: integer
+      enabled:
+        type: boolean
+      expression:
+        description: expr-lang expression, e.g. "CPU > 90 && ArrayState == 'Started'"
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      severity:
+        description: '"info", "warning", "critical"'
+        type: string
+    type: object
+  dto.AlertStatus:
+    properties:
+      eval_count:
+        type: integer
+      message:
+        type: string
+      rule_id:
+        type: string
+      rule_name:
+        type: string
+      severity:
+        type: string
+      since:
+        type: string
+      state:
+        description: '"ok", "pending", "firing"'
+        type: string
+    type: object
+  dto.AlertsStatusResponse:
+    properties:
+      statuses:
+        items:
+          $ref: '#/definitions/dto.AlertStatus'
+        type: array
+    type: object
   dto.ArrayStatus:
     properties:
       free_bytes:
@@ -240,6 +318,24 @@ definitions:
       total:
         type: integer
     type: object
+  dto.ContainerBulkUpdateResult:
+    properties:
+      failed:
+        example: 1
+        type: integer
+      results:
+        items:
+          $ref: '#/definitions/dto.ContainerUpdateResult'
+        type: array
+      skipped:
+        example: 1
+        type: integer
+      succeeded:
+        example: 8
+        type: integer
+      timestamp:
+        type: string
+    type: object
   dto.ContainerInfo:
     properties:
       cpu_percent:
@@ -304,6 +400,111 @@ definitions:
         items:
           $ref: '#/definitions/dto.VolumeMapping'
         type: array
+    type: object
+  dto.ContainerLogs:
+    properties:
+      container_id:
+        example: abc123def456
+        type: string
+      container_name:
+        example: plex
+        type: string
+      line_count:
+        example: 100
+        type: integer
+      logs:
+        type: string
+      since:
+        example: "2026-02-17T00:00:00Z"
+        type: string
+      timestamp:
+        type: string
+    type: object
+  dto.ContainerSizeInfo:
+    properties:
+      container_id:
+        example: abc123def456
+        type: string
+      container_name:
+        example: plex
+        type: string
+      image_size_bytes:
+        example: 536870912
+        type: integer
+      size_display:
+        example: 1.0 GiB
+        type: string
+      size_root_fs_bytes:
+        example: 1073741824
+        type: integer
+      size_rw_bytes:
+        example: 104857600
+        type: integer
+      timestamp:
+        type: string
+    type: object
+  dto.ContainerUpdateInfo:
+    properties:
+      container_id:
+        example: abc123def456
+        type: string
+      container_name:
+        example: plex
+        type: string
+      current_digest:
+        type: string
+      image:
+        example: plexinc/pms-docker:latest
+        type: string
+      latest_digest:
+        type: string
+      timestamp:
+        type: string
+      update_available:
+        example: true
+        type: boolean
+    type: object
+  dto.ContainerUpdateResult:
+    properties:
+      container_id:
+        example: abc123def456
+        type: string
+      container_name:
+        example: plex
+        type: string
+      image:
+        example: plexinc/pms-docker:latest
+        type: string
+      message:
+        example: Container updated successfully
+        type: string
+      new_digest:
+        type: string
+      previous_digest:
+        type: string
+      recreated:
+        example: true
+        type: boolean
+      timestamp:
+        type: string
+      updated:
+        example: true
+        type: boolean
+    type: object
+  dto.ContainerUpdatesResult:
+    properties:
+      containers:
+        items:
+          $ref: '#/definitions/dto.ContainerUpdateInfo'
+        type: array
+      timestamp:
+        type: string
+      total_count:
+        example: 10
+        type: integer
+      updates_available:
+        example: 2
+        type: integer
     type: object
   dto.DiskInfo:
     properties:
@@ -633,6 +834,122 @@ definitions:
         type: array
       timestamp:
         type: string
+    type: object
+  dto.HealthCheck:
+    properties:
+      enabled:
+        description: Enabled determines whether this health check is active.
+        type: boolean
+      id:
+        description: ID is the unique identifier for this health check.
+        type: string
+      interval_seconds:
+        description: IntervalSeconds is how often the check runs (minimum 10, default
+          30).
+        type: integer
+      name:
+        description: Name is a human-readable name for this health check.
+        type: string
+      on_fail:
+        description: 'OnFail is the remediation action: "notify", "restart_container:<name>",
+          or "webhook:<url>".'
+        type: string
+      success_code:
+        description: SuccessCode is the expected HTTP status code (HTTP probes only,
+          default 200).
+        type: integer
+      target:
+        description: 'Target is the probe target: URL for HTTP, host:port for TCP,
+          container ID/name for container.'
+        type: string
+      timeout_seconds:
+        description: TimeoutSeconds is the probe timeout (minimum 1, default 5).
+        type: integer
+      type:
+        allOf:
+        - $ref: '#/definitions/dto.HealthCheckType'
+        description: 'Type is the probe type: "http", "tcp", or "container".'
+    type: object
+  dto.HealthCheckEvent:
+    properties:
+      check_id:
+        description: CheckID is the health check identifier.
+        type: string
+      check_name:
+        description: CheckName is the human-readable check name.
+        type: string
+      message:
+        description: Message describes the event.
+        type: string
+      remediation_taken:
+        description: RemediationTaken is the action that was executed, if any.
+        type: string
+      state:
+        description: State is "healthy" or "unhealthy".
+        type: string
+      timestamp:
+        description: Timestamp is when the event occurred.
+        type: string
+    type: object
+  dto.HealthCheckHistoryResponse:
+    properties:
+      events:
+        items:
+          $ref: '#/definitions/dto.HealthCheckEvent'
+        type: array
+    type: object
+  dto.HealthCheckStatus:
+    properties:
+      check_id:
+        description: CheckID is the health check identifier.
+        type: string
+      check_name:
+        description: CheckName is the human-readable check name.
+        type: string
+      check_type:
+        allOf:
+        - $ref: '#/definitions/dto.HealthCheckType'
+        description: CheckType is the probe type.
+      consecutive_fails:
+        description: ConsecutiveFails is the number of consecutive probe failures.
+        type: integer
+      healthy:
+        description: Healthy is true when the last probe succeeded.
+        type: boolean
+      last_check:
+        description: LastCheck is the timestamp of the last probe execution.
+        type: string
+      last_error:
+        description: LastError is the error message from the last failed probe, empty
+          if healthy.
+        type: string
+      last_remediation:
+        description: LastRemediation is the timestamp of the last remediation action
+          taken.
+        type: string
+      remediation_action:
+        description: RemediationAction is the configured on_fail action.
+        type: string
+      target:
+        description: Target is the probe target.
+        type: string
+    type: object
+  dto.HealthCheckType:
+    enum:
+    - http
+    - tcp
+    - container
+    type: string
+    x-enum-varnames:
+    - HealthCheckHTTP
+    - HealthCheckTCP
+    - HealthCheckContainer
+  dto.HealthChecksStatusResponse:
+    properties:
+      checks:
+        items:
+          $ref: '#/definitions/dto.HealthCheckStatus'
+        type: array
     type: object
   dto.LogFileContent:
     properties:
@@ -1372,6 +1689,21 @@ definitions:
       timestamp:
         type: string
     type: object
+  dto.PluginBulkUpdateResult:
+    properties:
+      failed:
+        example: 0
+        type: integer
+      results:
+        items:
+          $ref: '#/definitions/dto.PluginUpdateResult'
+        type: array
+      succeeded:
+        example: 3
+        type: integer
+      timestamp:
+        type: string
+    type: object
   dto.PluginInfo:
     description: Information about an installed Unraid plugin
     properties:
@@ -1427,6 +1759,26 @@ definitions:
         example: 2
         type: integer
     type: object
+  dto.PluginUpdateResult:
+    properties:
+      message:
+        example: Updated successfully
+        type: string
+      new_version:
+        example: 2025.10.28
+        type: string
+      plugin_name:
+        example: community.applications
+        type: string
+      previous_version:
+        example: 2025.10.27
+        type: string
+      success:
+        example: true
+        type: boolean
+      timestamp:
+        type: string
+    type: object
   dto.PortMapping:
     properties:
       private_port:
@@ -1438,6 +1790,54 @@ definitions:
       type:
         example: tcp
         type: string
+    type: object
+  dto.ProcessInfo:
+    properties:
+      command:
+        example: /usr/bin/docker
+        type: string
+      cpu_percent:
+        example: 5.2
+        type: number
+      memory_percent:
+        example: 2.1
+        type: number
+      pid:
+        example: 1234
+        type: integer
+      rss_bytes:
+        example: 536870912
+        type: integer
+      started:
+        example: Jan01
+        type: string
+      state:
+        example: S
+        type: string
+      time:
+        example: "0:05"
+        type: string
+      tty:
+        example: '?'
+        type: string
+      user:
+        example: root
+        type: string
+      vsz_bytes:
+        example: 1073741824
+        type: integer
+    type: object
+  dto.ProcessList:
+    properties:
+      processes:
+        items:
+          $ref: '#/definitions/dto.ProcessInfo'
+        type: array
+      timestamp:
+        type: string
+      total_count:
+        example: 150
+        type: integer
     type: object
   dto.Registration:
     properties:
@@ -2041,6 +2441,45 @@ definitions:
           type: string
         type: array
     type: object
+  dto.VMSnapshot:
+    properties:
+      created_at:
+        example: "2025-02-16T10:30:00Z"
+        type: string
+      description:
+        example: Snapshot before Windows update
+        type: string
+      is_current:
+        example: true
+        type: boolean
+      name:
+        example: pre-update
+        type: string
+      parent:
+        example: base
+        type: string
+      state:
+        example: shutoff
+        type: string
+      vm_name:
+        example: Windows 11
+        type: string
+    type: object
+  dto.VMSnapshotList:
+    properties:
+      count:
+        example: 3
+        type: integer
+      snapshots:
+        items:
+          $ref: '#/definitions/dto.VMSnapshot'
+        type: array
+      timestamp:
+        type: string
+      vm_name:
+        example: Windows 11
+        type: string
+    type: object
   dto.VolumeMapping:
     properties:
       container_path:
@@ -2357,6 +2796,182 @@ info:
   title: Unraid Management Agent API
   version: 2025.12.1
 paths:
+  /alerts/firing:
+    get:
+      description: Get only alert rules currently in the firing state
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Firing alerts
+          schema:
+            items:
+              $ref: '#/definitions/dto.AlertStatus'
+            type: array
+      summary: Get firing alerts
+      tags:
+      - Alerts
+  /alerts/history:
+    get:
+      description: Get recent alert events (last 100)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Alert event history
+          schema:
+            $ref: '#/definitions/dto.AlertHistoryResponse'
+      summary: Get alert history
+      tags:
+      - Alerts
+  /alerts/rules:
+    get:
+      description: Retrieve all configured alert rules
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of alert rules
+          schema:
+            items:
+              $ref: '#/definitions/dto.AlertRule'
+            type: array
+      summary: List all alert rules
+      tags:
+      - Alerts
+    post:
+      consumes:
+      - application/json
+      description: Create a new alert rule with an expr-lang expression
+      parameters:
+      - description: Alert rule to create
+        in: body
+        name: rule
+        required: true
+        schema:
+          $ref: '#/definitions/dto.AlertRule'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Rule created successfully
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Create a new alert rule
+      tags:
+      - Alerts
+  /alerts/rules/{id}:
+    delete:
+      description: Delete an alert rule by ID
+      parameters:
+      - description: Alert rule ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Rule deleted successfully
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Rule not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Delete an alert rule
+      tags:
+      - Alerts
+    get:
+      description: Retrieve a single alert rule by ID
+      parameters:
+      - description: Alert rule ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Alert rule
+          schema:
+            $ref: '#/definitions/dto.AlertRule'
+        "404":
+          description: Rule not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get a specific alert rule
+      tags:
+      - Alerts
+    put:
+      consumes:
+      - application/json
+      description: Update an alert rule by ID
+      parameters:
+      - description: Alert rule ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated alert rule
+        in: body
+        name: rule
+        required: true
+        schema:
+          $ref: '#/definitions/dto.AlertRule'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Rule updated successfully
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Rule not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Update an existing alert rule
+      tags:
+      - Alerts
+  /alerts/status:
+    get:
+      description: Get the current evaluation status of all enabled alert rules
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Alert statuses
+          schema:
+            $ref: '#/definitions/dto.AlertsStatusResponse'
+      summary: Get alert status
+      tags:
+      - Alerts
   /array:
     get:
       description: Retrieve Unraid array status including parity information
@@ -2731,6 +3346,74 @@ paths:
       summary: Get specific Docker container
       tags:
       - Docker
+  /docker/{id}/check-update:
+    get:
+      description: Pull latest image and check if a specific container has an update
+        available
+      parameters:
+      - description: Container ID or name
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Container update status
+          schema:
+            $ref: '#/definitions/dto.ContainerUpdateInfo'
+        "400":
+          description: Invalid container reference
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to check update
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Check a specific container for updates
+      tags:
+      - Docker
+  /docker/{id}/logs:
+    get:
+      description: Retrieve stdout/stderr logs from a specific Docker container (equivalent
+        to docker logs)
+      parameters:
+      - description: Container ID or name
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 'Number of recent lines (default: 100, max: 5000)'
+        in: query
+        name: tail
+        type: integer
+      - description: Only logs since this timestamp (RFC3339)
+        in: query
+        name: since
+        type: string
+      - description: Include timestamps in output
+        in: query
+        name: timestamps
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Container logs
+          schema:
+            $ref: '#/definitions/dto.ContainerLogs'
+        "400":
+          description: Invalid container reference
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to get logs
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get Docker container logs
+      tags:
+      - Docker
   /docker/{id}/pause:
     post:
       description: Pause a specific Docker container by ID or name
@@ -2783,6 +3466,33 @@ paths:
           schema:
             $ref: '#/definitions/dto.Response'
       summary: Restart Docker container
+      tags:
+      - Docker
+  /docker/{id}/size:
+    get:
+      description: Get size information for a specific Docker container
+      parameters:
+      - description: Container ID or name
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Container size information
+          schema:
+            $ref: '#/definitions/dto.ContainerSizeInfo'
+        "400":
+          description: Invalid container reference
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to get container size
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get container size
       tags:
       - Docker
   /docker/{id}/start:
@@ -2864,6 +3574,68 @@ paths:
           schema:
             $ref: '#/definitions/dto.Response'
       summary: Unpause Docker container
+      tags:
+      - Docker
+  /docker/{id}/update:
+    post:
+      description: Pull latest image and recreate the container with the updated image
+      parameters:
+      - description: Container ID or name
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Container update result
+          schema:
+            $ref: '#/definitions/dto.ContainerUpdateResult'
+        "400":
+          description: Invalid container reference
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to update container
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Update a specific container
+      tags:
+      - Docker
+  /docker/update-all:
+    post:
+      description: Check all containers for updates and update those that have updates
+        available
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Bulk update results
+          schema:
+            $ref: '#/definitions/dto.ContainerBulkUpdateResult'
+        "500":
+          description: Failed to update containers
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Update all containers
+      tags:
+      - Docker
+  /docker/updates:
+    get:
+      description: Pull latest images and check if any containers have updates available
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Container update status
+          schema:
+            $ref: '#/definitions/dto.ContainerUpdatesResult'
+        "500":
+          description: Failed to check updates
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Check all containers for updates
       tags:
       - Docker
   /gpu:
@@ -3028,6 +3800,174 @@ paths:
       summary: Health check
       tags:
       - System
+  /healthchecks:
+    get:
+      description: Get all configured health checks
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of health checks
+          schema:
+            items:
+              $ref: '#/definitions/dto.HealthCheck'
+            type: array
+      summary: List health checks
+      tags:
+      - HealthChecks
+    post:
+      consumes:
+      - application/json
+      description: Create a new health check probe
+      parameters:
+      - description: Health check configuration
+        in: body
+        name: check
+        required: true
+        schema:
+          $ref: '#/definitions/dto.HealthCheck'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Create health check
+      tags:
+      - HealthChecks
+  /healthchecks/{id}:
+    delete:
+      description: Delete a health check by ID
+      parameters:
+      - description: Health check ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Deleted
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Delete health check
+      tags:
+      - HealthChecks
+    get:
+      description: Get a specific health check by ID
+      parameters:
+      - description: Health check ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Health check details
+          schema:
+            $ref: '#/definitions/dto.HealthCheck'
+        "404":
+          description: Health check not found
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get health check
+      tags:
+      - HealthChecks
+    put:
+      consumes:
+      - application/json
+      description: Update an existing health check configuration
+      parameters:
+      - description: Health check ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated health check configuration
+        in: body
+        name: check
+        required: true
+        schema:
+          $ref: '#/definitions/dto.HealthCheck'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Updated
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Update health check
+      tags:
+      - HealthChecks
+  /healthchecks/{id}/run:
+    post:
+      description: Manually trigger a specific health check and return the result
+      parameters:
+      - description: Health check ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Check result
+          schema:
+            $ref: '#/definitions/dto.HealthCheckStatus'
+        "404":
+          description: Not found
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Run health check
+      tags:
+      - HealthChecks
+  /healthchecks/history:
+    get:
+      description: Get recent health check state change events
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Health check events
+          schema:
+            $ref: '#/definitions/dto.HealthCheckHistoryResponse'
+      summary: Get health check history
+      tags:
+      - HealthChecks
+  /healthchecks/status:
+    get:
+      description: Get the current status of all health checks
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Health check statuses
+          schema:
+            $ref: '#/definitions/dto.HealthChecksStatusResponse'
+      summary: Get health check statuses
+      tags:
+      - HealthChecks
   /logs:
     get:
       description: List available log files or get log content with optional pagination
@@ -3491,6 +4431,95 @@ paths:
       summary: Get installed plugins list
       tags:
       - Plugins
+  /plugins/{name}/update:
+    post:
+      description: Update a specific plugin by name
+      parameters:
+      - description: Plugin name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Plugin updated
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid plugin name
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to update plugin
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Update a specific plugin
+      tags:
+      - Plugins
+  /plugins/check-updates:
+    get:
+      description: Check all installed plugins for available updates
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Plugins with available updates
+          schema:
+            items:
+              $ref: '#/definitions/dto.PluginInfo'
+            type: array
+        "500":
+          description: Failed to check updates
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Check for plugin updates
+      tags:
+      - Plugins
+  /plugins/update-all:
+    post:
+      description: Update all plugins that have updates available
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Plugin update results
+          schema:
+            $ref: '#/definitions/dto.PluginBulkUpdateResult'
+        "500":
+          description: Failed to update plugins
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Update all plugins
+      tags:
+      - Plugins
+  /processes:
+    get:
+      description: Get all running processes on the Unraid server
+      parameters:
+      - description: 'Sort by: cpu, memory, or pid (default: cpu)'
+        in: query
+        name: sort_by
+        type: string
+      - description: 'Max processes to return (default: 50)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Process list
+          schema:
+            $ref: '#/definitions/dto.ProcessList'
+        "500":
+          description: Failed to list processes
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: List running processes
+      tags:
+      - System
   /registration:
     get:
       description: Retrieve Unraid license/registration information
@@ -3504,6 +4533,53 @@ paths:
       summary: Get registration status
       tags:
       - System
+  /services:
+    get:
+      description: List all managed Unraid system services and their status
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Service list with status
+          schema:
+            additionalProperties: true
+            type: object
+      summary: List available services
+      tags:
+      - Services
+  /services/{name}/{action}:
+    post:
+      description: Start, stop, or restart an Unraid system service
+      parameters:
+      - description: Service name (docker, libvirt, smb, nfs, ftp, sshd, nginx, syslog,
+          ntpd, avahi, wireguard)
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Action (start, stop, restart)
+        in: path
+        name: action
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Service action completed
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid service or action
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to execute action
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Control an Unraid service
+      tags:
+      - Services
   /settings/disk-thresholds:
     get:
       description: Retrieve disk configuration settings including global temperature
@@ -3972,6 +5048,38 @@ paths:
       summary: Get specific VM
       tags:
       - VMs
+  /vm/{name}/clone:
+    post:
+      description: Clone a VM including disk images (source VM must be shut off)
+      parameters:
+      - description: Source VM name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Name for the cloned VM
+        in: query
+        name: clone_name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: VM cloned successfully
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid parameters
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to clone VM
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Clone a virtual machine
+      tags:
+      - VMs
   /vm/{name}/force-stop:
     post:
       description: Force stop a specific virtual machine by name (equivalent to pulling
@@ -4106,6 +5214,134 @@ paths:
           schema:
             $ref: '#/definitions/dto.Response'
       summary: Resume VM
+      tags:
+      - VMs
+  /vm/{name}/snapshot:
+    post:
+      description: Create a snapshot of a virtual machine
+      parameters:
+      - description: VM name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Snapshot name
+        in: query
+        name: snapshot_name
+        required: true
+        type: string
+      - description: Snapshot description
+        in: query
+        name: description
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Snapshot created
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid parameters
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to create snapshot
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Create a VM snapshot
+      tags:
+      - VMs
+  /vm/{name}/snapshots:
+    get:
+      description: List all snapshots for a virtual machine
+      parameters:
+      - description: VM name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Snapshot list
+          schema:
+            $ref: '#/definitions/dto.VMSnapshotList'
+        "400":
+          description: Invalid VM name
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to list snapshots
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: List VM snapshots
+      tags:
+      - VMs
+  /vm/{name}/snapshots/{snapshot_name}:
+    delete:
+      description: Delete a specific snapshot of a virtual machine
+      parameters:
+      - description: VM name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Snapshot name
+        in: path
+        name: snapshot_name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Snapshot deleted
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid parameters
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to delete snapshot
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Delete a VM snapshot
+      tags:
+      - VMs
+  /vm/{name}/snapshots/{snapshot_name}/restore:
+    post:
+      description: 'Restore a virtual machine to a previously created snapshot. WARNING:
+        This reverts the VM to the snapshot state.'
+      parameters:
+      - description: VM name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Snapshot name
+        in: path
+        name: snapshot_name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Snapshot restored
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid parameters
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to restore snapshot
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Restore a VM snapshot
       tags:
       - VMs
   /vm/{name}/start:

@@ -1,6 +1,6 @@
 # Copilot Instructions
 
-Go-based Unraid plugin exposing system monitoring/control via REST API, WebSockets, and MCP. **Language:** Go 1.25, **Target:** Linux/amd64 (Unraid OS). This is a **third-party community plugin** providing a REST/WebSocket interface as an alternative to the official Unraid GraphQL API.
+Go-based Unraid plugin exposing system monitoring/control via REST API, WebSockets, and MCP. **Language:** Go 1.26, **Target:** Linux/amd64 (Unraid OS). This is a **third-party community plugin** providing a REST/WebSocket interface as an alternative to the official Unraid GraphQL API.
 
 **Follow Go best practices**: idiomatic Go style, proper error handling with wrapped errors (`fmt.Errorf("context: %w", err)`), context propagation, and effective use of interfaces. Code must pass `golangci-lint` and `go vet`.
 

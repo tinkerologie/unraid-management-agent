@@ -42,6 +42,32 @@ func (c *DiskCollector) Start(ctx context.Context, interval time.Duration) {
 		c.Collect()
 	}()
 
+	// Set up fsnotify watcher for instant state updates on disks.ini changes
+	watchedFiles := []string{constants.DisksIni}
+	fw, err := NewFileWatcher(500 * time.Millisecond)
+	if err != nil {
+		logger.Warning("Disk collector: failed to create file watcher, using ticker only: %v", err)
+	} else {
+		defer func() { _ = fw.Close() }()
+		for _, f := range watchedFiles {
+			if watchErr := fw.WatchFile(f); watchErr != nil {
+				logger.Warning("Disk collector: failed to watch %s: %v", f, watchErr)
+			}
+		}
+		go fw.Run(ctx, watchedFiles, func() {
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Error("Disk collector PANIC on fsnotify: %v", r)
+					}
+				}()
+				logger.Debug("Disk collector: disks.ini changed, collecting immediately")
+				c.Collect()
+			}()
+		})
+		logger.Info("Disk collector: fsnotify watching %v for instant updates", watchedFiles)
+	}
+
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -277,8 +303,8 @@ func (c *DiskCollector) enrichWithModelAndSerial(disk *dto.DiskInfo) {
 				// Extract serial by removing model prefix from ID
 				// Model in sysfs has spaces, but ID has underscores instead of spaces
 				modelInID := strings.ReplaceAll(model, " ", "_")
-				if strings.HasPrefix(disk.ID, modelInID+"_") {
-					disk.SerialNumber = strings.TrimPrefix(disk.ID, modelInID+"_")
+				if after, ok := strings.CutPrefix(disk.ID, modelInID+"_"); ok {
+					disk.SerialNumber = after
 					logger.Debug("Disk: Extracted model='%s' serial='%s' for device %s from sysfs",
 						disk.Model, disk.SerialNumber, disk.Device)
 					return
@@ -557,9 +583,9 @@ func (c *DiskCollector) enrichWithMountInfo(disk *dto.DiskInfo) {
 	// For cache/flash, it's the actual device (e.g., /dev/nvme0n1p1, /dev/sda1)
 
 	var mountPoint string
-	lines := strings.Split(string(data), "\n")
+	lines := strings.SplitSeq(string(data), "\n")
 
-	for _, line := range lines {
+	for line := range lines {
 		fields := strings.Fields(line)
 		if len(fields) < 2 {
 			continue
@@ -742,8 +768,8 @@ func (c *DiskCollector) getFilesystemType(mountPoint string) string {
 		return "unknown"
 	}
 
-	lines := strings.Split(string(data), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(string(data), "\n")
+	for line := range lines {
 		fields := strings.Fields(line)
 		if len(fields) >= 3 {
 			// fields[1] is mount point, fields[2] is filesystem type
@@ -817,8 +843,8 @@ func (c *DiskCollector) getDeviceForMountPoint(mountPoint string) string {
 		return "unknown"
 	}
 
-	lines := strings.Split(string(data), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(string(data), "\n")
+	for line := range lines {
 		fields := strings.Fields(line)
 		if len(fields) >= 2 {
 			// fields[0] is device, fields[1] is mount point

@@ -55,8 +55,7 @@ func TestWSHubRun(t *testing.T) {
 
 	t.Run("registers client", func(t *testing.T) {
 		hub := NewWSHub()
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		go hub.Run(ctx)
 		time.Sleep(10 * time.Millisecond)
@@ -80,8 +79,7 @@ func TestWSHubRun(t *testing.T) {
 
 	t.Run("unregisters client", func(t *testing.T) {
 		hub := NewWSHub()
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		go hub.Run(ctx)
 		time.Sleep(10 * time.Millisecond)
@@ -109,8 +107,7 @@ func TestWSHubRun(t *testing.T) {
 
 func TestWSHubBroadcast(t *testing.T) {
 	hub := NewWSHub()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	go hub.Run(ctx)
 	time.Sleep(10 * time.Millisecond)
@@ -139,8 +136,7 @@ func TestWSHubBroadcast(t *testing.T) {
 
 func TestWSHubMultipleClients(t *testing.T) {
 	hub := NewWSHub()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	go hub.Run(ctx)
 	time.Sleep(10 * time.Millisecond)
@@ -149,7 +145,7 @@ func TestWSHubMultipleClients(t *testing.T) {
 	clients := make([]*WSClient, numClients)
 	sends := make([]chan dto.WSEvent, numClients)
 
-	for i := 0; i < numClients; i++ {
+	for i := range numClients {
 		sends[i] = make(chan dto.WSEvent, 256)
 		clients[i] = &WSClient{
 			hub:  hub,
@@ -171,7 +167,7 @@ func TestWSHubMultipleClients(t *testing.T) {
 	testMessage := "test broadcast"
 	hub.Broadcast(testMessage)
 
-	for i := 0; i < numClients; i++ {
+	for i := range numClients {
 		select {
 		case <-sends[i]:
 		case <-time.After(500 * time.Millisecond):
@@ -182,8 +178,7 @@ func TestWSHubMultipleClients(t *testing.T) {
 
 func TestWSHubUnregisterNonExistentClient(t *testing.T) {
 	hub := NewWSHub()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	go hub.Run(ctx)
 	time.Sleep(10 * time.Millisecond)
@@ -210,7 +205,7 @@ func TestWSHubClosesClientsOnShutdown(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	numClients := 3
-	for i := 0; i < numClients; i++ {
+	for range numClients {
 		client := &WSClient{
 			hub:  hub,
 			send: make(chan dto.WSEvent, 256),
@@ -247,13 +242,12 @@ func TestWSHubClosesClientsOnShutdown(t *testing.T) {
 
 func BenchmarkWSHubBroadcast(b *testing.B) {
 	hub := NewWSHub()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := b.Context()
 
 	go hub.Run(ctx)
 	time.Sleep(10 * time.Millisecond)
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		client := &WSClient{
 			hub:  hub,
 			send: make(chan dto.WSEvent, 256),

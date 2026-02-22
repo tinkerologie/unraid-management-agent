@@ -37,7 +37,7 @@ func TestHealthEndpoint(t *testing.T) {
 		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
 	}
 
-	var response map[string]interface{}
+	var response map[string]any
 	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
 		t.Errorf("failed to parse response: %v", err)
 	}

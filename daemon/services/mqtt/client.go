@@ -181,7 +181,7 @@ func (c *Client) TestConnection() error {
 
 	// Publish a test message to verify the connection is working
 	testTopic := fmt.Sprintf("%s/test", c.config.TopicPrefix)
-	testPayload := map[string]interface{}{
+	testPayload := map[string]any{
 		"test":      true,
 		"timestamp": time.Now().Unix(),
 	}
@@ -341,7 +341,7 @@ func (c *Client) PublishNotifications(notifications *dto.NotificationList) error
 }
 
 // PublishCustom publishes a custom message to the specified topic.
-func (c *Client) PublishCustom(topic string, payload interface{}, retained bool) error {
+func (c *Client) PublishCustom(topic string, payload any, retained bool) error {
 	if !c.shouldPublish() {
 		return fmt.Errorf("MQTT client not connected")
 	}
@@ -375,7 +375,7 @@ func (c *Client) publish(topic, payload string, retained bool) error {
 }
 
 // publishJSON publishes a JSON-encoded payload to the specified topic.
-func (c *Client) publishJSON(topic string, payload interface{}) error {
+func (c *Client) publishJSON(topic string, payload any) error {
 	data, err := json.Marshal(payload)
 	if err != nil {
 		c.msgErrors.Add(1)
@@ -418,7 +418,7 @@ func (c *Client) publishHASensor(id, name, unit, icon, template string) {
 		id,
 	)
 
-	config := map[string]interface{}{
+	config := map[string]any{
 		"name":                  name,
 		"unique_id":             fmt.Sprintf("unraid_%s_%s", strings.ReplaceAll(c.hostname, " ", "_"), id),
 		"state_topic":           c.buildTopic("system"),
@@ -447,7 +447,7 @@ func (c *Client) publishHAArraySensor(id, name, icon, template string) {
 		id,
 	)
 
-	config := map[string]interface{}{
+	config := map[string]any{
 		"name":                  name,
 		"unique_id":             fmt.Sprintf("unraid_%s_%s", strings.ReplaceAll(c.hostname, " ", "_"), id),
 		"state_topic":           c.buildTopic("array"),

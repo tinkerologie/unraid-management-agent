@@ -109,7 +109,7 @@ If the plugin doesn't work correctly on your hardware, see the [Hardware Compati
 
 ### Prerequisites
 
-- Go 1.25 or later
+- Go 1.26 or later
 - Git
 - Access to an Unraid system for testing (recommended)
 - Make

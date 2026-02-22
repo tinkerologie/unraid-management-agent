@@ -13,9 +13,11 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/alerting"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/api"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/mcp"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/mqtt"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/watchdog"
 )
 
 // Orchestrator coordinates the lifecycle of all collectors, API server, and handles graceful shutdown.
@@ -76,6 +78,27 @@ func (o *Orchestrator) Run() error {
 		logger.Success("MCP server initialized at /mcp endpoint (official SDK, protocol 2025-06-18)")
 	}
 
+	// Initialize alerting engine
+	alertStore := alerting.NewStore("")
+	alertEngine := alerting.NewEngine(alertStore, apiServer)
+	apiServer.SetAlertEngine(alertEngine, alertStore)
+	mcpServer.SetAlertEngine(alertEngine, alertStore)
+	wg.Go(func() {
+		alertEngine.Start(ctx)
+	})
+	logger.Success("Alerting engine started")
+
+	// Initialize watchdog (health checks)
+	watchdogStore := watchdog.NewStore("")
+	watchdogRunner := watchdog.NewRunner(watchdogStore)
+	watchdog.SetDockerProvider(apiServer)
+	apiServer.SetWatchdog(watchdogRunner, watchdogStore)
+	mcpServer.SetWatchdog(watchdogRunner, watchdogStore)
+	wg.Go(func() {
+		watchdogRunner.Start(ctx)
+	})
+	logger.Success("Watchdog started")
+
 	// Start all enabled collectors
 	enabledCount := o.collectorManager.StartAll()
 
@@ -93,13 +116,11 @@ func (o *Orchestrator) Run() error {
 	}
 
 	// Start HTTP server
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		if err := apiServer.StartHTTP(); err != nil {
 			logger.Error("API server error: %v", err)
 		}
-	}()
+	})
 
 	logger.Success("API server started on port %d", o.ctx.Port)
 
@@ -172,14 +193,30 @@ func (o *Orchestrator) RunMCPStdio() error {
 		return fmt.Errorf("failed to initialize MCP server: %w", err)
 	}
 
-	// Handle shutdown signals
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
-	go func() {
-		sig := <-sigChan
-		logger.Warning("Received %s signal, shutting down MCP STDIO...", sig)
-		cancel()
-	}()
+	// Initialize alerting engine for STDIO mode
+	alertStore := alerting.NewStore("")
+	alertEngine := alerting.NewEngine(alertStore, apiServer)
+	apiServer.SetAlertEngine(alertEngine, alertStore)
+	mcpServer.SetAlertEngine(alertEngine, alertStore)
+	wg.Go(func() {
+		alertEngine.Start(ctx)
+	})
+	logger.Success("Alerting engine started (STDIO mode)")
+
+	// Initialize watchdog for STDIO mode
+	watchdogStore := watchdog.NewStore("")
+	watchdogRunner := watchdog.NewRunner(watchdogStore)
+	watchdog.SetDockerProvider(apiServer)
+	apiServer.SetWatchdog(watchdogRunner, watchdogStore)
+	mcpServer.SetWatchdog(watchdogRunner, watchdogStore)
+	wg.Go(func() {
+		watchdogRunner.Start(ctx)
+	})
+	logger.Success("Watchdog started (STDIO mode)")
+
+	// Cancel context on shutdown signals (SIGTERM, SIGINT)
+	ctx, stop := signal.NotifyContext(ctx, syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
 
 	// Run MCP over STDIO (blocks until context cancelled or pipe closed)
 	logger.Info("MCP STDIO transport ready — waiting for client")
@@ -221,11 +258,9 @@ func (o *Orchestrator) initializeMQTT(ctx context.Context, wg *sync.WaitGroup, a
 	apiServer.SetMQTTClient(o.mqttClient)
 
 	// Start MQTT event subscriber
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		o.subscribeMQTTEvents(ctx, apiServer)
-	}()
+	})
 }
 
 // subscribeMQTTEvents subscribes to collector events and publishes them via MQTT.
@@ -260,7 +295,7 @@ func (o *Orchestrator) subscribeMQTTEvents(ctx context.Context, apiServer *api.S
 }
 
 // handleMQTTEvent processes an event and publishes it via MQTT.
-func (o *Orchestrator) handleMQTTEvent(msg interface{}) {
+func (o *Orchestrator) handleMQTTEvent(msg any) {
 	if o.mqttClient == nil || !o.mqttClient.IsConnected() {
 		return
 	}

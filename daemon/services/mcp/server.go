@@ -20,7 +20,9 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/alerting"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/controllers"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/watchdog"
 )
 
 // CacheProvider defines the interface for accessing cached data from the API server.
@@ -61,7 +63,7 @@ type CacheProvider interface {
 	GetShareConfig(name string) *dto.ShareConfig
 	// Network and Health
 	GetNetworkAccessURLs() *dto.NetworkAccessURLs
-	GetHealthStatus() map[string]interface{}
+	GetHealthStatus() map[string]any
 }
 
 // ptr returns a pointer to the given bool value. Used for optional ToolAnnotations fields.
@@ -69,10 +71,14 @@ func ptr(b bool) *bool { return &b }
 
 // Server represents the MCP server that exposes Unraid capabilities to AI agents.
 type Server struct {
-	ctx           *domain.Context
-	mcpServer     *mcp.Server
-	httpHandler   *mcp.StreamableHTTPHandler
-	cacheProvider CacheProvider
+	ctx            *domain.Context
+	mcpServer      *mcp.Server
+	httpHandler    *mcp.StreamableHTTPHandler
+	cacheProvider  CacheProvider
+	alertEngine    *alerting.Engine
+	alertStore     *alerting.Store
+	watchdogRunner *watchdog.Runner
+	watchdogStore  *watchdog.Store
 }
 
 // NewServer creates a new MCP server instance.
@@ -98,9 +104,13 @@ func (s *Server) Initialize() error {
 
 	// Register all tools, resources, and prompts
 	s.registerMonitoringTools()
+	s.registerNewMonitoringTools()
 	s.registerControlTools()
+	s.registerNewControlTools()
 	s.registerResources()
 	s.registerPrompts()
+	s.registerAlertingTools()
+	s.registerWatchdogTools()
 
 	// Create the Streamable HTTP handler (implements MCP 2025-06-18 transport)
 	s.httpHandler = mcp.NewStreamableHTTPHandler(
@@ -110,6 +120,18 @@ func (s *Server) Initialize() error {
 
 	logger.Info("MCP server initialized with official SDK (protocol 2025-06-18), tools, resources, and prompts")
 	return nil
+}
+
+// SetAlertEngine sets the alerting engine and store for MCP alerting tools.
+func (s *Server) SetAlertEngine(engine *alerting.Engine, store *alerting.Store) {
+	s.alertEngine = engine
+	s.alertStore = store
+}
+
+// SetWatchdog sets the watchdog runner and store for MCP health check tools.
+func (s *Server) SetWatchdog(runner *watchdog.Runner, store *watchdog.Store) {
+	s.watchdogRunner = runner
+	s.watchdogStore = store
 }
 
 // GetHTTPHandler returns the Streamable HTTP handler for the MCP endpoint.
@@ -735,7 +757,7 @@ func (s *Server) registerMonitoringTools() {
 		if len(matches) == 0 {
 			return textResult(fmt.Sprintf("No containers matching '%s' found", args.Query)), nil, nil
 		}
-		return jsonResult(map[string]interface{}{
+		return jsonResult(map[string]any{
 			"query":   args.Query,
 			"count":   len(matches),
 			"results": matches,
@@ -768,7 +790,7 @@ func (s *Server) registerMonitoringTools() {
 		if len(matches) == 0 {
 			return textResult(fmt.Sprintf("No VMs matching '%s' found", args.Query)), nil, nil
 		}
-		return jsonResult(map[string]interface{}{
+		return jsonResult(map[string]any{
 			"query":   args.Query,
 			"count":   len(matches),
 			"results": matches,
@@ -781,11 +803,11 @@ func (s *Server) registerMonitoringTools() {
 		Description: "Get a comprehensive diagnostic summary including system health, array status, recent alerts, disk health, and resource usage",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
-		summary := make(map[string]interface{})
+		summary := make(map[string]any)
 
 		// System info
 		if sysInfo := s.cacheProvider.GetSystemCache(); sysInfo != nil {
-			summary["system"] = map[string]interface{}{
+			summary["system"] = map[string]any{
 				"hostname":    sysInfo.Hostname,
 				"uptime_days": sysInfo.Uptime / 86400,
 				"cpu_usage":   sysInfo.CPUUsage,
@@ -796,7 +818,7 @@ func (s *Server) registerMonitoringTools() {
 
 		// Array status
 		if arrayStatus := s.cacheProvider.GetArrayCache(); arrayStatus != nil {
-			summary["array"] = map[string]interface{}{
+			summary["array"] = map[string]any{
 				"state":               arrayStatus.State,
 				"parity_valid":        arrayStatus.ParityValid,
 				"used_percent":        arrayStatus.UsedPercent,
@@ -806,10 +828,10 @@ func (s *Server) registerMonitoringTools() {
 
 		// Disk issues
 		disks := s.cacheProvider.GetDisksCache()
-		var diskIssues []map[string]interface{}
+		var diskIssues []map[string]any
 		for _, disk := range disks {
 			if disk.Temperature > 50 || disk.Status != "PASSED" {
-				diskIssues = append(diskIssues, map[string]interface{}{
+				diskIssues = append(diskIssues, map[string]any{
 					"id":          disk.ID,
 					"name":        disk.Name,
 					"temperature": disk.Temperature,
@@ -840,6 +862,179 @@ func (s *Server) registerMonitoringTools() {
 	})
 
 	logger.Debug("MCP monitoring tools registered (40 read-only tools with annotations)")
+}
+
+// registerNewMonitoringTools registers new monitoring tools for updates, snapshots, services, and processes.
+func (s *Server) registerNewMonitoringTools() {
+	// Check all container updates
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "check_container_updates",
+		Description: "Check all Docker containers for available image updates. Pulls latest images and compares digests.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		logger.Info("MCP: Checking all containers for updates")
+		dockerCtrl := controllers.NewDockerController()
+		defer dockerCtrl.Close() //nolint:errcheck
+		result, err := dockerCtrl.CheckAllContainerUpdates()
+		if err != nil {
+			return textResult(fmt.Sprintf("Failed to check container updates: %v", err)), nil, nil
+		}
+		return jsonResult(result)
+	})
+
+	// Check single container update
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "check_container_update",
+		Description: "Check a specific Docker container for an available image update by pulling the latest image and comparing digests.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPContainerSizeArgs) (*mcp.CallToolResult, any, error) {
+		logger.Info("MCP: Checking container '%s' for updates", args.ContainerID)
+		dockerCtrl := controllers.NewDockerController()
+		defer dockerCtrl.Close() //nolint:errcheck
+		result, err := dockerCtrl.CheckContainerUpdate(args.ContainerID)
+		if err != nil {
+			return textResult(fmt.Sprintf("Failed to check container update: %v", err)), nil, nil
+		}
+		return jsonResult(result)
+	})
+
+	// Get container size
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "get_container_size",
+		Description: "Get the disk size of a specific Docker container including writable layer and virtual size.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPContainerSizeArgs) (*mcp.CallToolResult, any, error) {
+		logger.Info("MCP: Getting container size for '%s'", args.ContainerID)
+		dockerCtrl := controllers.NewDockerController()
+		defer dockerCtrl.Close() //nolint:errcheck
+		result, err := dockerCtrl.GetContainerSize(args.ContainerID)
+		if err != nil {
+			return textResult(fmt.Sprintf("Failed to get container size: %v", err)), nil, nil
+		}
+		return jsonResult(result)
+	})
+
+	// Check plugin updates
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "check_plugin_updates",
+		Description: "Check all installed Unraid plugins for available updates.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		logger.Info("MCP: Checking all plugins for updates")
+		pluginCtrl := controllers.NewPluginController()
+		updates, err := pluginCtrl.CheckPluginUpdates()
+		if err != nil {
+			return textResult(fmt.Sprintf("Failed to check plugin updates: %v", err)), nil, nil
+		}
+		return jsonResult(map[string]any{
+			"plugins_with_updates": updates,
+			"count":                len(updates),
+		})
+	})
+
+	// List VM snapshots
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "list_vm_snapshots",
+		Description: "List all snapshots for a specific virtual machine.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPVMSnapshotArgs) (*mcp.CallToolResult, any, error) {
+		logger.Info("MCP: Listing snapshots for VM '%s'", args.VMName)
+		vmCtrl := controllers.NewVMController()
+		result, err := vmCtrl.ListSnapshots(args.VMName)
+		if err != nil {
+			return textResult(fmt.Sprintf("Failed to list VM snapshots: %v", err)), nil, nil
+		}
+		return jsonResult(result)
+	})
+
+	// Get service status
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "get_service_status",
+		Description: "Get the running status of an Unraid system service (docker, libvirt, smb, nfs, ftp, sshd, nginx, syslog, ntpd, avahi, wireguard).",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPServiceStatusArgs) (*mcp.CallToolResult, any, error) {
+		logger.Info("MCP: Getting status for service '%s'", args.ServiceName)
+		serviceCtrl := controllers.NewServiceController()
+		running, err := serviceCtrl.GetServiceStatus(args.ServiceName)
+		if err != nil {
+			return textResult(fmt.Sprintf("Failed to get service status: %v", err)), nil, nil
+		}
+		return jsonResult(map[string]any{
+			"service": args.ServiceName,
+			"running": running,
+		})
+	})
+
+	// List all services
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "list_services",
+		Description: "List all managed Unraid system services and their running status.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		logger.Info("MCP: Listing all services")
+		serviceCtrl := controllers.NewServiceController()
+		serviceNames := controllers.ValidServiceNames()
+		services := make([]map[string]any, 0)
+		for _, name := range serviceNames {
+			running, _ := serviceCtrl.GetServiceStatus(name)
+			services = append(services, map[string]any{
+				"name":    name,
+				"running": running,
+			})
+		}
+		return jsonResult(map[string]any{
+			"services": services,
+			"count":    len(services),
+		})
+	})
+
+	// List processes
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "list_processes",
+		Description: "List running processes on the Unraid server sorted by CPU or memory usage.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPProcessListArgs) (*mcp.CallToolResult, any, error) {
+		sortBy := args.SortBy
+		if sortBy == "" {
+			sortBy = "cpu"
+		}
+		limit := args.Limit
+		if limit <= 0 {
+			limit = 50
+		}
+		logger.Info("MCP: Listing processes (sort=%s, limit=%d)", sortBy, limit)
+		processCtrl := controllers.NewProcessController()
+		result, err := processCtrl.ListProcesses(sortBy, limit)
+		if err != nil {
+			return textResult(fmt.Sprintf("Failed to list processes: %v", err)), nil, nil
+		}
+		return jsonResult(result)
+	})
+
+	// Get container logs (per-container stdout/stderr)
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "get_container_logs",
+		Description: "Get stdout/stderr logs from a specific Docker container (equivalent to docker logs). Returns the most recent log lines.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPContainerLogsArgs) (*mcp.CallToolResult, any, error) {
+		if args.ContainerID == "" {
+			return textResult("container_id is required"), nil, nil
+		}
+		tail := args.Tail
+		if tail <= 0 {
+			tail = 100
+		}
+		logger.Info("MCP: Getting logs for container '%s' (tail=%d)", args.ContainerID, tail)
+		dockerCtrl := controllers.NewDockerController()
+		defer dockerCtrl.Close() //nolint:errcheck
+		result, err := dockerCtrl.ContainerLogs(args.ContainerID, tail, args.Since, args.Timestamps)
+		if err != nil {
+			return textResult(fmt.Sprintf("Failed to get container logs: %v", err)), nil, nil
+		}
+		return jsonResult(result)
+	})
+
+	logger.Debug("MCP new monitoring tools registered (8 additional read-only tools)")
 }
 
 // registerControlTools registers tools that can modify system state.
@@ -1209,7 +1404,7 @@ func (s *Server) registerControlTools() {
 		}
 
 		status, _ := s.cacheProvider.GetCollectorStatus(args.CollectorName)
-		return jsonResult(map[string]interface{}{
+		return jsonResult(map[string]any{
 			"success":   true,
 			"message":   fmt.Sprintf("Collector '%s' %sd successfully", args.CollectorName, args.Action),
 			"collector": status,
@@ -1242,7 +1437,7 @@ func (s *Server) registerControlTools() {
 		}
 
 		status, _ := s.cacheProvider.GetCollectorStatus(args.CollectorName)
-		return jsonResult(map[string]interface{}{
+		return jsonResult(map[string]any{
 			"success":   true,
 			"message":   fmt.Sprintf("Collector '%s' interval updated to %d seconds", args.CollectorName, args.Interval),
 			"collector": status,
@@ -1252,7 +1447,521 @@ func (s *Server) registerControlTools() {
 	logger.Debug("MCP control tools registered (14 tools with safety annotations)")
 }
 
-// registerResources registers MCP resources for real-time data access.
+// registerNewControlTools registers new control tools for updates, snapshots, services.
+func (s *Server) registerNewControlTools() {
+	// Update single container
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "update_container",
+		Description: "Update a Docker container to the latest image. Stops the container, pulls the latest image, recreates with the same config, and starts it.",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(true),
+			IdempotentHint:  true,
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPContainerUpdateArgs) (*mcp.CallToolResult, any, error) {
+		if !args.Confirm {
+			return textResult("Container update requires confirm=true. This will stop, remove, and recreate the container with the latest image."), nil, nil
+		}
+		logger.Info("MCP: Updating container '%s'", args.ContainerID)
+		dockerCtrl := controllers.NewDockerController()
+		defer dockerCtrl.Close() //nolint:errcheck
+		result, err := dockerCtrl.UpdateContainer(args.ContainerID, args.Force)
+		if err != nil {
+			return textResult(fmt.Sprintf("Failed to update container: %v", err)), nil, nil
+		}
+		return jsonResult(result)
+	})
+
+	// Update all containers
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "update_all_containers",
+		Description: "Update all Docker containers that have available image updates. Stops, pulls latest images, recreates, and starts each container.",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(true),
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPContainerUpdateArgs) (*mcp.CallToolResult, any, error) {
+		if !args.Confirm {
+			return textResult("Bulk container update requires confirm=true. This will update ALL containers with available updates."), nil, nil
+		}
+		logger.Info("MCP: Updating all containers")
+		dockerCtrl := controllers.NewDockerController()
+		defer dockerCtrl.Close() //nolint:errcheck
+		result, err := dockerCtrl.UpdateAllContainers()
+		if err != nil {
+			return textResult(fmt.Sprintf("Failed to update containers: %v", err)), nil, nil
+		}
+		return jsonResult(result)
+	})
+
+	// Update single plugin
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "update_plugin",
+		Description: "Update a specific Unraid plugin to the latest version.",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(true),
+			IdempotentHint:  true,
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPPluginUpdateArgs) (*mcp.CallToolResult, any, error) {
+		if !args.Confirm {
+			return textResult("Plugin update requires confirm=true."), nil, nil
+		}
+		if args.PluginName == "" {
+			return textResult("plugin_name is required for single plugin updates"), nil, nil
+		}
+		logger.Info("MCP: Updating plugin '%s'", args.PluginName)
+		pluginCtrl := controllers.NewPluginController()
+		err := pluginCtrl.UpdatePlugin(args.PluginName)
+		if err != nil {
+			return textResult(fmt.Sprintf("Failed to update plugin: %v", err)), nil, nil
+		}
+		return textResult(fmt.Sprintf("Plugin '%s' updated successfully", args.PluginName)), nil, nil
+	})
+
+	// Update all plugins
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "update_all_plugins",
+		Description: "Update all installed Unraid plugins that have available updates.",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(true),
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPPluginUpdateArgs) (*mcp.CallToolResult, any, error) {
+		if !args.Confirm {
+			return textResult("Bulk plugin update requires confirm=true."), nil, nil
+		}
+		logger.Info("MCP: Updating all plugins")
+		pluginCtrl := controllers.NewPluginController()
+		results, err := pluginCtrl.UpdateAllPlugins()
+		if err != nil {
+			return textResult(fmt.Sprintf("Failed to update plugins: %v", err)), nil, nil
+		}
+		return jsonResult(results)
+	})
+
+	// Create VM snapshot
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "create_vm_snapshot",
+		Description: "Create a snapshot of a virtual machine for backup or rollback purposes.",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(false),
+			IdempotentHint:  false,
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPVMSnapshotArgs) (*mcp.CallToolResult, any, error) {
+		snapshotName := args.SnapshotName
+		if snapshotName == "" {
+			snapshotName = fmt.Sprintf("snapshot-%d", time.Now().Unix())
+		}
+		logger.Info("MCP: Creating snapshot '%s' for VM '%s'", snapshotName, args.VMName)
+		vmCtrl := controllers.NewVMController()
+		err := vmCtrl.CreateSnapshot(args.VMName, snapshotName, args.Description)
+		if err != nil {
+			return textResult(fmt.Sprintf("Failed to create snapshot: %v", err)), nil, nil
+		}
+		return textResult(fmt.Sprintf("Snapshot '%s' created for VM '%s'", snapshotName, args.VMName)), nil, nil
+	})
+
+	// Delete VM snapshot
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "delete_vm_snapshot",
+		Description: "Delete a snapshot of a virtual machine. This cannot be undone.",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(true),
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPVMSnapshotArgs) (*mcp.CallToolResult, any, error) {
+		if args.SnapshotName == "" {
+			return textResult("snapshot_name is required"), nil, nil
+		}
+		logger.Info("MCP: Deleting snapshot '%s' from VM '%s'", args.SnapshotName, args.VMName)
+		vmCtrl := controllers.NewVMController()
+		err := vmCtrl.DeleteSnapshot(args.VMName, args.SnapshotName)
+		if err != nil {
+			return textResult(fmt.Sprintf("Failed to delete snapshot: %v", err)), nil, nil
+		}
+		return textResult(fmt.Sprintf("Snapshot '%s' deleted from VM '%s'", args.SnapshotName, args.VMName)), nil, nil
+	})
+
+	// Restore VM snapshot
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "restore_vm_snapshot",
+		Description: "Restore a virtual machine to a previously created snapshot. WARNING: This reverts the VM to the snapshot state and the current state is lost.",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(true),
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPVMSnapshotRestoreArgs) (*mcp.CallToolResult, any, error) {
+		if !args.Confirm {
+			return textResult("Snapshot restore requires confirm=true. WARNING: This will revert the VM to the snapshot state — the current state will be lost."), nil, nil
+		}
+		if args.SnapshotName == "" {
+			return textResult("snapshot_name is required"), nil, nil
+		}
+		logger.Info("MCP: Restoring snapshot '%s' for VM '%s'", args.SnapshotName, args.VMName)
+		vmCtrl := controllers.NewVMController()
+		err := vmCtrl.RestoreSnapshot(args.VMName, args.SnapshotName)
+		if err != nil {
+			return textResult(fmt.Sprintf("Failed to restore snapshot: %v", err)), nil, nil
+		}
+		return textResult(fmt.Sprintf("Snapshot '%s' restored for VM '%s' — VM has been reverted to the snapshot state", args.SnapshotName, args.VMName)), nil, nil
+	})
+
+	// Clone VM
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "clone_vm",
+		Description: "Clone a virtual machine including its disk images. The source VM must be shut off.",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(false),
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPVMCloneArgs) (*mcp.CallToolResult, any, error) {
+		if !args.Confirm {
+			return textResult("VM cloning requires confirm=true. The source VM must be shut off."), nil, nil
+		}
+		if args.CloneName == "" {
+			return textResult("clone_name is required"), nil, nil
+		}
+		logger.Info("MCP: Cloning VM '%s' as '%s'", args.VMName, args.CloneName)
+		vmCtrl := controllers.NewVMController()
+		err := vmCtrl.CloneVM(args.VMName, args.CloneName)
+		if err != nil {
+			return textResult(fmt.Sprintf("Failed to clone VM: %v", err)), nil, nil
+		}
+		return textResult(fmt.Sprintf("VM '%s' cloned as '%s'", args.VMName, args.CloneName)), nil, nil
+	})
+
+	// Service control
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "service_action",
+		Description: "Start, stop, or restart an Unraid system service (docker, libvirt, smb, nfs, ftp, sshd, nginx, syslog, ntpd, avahi, wireguard).",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(true),
+			IdempotentHint:  true,
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPServiceActionArgs) (*mcp.CallToolResult, any, error) {
+		if !args.Confirm {
+			return textResult("Service action requires confirm=true. This will modify the running state of a system service."), nil, nil
+		}
+		logger.Info("MCP: Service action '%s' on '%s'", args.Action, args.ServiceName)
+		serviceCtrl := controllers.NewServiceController()
+		var err error
+		switch args.Action {
+		case "start":
+			err = serviceCtrl.StartService(args.ServiceName)
+		case "stop":
+			err = serviceCtrl.StopService(args.ServiceName)
+		case "restart":
+			err = serviceCtrl.RestartService(args.ServiceName)
+		default:
+			return textResult(fmt.Sprintf("Unknown action: %s (use start, stop, or restart)", args.Action)), nil, nil
+		}
+		if err != nil {
+			return textResult(fmt.Sprintf("Failed to %s service %s: %v", args.Action, args.ServiceName, err)), nil, nil
+		}
+		return textResult(fmt.Sprintf("Service '%s' %sed successfully", args.ServiceName, args.Action)), nil, nil
+	})
+
+	logger.Debug("MCP new control tools registered (8 additional control tools)")
+}
+
+// registerAlertingTools registers MCP tools for alert rule management and monitoring.
+func (s *Server) registerAlertingTools() {
+	// List alert rules
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "list_alert_rules",
+		Description: "List all configured alert rules with their expressions, severity, channels, and enabled state",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		if s.alertStore == nil {
+			return textResult("Alerting engine not initialized"), nil, nil
+		}
+		rules := s.alertStore.GetRules()
+		if len(rules) == 0 {
+			return textResult("No alert rules configured"), nil, nil
+		}
+		return jsonResult(rules)
+	})
+
+	// Get alert rule by ID
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "get_alert_rule",
+		Description: "Get details of a specific alert rule by ID",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPAlertRuleIDArgs) (*mcp.CallToolResult, any, error) {
+		if s.alertStore == nil {
+			return textResult("Alerting engine not initialized"), nil, nil
+		}
+		rule, err := s.alertStore.GetRule(args.RuleID)
+		if err != nil {
+			return textResult(fmt.Sprintf("Alert rule not found: %s", args.RuleID)), nil, nil
+		}
+		return jsonResult(rule)
+	})
+
+	// Create alert rule
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "create_alert_rule",
+		Description: "Create a new alert rule with an expr-lang expression that evaluates against system metrics. Available variables: CPU, RAMUsedPct, CPUTemp, MotherboardTemp, ArrayState, ArrayUsedPct, ParityValid, ContainerCount, RunningContainers, StoppedContainers, VMCount, RunningVMs, MaxDiskTemp, MaxDiskUsedPct, TotalDiskErrors, UPSStatus, UPSBatteryCharge, UPSLoadPercent, UPSRuntimeLeft",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(false),
+			IdempotentHint:  false,
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPCreateAlertRuleArgs) (*mcp.CallToolResult, any, error) {
+		if s.alertStore == nil || s.alertEngine == nil {
+			return textResult("Alerting engine not initialized"), nil, nil
+		}
+
+		if args.ID == "" || args.Name == "" || args.Expression == "" {
+			return textResult("id, name, and expression are required"), nil, nil
+		}
+
+		rule := dto.AlertRule{
+			ID:              args.ID,
+			Name:            args.Name,
+			Expression:      args.Expression,
+			Severity:        args.Severity,
+			DurationSeconds: args.DurationSeconds,
+			CooldownMinutes: args.CooldownMinutes,
+			Channels:        args.Channels,
+			Enabled:         args.Enabled,
+		}
+
+		if rule.Severity == "" {
+			rule.Severity = "warning"
+		}
+
+		if err := s.alertStore.CreateRule(rule); err != nil {
+			return textResult(fmt.Sprintf("Failed to create alert rule: %v", err)), nil, nil
+		}
+
+		s.alertEngine.RecompileRules()
+		return textResult(fmt.Sprintf("Alert rule '%s' created successfully", args.Name)), nil, nil
+	})
+
+	// Delete alert rule
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "delete_alert_rule",
+		Description: "Delete an alert rule by ID. Requires confirm=true to proceed.",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(true),
+			IdempotentHint:  true,
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPDeleteAlertRuleArgs) (*mcp.CallToolResult, any, error) {
+		if s.alertStore == nil || s.alertEngine == nil {
+			return textResult("Alerting engine not initialized"), nil, nil
+		}
+
+		if !args.Confirm {
+			return textResult("Deletion not confirmed. Set confirm=true to delete the rule."), nil, nil
+		}
+
+		if err := s.alertStore.DeleteRule(args.RuleID); err != nil {
+			return textResult(fmt.Sprintf("Failed to delete alert rule: %v", err)), nil, nil
+		}
+
+		s.alertEngine.RecompileRules()
+		return textResult(fmt.Sprintf("Alert rule '%s' deleted successfully", args.RuleID)), nil, nil
+	})
+
+	// Get alert status
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "get_alert_status",
+		Description: "Get the current evaluation status of all enabled alert rules (ok, pending, firing)",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		if s.alertEngine == nil {
+			return textResult("Alerting engine not initialized"), nil, nil
+		}
+		statuses := s.alertEngine.GetStatuses()
+		if len(statuses) == 0 {
+			return textResult("No enabled alert rules to report status for"), nil, nil
+		}
+		return jsonResult(dto.AlertsStatusResponse{Statuses: statuses})
+	})
+
+	// Get firing alerts
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "get_firing_alerts",
+		Description: "Get only alert rules that are currently in the firing (triggered) state",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		if s.alertEngine == nil {
+			return textResult("Alerting engine not initialized"), nil, nil
+		}
+		firing := s.alertEngine.GetFiringAlerts()
+		if len(firing) == 0 {
+			return textResult("No alerts are currently firing"), nil, nil
+		}
+		return jsonResult(firing)
+	})
+
+	// Get alert history
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "get_alert_history",
+		Description: "Get recent alert events (last 100), including firing and resolved transitions",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		if s.alertEngine == nil {
+			return textResult("Alerting engine not initialized"), nil, nil
+		}
+		events := s.alertEngine.GetHistory()
+		if len(events) == 0 {
+			return textResult("No alert events in history"), nil, nil
+		}
+		return jsonResult(dto.AlertHistoryResponse{Events: events, Total: len(events)})
+	})
+
+	logger.Debug("MCP alerting tools registered (7 tools)")
+}
+
+// registerWatchdogTools registers MCP tools for health check management and monitoring.
+func (s *Server) registerWatchdogTools() {
+	// List health checks
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "list_health_checks",
+		Description: "List all configured health check probes with their type, target, interval, and enabled state",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		if s.watchdogStore == nil {
+			return textResult("Watchdog not initialized"), nil, nil
+		}
+		checks := s.watchdogStore.GetChecks()
+		if len(checks) == 0 {
+			return textResult("No health checks configured"), nil, nil
+		}
+		return jsonResult(checks)
+	})
+
+	// Get health check by ID
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "get_health_check",
+		Description: "Get details of a specific health check by ID",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPHealthCheckIDArgs) (*mcp.CallToolResult, any, error) {
+		if s.watchdogStore == nil {
+			return textResult("Watchdog not initialized"), nil, nil
+		}
+		check, err := s.watchdogStore.GetCheck(args.CheckID)
+		if err != nil {
+			return textResult(err.Error()), nil, nil
+		}
+		return jsonResult(check)
+	})
+
+	// Create health check
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "create_health_check",
+		Description: "Create a new health check probe (HTTP, TCP, or container state). Probes run at configurable intervals with optional remediation actions on failure (notify, restart container, or webhook).",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(false),
+			IdempotentHint:  true,
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPCreateHealthCheckArgs) (*mcp.CallToolResult, any, error) {
+		if s.watchdogStore == nil {
+			return textResult("Watchdog not initialized"), nil, nil
+		}
+		if args.ID == "" || args.Name == "" || args.Type == "" || args.Target == "" {
+			return textResult("id, name, type, and target are required"), nil, nil
+		}
+		checkType := dto.HealthCheckType(args.Type)
+		if checkType != dto.HealthCheckHTTP && checkType != dto.HealthCheckTCP && checkType != dto.HealthCheckContainer {
+			return textResult("type must be http, tcp, or container"), nil, nil
+		}
+		enabled := args.Enabled
+		if args.ID != "" && !args.Enabled {
+			enabled = true // Default to enabled when creating
+		}
+		check := dto.HealthCheck{
+			ID:              args.ID,
+			Name:            args.Name,
+			Type:            checkType,
+			Target:          args.Target,
+			IntervalSeconds: args.IntervalSeconds,
+			TimeoutSeconds:  args.TimeoutSeconds,
+			SuccessCode:     args.SuccessCode,
+			OnFail:          args.OnFail,
+			Enabled:         enabled,
+		}
+		if err := s.watchdogStore.CreateCheck(check); err != nil {
+			return textResult(fmt.Sprintf("Failed to create health check: %v", err)), nil, nil
+		}
+		return textResult(fmt.Sprintf("Health check '%s' created (%s probe for %s)", args.ID, args.Type, args.Target)), nil, nil
+	})
+
+	// Delete health check
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "delete_health_check",
+		Description: "Delete a health check by ID. Requires confirm=true to proceed.",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(true),
+			IdempotentHint:  true,
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPDeleteHealthCheckArgs) (*mcp.CallToolResult, any, error) {
+		if s.watchdogStore == nil {
+			return textResult("Watchdog not initialized"), nil, nil
+		}
+		if !args.Confirm {
+			return textResult("Set confirm=true to delete health check"), nil, nil
+		}
+		if err := s.watchdogStore.DeleteCheck(args.CheckID); err != nil {
+			return textResult(fmt.Sprintf("Failed to delete: %v", err)), nil, nil
+		}
+		if s.watchdogRunner != nil {
+			s.watchdogRunner.CleanupCheck(args.CheckID)
+		}
+		return textResult(fmt.Sprintf("Health check '%s' deleted", args.CheckID)), nil, nil
+	})
+
+	// Get health check status
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "get_health_check_status",
+		Description: "Get the current status of all health checks including healthy/unhealthy state, consecutive failures, and last check time",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		if s.watchdogRunner == nil {
+			return textResult("Watchdog not initialized"), nil, nil
+		}
+		statuses := s.watchdogRunner.GetStatuses()
+		if len(statuses) == 0 {
+			return textResult("No health check results yet"), nil, nil
+		}
+		return jsonResult(dto.HealthChecksStatusResponse{Checks: statuses})
+	})
+
+	// Run health check manually
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "run_health_check",
+		Description: "Manually trigger a specific health check probe and return the immediate result",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(false),
+			IdempotentHint:  true,
+		},
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, args dto.MCPHealthCheckIDArgs) (*mcp.CallToolResult, any, error) {
+		if s.watchdogRunner == nil {
+			return textResult("Watchdog not initialized"), nil, nil
+		}
+		status, err := s.watchdogRunner.RunSingleCheck(ctx, args.CheckID)
+		if err != nil {
+			return textResult(fmt.Sprintf("Failed: %v", err)), nil, nil
+		}
+		if status == nil {
+			return textResult("Check executed but no status recorded"), nil, nil
+		}
+		return jsonResult(status)
+	})
+
+	// Get health check history
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "get_health_check_history",
+		Description: "Get recent health check state change events (up to 100), including transitions between healthy and unhealthy states and any remediation actions taken",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		if s.watchdogRunner == nil {
+			return textResult("Watchdog not initialized"), nil, nil
+		}
+		events := s.watchdogRunner.GetHistory()
+		if len(events) == 0 {
+			return textResult("No health check events in history"), nil, nil
+		}
+		return jsonResult(dto.HealthCheckHistoryResponse{Events: events})
+	})
+
+	logger.Debug("MCP watchdog tools registered (7 tools)")
+} // registerResources registers MCP resources for real-time data access.
 func (s *Server) registerResources() {
 	// System resource
 	s.mcpServer.AddResource(&mcp.Resource{
@@ -1334,15 +2043,15 @@ func (s *Server) registerResources() {
 
 // registerPrompts registers MCP prompts for guided interactions.
 func (s *Server) registerPrompts() {
-	// Disk health analysis prompt
+	// Disk health diagnostic prompt (replaces analyze_disk_health with richer analysis)
 	s.mcpServer.AddPrompt(&mcp.Prompt{
-		Name:        "analyze_disk_health",
-		Description: "Analyze the health status of all disks and provide recommendations",
-	}, func(_ context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+		Name:        "diagnose_disk_health",
+		Description: "Walk through SMART data, temperatures, error rates, and power-on hours to produce a plain-English health verdict per disk",
+	}, func(_ context.Context, _ *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		disks := s.cacheProvider.GetDisksCache()
 		if disks == nil {
 			return &mcp.GetPromptResult{
-				Description: "Disk health analysis",
+				Description: "Disk health diagnosis",
 				Messages: []*mcp.PromptMessage{{
 					Role:    "assistant",
 					Content: &mcp.TextContent{Text: "Disk information is not available. Please wait for the system to collect disk data."},
@@ -1352,16 +2061,157 @@ func (s *Server) registerPrompts() {
 
 		data, _ := json.MarshalIndent(disks, "", "  ")
 		return &mcp.GetPromptResult{
-			Description: "Disk health analysis",
+			Description: "Disk health diagnosis",
 			Messages: []*mcp.PromptMessage{{
 				Role: "user",
-				Content: &mcp.TextContent{Text: fmt.Sprintf(`Please analyze the following Unraid disk information and provide:
-1. Overall health assessment for each disk
-2. Any SMART warnings or concerns
-3. Recommendations for maintenance or replacement
-4. Temperature analysis
+				Content: &mcp.TextContent{Text: fmt.Sprintf(`Analyze the following Unraid disk data and produce a structured health report.
+
+For EACH disk, evaluate:
+1. **SMART Status** — Check overall SMART pass/fail, reallocated sector count (ID 5), current pending sectors (ID 197), offline uncorrectable (ID 198), and UltraDMA CRC errors (ID 199). Flag any non-zero raw values.
+2. **Temperature** — Is the disk within safe operating range (under 45°C normal, 45-50°C caution, over 50°C warning)? Note any disks that are significantly hotter than peers.
+3. **Error Rates** — Check smart_errors count. Any disk with errors > 0 needs investigation.
+4. **Age & Wear** — Review power_on_hours. Disks over 40,000 hours (≈4.5 years) should be flagged for proactive replacement planning.
+5. **I/O Health** — Check io_utilization_percent for any disks under sustained heavy load.
+
+Output format:
+- Per-disk verdict: ✅ Healthy / ⚠️ Caution / 🔴 Warning / 🚨 Critical
+- Overall array health summary
+- Prioritized action items (e.g., "Replace disk2 within 30 days", "Monitor disk3 temperature")
 
 Disk Data:
+%s`, string(data))},
+			}},
+		}, nil
+	})
+
+	// Performance issue diagnostic prompt
+	s.mcpServer.AddPrompt(&mcp.Prompt{
+		Name:        "diagnose_performance_issue",
+		Description: "Correlate CPU, RAM, Docker resource usage, and VM count to identify performance bottlenecks",
+	}, func(_ context.Context, _ *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+		system := s.cacheProvider.GetSystemCache()
+		containers := s.cacheProvider.GetDockerCache()
+		vms := s.cacheProvider.GetVMsCache()
+		array := s.cacheProvider.GetArrayCache()
+
+		perfData := map[string]any{
+			"system":     system,
+			"array":      array,
+			"containers": containers,
+			"vms":        vms,
+			"timestamp":  time.Now(),
+		}
+
+		data, _ := json.MarshalIndent(perfData, "", "  ")
+		return &mcp.GetPromptResult{
+			Description: "Performance issue diagnosis",
+			Messages: []*mcp.PromptMessage{{
+				Role: "user",
+				Content: &mcp.TextContent{Text: fmt.Sprintf(`Analyze the following Unraid system data to identify performance bottlenecks.
+
+Evaluate these areas:
+
+1. **CPU Pressure** — Is overall CPU usage high (>80%%)? Check per-core usage for hotspots. Identify which containers or VMs are consuming the most CPU.
+2. **Memory Pressure** — Is RAM usage high (>85%%)? Calculate available memory (free + buffers + cached). Check if any single container uses a disproportionate amount.
+3. **Docker Resource Usage** — List the top 5 containers by CPU and memory. Flag any containers using >25%% CPU or >4GB RAM. Note any stopped containers that should be running.
+4. **VM Resource Contention** — How many VMs are running? Total vCPUs allocated vs physical cores available. Total VM memory allocated vs system RAM.
+5. **Array Status** — Is a parity check running? Active parity checks significantly impact disk I/O and can cause system slowness.
+6. **I/O Bottleneck Indicators** — Check disk I/O utilization for signs of disk-bound workloads.
+
+Output:
+- Identified bottleneck(s) with severity
+- Root cause analysis
+- Specific remediation steps (e.g., "Reduce Plex transcoding threads", "Add RAM", "Migrate VM to SSD-backed storage")
+
+System Data:
+%s`, string(data))},
+			}},
+		}, nil
+	})
+
+	// Maintenance suggestion prompt
+	s.mcpServer.AddPrompt(&mcp.Prompt{
+		Name:        "suggest_maintenance",
+		Description: "Review parity history, disk ages, array errors, and temperatures to generate a prioritized maintenance checklist",
+	}, func(_ context.Context, _ *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+		disks := s.cacheProvider.GetDisksCache()
+		array := s.cacheProvider.GetArrayCache()
+		system := s.cacheProvider.GetSystemCache()
+		parityHistory := s.cacheProvider.GetParityHistoryCache()
+		notifications := s.cacheProvider.GetNotificationsCache()
+
+		maintData := map[string]any{
+			"disks":          disks,
+			"array":          array,
+			"system":         system,
+			"parity_history": parityHistory,
+			"notifications":  notifications,
+			"timestamp":      time.Now(),
+		}
+
+		data, _ := json.MarshalIndent(maintData, "", "  ")
+		return &mcp.GetPromptResult{
+			Description: "Maintenance suggestions",
+			Messages: []*mcp.PromptMessage{{
+				Role: "user",
+				Content: &mcp.TextContent{Text: fmt.Sprintf(`Review the following Unraid system data and generate a prioritized maintenance checklist.
+
+Evaluate:
+
+1. **Parity Check Status** — When was the last parity check? Was it successful? Any errors found? If the last check was >30 days ago, recommend scheduling one. Review parity check history for trends (increasing errors, slower speeds).
+2. **Disk Health & Age** — Check power_on_hours across all disks. Flag disks approaching end-of-life (>40,000 hours). Check for any disks with SMART warnings or reallocated sectors.
+3. **Array Errors** — Is parity valid? Any disks showing errors? Any disks in a degraded state?
+4. **Temperature Trends** — Are any disks consistently running hot? Are fans operating normally?
+5. **System Uptime** — Has the server been running for an extended period without a reboot? (>90 days may warrant a maintenance reboot)
+6. **Notifications** — Are there any unresolved system notifications that need attention?
+
+Output a prioritized checklist:
+- 🔴 **Critical** — Must address immediately (data at risk)
+- 🟡 **Recommended** — Address within the next week
+- 🟢 **Routine** — Schedule during next maintenance window
+- Each item should include: what to do, why, and estimated time/effort
+
+System Data:
+%s`, string(data))},
+			}},
+		}, nil
+	})
+
+	// Array state explanation prompt
+	s.mcpServer.AddPrompt(&mcp.Prompt{
+		Name:        "explain_array_state",
+		Description: "Translate raw array status into human-readable context with recommended actions",
+	}, func(_ context.Context, _ *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+		array := s.cacheProvider.GetArrayCache()
+		disks := s.cacheProvider.GetDisksCache()
+		parityHistory := s.cacheProvider.GetParityHistoryCache()
+
+		stateData := map[string]any{
+			"array":          array,
+			"disks":          disks,
+			"parity_history": parityHistory,
+			"timestamp":      time.Now(),
+		}
+
+		data, _ := json.MarshalIndent(stateData, "", "  ")
+		return &mcp.GetPromptResult{
+			Description: "Array state explanation",
+			Messages: []*mcp.PromptMessage{{
+				Role: "user",
+				Content: &mcp.TextContent{Text: fmt.Sprintf(`Explain the current Unraid array state in plain English for a non-technical user.
+
+Translate the following data into clear, actionable information:
+
+1. **Array State** — What does the current state mean? (Started = normal operation, Stopped = array is offline, etc.)
+2. **Parity Status** — Is parity valid? What does this mean for data protection? If a parity check/sync is running, explain why it might be running and how long it typically takes.
+3. **Parity Check Progress** — If a check is in progress, what percentage is complete? Is it a scheduled check or was it triggered by an event?
+4. **Disk States** — Are all disks healthy and online? Explain any disks in unusual states (disabled, missing, emulated, etc.)
+5. **Capacity** — How much space is used vs available? Is the array approaching full? (>85%% warrants attention, >95%% is critical)
+6. **Data Protection Level** — How many parity disks protect the array? What level of disk failure can it survive?
+
+Use simple language. Avoid jargon. If something needs user action, clearly state what to do and how urgent it is.
+
+Array Data:
 %s`, string(data))},
 			}},
 		}, nil
@@ -1371,7 +2221,7 @@ Disk Data:
 	s.mcpServer.AddPrompt(&mcp.Prompt{
 		Name:        "system_overview",
 		Description: "Get a comprehensive overview of the Unraid system status",
-	}, func(_ context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+	}, func(_ context.Context, _ *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		system := s.cacheProvider.GetSystemCache()
 		array := s.cacheProvider.GetArrayCache()
 		containers := s.cacheProvider.GetDockerCache()
@@ -1386,7 +2236,7 @@ Disk Data:
 			vmCount = len(vms)
 		}
 
-		overview := map[string]interface{}{
+		overview := map[string]any{
 			"system":     system,
 			"array":      array,
 			"containers": containerCount,
@@ -1415,7 +2265,7 @@ System Data:
 	s.mcpServer.AddPrompt(&mcp.Prompt{
 		Name:        "troubleshoot_issue",
 		Description: "Help troubleshoot common Unraid issues",
-	}, func(_ context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+	}, func(_ context.Context, _ *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		return &mcp.GetPromptResult{
 			Description: "Troubleshooting assistant",
 			Messages: []*mcp.PromptMessage{{
@@ -1439,7 +2289,7 @@ Please describe your issue and I'll gather the relevant system information to he
 		}, nil
 	})
 
-	logger.Debug("MCP prompts registered (3 prompts)")
+	logger.Debug("MCP prompts registered (6 prompts)")
 }
 
 // textResult creates a tool result with text content.
@@ -1450,7 +2300,7 @@ func textResult(text string) *mcp.CallToolResult {
 }
 
 // jsonResult creates a tool result with JSON-formatted text content.
-func jsonResult(data interface{}) (*mcp.CallToolResult, any, error) {
+func jsonResult(data any) (*mcp.CallToolResult, any, error) {
 	jsonData, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return &mcp.CallToolResult{

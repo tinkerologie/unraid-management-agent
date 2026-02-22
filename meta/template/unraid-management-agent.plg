@@ -3,9 +3,9 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name        "unraid-management-agent">
 <!ENTITY author      "ruaan-deysel">
-<!ENTITY version     "2026.02.01">
+<!ENTITY version     "2026.02.02">
 <!ENTITY launch      "Settings/&name;">
-<!ENTITY gitURL      "https://github.com/ruaandeysel/&name;">
+<!ENTITY gitURL      "https://github.com/ruaan-deysel/&name;">
 <!ENTITY pluginURL   "&gitURL;/releases/latest/download/&name;.plg">
 <!ENTITY bundle      "&name;-&version;.tgz">
 <!ENTITY md5         "5f0606dd5f45af61a553ee00e69756ae">
@@ -20,6 +20,9 @@
          icon="server">
 
 <CHANGES>
+###2026.02.02 (2026-02-17)
+- 16 New MCP Tools (9 monitoring, 9 control)
+
 ###2026.02.01 (2026-02-14)
 - CPU Power Consumption Monitoring
 - MCP Streamable HTTP Transport

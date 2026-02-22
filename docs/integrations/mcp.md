@@ -33,7 +33,7 @@ The MCP server supports two transports — use the one that fits your deployment
 > - Use **Streamable HTTP** if the AI client (Cursor, VS Code, etc.) runs on a different machine than the Unraid server.
 > - Use **STDIO** if the AI client (Claude Desktop, Cursor) runs locally on the Unraid server itself — it has zero network overhead and requires no authentication.
 
-## Available Tools (54 total)
+## Available Tools (72 total)
 
 ### System Monitoring Tools
 
@@ -69,21 +69,26 @@ The MCP server supports two transports — use the one that fits your deployment
 
 ### Docker Tools
 
-| Tool                  | Description                                     |
-| --------------------- | ----------------------------------------------- |
-| `list_containers`     | Docker containers, optionally filtered by state |
-| `get_container_info`  | Detailed information about a specific container |
-| `search_containers`   | Search containers by name or state              |
-| `get_docker_settings` | Docker daemon configuration settings            |
+| Tool                       | Description                                                     |
+| -------------------------- | --------------------------------------------------------------- |
+| `list_containers`          | Docker containers, optionally filtered by state                 |
+| `get_container_info`       | Detailed information about a specific container                 |
+| `get_container_logs`       | Container stdout/stderr logs with tail/since opts               |
+| `search_containers`        | Search containers by name or state                              |
+| `get_docker_settings`      | Docker daemon configuration settings                            |
+| `check_container_updates`  | Check all containers for available image updates                |
+| `check_container_update`   | Check a specific container for an image update                  |
+| `get_container_size`       | Get disk usage (image size + rw layer) of a container           |
 
 ### VM Tools
 
-| Tool              | Description                              |
-| ----------------- | ---------------------------------------- |
-| `list_vms`        | Virtual machines, optionally filtered    |
-| `get_vm_info`     | Detailed information about a specific VM |
-| `search_vms`      | Search VMs by name or state              |
-| `get_vm_settings` | VM manager configuration settings        |
+| Tool                  | Description                              |
+| --------------------- | ---------------------------------------- |
+| `list_vms`            | Virtual machines, optionally filtered    |
+| `get_vm_info`         | Detailed information about a specific VM |
+| `search_vms`          | Search VMs by name or state              |
+| `get_vm_settings`     | VM manager configuration settings        |
+| `list_vm_snapshots`   | List snapshots for a specific VM         |
 
 ### Network & UPS Tools
 
@@ -112,6 +117,20 @@ The MCP server supports two transports — use the one that fits your deployment
 | `list_collectors`      | List all data collectors and their status |
 | `get_collector_status` | Get status of a specific collector        |
 
+### Plugin Tools
+
+| Tool                   | Description                                       |
+| ---------------------- | ------------------------------------------------- |
+| `check_plugin_updates` | Check all installed plugins for available updates |
+
+### Service & Process Tools
+
+| Tool                | Description                                              |
+| ------------------- | -------------------------------------------------------- |
+| `get_service_status`| Get running/stopped status of a system service           |
+| `list_services`     | List all manageable system services with their status    |
+| `list_processes`    | List top system processes sorted by CPU, memory, or PID  |
+
 ### Parity & User Scripts Tools
 
 | Tool                 | Description                                          |
@@ -134,7 +153,13 @@ The MCP server supports two transports — use the one that fits your deployment
 | Tool                        | Description                                       | Actions                                                    |
 | --------------------------- | ------------------------------------------------- | ---------------------------------------------------------- |
 | `container_action`          | Docker container control                          | start, stop, restart, pause, unpause                       |
+| `update_container`          | Pull latest image and recreate a container        | Requires `confirm: true`                                   |
+| `update_all_containers`     | Update all containers with available updates      | Requires `confirm: true`                                   |
 | `vm_action`                 | Virtual machine control                           | start, stop, restart, pause, resume, hibernate, force-stop |
+| `create_vm_snapshot`        | Create a snapshot of a VM                         | Requires `confirm: true`                                   |
+| `delete_vm_snapshot`        | Delete a VM snapshot                              | Requires `confirm: true`                                   |
+| `restore_vm_snapshot`       | Restore a VM snapshot                             | Requires `confirm: true`                                   |
+| `clone_vm`                  | Clone a VM to a new name                          | Requires `confirm: true`                                   |
 | `array_action`              | Array control (**use with caution**)              | start, stop                                                |
 | `parity_check_action`       | Start parity check                                | correcting or non-correcting                               |
 | `parity_check_stop`         | Stop a running parity check                       | -                                                          |
@@ -142,6 +167,9 @@ The MCP server supports two transports — use the one that fits your deployment
 | `parity_check_resume`       | Resume a paused parity check                      | -                                                          |
 | `disk_spin_down`            | Spin down a specific disk                         | -                                                          |
 | `disk_spin_up`              | Spin up a specific disk                           | -                                                          |
+| `update_plugin`             | Update a specific plugin to latest version        | Requires `confirm: true`                                   |
+| `update_all_plugins`        | Update all plugins with available updates         | Requires `confirm: true`                                   |
+| `service_action`            | Start, stop, or restart a system service          | start, stop, restart — requires `confirm: true`            |
 | `execute_user_script`       | Execute a user script (**requires confirmation**) | -                                                          |
 | `collector_action`          | Enable or disable a data collector                | enable, disable                                            |
 | `update_collector_interval` | Update a collector's polling interval             | -                                                          |
@@ -152,9 +180,9 @@ The MCP server supports two transports — use the one that fits your deployment
 
 ## Tool Safety Annotations
 
-All 54 tools include MCP safety annotations to help AI agents make safe decisions automatically:
+All 70 tools include MCP safety annotations to help AI agents make safe decisions automatically:
 
-### Read-Only Tools (40 tools)
+### Read-Only Tools (49 tools)
 
 All monitoring and query tools are annotated with `readOnlyHint: true`, signaling to AI agents that these tools are safe to call without side effects:
 
@@ -165,24 +193,35 @@ get_ups_status, get_nut_status, get_gpu_metrics, list_disks, get_disk_info,
 get_disk_settings, list_shares, get_share_config, get_unassigned_devices,
 get_zfs_pools, get_zfs_datasets, get_zfs_snapshots, get_zfs_arc_stats,
 list_containers, get_container_info, search_containers, get_docker_settings,
-list_vms, get_vm_info, search_vms, get_vm_settings, get_notifications,
-get_notifications_overview, list_log_files, get_log_content, get_syslog,
-get_docker_log, get_parity_history, list_user_scripts, list_collectors,
-get_collector_status, get_system_settings
+check_container_updates, check_container_update, get_container_logs, get_container_size,
+list_vms, get_vm_info, search_vms, get_vm_settings, list_vm_snapshots,
+check_plugin_updates, get_service_status, list_services, list_processes,
+get_notifications, get_notifications_overview, list_log_files, get_log_content,
+get_syslog, get_docker_log, get_parity_history, list_user_scripts,
+list_collectors, get_collector_status, get_system_settings
 ```
 
-### Destructive Tools (6 tools) — `destructiveHint: true`
+### Destructive Tools (15 tools) — `destructiveHint: true`
 
 These tools make changes that may be difficult or impossible to reverse:
 
-| Tool                  | Additional Hints       | Confirmation Required |
-| --------------------- | ---------------------- | --------------------- |
-| `container_action`    | `idempotentHint: true` | No                    |
-| `vm_action`           | `idempotentHint: true` | No                    |
-| `array_action`        | `idempotentHint: true` | Yes (`confirm: true`) |
-| `execute_user_script` | —                      | Yes (`confirm: true`) |
-| `system_reboot`       | —                      | Yes (`confirm: true`) |
-| `system_shutdown`     | —                      | Yes (`confirm: true`) |
+| Tool                    | Additional Hints       | Confirmation Required |
+| ----------------------- | ---------------------- | --------------------- |
+| `container_action`      | `idempotentHint: true` | No                    |
+| `update_container`      | —                      | Yes (`confirm: true`) |
+| `update_all_containers` | —                      | Yes (`confirm: true`) |
+| `vm_action`             | `idempotentHint: true` | No                    |
+| `create_vm_snapshot`    | —                      | Yes (`confirm: true`) |
+| `delete_vm_snapshot`    | —                      | Yes (`confirm: true`) |
+| `restore_vm_snapshot`   | —                      | Yes (`confirm: true`) |
+| `clone_vm`              | —                      | Yes (`confirm: true`) |
+| `array_action`          | `idempotentHint: true` | Yes (`confirm: true`) |
+| `update_plugin`         | —                      | Yes (`confirm: true`) |
+| `update_all_plugins`    | —                      | Yes (`confirm: true`) |
+| `service_action`        | `idempotentHint: true` | Yes (`confirm: true`) |
+| `execute_user_script`   | —                      | Yes (`confirm: true`) |
+| `system_reboot`         | —                      | Yes (`confirm: true`) |
+| `system_shutdown`       | —                      | Yes (`confirm: true`) |
 
 ### Non-Destructive Control Tools (8 tools) — `destructiveHint: false`
 

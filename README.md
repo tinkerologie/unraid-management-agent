@@ -522,7 +522,7 @@ make clean
 - Prereqs: Docker (or compatible), VS Code with Dev Containers extension.
 - Open the repo in VS Code and run `Dev Containers: Reopen in Container`.
 - Builds image and container named `unraid-management-agent-dev` via `.devcontainer/docker-compose.yml`.
-- Tooling baked in: Go 1.25, Node.js 20, GitHub CLI (`gh`), Copilot CLI, make, gcc, jq.
+- Tooling baked in: Go 1.26, Node.js 20, GitHub CLI (`gh`), Copilot CLI, make, gcc, jq.
 - VS Code extensions auto-installed: Go, Makefile Tools, Prettier, GitHub (PRs, Codespaces, Actions, Copilot, Copilot Chat, RemoteHub, theme), and Claude Dev.
 - Post-create runs `go mod download`; run `make test` to verify after attach.
 

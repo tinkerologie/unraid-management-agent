@@ -190,10 +190,7 @@ func (s *Server) getLogContent(path, linesParam, startParam string) (*dto.LogFil
 		}, nil
 	}
 
-	endLine := startLine + numLines
-	if endLine > totalLines {
-		endLine = totalLines
-	}
+	endLine := min(startLine+numLines, totalLines)
 
 	selectedLines := allLines[startLine:endLine]
 

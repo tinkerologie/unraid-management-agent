@@ -142,6 +142,24 @@ type FlashDriveHealth struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
+// PluginUpdateResult contains the result of updating a single plugin
+type PluginUpdateResult struct {
+	PluginName      string    `json:"plugin_name" example:"community.applications"`
+	PreviousVersion string    `json:"previous_version" example:"2025.10.27"`
+	NewVersion      string    `json:"new_version" example:"2025.10.28"`
+	Success         bool      `json:"success" example:"true"`
+	Message         string    `json:"message" example:"Updated successfully"`
+	Timestamp       time.Time `json:"timestamp"`
+}
+
+// PluginBulkUpdateResult contains the results of updating multiple plugins
+type PluginBulkUpdateResult struct {
+	Results   []PluginUpdateResult `json:"results"`
+	Succeeded int                  `json:"succeeded" example:"3"`
+	Failed    int                  `json:"failed" example:"0"`
+	Timestamp time.Time            `json:"timestamp"`
+}
+
 // NetworkServiceInfo represents a single network service status
 // @Description Status information for a single network service
 type NetworkServiceInfo struct {

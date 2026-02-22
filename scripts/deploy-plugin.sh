@@ -28,14 +28,20 @@ VERSION=$(cat VERSION)
 BUILD_DIR="build"
 PLUGIN_BUNDLE="${BUILD_DIR}/${PLUGIN_NAME}-${VERSION}.tgz"
 
+# SSH options for reliable password-based authentication
+# -o PubkeyAuthentication=no prevents SSH from trying keys first (which causes
+# "Too many authentication failures" when keys don't match the Unraid server)
+# -o PreferredAuthentications=password ensures only password auth is attempted
+SSH_OPTS="-o StrictHostKeyChecking=no -o PubkeyAuthentication=no -o PreferredAuthentications=password"
+
 # Helper functions to avoid eval and command injection risks
 # These functions properly quote arguments to prevent shell metacharacter injection
 run_ssh() {
-    sshpass -p "$UNRAID_PASSWORD" ssh -o StrictHostKeyChecking=no "root@$UNRAID_IP" "$@"
+    sshpass -p "$UNRAID_PASSWORD" ssh $SSH_OPTS "root@$UNRAID_IP" "$@"
 }
 
 run_scp() {
-    sshpass -p "$UNRAID_PASSWORD" scp -o StrictHostKeyChecking=no "$@"
+    sshpass -p "$UNRAID_PASSWORD" scp $SSH_OPTS "$@"
 }
 
 echo "========================================="

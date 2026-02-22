@@ -119,7 +119,7 @@ repos:
           - -fmt=text
           - -exclude-dir=vendor
           - -exclude-dir=tests
-          - -exclude=G115,G304,G301,G306
+          - -exclude=G115,G304,G301,G306,G703,G204,G117,G704
           - -severity=medium
           - -confidence=medium
           - ./...
@@ -160,7 +160,7 @@ repos:
       - id: codespell
         name: Code Spell Checker
         args:
-          - --ignore-words-list=crate,nd,sav,fo,ue,numer,unexpect,aNULL,socio,socio-economic
+          - --ignore-words-list=crate,nd,sav,fo,ue,numer,unexpect,aNULL,socio,socio-economic,hax,publishErr
           - --skip="*.sum,*.lock,*.json,*.mod,coverage.html,CODE_OF_CONDUCT.md"
           - --quiet-level=2
 

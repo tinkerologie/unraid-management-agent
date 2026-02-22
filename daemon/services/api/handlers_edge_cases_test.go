@@ -58,7 +58,7 @@ func TestHandlersWithEmptyCache(t *testing.T) {
 			}
 
 			// Verify response is valid JSON
-			var response interface{}
+			var response any
 			if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
 				t.Errorf("failed to parse response as JSON: %v", err)
 			}
@@ -152,7 +152,7 @@ func TestCacheLocking(t *testing.T) {
 	// Test multiple concurrent reads
 	done := make(chan bool, 5)
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		go func() {
 			req, _ := http.NewRequest("GET", "/api/v1/system", nil)
 			rr := httptest.NewRecorder()
@@ -162,7 +162,7 @@ func TestCacheLocking(t *testing.T) {
 	}
 
 	// Wait for all goroutines
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		if !<-done {
 			t.Error("concurrent read failed")
 		}
@@ -189,7 +189,7 @@ func TestResponseFormat(t *testing.T) {
 	}
 
 	// Verify response is valid JSON
-	var response map[string]interface{}
+	var response map[string]any
 	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
 		t.Errorf("response is not valid JSON: %v", err)
 	}

@@ -479,7 +479,7 @@ func TestReadLinesLargeFile(t *testing.T) {
 	defer os.Remove(tmpFile.Name())
 
 	// Write 1000 lines with newlines
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		tmpFile.WriteString("line content\n")
 	}
 	tmpFile.Close()

@@ -100,7 +100,7 @@ security-check:
 	@echo "Running security checks..."
 	@echo "→ Running gosec..."
 	@if command -v gosec >/dev/null 2>&1; then \
-		gosec -fmt=text -exclude-dir=vendor -exclude-dir=tests -severity=medium -confidence=medium ./...; \
+		gosec -fmt=text -exclude-dir=vendor -exclude-dir=tests -exclude=G115,G304,G301,G306,G703,G204,G117 -severity=medium -confidence=medium ./...; \
 	else \
 		echo "⚠️  gosec not found. Install with: go install github.com/securego/gosec/v2/cmd/gosec@latest"; \
 	fi

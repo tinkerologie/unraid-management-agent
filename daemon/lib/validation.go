@@ -26,6 +26,18 @@ var (
 	// User script names: alphanumeric, hyphens, underscores, dots (max 255 chars)
 	// Must not contain path separators or parent directory references
 	userScriptNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_.-]{1,255}$`)
+
+	// Container references: either hex IDs (12/64 chars) or names (alphanumeric, hyphens, underscores, dots, slashes)
+	containerNameRegex = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,254}$`)
+
+	// Plugin names: alphanumeric, hyphens, underscores, dots (max 255 chars)
+	pluginNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_.-]{1,255}$`)
+
+	// Service names: lowercase alphanumeric and hyphens
+	serviceNameRegex = regexp.MustCompile(`^[a-z][a-z0-9-]{0,63}$`)
+
+	// Snapshot names: alphanumeric, hyphens, underscores, dots (max 255 chars)
+	snapshotNameRegex = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,254}$`)
 )
 
 // ValidateContainerID validates a Docker container ID format
@@ -216,4 +228,86 @@ func ValidateLogFilename(name string) bool {
 	}
 
 	return true
+}
+
+// ValidateContainerRef validates a Docker container reference (ID or name).
+// Accepts both short/full hex IDs and container names.
+func ValidateContainerRef(ref string) error {
+	if ref == "" {
+		return fmt.Errorf("container reference cannot be empty")
+	}
+
+	if len(ref) > 255 {
+		return fmt.Errorf("container reference too long: maximum 255 characters")
+	}
+
+	// Check for path traversal and injection
+	if strings.Contains(ref, "..") || strings.Contains(ref, "/") || strings.Contains(ref, "\\") {
+		return fmt.Errorf("invalid container reference: cannot contain path separators or directory traversal")
+	}
+
+	if strings.Contains(ref, "\x00") {
+		return fmt.Errorf("invalid container reference: cannot contain null bytes")
+	}
+
+	// Accept hex IDs (12 or 64 chars)
+	refLower := strings.ToLower(ref)
+	if containerIDShortRegex.MatchString(refLower) || containerIDFullRegex.MatchString(refLower) {
+		return nil
+	}
+
+	// Accept container names
+	if containerNameRegex.MatchString(ref) {
+		return nil
+	}
+
+	return fmt.Errorf("invalid container reference: must be a 12/64 hex ID or a valid container name")
+}
+
+// ValidatePluginName validates an Unraid plugin name.
+func ValidatePluginName(name string) error {
+	if name == "" {
+		return fmt.Errorf("plugin name cannot be empty")
+	}
+
+	if strings.Contains(name, "..") || strings.Contains(name, "/") || strings.Contains(name, "\\") {
+		return fmt.Errorf("invalid plugin name: cannot contain path separators or directory traversal")
+	}
+
+	if !pluginNameRegex.MatchString(name) {
+		return fmt.Errorf("invalid plugin name format: must contain only alphanumeric characters, hyphens, underscores, and dots")
+	}
+
+	return nil
+}
+
+// ValidateServiceName validates an Unraid service name.
+func ValidateServiceName(name string) error {
+	if name == "" {
+		return fmt.Errorf("service name cannot be empty")
+	}
+
+	nameLower := strings.ToLower(name)
+	if !serviceNameRegex.MatchString(nameLower) {
+		return fmt.Errorf("invalid service name format: must be lowercase alphanumeric with hyphens")
+	}
+
+	return nil
+}
+
+// ValidateSnapshotName validates a VM snapshot name.
+func ValidateSnapshotName(name string) error {
+	if name == "" {
+		return fmt.Errorf("snapshot name cannot be empty")
+	}
+
+	if strings.Contains(name, "..") || strings.Contains(name, "/") || strings.Contains(name, "\\") {
+		return fmt.Errorf("invalid snapshot name: cannot contain path separators or directory traversal")
+	}
+
+	if !snapshotNameRegex.MatchString(name) {
+		return fmt.Errorf("invalid snapshot name format: must start with alphanumeric and contain only alphanumeric, hyphens, underscores, and dots")
+	}
+
+	return nil
 }

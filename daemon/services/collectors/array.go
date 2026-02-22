@@ -15,6 +15,9 @@ import (
 	"gopkg.in/ini.v1"
 )
 
+// watchedArrayFiles are the INI files the array collector monitors for changes.
+var watchedArrayFiles = []string{constants.VarIni, constants.DisksIni}
+
 // ArrayCollector collects Unraid array status information including state, parity status, and disk assignments.
 // It publishes array status updates to the event bus at regular intervals.
 type ArrayCollector struct {
@@ -40,6 +43,32 @@ func (c *ArrayCollector) Start(ctx context.Context, interval time.Duration) {
 		}()
 		c.Collect()
 	}()
+
+	// Set up fsnotify watcher for instant state updates on INI file changes
+	fw, err := NewFileWatcher(500 * time.Millisecond)
+	if err != nil {
+		logger.Warning("Array collector: failed to create file watcher, using ticker only: %v", err)
+	} else {
+		defer func() { _ = fw.Close() }()
+		for _, f := range watchedArrayFiles {
+			if watchErr := fw.WatchFile(f); watchErr != nil {
+				logger.Warning("Array collector: failed to watch %s: %v", f, watchErr)
+			}
+		}
+		// Run watcher in background goroutine — triggers Collect on file changes
+		go fw.Run(ctx, watchedArrayFiles, func() {
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Error("Array collector PANIC on fsnotify: %v", r)
+					}
+				}()
+				logger.Debug("Array collector: INI file changed, collecting immediately")
+				c.Collect()
+			}()
+		})
+		logger.Info("Array collector: fsnotify watching %v for instant updates", watchedArrayFiles)
+	}
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()

@@ -6,11 +6,13 @@ import (
 	"testing"
 )
 
-func TestArchiveNotification(t *testing.T) {
-	// Create temp directories
+// setupNotificationTestDirs creates temp directories and overrides the package-level vars.
+// Returns a cleanup function that restores original values.
+func setupNotificationTestDirs(t *testing.T) func() {
+	t.Helper()
 	tmpDir := t.TempDir()
 	tmpNotifDir := filepath.Join(tmpDir, "notifications")
-	tmpArchiveDir := filepath.Join(tmpDir, "archive")
+	tmpArchiveDir := filepath.Join(tmpNotifDir, "archive")
 
 	if err := os.MkdirAll(tmpNotifDir, 0755); err != nil {
 		t.Fatalf("Failed to create temp notification dir: %v", err)
@@ -19,34 +21,28 @@ func TestArchiveNotification(t *testing.T) {
 		t.Fatalf("Failed to create temp archive dir: %v", err)
 	}
 
-	// Temporarily override directories for testing
 	oldNotifDir := notificationsDir
 	oldArchiveDir := notificationsArchiveDir
-	defer func() {
-		// Restore original values - note: this won't work as they're constants
-		// In a real scenario, these would need to be configurable
-		_ = oldNotifDir
-		_ = oldArchiveDir
-	}()
+	notificationsDir = tmpNotifDir
+	notificationsArchiveDir = tmpArchiveDir
+
+	return func() {
+		notificationsDir = oldNotifDir
+		notificationsArchiveDir = oldArchiveDir
+	}
+}
+
+func TestArchiveNotification(t *testing.T) {
+	cleanup := setupNotificationTestDirs(t)
+	defer cleanup()
 
 	// Create a test notification file
 	testFile := "test.notify"
 	testPath := filepath.Join(notificationsDir, testFile)
 	testContent := []byte("test notification content")
 
-	// Create parent directory if needed
-	if err := os.MkdirAll(filepath.Dir(testPath), 0755); err != nil {
-		t.Fatalf("Failed to create notifications dir: %v", err)
-	}
-
 	if err := os.WriteFile(testPath, testContent, 0644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
-	}
-	defer os.Remove(testPath)
-
-	// Ensure archive dir exists
-	if err := os.MkdirAll(notificationsArchiveDir, 0755); err != nil {
-		t.Fatalf("Failed to create archive dir: %v", err)
 	}
 
 	// Test archiving
@@ -59,9 +55,6 @@ func TestArchiveNotification(t *testing.T) {
 	archivedPath := filepath.Join(notificationsArchiveDir, testFile)
 	if _, err := os.Stat(archivedPath); os.IsNotExist(err) {
 		t.Error("Notification file was not archived")
-	} else {
-		// Clean up
-		os.Remove(archivedPath)
 	}
 
 	// Verify original file was removed
@@ -98,23 +91,17 @@ func TestArchiveNotification_InvalidID(t *testing.T) {
 }
 
 func TestUnarchiveNotification(t *testing.T) {
+	cleanup := setupNotificationTestDirs(t)
+	defer cleanup()
+
 	// Create a test archived notification
 	testFile := "test-archived.notify"
 	testPath := filepath.Join(notificationsArchiveDir, testFile)
 	testContent := []byte("archived notification content")
 
-	// Ensure directories exist
-	if err := os.MkdirAll(notificationsArchiveDir, 0755); err != nil {
-		t.Fatalf("Failed to create archive dir: %v", err)
-	}
-	if err := os.MkdirAll(notificationsDir, 0755); err != nil {
-		t.Fatalf("Failed to create notifications dir: %v", err)
-	}
-
 	if err := os.WriteFile(testPath, testContent, 0644); err != nil {
 		t.Fatalf("Failed to create test archived file: %v", err)
 	}
-	defer os.Remove(testPath)
 
 	// Test unarchiving
 	err := UnarchiveNotification(testFile)
@@ -126,9 +113,6 @@ func TestUnarchiveNotification(t *testing.T) {
 	unarchivedPath := filepath.Join(notificationsDir, testFile)
 	if _, err := os.Stat(unarchivedPath); os.IsNotExist(err) {
 		t.Error("Notification file was not unarchived")
-	} else {
-		// Clean up
-		os.Remove(unarchivedPath)
 	}
 
 	// Verify archived file was removed
@@ -145,14 +129,13 @@ func TestUnarchiveNotification_NonExistent(t *testing.T) {
 }
 
 func TestDeleteNotification(t *testing.T) {
+	cleanup := setupNotificationTestDirs(t)
+	defer cleanup()
+
 	// Create a test notification
 	testFile := "test-delete.notify"
 	testPath := filepath.Join(notificationsDir, testFile)
 	testContent := []byte("notification to delete")
-
-	if err := os.MkdirAll(notificationsDir, 0755); err != nil {
-		t.Fatalf("Failed to create notifications dir: %v", err)
-	}
 
 	if err := os.WriteFile(testPath, testContent, 0644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
@@ -197,13 +180,8 @@ func TestDeleteNotification_InvalidID(t *testing.T) {
 }
 
 func TestArchiveAllNotifications(t *testing.T) {
-	// Create multiple test notifications
-	if err := os.MkdirAll(notificationsDir, 0755); err != nil {
-		t.Fatalf("Failed to create notifications dir: %v", err)
-	}
-	if err := os.MkdirAll(notificationsArchiveDir, 0755); err != nil {
-		t.Fatalf("Failed to create archive dir: %v", err)
-	}
+	cleanup := setupNotificationTestDirs(t)
+	defer cleanup()
 
 	testFiles := []string{
 		"test1.notify",
@@ -217,8 +195,6 @@ func TestArchiveAllNotifications(t *testing.T) {
 		if err := os.WriteFile(path, []byte("test"), 0644); err != nil {
 			t.Fatalf("Failed to create test file %s: %v", file, err)
 		}
-		defer os.Remove(path)
-		defer os.Remove(filepath.Join(notificationsArchiveDir, file))
 	}
 
 	// Archive all
@@ -237,12 +213,10 @@ func TestArchiveAllNotifications(t *testing.T) {
 }
 
 func TestArchiveAllNotifications_EmptyDirectory(t *testing.T) {
-	// Ensure directory exists but is empty
-	if err := os.MkdirAll(notificationsDir, 0755); err != nil {
-		t.Fatalf("Failed to create notifications dir: %v", err)
-	}
+	cleanup := setupNotificationTestDirs(t)
+	defer cleanup()
 
-	// Should not error on empty directory
+	// Should not error on empty directory (no .notify files)
 	err := ArchiveAllNotifications()
 	if err != nil {
 		t.Errorf("ArchiveAllNotifications failed on empty directory: %v", err)
@@ -250,10 +224,8 @@ func TestArchiveAllNotifications_EmptyDirectory(t *testing.T) {
 }
 
 func TestCreateNotification_ValidInput(t *testing.T) {
-	// Ensure directory exists
-	if err := os.MkdirAll(notificationsDir, 0755); err != nil {
-		t.Fatalf("Failed to create notifications dir: %v", err)
-	}
+	cleanup := setupNotificationTestDirs(t)
+	defer cleanup()
 
 	err := CreateNotification(
 		"Test Notification",
@@ -267,10 +239,10 @@ func TestCreateNotification_ValidInput(t *testing.T) {
 		t.Errorf("CreateNotification failed: %v", err)
 	}
 
-	// Clean up - find and remove the created file
+	// Verify a file was created
 	files, _ := filepath.Glob(filepath.Join(notificationsDir, "*Test_Notification.notify"))
-	for _, file := range files {
-		os.Remove(file)
+	if len(files) == 0 {
+		t.Error("Expected notification file to be created")
 	}
 }
 
@@ -303,9 +275,8 @@ func TestCreateNotification_EmptyTitle(t *testing.T) {
 }
 
 func TestCreateNotification_SpecialCharactersInTitle(t *testing.T) {
-	if err := os.MkdirAll(notificationsDir, 0755); err != nil {
-		t.Fatalf("Failed to create notifications dir: %v", err)
-	}
+	cleanup := setupNotificationTestDirs(t)
+	defer cleanup()
 
 	tests := []struct {
 		name  string
@@ -329,12 +300,6 @@ func TestCreateNotification_SpecialCharactersInTitle(t *testing.T) {
 
 			if err != nil {
 				t.Logf("CreateNotification with '%s' failed: %v", tt.title, err)
-			}
-
-			// Clean up
-			files, _ := filepath.Glob(filepath.Join(notificationsDir, "*.notify"))
-			for _, file := range files {
-				os.Remove(file)
 			}
 		})
 	}

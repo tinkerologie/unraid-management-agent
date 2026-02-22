@@ -41,7 +41,7 @@ func TestPubSubMultipleSubscribers(t *testing.T) {
 	hub.Pub("broadcast message", "events")
 
 	// All subscribers should receive the message
-	channels := []chan interface{}{ch1, ch2, ch3}
+	channels := []chan any{ch1, ch2, ch3}
 	for i, ch := range channels {
 		select {
 		case msg := <-ch:
@@ -73,7 +73,7 @@ func TestPubSubMultipleTopics(t *testing.T) {
 
 	// Verify each subscriber receives correct message
 	tests := []struct {
-		ch       chan interface{}
+		ch       chan any
 		expected string
 		topic    string
 	}{
@@ -128,7 +128,7 @@ func TestPubSubHighVolume(t *testing.T) {
 	// Publish many messages
 	messageCount := 100
 	go func() {
-		for i := 0; i < messageCount; i++ {
+		for i := range messageCount {
 			hub.Pub(i, "high_volume")
 		}
 	}()

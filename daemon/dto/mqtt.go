@@ -39,18 +39,18 @@ type MQTTStatus struct {
 
 // MQTTMessage represents a message to be published via MQTT.
 type MQTTMessage struct {
-	Topic    string      `json:"topic" example:"unraid/system/status"`
-	Payload  interface{} `json:"payload"`
-	QoS      int         `json:"qos" example:"1"`
-	Retained bool        `json:"retained" example:"false"`
+	Topic    string `json:"topic" example:"unraid/system/status"`
+	Payload  any    `json:"payload"`
+	QoS      int    `json:"qos" example:"1"`
+	Retained bool   `json:"retained" example:"false"`
 }
 
 // MQTTPublishRequest represents a request to publish a message via MQTT.
 type MQTTPublishRequest struct {
-	Topic    string      `json:"topic" example:"custom/topic"`
-	Payload  interface{} `json:"payload"`
-	QoS      int         `json:"qos" example:"1"`
-	Retained bool        `json:"retained" example:"false"`
+	Topic    string `json:"topic" example:"custom/topic"`
+	Payload  any    `json:"payload"`
+	QoS      int    `json:"qos" example:"1"`
+	Retained bool   `json:"retained" example:"false"`
 }
 
 // MQTTPublishResponse represents the response after publishing a message.

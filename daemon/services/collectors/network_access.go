@@ -260,8 +260,8 @@ func getWANIPFromUnraid() string {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.HasPrefix(line, "WANIP=") {
-			ip := strings.TrimPrefix(line, "WANIP=")
+		if after, ok := strings.CutPrefix(line, "WANIP="); ok {
+			ip := after
 			ip = strings.Trim(ip, "\"")
 			if net.ParseIP(ip) != nil {
 				return ip

@@ -320,13 +320,13 @@ func extractInterfaceTargets(xml string) []string {
 		if endIdx := strings.Index(ifaceXML, "</interface>"); endIdx > 0 {
 			ifaceXML = ifaceXML[:endIdx]
 			// Find target dev within this interface
-			if devIdx := strings.Index(ifaceXML, "<target dev=\""); devIdx >= 0 {
-				devPart := ifaceXML[devIdx+len("<target dev=\""):]
+			if _, after, ok := strings.Cut(ifaceXML, "<target dev=\""); ok {
+				devPart := after
 				if quoteIdx := strings.Index(devPart, "\""); quoteIdx > 0 {
 					targets = append(targets, devPart[:quoteIdx])
 				}
-			} else if devIdx := strings.Index(ifaceXML, "<target dev='"); devIdx >= 0 {
-				devPart := ifaceXML[devIdx+len("<target dev='"):]
+			} else if _, after, ok := strings.Cut(ifaceXML, "<target dev='"); ok {
+				devPart := after
 				if quoteIdx := strings.Index(devPart, "'"); quoteIdx > 0 {
 					targets = append(targets, devPart[:quoteIdx])
 				}

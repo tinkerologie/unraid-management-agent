@@ -23,3 +23,22 @@ type VMInfo struct {
 	PersistentState bool      `json:"persistent" example:"true"`
 	Timestamp       time.Time `json:"timestamp"`
 }
+
+// VMSnapshot contains information about a VM snapshot
+type VMSnapshot struct {
+	Name        string `json:"name" example:"pre-update"`
+	VMName      string `json:"vm_name" example:"Windows 11"`
+	Description string `json:"description,omitempty" example:"Snapshot before Windows update"`
+	State       string `json:"state" example:"shutoff"`
+	CreatedAt   string `json:"created_at,omitempty" example:"2025-02-16T10:30:00Z"`
+	Parent      string `json:"parent,omitempty" example:"base"`
+	IsCurrent   bool   `json:"is_current" example:"true"`
+}
+
+// VMSnapshotList contains a list of VM snapshots
+type VMSnapshotList struct {
+	VMName    string       `json:"vm_name" example:"Windows 11"`
+	Snapshots []VMSnapshot `json:"snapshots"`
+	Count     int          `json:"count" example:"3"`
+	Timestamp time.Time    `json:"timestamp"`
+}

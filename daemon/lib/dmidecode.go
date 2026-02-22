@@ -25,8 +25,8 @@ func parseDmidecodeOutput(output string) []map[string]string {
 	var currentSection map[string]string
 	var currentKey string
 
-	lines := strings.Split(output, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(output, "\n")
+	for line := range lines {
 		// Skip empty lines and header lines
 		if strings.TrimSpace(line) == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "SMBIOS") || strings.HasPrefix(line, "Getting") {
 			continue
@@ -79,7 +79,11 @@ func ParseBIOSInfo() (*dto.BIOSInfo, error) {
 		return nil, fmt.Errorf("no BIOS information found")
 	}
 
-	section := sections[0]
+	return parseBIOSInfoFromSection(sections[0]), nil
+}
+
+// parseBIOSInfoFromSection extracts BIOS info from a pre-parsed section map.
+func parseBIOSInfoFromSection(section map[string]string) *dto.BIOSInfo {
 	bios := &dto.BIOSInfo{
 		Vendor:      section["Vendor"],
 		Version:     section["Version"],
@@ -98,7 +102,7 @@ func ParseBIOSInfo() (*dto.BIOSInfo, error) {
 		}
 	}
 
-	return bios, nil
+	return bios
 }
 
 // ParseBaseboardInfo parses baseboard information from dmidecode type 2
@@ -112,7 +116,11 @@ func ParseBaseboardInfo() (*dto.BaseboardInfo, error) {
 		return nil, fmt.Errorf("no baseboard information found")
 	}
 
-	section := sections[0]
+	return parseBaseboardInfoFromSection(sections[0]), nil
+}
+
+// parseBaseboardInfoFromSection extracts baseboard info from a pre-parsed section map.
+func parseBaseboardInfoFromSection(section map[string]string) *dto.BaseboardInfo {
 	baseboard := &dto.BaseboardInfo{
 		Manufacturer:      section["Manufacturer"],
 		ProductName:       section["Product Name"],
@@ -131,7 +139,7 @@ func ParseBaseboardInfo() (*dto.BaseboardInfo, error) {
 		}
 	}
 
-	return baseboard, nil
+	return baseboard
 }
 
 // ParseCPUInfo parses CPU information from dmidecode type 4
@@ -145,7 +153,11 @@ func ParseCPUInfo() (*dto.CPUHardwareInfo, error) {
 		return nil, fmt.Errorf("no CPU information found")
 	}
 
-	section := sections[0]
+	return parseCPUInfoFromSection(sections[0]), nil
+}
+
+// parseCPUInfoFromSection extracts CPU info from a pre-parsed section map.
+func parseCPUInfoFromSection(section map[string]string) *dto.CPUHardwareInfo {
 	cpu := &dto.CPUHardwareInfo{
 		SocketDesignation: section["Socket Designation"],
 		Family:            section["Family"],
@@ -199,7 +211,7 @@ func ParseCPUInfo() (*dto.CPUHardwareInfo, error) {
 		}
 	}
 
-	return cpu, nil
+	return cpu
 }
 
 // ParseCPUCacheInfo parses CPU cache information from dmidecode type 7
@@ -209,6 +221,11 @@ func ParseCPUCacheInfo() ([]dto.CPUCacheInfo, error) {
 		return nil, err
 	}
 
+	return parseCPUCacheInfoFromSections(sections), nil
+}
+
+// parseCPUCacheInfoFromSections extracts cache info from pre-parsed section maps.
+func parseCPUCacheInfoFromSections(sections []map[string]string) []dto.CPUCacheInfo {
 	var caches []dto.CPUCacheInfo
 	for _, section := range sections {
 		cache := dto.CPUCacheInfo{
@@ -245,7 +262,7 @@ func ParseCPUCacheInfo() ([]dto.CPUCacheInfo, error) {
 		caches = append(caches, cache)
 	}
 
-	return caches, nil
+	return caches
 }
 
 // ParseMemoryArrayInfo parses memory array information from dmidecode type 16
@@ -259,7 +276,11 @@ func ParseMemoryArrayInfo() (*dto.MemoryArrayInfo, error) {
 		return nil, fmt.Errorf("no memory array information found")
 	}
 
-	section := sections[0]
+	return parseMemoryArrayInfoFromSection(sections[0]), nil
+}
+
+// parseMemoryArrayInfoFromSection extracts memory array info from a pre-parsed section map.
+func parseMemoryArrayInfoFromSection(section map[string]string) *dto.MemoryArrayInfo {
 	memArray := &dto.MemoryArrayInfo{
 		Location:            section["Location"],
 		Use:                 section["Use"],
@@ -274,7 +295,7 @@ func ParseMemoryArrayInfo() (*dto.MemoryArrayInfo, error) {
 		}
 	}
 
-	return memArray, nil
+	return memArray
 }
 
 // ParseMemoryDevices parses memory device information from dmidecode type 17
@@ -284,6 +305,11 @@ func ParseMemoryDevices() ([]dto.MemoryDeviceInfo, error) {
 		return nil, err
 	}
 
+	return parseMemoryDevicesFromSections(sections), nil
+}
+
+// parseMemoryDevicesFromSections extracts memory device info from pre-parsed section maps.
+func parseMemoryDevicesFromSections(sections []map[string]string) []dto.MemoryDeviceInfo {
 	var devices []dto.MemoryDeviceInfo
 	for _, section := range sections {
 		// Skip empty slots
@@ -329,5 +355,5 @@ func ParseMemoryDevices() ([]dto.MemoryDeviceInfo, error) {
 		devices = append(devices, device)
 	}
 
-	return devices, nil
+	return devices
 }

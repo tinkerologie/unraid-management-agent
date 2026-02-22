@@ -134,8 +134,8 @@ func (m *MockCacheProvider) GetNetworkAccessURLs() *dto.NetworkAccessURLs {
 		URLs: []dto.AccessURL{{Type: "lan", Name: "LAN", IPv4: "192.168.1.100"}},
 	}
 }
-func (m *MockCacheProvider) GetHealthStatus() map[string]interface{} {
-	return map[string]interface{}{
+func (m *MockCacheProvider) GetHealthStatus() map[string]any {
+	return map[string]any{
 		"cpu_usage":   25.5,
 		"ram_usage":   60.0,
 		"array_state": "Started",
@@ -507,7 +507,7 @@ func TestMockCacheProviderNil(t *testing.T) {
 func TestJSONResultMarshal(t *testing.T) {
 	tests := []struct {
 		name    string
-		input   interface{}
+		input   any
 		wantErr bool
 	}{
 		{

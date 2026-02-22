@@ -300,18 +300,52 @@ func TestListLogFiles(t *testing.T) {
 	server, _ := setupTestServer()
 
 	// This just checks that listLogFiles doesn't crash
-	// It will return an empty list or files from system
+	// It will return an empty list or nil on non-Unraid systems
 	files := server.listLogFiles()
 
-	// Should return a slice (may be empty)
-	if files == nil {
-		t.Error("Expected non-nil slice from listLogFiles")
-	}
-
-	// Each file should have a Path
+	// Each file should have a Path (if any files found)
 	for _, file := range files {
 		if file.Path == "" {
 			t.Error("Expected non-empty Path for log file")
 		}
+	}
+}
+
+// ===== Public wrapper method tests =====
+
+func TestListLogFiles_PublicWrapper(t *testing.T) {
+	server, _ := setupTestServer()
+
+	tmpDir := t.TempDir()
+	logFile := filepath.Join(tmpDir, "pub.log")
+	if err := os.WriteFile(logFile, []byte("data\n"), 0644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	oldPaths := commonLogPaths
+	commonLogPaths = []string{logFile}
+	t.Cleanup(func() { commonLogPaths = oldPaths })
+
+	logs := server.ListLogFiles()
+	if len(logs) != 1 {
+		t.Fatalf("expected 1 log, got %d", len(logs))
+	}
+}
+
+func TestGetLogContent_PublicWrapper(t *testing.T) {
+	server, _ := setupTestServer()
+
+	tmpDir := t.TempDir()
+	logFile := filepath.Join(tmpDir, "pub.log")
+	if err := os.WriteFile(logFile, []byte("a\nb\nc\n"), 0644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	content, err := server.GetLogContent(logFile, "", "")
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	if content.TotalLines != 3 {
+		t.Errorf("expected 3 lines, got %d", content.TotalLines)
 	}
 }

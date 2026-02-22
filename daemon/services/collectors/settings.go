@@ -3,6 +3,7 @@ package collectors
 import (
 	"bufio"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -617,8 +618,8 @@ func (c *SettingsCollector) parseUnraidVersion(status *dto.UpdateStatus) error {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		if strings.HasPrefix(line, "version=") {
-			status.CurrentVersion = strings.Trim(strings.TrimPrefix(line, "version="), `"`)
+		if after, ok := strings.CutPrefix(line, "version="); ok {
+			status.CurrentVersion = strings.Trim(after, `"`)
 			break
 		}
 	}
@@ -972,19 +973,13 @@ func (c *SettingsCollector) mergeNetworkSettings(varIni, identCfg, tips map[stri
 	merged := make(map[string]string)
 
 	// Start with ident.cfg
-	for k, v := range identCfg {
-		merged[k] = v
-	}
+	maps.Copy(merged, identCfg)
 
 	// Overlay tips.and.tweaks.cfg
-	for k, v := range tips {
-		merged[k] = v
-	}
+	maps.Copy(merged, tips)
 
 	// Overlay var.ini (runtime state takes precedence)
-	for k, v := range varIni {
-		merged[k] = v
-	}
+	maps.Copy(merged, varIni)
 
 	return merged
 }
@@ -1070,8 +1065,8 @@ func (c *SettingsCollector) isSyslogServerEnabled() bool {
 		return false
 	}
 
-	lines := strings.Split(string(content), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(string(content), "\n")
+	for line := range lines {
 		line = strings.TrimSpace(line)
 		// Skip comments
 		if strings.HasPrefix(line, "#") {

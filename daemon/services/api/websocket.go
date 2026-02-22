@@ -22,7 +22,7 @@ var upgrader = websocket.Upgrader{
 // It handles client registration, unregistration, and message broadcasting in a thread-safe manner.
 type WSHub struct {
 	clients    map[*WSClient]bool
-	broadcast  chan interface{}
+	broadcast  chan any
 	register   chan *WSClient
 	unregister chan *WSClient
 	mu         sync.RWMutex
@@ -41,7 +41,7 @@ type WSClient struct {
 func NewWSHub() *WSHub {
 	return &WSHub{
 		clients:    make(map[*WSClient]bool),
-		broadcast:  make(chan interface{}, constants.WSBufferSize),
+		broadcast:  make(chan any, constants.WSBufferSize),
 		register:   make(chan *WSClient),
 		unregister: make(chan *WSClient),
 	}
@@ -100,7 +100,7 @@ func (h *WSHub) Run(ctx context.Context) {
 
 // Broadcast sends a message to all connected WebSocket clients.
 // The message is wrapped in a WSEvent and sent asynchronously to each client.
-func (h *WSHub) Broadcast(message interface{}) {
+func (h *WSHub) Broadcast(message any) {
 	h.broadcast <- message
 }
 

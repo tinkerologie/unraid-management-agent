@@ -145,8 +145,8 @@ func parseListValue(value string) []string {
 
 	var result []string
 	if strings.Contains(value, ",") {
-		parts := strings.Split(value, ",")
-		for _, part := range parts {
+		parts := strings.SplitSeq(value, ",")
+		for part := range parts {
 			trimmed := strings.TrimSpace(part)
 			if trimmed != "" {
 				result = append(result, trimmed)

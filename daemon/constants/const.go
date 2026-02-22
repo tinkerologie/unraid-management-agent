@@ -72,6 +72,10 @@ const (
 	ZpoolBin = "/usr/sbin/zpool"
 	// ZfsBin is the path to the zfs binary.
 	ZfsBin = "/usr/sbin/zfs"
+	// PluginBin is the path to the Unraid plugin management binary.
+	PluginBin = "/usr/local/sbin/plugin"
+	// VirtCloneBin is the path to the virt-clone binary.
+	VirtCloneBin = "/usr/bin/virt-clone"
 
 	// ProcSPLARCStats is the path to the ZFS ARC statistics file.
 	ProcSPLARCStats = "/proc/spl/kstat/zfs/arcstats"

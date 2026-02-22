@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The Unraid Management Agent is a Go-based plugin for Unraid that exposes comprehensive system monitoring and control via REST API, WebSockets, and MCP (Model Context Protocol). This is a **third-party community plugin**, not an official Unraid product. It provides a REST API + WebSocket interface as an alternative/complement to the official Unraid GraphQL API.
 
-**Language:** Go 1.25
+**Language:** Go 1.26
 **Target Platform:** Linux/amd64 (Unraid OS)
 
 ## Essential Commands

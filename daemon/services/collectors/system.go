@@ -446,7 +446,7 @@ func (c *SystemCollector) readHwmonTemperatures() (map[string]float64, error) {
 	temperatures := make(map[string]float64)
 
 	// Read from /sys/class/hwmon/hwmon*/temp*_input
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		for j := 1; j < 20; j++ {
 			path := fmt.Sprintf("/sys/class/hwmon/hwmon%d/temp%d_input", i, j)
 			//nolint:gosec // G304: Path is constructed from /sys/class/hwmon system directory with numeric indices
@@ -548,7 +548,7 @@ func (c *SystemCollector) readHwmonFanSpeeds() (map[string]int, error) {
 	fanSpeeds := make(map[string]int)
 
 	// Read from /sys/class/hwmon/hwmon*/fan*_input
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		for j := 1; j < 20; j++ {
 			path := fmt.Sprintf("/sys/class/hwmon/hwmon%d/fan%d_input", i, j)
 			//nolint:gosec // G304: Path is constructed from /sys/class/hwmon system directory with numeric indices
@@ -838,8 +838,8 @@ func (c *SystemCollector) getUnraidVersion() string {
 	if err == nil {
 		content := strings.TrimSpace(string(data))
 		// The file contains version="7.2.0" format
-		if strings.HasPrefix(content, "version=") {
-			version := strings.TrimPrefix(content, "version=")
+		if after, ok := strings.CutPrefix(content, "version="); ok {
+			version := after
 			version = strings.Trim(version, "\"")
 			return version
 		}
@@ -851,11 +851,11 @@ func (c *SystemCollector) getUnraidVersion() string {
 	varIniPath := "/var/local/emhttp/var.ini"
 	varIniData, err := os.ReadFile(varIniPath)
 	if err == nil {
-		lines := strings.Split(string(varIniData), "\n")
-		for _, line := range lines {
+		lines := strings.SplitSeq(string(varIniData), "\n")
+		for line := range lines {
 			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "version=") {
-				version := strings.TrimPrefix(line, "version=")
+			if after, ok := strings.CutPrefix(line, "version="); ok {
+				version := after
 				version = strings.Trim(version, "\"")
 				return version
 			}
@@ -875,8 +875,8 @@ func (c *SystemCollector) getParityCheckSpeed() string {
 	}
 
 	// Parse for sbSynced line which contains parity check speed
-	lines := strings.Split(string(data), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(string(data), "\n")
+	for line := range lines {
 		if strings.HasPrefix(line, "sbSynced=") {
 			// Extract the speed part (e.g., "18645 MB/s + 38044 MB/s")
 			parts := strings.SplitN(line, "=", 2)

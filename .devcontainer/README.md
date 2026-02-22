@@ -6,7 +6,7 @@ This document describes the development container setup for the unraid-managemen
 
 ### Base Tools
 
-- **Go 1.25.0** - Go programming language (matches deployment target)
+- **Go 1.26.0** - Go programming language (matches deployment target)
 - **Node.js 20** - JavaScript runtime (for Copilot CLI)
 - **GitHub CLI (gh)** - GitHub command-line interface
 - **Git** - Version control

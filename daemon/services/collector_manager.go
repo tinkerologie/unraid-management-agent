@@ -115,11 +115,9 @@ func (cm *CollectorManager) startCollectorLocked(name string) {
 	collector := mc.factory(mc.domainCtx)
 
 	// Start the collector goroutine
-	mc.wg.Add(1)
-	go func() {
-		defer mc.wg.Done()
+	mc.wg.Go(func() {
 		collector.Start(ctx, time.Duration(mc.Interval)*time.Second)
-	}()
+	})
 
 	mc.Status = "running"
 	mc.Enabled = true

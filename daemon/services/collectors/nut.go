@@ -212,8 +212,8 @@ func (c *NUTCollector) listDevices() ([]dto.NUTDevice, error) {
 	}
 
 	var devices []dto.NUTDevice
-	lines := strings.Split(strings.TrimSpace(output), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(strings.TrimSpace(output), "\n")
+	for line := range lines {
 		name := strings.TrimSpace(line)
 		if name == "" {
 			continue
@@ -252,8 +252,8 @@ func (c *NUTCollector) collectStatus(deviceName, host string) (*dto.NUTStatus, e
 		Timestamp:    time.Now(),
 	}
 
-	lines := strings.Split(output, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(output, "\n")
+	for line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
