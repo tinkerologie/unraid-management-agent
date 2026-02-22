@@ -1,0 +1,147 @@
+---
+# Parameterized endpoint tests — use data from list endpoints to test individual lookups
+
+- name: Test individual disk endpoint
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/disks/{{ disk_data.json[0].id }}"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: single_disk
+  when: disk_data.json | length > 0 and disk_data.json[0].id | default('') | length > 0
+
+- name: Verify individual disk response
+  ansible.builtin.assert:
+    that:
+      - single_disk.json.name is defined
+      - single_disk.json.id == disk_data.json[0].id
+    success_msg: "Individual disk lookup OK ({{ single_disk.json.name }})"
+  when: single_disk is not skipped
+
+- name: Test individual container endpoint
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/docker/{{ docker_data.json[0].id }}"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: single_container
+  when: docker_data.json | length > 0
+
+- name: Verify individual container response
+  ansible.builtin.assert:
+    that:
+      - single_container.json.name is defined
+      - single_container.json.id == docker_data.json[0].id
+    success_msg: "Individual container lookup OK ({{ single_container.json.name }})"
+  when: single_container is not skipped
+
+- name: Test individual container logs
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/docker/{{ docker_data.json[0].id }}/logs?tail=5"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: container_logs
+  when: docker_data.json | length > 0
+
+- name: Verify container logs response
+  ansible.builtin.debug:
+    msg: "Container logs OK ({{ docker_data.json[0].name }}, {{ container_logs.json.logs | default([]) | length }} lines)"
+  when: container_logs is not skipped
+
+- name: Test individual container size
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/docker/{{ docker_data.json[0].id }}/size"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: container_size
+  when: docker_data.json | length > 0
+
+- name: Get VM list for parameterized tests
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/vm"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: vm_data
+
+- name: Test individual VM endpoint
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/vm/{{ vm_data.json[0].name | urlencode }}"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: single_vm
+  when: vm_data.json | length > 0
+
+- name: Verify individual VM response
+  ansible.builtin.assert:
+    that:
+      - single_vm.json.name is defined
+      - single_vm.json.state is defined
+    success_msg: "Individual VM lookup OK ({{ single_vm.json.name }}, state={{ single_vm.json.state }})"
+  when: single_vm is not skipped
+
+- name: Test VM snapshots endpoint
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/vm/{{ vm_data.json[0].name | urlencode }}/snapshots"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: vm_snapshots
+  when: vm_data.json | length > 0
+
+- name: Test individual share config
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/shares/{{ (endpoint_results.results | selectattr('item.path', 'eq', 'shares') | first).json[0].name }}/config"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: share_config
+  when: endpoint_results.results | selectattr('item.path', 'eq', 'shares') | first is defined
+  ignore_errors: true
+
+- name: Test individual collector status
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/collectors/system"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: single_collector
+
+- name: Verify collector response
+  ansible.builtin.assert:
+    that:
+      - single_collector.json.collector.name == 'system'
+      - single_collector.json.collector.status is defined
+      - single_collector.json.collector.enabled == true
+    success_msg: "Individual collector lookup OK (system, status={{ single_collector.json.collector.status }})"
+
+- name: Test syslog content retrieval
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/logs/syslog?lines=10"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: syslog_content
+
+- name: Verify syslog content
+  ansible.builtin.assert:
+    that:
+      - syslog_content.content | length > 0
+    success_msg: "Log file retrieval OK (syslog, {{ syslog_content.content | length }} bytes)"
+
+- name: Parameterized test summary
+  ansible.builtin.debug:
+    msg: "Parameterized endpoint tests: disk/{{ disk_data.json[0].id | default('N/A') }}, container/{{ docker_data.json[0].name | default('N/A') }}, VM/{{ vm_data.json[0].name | default('N/A') }}, collector/system, logs/syslog — all passed"

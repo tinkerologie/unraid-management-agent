@@ -10,11 +10,11 @@ The Unraid Management Agent is a **third-party community plugin** for Unraid, no
 
 We follow a date-based versioning scheme (YYYY.MM.DD format). Security updates are provided for the following versions:
 
-| Version | Supported | Status | Notes |
-| ------- | --------- | ------ | ----- |
-| 2025.11.25 | ✅ Yes | **Current** | Latest release with security fixes |
-| 2025.11.24 | ⚠️ Limited | Upgrade recommended | Contains known vulnerabilities (CWE-22) |
-| < 2025.11.24 | ❌ No | **Unsupported** | Immediate upgrade required |
+| Version      | Supported  | Status              | Notes                                   |
+| ------------ | ---------- | ------------------- | --------------------------------------- |
+| 2025.11.25   | ✅ Yes     | **Current**         | Latest release with security fixes      |
+| 2025.11.24   | ⚠️ Limited | Upgrade recommended | Contains known vulnerabilities (CWE-22) |
+| < 2025.11.24 | ❌ No      | **Unsupported**     | Immediate upgrade required              |
 
 **Recommendation**: Always use the latest version to ensure you have the most recent security patches and bug fixes.
 

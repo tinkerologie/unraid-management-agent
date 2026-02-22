@@ -1,9 +1,9 @@
 ---
 name: Hardware Compatibility Issue
 about: Report that the plugin doesn't work correctly on your hardware
-title: '[HARDWARE] '
+title: "[HARDWARE] "
 labels: hardware-compatibility
-assignees: ''
+assignees: ""
 ---
 
 ## Hardware Not Working
@@ -107,7 +107,7 @@ If you know which collector is failing:
 - [ ] GPU Collector (`daemon/services/collectors/gpu.go`)
 - [ ] UPS Collector (`daemon/services/collectors/ups.go`)
 - [ ] Network Collector (`daemon/services/collectors/network.go`)
-- [ ] Other: _____________
+- [ ] Other: <!-- specify -->
 
 ## Possible Solution
 

@@ -1,31 +1,55 @@
 {
-  "name": "unraid-management-agent-dev",
-  "dockerComposeFile": "docker-compose.yml",
-  "service": "unraid-management-agent-dev",
-  "workspaceFolder": "/workspaces/unraid-management-agent",
-  "shutdownAction": "stopCompose",
+  "name": "unraid-management-agent",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/go:1": {
+      "version": "1.26"
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22"
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.12",
+      "installTools": true
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
   "containerEnv": {
     "GOOS": "linux",
-    "GOARCH": "amd64",
-    "GOPATH": "/go",
-    "GOBIN": "/go/bin"
+    "GOARCH": "amd64"
   },
   "forwardPorts": [8043],
+  "portsAttributes": {
+    "8043": {
+      "label": "Agent API",
+      "onAutoForward": "notify"
+    }
+  },
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "8gb",
+    "storage": "32gb"
+  },
   "remoteUser": "vscode",
+  "onCreateCommand": ".devcontainer/on-create.sh",
+  "updateContentCommand": "go mod download",
+  "postCreateCommand": "pre-commit install 2>/dev/null || true",
   "customizations": {
     "vscode": {
       "extensions": [
         "golang.go",
+        "ms-python.python",
+        "redhat.ansible",
         "ms-vscode.makefile-tools",
         "esbenp.prettier-vscode",
         "GitHub.vscode-pull-request-github",
         "GitHub.copilot",
         "GitHub.copilot-chat",
-        "GitHub.remotehub",
         "GitHub.vscode-github-actions",
-        "GitHub.codespaces",
-        "GitHub.github-vscode-theme",
-        "Anthropic.claude-dev"
+        "GitHub.codespaces"
       ],
       "settings": {
         "editor.formatOnSave": true,
@@ -34,11 +58,17 @@
           "editor.defaultFormatter": "golang.go",
           "editor.formatOnSave": true
         },
+        "[ansible]": {
+          "editor.defaultFormatter": "redhat.ansible"
+        },
         "go.useLanguageServer": true,
         "go.toolsManagement.autoUpdate": true,
+        "ansible.python.interpreterPath": "/usr/bin/python3",
         "makefile.makefilePath": "Makefile"
       }
+    },
+    "codespaces": {
+      "openFiles": ["README.md"]
     }
-  },
-  "postCreateCommand": "go mod download"
+  }
 }

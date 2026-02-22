@@ -1,0 +1,50 @@
+---
+# Swagger documentation validation
+
+- name: Fetch Swagger doc.json
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/swagger/doc.json"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: swagger_result
+
+- name: Parse Swagger JSON
+  ansible.builtin.set_fact:
+    swagger_doc: "{{ swagger_result.content | from_json }}"
+
+- name: Verify Swagger structure
+  ansible.builtin.assert:
+    that:
+      - swagger_doc.swagger is defined or swagger_doc.openapi is defined
+      - swagger_doc.info is defined
+      - swagger_doc.info.title is defined
+      - swagger_doc.info.version is defined
+      - swagger_doc.paths is defined
+      - swagger_doc.paths | length >= 40
+    fail_msg: "Swagger schema invalid ({{ swagger_doc.paths | default({}) | length }} paths, expected >= 40)"
+    success_msg: "Swagger structure valid ({{ swagger_doc.info.title }}, v{{ swagger_doc.info.version }}, {{ swagger_doc.paths | length }} paths)"
+
+- name: Verify critical Swagger paths exist
+  ansible.builtin.assert:
+    that:
+      - "'/system' in swagger_doc.paths"
+      - "'/array' in swagger_doc.paths"
+      - "'/disks' in swagger_doc.paths"
+      - "'/docker' in swagger_doc.paths"
+      - "'/vm' in swagger_doc.paths"
+      - "'/network' in swagger_doc.paths"
+      - "'/health' in swagger_doc.paths"
+      - "'/alerts/rules' in swagger_doc.paths"
+      - "'/healthchecks' in swagger_doc.paths"
+    fail_msg: "Swagger doc missing critical API paths"
+    success_msg: "Swagger: all critical paths documented (basePath={{ swagger_doc.basePath }})"
+
+- name: Verify Swagger definitions/schemas exist
+  ansible.builtin.assert:
+    that:
+      - swagger_doc.definitions is defined or swagger_doc.components is defined
+      - (swagger_doc.definitions | default(swagger_doc.components.schemas | default({}))) | length >= 10
+    fail_msg: "Swagger missing data model definitions"
+    success_msg: "Swagger: {{ (swagger_doc.definitions | default(swagger_doc.components.schemas | default({}))) | length }} data models defined"

@@ -1,0 +1,17 @@
+# Ansible inventory for Unraid Management Agent deployment
+# Copy to inventory.yml and update with your server details:
+#   cp ansible/inventory.yml.example ansible/inventory.yml
+#
+# IMPORTANT: inventory.yml is in .gitignore and will NOT be committed to git
+
+all:
+  hosts:
+    unraid:
+      ansible_host: 192.168.1.100
+      ansible_user: root
+      ansible_password: "your-password-here"
+      ansible_ssh_common_args: >-
+        -o StrictHostKeyChecking=no
+        -o PubkeyAuthentication=no
+        -o PreferredAuthentications=password
+      api_port: 8043

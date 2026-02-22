@@ -150,34 +150,34 @@ mqtt:
       value_template: "{{ value_json.cpu_usage | round(1) }}"
       unit_of_measurement: "%"
       icon: mdi:cpu-64-bit
-      
+
     # RAM Usage
     - name: "Unraid RAM Usage"
       state_topic: "unraid/system"
       value_template: "{{ value_json.ram_usage | round(1) }}"
       unit_of_measurement: "%"
       icon: mdi:memory
-      
+
     # CPU Temperature
     - name: "Unraid CPU Temperature"
       state_topic: "unraid/system"
       value_template: "{{ value_json.cpu_temp | round(1) }}"
       unit_of_measurement: "°C"
       device_class: temperature
-      
+
     # Array Status
     - name: "Unraid Array State"
       state_topic: "unraid/array"
       value_template: "{{ value_json.state }}"
       icon: mdi:server
-      
+
     # Array Usage
     - name: "Unraid Array Usage"
       state_topic: "unraid/array"
       value_template: "{{ value_json.used_percent | round(1) }}"
       unit_of_measurement: "%"
       icon: mdi:harddisk
-      
+
     # Parity Valid
     - name: "Unraid Parity Status"
       state_topic: "unraid/array"
@@ -376,7 +376,7 @@ tail -f /var/log/mosquitto/mosquitto.log
 ### Mosquitto on Unraid (Docker)
 
 ```yaml
-version: '3'
+version: "3"
 services:
   mosquitto:
     image: eclipse-mosquitto:latest
@@ -444,7 +444,7 @@ Impact on MQTT broker:
 ## Next Steps
 
 - [Home Assistant Integration](home-assistant.md) - Complete HA setup
-- [Grafana Integration](grafana.md) - Monitoring dashboards  
+- [Grafana Integration](grafana.md) - Monitoring dashboards
 - [REST API Reference](../api/rest-api.md) - Control via API
 - [Configuration Guide](../guides/configuration.md) - Customize settings
 

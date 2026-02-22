@@ -401,17 +401,17 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 
 ## Event Frequency Summary
 
-| Event Type | Interval | Collector |
-|------------|----------|-----------|
-| system_update | 5s | SystemCollector |
-| array_status_update | 10s | ArrayCollector |
-| disk_list_update | 30s | DiskCollector |
-| container_list_update | 10s | DockerCollector |
-| vm_list_update | 10s | VMCollector |
-| ups_status_update | 10s | UPSCollector |
-| gpu_update | 10s | GPUCollector |
-| network_list_update | 15s | NetworkCollector |
-| share_list_update | 60s | ShareCollector |
+| Event Type            | Interval | Collector        |
+| --------------------- | -------- | ---------------- |
+| system_update         | 5s       | SystemCollector  |
+| array_status_update   | 10s      | ArrayCollector   |
+| disk_list_update      | 30s      | DiskCollector    |
+| container_list_update | 10s      | DockerCollector  |
+| vm_list_update        | 10s      | VMCollector      |
+| ups_status_update     | 10s      | UPSCollector     |
+| gpu_update            | 10s      | GPUCollector     |
+| network_list_update   | 15s      | NetworkCollector |
+| share_list_update     | 60s      | ShareCollector   |
 
 ---
 
@@ -455,13 +455,13 @@ async def monitor_events():
 def identify_event_type(data):
     if isinstance(data, list):
         data = data[0] if data else {}
-    
+
     if "hostname" in data and "cpu_usage_percent" in data:
         return "system_update"
     elif "state" in data and "parity_check_status" in data:
         return "array_status_update"
     # ... (see websocket_client.py for full implementation)
-    
+
     return "unknown"
 
 asyncio.run(monitor_events())
@@ -470,7 +470,7 @@ asyncio.run(monitor_events())
 ### JavaScript WebSocket Client
 
 ```javascript
-const ws = new WebSocket('ws://192.168.1.100:8043/api/v1/ws');
+const ws = new WebSocket("ws://192.168.1.100:8043/api/v1/ws");
 
 ws.onmessage = (event) => {
   const message = JSON.parse(event.data);
@@ -480,12 +480,12 @@ ws.onmessage = (event) => {
 
 function identifyEventType(data) {
   if (Array.isArray(data)) data = data[0] || {};
-  
-  if (data.hostname && data.cpu_usage_percent) return 'system_update';
-  if (data.state && data.parity_check_status) return 'array_status_update';
+
+  if (data.hostname && data.cpu_usage_percent) return "system_update";
+  if (data.state && data.parity_check_status) return "array_status_update";
   // ... (add other checks)
-  
-  return 'unknown';
+
+  return "unknown";
 }
 ```
 

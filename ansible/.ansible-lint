@@ -1,0 +1,20 @@
+---
+# Ansible-lint configuration
+# https://ansible.readthedocs.io/projects/lint/configuring/
+
+skip_list:
+  # Justified: Unraid has no Python — raw module is the only option
+  - command-instead-of-module
+  - no-changed-when
+  # Justified: curl required for MCP SSE protocol and WebSocket upgrade
+  - command-instead-of-shell
+  - risky-shell-pipe
+  # Justified: sshpass SCP required for Python-less host file transfer
+  - no-free-form
+
+warn_list:
+  - experimental
+  - role-name
+
+exclude_paths:
+  - .cache/

@@ -1,0 +1,22 @@
+---
+# MQTT status validation
+
+- name: Verify MQTT status
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/mqtt/status"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: mqtt_result
+
+- name: Validate MQTT status schema
+  vars:
+    mqtt_data: "{{ mqtt_result.json }}"
+  ansible.builtin.assert:
+    that:
+      - mqtt_data.enabled is defined
+      - mqtt_data.connected is defined
+      - mqtt_data.messages_sent is defined
+    fail_msg: "MQTT status missing expected fields"
+    success_msg: "MQTT: enabled={{ mqtt_data.enabled }}, connected={{ mqtt_data.connected }}, messages_sent={{ mqtt_data.messages_sent }}"

@@ -1,0 +1,64 @@
+---
+# Alerting CRUD test — create, verify, and delete an alert rule
+
+- name: Cleanup any leftover test alert rule
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/alerts/rules/ansible-test-rule"
+    method: DELETE
+    status_code: [200, 404]
+  ignore_errors: true
+
+- name: Create test alert rule
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/alerts/rules"
+    method: POST
+    body_format: json
+    body:
+      id: ansible-test-rule
+      name: Ansible Test Rule
+      expression: "system.cpu_percent > 99"
+      severity: warning
+      message: "Test alert from Ansible"
+      cooldown: "5m"
+    status_code: [200, 201]
+  register: alert_create
+
+- name: Verify alert rule was created
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/alerts/rules/ansible-test-rule"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: alert_get
+
+- name: Verify alert rule fields
+  vars:
+    rule: "{{ alert_get.json }}"
+  ansible.builtin.assert:
+    that:
+      - rule.id == 'ansible-test-rule'
+      - rule.name == 'Ansible Test Rule'
+      - rule.severity == 'warning'
+    fail_msg: "Alert rule fields don't match expected values"
+    success_msg: "Alert rule verified (id={{ rule.id }}, severity={{ rule.severity }})"
+
+- name: Delete test alert rule
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/alerts/rules/ansible-test-rule"
+    method: DELETE
+    status_code: 200
+
+- name: Verify alert rule was deleted
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/alerts/rules/ansible-test-rule"
+    method: GET
+    status_code: 404
+
+- name: Alerting CRUD result
+  ansible.builtin.debug:
+    msg: "Alerting CRUD: cleanup/create/verify/delete/confirm-delete — all passed"

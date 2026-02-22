@@ -485,14 +485,7 @@ interface DiskInfo {
   id: string;
   device: string;
   name: string;
-  role:
-    | "parity"
-    | "parity2"
-    | "data"
-    | "cache"
-    | "pool"
-    | "docker_vdisk"
-    | "log";
+  role: "parity" | "parity2" | "data" | "cache" | "pool" | "docker_vdisk" | "log";
   size_bytes: number;
   used_bytes: number;
   free_bytes: number;
@@ -554,11 +547,7 @@ class UnraidAPIClient {
     this.timeout = timeout;
   }
 
-  private async request<T>(
-    endpoint: string,
-    method: "GET" | "POST" = "GET",
-    body?: any,
-  ): Promise<T> {
+  private async request<T>(endpoint: string, method: "GET" | "POST" = "GET", body?: any): Promise<T> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
@@ -683,9 +672,7 @@ async function listDisks() {
     const disks = await client.listDisks();
 
     disks.forEach((disk: DiskInfo) => {
-      console.log(
-        `${disk.name}: ${disk.spin_state} (${disk.temperature_celsius}°C)`,
-      );
+      console.log(`${disk.name}: ${disk.spin_state} (${disk.temperature_celsius}°C)`);
     });
   } catch (error) {
     console.error("Error listing disks:", error);
@@ -2948,11 +2935,7 @@ Get OS and plugin update availability.
   "current_version": "6.12.10",
   "available_version": "6.12.11",
   "plugin_updates_count": 3,
-  "plugins_with_updates": [
-    "unassigned.devices",
-    "dynamix.docker.manager",
-    "user.scripts"
-  ],
+  "plugins_with_updates": ["unassigned.devices", "dynamix.docker.manager", "user.scripts"],
   "timestamp": "2025-10-03T13:41:13+10:00"
 }
 ```
@@ -3687,9 +3670,7 @@ async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
 
       // Exponential backoff: 1s, 2s, 4s, 8s, ...
       const delay = Math.min(baseDelay * Math.pow(2, retries - 1), 60000);
-      console.log(
-        `Request failed: ${error.message}. Retrying in ${delay}ms... (${retries}/${maxRetries})`,
-      );
+      console.log(`Request failed: ${error.message}. Retrying in ${delay}ms... (${retries}/${maxRetries})`);
 
       await new Promise((resolve) => setTimeout(resolve, delay));
     }

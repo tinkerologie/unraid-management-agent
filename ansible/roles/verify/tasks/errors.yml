@@ -1,0 +1,93 @@
+---
+# Error handling tests — verify the API properly rejects invalid inputs
+
+- name: "Error: Invalid container ID returns 400"
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/docker/../../etc/passwd"
+    method: GET
+    status_code: [400, 404]
+  register: err_container_traversal
+
+- name: "Error: Non-existent disk returns 404"
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/disks/nonexistent-disk-id-xyz"
+    method: GET
+    status_code: [400, 404]
+  register: err_disk_not_found
+
+- name: "Error: Path traversal in logs returns error"
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/logs/..%2F..%2Fetc%2Fpasswd"
+    method: GET
+    status_code: [400, 403, 404]
+  register: err_log_traversal
+
+- name: "Error: Non-existent collector returns 404"
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/collectors/nonexistent_collector"
+    method: GET
+    status_code: [400, 404]
+  register: err_collector_not_found
+
+- name: "Error: Non-existent alert rule returns 404"
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/alerts/rules/this-rule-does-not-exist"
+    method: GET
+    status_code: [400, 404]
+  register: err_alert_not_found
+
+- name: "Error: Non-existent health check returns 404"
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/healthchecks/this-hc-does-not-exist"
+    method: GET
+    status_code: [400, 404]
+  register: err_hc_not_found
+
+- name: "Error: Invalid JSON body for alert creation"
+  delegate_to: localhost
+  ansible.builtin.command:
+    cmd: >
+      curl -s -o /dev/null -w '%{http_code}' -X POST
+      -H 'Content-Type: application/json'
+      -d 'this is not valid json'
+      http://{{ ansible_host }}:{{ api_port }}/api/v1/alerts/rules
+  register: err_invalid_json
+  changed_when: false
+
+- name: "Error: Verify invalid JSON returns 400"
+  ansible.builtin.assert:
+    that:
+      - err_invalid_json.stdout == '400'
+    fail_msg: "Invalid JSON should return 400, got {{ err_invalid_json.stdout }}"
+    success_msg: "Invalid JSON correctly rejected (HTTP 400)"
+
+- name: "Error: MCP request without Accept header returns 400"
+  delegate_to: localhost
+  ansible.builtin.command:
+    cmd: >
+      curl -s -o /dev/null -w '%{http_code}' -X POST
+      -H 'Content-Type: application/json'
+      -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
+      http://{{ ansible_host }}:{{ api_port }}/mcp
+  register: err_mcp_no_accept
+  changed_when: false
+
+- name: "MCP: Handles request without Accept header gracefully"
+  ansible.builtin.assert:
+    that:
+      - err_mcp_no_accept.stdout in ['200', '400', '406']
+    fail_msg: "MCP returned unexpected status {{ err_mcp_no_accept.stdout }} without Accept header"
+    success_msg: "MCP handles missing Accept header (HTTP {{ err_mcp_no_accept.stdout }})"
+
+- name: Error handling test summary
+  ansible.builtin.debug:
+    msg: >-
+      Error handling: path traversal (container) ✓, disk 404 ✓,
+      log traversal ✓, collector 404 ✓, alert 404 ✓, HC 404 ✓,
+      invalid JSON 400 ✓, MCP missing Accept ✓

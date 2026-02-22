@@ -26,6 +26,15 @@ if (file_exists($config_file)) {
 // Default values
 $port = $config['PORT'] ?? '8043';
 
+// MQTT defaults
+$mqtt_enabled = $config['MQTT_ENABLED'] ?? 'false';
+$mqtt_broker = $config['MQTT_BROKER'] ?? '';
+$mqtt_port = $config['MQTT_PORT'] ?? '1883';
+$mqtt_username = $config['MQTT_USERNAME'] ?? '';
+$mqtt_password = $config['MQTT_PASSWORD'] ?? '';
+$mqtt_topic_prefix = $config['MQTT_TOPIC_PREFIX'] ?? 'unraid';
+$mqtt_ha_enabled = $config['MQTT_HOME_ASSISTANT'] ?? 'false';
+
 // Collection interval defaults (industry-standard: Zabbix, Prometheus, Datadog)
 $interval_system = $config['INTERVAL_SYSTEM'] ?? '15';
 $interval_array = $config['INTERVAL_ARRAY'] ?? '60';
@@ -130,6 +139,14 @@ if ($_POST) {
         $new_config = "# Unraid Management Agent Configuration\n\n";
         $new_config .= "# API Server Configuration\n";
         $new_config .= "PORT=" . $_POST['port'] . "\n\n";
+        $new_config .= "# MQTT Configuration\n";
+        $new_config .= "MQTT_ENABLED=" . (isset($_POST['mqtt_enabled']) ? 'true' : 'false') . "\n";
+        $new_config .= "MQTT_BROKER=" . $_POST['mqtt_broker'] . "\n";
+        $new_config .= "MQTT_PORT=" . $_POST['mqtt_port'] . "\n";
+        $new_config .= "MQTT_USERNAME=" . $_POST['mqtt_username'] . "\n";
+        $new_config .= "MQTT_PASSWORD=" . $_POST['mqtt_password'] . "\n";
+        $new_config .= "MQTT_TOPIC_PREFIX=" . $_POST['mqtt_topic_prefix'] . "\n";
+        $new_config .= "MQTT_HOME_ASSISTANT=" . (isset($_POST['mqtt_ha_enabled']) ? 'true' : 'false') . "\n\n";
         $new_config .= "# Collection Intervals in seconds\n";
         $new_config .= "INTERVAL_SYSTEM=" . $_POST['interval_system'] . "\n";
         $new_config .= "INTERVAL_ARRAY=" . $_POST['interval_array'] . "\n";
@@ -157,6 +174,14 @@ if ($_POST) {
         $default_config = "# Unraid Management Agent Configuration\n\n";
         $default_config .= "# API Server Configuration\n";
         $default_config .= "PORT=8043\n\n";
+        $default_config .= "# MQTT Configuration\n";
+        $default_config .= "MQTT_ENABLED=false\n";
+        $default_config .= "MQTT_BROKER=\n";
+        $default_config .= "MQTT_PORT=1883\n";
+        $default_config .= "MQTT_USERNAME=\n";
+        $default_config .= "MQTT_PASSWORD=\n";
+        $default_config .= "MQTT_TOPIC_PREFIX=unraid\n";
+        $default_config .= "MQTT_HOME_ASSISTANT=false\n\n";
         $default_config .= "# Collection Intervals in seconds - Industry-standard defaults\n";
         $default_config .= "INTERVAL_SYSTEM=15\n";
         $default_config .= "INTERVAL_ARRAY=60\n";
@@ -313,6 +338,46 @@ if ($_POST) {
     border-color: #d32f2f;
     background-color: var(--error-background, #ffebee);
 }
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 26px;
+    vertical-align: middle;
+}
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .3s;
+    border-radius: 26px;
+}
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .3s;
+    border-radius: 50%;
+}
+.toggle-switch input:checked + .toggle-slider {
+    background-color: #4CAF50;
+}
+.toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(24px);
+}
 </style>
 
 <div class="agent-container">
@@ -325,6 +390,7 @@ if ($_POST) {
         <?php if ($running): ?>
             <p><strong>API Endpoint:</strong> http://<?= $_SERVER['SERVER_ADDR'] ?>:<?= $port ?>/api/v1</p>
             <p><strong>WebSocket:</strong> ws://<?= $_SERVER['SERVER_ADDR'] ?>:<?= $port ?>/api/v1/ws</p>
+            <p><strong>MCP Endpoint:</strong> http://<?= $_SERVER['SERVER_ADDR'] ?>:<?= $port ?>/mcp</p>
         <?php endif; ?>
 
         <form method="post" style="margin-top: 15px;">
@@ -347,6 +413,63 @@ if ($_POST) {
                 <div class="help-text">Port number for the API server (default: 8043)</div>
             </div>
 
+        </div>
+
+        <div class="config-box">
+            <h3>MQTT Integration</h3>
+            <p class="help-text" style="margin-bottom: 15px;">
+                Publish system data to an MQTT broker for Home Assistant or other automation platforms.
+            </p>
+
+            <div class="form-row">
+                <label class="form-label">Enable MQTT:</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" name="mqtt_enabled" id="mqtt_enabled" <?= ($mqtt_enabled === 'true') ? 'checked' : '' ?> onchange="toggleMQTTFields()">
+                    <span class="toggle-slider"></span>
+                </label>
+                <div class="help-text">Enable publishing system data to an MQTT broker</div>
+            </div>
+
+            <div id="mqtt_fields" style="display: <?= ($mqtt_enabled === 'true') ? 'block' : 'none' ?>;">
+                <div class="form-row">
+                    <label class="form-label">Broker Address:</label>
+                    <input type="text" name="mqtt_broker" value="<?= htmlspecialchars($mqtt_broker) ?>" class="form-input" placeholder="e.g. 192.168.1.100">
+                    <div class="help-text">IP address or hostname of your MQTT broker</div>
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label">Broker Port:</label>
+                    <input type="number" name="mqtt_port" value="<?= htmlspecialchars($mqtt_port) ?>" class="form-input" min="1" max="65535" style="width: 120px;">
+                    <div class="help-text">MQTT broker port (default: 1883)</div>
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label">Username:</label>
+                    <input type="text" name="mqtt_username" value="<?= htmlspecialchars($mqtt_username) ?>" class="form-input" placeholder="Leave blank if not required" autocomplete="off">
+                    <div class="help-text">MQTT broker username (optional)</div>
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label">Password:</label>
+                    <input type="password" name="mqtt_password" value="<?= htmlspecialchars($mqtt_password) ?>" class="form-input" placeholder="Leave blank if not required" autocomplete="off">
+                    <div class="help-text">MQTT broker password (optional)</div>
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label">Topic Prefix:</label>
+                    <input type="text" name="mqtt_topic_prefix" value="<?= htmlspecialchars($mqtt_topic_prefix) ?>" class="form-input" style="width: 200px;">
+                    <div class="help-text">Prefix for all MQTT topics (default: unraid). Messages published to: {prefix}/system, {prefix}/docker, etc.</div>
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label">Home Assistant:</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="mqtt_ha_enabled" <?= ($mqtt_ha_enabled === 'true') ? 'checked' : '' ?>>
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <div class="help-text">Enable Home Assistant MQTT auto-discovery (entities appear automatically in HA)</div>
+                </div>
+            </div>
         </div>
 
         <div class="config-box">
@@ -496,6 +619,12 @@ if ($_POST) {
 </div>
 
 <script>
+// Toggle MQTT fields visibility
+function toggleMQTTFields() {
+    var enabled = document.getElementById('mqtt_enabled').checked;
+    document.getElementById('mqtt_fields').style.display = enabled ? 'block' : 'none';
+}
+
 // Highlight disabled interval selects
 function updateDisabledHighlighting() {
     document.querySelectorAll('.interval-select').forEach(function(select) {

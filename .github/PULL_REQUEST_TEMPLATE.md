@@ -59,12 +59,9 @@ Related to #(issue number)
 
 <!-- Describe what you tested and the results -->
 
-**API Endpoints Tested:**
--
+## **API Endpoints Tested:**
 
--
-
-**Test Output/Results:**
+- **Test Output/Results:**
 
 ```
 [Paste relevant test output or API responses]
@@ -91,11 +88,9 @@ Related to #(issue number)
 
 <!-- If this PR introduces breaking changes, describe them and the migration path -->
 
-**Breaking Changes:**
--
+## **Breaking Changes:**
 
-**Migration Guide:**
--
+## **Migration Guide:**
 
 ## Screenshots/Logs
 
@@ -123,11 +118,9 @@ Related to #(issue number)
 
 **Fix Implemented:**
 
-**Tested On:**
--
+## **Tested On:**
 
-**Should Also Work On:**
--
+## **Should Also Work On:**
 
 **Potential Impact on Other Hardware:**
 

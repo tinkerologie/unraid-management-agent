@@ -1,0 +1,100 @@
+---
+# Response schema validation — verify critical endpoints return expected JSON fields
+
+- name: Validate system info schema
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/system"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: system_data
+
+- name: Assert system fields
+  vars:
+    sys: "{{ system_data.json }}"
+  ansible.builtin.assert:
+    that:
+      - sys.hostname is defined
+      - sys.version is defined
+      - sys.agent_version is defined
+      - sys.uptime_seconds is defined and sys.uptime_seconds > 0
+      - sys.cpu_usage_percent is defined
+      - sys.cpu_cores is defined and sys.cpu_cores > 0
+      - sys.cpu_threads is defined and sys.cpu_threads > 0
+      - sys.ram_total_bytes is defined and sys.ram_total_bytes > 0
+      - sys.ram_used_bytes is defined
+      - sys.ram_usage_percent is defined
+      - sys.kernel_version is defined
+    fail_msg: "System info schema validation failed"
+    success_msg: "System schema valid ({{ sys.hostname }}, {{ sys.agent_version }}, {{ sys.cpu_cores }} cores, {{ (sys.ram_total_bytes / 1073741824) | round(1) }} GB RAM)"
+
+- name: Validate array status schema
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/array"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: array_data
+
+- name: Assert array fields
+  vars:
+    arr: "{{ array_data.json }}"
+  ansible.builtin.assert:
+    that:
+      - arr.state is defined
+      - arr.state in ['STARTED', 'STOPPED', 'STARTING', 'STOPPING']
+      - arr.num_disks is defined
+      - arr.total_bytes is defined
+      - arr.parity_valid is defined
+    fail_msg: "Array status schema validation failed"
+    success_msg: "Array schema valid (state={{ arr.state }}, {{ arr.num_disks }} disks, parity={{ arr.parity_valid }})"
+
+- name: Validate disk list schema
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/disks"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: disk_data
+
+- name: Assert disk fields
+  vars:
+    first_disk: "{{ disk_data.json[0] }}"
+  ansible.builtin.assert:
+    that:
+      - disk_data.json | length > 0
+      - first_disk.name is defined
+      - first_disk.status is defined
+      - first_disk.size_bytes is defined
+      - first_disk.role is defined
+    fail_msg: "Disk list schema validation failed"
+    success_msg: "Disk schema valid ({{ disk_data.json | length }} disks, first={{ first_disk.name }})"
+
+- name: Validate container list schema
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/docker"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: docker_data
+  retries: 6
+  delay: 10
+  until: docker_data.json | length > 0
+
+- name: Assert container fields
+  vars:
+    first_container: "{{ docker_data.json[0] }}"
+  ansible.builtin.assert:
+    that:
+      - docker_data.json | length > 0
+      - first_container.id is defined
+      - first_container.name is defined
+      - first_container.image is defined
+      - first_container.state is defined
+      - first_container.state in ['running', 'stopped', 'paused', 'restarting', 'created', 'dead', 'exited']
+    fail_msg: "Container list schema validation failed"
+    success_msg: "Container schema valid ({{ docker_data.json | length }} containers, {{ docker_data.json | selectattr('state', 'eq', 'running') | list | length }} running)"

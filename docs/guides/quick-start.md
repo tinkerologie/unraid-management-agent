@@ -82,19 +82,19 @@ curl http://localhost:8043/api/v1/disks | jq
 ### JavaScript Example
 
 ```javascript
-const ws = new WebSocket('ws://YOUR_UNRAID_IP:8043/api/v1/ws');
+const ws = new WebSocket("ws://YOUR_UNRAID_IP:8043/api/v1/ws");
 
 ws.onopen = () => {
-  console.log('Connected to Unraid Management Agent');
+  console.log("Connected to Unraid Management Agent");
 };
 
 ws.onmessage = (event) => {
   const data = JSON.parse(event.data);
-  console.log('Event received:', data.event, data.data);
+  console.log("Event received:", data.event, data.data);
 };
 
 ws.onerror = (error) => {
-  console.error('WebSocket error:', error);
+  console.error("WebSocket error:", error);
 };
 ```
 

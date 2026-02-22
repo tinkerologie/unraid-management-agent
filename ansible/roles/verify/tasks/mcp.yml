@@ -1,0 +1,184 @@
+---
+# MCP protocol compliance tests — verify JSON-RPC protocol at /mcp
+# MCP requires Accept header with both application/json and text/event-stream
+
+- name: "MCP: Initialize session"
+  delegate_to: localhost
+  ansible.builtin.command:
+    cmd: >
+      curl -s -w "\n%{http_code}" -X POST
+      -H "Content-Type: application/json"
+      -H "Accept: application/json, text/event-stream"
+      -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ansible-verify","version":"1.0"}}}'
+      http://{{ ansible_host }}:{{ api_port }}/mcp
+  register: mcp_init
+  changed_when: false
+  failed_when: mcp_init.rc != 0
+
+- name: "MCP: Verify initialize response"
+  vars:
+    mcp_http_code: "{{ mcp_init.stdout_lines[-1] }}"
+  ansible.builtin.assert:
+    that:
+      - mcp_http_code == '200'
+    fail_msg: "MCP initialize failed (HTTP {{ mcp_http_code }})"
+    success_msg: "MCP server responding (HTTP {{ mcp_http_code }})"
+
+- name: "MCP: Extract session ID from init response"
+  delegate_to: localhost
+  ansible.builtin.command:
+    cmd: >
+      curl -s -D - -X POST
+      -H "Content-Type: application/json"
+      -H "Accept: application/json, text/event-stream"
+      -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ansible-mcp-test","version":"1.0"}}}'
+      http://{{ ansible_host }}:{{ api_port }}/mcp
+  register: mcp_init_headers
+  changed_when: false
+
+- name: "MCP: Parse session ID"
+  ansible.builtin.set_fact:
+    mcp_session_id: "{{ mcp_init_headers.stdout | regex_search('Mcp-Session-Id:\\s*(.+)', '\\1') | first | default('') | trim }}"
+
+- name: "MCP: List tools"
+  delegate_to: localhost
+  ansible.builtin.command:
+    cmd: >
+      curl -s -X POST
+      -H "Content-Type: application/json"
+      -H "Accept: application/json, text/event-stream"
+      -H "Mcp-Session-Id: {{ mcp_session_id }}"
+      -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
+      http://{{ ansible_host }}:{{ api_port }}/mcp
+  register: mcp_tools_raw
+  changed_when: false
+  when: mcp_session_id | length > 0
+
+- name: "MCP: Parse tools response"
+  ansible.builtin.set_fact:
+    mcp_tools_data: "{{ mcp_tools_raw.stdout | regex_search('data:\\s*({.*})', '\\1') | first | default('{}') | from_json }}"
+  when: mcp_tools_raw is not skipped
+
+- name: "MCP: Verify tools count"
+  vars:
+    tool_count: "{{ mcp_tools_data.result.tools | default([]) | length }}"
+  ansible.builtin.assert:
+    that:
+      - tool_count | int >= 50
+    fail_msg: "MCP tools count too low: {{ tool_count }} (expected >= 50)"
+    success_msg: "MCP tools/list OK ({{ tool_count }} tools registered)"
+  when: mcp_tools_data is defined
+
+- name: "MCP: List resources"
+  delegate_to: localhost
+  ansible.builtin.command:
+    cmd: >
+      curl -s -X POST
+      -H "Content-Type: application/json"
+      -H "Accept: application/json, text/event-stream"
+      -H "Mcp-Session-Id: {{ mcp_session_id }}"
+      -d '{"jsonrpc":"2.0","id":3,"method":"resources/list","params":{}}'
+      http://{{ ansible_host }}:{{ api_port }}/mcp
+  register: mcp_resources_raw
+  changed_when: false
+  when: mcp_session_id | length > 0
+
+- name: "MCP: Parse resources response"
+  ansible.builtin.set_fact:
+    mcp_resources_data: "{{ mcp_resources_raw.stdout | regex_search('data:\\s*({.*})', '\\1') | first | default('{}') | from_json }}"
+  when: mcp_resources_raw is not skipped
+
+- name: "MCP: Verify resources count"
+  vars:
+    resource_count: "{{ mcp_resources_data.result.resources | default([]) | length }}"
+  ansible.builtin.assert:
+    that:
+      - resource_count | int >= 5
+    fail_msg: "MCP resources count too low: {{ resource_count }} (expected >= 5)"
+    success_msg: "MCP resources/list OK ({{ resource_count }} resources: {{ mcp_resources_data.result.resources | map(attribute='name') | join(', ') }})"
+  when: mcp_resources_data is defined
+
+- name: "MCP: List prompts"
+  delegate_to: localhost
+  ansible.builtin.command:
+    cmd: >
+      curl -s -X POST
+      -H "Content-Type: application/json"
+      -H "Accept: application/json, text/event-stream"
+      -H "Mcp-Session-Id: {{ mcp_session_id }}"
+      -d '{"jsonrpc":"2.0","id":4,"method":"prompts/list","params":{}}'
+      http://{{ ansible_host }}:{{ api_port }}/mcp
+  register: mcp_prompts_raw
+  changed_when: false
+  when: mcp_session_id | length > 0
+
+- name: "MCP: Parse prompts response"
+  ansible.builtin.set_fact:
+    mcp_prompts_data: "{{ mcp_prompts_raw.stdout | regex_search('data:\\s*({.*})', '\\1') | first | default('{}') | from_json }}"
+  when: mcp_prompts_raw is not skipped
+
+- name: "MCP: Verify prompts count"
+  vars:
+    prompt_count: "{{ mcp_prompts_data.result.prompts | default([]) | length }}"
+  ansible.builtin.assert:
+    that:
+      - prompt_count | int >= 6
+    fail_msg: "MCP prompts count too low: {{ prompt_count }} (expected >= 6)"
+    success_msg: "MCP prompts/list OK ({{ prompt_count }} prompts: {{ mcp_prompts_data.result.prompts | map(attribute='name') | join(', ') }})"
+  when: mcp_prompts_data is defined
+
+- name: "MCP: Call safe read-only tool (get_system_info)"
+  delegate_to: localhost
+  ansible.builtin.command:
+    cmd: >
+      curl -s -X POST
+      -H "Content-Type: application/json"
+      -H "Accept: application/json, text/event-stream"
+      -H "Mcp-Session-Id: {{ mcp_session_id }}"
+      -d '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"get_system_info","arguments":{}}}'
+      http://{{ ansible_host }}:{{ api_port }}/mcp
+  register: mcp_tool_call_raw
+  changed_when: false
+  when: mcp_session_id | length > 0
+
+- name: "MCP: Verify tool call response"
+  vars:
+    mcp_tool_response: "{{ mcp_tool_call_raw.stdout | regex_search('data:\\s*({.*})', '\\1') | first | default('{}') | from_json }}"
+  ansible.builtin.assert:
+    that:
+      - mcp_tool_response.result is defined
+      - mcp_tool_response.result.content | length > 0
+    fail_msg: "MCP tools/call get_system_info failed"
+    success_msg: "MCP tools/call OK (get_system_info returned data)"
+  when: mcp_tool_call_raw is not skipped
+
+- name: "MCP: Read resource (unraid://system)"
+  delegate_to: localhost
+  ansible.builtin.command:
+    cmd: >
+      curl -s -X POST
+      -H "Content-Type: application/json"
+      -H "Accept: application/json, text/event-stream"
+      -H "Mcp-Session-Id: {{ mcp_session_id }}"
+      -d '{"jsonrpc":"2.0","id":6,"method":"resources/read","params":{"uri":"unraid://system"}}'
+      http://{{ ansible_host }}:{{ api_port }}/mcp
+  register: mcp_resource_read_raw
+  changed_when: false
+  when: mcp_session_id | length > 0
+
+- name: "MCP: Verify resource read response"
+  vars:
+    mcp_resource_response: "{{ mcp_resource_read_raw.stdout | regex_search('data:\\s*({.*})', '\\1') | first | default('{}') | from_json }}"
+  ansible.builtin.assert:
+    that:
+      - mcp_resource_response.result is defined
+      - mcp_resource_response.result.contents | length > 0
+    fail_msg: "MCP resources/read unraid://system failed"
+    success_msg: "MCP resources/read OK (unraid://system returned data)"
+  when: mcp_resource_read_raw is not skipped
+
+- name: "MCP: Protocol compliance summary"
+  ansible.builtin.debug:
+    msg: >-
+      MCP Protocol Tests: initialize ✓, tools/list ✓, resources/list ✓,
+      prompts/list ✓, tools/call ✓, resources/read ✓

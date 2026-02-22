@@ -19,7 +19,7 @@ This guide shows you how to create a comprehensive Grafana dashboard for the Unr
 Create `docker-compose.yml`:
 
 ```yaml
-version: '3.8'
+version: "3.8"
 
 services:
   prometheus:
@@ -32,9 +32,9 @@ services:
     ports:
       - "9090:9090"
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=30d'
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
     networks:
       - monitoring
 
@@ -70,10 +70,10 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
-  - job_name: 'unraid'
+  - job_name: "unraid"
     static_configs:
-      - targets: ['YOUR_UNRAID_IP:8043']
-    metrics_path: '/metrics'
+      - targets: ["YOUR_UNRAID_IP:8043"]
+    metrics_path: "/metrics"
 ```
 
 Deploy:
@@ -314,7 +314,7 @@ Add to `prometheus.yml`:
 
 ```yaml
 rule_files:
-  - 'alerts.yml'
+  - "alerts.yml"
 ```
 
 ## Variables

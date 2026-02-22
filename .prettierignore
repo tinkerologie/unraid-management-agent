@@ -1,0 +1,45 @@
+# Build artifacts
+build/
+*.out
+coverage.html
+
+# Go files (handled by gofmt/goimports)
+*.go
+go.mod
+go.sum
+
+# Vendor
+vendor/
+
+# Binary
+unraid-management-agent
+
+# Generated files
+daemon/docs/swagger.json
+daemon/docs/swagger.yaml
+daemon/docs/docs.go
+
+# Git
+.git/
+
+# IDE
+.vscode/
+.idea/
+
+# Node
+node_modules/
+
+# Secrets baseline
+.secrets.baseline
+
+# OS files
+.DS_Store
+
+# Plugin files
+*.plg
+*.plg.tmp
+*.txz
+*.tgz
+
+# Claude/AI local settings
+.claude/settings.local.json

@@ -1,263 +1,159 @@
 # Unraid Management Agent - Development Container
 
-This document describes the development container setup for the unraid-management-agent project.
+Fully configured development environment for the unraid-management-agent project.
+Works with **VS Code Dev Containers** and **GitHub Codespaces**.
+
+## Quick Start
+
+**VS Code**: Open the repo and run `Dev Containers: Reopen in Container` from the Command Palette.
+
+**GitHub Codespaces**: Click "Code" → "Codespaces" → "Create codespace on main".
+
+The container automatically installs all tools and dependencies on first creation (~3 minutes).
 
 ## What's Included
 
-### Base Tools
+### Via Dev Container Features
 
-- **Go 1.26.0** - Go programming language (matches deployment target)
-- **Node.js 20** - JavaScript runtime (for Copilot CLI)
-- **GitHub CLI (gh)** - GitHub command-line interface
-- **Git** - Version control
-- **Make** - Build automation
-- **Python 3** - Python runtime with pip
+| Tool | Version | Purpose |
+| ----------- | ------- | -------------------------------- |
+| Go | 1.26 | Matches deployment target |
+| Node.js | 22 LTS | Prettier, npm tooling |
+| Python | 3.12 | pre-commit, Ansible, pip |
+| GitHub CLI | latest | `gh` commands, `gh copilot` |
 
-### Development Tools
+### Via Dockerfile (apt)
 
-- **pre-commit** - Git hooks framework for code quality checks
-- **sshpass** - Non-interactive SSH password authentication (for Unraid deployment testing)
-- **shellcheck** - Bash/shell script linter
-- **yamllint** - YAML file linter
-- **jq** - JSON processor
-- **php-cli** - PHP command-line interface (for plugin page validation)
+| Package | Purpose |
+| ----------- | ----------------------------------------- |
+| gcc, g++ | C toolchain for cgo |
+| pkg-config | Build dependency resolution |
+| libssl-dev | TLS/crypto libraries |
+| jq | JSON processing |
+| php-cli | Plugin page validation |
+| shellcheck | Shell script linting |
+| yamllint | YAML file linting |
+| sshpass | Non-interactive SSH (deployment scripts) |
 
-### MQTT Testing
+### Via on-create.sh (first launch)
 
-- **Mosquitto MQTT Broker** - Full MQTT broker for testing (runs in separate container)
-- **mosquitto-clients** - MQTT client tools (mosquitto_sub, mosquitto_pub)
+| Tool | Purpose |
+| --------------- | -------------------------------------- |
+| golangci-lint | Go linting (v2, zero tolerance) |
+| gosec | Go security scanner |
+| govulncheck | Go vulnerability checker |
+| swag | Swagger doc generator |
+| goimports | Go import organizer |
+| pre-commit | Git hooks framework |
+| ansible | Deployment automation (`ansible/` dir) |
+| ansible-lint | Ansible playbook linter |
 
 ### VS Code Extensions
 
-- Go - Go language support
-- GitHub Copilot - AI-powered coding assistance
-- GitHub Copilot Chat - AI conversation interface
-- Make Tools - Makefile support
-- Prettier - Code formatter
-- Pull Requests and Issues - GitHub integration
-- GitHub Actions - Actions workflow support
-- Remote Hub - GitHub remote browsing
+- **Go** — Language support, debugging, testing
+- **Python** — Required by Ansible extension
+- **Ansible** — Playbook editing, linting, syntax highlighting
+- **Makefile Tools** — Makefile support
+- **Prettier** — Markdown, YAML, JSON formatting
+- **GitHub Copilot + Chat** — AI-powered coding
+- **GitHub Pull Requests** — PR review in editor
+- **GitHub Actions** — Workflow editing
+- **GitHub Codespaces** — Codespace management
 
-## Getting Started
+## Container Lifecycle
 
-### Rebuild the Container
+The dev container uses the optimized lifecycle for fast startup and Codespaces caching:
 
-When you rebuild the container, all tools are automatically installed:
-
-```bash
-# If using VS Code Dev Containers or GitHub Codespaces:
-# - Use Command Palette (Ctrl+Shift+P)
-# - Select "Dev Containers: Rebuild Container"
-# - Wait for the build to complete (2-3 minutes)
-
-# OR manually rebuild:
-docker-compose -f .devcontainer/docker-compose.yml build --no-cache
 ```
-
-### MQTT Testing
-
-The devcontainer includes a Mosquitto MQTT broker for testing MQTT functionality:
-
-#### Start the MQTT Broker
-
-```bash
-# The broker starts automatically when you rebuild/restart the container
-# To manually verify it's running:
-docker ps | grep mqtt
-```
-
-#### Test MQTT Connectivity
-
-```bash
-# Check broker status
-./scripts/mqtt-test.sh check
-
-# Subscribe to all MQTT topics (press Ctrl+C to stop)
-./scripts/mqtt-test.sh sub
-
-# Monitor broker system stats
-./scripts/mqtt-test.sh monitor
-
-# Publish a test message
-./scripts/mqtt-test.sh pub "test/topic" "hello world"
-```
-
-#### Connect the Agent to Local MQTT Broker
-
-```bash
-# Start the agent with MQTT enabled (pointing to local broker)
-./unraid-management-agent boot \
-  --debug \
-  --port 8043 \
-  --mqtt-enabled \
-  --mqtt-broker tcp://mosquitto:1883 \
-  --mqtt-port 1883
-```
-
-#### Verify MQTT Messages
-
-In another terminal, subscribe to MQTT topics:
-
-```bash
-# Watch system updates
-mosquitto_sub -h mosquitto -t "unraid/system_update" -v
-
-# Watch all topics
-mosquitto_sub -h mosquitto -t "unraid/#" -v
+onCreateCommand        →  Install Go tools, Python tools, Ansible (one-time)
+updateContentCommand   →  go mod download (runs on code changes in Codespaces)
+postCreateCommand      →  pre-commit install (quick, sets up git hooks)
 ```
 
 ## Common Tasks
 
-### Run Pre-commit Checks
-
 ```bash
-# Run all hooks on all files
-pre-commit run --all-files
-
-# Run specific hook
-pre-commit run go-fmt --all-files
-```
-
-### Build the Project
-
-```bash
-# Build for Linux/amd64 (Unraid)
+# Build for Unraid (Linux/amd64)
 make release
-
-# Build for current architecture
-make local
 
 # Run all tests
 make test
-```
 
-### Deploy to Unraid Server
+# Run pre-commit checks
+pre-commit run --all-files
 
-```bash
-# Set up SSH credentials in config.sh
-cp scripts/config.sh.example scripts/config.sh
-# Edit config.sh with your Unraid server details
+# Deploy to Unraid via Ansible
+cd ansible && ansible-playbook -i inventory.yml deploy.yml
 
-# Deploy the plugin
+# Deploy to Unraid via script
+cp scripts/config.sh.example scripts/config.sh  # configure first
 ./scripts/deploy-plugin.sh
+
+# Generate Swagger docs
+make swagger
 ```
-
-### Check for Dependency Updates
-
-```bash
-# List available updates
-go list -m -u all
-
-# Update specific dependency
-go get -u github.com/package/name
-
-# Update all direct dependencies
-go get -u ./...
-
-# Clean up
-go mod tidy
-```
-
-## Troubleshooting
-
-### "sshpass not found"
-
-This shouldn't happen if the container was rebuilt after the Dockerfile update. If you encounter this:
-
-```bash
-# Install manually
-apt-get update && apt-get install -y sshpass
-```
-
-### "pre-commit not found"
-
-This shouldn't happen if the container was rebuilt. If you encounter this:
-
-```bash
-# Install manually
-pip3 install pre-commit
-```
-
-### "mosquitto_sub/mosquitto_pub not found"
-
-If the MQTT client tools aren't available:
-
-```bash
-# Install manually
-apt-get update && apt-get install -y mosquitto-clients
-```
-
-### MQTT Broker Connection Refused
-
-Verify the broker is running:
-
-```bash
-# Check if mosquitto container is running
-docker ps | grep mosquitto
-
-# View broker logs
-docker logs unraid-mqtt-broker
-
-# Manually start the broker (if stopped)
-docker-compose -f .devcontainer/docker-compose.yml up mosquitto -d
-```
-
-### MQTT Broker Port 1883 Already in Use
-
-If port 1883 is already in use on your system:
-
-1. Edit `.devcontainer/docker-compose.yml`
-2. Change the port mapping: `"1884:1883"` instead of `"1883:1883"`
-3. Rebuild the container
-4. Connect with: `mosquitto_sub -h localhost -p 1884 -t "unraid/#"`
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ Development Container (unraid-management-agent-dev)         │
+│ Development Container                                       │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
-│ Tools: Go, Node.js, Python, Git, Make                       │
-│ Linters: golangci-lint, shellcheck, yamllint               │
-│ Git Hooks: pre-commit framework                             │
-│ SSH: sshpass for remote Unraid deployment                   │
+│ Features: Go 1.26, Node.js 22, Python 3.12, GitHub CLI     │
+│ Go Tools: golangci-lint, gosec, govulncheck, swag          │
+│ Ansible:  ansible, ansible-lint                             │
+│ Linters:  shellcheck, yamllint, pre-commit                 │
+│ SSH:      sshpass for remote Unraid deployment              │
 │                                                              │
-│ Network: unraid-dev-network                                 │
 └────────────────────────┬────────────────────────────────────┘
                          │
-        ┌────────────────┴────────────────┐
-        │                                 │
-        ▼                                 ▼
-┌───────────────────┐          ┌──────────────────────┐
-│ MQTT Broker       │          │ Unraid Server        │
-│ (mosquitto:1883)  │          │ (192.168.20.21:8043) │
-│                   │          │                      │
-│ - System broker   │          │ Running agent        │
-│ - Data logging    │          │ with MQTT enabled    │
-│ - Testing topics  │          │                      │
-└───────────────────┘          └──────────────────────┘
+                         ▼
+              ┌──────────────────────┐
+              │ Unraid Server        │
+              │ (your-server:8043)   │
+              │                      │
+              │ Running agent        │
+              └──────────────────────┘
 ```
 
 ## Environment Variables
 
-### In devcontainer.json
+- `GOOS=linux` — Target operating system (always Linux for Unraid)
+- `GOARCH=amd64` — Target architecture (always amd64 for Unraid)
 
-- `GOOS=linux` - Target operating system (always Linux for Unraid)
-- `GOARCH=amd64` - Target architecture (always amd64)
-- `GOPATH=/go` - Go workspace directory
-- `GOBIN=/go/bin` - Go binaries installation directory
+## Codespaces Notes
 
-### For MQTT Testing (scripts/mqtt-test.sh)
+- **Machine size**: Requests 4 CPUs, 8 GB RAM, 32 GB storage via `hostRequirements`
+- **Port 8043**: Labeled "Agent API", auto-forwarded with notification
+- **Caching**: `onCreateCommand` runs once; `updateContentCommand` refreshes deps on branch changes
+- **Open files**: `README.md` opens automatically on attach
 
-- `MQTT_BROKER` - Broker hostname (default: `mosquitto`)
-- `MQTT_PORT` - Broker port (default: `1883`)
-- `MQTT_TOPIC` - Topic pattern to test (default: `unraid/#`)
+## Troubleshooting
+
+### Tool not found after container creation
+
+Re-run the setup script:
+
+```bash
+.devcontainer/on-create.sh
+```
+
+### Pre-commit hooks not installed
+
+```bash
+pre-commit install --install-hooks
+```
+
+### Ansible not found
+
+```bash
+pip install ansible ansible-lint
+```
 
 ## References
 
-- [devcontainer.json documentation](https://containers.dev/implementers/json_reference/)
-- [Docker Compose documentation](https://docs.docker.com/compose/)
-- [Mosquitto MQTT Broker](https://mosquitto.org/)
-- [Eclipse Paho MQTT Go Client](https://github.com/eclipse/paho.mqtt.golang)
-- [unraid-management-agent MCP Integration](../docs/MCP_INTEGRATION.md)
+- [Dev Container Features](https://containers.dev/features)
+- [Dev Container Spec](https://containers.dev/implementors/spec/)
+- [GitHub Codespaces](https://docs.github.com/en/codespaces)
+- [MCP Integration](../docs/integrations/mcp.md)

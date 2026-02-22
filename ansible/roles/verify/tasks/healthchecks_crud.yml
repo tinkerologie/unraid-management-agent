@@ -1,0 +1,65 @@
+---
+# Health check CRUD test — create, run, verify, and delete a health check
+
+- name: Cleanup any leftover test health check
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/healthchecks/ansible-test-hc"
+    method: DELETE
+    status_code: [200, 404]
+  ignore_errors: true
+
+- name: Create test health check
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/healthchecks"
+    method: POST
+    body_format: json
+    body:
+      id: ansible-test-hc
+      name: Ansible DNS Check
+      type: tcp
+      target: "8.8.8.8:53"
+      interval: "30s"
+      timeout: "5s"
+      enabled: true
+    status_code: [200, 201]
+  register: hc_create
+
+- name: Run test health check
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/healthchecks/ansible-test-hc/run"
+    method: POST
+    status_code: 200
+    return_content: true
+  register: hc_run
+
+- name: Verify health check passed
+  vars:
+    hc_data: "{{ hc_run.json }}"
+  ansible.builtin.assert:
+    that:
+      - hc_data.healthy == true
+      - hc_data.check_name is defined
+      - hc_data.check_id == 'ansible-test-hc'
+    fail_msg: "Health check failed: {{ hc_data }}"
+    success_msg: "Health check passed: {{ hc_data.check_name }} → healthy={{ hc_data.healthy }}"
+
+- name: Delete test health check
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/healthchecks/ansible-test-hc"
+    method: DELETE
+    status_code: 200
+
+- name: Verify health check was deleted
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/healthchecks/ansible-test-hc"
+    method: GET
+    status_code: 404
+
+- name: Health check CRUD result
+  ansible.builtin.debug:
+    msg: "Health check CRUD: cleanup/create/run/verify/delete/confirm-delete — all passed"

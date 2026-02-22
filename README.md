@@ -58,23 +58,27 @@ For information about the official Unraid GraphQL API, please refer to:
 ### Quick Links
 
 - **Getting Started**
+
   - [Installation Guide](docs/guides/installation.md) - Install the plugin
   - [Quick Start](docs/guides/quick-start.md) - First API calls
   - [Configuration](docs/guides/configuration.md) - Customize settings
   - [System Requirements](docs/guides/system-requirements.md) - Requirements & dependencies
 
 - **API Reference**
+
   - [REST API](docs/api/rest-api.md) - Complete HTTP API reference (57 endpoints)
   - [WebSocket Events](docs/api/websocket-events.md) - Real-time events
   - [Prometheus Metrics](docs/api/prometheus.md) - Metrics endpoint (41 metrics)
 
 - **Integrations**
+
   - [MCP (AI Agents)](docs/integrations/mcp.md) - Model Context Protocol (54 tools)
   - [MQTT](docs/integrations/mqtt.md) - MQTT publishing for IoT
   - [Grafana Dashboards](docs/integrations/grafana.md) - Monitoring dashboards
   - [Home Assistant](docs/integrations/home-assistant.md) - Smart home integration
 
 - **Development**
+
   - [Contributing](docs/development/contributing.md) - Contribution guidelines
   - [Code Quality](docs/development/code-quality.md) - Linting & pre-commit hooks
   - [Testing](docs/development/testing.md) - Test suite documentation
@@ -517,14 +521,16 @@ go test -v ./daemon/services/api/handlers_test.go
 make clean
 ```
 
-### Dev Container (VS Code)
+### Dev Container (VS Code / GitHub Codespaces)
 
-- Prereqs: Docker (or compatible), VS Code with Dev Containers extension.
+- Prereqs: Docker (or compatible), VS Code with Dev Containers extension — or just open in GitHub Codespaces.
 - Open the repo in VS Code and run `Dev Containers: Reopen in Container`.
-- Builds image and container named `unraid-management-agent-dev` via `.devcontainer/docker-compose.yml`.
-- Tooling baked in: Go 1.26, Node.js 20, GitHub CLI (`gh`), Copilot CLI, make, gcc, jq.
-- VS Code extensions auto-installed: Go, Makefile Tools, Prettier, GitHub (PRs, Codespaces, Actions, Copilot, Copilot Chat, RemoteHub, theme), and Claude Dev.
-- Post-create runs `go mod download`; run `make test` to verify after attach.
+- Uses [Dev Container Features](https://containers.dev/features) for Go 1.26, Node.js 22, Python 3.12, and GitHub CLI.
+- Ansible + ansible-lint included for deployment automation (`ansible/` directory).
+- Go tools auto-installed: golangci-lint, gosec, govulncheck, swag, goimports.
+- VS Code extensions auto-installed: Go, Python, Ansible, Makefile Tools, Prettier, GitHub Copilot.
+- Lifecycle: `onCreateCommand` installs tools, `updateContentCommand` refreshes deps, `postCreateCommand` sets up pre-commit hooks.
+- Run `make test` to verify after attach.
 
 ## Configuration
 
@@ -534,6 +540,7 @@ Configure the plugin through the Unraid web UI:
 
 1. Navigate to **Settings** → **Unraid Management Agent**
 2. Adjust settings as needed:
+
    - **Port**: API server port (default: 8043)
    - **Collection Intervals**: How often each data type is collected
 

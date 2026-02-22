@@ -1,0 +1,14 @@
+---
+# Shared variables for all Unraid hosts
+#
+# These are used across build, deploy, uninstall, and verify roles.
+# Override per-host values in inventory.yml (e.g., api_port).
+
+plugin_name: unraid-management-agent
+version: "{{ lookup('file', playbook_dir + '/../VERSION') }}"
+build_dir: "{{ playbook_dir }}/../build"
+plugin_bundle: "{{ build_dir }}/{{ plugin_name }}-{{ version }}.tgz"
+plugin_dir: "/usr/local/emhttp/plugins/{{ plugin_name }}"
+config_dir: "/boot/config/plugins/{{ plugin_name }}"
+api_port: "{{ hostvars[inventory_hostname].api_port | default(8043) }}"
+create_backup: false

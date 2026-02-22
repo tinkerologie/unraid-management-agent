@@ -31,14 +31,14 @@ Prioritized backlog of planned enhancements. Each feature includes researched Go
 
 All libraries verified as pure Go (no CGO) unless noted.
 
-| Feature | Library | Import Path | Version | GitHub |
-|---|---|---|---|---|
-| Alerting rules engine | expr-lang/expr | `github.com/expr-lang/expr` | v1.17.8 | <https://github.com/expr-lang/expr> |
-| Notification dispatch (all-in-one) | nicholas-fedor/shoutrrr | `github.com/nicholas-fedor/shoutrrr` | v0.13.2 | <https://github.com/nicholas-fedor/shoutrrr> |
-| Time-series storage | bbolt | `go.etcd.io/bbolt` | v1.4.3 | <https://github.com/etcd-io/bbolt> |
-| Cron scheduler | gocron v2 | `github.com/go-co-op/gocron/v2` | v2.19.1 | <https://github.com/go-co-op/gocron> |
-| Git backup | go-git v5 | `github.com/go-git/go-git/v5` | v5.16.5 | <https://github.com/go-git/go-git> |
-| Speedtest | speedtest-go | `github.com/showwin/speedtest-go/speedtest` | v1.7.10 | <https://github.com/showwin/speedtest-go> |
+| Feature                            | Library                 | Import Path                                 | Version | GitHub                                       |
+| ---------------------------------- | ----------------------- | ------------------------------------------- | ------- | -------------------------------------------- |
+| Alerting rules engine              | expr-lang/expr          | `github.com/expr-lang/expr`                 | v1.17.8 | <https://github.com/expr-lang/expr>          |
+| Notification dispatch (all-in-one) | nicholas-fedor/shoutrrr | `github.com/nicholas-fedor/shoutrrr`        | v0.13.2 | <https://github.com/nicholas-fedor/shoutrrr> |
+| Time-series storage                | bbolt                   | `go.etcd.io/bbolt`                          | v1.4.3  | <https://github.com/etcd-io/bbolt>           |
+| Cron scheduler                     | gocron v2               | `github.com/go-co-op/gocron/v2`             | v2.19.1 | <https://github.com/go-co-op/gocron>         |
+| Git backup                         | go-git v5               | `github.com/go-git/go-git/v5`               | v5.16.5 | <https://github.com/go-git/go-git>           |
+| Speedtest                          | speedtest-go            | `github.com/showwin/speedtest-go/speedtest` | v1.7.10 | <https://github.com/showwin/speedtest-go>    |
 
 **Not used (reasons):**
 
@@ -422,17 +422,17 @@ Phase 5 (T061–T073)  ──── Add speedtest-go. Federation has no new deps
 
 ### Files touched per feature
 
-| Feature | New Packages | Modified Files |
-|---|---|---|
-| MCP Diagnostic Prompts | none | `mcp/server.go` |
-| Docker Update Detection | none | `dto/docker.go`, `controllers/docker.go`, `api/handlers.go`, `mcp/server.go` |
-| Alerting Engine | `services/alerting/`, `dto/alert.go` | `orchestrator.go`, `api/server.go`, `api/handlers.go`, `go.mod` |
-| Historical Metrics | `services/history/` | `api/server.go`, `api/handlers.go`, `orchestrator.go`, `go.mod` |
-| Health Checks / Watchdog | `services/watchdog/`, `dto/healthcheck.go` | `orchestrator.go`, `api/handlers.go` |
-| Scheduled Tasks | `services/scheduler/`, `dto/schedule.go` | `orchestrator.go`, `api/handlers.go`, `go.mod` |
-| Config Backup + Git | `services/backup/`, `collectors/backup.go` | `orchestrator.go`, `api/handlers.go`, `domain/config.go`, `go.mod` |
-| Speedtest | `collectors/speedtest.go` | `dto/network.go`, `api/handlers.go`, `orchestrator.go`, `go.mod` |
-| Multi-Server Federation | `services/federation/`, `dto/federation.go` | `orchestrator.go`, `api/handlers.go`, `mcp/server.go` |
+| Feature                  | New Packages                                | Modified Files                                                               |
+| ------------------------ | ------------------------------------------- | ---------------------------------------------------------------------------- |
+| MCP Diagnostic Prompts   | none                                        | `mcp/server.go`                                                              |
+| Docker Update Detection  | none                                        | `dto/docker.go`, `controllers/docker.go`, `api/handlers.go`, `mcp/server.go` |
+| Alerting Engine          | `services/alerting/`, `dto/alert.go`        | `orchestrator.go`, `api/server.go`, `api/handlers.go`, `go.mod`              |
+| Historical Metrics       | `services/history/`                         | `api/server.go`, `api/handlers.go`, `orchestrator.go`, `go.mod`              |
+| Health Checks / Watchdog | `services/watchdog/`, `dto/healthcheck.go`  | `orchestrator.go`, `api/handlers.go`                                         |
+| Scheduled Tasks          | `services/scheduler/`, `dto/schedule.go`    | `orchestrator.go`, `api/handlers.go`, `go.mod`                               |
+| Config Backup + Git      | `services/backup/`, `collectors/backup.go`  | `orchestrator.go`, `api/handlers.go`, `domain/config.go`, `go.mod`           |
+| Speedtest                | `collectors/speedtest.go`                   | `dto/network.go`, `api/handlers.go`, `orchestrator.go`, `go.mod`             |
+| Multi-Server Federation  | `services/federation/`, `dto/federation.go` | `orchestrator.go`, `api/handlers.go`, `mcp/server.go`                        |
 
 ---
 

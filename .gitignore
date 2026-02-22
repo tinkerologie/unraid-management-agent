@@ -57,6 +57,8 @@ temp/
 scripts/config.sh
 scripts/*.local.sh
 scripts/*-local.sh
+ansible/inventory.yml
+ansible/.vault-password-file
 config.local.*
 *.credentials
 *.secrets
@@ -85,3 +87,7 @@ PHASE_2_COMPLETION_SUMMARY.md
 # Specify tool cache/memory (if it generates local state)
 .specify/memory/
 .specify/.cache/
+
+# AI scratch directory (temporary AI working files)
+.ai-scratch/*
+!.ai-scratch/.gitkeep

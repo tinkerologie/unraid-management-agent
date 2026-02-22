@@ -1,0 +1,99 @@
+---
+# Uninstall plugin from Unraid
+# Uses 'raw' module — Unraid has no Python interpreter
+
+- name: Check server before uninstall
+  ansible.builtin.raw: echo "ok"
+  changed_when: false
+
+- name: Check if plugin is installed
+  ansible.builtin.raw: test -f {{ plugin_dir }}/{{ plugin_name }} && echo "EXISTS" || echo "MISSING"
+  register: plugin_check
+  changed_when: false
+
+- name: Stop service via stop script
+  ansible.builtin.raw: "{{ plugin_dir }}/scripts/stop 2>/dev/null; true"
+  register: stop_result
+  changed_when: "'EXISTS' in plugin_check.stdout"
+  when: "'EXISTS' in plugin_check.stdout"
+
+- name: Wait for service to stop
+  ansible.builtin.pause:
+    seconds: 3
+  when: "'EXISTS' in plugin_check.stdout"
+
+- name: Verify process is stopped
+  ansible.builtin.raw: "pidof {{ plugin_name }} 2>/dev/null && echo RUNNING || echo STOPPED"
+  register: pid_after_stop
+  changed_when: false
+
+- name: Force kill if still running
+  ansible.builtin.raw: "killall -9 {{ plugin_name }} 2>/dev/null; true"
+  when: "'RUNNING' in pid_after_stop.stdout"
+  changed_when: "'RUNNING' in pid_after_stop.stdout"
+
+- name: Wait after force kill
+  ansible.builtin.pause:
+    seconds: 2
+  when: "'RUNNING' in pid_after_stop.stdout"
+
+- name: Verify API is unreachable after stop
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/health"
+    method: GET
+    status_code: 200
+    timeout: 3
+  register: api_after_stop
+  failed_when: false
+  changed_when: false
+
+- name: Confirm API is down
+  ansible.builtin.assert:
+    that:
+      - api_after_stop.status != 200
+    fail_msg: "API is still responding after stop — PID may still be running"
+    success_msg: "API confirmed unreachable after service stop"
+
+- name: Remove plugin files
+  ansible.builtin.raw: "rm -rf {{ plugin_dir }}"
+  changed_when: true
+
+- name: Remove config files
+  ansible.builtin.raw: "rm -rf {{ config_dir }}"
+  changed_when: true
+
+- name: Remove log file
+  ansible.builtin.raw: "rm -f /var/log/{{ plugin_name }}.log"
+  changed_when: true
+
+- name: Verify plugin directory removed
+  ansible.builtin.raw: "test -d {{ plugin_dir }} && echo EXISTS || echo REMOVED"
+  register: dir_after_remove
+  changed_when: false
+
+- name: Verify config directory removed
+  ansible.builtin.raw: "test -d {{ config_dir }} && echo EXISTS || echo REMOVED"
+  register: config_after_remove
+  changed_when: false
+
+- name: Confirm full uninstall
+  ansible.builtin.assert:
+    that:
+      - "'REMOVED' in dir_after_remove.stdout"
+      - "'REMOVED' in config_after_remove.stdout"
+    fail_msg: "Uninstall incomplete — directories still exist"
+    success_msg: "Plugin fully uninstalled (binary, config, and log removed)"
+
+- name: Uninstall summary
+  ansible.builtin.debug:
+    msg: |
+      ══════════════════════════════════════
+      Plugin Uninstalled Successfully
+      ══════════════════════════════════════
+      Service:     stopped ✓
+      Plugin dir:  {{ plugin_dir }} removed ✓
+      Config dir:  {{ config_dir }} removed ✓
+      Log file:    /var/log/{{ plugin_name }}.log removed ✓
+      API:         unreachable ✓
+      ══════════════════════════════════════

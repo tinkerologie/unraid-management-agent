@@ -228,7 +228,7 @@ func (c *SystemCollector) Collect() error {
     if err != nil {
         return fmt.Errorf("failed to collect system info: %w", err)
     }
-    
+
     c.ctx.Hub.Pub(info, "system_update")
     return nil
 }
@@ -310,10 +310,10 @@ linters-settings:
   errcheck:
     check-blank: true
     check-type-assertions: true
-  
+
   govet:
     enable-all: true
-  
+
   gosec:
     severity: medium
     confidence: medium
@@ -383,7 +383,7 @@ Edit `.golangci.yml` to exclude specific issues:
 linters-settings:
   gosec:
     excludes:
-      - G304  # File path provided as taint input (if validated elsewhere)
+      - G304 # File path provided as taint input (if validated elsewhere)
 ```
 
 **Important**: Only exclude after verifying it's a false positive.
@@ -417,7 +417,7 @@ func TestValidateContainerID(t *testing.T) {
         {"empty ID", "", true},
         {"SQL injection", "'; DROP TABLE--", true},
     }
-    
+
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
             err := ValidateContainerID(tt.id)

@@ -74,14 +74,14 @@ mqtt:
       value_template: "{{ value_json.cpu_usage | round(1) }}"
       unit_of_measurement: "%"
       icon: mdi:cpu-64-bit
-      
+
     - name: "Unraid RAM Usage"
       unique_id: unraid_ram_usage
       state_topic: "unraid/system"
       value_template: "{{ value_json.ram_usage | round(1) }}"
       unit_of_measurement: "%"
       icon: mdi:memory
-      
+
     - name: "Unraid CPU Temperature"
       unique_id: unraid_cpu_temp
       state_topic: "unraid/system"
@@ -89,21 +89,21 @@ mqtt:
       unit_of_measurement: "°C"
       device_class: temperature
       state_class: measurement
-      
+
     - name: "Unraid Uptime"
       unique_id: unraid_uptime
       state_topic: "unraid/system"
       value_template: "{{ (value_json.uptime / 86400) | round(1) }}"
       unit_of_measurement: "days"
       icon: mdi:clock-outline
-      
+
     # Array Sensors
     - name: "Unraid Array State"
       unique_id: unraid_array_state
       state_topic: "unraid/array"
       value_template: "{{ value_json.state }}"
       icon: mdi:server
-      
+
     - name: "Unraid Array Usage"
       unique_id: unraid_array_usage
       state_topic: "unraid/array"
@@ -111,7 +111,7 @@ mqtt:
       unit_of_measurement: "%"
       icon: mdi:harddisk
       state_class: measurement
-      
+
     - name: "Unraid Array Free Space"
       unique_id: unraid_array_free
       state_topic: "unraid/array"
@@ -119,7 +119,7 @@ mqtt:
       unit_of_measurement: "TB"
       icon: mdi:database
       state_class: measurement
-      
+
     - name: "Unraid Parity Status"
       unique_id: unraid_parity_status
       state_topic: "unraid/array"
@@ -144,21 +144,21 @@ mqtt:
       value_template: "{{ value_json.battery_charge }}"
       unit_of_measurement: "%"
       device_class: battery
-      
+
     - name: "UPS Runtime"
       unique_id: ups_runtime
       state_topic: "unraid/ups"
       value_template: "{{ (value_json.runtime / 60) | round(0) }}"
       unit_of_measurement: "minutes"
       icon: mdi:clock-outline
-      
+
     - name: "UPS Load"
       unique_id: ups_load
       state_topic: "unraid/ups"
       value_template: "{{ value_json.load }}"
       unit_of_measurement: "%"
       icon: mdi:gauge
-      
+
     # Docker Container Counts
     - name: "Unraid Containers Running"
       unique_id: unraid_containers_running
@@ -166,7 +166,7 @@ mqtt:
       value_template: >
         {{ value_json | selectattr('state', 'eq', 'running') | list | count }}
       icon: mdi:docker
-      
+
     # VM Counts
     - name: "Unraid VMs Running"
       unique_id: unraid_vms_running
@@ -188,7 +188,7 @@ mqtt:
       value_template: >
         {{ value_json.state == 'STARTED' }}
       device_class: running
-      
+
     # Parity Check Active
     - name: "Unraid Parity Check Running"
       unique_id: unraid_parity_check
@@ -196,7 +196,7 @@ mqtt:
       value_template: >
         {{ value_json.parity_check_status == 'running' }}
       device_class: running
-      
+
     # UPS Online
     - name: "UPS Online"
       unique_id: ups_online
@@ -242,7 +242,7 @@ switch:
     body_off: ""
     is_on_template: >
       {{ state_attr('sensor.unraid_containers', 'plex_state') == 'running' }}
-    
+
   # VM Control
   - platform: rest
     name: "Windows VM"
@@ -263,29 +263,29 @@ rest_command:
   plex_start:
     url: "http://unraid-server:8043/api/v1/docker/plex/start"
     method: POST
-    
+
   plex_stop:
     url: "http://unraid-server:8043/api/v1/docker/plex/stop"
     method: POST
-    
+
   plex_restart:
     url: "http://unraid-server:8043/api/v1/docker/plex/restart"
     method: POST
-    
+
   # VM Control
   windows_start:
     url: "http://unraid-server:8043/api/v1/vm/Windows10/start"
     method: POST
-    
+
   windows_stop:
     url: "http://unraid-server:8043/api/v1/vm/Windows10/stop"
     method: POST
-    
+
   # Array Control
   array_start:
     url: "http://unraid-server:8043/api/v1/array/start"
     method: POST
-    
+
   array_stop:
     url: "http://unraid-server:8043/api/v1/array/stop"
     method: POST
@@ -445,21 +445,21 @@ views:
             line_color: blue
             hours_to_show: 6
             points_per_hour: 10
-            
+
           - type: custom:mini-graph-card
             name: RAM Usage
             entities:
               - entity: sensor.unraid_ram_usage
             line_color: green
             hours_to_show: 6
-            
+
           - type: custom:mini-graph-card
             name: CPU Temperature
             entities:
               - entity: sensor.unraid_cpu_temperature
             line_color: red
             hours_to_show: 6
-      
+
       # Array Status
       - type: entities
         title: Array Status
@@ -469,7 +469,7 @@ views:
           - entity: sensor.unraid_array_free_space
           - entity: sensor.unraid_parity_status
           - entity: binary_sensor.unraid_parity_check_running
-      
+
       # Docker Containers
       - type: entities
         title: Docker Containers
@@ -479,7 +479,7 @@ views:
           - entity: switch.plex_container
           - entity: switch.sonarr_container
           - entity: switch.radarr_container
-      
+
       # UPS Status
       - type: entities
         title: UPS
@@ -568,13 +568,13 @@ template:
           {% set ram = states('sensor.unraid_ram_usage') | float(0) %}
           {% set temp = states('sensor.unraid_cpu_temperature') | float(0) %}
           {% set parity = 'Valid' if is_state('sensor.unraid_parity_status', 'Valid') else 'Invalid' %}
-          
+
           {% set score = 100 %}
           {% set score = score - (10 if cpu > 80 else 0) %}
           {% set score = score - (10 if ram > 90 else 0) %}
           {% set score = score - (15 if temp > 75 else 0) %}
           {% set score = score - (50 if parity == 'Invalid' else 0) %}
-          
+
           {{ score | int }}
         unit_of_measurement: "%"
         icon: mdi:heart-pulse

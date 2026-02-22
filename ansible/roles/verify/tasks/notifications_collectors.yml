@@ -1,0 +1,46 @@
+---
+# Notification and collector validation
+
+# ── NOTIFICATION READ TEST ───────────────────────────────────────────
+- name: Get notification overview
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/notifications/overview"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: notif_overview
+
+- name: Validate notification overview schema
+  vars:
+    notif: "{{ notif_overview.json }}"
+  ansible.builtin.assert:
+    that:
+      - notif.unread is defined
+      - notif.unread.total is defined
+      - notif.archive is defined
+      - notif.archive.total is defined
+    fail_msg: "Notification overview missing expected fields"
+    success_msg: "Notifications: unread={{ notif.unread.total }}, archived={{ notif.archive.total }}"
+
+# ── COLLECTOR STATUS VALIDATION ──────────────────────────────────────
+- name: Get all collector statuses
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/collectors/status"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: all_collectors
+
+- name: Validate collector statuses
+  vars:
+    collectors: "{{ all_collectors.json.collectors }}"
+    enabled_collectors: "{{ collectors | selectattr('enabled', 'eq', true) | list }}"
+    running_collectors: "{{ enabled_collectors | selectattr('status', 'eq', 'running') | list }}"
+  ansible.builtin.assert:
+    that:
+      - collectors | length >= 5
+      - enabled_collectors | length >= 3
+    fail_msg: "Collector status check: only {{ enabled_collectors | length }}/{{ collectors | length }} enabled"
+    success_msg: "Collectors: {{ running_collectors | length }} running, {{ enabled_collectors | length }} enabled, {{ collectors | length }} total ({{ collectors | map(attribute='name') | join(', ') }})"

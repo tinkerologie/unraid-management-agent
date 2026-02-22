@@ -1,0 +1,95 @@
+---
+# Core API endpoint tests — verify all endpoints return HTTP 200
+
+- name: Test core API endpoints
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/{{ item.path }}"
+    method: GET
+    status_code: 200
+    return_content: true
+  loop:
+    # Core monitoring
+    - { path: "health", name: "Health" }
+    - { path: "system", name: "System info" }
+    - { path: "system/flash", name: "Flash health" }
+    - { path: "array", name: "Array status" }
+    - { path: "disks", name: "Disks" }
+    - { path: "docker", name: "Docker" }
+    - { path: "docker/updates", name: "Docker updates" }
+    - { path: "vm", name: "VMs" }
+    - { path: "network", name: "Network" }
+    - { path: "network/access-urls", name: "Access URLs" }
+    - { path: "gpu", name: "GPU" }
+    - { path: "ups", name: "UPS" }
+    - { path: "nut", name: "NUT" }
+    - { path: "shares", name: "Shares" }
+    - { path: "unassigned", name: "Unassigned devices" }
+    - { path: "unassigned/devices", name: "Unassigned device list" }
+    - { path: "unassigned/remote-shares", name: "Unassigned remote shares" }
+    # Notifications
+    - { path: "notifications", name: "Notifications" }
+    - { path: "notifications/overview", name: "Notification overview" }
+    - { path: "notifications/unread", name: "Notifications unread" }
+    - { path: "notifications/archive", name: "Notifications archive" }
+    # Hardware (all sub-endpoints)
+    - { path: "hardware/full", name: "Hardware full" }
+    - { path: "hardware/bios", name: "Hardware BIOS" }
+    - { path: "hardware/baseboard", name: "Hardware baseboard" }
+    - { path: "hardware/cpu", name: "Hardware CPU" }
+    - { path: "hardware/cache", name: "Hardware cache" }
+    - { path: "hardware/memory-array", name: "Hardware memory array" }
+    - { path: "hardware/memory-devices", name: "Hardware memory devices" }
+    # ZFS
+    - { path: "zfs/pools", name: "ZFS pools" }
+    - { path: "zfs/datasets", name: "ZFS datasets" }
+    - { path: "zfs/snapshots", name: "ZFS snapshots" }
+    - { path: "zfs/arc", name: "ZFS ARC stats" }
+    # Settings (all sub-endpoints)
+    - { path: "settings/system", name: "Settings: system" }
+    - { path: "settings/docker", name: "Settings: docker" }
+    - { path: "settings/vm", name: "Settings: VM" }
+    - { path: "settings/disks", name: "Settings: disks" }
+    - { path: "settings/disk-thresholds", name: "Settings: disk thresholds" }
+    - { path: "settings/mover", name: "Settings: mover" }
+    - { path: "settings/services", name: "Settings: services" }
+    - { path: "settings/network-services", name: "Settings: network services" }
+    # Plugins, updates, services, processes
+    - { path: "plugins", name: "Plugins" }
+    - { path: "updates", name: "Update status" }
+    - { path: "services", name: "Services" }
+    - { path: "processes", name: "Processes" }
+    # Logs
+    - { path: "logs", name: "Logs" }
+    - { path: "user-scripts", name: "User scripts" }
+    - { path: "registration", name: "Registration" }
+    # Collectors
+    - { path: "collectors/status", name: "Collectors" }
+    # Alerting
+    - { path: "alerts/rules", name: "Alert rules" }
+    - { path: "alerts/status", name: "Alert status" }
+    - { path: "alerts/history", name: "Alert history" }
+    - { path: "alerts/firing", name: "Firing alerts" }
+    # Health checks
+    - { path: "healthchecks", name: "Health checks" }
+    - { path: "healthchecks/status", name: "Health check status" }
+    - { path: "healthchecks/history", name: "Health check history" }
+    # Parity
+    - { path: "array/parity-check/history", name: "Parity history" }
+    - { path: "array/parity-check/schedule", name: "Parity schedule" }
+    # MQTT
+    - { path: "mqtt/status", name: "MQTT status" }
+  loop_control:
+    label: "{{ item.name }}"
+  register: endpoint_results
+  ignore_errors: true
+
+- name: Endpoint test summary
+  vars:
+    passed: "{{ endpoint_results.results | selectattr('status', 'defined') | selectattr('status', 'eq', 200) | list | length }}"
+    total: "{{ endpoint_results.results | length }}"
+    failed_items: "{{ endpoint_results.results | rejectattr('status', 'defined') | list + endpoint_results.results | selectattr('status', 'defined') | rejectattr('status', 'eq', 200) | list }}"
+  ansible.builtin.debug:
+    msg: >-
+      Endpoints: {{ passed }}/{{ total }} passed
+      {{ '— FAILED: ' + (failed_items | map(attribute='item.name') | join(', ')) if failed_items | length > 0 else '' }}

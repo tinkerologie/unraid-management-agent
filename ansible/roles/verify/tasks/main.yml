@@ -1,0 +1,39 @@
+---
+# Verify deployment by running comprehensive endpoint tests
+# All HTTP tests delegate to localhost — no Python needed on Unraid
+
+- name: Core API endpoint tests
+  ansible.builtin.include_tasks: endpoints.yml
+
+- name: Response schema validation
+  ansible.builtin.include_tasks: schemas.yml
+
+- name: Parameterized endpoint tests
+  ansible.builtin.include_tasks: parameterized.yml
+
+- name: MCP protocol compliance tests
+  ansible.builtin.include_tasks: mcp.yml
+
+- name: Prometheus metrics validation
+  ansible.builtin.include_tasks: prometheus.yml
+
+- name: Swagger documentation validation
+  ansible.builtin.include_tasks: swagger.yml
+
+- name: WebSocket upgrade test
+  ansible.builtin.include_tasks: websocket.yml
+
+- name: MQTT status validation
+  ansible.builtin.include_tasks: mqtt.yml
+
+- name: Error handling tests
+  ansible.builtin.include_tasks: errors.yml
+
+- name: Alerting CRUD tests
+  ansible.builtin.include_tasks: alerts_crud.yml
+
+- name: Health check CRUD tests
+  ansible.builtin.include_tasks: healthchecks_crud.yml
+
+- name: Notification and collector validation
+  ansible.builtin.include_tasks: notifications_collectors.yml

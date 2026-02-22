@@ -39,11 +39,11 @@ type WSEvent struct {
 
 ### Envelope Fields
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `event` | string | Yes | Always "update" for all event types |
-| `timestamp` | string (ISO 8601) | Yes | Server timestamp when event was created |
-| `data` | object/array | Yes | Event-specific payload (varies by type) |
+| Field       | Type              | Required | Description                             |
+| ----------- | ----------------- | -------- | --------------------------------------- |
+| `event`     | string            | Yes      | Always "update" for all event types     |
+| `timestamp` | string (ISO 8601) | Yes      | Server timestamp when event was created |
+| `data`      | object/array      | Yes      | Event-specific payload (varies by type) |
 
 ### Example Envelope
 
@@ -72,13 +72,13 @@ type WSEvent struct {
 
 ### Primitive Types
 
-| Type | Go Type | JSON Type | Description |
-|------|---------|-----------|-------------|
-| String | `string` | string | UTF-8 encoded text |
-| Integer | `int`, `int64` | number | Whole numbers |
-| Float | `float64` | number | Decimal numbers |
-| Boolean | `bool` | boolean | true/false values |
-| Timestamp | `time.Time` | string | ISO 8601 formatted datetime |
+| Type      | Go Type        | JSON Type | Description                 |
+| --------- | -------------- | --------- | --------------------------- |
+| String    | `string`       | string    | UTF-8 encoded text          |
+| Integer   | `int`, `int64` | number    | Whole numbers               |
+| Float     | `float64`      | number    | Decimal numbers             |
+| Boolean   | `bool`         | boolean   | true/false values           |
+| Timestamp | `time.Time`    | string    | ISO 8601 formatted datetime |
 
 ### Complex Types
 
@@ -114,17 +114,17 @@ Since events lack a `type` field, clients must inspect the `data` structure to d
 
 ### Identification Rules
 
-| Event Type | Identification Rule |
-|------------|---------------------|
-| `system_update` | Has `hostname` AND `cpu_usage_percent` |
-| `array_status_update` | Has `state` AND `parity_check_status` AND `num_disks` |
-| `ups_status_update` | Has `connected` AND `battery_charge_percent` |
-| `gpu_update` | Has `available` AND `driver_version` AND `utilization_gpu_percent` |
-| `network_list_update` | Has `mac_address` AND `bytes_received` |
-| `container_list_update` | Has `image` AND `ports` |
-| `vm_list_update` | Has `state` AND `vcpus` |
-| `disk_list_update` | Has `device` AND `mount_point` |
-| `share_list_update` | Has `name` AND `path` AND `size_bytes` |
+| Event Type              | Identification Rule                                                |
+| ----------------------- | ------------------------------------------------------------------ |
+| `system_update`         | Has `hostname` AND `cpu_usage_percent`                             |
+| `array_status_update`   | Has `state` AND `parity_check_status` AND `num_disks`              |
+| `ups_status_update`     | Has `connected` AND `battery_charge_percent`                       |
+| `gpu_update`            | Has `available` AND `driver_version` AND `utilization_gpu_percent` |
+| `network_list_update`   | Has `mac_address` AND `bytes_received`                             |
+| `container_list_update` | Has `image` AND `ports`                                            |
+| `vm_list_update`        | Has `state` AND `vcpus`                                            |
+| `disk_list_update`      | Has `device` AND `mount_point`                                     |
+| `share_list_update`     | Has `name` AND `path` AND `size_bytes`                             |
 
 ### Reference Implementation
 
@@ -136,47 +136,47 @@ def identify_event_type(data):
         if not data:
             return "empty_list"
         data = data[0]
-    
+
     # Must be a dict to identify
     if not isinstance(data, dict):
         return "unknown"
-    
+
     # System update
     if "hostname" in data and "cpu_usage_percent" in data:
         return "system_update"
-    
+
     # Array status
     if "state" in data and "parity_check_status" in data and "num_disks" in data:
         return "array_status_update"
-    
+
     # UPS status
     if "connected" in data and "battery_charge_percent" in data:
         return "ups_status_update"
-    
+
     # GPU metrics
     if "available" in data and "driver_version" in data and "utilization_gpu_percent" in data:
         return "gpu_update"
-    
+
     # Network interface
     if "mac_address" in data and "bytes_received" in data:
         return "network_list_update"
-    
+
     # Container
     if "image" in data and "ports" in data:
         return "container_list_update"
-    
+
     # VM
     if "state" in data and "vcpus" in data:
         return "vm_list_update"
-    
+
     # Disk
     if "device" in data and "mount_point" in data:
         return "disk_list_update"
-    
+
     # Share
     if "name" in data and "path" AND "size_bytes" in data:
         return "share_list_update"
-    
+
     return "unknown"
 ```
 
@@ -186,164 +186,164 @@ def identify_event_type(data):
 
 ### System Update Fields
 
-| Field | Type | Unit | Range | Nullable | Description |
-|-------|------|------|-------|----------|-------------|
-| `hostname` | string | - | - | No | Server hostname |
-| `version` | string | - | - | No | Agent version |
-| `uptime_seconds` | int64 | seconds | ≥0 | No | System uptime |
-| `cpu_usage_percent` | float64 | percent | 0-100 | No | CPU usage |
-| `cpu_model` | string | - | - | No | CPU model name |
-| `cpu_cores` | int | count | ≥1 | No | Physical cores |
-| `cpu_threads` | int | count | ≥1 | No | Logical threads |
-| `cpu_mhz` | float64 | MHz | ≥0 | No | CPU frequency |
-| `cpu_temp_celsius` | float64 | °C | -273-∞ | Yes | CPU temperature |
-| `ram_usage_percent` | float64 | percent | 0-100 | No | RAM usage |
-| `ram_total_bytes` | int64 | bytes | ≥0 | No | Total RAM |
-| `ram_used_bytes` | int64 | bytes | ≥0 | No | Used RAM |
-| `ram_free_bytes` | int64 | bytes | ≥0 | No | Free RAM |
-| `ram_buffers_bytes` | int64 | bytes | ≥0 | No | Buffer RAM |
-| `ram_cached_bytes` | int64 | bytes | ≥0 | No | Cached RAM |
-| `server_model` | string | - | - | No | Server model |
-| `bios_version` | string | - | - | No | BIOS version |
-| `bios_date` | string | - | - | No | BIOS date |
-| `motherboard_temp_celsius` | float64 | °C | -273-∞ | Yes | MB temperature |
-| `fans` | array | - | - | Yes | Fan sensors |
-| `timestamp` | string | - | - | No | Event timestamp |
+| Field                      | Type    | Unit    | Range  | Nullable | Description     |
+| -------------------------- | ------- | ------- | ------ | -------- | --------------- |
+| `hostname`                 | string  | -       | -      | No       | Server hostname |
+| `version`                  | string  | -       | -      | No       | Agent version   |
+| `uptime_seconds`           | int64   | seconds | ≥0     | No       | System uptime   |
+| `cpu_usage_percent`        | float64 | percent | 0-100  | No       | CPU usage       |
+| `cpu_model`                | string  | -       | -      | No       | CPU model name  |
+| `cpu_cores`                | int     | count   | ≥1     | No       | Physical cores  |
+| `cpu_threads`              | int     | count   | ≥1     | No       | Logical threads |
+| `cpu_mhz`                  | float64 | MHz     | ≥0     | No       | CPU frequency   |
+| `cpu_temp_celsius`         | float64 | °C      | -273-∞ | Yes      | CPU temperature |
+| `ram_usage_percent`        | float64 | percent | 0-100  | No       | RAM usage       |
+| `ram_total_bytes`          | int64   | bytes   | ≥0     | No       | Total RAM       |
+| `ram_used_bytes`           | int64   | bytes   | ≥0     | No       | Used RAM        |
+| `ram_free_bytes`           | int64   | bytes   | ≥0     | No       | Free RAM        |
+| `ram_buffers_bytes`        | int64   | bytes   | ≥0     | No       | Buffer RAM      |
+| `ram_cached_bytes`         | int64   | bytes   | ≥0     | No       | Cached RAM      |
+| `server_model`             | string  | -       | -      | No       | Server model    |
+| `bios_version`             | string  | -       | -      | No       | BIOS version    |
+| `bios_date`                | string  | -       | -      | No       | BIOS date       |
+| `motherboard_temp_celsius` | float64 | °C      | -273-∞ | Yes      | MB temperature  |
+| `fans`                     | array   | -       | -      | Yes      | Fan sensors     |
+| `timestamp`                | string  | -       | -      | No       | Event timestamp |
 
 ### Array Status Fields
 
-| Field | Type | Unit | Range | Nullable | Description |
-|-------|------|------|-------|----------|-------------|
-| `state` | string | - | enum | No | Array state |
-| `num_disks` | int | count | ≥0 | No | Total disks |
-| `num_data_disks` | int | count | ≥0 | No | Data disks |
-| `num_parity_disks` | int | count | 0-2 | No | Parity disks |
-| `sync_percent` | float64 | percent | 0-100 | No | Sync progress |
-| `parity_valid` | bool | - | - | No | Parity valid |
-| `parity_check_status` | string | - | enum | No | Check status |
-| `parity_check_running` | bool | - | - | No | Check active |
-| `parity_check_progress` | float64 | percent | 0-100 | No | Check progress |
-| `timestamp` | string | - | - | No | Event timestamp |
+| Field                   | Type    | Unit    | Range | Nullable | Description     |
+| ----------------------- | ------- | ------- | ----- | -------- | --------------- |
+| `state`                 | string  | -       | enum  | No       | Array state     |
+| `num_disks`             | int     | count   | ≥0    | No       | Total disks     |
+| `num_data_disks`        | int     | count   | ≥0    | No       | Data disks      |
+| `num_parity_disks`      | int     | count   | 0-2   | No       | Parity disks    |
+| `sync_percent`          | float64 | percent | 0-100 | No       | Sync progress   |
+| `parity_valid`          | bool    | -       | -     | No       | Parity valid    |
+| `parity_check_status`   | string  | -       | enum  | No       | Check status    |
+| `parity_check_running`  | bool    | -       | -     | No       | Check active    |
+| `parity_check_progress` | float64 | percent | 0-100 | No       | Check progress  |
+| `timestamp`             | string  | -       | -     | No       | Event timestamp |
 
 ### Disk Info Fields
 
-| Field | Type | Unit | Range | Nullable | Description |
-|-------|------|------|-------|----------|-------------|
-| `id` | string | - | - | No | Disk identifier |
-| `device` | string | - | - | No | Device name |
-| `name` | string | - | - | No | Disk name |
-| `status` | string | - | enum | No | Disk status |
-| `size_bytes` | int64 | bytes | ≥0 | No | Total size |
-| `used_bytes` | int64 | bytes | ≥0 | No | Used space |
-| `free_bytes` | int64 | bytes | ≥0 | No | Free space |
-| `temperature_celsius` | float64 | °C | 0-∞ | Yes | Temperature |
-| `smart_status` | string | - | enum | No | SMART status |
-| `smart_errors` | int | count | ≥0 | No | Error count |
-| `spindown_delay` | int | minutes | ≥0 | No | Spindown delay |
-| `filesystem` | string | - | - | No | FS type |
-| `mount_point` | string | - | - | No | Mount path |
-| `usage_percent` | float64 | percent | 0-100 | No | Usage percent |
-| `power_on_hours` | int64 | hours | ≥0 | No | Power-on time |
-| `power_cycle_count` | int | count | ≥0 | No | Power cycles |
-| `read_bytes` | int64 | bytes | ≥0 | No | Bytes read |
-| `write_bytes` | int64 | bytes | ≥0 | No | Bytes written |
-| `read_ops` | int64 | count | ≥0 | No | Read ops |
-| `write_ops` | int64 | count | ≥0 | No | Write ops |
-| `io_utilization_percent` | float64 | percent | 0-100 | No | I/O usage |
-| `timestamp` | string | - | - | No | Event timestamp |
+| Field                    | Type    | Unit    | Range | Nullable | Description     |
+| ------------------------ | ------- | ------- | ----- | -------- | --------------- |
+| `id`                     | string  | -       | -     | No       | Disk identifier |
+| `device`                 | string  | -       | -     | No       | Device name     |
+| `name`                   | string  | -       | -     | No       | Disk name       |
+| `status`                 | string  | -       | enum  | No       | Disk status     |
+| `size_bytes`             | int64   | bytes   | ≥0    | No       | Total size      |
+| `used_bytes`             | int64   | bytes   | ≥0    | No       | Used space      |
+| `free_bytes`             | int64   | bytes   | ≥0    | No       | Free space      |
+| `temperature_celsius`    | float64 | °C      | 0-∞   | Yes      | Temperature     |
+| `smart_status`           | string  | -       | enum  | No       | SMART status    |
+| `smart_errors`           | int     | count   | ≥0    | No       | Error count     |
+| `spindown_delay`         | int     | minutes | ≥0    | No       | Spindown delay  |
+| `filesystem`             | string  | -       | -     | No       | FS type         |
+| `mount_point`            | string  | -       | -     | No       | Mount path      |
+| `usage_percent`          | float64 | percent | 0-100 | No       | Usage percent   |
+| `power_on_hours`         | int64   | hours   | ≥0    | No       | Power-on time   |
+| `power_cycle_count`      | int     | count   | ≥0    | No       | Power cycles    |
+| `read_bytes`             | int64   | bytes   | ≥0    | No       | Bytes read      |
+| `write_bytes`            | int64   | bytes   | ≥0    | No       | Bytes written   |
+| `read_ops`               | int64   | count   | ≥0    | No       | Read ops        |
+| `write_ops`              | int64   | count   | ≥0    | No       | Write ops       |
+| `io_utilization_percent` | float64 | percent | 0-100 | No       | I/O usage       |
+| `timestamp`              | string  | -       | -     | No       | Event timestamp |
 
 ### Container Info Fields
 
-| Field | Type | Unit | Range | Nullable | Description |
-|-------|------|------|-------|----------|-------------|
-| `id` | string | - | - | No | Container ID |
-| `name` | string | - | - | No | Container name |
-| `image` | string | - | - | No | Image name |
-| `state` | string | - | enum | No | Container state |
-| `status` | string | - | - | No | Status text |
-| `cpu_percent` | float64 | percent | 0-∞ | No | CPU usage |
-| `memory_usage_bytes` | int64 | bytes | ≥0 | No | Memory used |
-| `memory_limit_bytes` | int64 | bytes | ≥0 | No | Memory limit |
-| `network_rx_bytes` | int64 | bytes | ≥0 | No | RX bytes |
-| `network_tx_bytes` | int64 | bytes | ≥0 | No | TX bytes |
-| `ports` | array | - | - | No | Port mappings |
-| `timestamp` | string | - | - | No | Event timestamp |
+| Field                | Type    | Unit    | Range | Nullable | Description     |
+| -------------------- | ------- | ------- | ----- | -------- | --------------- |
+| `id`                 | string  | -       | -     | No       | Container ID    |
+| `name`               | string  | -       | -     | No       | Container name  |
+| `image`              | string  | -       | -     | No       | Image name      |
+| `state`              | string  | -       | enum  | No       | Container state |
+| `status`             | string  | -       | -     | No       | Status text     |
+| `cpu_percent`        | float64 | percent | 0-∞   | No       | CPU usage       |
+| `memory_usage_bytes` | int64   | bytes   | ≥0    | No       | Memory used     |
+| `memory_limit_bytes` | int64   | bytes   | ≥0    | No       | Memory limit    |
+| `network_rx_bytes`   | int64   | bytes   | ≥0    | No       | RX bytes        |
+| `network_tx_bytes`   | int64   | bytes   | ≥0    | No       | TX bytes        |
+| `ports`              | array   | -       | -     | No       | Port mappings   |
+| `timestamp`          | string  | -       | -     | No       | Event timestamp |
 
 ### VM Info Fields
 
-| Field | Type | Unit | Range | Nullable | Description |
-|-------|------|------|-------|----------|-------------|
-| `id` | string | - | - | No | VM ID |
-| `name` | string | - | - | No | VM name |
-| `state` | string | - | enum | No | VM state |
-| `vcpus` | int | count | ≥1 | No | Virtual CPUs |
-| `memory_allocated_bytes` | int64 | bytes | ≥0 | No | Allocated RAM |
-| `memory_used_bytes` | int64 | bytes | ≥0 | No | Used RAM |
-| `disk_path` | string | - | - | No | Disk path |
-| `disk_size_bytes` | int64 | bytes | ≥0 | No | Disk size |
-| `autostart` | bool | - | - | No | Auto-start |
-| `persistent` | bool | - | - | No | Persistent |
-| `timestamp` | string | - | - | No | Event timestamp |
+| Field                    | Type   | Unit  | Range | Nullable | Description     |
+| ------------------------ | ------ | ----- | ----- | -------- | --------------- |
+| `id`                     | string | -     | -     | No       | VM ID           |
+| `name`                   | string | -     | -     | No       | VM name         |
+| `state`                  | string | -     | enum  | No       | VM state        |
+| `vcpus`                  | int    | count | ≥1    | No       | Virtual CPUs    |
+| `memory_allocated_bytes` | int64  | bytes | ≥0    | No       | Allocated RAM   |
+| `memory_used_bytes`      | int64  | bytes | ≥0    | No       | Used RAM        |
+| `disk_path`              | string | -     | -     | No       | Disk path       |
+| `disk_size_bytes`        | int64  | bytes | ≥0    | No       | Disk size       |
+| `autostart`              | bool   | -     | -     | No       | Auto-start      |
+| `persistent`             | bool   | -     | -     | No       | Persistent      |
+| `timestamp`              | string | -     | -     | No       | Event timestamp |
 
 ### UPS Status Fields
 
-| Field | Type | Unit | Range | Nullable | Description |
-|-------|------|------|-------|----------|-------------|
-| `connected` | bool | - | - | No | UPS connected |
-| `model` | string | - | - | No | UPS model |
-| `status` | string | - | enum | No | UPS status |
-| `battery_charge_percent` | float64 | percent | 0-100 | No | Battery charge |
-| `battery_runtime_seconds` | int | seconds | ≥0 | No | Runtime est. |
-| `load_percent` | float64 | percent | 0-100 | No | Load percent |
-| `input_voltage` | float64 | volts | ≥0 | No | Input voltage |
-| `output_voltage` | float64 | volts | ≥0 | No | Output voltage |
-| `power_watts` | float64 | watts | ≥0 | No | Power draw |
-| `timestamp` | string | - | - | No | Event timestamp |
+| Field                     | Type    | Unit    | Range | Nullable | Description     |
+| ------------------------- | ------- | ------- | ----- | -------- | --------------- |
+| `connected`               | bool    | -       | -     | No       | UPS connected   |
+| `model`                   | string  | -       | -     | No       | UPS model       |
+| `status`                  | string  | -       | enum  | No       | UPS status      |
+| `battery_charge_percent`  | float64 | percent | 0-100 | No       | Battery charge  |
+| `battery_runtime_seconds` | int     | seconds | ≥0    | No       | Runtime est.    |
+| `load_percent`            | float64 | percent | 0-100 | No       | Load percent    |
+| `input_voltage`           | float64 | volts   | ≥0    | No       | Input voltage   |
+| `output_voltage`          | float64 | volts   | ≥0    | No       | Output voltage  |
+| `power_watts`             | float64 | watts   | ≥0    | No       | Power draw      |
+| `timestamp`               | string  | -       | -     | No       | Event timestamp |
 
 ### GPU Metrics Fields
 
-| Field | Type | Unit | Range | Nullable | Description |
-|-------|------|------|-------|----------|-------------|
-| `available` | bool | - | - | No | GPU available |
-| `name` | string | - | - | No | GPU name |
-| `driver_version` | string | - | - | No | Driver version |
-| `temperature_celsius` | float64 | °C | 0-∞ | Yes | GPU temp |
-| `cpu_temperature_celsius` | float64 | °C | 0-∞ | Yes | CPU temp (iGPU) |
-| `utilization_gpu_percent` | float64 | percent | 0-100 | No | GPU usage |
-| `utilization_memory_percent` | float64 | percent | 0-100 | No | VRAM usage |
-| `memory_total_bytes` | int64 | bytes | ≥0 | No | Total VRAM |
-| `memory_used_bytes` | int64 | bytes | ≥0 | No | Used VRAM |
-| `power_draw_watts` | float64 | watts | ≥0 | No | Power draw |
-| `timestamp` | string | - | - | No | Event timestamp |
+| Field                        | Type    | Unit    | Range | Nullable | Description     |
+| ---------------------------- | ------- | ------- | ----- | -------- | --------------- |
+| `available`                  | bool    | -       | -     | No       | GPU available   |
+| `name`                       | string  | -       | -     | No       | GPU name        |
+| `driver_version`             | string  | -       | -     | No       | Driver version  |
+| `temperature_celsius`        | float64 | °C      | 0-∞   | Yes      | GPU temp        |
+| `cpu_temperature_celsius`    | float64 | °C      | 0-∞   | Yes      | CPU temp (iGPU) |
+| `utilization_gpu_percent`    | float64 | percent | 0-100 | No       | GPU usage       |
+| `utilization_memory_percent` | float64 | percent | 0-100 | No       | VRAM usage      |
+| `memory_total_bytes`         | int64   | bytes   | ≥0    | No       | Total VRAM      |
+| `memory_used_bytes`          | int64   | bytes   | ≥0    | No       | Used VRAM       |
+| `power_draw_watts`           | float64 | watts   | ≥0    | No       | Power draw      |
+| `timestamp`                  | string  | -       | -     | No       | Event timestamp |
 
 ### Network Info Fields
 
-| Field | Type | Unit | Range | Nullable | Description |
-|-------|------|------|-------|----------|-------------|
-| `name` | string | - | - | No | Interface name |
-| `mac_address` | string | - | - | No | MAC address |
-| `ip_address` | string | - | - | No | IP address |
-| `speed_mbps` | int | Mbps | ≥0 | No | Link speed |
-| `state` | string | - | enum | No | Interface state |
-| `bytes_received` | int64 | bytes | ≥0 | No | RX bytes |
-| `bytes_sent` | int64 | bytes | ≥0 | No | TX bytes |
-| `packets_received` | int64 | count | ≥0 | No | RX packets |
-| `packets_sent` | int64 | count | ≥0 | No | TX packets |
-| `errors_received` | int64 | count | ≥0 | No | RX errors |
-| `errors_sent` | int64 | count | ≥0 | No | TX errors |
-| `timestamp` | string | - | - | No | Event timestamp |
+| Field              | Type   | Unit  | Range | Nullable | Description     |
+| ------------------ | ------ | ----- | ----- | -------- | --------------- |
+| `name`             | string | -     | -     | No       | Interface name  |
+| `mac_address`      | string | -     | -     | No       | MAC address     |
+| `ip_address`       | string | -     | -     | No       | IP address      |
+| `speed_mbps`       | int    | Mbps  | ≥0    | No       | Link speed      |
+| `state`            | string | -     | enum  | No       | Interface state |
+| `bytes_received`   | int64  | bytes | ≥0    | No       | RX bytes        |
+| `bytes_sent`       | int64  | bytes | ≥0    | No       | TX bytes        |
+| `packets_received` | int64  | count | ≥0    | No       | RX packets      |
+| `packets_sent`     | int64  | count | ≥0    | No       | TX packets      |
+| `errors_received`  | int64  | count | ≥0    | No       | RX errors       |
+| `errors_sent`      | int64  | count | ≥0    | No       | TX errors       |
+| `timestamp`        | string | -     | -     | No       | Event timestamp |
 
 ### Share Info Fields
 
-| Field | Type | Unit | Range | Nullable | Description |
-|-------|------|------|-------|----------|-------------|
-| `name` | string | - | - | No | Share name |
-| `path` | string | - | - | No | Share path |
-| `size_bytes` | int64 | bytes | ≥0 | No | Total size |
-| `used_bytes` | int64 | bytes | ≥0 | No | Used space |
-| `free_bytes` | int64 | bytes | ≥0 | No | Free space |
-| `usage_percent` | float64 | percent | 0-100 | No | Usage percent |
-| `timestamp` | string | - | - | No | Event timestamp |
+| Field           | Type    | Unit    | Range | Nullable | Description     |
+| --------------- | ------- | ------- | ----- | -------- | --------------- |
+| `name`          | string  | -       | -     | No       | Share name      |
+| `path`          | string  | -       | -     | No       | Share path      |
+| `size_bytes`    | int64   | bytes   | ≥0    | No       | Total size      |
+| `used_bytes`    | int64   | bytes   | ≥0    | No       | Used space      |
+| `free_bytes`    | int64   | bytes   | ≥0    | No       | Free space      |
+| `usage_percent` | float64 | percent | 0-100 | No       | Usage percent   |
+| `timestamp`     | string  | -       | -     | No       | Event timestamp |
 
 ---
 
@@ -421,38 +421,38 @@ def identify_event_type(data):
 
 ### Go to JSON Type Mapping
 
-| Go Type | JSON Type | Notes |
-|---------|-----------|-------|
-| `string` | string | UTF-8 encoded |
-| `int`, `int64` | number | Integer values |
-| `float64` | number | Decimal values |
-| `bool` | boolean | true/false |
-| `time.Time` | string | RFC3339Nano format |
-| `[]T` | array | Array of type T |
-| `*T` | object/null | Pointer can be null |
+| Go Type        | JSON Type   | Notes               |
+| -------------- | ----------- | ------------------- |
+| `string`       | string      | UTF-8 encoded       |
+| `int`, `int64` | number      | Integer values      |
+| `float64`      | number      | Decimal values      |
+| `bool`         | boolean     | true/false          |
+| `time.Time`    | string      | RFC3339Nano format  |
+| `[]T`          | array       | Array of type T     |
+| `*T`           | object/null | Pointer can be null |
 
 ### JSON to Python Type Mapping
 
-| JSON Type | Python Type | Notes |
-|-----------|-------------|-------|
-| string | str | Unicode string |
-| number (int) | int | Integer |
-| number (float) | float | Float |
-| boolean | bool | True/False |
-| array | list | List of items |
-| object | dict | Dictionary |
-| null | None | None value |
+| JSON Type      | Python Type | Notes          |
+| -------------- | ----------- | -------------- |
+| string         | str         | Unicode string |
+| number (int)   | int         | Integer        |
+| number (float) | float       | Float          |
+| boolean        | bool        | True/False     |
+| array          | list        | List of items  |
+| object         | dict        | Dictionary     |
+| null           | None        | None value     |
 
 ### JSON to JavaScript Type Mapping
 
-| JSON Type | JavaScript Type | Notes |
-|-----------|-----------------|-------|
-| string | string | String |
-| number | number | Number (int/float) |
-| boolean | boolean | true/false |
-| array | Array | Array |
-| object | Object | Object |
-| null | null | null value |
+| JSON Type | JavaScript Type | Notes              |
+| --------- | --------------- | ------------------ |
+| string    | string          | String             |
+| number    | number          | Number (int/float) |
+| boolean   | boolean         | true/false         |
+| array     | Array           | Array              |
+| object    | Object          | Object             |
+| null      | null            | null value         |
 
 ---
 
@@ -464,8 +464,16 @@ def identify_event_type(data):
 interface WSEvent {
   event: string;
   timestamp: string;
-  data: SystemInfo | ArrayStatus | DiskInfo[] | ContainerInfo[] | VMInfo[] | 
-        UPSStatus | GPUMetrics[] | NetworkInfo[] | ShareInfo[];
+  data:
+    | SystemInfo
+    | ArrayStatus
+    | DiskInfo[]
+    | ContainerInfo[]
+    | VMInfo[]
+    | UPSStatus
+    | GPUMetrics[]
+    | NetworkInfo[]
+    | ShareInfo[];
 }
 
 interface SystemInfo {

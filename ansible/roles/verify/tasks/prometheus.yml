@@ -1,0 +1,53 @@
+---
+# Prometheus metrics validation
+
+- name: Test Prometheus metrics endpoint
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/metrics"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: prom_result
+  retries: 6
+  delay: 10
+  until: "'unraid_ups_status' in prom_result.content"
+
+- name: Verify Prometheus core metrics
+  ansible.builtin.assert:
+    that:
+      - "'# HELP' in prom_result.content"
+      - "'# TYPE' in prom_result.content"
+      - "'unraid_' in prom_result.content"
+      # System metrics
+      - "'unraid_system_uptime_seconds' in prom_result.content"
+      - "'unraid_cpu_usage_percent' in prom_result.content"
+      - "'unraid_memory_total_bytes' in prom_result.content"
+      - "'unraid_memory_used_bytes' in prom_result.content"
+      # Array metrics
+      - "'unraid_array_state' in prom_result.content"
+      - "'unraid_array_total_bytes' in prom_result.content"
+    fail_msg: "Prometheus metrics missing core unraid_ metrics"
+    success_msg: "Prometheus core metrics valid"
+
+- name: Verify Prometheus component metrics
+  ansible.builtin.assert:
+    that:
+      # Docker metrics
+      - "'unraid_docker_containers_total' in prom_result.content"
+      # Disk metrics
+      - "'unraid_disk_' in prom_result.content"
+      # UPS metrics
+      - "'unraid_ups_status' in prom_result.content"
+    fail_msg: "Prometheus missing component metrics (docker/disk/network)"
+    success_msg: "Prometheus component metrics valid"
+
+- name: Count Prometheus metric families
+  vars:
+    help_lines: "{{ prom_result.content.split('\n') | select('match', '^# HELP') | list }}"
+    unraid_metrics: "{{ help_lines | select('match', '.*unraid_.*') | list }}"
+  ansible.builtin.assert:
+    that:
+      - unraid_metrics | length >= 20
+    fail_msg: "Only {{ unraid_metrics | length }} unraid_ metric families (expected >= 20)"
+    success_msg: "Prometheus: {{ unraid_metrics | length }} unraid_ metric families, {{ help_lines | length }} total"

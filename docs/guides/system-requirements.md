@@ -31,32 +31,32 @@ The Unraid Management Agent is a lightweight Go-based plugin with **NO external 
 
 The agent collects most data using direct system access:
 
-| Data Source | Method | Dependencies |
-|------------|--------|--------------|
-| **CPU/RAM** | `/proc/stat`, `/proc/meminfo` | None (kernel) |
-| **Disks** | `/proc/diskstats`, `smartctl` | smartmontools (pre-installed) |
-| **Array** | `/var/local/emhttp/var.ini` | None (Unraid core) |
-| **Network** | `/sys/class/net/*`, `ethtool` | ethtool (pre-installed) |
-| **Temperature** | `sensors`, `/sys/class/hwmon/*` | lm-sensors (optional) |
+| Data Source     | Method                          | Dependencies                  |
+| --------------- | ------------------------------- | ----------------------------- |
+| **CPU/RAM**     | `/proc/stat`, `/proc/meminfo`   | None (kernel)                 |
+| **Disks**       | `/proc/diskstats`, `smartctl`   | smartmontools (pre-installed) |
+| **Array**       | `/var/local/emhttp/var.ini`     | None (Unraid core)            |
+| **Network**     | `/sys/class/net/*`, `ethtool`   | ethtool (pre-installed)       |
+| **Temperature** | `sensors`, `/sys/class/hwmon/*` | lm-sensors (optional)         |
 
 ### Container & VM Data (Native APIs)
 
-| Service | API Method | Library | Status |
-|---------|-----------|---------|--------|
-| **Docker** | Docker Engine API | `github.com/moby/moby/client` | Built-in Go SDK |
-| **VMs** | libvirt protocol | `github.com/digitalocean/go-libvirt` | Native Go bindings |
+| Service    | API Method        | Library                              | Status             |
+| ---------- | ----------------- | ------------------------------------ | ------------------ |
+| **Docker** | Docker Engine API | `github.com/moby/moby/client`        | Built-in Go SDK    |
+| **VMs**    | libvirt protocol  | `github.com/digitalocean/go-libvirt` | Native Go bindings |
 
 ### Optional Features
 
 These features require additional Unraid plugins or hardware:
 
-| Feature | Requirement | Notes |
-|---------|------------|-------|
-| **GPU Metrics** | NVIDIA GPU + drivers | Uses `nvidia-smi` command |
-| **UPS Status** | apcupsd or NUT plugin | Reads UPS daemon status |
-| **ZFS** | ZFS support enabled | Uses `zfs` and `zpool` commands |
-| **User Scripts** | User Scripts plugin | Executes scripts via plugin |
-| **Unassigned Devices** | Unassigned Devices plugin | Reads plugin config files |
+| Feature                | Requirement               | Notes                           |
+| ---------------------- | ------------------------- | ------------------------------- |
+| **GPU Metrics**        | NVIDIA GPU + drivers      | Uses `nvidia-smi` command       |
+| **UPS Status**         | apcupsd or NUT plugin     | Reads UPS daemon status         |
+| **ZFS**                | ZFS support enabled       | Uses `zfs` and `zpool` commands |
+| **User Scripts**       | User Scripts plugin       | Executes scripts via plugin     |
+| **Unassigned Devices** | Unassigned Devices plugin | Reads plugin config files       |
 
 ## Port Requirements
 
@@ -107,12 +107,12 @@ The agent runs with standard Unraid plugin permissions and requires:
 
 Default intervals optimize for low power consumption:
 
-| Category | Default | Impact |
-|----------|---------|--------|
-| **Fast** | 15s | System metrics |
-| **Standard** | 30s | Array, disk, containers, VMs |
-| **Moderate** | 60s | UPS, GPU, shares |
-| **Slow** | 5min | Hardware info, license |
+| Category     | Default | Impact                       |
+| ------------ | ------- | ---------------------------- |
+| **Fast**     | 15s     | System metrics               |
+| **Standard** | 30s     | Array, disk, containers, VMs |
+| **Moderate** | 60s     | UPS, GPU, shares             |
+| **Slow**     | 5min    | Hardware info, license       |
 
 ⚡ **Power Note**: Aggressive intervals (5-10s) can increase idle power by 15-20W on Intel systems with many Docker containers.
 

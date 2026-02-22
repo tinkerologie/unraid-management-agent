@@ -1,0 +1,114 @@
+---
+# Deploy plugin to Unraid
+# Uses 'raw' module — Unraid has no Python interpreter
+
+- name: Deploy plugin
+  block:
+    - name: Check server connectivity
+      ansible.builtin.raw: echo "ok"
+      changed_when: false
+
+    - name: Stop existing service
+      ansible.builtin.raw: "killall {{ plugin_name }} 2>/dev/null; true"
+      register: kill_result
+      changed_when: "'no process' not in kill_result.stdout | default('')"
+
+    - name: Wait for service to stop
+      ansible.builtin.pause:
+        seconds: 2
+
+    - name: Clean old plugin files
+      ansible.builtin.raw: "rm -rf {{ plugin_dir }}"
+      changed_when: true
+
+    - name: Create plugin directory
+      ansible.builtin.raw: "mkdir -p {{ plugin_dir }}"
+      changed_when: true
+
+    - name: Upload plugin bundle via SCP
+      delegate_to: localhost
+      ansible.builtin.command:
+        cmd: >
+          sshpass -p '{{ ansible_password }}'
+          scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+          -o PubkeyAuthentication=no -o PreferredAuthentications=password
+          -o ConnectTimeout=10
+          {{ plugin_bundle }}
+          {{ ansible_user }}@{{ ansible_host }}:/tmp/{{ plugin_name }}.tgz
+      register: scp_result
+      retries: 3
+      delay: 3
+      until: scp_result.rc == 0
+      changed_when: true
+
+    - name: Extract plugin bundle
+      ansible.builtin.raw: "cd /tmp && tar xzf {{ plugin_name }}.tgz && rm -f {{ plugin_name }}.tgz"
+      changed_when: true
+
+    - name: Copy plugin files to destination
+      ansible.builtin.raw: |
+        cp -r /tmp/usr/local/emhttp/plugins/{{ plugin_name }}/* {{ plugin_dir }}/
+        rm -rf /tmp/usr
+      changed_when: true
+
+    - name: Set permissions
+      ansible.builtin.raw: |
+        chmod 755 {{ plugin_dir }}/{{ plugin_name }}
+        chmod +x {{ plugin_dir }}/scripts/* 2>/dev/null || true
+        chmod +x {{ plugin_dir }}/event/* 2>/dev/null || true
+      changed_when: true
+
+    - name: Verify deployed files
+      ansible.builtin.raw: |
+        for f in {{ plugin_dir }}/{{ plugin_name }} {{ plugin_dir }}/{{ plugin_name }}.page {{ plugin_dir }}/VERSION; do
+          test -f "$f" && echo "$(basename $f): OK" || echo "$(basename $f): MISSING"
+        done
+      register: file_checks
+      changed_when: false
+
+    - name: Report file status
+      ansible.builtin.debug:
+        msg: "{{ file_checks.stdout_lines }}"
+
+    - name: Create config directory
+      ansible.builtin.raw: "mkdir -p {{ config_dir }}"
+      changed_when: true
+
+    - name: Create default configuration
+      ansible.builtin.raw: "test -f {{ config_dir }}/config.cfg || echo 'PORT={{ api_port }}' > {{ config_dir }}/config.cfg"
+      changed_when: true
+
+    - name: Start service
+      ansible.builtin.raw: "nohup {{ plugin_dir }}/scripts/start > /dev/null 2>&1; sleep 2; echo started"
+      changed_when: true
+
+    - name: Wait for API to be ready
+      delegate_to: localhost
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/health"
+        method: GET
+        status_code: 200
+      register: health_check
+      retries: 10
+      delay: 2
+      until: health_check.status == 200
+
+    - name: Show service status
+      ansible.builtin.raw: "pidof {{ plugin_name }}"
+      register: pid_result
+      changed_when: false
+
+    - name: Report deployment
+      ansible.builtin.debug:
+        msg: "Service running (PID: {{ pid_result.stdout | trim }}) — v{{ version }} on port {{ api_port }}"
+
+  rescue:
+    - name: Deploy failed — ensure service is stopped
+      ansible.builtin.raw: "killall -9 {{ plugin_name }} 2>/dev/null; true"
+      changed_when: false
+
+    - name: Deploy failure notice
+      ansible.builtin.fail:
+        msg: >-
+          Deployment failed. Service has been stopped for safety.
+          Review the errors above and re-run with --tags deploy.

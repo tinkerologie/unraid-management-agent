@@ -16,37 +16,37 @@ This file is created automatically after the first installation and persists acr
 
 ### Core Settings
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--port` | `8043` | HTTP API port |
-| `--debug` | `false` | Enable debug logging |
-| `--mqtt-enabled` | `false` | Enable MQTT publishing |
-| `--mqtt-broker` | - | MQTT broker address (e.g., `tcp://localhost:1883`) |
-| `--mqtt-topic-prefix` | `unraid` | MQTT topic prefix |
-| `--mqtt-username` | - | MQTT username (optional) |
-| `--mqtt-password` | - | MQTT password (optional) |
+| Option                | Default  | Description                                        |
+| --------------------- | -------- | -------------------------------------------------- |
+| `--port`              | `8043`   | HTTP API port                                      |
+| `--debug`             | `false`  | Enable debug logging                               |
+| `--mqtt-enabled`      | `false`  | Enable MQTT publishing                             |
+| `--mqtt-broker`       | -        | MQTT broker address (e.g., `tcp://localhost:1883`) |
+| `--mqtt-topic-prefix` | `unraid` | MQTT topic prefix                                  |
+| `--mqtt-username`     | -        | MQTT username (optional)                           |
+| `--mqtt-password`     | -        | MQTT password (optional)                           |
 
 ### Collection Intervals
 
 Control how often data is collected (in seconds):
 
-| Collector | Flag | Default | Min | Max |
-|-----------|------|---------|-----|-----|
-| System | `--interval-system` | 5s | 1s | 3600s |
-| Array | `--interval-array` | 10s | 5s | 3600s |
-| Disks | `--interval-disk` | 30s | 10s | 3600s |
-| Docker | `--interval-docker` | 10s | 5s | 3600s |
-| VMs | `--interval-vm` | 10s | 5s | 3600s |
-| UPS | `--interval-ups` | 10s | 5s | 3600s |
-| NUT | `--interval-nut` | 10s | 5s | 3600s |
-| GPU | `--interval-gpu` | 10s | 5s | 3600s |
-| Shares | `--interval-shares` | 60s | 30s | 3600s |
-| Network | `--interval-network` | 15s | 5s | 3600s |
-| Hardware | `--interval-hardware` | 60s | 30s | 3600s |
-| ZFS | `--interval-zfs` | 30s | 10s | 3600s |
-| Notifications | `--interval-notification` | 30s | 10s | 3600s |
-| Registration | `--interval-registration` | 300s | 60s | 3600s |
-| Unassigned Devices | `--interval-unassigned` | 60s | 30s | 3600s |
+| Collector          | Flag                      | Default | Min | Max   |
+| ------------------ | ------------------------- | ------- | --- | ----- |
+| System             | `--interval-system`       | 5s      | 1s  | 3600s |
+| Array              | `--interval-array`        | 10s     | 5s  | 3600s |
+| Disks              | `--interval-disk`         | 30s     | 10s | 3600s |
+| Docker             | `--interval-docker`       | 10s     | 5s  | 3600s |
+| VMs                | `--interval-vm`           | 10s     | 5s  | 3600s |
+| UPS                | `--interval-ups`          | 10s     | 5s  | 3600s |
+| NUT                | `--interval-nut`          | 10s     | 5s  | 3600s |
+| GPU                | `--interval-gpu`          | 10s     | 5s  | 3600s |
+| Shares             | `--interval-shares`       | 60s     | 30s | 3600s |
+| Network            | `--interval-network`      | 15s     | 5s  | 3600s |
+| Hardware           | `--interval-hardware`     | 60s     | 30s | 3600s |
+| ZFS                | `--interval-zfs`          | 30s     | 10s | 3600s |
+| Notifications      | `--interval-notification` | 30s     | 10s | 3600s |
+| Registration       | `--interval-registration` | 300s    | 60s | 3600s |
+| Unassigned Devices | `--interval-unassigned`   | 60s     | 30s | 3600s |
 
 **Disable a collector**: Set interval to `0`
 
@@ -81,14 +81,14 @@ Future versions will include a web UI for configuration.
    # Unraid Management Agent Configuration
    PORT=8043
    DEBUG=false
-   
+
    # MQTT Settings
    MQTT_ENABLED=true
    MQTT_BROKER=tcp://mqtt.local:1883
    MQTT_USERNAME=unraid
    MQTT_PASSWORD=your_password
    MQTT_TOPIC_PREFIX=unraid
-   
+
    # Collection Intervals (seconds)
    INTERVAL_SYSTEM=5
    INTERVAL_ARRAY=10
@@ -327,13 +327,13 @@ Authentication is planned for future versions. Current options:
 server {
     listen 443 ssl;
     server_name unraid-api.local;
-    
+
     ssl_certificate /path/to/cert.pem;
     ssl_certificate_key /path/to/key.pem;
-    
+
     auth_basic "Unraid API";
     auth_basic_user_file /path/to/.htpasswd;
-    
+
     location / {
         proxy_pass http://localhost:8043;
         proxy_http_version 1.1;

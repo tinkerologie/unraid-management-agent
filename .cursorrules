@@ -1,0 +1,27 @@
+# Cursor Rules — Unraid Management Agent
+
+Read `AGENTS.md` in the project root for comprehensive instructions.
+
+## Key Points
+
+- **Language:** Go 1.26 | **Target:** Linux/amd64 (Unraid OS)
+- **Architecture:** Event-driven PubSub (collectors → event bus → API cache → REST/WS/MCP)
+- **Critical:** API subscriptions must start BEFORE collectors in orchestrator.go
+- **Security:** Always validate user input via `daemon/lib/validation.go`
+- **Shell commands:** Use `lib.ExecCommand()` — never `exec.Command` directly
+- **Cache access:** Always use `RLock`/`RUnlock` for reads
+- **Collectors:** Must wrap work in defer/recover for panic recovery
+- **Testing:** Table-driven tests with security cases
+- **Pre-commit:** Run `make pre-commit-run` before committing
+- **CHANGELOG:** Must be updated with every change
+
+## Commands
+
+```bash
+make test && make lint        # Test and lint
+make pre-commit-run           # Full pre-commit checks
+make swagger                  # Regenerate Swagger docs
+
+# Deploy to Unraid (Ansible — preferred)
+ansible-playbook -i ansible/inventory.yml ansible/deploy.yml
+```

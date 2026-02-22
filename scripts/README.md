@@ -2,7 +2,7 @@
 
 This directory contains scripts for deploying and managing the Unraid Management Agent plugin.
 
-## 🔒 Security Setup
+## Security Setup
 
 **IMPORTANT**: Before using these scripts, you must configure your server credentials.
 
@@ -17,13 +17,11 @@ This directory contains scripts for deploying and managing the Unraid Management
 2. **Edit `config.sh` with your server details**:
 
    ```bash
-   # Edit the file with your favorite editor
    nano scripts/config.sh
-   # or
-   vim scripts/config.sh
    ```
 
 3. **Update the following values**:
+
    - `UNRAID_IP`: Your Unraid server IP address
    - `UNRAID_PASSWORD`: Your Unraid root password
 
@@ -36,42 +34,18 @@ This directory contains scripts for deploying and managing the Unraid Management
 
 ### Security Notes
 
-- ✅ `config.sh` is automatically excluded from git via `.gitignore`
-- ✅ Never commit `config.sh` to version control
-- ✅ The `config.sh.example` template is safe to commit (contains no real credentials)
-- ✅ All deployment scripts now load credentials from `config.sh`
+- `config.sh` is automatically excluded from git via `.gitignore`
+- Never commit `config.sh` to version control
+- The `config.sh.example` template is safe to commit (contains no real credentials)
+- All deployment scripts load credentials from `config.sh`
 
 ---
 
-## 📜 Available Scripts
-
-### `deploy-to-unraid.sh`
-
-Deploy the agent binary to your Unraid server.
-
-**Usage**:
-
-```bash
-./scripts/deploy-to-unraid.sh <unraid_ip> [--test]
-```
-
-**Examples**:
-
-```bash
-# Standard deployment
-./scripts/deploy-to-unraid.sh 192.168.1.100
-
-# Deployment with debug logging
-./scripts/deploy-to-unraid.sh 192.168.1.100 --test
-```
-
-**Note**: This script requires the IP as a parameter and does not use `config.sh`.
-
----
+## Available Scripts
 
 ### `deploy-plugin.sh`
 
-Build and deploy the complete plugin package.
+Build and deploy the complete plugin package to an Unraid server.
 
 **Usage**:
 
@@ -95,16 +69,15 @@ Build and deploy the complete plugin package.
 **Features**:
 
 - Builds the plugin package
-- Verifies icon fix
-- Optionally creates backup
-- Deploys to Unraid server
+- Deploys to Unraid server via SSH
+- Optionally creates backup before deployment
 - Restarts the plugin service
 
 ---
 
 ### `validate-live.sh`
 
-Comprehensive validation script that tests all API endpoints.
+Comprehensive validation script that tests all API endpoints against a running Unraid server.
 
 **Usage**:
 
@@ -114,62 +87,37 @@ Comprehensive validation script that tests all API endpoints.
 
 **Features**:
 
-- Tests all API endpoints
+- Tests all REST API endpoints
 - Compares API responses with actual system state
 - Validates data accuracy
-- Provides detailed test results
+- Provides detailed test results with pass/fail counts
 
 **Requirements**:
 
 - `config.sh` must be configured
-- `curl` must be installed
-- `sshpass` must be installed for SSH automation
+- `curl` and `sshpass` must be installed
 
 ---
 
-### `cleanup-backups.sh`
+### `setup-pre-commit.sh`
 
-Remove old plugin backups from the Unraid server.
+Automated setup for pre-commit hooks and development tools.
 
 **Usage**:
 
 ```bash
-./scripts/cleanup-backups.sh [unraid_ip] [password]
-```
-
-**Examples**:
-
-```bash
-# Use credentials from config.sh
-./scripts/cleanup-backups.sh
-
-# Override IP and password
-./scripts/cleanup-backups.sh 192.168.1.100 mypassword
-```
-
-**Warning**: This will delete all backup directories. Use with caution!
-
----
-
-### `generate-icon.sh`
-
-Generate plugin icons in various sizes.
-
-**Usage**:
-
-```bash
-./scripts/generate-icon.sh
+./scripts/setup-pre-commit.sh
 ```
 
 **Features**:
 
-- Generates icons in multiple sizes (48x48, 64x64, 96x96, 128x128)
-- Creates both PNG and SVG formats
-- No credentials required
+- Installs pre-commit framework
+- Configures git hooks for code quality checks
+- Installs required linting tools (golangci-lint, shellcheck, etc.)
 
 ---
 
-## 🔧 Prerequisites
+## Prerequisites
 
 ### Required Tools
 
@@ -178,12 +126,9 @@ Generate plugin icons in various sizes.
    ```bash
    # macOS
    brew install hudochenkov/sshpass/sshpass
-   
+
    # Ubuntu/Debian
    sudo apt-get install sshpass
-   
-   # Fedora/RHEL
-   sudo dnf install sshpass
    ```
 
 2. **curl** - For API testing (usually pre-installed)
@@ -193,25 +138,16 @@ Generate plugin icons in various sizes.
    ```bash
    # macOS
    brew install jq
-   
+
    # Ubuntu/Debian
    sudo apt-get install jq
    ```
 
 ---
 
-## 🚨 Troubleshooting
+## Troubleshooting
 
 ### "Configuration file not found" Error
-
-If you see this error:
-
-```
-ERROR: Configuration file not found!
-Please create scripts/config.sh from scripts/config.sh.example
-```
-
-**Solution**:
 
 ```bash
 cp scripts/config.sh.example scripts/config.sh
@@ -220,29 +156,11 @@ cp scripts/config.sh.example scripts/config.sh
 
 ### SSH Connection Issues
 
-If SSH connections fail:
-
-1. **Verify server is reachable**:
-
-   ```bash
-   ping 192.168.1.100
-   ```
-
-2. **Test SSH manually**:
-
-   ```bash
-   ssh root@192.168.1.100
-   ```
-
-3. **Check sshpass is installed**:
-
-   ```bash
-   which sshpass
-   ```
+1. Verify server is reachable: `ping <your-unraid-ip>`
+2. Test SSH manually: `ssh root@<your-unraid-ip>`
+3. Check sshpass is installed: `which sshpass`
 
 ### Permission Denied
-
-If you get permission denied errors:
 
 ```bash
 chmod +x scripts/*.sh
@@ -250,31 +168,7 @@ chmod +x scripts/*.sh
 
 ---
 
-## 📝 Best Practices
-
-1. **Never commit credentials**:
-   - Always use `config.sh` for credentials
-   - Never hardcode passwords in scripts
-   - Verify `.gitignore` is working: `git status`
-
-2. **Use version control for scripts**:
-   - Commit script changes
-   - Use `.example` files for templates
-   - Document changes in commit messages
-
-3. **Test before deploying**:
-   - Use `--test` mode when available
-   - Verify backups are created
-   - Check logs after deployment
-
-4. **Keep backups**:
-   - Use `CREATE_BACKUP=yes` for important deployments
-   - Regularly clean old backups to save space
-   - Test restore procedures
-
----
-
-## 🔐 Security Checklist
+## Security Checklist
 
 Before pushing to GitHub:
 
@@ -282,12 +176,4 @@ Before pushing to GitHub:
 - [ ] `config.sh` does not appear in `git status`
 - [ ] No hardcoded passwords in committed scripts
 - [ ] Template files (`.example`) contain placeholder values only
-- [ ] Documentation uses example IPs (192.168.1.100, not your real IP)
-
----
-
-## 📚 Additional Resources
-
-- [Unraid Management Agent Documentation](../docs/)
-- [API Reference](../docs/api/API_REFERENCE.md)
-- [Changelog](../CHANGELOG.md)
+- [ ] Documentation uses example IPs, not your real IP

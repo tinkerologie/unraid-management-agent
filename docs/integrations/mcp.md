@@ -23,10 +23,10 @@ MCP is an open protocol that standardizes how AI applications can securely conne
 
 The MCP server supports two transports — use the one that fits your deployment:
 
-| Transport              | Endpoint / Command                                       | Best For                                                                     |
-| ---------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| **Streamable HTTP** ⭐ | `POST/GET/DELETE http://<unraid-ip>:8043/mcp`            | Remote connections from any machine on the network                           |
-| **STDIO**              | `unraid-management-agent mcp-stdio`                      | Local AI clients running directly on the Unraid server                       |
+| Transport              | Endpoint / Command                            | Best For                                               |
+| ---------------------- | --------------------------------------------- | ------------------------------------------------------ |
+| **Streamable HTTP** ⭐ | `POST/GET/DELETE http://<unraid-ip>:8043/mcp` | Remote connections from any machine on the network     |
+| **STDIO**              | `unraid-management-agent mcp-stdio`           | Local AI clients running directly on the Unraid server |
 
 > **Which transport should I use?**
 >
@@ -69,26 +69,26 @@ The MCP server supports two transports — use the one that fits your deployment
 
 ### Docker Tools
 
-| Tool                       | Description                                                     |
-| -------------------------- | --------------------------------------------------------------- |
-| `list_containers`          | Docker containers, optionally filtered by state                 |
-| `get_container_info`       | Detailed information about a specific container                 |
-| `get_container_logs`       | Container stdout/stderr logs with tail/since opts               |
-| `search_containers`        | Search containers by name or state                              |
-| `get_docker_settings`      | Docker daemon configuration settings                            |
-| `check_container_updates`  | Check all containers for available image updates                |
-| `check_container_update`   | Check a specific container for an image update                  |
-| `get_container_size`       | Get disk usage (image size + rw layer) of a container           |
+| Tool                      | Description                                           |
+| ------------------------- | ----------------------------------------------------- |
+| `list_containers`         | Docker containers, optionally filtered by state       |
+| `get_container_info`      | Detailed information about a specific container       |
+| `get_container_logs`      | Container stdout/stderr logs with tail/since opts     |
+| `search_containers`       | Search containers by name or state                    |
+| `get_docker_settings`     | Docker daemon configuration settings                  |
+| `check_container_updates` | Check all containers for available image updates      |
+| `check_container_update`  | Check a specific container for an image update        |
+| `get_container_size`      | Get disk usage (image size + rw layer) of a container |
 
 ### VM Tools
 
-| Tool                  | Description                              |
-| --------------------- | ---------------------------------------- |
-| `list_vms`            | Virtual machines, optionally filtered    |
-| `get_vm_info`         | Detailed information about a specific VM |
-| `search_vms`          | Search VMs by name or state              |
-| `get_vm_settings`     | VM manager configuration settings        |
-| `list_vm_snapshots`   | List snapshots for a specific VM         |
+| Tool                | Description                              |
+| ------------------- | ---------------------------------------- |
+| `list_vms`          | Virtual machines, optionally filtered    |
+| `get_vm_info`       | Detailed information about a specific VM |
+| `search_vms`        | Search VMs by name or state              |
+| `get_vm_settings`   | VM manager configuration settings        |
+| `list_vm_snapshots` | List snapshots for a specific VM         |
 
 ### Network & UPS Tools
 
@@ -125,11 +125,11 @@ The MCP server supports two transports — use the one that fits your deployment
 
 ### Service & Process Tools
 
-| Tool                | Description                                              |
-| ------------------- | -------------------------------------------------------- |
-| `get_service_status`| Get running/stopped status of a system service           |
-| `list_services`     | List all manageable system services with their status    |
-| `list_processes`    | List top system processes sorted by CPU, memory, or PID  |
+| Tool                 | Description                                             |
+| -------------------- | ------------------------------------------------------- |
+| `get_service_status` | Get running/stopped status of a system service          |
+| `list_services`      | List all manageable system services with their status   |
+| `list_processes`     | List top system processes sorted by CPU, memory, or PID |
 
 ### Parity & User Scripts Tools
 

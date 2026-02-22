@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Deploy Unraid Management Agent Plugin with Icon Fix
-# This script builds and deploys the complete plugin package including the icon fix
+# Deploy Unraid Management Agent Plugin
+# Uses SSH ControlMaster for persistent connections (prevents auth exhaustion)
 
 set -e  # Exit on error, except during API endpoint testing
 
@@ -28,11 +28,22 @@ VERSION=$(cat VERSION)
 BUILD_DIR="build"
 PLUGIN_BUNDLE="${BUILD_DIR}/${PLUGIN_NAME}-${VERSION}.tgz"
 
-# SSH options for reliable password-based authentication
-# -o PubkeyAuthentication=no prevents SSH from trying keys first (which causes
-# "Too many authentication failures" when keys don't match the Unraid server)
-# -o PreferredAuthentications=password ensures only password auth is attempted
+# SSH ControlMaster — reuse a single persistent SSH connection for all commands.
+# This prevents "Too many authentication failures" by making only ONE auth attempt
+# instead of 30+ separate connections during the deploy process.
+SSH_CONTROL_DIR="/tmp/deploy-ssh-$$"
+SSH_CONTROL_PATH="${SSH_CONTROL_DIR}/control-%r@%h:%p"
+mkdir -p "$SSH_CONTROL_DIR"
+
+# Cleanup SSH control socket on exit
+cleanup_ssh() {
+    ssh -O exit -o ControlPath="$SSH_CONTROL_PATH" "root@$UNRAID_IP" 2>/dev/null || true
+    rm -rf "$SSH_CONTROL_DIR"
+}
+trap cleanup_ssh EXIT
+
 SSH_OPTS="-o StrictHostKeyChecking=no -o PubkeyAuthentication=no -o PreferredAuthentications=password"
+SSH_OPTS="$SSH_OPTS -o ControlMaster=auto -o ControlPath=$SSH_CONTROL_PATH -o ControlPersist=300"
 
 # Helper functions to avoid eval and command injection risks
 # These functions properly quote arguments to prevent shell metacharacter injection
@@ -45,7 +56,7 @@ run_scp() {
 }
 
 echo "========================================="
-echo "Unraid Plugin Deployment with Icon Fix"
+echo "Unraid Plugin Deployment"
 echo "========================================="
 echo "Target Server: $UNRAID_IP"
 echo "Plugin Version: $VERSION"
@@ -211,7 +222,7 @@ echo "----------------------------------------"
 # Wait a moment for API to be ready
 sleep 2
 
-# Helper function to test endpoint
+# Helper function to test endpoint — runs curl LOCALLY (no SSH needed, saves connections)
 test_endpoint() {
     local endpoint="$1"
     local description="$2"
@@ -219,8 +230,8 @@ test_endpoint() {
 
     echo -n "Testing $endpoint... "
 
-    # Run the curl command and capture response, don't fail on error
-    response=$(run_ssh "curl -s http://localhost:8043/api/v1${endpoint}" || true)
+    # Curl the API from the local machine — the API is network-accessible
+    response=$(curl -s -m 5 "http://${UNRAID_IP}:${API_PORT}/api/v1${endpoint}" 2>/dev/null || true)
 
     # Check for actual error responses (JSON error objects), not just the word "error" in field names
     # Look for patterns like {"error":"message"} or "success":false

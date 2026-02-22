@@ -7,16 +7,7 @@
     "headings": false
   },
   "MD033": {
-    "allowed_elements": [
-      "br",
-      "sup",
-      "sub",
-      "details",
-      "summary",
-      "kbd",
-      "Option",
-      "img"
-    ]
+    "allowed_elements": ["br", "sup", "sub", "details", "summary", "kbd", "Option", "img"]
   },
   "MD041": false,
   "MD024": {
