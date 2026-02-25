@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
@@ -71,8 +72,8 @@ func (c *HardwareCollector) Collect() {
 
 	logger.Debug("Hardware: Successfully collected hardware info, publishing event")
 	// Publish event
-	c.ctx.Hub.Pub(hardwareInfo, "hardware_update")
-	logger.Debug("Hardware: Published hardware_update event")
+	domain.Publish(c.ctx.Hub, constants.TopicHardwareUpdate, hardwareInfo)
+	logger.Debug("Hardware: Published %s event", constants.TopicHardwareUpdate.Name)
 }
 
 func (c *HardwareCollector) collectHardwareInfo() (*dto.HardwareInfo, error) {

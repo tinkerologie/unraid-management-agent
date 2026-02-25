@@ -121,6 +121,7 @@ type MQTTTopics struct {
 	Network      string `json:"network" example:"unraid/network"`
 	Shares       string `json:"shares" example:"unraid/shares"`
 	Notification string `json:"notifications" example:"unraid/notifications"`
+	ZFSPools     string `json:"zfs_pools" example:"unraid/zfs/pools"`
 	Availability string `json:"availability" example:"unraid/availability"`
 }
 

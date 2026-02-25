@@ -103,8 +103,8 @@ func (c *DiskCollector) Collect() {
 
 	logger.Debug("Disk: Successfully collected %d disks, publishing event", len(disks))
 	// Publish event
-	c.ctx.Hub.Pub(disks, "disk_list_update")
-	logger.Debug("Disk: Published disk_list_update event with %d disks", len(disks))
+	domain.Publish(c.ctx.Hub, constants.TopicDiskListUpdate, disks)
+	logger.Debug("Disk: Published %s event with %d disks", constants.TopicDiskListUpdate.Name, len(disks))
 }
 
 func (c *DiskCollector) collectDisks() ([]dto.DiskInfo, error) {

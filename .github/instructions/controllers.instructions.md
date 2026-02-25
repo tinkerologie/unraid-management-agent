@@ -33,12 +33,12 @@ func (c *Controller) Action(input string) error {
 
 Use the appropriate validation function from `daemon/lib/validation.go`:
 
-| Function | Use For |
-|----------|---------|
-| `ValidateContainerID()` | Docker container IDs |
-| `ValidateVMName()` | VM names |
-| `ValidateShareName()` | Share names |
-| `ValidateConfigPath()` | File paths |
+| Function                         | Use For                |
+| -------------------------------- | ---------------------- |
+| `ValidateContainerID()`          | Docker container IDs   |
+| `ValidateVMName()`               | VM names               |
+| `ValidateShareName()`            | Share names            |
+| `ValidateConfigPath()`           | File paths             |
 | `ValidateNotificationFilename()` | Notification filenames |
 
 ## Existing Controllers

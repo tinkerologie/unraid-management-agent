@@ -699,13 +699,17 @@ func TestHandleCreateNotification_EmptyBody(t *testing.T) {
 		t.Errorf("expected 400 for empty body, got %d", rr.Code)
 	}
 
-	var resp map[string]string
+	var resp dto.Response
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
 		t.Errorf("response is not valid JSON: %v", err)
 	}
 
-	if _, ok := resp["error"]; !ok {
-		t.Error("expected 'error' field in response")
+	if resp.Success {
+		t.Error("expected success=false in error response")
+	}
+
+	if resp.Message == "" {
+		t.Error("expected non-empty message in error response")
 	}
 }
 
@@ -744,13 +748,17 @@ func TestHandleCreateNotification_MissingTitle(t *testing.T) {
 		t.Errorf("expected 400 for missing title, got %d", rr.Code)
 	}
 
-	var resp map[string]string
+	var resp dto.Response
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
 		t.Errorf("response is not valid JSON: %v", err)
 	}
 
-	if errMsg, ok := resp["error"]; !ok || errMsg != "Title is required" {
-		t.Errorf("expected error 'Title is required', got %v", resp["error"])
+	if resp.Success {
+		t.Error("expected success=false")
+	}
+
+	if resp.Message != "Title is required" {
+		t.Errorf("expected message 'Title is required', got %q", resp.Message)
 	}
 }
 
@@ -963,13 +971,17 @@ func TestRespondWithError_ReturnsErrorJSON(t *testing.T) {
 		t.Errorf("expected status 400, got %d", rr.Code)
 	}
 
-	var resp map[string]string
+	var resp dto.Response
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
 		t.Errorf("response is not valid JSON: %v", err)
 	}
 
-	if resp["error"] != "something went wrong" {
-		t.Errorf("expected error message 'something went wrong', got %s", resp["error"])
+	if resp.Success {
+		t.Error("expected success=false")
+	}
+
+	if resp.Message != "something went wrong" {
+		t.Errorf("expected message 'something went wrong', got %q", resp.Message)
 	}
 }
 
@@ -993,13 +1005,17 @@ func TestRespondWithError_DifferentStatuses(t *testing.T) {
 				t.Errorf("expected status %d, got %d", tt.status, rr.Code)
 			}
 
-			var resp map[string]string
+			var resp dto.Response
 			if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
 				t.Errorf("response is not valid JSON: %v", err)
 			}
 
-			if resp["error"] != tt.message {
-				t.Errorf("expected error %q, got %q", tt.message, resp["error"])
+			if resp.Success {
+				t.Error("expected success=false")
+			}
+
+			if resp.Message != tt.message {
+				t.Errorf("expected message %q, got %q", tt.message, resp.Message)
 			}
 		})
 	}

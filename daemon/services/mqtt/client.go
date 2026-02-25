@@ -14,6 +14,7 @@ import (
 
 	pahomqtt "github.com/eclipse/paho.mqtt.golang"
 
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
@@ -33,14 +34,22 @@ type Client struct {
 	deviceInfo   *dto.HADeviceInfo
 	hostname     string
 	agentVersion string
+	tracker      *discoveryTracker
+	domainCtx    *domain.Context // domain context for controllers (array, system)
+
+	// connectCancel cancels the context for goroutines spawned by handleConnect.
+	// Protected by mu.
+	connectCancel context.CancelFunc
 }
 
 // NewClient creates a new MQTT client with the given configuration.
-func NewClient(config *dto.MQTTConfig, hostname, agentVersion string) *Client {
+func NewClient(config *dto.MQTTConfig, hostname, agentVersion string, domainCtx *domain.Context) *Client {
 	return &Client{
 		config:       config,
 		hostname:     hostname,
 		agentVersion: agentVersion,
+		tracker:      newDiscoveryTracker(),
+		domainCtx:    domainCtx,
 		deviceInfo: &dto.HADeviceInfo{
 			Identifiers:  []string{fmt.Sprintf("unraid_%s", strings.ReplaceAll(hostname, " ", "_"))},
 			Name:         hostname,
@@ -121,6 +130,15 @@ func (c *Client) Connect(ctx context.Context) error {
 
 // handleConnect is called when connection is established.
 func (c *Client) handleConnect() {
+	c.mu.Lock()
+	// Cancel any goroutines from a previous connection cycle.
+	if c.connectCancel != nil {
+		c.connectCancel()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	c.connectCancel = cancel
+	c.mu.Unlock()
+
 	c.connected.Store(true)
 	now := time.Now()
 	c.lastConnect = &now
@@ -134,7 +152,22 @@ func (c *Client) handleConnect() {
 
 	// Publish Home Assistant discovery if enabled
 	if c.config.HomeAssistantMode {
-		go c.publishHADiscovery()
+		go func() {
+			// Run discovery, initial states, then subscribe — sequentially —
+			// so command subscriptions exist only after discovery completes.
+			if ctx.Err() != nil {
+				return
+			}
+			c.publishHADiscovery()
+			if ctx.Err() != nil {
+				return
+			}
+			c.publishServiceStates()
+			if ctx.Err() != nil {
+				return
+			}
+			c.subscribeCommandTopics()
+		}()
 	}
 }
 
@@ -143,6 +176,14 @@ func (c *Client) handleDisconnect(err error) {
 	c.connected.Store(false)
 	now := time.Now()
 	c.lastDisconn = &now
+
+	// Cancel any in-flight connect goroutines.
+	c.mu.Lock()
+	if c.connectCancel != nil {
+		c.connectCancel()
+		c.connectCancel = nil
+	}
+	c.mu.Unlock()
 
 	if err != nil {
 		c.lastError = err.Error()
@@ -156,6 +197,12 @@ func (c *Client) handleDisconnect(err error) {
 func (c *Client) Disconnect() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	// Cancel any in-flight connect goroutines.
+	if c.connectCancel != nil {
+		c.connectCancel()
+		c.connectCancel = nil
+	}
 
 	if c.client != nil && c.client.IsConnected() {
 		// Publish offline status
@@ -256,6 +303,7 @@ func (c *Client) GetTopics() *dto.MQTTTopics {
 		Network:      c.buildTopic("network"),
 		Shares:       c.buildTopic("shares"),
 		Notification: c.buildTopic("notifications"),
+		ZFSPools:     c.buildTopic("zfs/pools"),
 		Availability: c.buildTopic("availability"),
 	}
 }
@@ -281,7 +329,10 @@ func (c *Client) PublishDisks(disks []dto.DiskInfo) error {
 	if !c.shouldPublish() {
 		return nil
 	}
-	return c.publishJSON(c.buildTopic("disks"), disks)
+	err := c.publishJSON(c.buildTopic("disks"), disks)
+	// Publish per-disk topics and HA discovery
+	go c.publishDiskDiscovery(disks)
+	return err
 }
 
 // PublishContainers publishes Docker container information to MQTT.
@@ -289,7 +340,10 @@ func (c *Client) PublishContainers(containers []dto.ContainerInfo) error {
 	if !c.shouldPublish() {
 		return nil
 	}
-	return c.publishJSON(c.buildTopic("docker/containers"), containers)
+	err := c.publishJSON(c.buildTopic("docker/containers"), containers)
+	// Publish per-container topics and HA discovery
+	go c.publishContainerDiscovery(containers)
+	return err
 }
 
 // PublishVMs publishes VM information to MQTT.
@@ -297,7 +351,10 @@ func (c *Client) PublishVMs(vms []dto.VMInfo) error {
 	if !c.shouldPublish() {
 		return nil
 	}
-	return c.publishJSON(c.buildTopic("vm/list"), vms)
+	err := c.publishJSON(c.buildTopic("vm/list"), vms)
+	// Publish per-VM topics and HA discovery
+	go c.publishVMDiscovery(vms)
+	return err
 }
 
 // PublishUPSStatus publishes UPS status to MQTT.
@@ -313,7 +370,10 @@ func (c *Client) PublishGPUMetrics(gpus []*dto.GPUMetrics) error {
 	if !c.shouldPublish() {
 		return nil
 	}
-	return c.publishJSON(c.buildTopic("gpu"), gpus)
+	err := c.publishJSON(c.buildTopic("gpu"), gpus)
+	// Publish per-GPU topics and HA discovery
+	go c.publishGPUDiscovery(gpus)
+	return err
 }
 
 // PublishNetworkInfo publishes network information to MQTT.
@@ -321,7 +381,10 @@ func (c *Client) PublishNetworkInfo(network []dto.NetworkInfo) error {
 	if !c.shouldPublish() {
 		return nil
 	}
-	return c.publishJSON(c.buildTopic("network"), network)
+	err := c.publishJSON(c.buildTopic("network"), network)
+	// Publish per-interface topics and HA discovery
+	go c.publishNetworkDiscovery(network)
+	return err
 }
 
 // PublishShares publishes share information to MQTT.
@@ -329,7 +392,10 @@ func (c *Client) PublishShares(shares []dto.ShareInfo) error {
 	if !c.shouldPublish() {
 		return nil
 	}
-	return c.publishJSON(c.buildTopic("shares"), shares)
+	err := c.publishJSON(c.buildTopic("shares"), shares)
+	// Publish per-share topics and HA discovery
+	go c.publishShareDiscovery(shares)
+	return err
 }
 
 // PublishNotifications publishes notifications to MQTT.
@@ -338,6 +404,17 @@ func (c *Client) PublishNotifications(notifications *dto.NotificationList) error
 		return nil
 	}
 	return c.publishJSON(c.buildTopic("notifications"), notifications)
+}
+
+// PublishZFSPools publishes ZFS pool information to MQTT.
+func (c *Client) PublishZFSPools(pools []dto.ZFSPool) error {
+	if !c.shouldPublish() {
+		return nil
+	}
+	err := c.publishJSON(c.buildTopic("zfs/pools"), pools)
+	// Publish per-pool topics and HA discovery
+	go c.publishZFSDiscovery(pools)
+	return err
 }
 
 // PublishCustom publishes a custom message to the specified topic.
@@ -393,76 +470,8 @@ func (c *Client) buildTopic(suffix string) string {
 	return fmt.Sprintf("%s/%s", c.config.TopicPrefix, suffix)
 }
 
-// publishHADiscovery publishes Home Assistant MQTT Discovery configurations.
-func (c *Client) publishHADiscovery() {
-	logger.Info("MQTT: Publishing Home Assistant discovery configurations...")
-
-	// System sensors
-	c.publishHASensor("cpu_usage", "CPU Usage", "%", "mdi:cpu-64-bit", "{{ value_json.cpu_usage | round(1) }}")
-	c.publishHASensor("ram_usage", "RAM Usage", "%", "mdi:memory", "{{ value_json.ram_usage | round(1) }}")
-	c.publishHASensor("cpu_temp", "CPU Temperature", "°C", "mdi:thermometer", "{{ value_json.cpu_temp }}")
-	c.publishHASensor("uptime", "Uptime", "s", "mdi:clock-outline", "{{ value_json.uptime }}")
-
-	// Array sensors
-	c.publishHAArraySensor("array_state", "Array State", "mdi:harddisk", "{{ value_json.state }}")
-	c.publishHAArraySensor("array_used", "Array Used", "mdi:chart-pie", "{{ value_json.used_percent | round(1) }}%")
-
-	logger.Success("MQTT: Home Assistant discovery published")
-}
-
-// publishHASensor publishes a Home Assistant sensor discovery config for system metrics.
-func (c *Client) publishHASensor(id, name, unit, icon, template string) {
-	discoveryTopic := fmt.Sprintf("%s/sensor/%s/%s/config",
-		c.config.HADiscoveryPrefix,
-		strings.ReplaceAll(c.hostname, " ", "_"),
-		id,
-	)
-
-	config := map[string]any{
-		"name":                  name,
-		"unique_id":             fmt.Sprintf("unraid_%s_%s", strings.ReplaceAll(c.hostname, " ", "_"), id),
-		"state_topic":           c.buildTopic("system"),
-		"availability_topic":    c.buildTopic("availability"),
-		"payload_available":     "online",
-		"payload_not_available": "offline",
-		"value_template":        template,
-		"icon":                  icon,
-		"device":                c.deviceInfo,
-	}
-
-	if unit != "" {
-		config["unit_of_measurement"] = unit
-	}
-
-	if err := c.publishJSON(discoveryTopic, config); err != nil {
-		logger.Warning("MQTT: Failed to publish HA discovery for %s: %v", id, err)
-	}
-}
-
-// publishHAArraySensor publishes a Home Assistant sensor discovery config for array metrics.
-func (c *Client) publishHAArraySensor(id, name, icon, template string) {
-	discoveryTopic := fmt.Sprintf("%s/sensor/%s/%s/config",
-		c.config.HADiscoveryPrefix,
-		strings.ReplaceAll(c.hostname, " ", "_"),
-		id,
-	)
-
-	config := map[string]any{
-		"name":                  name,
-		"unique_id":             fmt.Sprintf("unraid_%s_%s", strings.ReplaceAll(c.hostname, " ", "_"), id),
-		"state_topic":           c.buildTopic("array"),
-		"availability_topic":    c.buildTopic("availability"),
-		"payload_available":     "online",
-		"payload_not_available": "offline",
-		"value_template":        template,
-		"icon":                  icon,
-		"device":                c.deviceInfo,
-	}
-
-	if err := c.publishJSON(discoveryTopic, config); err != nil {
-		logger.Warning("MQTT: Failed to publish HA discovery for %s: %v", id, err)
-	}
-}
+// NOTE: publishHADiscovery, publishHAEntity, and all per-item discovery
+// methods are in ha_discovery.go
 
 // TestConnection tests connectivity to an MQTT broker.
 func TestConnection(broker, username, password, clientID string, timeout time.Duration) *dto.MQTTTestResponse {

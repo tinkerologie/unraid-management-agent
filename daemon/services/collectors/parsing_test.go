@@ -3,7 +3,6 @@ package collectors
 import (
 	"testing"
 
-	"github.com/cskr/pubsub"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 )
@@ -11,7 +10,7 @@ import (
 // --- System Collector: parseSensorsOutput ---
 
 func TestParseSensorsOutput(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	c := NewSystemCollector(ctx)
 
@@ -60,7 +59,7 @@ func TestParseSensorsOutput(t *testing.T) {
 // --- System Collector: parseFanSpeeds ---
 
 func TestParseFanSpeeds(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	c := NewSystemCollector(ctx)
 
@@ -104,7 +103,7 @@ func TestParseFanSpeeds(t *testing.T) {
 // --- ZFS Collector: parseVdevLine ---
 
 func TestParseVdevLine(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	c := NewZFSCollector(ctx)
 
@@ -169,7 +168,7 @@ func TestParseVdevLine(t *testing.T) {
 // --- ZFS Collector: parseScanInfo ---
 
 func TestParseScanInfo(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	c := NewZFSCollector(ctx)
 
@@ -234,7 +233,7 @@ func TestParseScanInfo(t *testing.T) {
 // --- ZFS Collector: parseDatasetLine ---
 
 func TestParseDatasetLine_Extended(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	c := NewZFSCollector(ctx)
 
@@ -330,7 +329,7 @@ func TestParseDatasetLine_Extended(t *testing.T) {
 // --- ZFS Collector: parseSnapshotLine ---
 
 func TestParseSnapshotLine_Extended(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	c := NewZFSCollector(ctx)
 

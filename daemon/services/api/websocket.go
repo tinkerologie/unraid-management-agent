@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"sync"
 	"time"
@@ -18,11 +19,17 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+// broadcastMessage carries an event with its topic name through the broadcast channel.
+type broadcastMessage struct {
+	Topic string
+	Data  any
+}
+
 // WSHub manages WebSocket client connections and broadcasts messages to all connected clients.
 // It handles client registration, unregistration, and message broadcasting in a thread-safe manner.
 type WSHub struct {
 	clients    map[*WSClient]bool
-	broadcast  chan any
+	broadcast  chan broadcastMessage
 	register   chan *WSClient
 	unregister chan *WSClient
 	mu         sync.RWMutex
@@ -31,9 +38,11 @@ type WSHub struct {
 // WSClient represents a single WebSocket client connection.
 // It maintains the connection to the hub, the WebSocket connection, and a send channel for outgoing messages.
 type WSClient struct {
-	hub  *WSHub
-	conn *websocket.Conn
-	send chan dto.WSEvent
+	hub    *WSHub
+	conn   *websocket.Conn
+	send   chan dto.WSEvent
+	topics map[string]bool // nil = all topics; non-nil = only matching topics
+	topMu  sync.RWMutex
 }
 
 // NewWSHub creates and initializes a new WebSocket hub.
@@ -41,7 +50,7 @@ type WSClient struct {
 func NewWSHub() *WSHub {
 	return &WSHub{
 		clients:    make(map[*WSClient]bool),
-		broadcast:  make(chan any, constants.WSBufferSize),
+		broadcast:  make(chan broadcastMessage, constants.WSBufferSize),
 		register:   make(chan *WSClient),
 		unregister: make(chan *WSClient),
 	}
@@ -78,14 +87,17 @@ func (h *WSHub) Run(ctx context.Context) {
 			}
 			h.mu.Unlock()
 
-		case message := <-h.broadcast:
+		case msg := <-h.broadcast:
 			h.mu.RLock()
 			event := dto.WSEvent{
-				Event:     "update",
+				Event:     msg.Topic,
 				Timestamp: time.Now(),
-				Data:      message,
+				Data:      msg.Data,
 			}
 			for client := range h.clients {
+				if !client.wantsTopic(msg.Topic) {
+					continue
+				}
 				select {
 				case client.send <- event:
 				default:
@@ -98,10 +110,35 @@ func (h *WSHub) Run(ctx context.Context) {
 	}
 }
 
-// Broadcast sends a message to all connected WebSocket clients.
-// The message is wrapped in a WSEvent and sent asynchronously to each client.
-func (h *WSHub) Broadcast(message any) {
-	h.broadcast <- message
+// wantsTopic returns true if the client is subscribed to the given topic.
+// A nil topics map means the client receives all topics (default).
+func (c *WSClient) wantsTopic(topic string) bool {
+	c.topMu.RLock()
+	defer c.topMu.RUnlock()
+	if c.topics == nil {
+		return true
+	}
+	return c.topics[topic]
+}
+
+// setTopics updates the client's topic filter.
+// A nil or empty list resets to receiving all topics.
+func (c *WSClient) setTopics(topics []string) {
+	c.topMu.Lock()
+	defer c.topMu.Unlock()
+	if len(topics) == 0 {
+		c.topics = nil
+		return
+	}
+	c.topics = make(map[string]bool, len(topics))
+	for _, t := range topics {
+		c.topics[t] = true
+	}
+}
+
+// Broadcast sends a message to all connected WebSocket clients matching the topic filter.
+func (h *WSHub) Broadcast(topic string, data any) {
+	h.broadcast <- broadcastMessage{Topic: topic, Data: data}
 }
 
 // handleWebSocket godoc
@@ -205,9 +242,27 @@ func (c *WSClient) readPump() {
 	})
 
 	for {
-		_, _, err := c.conn.ReadMessage()
+		_, raw, err := c.conn.ReadMessage()
 		if err != nil {
 			break
 		}
+		// Try to parse subscribe message. Use a raw map to distinguish between
+		// "subscribe" key absent vs. explicitly set to null (both unmarshal to
+		// nil []string, but only the latter should reset topics to "all").
+		var envelope map[string]json.RawMessage
+		if json.Unmarshal(raw, &envelope) != nil {
+			continue
+		}
+		rawSub, hasKey := envelope["subscribe"]
+		if !hasKey {
+			continue
+		}
+		var topics []string
+		// json.Unmarshal handles both null → nil and ["a","b"] → slice.
+		if err := json.Unmarshal(rawSub, &topics); err != nil {
+			continue
+		}
+		c.setTopics(topics) // nil means "all topics"
+		logger.Debug("WebSocket client updated topic filter: %v", topics)
 	}
 }

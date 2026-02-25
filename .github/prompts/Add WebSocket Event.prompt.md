@@ -39,7 +39,7 @@ sub := s.ctx.Hub.Sub(
 )
 ```
 
-2. Add a case in the switch statement:
+1. Add a case in the switch statement:
 
 ```go
 case dto.MyFeatureInfo:
@@ -55,9 +55,11 @@ Events are broadcast to clients as `dto.WSEvent`:
 
 ```json
 {
-    "event": "my_feature_update",
-    "timestamp": "2025-01-01T00:00:00Z",
-    "data": { /* DTO fields */ }
+  "event": "my_feature_update",
+  "timestamp": "2025-01-01T00:00:00Z",
+  "data": {
+    /* DTO fields */
+  }
 }
 ```
 

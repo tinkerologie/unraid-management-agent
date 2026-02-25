@@ -7,7 +7,7 @@ import (
 )
 
 func TestCorsMiddleware(t *testing.T) {
-	handler := corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := corsMiddleware("*")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -58,6 +58,30 @@ func TestCorsMiddleware(t *testing.T) {
 
 		if rr.Code != http.StatusOK {
 			t.Errorf("POST request returned status %d, want %d", rr.Code, http.StatusOK)
+		}
+	})
+
+	t.Run("custom origin", func(t *testing.T) {
+		h := corsMiddleware("https://example.com")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		req := httptest.NewRequest("GET", "/test", nil)
+		rr := httptest.NewRecorder()
+		h.ServeHTTP(rr, req)
+		if got := rr.Header().Get("Access-Control-Allow-Origin"); got != "https://example.com" {
+			t.Errorf("Access-Control-Allow-Origin = %q, want %q", got, "https://example.com")
+		}
+	})
+
+	t.Run("empty origin defaults to wildcard", func(t *testing.T) {
+		h := corsMiddleware("")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		req := httptest.NewRequest("GET", "/test", nil)
+		rr := httptest.NewRecorder()
+		h.ServeHTTP(rr, req)
+		if got := rr.Header().Get("Access-Control-Allow-Origin"); got != "*" {
+			t.Errorf("Access-Control-Allow-Origin = %q, want %q", got, "*")
 		}
 	})
 }
@@ -170,7 +194,7 @@ func TestMiddlewareChain(t *testing.T) {
 		w.Write([]byte("success"))
 	})
 
-	handler := corsMiddleware(loggingMiddleware(recoveryMiddleware(finalHandler)))
+	handler := corsMiddleware("*")(loggingMiddleware(recoveryMiddleware(finalHandler)))
 
 	req := httptest.NewRequest("GET", "/test", nil)
 	rr := httptest.NewRecorder()
@@ -193,7 +217,7 @@ func TestMiddlewareChainWithPanic(t *testing.T) {
 		panic("chain panic")
 	})
 
-	handler := corsMiddleware(loggingMiddleware(recoveryMiddleware(panicHandler)))
+	handler := corsMiddleware("*")(loggingMiddleware(recoveryMiddleware(panicHandler)))
 
 	req := httptest.NewRequest("GET", "/test", nil)
 	rr := httptest.NewRecorder()

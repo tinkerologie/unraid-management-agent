@@ -4,7 +4,6 @@ go 1.26.0
 
 require (
 	github.com/alecthomas/kong v1.13.0
-	github.com/cskr/pubsub v1.0.2
 	github.com/digitalocean/go-libvirt v0.0.0-20260126183639-bb11c33248dc
 	github.com/eclipse/paho.mqtt.golang v1.5.1
 	github.com/expr-lang/expr v1.17.8
@@ -18,6 +17,7 @@ require (
 	github.com/prometheus/client_golang v1.23.2
 	github.com/swaggo/http-swagger/v2 v2.0.2
 	github.com/swaggo/swag v1.16.6
+	go.yaml.in/yaml/v3 v3.0.4
 	gopkg.in/ini.v1 v1.67.1
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
@@ -63,7 +63,6 @@ require (
 	go.opentelemetry.io/otel/metric v1.39.0 // indirect
 	go.opentelemetry.io/otel/trace v1.39.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
-	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.47.0 // indirect
 	golang.org/x/mod v0.32.0 // indirect
 	golang.org/x/net v0.49.0 // indirect

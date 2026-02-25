@@ -15,7 +15,7 @@ func TestConnect_InvalidBroker(t *testing.T) {
 	config.ConnectTimeout = 1              // 1 second timeout
 	config.AutoReconnect = false
 
-	client := NewClient(config, "test-server", "1.0.0")
+	client := NewClient(config, "test-server", "1.0.0", nil)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -37,7 +37,7 @@ func TestConnect_DisabledConfig(t *testing.T) {
 	config := DefaultConfig()
 	config.Enabled = false
 
-	client := NewClient(config, "test-server", "1.0.0")
+	client := NewClient(config, "test-server", "1.0.0", nil)
 
 	err := client.Connect(context.Background())
 	if err != nil {
@@ -52,7 +52,7 @@ func TestConnect_CancelledContext(t *testing.T) {
 	config.ConnectTimeout = 30 // Long timeout so context cancellation wins
 	config.AutoReconnect = false
 
-	client := NewClient(config, "test-server", "1.0.0")
+	client := NewClient(config, "test-server", "1.0.0", nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	// Cancel immediately so the context is done before connection completes
@@ -70,7 +70,7 @@ func TestConnect_CancelledContext(t *testing.T) {
 func TestTestConnection_NotConnected(t *testing.T) {
 	config := DefaultConfig()
 	config.Enabled = true
-	client := NewClient(config, "test-server", "1.0.0")
+	client := NewClient(config, "test-server", "1.0.0", nil)
 
 	// Client method TestConnection (not the package-level function)
 	err := client.TestConnection()
@@ -87,7 +87,7 @@ func TestTestConnection_NotConnected(t *testing.T) {
 func TestPublishJSON_NotConnected(t *testing.T) {
 	config := DefaultConfig()
 	config.Enabled = true
-	client := NewClient(config, "test-server", "1.0.0")
+	client := NewClient(config, "test-server", "1.0.0", nil)
 	// client.client is nil — publishJSON -> publish should return "client not initialized"
 
 	err := client.publishJSON("test/topic", map[string]string{"key": "value"})
@@ -101,7 +101,7 @@ func TestPublishJSON_NotConnected(t *testing.T) {
 
 func TestPublish_NilClient(t *testing.T) {
 	config := DefaultConfig()
-	client := NewClient(config, "test-server", "1.0.0")
+	client := NewClient(config, "test-server", "1.0.0", nil)
 	// client.client is nil
 
 	err := client.publish("test/topic", "payload", false)
@@ -118,7 +118,7 @@ func TestPublish_NilClient(t *testing.T) {
 func TestPublishJSON_MarshalError(t *testing.T) {
 	config := DefaultConfig()
 	config.Enabled = true
-	client := NewClient(config, "test-server", "1.0.0")
+	client := NewClient(config, "test-server", "1.0.0", nil)
 
 	// Channels cannot be marshalled to JSON
 	err := client.publishJSON("test/topic", make(chan int))
@@ -137,7 +137,7 @@ func TestPublishHADiscovery_NotConnected(t *testing.T) {
 	config.Enabled = true
 	config.HomeAssistantMode = true
 	config.HADiscoveryPrefix = "homeassistant"
-	client := NewClient(config, "test-server", "1.0.0")
+	client := NewClient(config, "test-server", "1.0.0", nil)
 	// client.client is nil — all internal publishes will fail silently (logged as warnings)
 
 	// Should not panic when client is not connected
@@ -150,41 +150,143 @@ func TestPublishHADiscovery_NotConnected(t *testing.T) {
 	}
 }
 
-func TestPublishHASensor_NotConnected(t *testing.T) {
+func TestPublishHAEntity_NotConnected(t *testing.T) {
 	config := DefaultConfig()
 	config.Enabled = true
 	config.HADiscoveryPrefix = "homeassistant"
-	client := NewClient(config, "test-server", "1.0.0")
+	client := NewClient(config, "test-server", "1.0.0", nil)
 	// client.client is nil
 
 	// Should not panic — errors are logged as warnings
-	client.publishHASensor("test_sensor", "Test Sensor", "%", "mdi:test", "{{ value_json.test }}")
+	client.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: "unraid/system",
+		id: "test_sensor", name: "Test Sensor", unit: "%",
+		icon: "mdi:test", template: "{{ value_json.test }}",
+		deviceClass: "temperature", stateClass: "measurement",
+	})
 
-	// Verify no panic — the nil-client path returns error without incrementing msgErrors
+	// binary_sensor variant
+	client.publishHAEntity(haEntityOpts{
+		entityType: "binary_sensor", stateTopic: "unraid/system",
+		id: "test_binary", name: "Test Binary",
+		icon: "mdi:test", template: "{{ 'ON' if value_json.test else 'OFF' }}",
+		deviceClass: "safety",
+	})
+
+	// Verify no panic
 	if client.IsConnected() {
 		t.Error("client should not be connected")
 	}
 }
 
-func TestPublishHAArraySensor_NotConnected(t *testing.T) {
+func TestPerItemDiscovery_NotConnected(t *testing.T) {
 	config := DefaultConfig()
 	config.Enabled = true
+	config.HomeAssistantMode = true
 	config.HADiscoveryPrefix = "homeassistant"
-	client := NewClient(config, "test-server", "1.0.0")
-	// client.client is nil
+	client := NewClient(config, "test-server", "1.0.0", nil)
+	// client.client is nil — all per-item discovery should not panic
 
-	// Should not panic — errors are logged as warnings
-	client.publishHAArraySensor("test_array", "Test Array", "mdi:test", "{{ value_json.state }}")
+	// Disks
+	client.publishDiskDiscovery([]dto.DiskInfo{{ID: "disk1", Name: "Disk 1"}})
+	// Containers
+	client.publishContainerDiscovery([]dto.ContainerInfo{{Name: "plex", State: "running"}})
+	// VMs
+	client.publishVMDiscovery([]dto.VMInfo{{Name: "Windows", State: "running"}})
+	// GPUs
+	client.publishGPUDiscovery([]*dto.GPUMetrics{{Available: true, Index: 0, Name: "Test GPU"}})
+	// Network
+	client.publishNetworkDiscovery([]dto.NetworkInfo{{Name: "eth0", State: "up"}})
+	// Shares
+	client.publishShareDiscovery([]dto.ShareInfo{{Name: "Media"}})
+	// ZFS
+	client.publishZFSDiscovery([]dto.ZFSPool{{Name: "tank", Health: "ONLINE"}})
 
-	// Verify no panic — the nil-client path returns error without incrementing msgErrors
 	if client.IsConnected() {
 		t.Error("client should not be connected")
+	}
+}
+
+func TestDiscoveryTracker_CleanupRemovedEntities(t *testing.T) {
+	tracker := newDiscoveryTracker()
+
+	// Initial set
+	removed := tracker.update("disks", []string{"disk_1", "disk_2", "disk_3"})
+	if len(removed) != 0 {
+		t.Errorf("first update should return no removed, got %v", removed)
+	}
+
+	// Remove disk_2
+	removed = tracker.update("disks", []string{"disk_1", "disk_3"})
+	if len(removed) != 1 || removed[0] != "disk_2" {
+		t.Errorf("expected [disk_2] removed, got %v", removed)
+	}
+
+	// Remove all
+	removed = tracker.update("disks", []string{})
+	if len(removed) != 2 {
+		t.Errorf("expected 2 removed, got %v", removed)
+	}
+}
+
+func TestSanitizeID(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"Disk 1", "disk_1"},
+		{"My-Container", "my_container"},
+		{"eth0.1", "eth0_1"},
+		{"path/to/thing", "path_to_thing"},
+		{"already_clean", "already_clean"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := sanitizeID(tt.input)
+			if result != tt.expected {
+				t.Errorf("sanitizeID(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestIsPhysicalInterface(t *testing.T) {
+	tests := []struct {
+		name     string
+		expected bool
+	}{
+		{"eth0", true},
+		{"eth1", true},
+		{"br0", true},
+		{"bond0", true},
+		{"wlan0", true},
+		{"veth1ab0321", false},
+		{"vethdb96cc6", false},
+		{"tunl0", false},
+		{"tun0", false},
+		{"virbr0", false},
+		{"docker0", false},
+		{"br-3cc0fa14431c", false},
+		{"br_f063b8e6a1ab", false},
+		{"shim-br0", false},
+		{"shim_br0", false},
+		{"vhost1", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isPhysicalInterface(tt.name)
+			if result != tt.expected {
+				t.Errorf("isPhysicalInterface(%q) = %v, want %v", tt.name, result, tt.expected)
+			}
+		})
 	}
 }
 
 func TestDisconnect_NotConnected(t *testing.T) {
 	config := DefaultConfig()
-	client := NewClient(config, "test-server", "1.0.0")
+	client := NewClient(config, "test-server", "1.0.0", nil)
 
 	// Should not panic when called without a prior Connect
 	client.Disconnect()
@@ -206,7 +308,7 @@ func TestConnect_WithCredentials(t *testing.T) {
 	config.ConnectTimeout = 1
 	config.AutoReconnect = false
 
-	client := NewClient(config, "test-server", "1.0.0")
+	client := NewClient(config, "test-server", "1.0.0", nil)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -223,7 +325,7 @@ func TestConnect_WithCredentials(t *testing.T) {
 func TestPublishMethodsWithEnabledButNotConnected(t *testing.T) {
 	config := DefaultConfig()
 	config.Enabled = true
-	client := NewClient(config, "test-server", "1.0.0")
+	client := NewClient(config, "test-server", "1.0.0", nil)
 	// Enabled but shouldPublish() returns false (not connected, no underlying client)
 
 	// All typed publish methods should return nil (early return via shouldPublish)
@@ -241,6 +343,7 @@ func TestPublishMethodsWithEnabledButNotConnected(t *testing.T) {
 		{"PublishNetworkInfo", func() error { return client.PublishNetworkInfo([]dto.NetworkInfo{}) }},
 		{"PublishShares", func() error { return client.PublishShares([]dto.ShareInfo{}) }},
 		{"PublishNotifications", func() error { return client.PublishNotifications(&dto.NotificationList{}) }},
+		{"PublishZFSPools", func() error { return client.PublishZFSPools([]dto.ZFSPool{}) }},
 	}
 
 	for _, tt := range tests {
@@ -256,7 +359,7 @@ func TestPublishMethodsWithEnabledButNotConnected(t *testing.T) {
 func TestGetStatus_Uptime(t *testing.T) {
 	config := DefaultConfig()
 	config.Enabled = true
-	client := NewClient(config, "test-server", "1.0.0")
+	client := NewClient(config, "test-server", "1.0.0", nil)
 
 	// When not connected, uptime should be 0
 	status := client.GetStatus()
@@ -276,7 +379,7 @@ func TestGetStatus_Uptime(t *testing.T) {
 
 func TestNewClient_HostnameWithSpaces(t *testing.T) {
 	config := DefaultConfig()
-	client := NewClient(config, "My Unraid Server", "1.0.0")
+	client := NewClient(config, "My Unraid Server", "1.0.0", nil)
 
 	// Spaces should be replaced with underscores in the identifier
 	expectedID := "unraid_My_Unraid_Server"
@@ -290,16 +393,21 @@ func TestNewClient_HostnameWithSpaces(t *testing.T) {
 	}
 }
 
-func TestPublishHASensor_TopicFormat(t *testing.T) {
+func TestPublishHAEntity_TopicFormat(t *testing.T) {
 	config := DefaultConfig()
 	config.Enabled = true
 	config.HADiscoveryPrefix = "homeassistant"
 	config.TopicPrefix = "unraid"
-	client := NewClient(config, "My Server", "1.0.0")
+	client := NewClient(config, "My Server", "1.0.0", nil)
 
 	// Verify the discovery topic format by exercising the code path
 	// (it will fail because client.client is nil, but the topic construction is exercised)
-	client.publishHASensor("cpu_usage", "CPU Usage", "%", "mdi:cpu-64-bit", "{{ value_json.cpu_usage }}")
+	client.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: "unraid/system",
+		id: "cpu_usage", name: "CPU Usage", unit: "%",
+		icon: "mdi:cpu-64-bit", template: "{{ value_json.cpu_usage_percent }}",
+		stateClass: "measurement",
+	})
 
 	// At minimum, ensure no panic occurred
 	if client.IsConnected() {

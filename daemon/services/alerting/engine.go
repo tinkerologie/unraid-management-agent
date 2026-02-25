@@ -27,6 +27,11 @@ type DataProvider interface {
 	GetDockerCache() []dto.ContainerInfo
 	GetVMsCache() []dto.VMInfo
 	GetUPSCache() *dto.UPSStatus
+	GetGPUCache() []*dto.GPUMetrics
+	GetZFSPoolsCache() []dto.ZFSPool
+	GetNetworkCache() []dto.NetworkInfo
+	GetNUTCache() *dto.NUTResponse
+	GetNotificationsCache() *dto.NotificationList
 }
 
 // Engine orchestrates alert rule evaluation and notification dispatch.
@@ -268,6 +273,64 @@ func (e *Engine) buildEnv() dto.AlertEnv {
 		env.UPSBatteryCharge = ups.BatteryCharge
 		env.UPSLoadPercent = ups.LoadPercent
 		env.UPSRuntimeLeft = float64(ups.RuntimeLeft)
+	}
+
+	// GPU
+	if gpus := e.provider.GetGPUCache(); gpus != nil {
+		for _, g := range gpus {
+			if g == nil {
+				continue
+			}
+			env.GPUCount++
+			if g.Temperature > env.MaxGPUTemp {
+				env.MaxGPUTemp = g.Temperature
+			}
+			if g.UtilizationGPU > env.MaxGPUUtil {
+				env.MaxGPUUtil = g.UtilizationGPU
+			}
+			env.TotalGPUPower += g.PowerDraw
+		}
+	}
+
+	// ZFS pools
+	if pools := e.provider.GetZFSPoolsCache(); pools != nil {
+		env.ZFSPoolCount = len(pools)
+		for _, p := range pools {
+			if p.CapacityPct > env.MaxZFSPoolUsedPct {
+				env.MaxZFSPoolUsedPct = p.CapacityPct
+			}
+			switch p.Health {
+			case "DEGRADED":
+				env.ZFSDegradedPools++
+			case "FAULTED":
+				env.ZFSFaultedPools++
+			}
+		}
+	}
+
+	// Network
+	if nets := e.provider.GetNetworkCache(); nets != nil {
+		env.NetworkIFCount = len(nets)
+		for _, n := range nets {
+			env.NetworkErrors += n.ErrorsReceived + n.ErrorsSent
+		}
+	}
+
+	// NUT
+	if nut := e.provider.GetNUTCache(); nut != nil && nut.Status != nil {
+		env.NUTStatus = nut.Status.Status
+		env.NUTBatteryCharge = nut.Status.BatteryCharge
+		env.NUTBatteryRuntime = nut.Status.BatteryRuntime
+		env.NUTLoadPercent = nut.Status.LoadPercent
+	}
+
+	// Notifications
+	// NotificationOverview and NotificationCounts are value types (not pointers),
+	// so the only nil-deref risk is notifs itself, which is guarded here.
+	if notifs := e.provider.GetNotificationsCache(); notifs != nil {
+		env.UnreadNotifications = notifs.Overview.Unread.Total
+		env.WarningNotifications = notifs.Overview.Unread.Warning
+		env.AlertNotifications = notifs.Overview.Unread.Alert
 	}
 
 	return env

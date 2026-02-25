@@ -4,10 +4,10 @@ import (
 	"context"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/cskr/pubsub"
 	"github.com/gorilla/websocket"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
@@ -17,14 +17,16 @@ import (
 func startSubscribeToEvents(t *testing.T, server *Server) context.CancelFunc {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
-	go server.subscribeToEvents(ctx)
-	// Give the subscription a moment to start
-	time.Sleep(50 * time.Millisecond)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go server.subscribeToEvents(ctx, &wg)
+	// Wait for subscription to be registered
+	wg.Wait()
 	return cancel
 }
 
 func TestSubscribeToEvents_SystemUpdate(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
 	server := NewServer(appCtx)
 
@@ -35,9 +37,7 @@ func TestSubscribeToEvents_SystemUpdate(t *testing.T) {
 	hub.Pub(sysInfo, "system_update")
 	time.Sleep(100 * time.Millisecond)
 
-	server.cacheMutex.RLock()
-	cached := server.systemCache
-	server.cacheMutex.RUnlock()
+	cached := server.systemCache.Load()
 
 	if cached == nil {
 		t.Fatal("systemCache not updated")
@@ -48,7 +48,7 @@ func TestSubscribeToEvents_SystemUpdate(t *testing.T) {
 }
 
 func TestSubscribeToEvents_ArrayStatusUpdate(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
 	server := NewServer(appCtx)
 
@@ -59,9 +59,7 @@ func TestSubscribeToEvents_ArrayStatusUpdate(t *testing.T) {
 	hub.Pub(arrayStatus, "array_status_update")
 	time.Sleep(100 * time.Millisecond)
 
-	server.cacheMutex.RLock()
-	cached := server.arrayCache
-	server.cacheMutex.RUnlock()
+	cached := server.arrayCache.Load()
 
 	if cached == nil {
 		t.Fatal("arrayCache not updated")
@@ -72,7 +70,7 @@ func TestSubscribeToEvents_ArrayStatusUpdate(t *testing.T) {
 }
 
 func TestSubscribeToEvents_DiskListUpdate(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
 	server := NewServer(appCtx)
 
@@ -83,9 +81,7 @@ func TestSubscribeToEvents_DiskListUpdate(t *testing.T) {
 	hub.Pub(disks, "disk_list_update")
 	time.Sleep(100 * time.Millisecond)
 
-	server.cacheMutex.RLock()
-	cached := server.disksCache
-	server.cacheMutex.RUnlock()
+	cached := server.GetDisksCache()
 
 	if len(cached) != 2 {
 		t.Fatalf("disksCache len = %d, want 2", len(cached))
@@ -93,7 +89,7 @@ func TestSubscribeToEvents_DiskListUpdate(t *testing.T) {
 }
 
 func TestSubscribeToEvents_ShareListUpdate(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
 	server := NewServer(appCtx)
 
@@ -104,9 +100,7 @@ func TestSubscribeToEvents_ShareListUpdate(t *testing.T) {
 	hub.Pub(shares, "share_list_update")
 	time.Sleep(100 * time.Millisecond)
 
-	server.cacheMutex.RLock()
-	cached := server.sharesCache
-	server.cacheMutex.RUnlock()
+	cached := server.GetSharesCache()
 
 	if len(cached) != 2 {
 		t.Fatalf("sharesCache len = %d, want 2", len(cached))
@@ -114,7 +108,7 @@ func TestSubscribeToEvents_ShareListUpdate(t *testing.T) {
 }
 
 func TestSubscribeToEvents_ContainerListUpdate(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
 	server := NewServer(appCtx)
 
@@ -129,9 +123,7 @@ func TestSubscribeToEvents_ContainerListUpdate(t *testing.T) {
 	hub.Pub(containers, "container_list_update")
 	time.Sleep(100 * time.Millisecond)
 
-	server.cacheMutex.RLock()
-	cached := server.dockerCache
-	server.cacheMutex.RUnlock()
+	cached := server.GetDockerCache()
 
 	if len(cached) != 2 {
 		t.Fatalf("dockerCache len = %d, want 2", len(cached))
@@ -142,7 +134,7 @@ func TestSubscribeToEvents_ContainerListUpdate(t *testing.T) {
 }
 
 func TestSubscribeToEvents_VMListUpdate(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
 	server := NewServer(appCtx)
 
@@ -156,9 +148,7 @@ func TestSubscribeToEvents_VMListUpdate(t *testing.T) {
 	hub.Pub(vms, "vm_list_update")
 	time.Sleep(100 * time.Millisecond)
 
-	server.cacheMutex.RLock()
-	cached := server.vmsCache
-	server.cacheMutex.RUnlock()
+	cached := server.GetVMsCache()
 
 	if len(cached) != 1 {
 		t.Fatalf("vmsCache len = %d, want 1", len(cached))
@@ -166,7 +156,7 @@ func TestSubscribeToEvents_VMListUpdate(t *testing.T) {
 }
 
 func TestSubscribeToEvents_UPSStatusUpdate(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
 	server := NewServer(appCtx)
 
@@ -177,9 +167,7 @@ func TestSubscribeToEvents_UPSStatusUpdate(t *testing.T) {
 	hub.Pub(ups, "ups_status_update")
 	time.Sleep(100 * time.Millisecond)
 
-	server.cacheMutex.RLock()
-	cached := server.upsCache
-	server.cacheMutex.RUnlock()
+	cached := server.upsCache.Load()
 
 	if cached == nil {
 		t.Fatal("upsCache not updated")
@@ -190,7 +178,7 @@ func TestSubscribeToEvents_UPSStatusUpdate(t *testing.T) {
 }
 
 func TestSubscribeToEvents_NUTStatusUpdate(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
 	server := NewServer(appCtx)
 
@@ -201,9 +189,7 @@ func TestSubscribeToEvents_NUTStatusUpdate(t *testing.T) {
 	hub.Pub(nut, "nut_status_update")
 	time.Sleep(100 * time.Millisecond)
 
-	server.cacheMutex.RLock()
-	cached := server.nutCache
-	server.cacheMutex.RUnlock()
+	cached := server.nutCache.Load()
 
 	if cached == nil {
 		t.Fatal("nutCache not updated")
@@ -214,7 +200,7 @@ func TestSubscribeToEvents_NUTStatusUpdate(t *testing.T) {
 }
 
 func TestSubscribeToEvents_GPUMetricsUpdate(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
 	server := NewServer(appCtx)
 
@@ -225,9 +211,7 @@ func TestSubscribeToEvents_GPUMetricsUpdate(t *testing.T) {
 	hub.Pub(gpus, "gpu_metrics_update")
 	time.Sleep(100 * time.Millisecond)
 
-	server.cacheMutex.RLock()
-	cached := server.gpuCache
-	server.cacheMutex.RUnlock()
+	cached := server.GetGPUCache()
 
 	if len(cached) != 1 {
 		t.Fatalf("gpuCache len = %d, want 1", len(cached))
@@ -235,7 +219,7 @@ func TestSubscribeToEvents_GPUMetricsUpdate(t *testing.T) {
 }
 
 func TestSubscribeToEvents_NetworkListUpdate(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
 	server := NewServer(appCtx)
 
@@ -246,9 +230,7 @@ func TestSubscribeToEvents_NetworkListUpdate(t *testing.T) {
 	hub.Pub(networks, "network_list_update")
 	time.Sleep(100 * time.Millisecond)
 
-	server.cacheMutex.RLock()
-	cached := server.networkCache
-	server.cacheMutex.RUnlock()
+	cached := server.GetNetworkCache()
 
 	if len(cached) != 1 {
 		t.Fatalf("networkCache len = %d, want 1", len(cached))
@@ -256,7 +238,7 @@ func TestSubscribeToEvents_NetworkListUpdate(t *testing.T) {
 }
 
 func TestSubscribeToEvents_HardwareUpdate(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
 	server := NewServer(appCtx)
 
@@ -267,9 +249,7 @@ func TestSubscribeToEvents_HardwareUpdate(t *testing.T) {
 	hub.Pub(hw, "hardware_update")
 	time.Sleep(100 * time.Millisecond)
 
-	server.cacheMutex.RLock()
-	cached := server.hardwareCache
-	server.cacheMutex.RUnlock()
+	cached := server.hardwareCache.Load()
 
 	if cached == nil {
 		t.Fatal("hardwareCache not updated")
@@ -280,7 +260,7 @@ func TestSubscribeToEvents_HardwareUpdate(t *testing.T) {
 }
 
 func TestSubscribeToEvents_RegistrationUpdate(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
 	server := NewServer(appCtx)
 
@@ -291,9 +271,7 @@ func TestSubscribeToEvents_RegistrationUpdate(t *testing.T) {
 	hub.Pub(reg, "registration_update")
 	time.Sleep(100 * time.Millisecond)
 
-	server.cacheMutex.RLock()
-	cached := server.registrationCache
-	server.cacheMutex.RUnlock()
+	cached := server.registrationCache.Load()
 
 	if cached == nil {
 		t.Fatal("registrationCache not updated")
@@ -304,7 +282,7 @@ func TestSubscribeToEvents_RegistrationUpdate(t *testing.T) {
 }
 
 func TestSubscribeToEvents_NotificationsUpdate(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
 	server := NewServer(appCtx)
 
@@ -319,9 +297,7 @@ func TestSubscribeToEvents_NotificationsUpdate(t *testing.T) {
 	hub.Pub(notifs, "notifications_update")
 	time.Sleep(100 * time.Millisecond)
 
-	server.cacheMutex.RLock()
-	cached := server.notificationsCache
-	server.cacheMutex.RUnlock()
+	cached := server.notificationsCache.Load()
 
 	if cached == nil {
 		t.Fatal("notificationsCache not updated")
@@ -332,7 +308,7 @@ func TestSubscribeToEvents_NotificationsUpdate(t *testing.T) {
 }
 
 func TestSubscribeToEvents_UnassignedDevicesUpdate(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
 	server := NewServer(appCtx)
 
@@ -345,9 +321,7 @@ func TestSubscribeToEvents_UnassignedDevicesUpdate(t *testing.T) {
 	hub.Pub(devices, "unassigned_devices_update")
 	time.Sleep(100 * time.Millisecond)
 
-	server.cacheMutex.RLock()
-	cached := server.unassignedCache
-	server.cacheMutex.RUnlock()
+	cached := server.unassignedCache.Load()
 
 	if cached == nil {
 		t.Fatal("unassignedCache not updated")
@@ -358,7 +332,7 @@ func TestSubscribeToEvents_UnassignedDevicesUpdate(t *testing.T) {
 }
 
 func TestSubscribeToEvents_ZFSPoolsUpdate(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
 	server := NewServer(appCtx)
 
@@ -369,9 +343,7 @@ func TestSubscribeToEvents_ZFSPoolsUpdate(t *testing.T) {
 	hub.Pub(pools, "zfs_pools_update")
 	time.Sleep(100 * time.Millisecond)
 
-	server.cacheMutex.RLock()
-	cached := server.zfsPoolsCache
-	server.cacheMutex.RUnlock()
+	cached := server.GetZFSPoolsCache()
 
 	if len(cached) != 1 {
 		t.Fatalf("zfsPoolsCache len = %d, want 1", len(cached))
@@ -379,7 +351,7 @@ func TestSubscribeToEvents_ZFSPoolsUpdate(t *testing.T) {
 }
 
 func TestSubscribeToEvents_ZFSDatasetsUpdate(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
 	server := NewServer(appCtx)
 
@@ -390,9 +362,7 @@ func TestSubscribeToEvents_ZFSDatasetsUpdate(t *testing.T) {
 	hub.Pub(datasets, "zfs_datasets_update")
 	time.Sleep(100 * time.Millisecond)
 
-	server.cacheMutex.RLock()
-	cached := server.zfsDatasetsCache
-	server.cacheMutex.RUnlock()
+	cached := server.GetZFSDatasetsCache()
 
 	if len(cached) != 1 {
 		t.Fatalf("zfsDatasetsCache len = %d, want 1", len(cached))
@@ -400,7 +370,7 @@ func TestSubscribeToEvents_ZFSDatasetsUpdate(t *testing.T) {
 }
 
 func TestSubscribeToEvents_ZFSSnapshotsUpdate(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
 	server := NewServer(appCtx)
 
@@ -411,9 +381,7 @@ func TestSubscribeToEvents_ZFSSnapshotsUpdate(t *testing.T) {
 	hub.Pub(snapshots, "zfs_snapshots_update")
 	time.Sleep(100 * time.Millisecond)
 
-	server.cacheMutex.RLock()
-	cached := server.zfsSnapshotsCache
-	server.cacheMutex.RUnlock()
+	cached := server.GetZFSSnapshotsCache()
 
 	if len(cached) != 1 {
 		t.Fatalf("zfsSnapshotsCache len = %d, want 1", len(cached))
@@ -421,7 +389,7 @@ func TestSubscribeToEvents_ZFSSnapshotsUpdate(t *testing.T) {
 }
 
 func TestSubscribeToEvents_ZFSARCStatsUpdate(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
 	server := NewServer(appCtx)
 
@@ -433,9 +401,7 @@ func TestSubscribeToEvents_ZFSARCStatsUpdate(t *testing.T) {
 	hub.Pub(arcStats, "zfs_arc_stats_update")
 	time.Sleep(100 * time.Millisecond)
 
-	server.cacheMutex.RLock()
-	cached := server.zfsARCStatsCache
-	server.cacheMutex.RUnlock()
+	cached := server.zfsARCStatsCache.Load()
 
 	if cached == nil {
 		t.Fatal("zfsARCStatsCache not updated")
@@ -446,17 +412,19 @@ func TestSubscribeToEvents_ZFSARCStatsUpdate(t *testing.T) {
 }
 
 func TestSubscribeToEvents_ContextCancellation(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
 	server := NewServer(appCtx)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
-		server.subscribeToEvents(ctx)
+		server.subscribeToEvents(ctx, &wg)
 		close(done)
 	}()
-	time.Sleep(50 * time.Millisecond)
+	wg.Wait()
 
 	cancel()
 
@@ -469,7 +437,7 @@ func TestSubscribeToEvents_ContextCancellation(t *testing.T) {
 }
 
 func TestSubscribeToEvents_UnknownType(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
 	server := NewServer(appCtx)
 
@@ -481,25 +449,25 @@ func TestSubscribeToEvents_UnknownType(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Verify no caches were changed
-	server.cacheMutex.RLock()
-	defer server.cacheMutex.RUnlock()
-	if server.systemCache != nil {
+	if server.systemCache.Load() != nil {
 		t.Error("systemCache should still be nil after unknown type")
 	}
 }
 
 func TestBroadcastEvents_ContextCancellation(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
 	server := NewServer(appCtx)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
-		server.broadcastEvents(ctx)
+		server.broadcastEvents(ctx, &wg)
 		close(done)
 	}()
-	time.Sleep(50 * time.Millisecond)
+	wg.Wait()
 
 	cancel()
 
@@ -512,7 +480,7 @@ func TestBroadcastEvents_ContextCancellation(t *testing.T) {
 }
 
 func TestBroadcastEvents_ForwardsToWSHub(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
 	server := NewServer(appCtx)
 
@@ -521,8 +489,10 @@ func TestBroadcastEvents_ForwardsToWSHub(t *testing.T) {
 	defer server.cancelFunc()
 
 	ctx := t.Context()
-	go server.broadcastEvents(ctx)
-	time.Sleep(50 * time.Millisecond)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go server.broadcastEvents(ctx, &wg)
+	wg.Wait()
 
 	// Create test server for WS connections
 	ts := httptest.NewServer(server.router)

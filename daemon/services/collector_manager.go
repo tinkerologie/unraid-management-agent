@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
@@ -129,15 +130,17 @@ func (cm *CollectorManager) startCollectorLocked(name string) {
 
 // EnableCollector enables a collector at runtime
 func (cm *CollectorManager) EnableCollector(name string) error {
-	cm.mu.Lock()
-	defer cm.mu.Unlock()
+	var event dto.CollectorStateEvent
 
+	cm.mu.Lock()
 	mc, exists := cm.collectors[name]
 	if !exists {
+		cm.mu.Unlock()
 		return fmt.Errorf("unknown collector: %s", name)
 	}
 
 	if mc.Status == "running" {
+		cm.mu.Unlock()
 		return nil // Already running
 	}
 
@@ -148,27 +151,35 @@ func (cm *CollectorManager) EnableCollector(name string) error {
 
 	cm.startCollectorLocked(name)
 
-	// Broadcast state change
-	cm.broadcastStateChange(name, true)
+	// Snapshot state while still holding the lock
+	event = cm.buildStateEvent(name, true)
+	cm.mu.Unlock()
+
+	// Broadcast outside the lock to avoid deadlock with subscribers
+	// that call GetStatus/GetAllStatus (which need RLock).
+	domain.Publish(cm.domainCtx.Hub, constants.TopicCollectorStateChange, event)
 
 	return nil
 }
 
 // DisableCollector disables a collector at runtime
 func (cm *CollectorManager) DisableCollector(name string) error {
-	cm.mu.Lock()
-	defer cm.mu.Unlock()
+	var event dto.CollectorStateEvent
 
+	cm.mu.Lock()
 	mc, exists := cm.collectors[name]
 	if !exists {
+		cm.mu.Unlock()
 		return fmt.Errorf("unknown collector: %s", name)
 	}
 
 	if mc.Required {
+		cm.mu.Unlock()
 		return fmt.Errorf("cannot disable %s collector (always required)", name)
 	}
 
 	if mc.Status != "running" {
+		cm.mu.Unlock()
 		return nil // Already stopped
 	}
 
@@ -183,8 +194,13 @@ func (cm *CollectorManager) DisableCollector(name string) error {
 
 	logger.Info("Disabled collector: %s", name)
 
-	// Broadcast state change
-	cm.broadcastStateChange(name, false)
+	// Snapshot state while still holding the lock
+	event = cm.buildStateEvent(name, false)
+	cm.mu.Unlock()
+
+	// Broadcast outside the lock to avoid deadlock with subscribers
+	// that call GetStatus/GetAllStatus (which need RLock).
+	domain.Publish(cm.domainCtx.Hub, constants.TopicCollectorStateChange, event)
 
 	return nil
 }
@@ -323,17 +339,16 @@ func (cm *CollectorManager) StopAll() {
 	}
 }
 
-// broadcastStateChange publishes a collector state change event
-func (cm *CollectorManager) broadcastStateChange(name string, enabled bool) {
-	event := dto.CollectorStateEvent{
-		Event:     "collector_state_change",
+// buildStateEvent creates a CollectorStateEvent snapshot. Must be called while cm.mu is held.
+func (cm *CollectorManager) buildStateEvent(name string, enabled bool) dto.CollectorStateEvent {
+	return dto.CollectorStateEvent{
+		Event:     constants.TopicCollectorStateChange.Name,
 		Collector: name,
 		Enabled:   enabled,
 		Status:    cm.collectors[name].Status,
 		Interval:  cm.collectors[name].Interval,
 		Timestamp: time.Now(),
 	}
-	cm.domainCtx.Hub.Pub(event, "collector_state_change")
 }
 
 // getDefaultInterval returns the default interval for a collector

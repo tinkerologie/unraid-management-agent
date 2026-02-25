@@ -34,8 +34,9 @@ type MQTTConfig struct {
 
 // Config holds the application configuration settings.
 type Config struct {
-	Version string `json:"version"`
-	Port    int    `json:"port"`
+	Version    string `json:"version"`
+	Port       int    `json:"port"`
+	CORSOrigin string `json:"cors_origin,omitempty"`
 }
 
 // DefaultMQTTConfig returns the default MQTT configuration.

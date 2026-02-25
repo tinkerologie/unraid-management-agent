@@ -4,11 +4,12 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
@@ -110,7 +111,7 @@ func (c *NotificationCollector) collect() {
 		Timestamp:     time.Now(),
 	}
 
-	c.ctx.Hub.Pub(notificationList, "notifications_update")
+	domain.Publish(c.ctx.Hub, constants.TopicNotificationsUpdate, notificationList)
 }
 
 // collectNotifications reads all notification files from a directory
@@ -134,8 +135,8 @@ func (c *NotificationCollector) collectNotifications(dir string, notifType strin
 	}
 
 	// Sort by timestamp descending (newest first)
-	sort.Slice(notifications, func(i, j int) bool {
-		return notifications[i].Timestamp.After(notifications[j].Timestamp)
+	slices.SortFunc(notifications, func(a, b dto.Notification) int {
+		return b.Timestamp.Compare(a.Timestamp)
 	})
 
 	return notifications

@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cskr/pubsub"
 	"github.com/gorilla/websocket"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
@@ -18,7 +17,7 @@ import (
 // newTestServerWithHub creates a Server with a running WSHub and returns a cleanup function.
 func newTestServerWithHub(t *testing.T) (*Server, func()) {
 	t.Helper()
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{
 		Hub:    hub,
 		Config: domain.Config{Version: "test"},
@@ -80,7 +79,7 @@ func TestWebSocketReceivesBroadcast(t *testing.T) {
 
 	// Broadcast a message through the hub
 	testData := map[string]string{"status": "ok"}
-	server.wsHub.Broadcast(testData)
+	server.wsHub.Broadcast("update", testData)
 
 	// The client should receive the broadcast wrapped in a WSEvent
 	ws.SetReadDeadline(time.Now().Add(2 * time.Second))
@@ -122,7 +121,7 @@ func TestWebSocketMultipleBroadcasts(t *testing.T) {
 	// Send multiple broadcasts
 	count := 5
 	for i := range count {
-		server.wsHub.Broadcast(map[string]int{"seq": i})
+		server.wsHub.Broadcast("update", map[string]int{"seq": i})
 	}
 
 	// Read all messages
@@ -160,7 +159,7 @@ func TestWebSocketMultipleClients(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Broadcast a message
-	server.wsHub.Broadcast(map[string]string{"to": "all"})
+	server.wsHub.Broadcast("update", map[string]string{"to": "all"})
 
 	// All clients should receive it
 	for i, ws := range clients {
@@ -232,7 +231,7 @@ func TestWebSocketCloseAndReconnect(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	// Broadcast should reach the new connection
-	server.wsHub.Broadcast(map[string]string{"reconnect": "yes"})
+	server.wsHub.Broadcast("update", map[string]string{"reconnect": "yes"})
 
 	ws2.SetReadDeadline(time.Now().Add(2 * time.Second))
 	_, _, err := ws2.ReadMessage()
@@ -316,7 +315,7 @@ func TestWebSocketPongHandler(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	// Broadcast after pong to verify the connection is still active
-	server.wsHub.Broadcast(map[string]string{"after": "pong"})
+	server.wsHub.Broadcast("update", map[string]string{"after": "pong"})
 
 	ws.SetReadDeadline(time.Now().Add(2 * time.Second))
 	_, _, err = ws.ReadMessage()
@@ -347,7 +346,7 @@ func TestWebSocketConcurrentBroadcasts(t *testing.T) {
 		go func(id int) {
 			defer wg.Done()
 			for j := range msgsPerGoroutine {
-				server.wsHub.Broadcast(map[string]int{"goroutine": id, "msg": j})
+				server.wsHub.Broadcast("update", map[string]int{"goroutine": id, "msg": j})
 			}
 		}(g)
 	}
@@ -406,7 +405,7 @@ func TestWebSocketBroadcastAfterClientClose(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Broadcasting after client disconnect should not panic
-	server.wsHub.Broadcast(map[string]string{"after": "close"})
+	server.wsHub.Broadcast("update", map[string]string{"after": "close"})
 	time.Sleep(50 * time.Millisecond)
 }
 

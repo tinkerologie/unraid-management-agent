@@ -3,12 +3,11 @@ package collectors
 import (
 	"testing"
 
-	"github.com/cskr/pubsub"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 )
 
 func TestNewNetworkCollector(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 
 	collector := NewNetworkCollector(ctx)

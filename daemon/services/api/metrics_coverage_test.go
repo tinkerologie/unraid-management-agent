@@ -31,18 +31,16 @@ func getMetricsBody(t *testing.T, server *Server) string {
 
 func TestMetricsGPUCache(t *testing.T) {
 	server := newMetricsTestServer()
-	server.cacheMutex.Lock()
-	server.gpuCache = []*dto.GPUMetrics{
-		{
-			Available:      true,
-			Name:           "NVIDIA RTX 3080",
-			Temperature:    65.0,
-			UtilizationGPU: 85.0,
-			MemoryUsed:     6442450944,
-			MemoryTotal:    10737418240,
-			PowerDraw:      250.5,
-			Timestamp:      time.Now(),
-		},
+	gpuVal := []*dto.GPUMetrics{{
+		Available:      true,
+		Name:           "NVIDIA RTX 3080",
+		Temperature:    65.0,
+		UtilizationGPU: 85.0,
+		MemoryUsed:     6442450944,
+		MemoryTotal:    10737418240,
+		PowerDraw:      250.5,
+		Timestamp:      time.Now(),
+	},
 		nil, // nil entry — exercises the nil guard
 		{
 			Available:      true,
@@ -55,7 +53,7 @@ func TestMetricsGPUCache(t *testing.T) {
 			Timestamp:      time.Now(),
 		},
 	}
-	server.cacheMutex.Unlock()
+	server.gpuCache.Store(&gpuVal)
 
 	body := getMetricsBody(t, server)
 
@@ -82,16 +80,14 @@ func TestMetricsCPUPowerRAPL_Present(t *testing.T) {
 	server := newMetricsTestServer()
 	cpuPower := 65.5
 	dramPower := 5.2
-	server.cacheMutex.Lock()
-	server.systemCache = &dto.SystemInfo{
+	server.systemCache.Store(&dto.SystemInfo{
 		Hostname:       "tower",
 		Version:        "7.0",
 		AgentVersion:   "2025.12.01",
 		CPUPowerWatts:  &cpuPower,
 		DRAMPowerWatts: &dramPower,
 		Timestamp:      time.Now(),
-	}
-	server.cacheMutex.Unlock()
+	})
 
 	body := getMetricsBody(t, server)
 
@@ -105,16 +101,14 @@ func TestMetricsCPUPowerRAPL_Present(t *testing.T) {
 
 func TestMetricsCPUPowerRAPL_Nil(t *testing.T) {
 	server := newMetricsTestServer()
-	server.cacheMutex.Lock()
-	server.systemCache = &dto.SystemInfo{
+	server.systemCache.Store(&dto.SystemInfo{
 		Hostname:       "tower",
 		Version:        "7.0",
 		AgentVersion:   "2025.12.01",
 		CPUPowerWatts:  nil,
 		DRAMPowerWatts: nil,
 		Timestamp:      time.Now(),
-	}
-	server.cacheMutex.Unlock()
+	})
 
 	body := getMetricsBody(t, server)
 
@@ -128,19 +122,17 @@ func TestMetricsCPUPowerRAPL_Nil(t *testing.T) {
 
 func TestMetricsDiskSMARTFailed(t *testing.T) {
 	server := newMetricsTestServer()
-	server.cacheMutex.Lock()
-	server.disksCache = []dto.DiskInfo{
-		{
-			Name:        "disk1",
-			Device:      "sda",
-			Role:        "data",
-			Status:      "DISK_OK",
-			SMARTStatus: "FAILED",
-			SpinState:   "active",
-			Timestamp:   time.Now(),
-		},
+	disksVal := []dto.DiskInfo{{
+		Name:        "disk1",
+		Device:      "sda",
+		Role:        "data",
+		Status:      "DISK_OK",
+		SMARTStatus: "FAILED",
+		SpinState:   "active",
+		Timestamp:   time.Now(),
+	},
 	}
-	server.cacheMutex.Unlock()
+	server.disksCache.Store(&disksVal)
 
 	body := getMetricsBody(t, server)
 
@@ -152,17 +144,15 @@ func TestMetricsDiskSMARTFailed(t *testing.T) {
 
 func TestMetricsDiskCachePoolType(t *testing.T) {
 	server := newMetricsTestServer()
-	server.cacheMutex.Lock()
-	server.disksCache = []dto.DiskInfo{
-		{
-			Name:        "cache",
-			Device:      "nvme0n1",
-			Role:        "cache",
-			Status:      "DISK_OK",
-			Temperature: 40.0,
-			SMARTStatus: "PASSED",
-			SpinState:   "active",
-		},
+	disksVal := []dto.DiskInfo{{
+		Name:        "cache",
+		Device:      "nvme0n1",
+		Role:        "cache",
+		Status:      "DISK_OK",
+		Temperature: 40.0,
+		SMARTStatus: "PASSED",
+		SpinState:   "active",
+	},
 		{
 			Name:        "pool1",
 			Device:      "nvme1n1",
@@ -173,7 +163,7 @@ func TestMetricsDiskCachePoolType(t *testing.T) {
 			SpinState:   "active",
 		},
 	}
-	server.cacheMutex.Unlock()
+	server.disksCache.Store(&disksVal)
 
 	body := getMetricsBody(t, server)
 
@@ -192,18 +182,16 @@ func TestMetricsDiskCachePoolType(t *testing.T) {
 
 func TestMetricsDiskProblemStatus(t *testing.T) {
 	server := newMetricsTestServer()
-	server.cacheMutex.Lock()
-	server.disksCache = []dto.DiskInfo{
-		{
-			Name:        "disk2",
-			Device:      "sdb",
-			Role:        "data",
-			Status:      "DISK_DSBL",
-			SMARTStatus: "PASSED",
-			SpinState:   "active",
-		},
+	disksVal := []dto.DiskInfo{{
+		Name:        "disk2",
+		Device:      "sdb",
+		Role:        "data",
+		Status:      "DISK_DSBL",
+		SMARTStatus: "PASSED",
+		SpinState:   "active",
+	},
 	}
-	server.cacheMutex.Unlock()
+	server.disksCache.Store(&disksVal)
 
 	body := getMetricsBody(t, server)
 
@@ -214,16 +202,14 @@ func TestMetricsDiskProblemStatus(t *testing.T) {
 
 func TestMetricsUPSOnBattery(t *testing.T) {
 	server := newMetricsTestServer()
-	server.cacheMutex.Lock()
-	server.upsCache = &dto.UPSStatus{
+	server.upsCache.Store(&dto.UPSStatus{
 		Status:        "OB",
 		Model:         "APC Back-UPS 600",
 		BatteryCharge: 85.0,
 		LoadPercent:   40.0,
 		RuntimeLeft:   1200,
 		Timestamp:     time.Now(),
-	}
-	server.cacheMutex.Unlock()
+	})
 
 	body := getMetricsBody(t, server)
 
@@ -235,16 +221,14 @@ func TestMetricsUPSOnBattery(t *testing.T) {
 
 func TestMetricsParityCheckRunning(t *testing.T) {
 	server := newMetricsTestServer()
-	server.cacheMutex.Lock()
-	server.arrayCache = &dto.ArrayStatus{
+	server.arrayCache.Store(&dto.ArrayStatus{
 		State:               "Started",
 		ParityCheckStatus:   "RUNNING",
 		ParityCheckProgress: 45.5,
 		ParityValid:         true,
 		TotalBytes:          8000000000000,
 		FreeBytes:           3000000000000,
-	}
-	server.cacheMutex.Unlock()
+	})
 
 	body := getMetricsBody(t, server)
 
@@ -258,14 +242,12 @@ func TestMetricsParityCheckRunning(t *testing.T) {
 
 func TestMetricsParityInvalid(t *testing.T) {
 	server := newMetricsTestServer()
-	server.cacheMutex.Lock()
-	server.arrayCache = &dto.ArrayStatus{
+	server.arrayCache.Store(&dto.ArrayStatus{
 		State:       "Started",
 		ParityValid: false,
 		TotalBytes:  8000000000000,
 		FreeBytes:   3000000000000,
-	}
-	server.cacheMutex.Unlock()
+	})
 
 	body := getMetricsBody(t, server)
 
@@ -276,16 +258,14 @@ func TestMetricsParityInvalid(t *testing.T) {
 
 func TestMetricsDiskStandby(t *testing.T) {
 	server := newMetricsTestServer()
-	server.cacheMutex.Lock()
-	server.disksCache = []dto.DiskInfo{
-		{
-			Name:        "disk1",
-			Device:      "sda",
-			Role:        "data",
-			Status:      "DISK_OK",
-			SMARTStatus: "PASSED",
-			SpinState:   "standby",
-		},
+	disksVal := []dto.DiskInfo{{
+		Name:        "disk1",
+		Device:      "sda",
+		Role:        "data",
+		Status:      "DISK_OK",
+		SMARTStatus: "PASSED",
+		SpinState:   "standby",
+	},
 		{
 			Name:        "disk2",
 			Device:      "sdb",
@@ -295,7 +275,7 @@ func TestMetricsDiskStandby(t *testing.T) {
 			SpinState:   "active",
 		},
 	}
-	server.cacheMutex.Unlock()
+	server.disksCache.Store(&disksVal)
 
 	body := getMetricsBody(t, server)
 

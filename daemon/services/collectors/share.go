@@ -101,8 +101,8 @@ func (c *ShareCollector) Collect() {
 
 	logger.Debug("Share: Successfully collected %d shares, publishing event", len(shares))
 	// Publish event
-	c.ctx.Hub.Pub(shares, "share_list_update")
-	logger.Debug("Share: Published share_list_update event with %d shares", len(shares))
+	domain.Publish(c.ctx.Hub, constants.TopicShareListUpdate, shares)
+	logger.Debug("Share: Published %s event with %d shares", constants.TopicShareListUpdate.Name, len(shares))
 }
 
 func (c *ShareCollector) collectShares() ([]dto.ShareInfo, error) {

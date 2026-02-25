@@ -6,8 +6,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/collectors"
 )
 
 // Prometheus metric definitions
@@ -333,68 +331,75 @@ func init() {
 
 // updateMetrics updates all Prometheus metrics from the server's cache
 func (s *Server) updateMetrics() {
-	s.cacheMutex.RLock()
-	defer s.cacheMutex.RUnlock()
+	// Load all cache values atomically (lock-free reads)
+	sysCache := s.systemCache.Load()
+	arrCache := s.arrayCache.Load()
+	disksSlice := s.GetDisksCache()
+	dockerSlice := s.GetDockerCache()
+	vmsSlice := s.GetVMsCache()
+	upsVal := s.upsCache.Load()
+	sharesSlice := s.GetSharesCache()
+	gpuSlice := s.GetGPUCache()
 
 	// Update system metrics
-	if s.systemCache != nil {
+	if sysCache != nil {
 		systemInfo.Reset()
 		systemInfo.WithLabelValues(
-			s.systemCache.Hostname,
-			s.systemCache.Version,
-			s.systemCache.AgentVersion,
+			sysCache.Hostname,
+			sysCache.Version,
+			sysCache.AgentVersion,
 		).Set(1)
 
-		systemUptime.Set(float64(s.systemCache.Uptime))
-		cpuUsage.Set(s.systemCache.CPUUsage)
-		cpuTemperature.Set(s.systemCache.CPUTemp)
-		memoryTotal.Set(float64(s.systemCache.RAMTotal))
-		memoryUsed.Set(float64(s.systemCache.RAMUsed))
-		memoryUsagePercent.Set(s.systemCache.RAMUsage)
+		systemUptime.Set(float64(sysCache.Uptime))
+		cpuUsage.Set(sysCache.CPUUsage)
+		cpuTemperature.Set(sysCache.CPUTemp)
+		memoryTotal.Set(float64(sysCache.RAMTotal))
+		memoryUsed.Set(float64(sysCache.RAMUsed))
+		memoryUsagePercent.Set(sysCache.RAMUsage)
 
 		// CPU power from Intel RAPL
-		if s.systemCache.CPUPowerWatts != nil {
-			cpuPowerWatts.Set(*s.systemCache.CPUPowerWatts)
+		if sysCache.CPUPowerWatts != nil {
+			cpuPowerWatts.Set(*sysCache.CPUPowerWatts)
 		} else {
 			cpuPowerWatts.Set(0)
 		}
-		if s.systemCache.DRAMPowerWatts != nil {
-			dramPowerWatts.Set(*s.systemCache.DRAMPowerWatts)
+		if sysCache.DRAMPowerWatts != nil {
+			dramPowerWatts.Set(*sysCache.DRAMPowerWatts)
 		} else {
 			dramPowerWatts.Set(0)
 		}
 	}
 
 	// Update array metrics
-	if s.arrayCache != nil {
-		if s.arrayCache.State == "STARTED" || s.arrayCache.State == "Started" {
+	if arrCache != nil {
+		if arrCache.State == "STARTED" || arrCache.State == "Started" {
 			arrayState.Set(1)
 		} else {
 			arrayState.Set(0)
 		}
-		arrayTotalBytes.Set(float64(s.arrayCache.TotalBytes))
+		arrayTotalBytes.Set(float64(arrCache.TotalBytes))
 		// Calculate used bytes from total - free
-		usedBytes := s.arrayCache.TotalBytes - s.arrayCache.FreeBytes
+		usedBytes := arrCache.TotalBytes - arrCache.FreeBytes
 		arrayUsedBytes.Set(float64(usedBytes))
-		arrayFreeBytes.Set(float64(s.arrayCache.FreeBytes))
-		arrayUsagePercent.Set(s.arrayCache.UsedPercent)
+		arrayFreeBytes.Set(float64(arrCache.FreeBytes))
+		arrayUsagePercent.Set(arrCache.UsedPercent)
 
-		if s.arrayCache.ParityValid {
+		if arrCache.ParityValid {
 			parityValid.Set(1)
 		} else {
 			parityValid.Set(0)
 		}
 
-		if s.arrayCache.ParityCheckStatus != "" && s.arrayCache.ParityCheckStatus != "IDLE" && s.arrayCache.ParityCheckStatus != "idle" {
+		if arrCache.ParityCheckStatus != "" && arrCache.ParityCheckStatus != "IDLE" && arrCache.ParityCheckStatus != "idle" {
 			parityCheckRunning.Set(1)
 		} else {
 			parityCheckRunning.Set(0)
 		}
-		parityCheckProgress.Set(s.arrayCache.ParityCheckProgress)
+		parityCheckProgress.Set(arrCache.ParityCheckProgress)
 	}
 
 	// Update disk metrics
-	if s.disksCache != nil {
+	if disksSlice != nil {
 		// Reset disk metrics to clear stale entries
 		diskTemperature.Reset()
 		diskSizeBytes.Reset()
@@ -404,7 +409,7 @@ func (s *Server) updateMetrics() {
 		diskStandby.Reset()
 		diskSmartStatus.Reset()
 
-		for _, disk := range s.disksCache {
+		for _, disk := range disksSlice {
 			// Determine disk type based on role (cache/pool disks are often SSDs)
 			diskType := "HDD"
 			if disk.Role == "cache" || disk.Role == "pool" {
@@ -443,10 +448,10 @@ func (s *Server) updateMetrics() {
 	}
 
 	// Update Docker metrics
-	if s.dockerCache != nil {
+	if dockerSlice != nil {
 		containerState.Reset()
 		running := 0
-		for _, container := range s.dockerCache {
+		for _, container := range dockerSlice {
 			stateValue := 0.0
 			if container.State == "running" {
 				stateValue = 1.0
@@ -454,15 +459,15 @@ func (s *Server) updateMetrics() {
 			}
 			containerState.WithLabelValues(container.Name, container.ID, container.Image).Set(stateValue)
 		}
-		containersTotal.Set(float64(len(s.dockerCache)))
+		containersTotal.Set(float64(len(dockerSlice)))
 		containersRunning.Set(float64(running))
 	}
 
 	// Update VM metrics
-	if s.vmsCache != nil {
+	if vmsSlice != nil {
 		vmState.Reset()
 		running := 0
-		for _, vm := range s.vmsCache {
+		for _, vm := range vmsSlice {
 			stateValue := 0.0
 			if vm.State == "running" {
 				stateValue = 1.0
@@ -470,46 +475,46 @@ func (s *Server) updateMetrics() {
 			}
 			vmState.WithLabelValues(vm.Name, vm.ID).Set(stateValue)
 		}
-		vmsTotal.Set(float64(len(s.vmsCache)))
+		vmsTotal.Set(float64(len(vmsSlice)))
 		vmsRunning.Set(float64(running))
 	}
 
 	// Update UPS metrics
-	if s.upsCache != nil {
+	if upsVal != nil {
 		upsStatus.Reset()
 		upsBatteryCharge.Reset()
 		upsLoad.Reset()
 		upsRuntime.Reset()
 
 		statusValue := 1.0 // Online by default
-		if s.upsCache.Status != "ONLINE" && s.upsCache.Status != "OL" {
+		if upsVal.Status != "ONLINE" && upsVal.Status != "OL" {
 			statusValue = 0.0
 		}
 		upsName := "ups"
-		upsStatus.WithLabelValues(upsName, s.upsCache.Model).Set(statusValue)
-		upsBatteryCharge.WithLabelValues(upsName).Set(s.upsCache.BatteryCharge)
-		upsLoad.WithLabelValues(upsName).Set(s.upsCache.LoadPercent)
-		upsRuntime.WithLabelValues(upsName).Set(float64(s.upsCache.RuntimeLeft))
+		upsStatus.WithLabelValues(upsName, upsVal.Model).Set(statusValue)
+		upsBatteryCharge.WithLabelValues(upsName).Set(upsVal.BatteryCharge)
+		upsLoad.WithLabelValues(upsName).Set(upsVal.LoadPercent)
+		upsRuntime.WithLabelValues(upsName).Set(float64(upsVal.RuntimeLeft))
 	}
 
 	// Update share metrics
-	if s.sharesCache != nil {
+	if sharesSlice != nil {
 		shareUsedBytes.Reset()
-		for _, share := range s.sharesCache {
+		for _, share := range sharesSlice {
 			shareUsedBytes.WithLabelValues(share.Name).Set(float64(share.Used))
 		}
-		sharesTotal.Set(float64(len(s.sharesCache)))
+		sharesTotal.Set(float64(len(sharesSlice)))
 	}
 
 	// Update GPU metrics
-	if s.gpuCache != nil {
+	if gpuSlice != nil {
 		gpuTemperature.Reset()
 		gpuUtilization.Reset()
 		gpuMemoryUsed.Reset()
 		gpuMemoryTotal.Reset()
 		gpuPowerWatts.Reset()
 
-		for i, gpu := range s.gpuCache {
+		for i, gpu := range gpuSlice {
 			if gpu == nil {
 				continue
 			}
@@ -543,13 +548,11 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	}).ServeHTTP(w, r)
 }
 
-// updateNetworkServiceMetrics fetches and updates network service metrics
+// updateNetworkServiceMetrics reads network service status from the cache
 func (s *Server) updateNetworkServiceMetrics() {
-	// Get network services status using the settings collector
-	settingsCollector := collectors.NewSettingsCollector()
-	status, err := settingsCollector.GetNetworkServicesStatus()
-	if err != nil {
-		return // Skip updating if there's an error
+	status := s.GetNetworkServicesCache()
+	if status == nil {
+		return
 	}
 
 	serviceEnabled.Reset()

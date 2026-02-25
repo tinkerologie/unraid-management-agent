@@ -9,7 +9,7 @@ import (
 
 func TestNewClient(t *testing.T) {
 	config := DefaultConfig()
-	client := NewClient(config, "test-server", "1.0.0")
+	client := NewClient(config, "test-server", "1.0.0", nil)
 
 	if client == nil {
 		t.Fatal("NewClient() returned nil")
@@ -94,7 +94,7 @@ func TestDefaultConfig(t *testing.T) {
 
 func TestClientIsConnected(t *testing.T) {
 	config := DefaultConfig()
-	client := NewClient(config, "test-server", "1.0.0")
+	client := NewClient(config, "test-server", "1.0.0", nil)
 
 	if client.IsConnected() {
 		t.Error("new client should not be connected")
@@ -104,7 +104,7 @@ func TestClientIsConnected(t *testing.T) {
 func TestClientGetStatus(t *testing.T) {
 	config := DefaultConfig()
 	config.Enabled = true
-	client := NewClient(config, "test-server", "1.0.0")
+	client := NewClient(config, "test-server", "1.0.0", nil)
 
 	status := client.GetStatus()
 
@@ -150,7 +150,7 @@ func TestClientGetConfig(t *testing.T) {
 	config.Enabled = true
 	config.Username = "testuser"
 	config.Password = "secret123" // Password should not be returned
-	client := NewClient(config, "test-server", "1.0.0")
+	client := NewClient(config, "test-server", "1.0.0", nil)
 
 	returnedConfig := client.GetConfig()
 
@@ -179,7 +179,7 @@ func TestClientGetConfig(t *testing.T) {
 func TestClientGetTopics(t *testing.T) {
 	config := DefaultConfig()
 	config.TopicPrefix = "unraid"
-	client := NewClient(config, "test-server", "1.0.0")
+	client := NewClient(config, "test-server", "1.0.0", nil)
 
 	topics := client.GetTopics()
 
@@ -216,7 +216,7 @@ func TestClientGetTopics(t *testing.T) {
 func TestClientGetTopicsWithEmptyPrefix(t *testing.T) {
 	config := DefaultConfig()
 	config.TopicPrefix = ""
-	client := NewClient(config, "test-server", "1.0.0")
+	client := NewClient(config, "test-server", "1.0.0", nil)
 
 	topics := client.GetTopics()
 
@@ -232,7 +232,7 @@ func TestClientGetTopicsWithEmptyPrefix(t *testing.T) {
 func TestClientGetTopicsWithCustomPrefix(t *testing.T) {
 	config := DefaultConfig()
 	config.TopicPrefix = "homelab/server1"
-	client := NewClient(config, "test-server", "1.0.0")
+	client := NewClient(config, "test-server", "1.0.0", nil)
 
 	topics := client.GetTopics()
 
@@ -278,7 +278,7 @@ func TestBuildTopic(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			config := DefaultConfig()
 			config.TopicPrefix = tt.prefix
-			client := NewClient(config, "test", "1.0.0")
+			client := NewClient(config, "test", "1.0.0", nil)
 
 			got := client.buildTopic(tt.suffix)
 			if got != tt.expected {
@@ -296,7 +296,7 @@ func TestShouldPublish(t *testing.T) {
 	t.Run("disabled client", func(t *testing.T) {
 		config := DefaultConfig()
 		config.Enabled = false
-		client := NewClient(config, "test", "1.0.0")
+		client := NewClient(config, "test", "1.0.0", nil)
 
 		got := client.shouldPublish()
 		if got != false {
@@ -307,7 +307,7 @@ func TestShouldPublish(t *testing.T) {
 	t.Run("enabled but not connected", func(t *testing.T) {
 		config := DefaultConfig()
 		config.Enabled = true
-		client := NewClient(config, "test", "1.0.0")
+		client := NewClient(config, "test", "1.0.0", nil)
 
 		got := client.shouldPublish()
 		if got != false {
@@ -318,7 +318,7 @@ func TestShouldPublish(t *testing.T) {
 	t.Run("enabled connected but no client", func(t *testing.T) {
 		config := DefaultConfig()
 		config.Enabled = true
-		client := NewClient(config, "test", "1.0.0")
+		client := NewClient(config, "test", "1.0.0", nil)
 		client.connected.Store(true)
 
 		// Without c.client being set, shouldPublish returns false
@@ -332,7 +332,7 @@ func TestShouldPublish(t *testing.T) {
 func TestPublishMethodsWithoutConnection(t *testing.T) {
 	config := DefaultConfig()
 	config.Enabled = false
-	client := NewClient(config, "test", "1.0.0")
+	client := NewClient(config, "test", "1.0.0", nil)
 
 	// All publish methods should return nil when not enabled/connected
 	t.Run("PublishSystemInfo", func(t *testing.T) {
@@ -409,7 +409,7 @@ func TestPublishMethodsWithoutConnection(t *testing.T) {
 func TestPublishCustomWithoutConnection(t *testing.T) {
 	config := DefaultConfig()
 	config.Enabled = true
-	client := NewClient(config, "test", "1.0.0")
+	client := NewClient(config, "test", "1.0.0", nil)
 	// Not connected
 
 	err := client.PublishCustom("test/topic", map[string]string{"key": "value"}, false)
@@ -420,7 +420,7 @@ func TestPublishCustomWithoutConnection(t *testing.T) {
 
 func TestClientDisconnect(t *testing.T) {
 	config := DefaultConfig()
-	client := NewClient(config, "test", "1.0.0")
+	client := NewClient(config, "test", "1.0.0", nil)
 
 	// Disconnect should not panic when client is nil
 	client.Disconnect()
@@ -432,7 +432,7 @@ func TestClientDisconnect(t *testing.T) {
 
 func TestMessageCounters(t *testing.T) {
 	config := DefaultConfig()
-	client := NewClient(config, "test", "1.0.0")
+	client := NewClient(config, "test", "1.0.0", nil)
 
 	// Initial counters should be zero
 	status := client.GetStatus()
@@ -447,7 +447,7 @@ func TestMessageCounters(t *testing.T) {
 func TestHandleConnect(t *testing.T) {
 	config := DefaultConfig()
 	config.HomeAssistantMode = false // Disable HA discovery for this test
-	client := NewClient(config, "test-server", "1.0.0")
+	client := NewClient(config, "test-server", "1.0.0", nil)
 
 	// Simulate connection
 	client.handleConnect()
@@ -467,7 +467,7 @@ func TestHandleConnect(t *testing.T) {
 
 func TestHandleDisconnect(t *testing.T) {
 	config := DefaultConfig()
-	client := NewClient(config, "test-server", "1.0.0")
+	client := NewClient(config, "test-server", "1.0.0", nil)
 
 	// First connect, then disconnect
 	client.connected.Store(true)
@@ -485,7 +485,7 @@ func TestHandleDisconnect(t *testing.T) {
 
 func TestHandleDisconnectWithError(t *testing.T) {
 	config := DefaultConfig()
-	client := NewClient(config, "test-server", "1.0.0")
+	client := NewClient(config, "test-server", "1.0.0", nil)
 	client.connected.Store(true)
 
 	testErr := &testError{msg: "connection lost"}
@@ -507,7 +507,7 @@ func (e *testError) Error() string {
 
 func TestDeviceInfo(t *testing.T) {
 	config := DefaultConfig()
-	client := NewClient(config, "My Server Name", "2.0.0")
+	client := NewClient(config, "My Server Name", "2.0.0", nil)
 
 	if client.deviceInfo == nil {
 		t.Fatal("deviceInfo is nil")

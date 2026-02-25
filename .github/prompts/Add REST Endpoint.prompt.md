@@ -16,7 +16,7 @@ Follow these steps to add a new REST API endpoint.
 
 In `daemon/services/api/handlers.go`:
 
-### For GET (cached data):
+### For GET (cached data)
 
 ```go
 func (s *Server) handleMyResource(w http.ResponseWriter, _ *http.Request) {
@@ -27,7 +27,7 @@ func (s *Server) handleMyResource(w http.ResponseWriter, _ *http.Request) {
 }
 ```
 
-### For POST (control operation):
+### For POST (control operation)
 
 ```go
 func (s *Server) handleMyAction(w http.ResponseWriter, r *http.Request) {

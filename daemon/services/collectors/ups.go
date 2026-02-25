@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
@@ -55,8 +56,8 @@ func (c *UPSCollector) Collect() {
 	if lib.CommandExists("apcaccess") {
 		upsData, err = c.collectAPC()
 		if err == nil {
-			c.ctx.Hub.Pub(upsData, "ups_status_update")
-			logger.Debug("Published ups_status_update event (APC)")
+			domain.Publish(c.ctx.Hub, constants.TopicUPSStatusUpdate, upsData)
+			logger.Debug("Published %s event (APC)", constants.TopicUPSStatusUpdate.Name)
 			return
 		}
 		logger.Warning("Failed to collect APC UPS data", "error", err)
@@ -66,8 +67,8 @@ func (c *UPSCollector) Collect() {
 	if lib.CommandExists("upsc") {
 		upsData, err = c.collectNUT()
 		if err == nil {
-			c.ctx.Hub.Pub(upsData, "ups_status_update")
-			logger.Debug("Published ups_status_update event (NUT)")
+			domain.Publish(c.ctx.Hub, constants.TopicUPSStatusUpdate, upsData)
+			logger.Debug("Published %s event (NUT)", constants.TopicUPSStatusUpdate.Name)
 			return
 		}
 		logger.Warning("Failed to collect NUT UPS data", "error", err)

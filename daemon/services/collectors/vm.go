@@ -10,6 +10,7 @@ import (
 
 	"github.com/digitalocean/go-libvirt"
 
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
@@ -66,7 +67,7 @@ func (c *VMCollector) Collect() {
 	if err != nil {
 		logger.Debug("Failed to connect to libvirt: %v (libvirt may not be running)", err)
 		// Publish empty list
-		c.appCtx.Hub.Pub([]*dto.VMInfo{}, "vm_list_update")
+		domain.Publish(c.appCtx.Hub, constants.TopicVMListUpdate, []*dto.VMInfo{})
 		return
 	}
 	defer l.Disconnect() //nolint:errcheck
@@ -140,7 +141,7 @@ func (c *VMCollector) Collect() {
 	}
 
 	// Publish event
-	c.appCtx.Hub.Pub(vms, "vm_list_update")
+	domain.Publish(c.appCtx.Hub, constants.TopicVMListUpdate, vms)
 	logger.Debug("VM libvirt: Total collection took %v, published %d VMs", time.Since(startTotal), len(vms))
 }
 
@@ -297,7 +298,7 @@ func (c *VMCollector) formatMemoryDisplay(used, allocated uint64) string {
 
 // extractDiskTargets parses XML to find disk device targets
 func extractDiskTargets(xml string) []string {
-	targets := []string{}
+	var targets []string
 	// Simple string parsing for <target dev="xxx"/> patterns
 	parts := strings.Split(xml, "<target dev=\"")
 	for i := 1; i < len(parts); i++ {
@@ -311,7 +312,7 @@ func extractDiskTargets(xml string) []string {
 
 // extractInterfaceTargets parses XML to find network interface targets
 func extractInterfaceTargets(xml string) []string {
-	targets := []string{}
+	var targets []string
 	// Look for interface sections and their targets
 	// Pattern: <interface type='...'> ... <target dev='vnetX'/> ... </interface>
 	parts := strings.Split(xml, "<interface ")

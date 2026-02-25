@@ -4,13 +4,12 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/cskr/pubsub"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 )
 
 func TestNewDiskCollector(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 
 	collector := NewDiskCollector(ctx)
@@ -302,7 +301,7 @@ func TestDiskStatusValues(t *testing.T) {
 
 // TestParseDiskKeyValue tests parsing of disk INI key-value pairs
 func TestParseDiskKeyValue(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewDiskCollector(ctx)
 
@@ -431,7 +430,7 @@ func TestParseDiskKeyValue(t *testing.T) {
 
 // TestIsNVMeDevice tests NVMe device detection
 func TestIsNVMeDevice(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewDiskCollector(ctx)
 
@@ -494,7 +493,7 @@ func TestDiskSMARTStatus(t *testing.T) {
 
 // TestParseModelSerialFromID tests parsing of model and serial from disk ID (Issue #56)
 func TestParseModelSerialFromID(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewDiskCollector(ctx)
 
@@ -597,7 +596,7 @@ func TestParseModelSerialFromID(t *testing.T) {
 
 // TestEnrichWithModelAndSerialNoDevice tests enrichment when device is empty
 func TestEnrichWithModelAndSerialNoDevice(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewDiskCollector(ctx)
 
@@ -620,7 +619,7 @@ func TestEnrichWithModelAndSerialNoDevice(t *testing.T) {
 
 // TestEnrichWithModelAndSerialEmptyID tests enrichment when ID is empty
 func TestEnrichWithModelAndSerialEmptyID(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewDiskCollector(ctx)
 

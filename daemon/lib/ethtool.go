@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -34,7 +35,7 @@ type EthtoolInfo struct {
 func ParseEthtool(ifName string) (*EthtoolInfo, error) {
 	// Check if ethtool is available
 	if !CommandExists("ethtool") {
-		return nil, fmt.Errorf("ethtool command not found")
+		return nil, errors.New("ethtool command not found")
 	}
 
 	output, err := ExecCommandOutput("ethtool", ifName)

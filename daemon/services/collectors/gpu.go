@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
@@ -51,7 +52,7 @@ func (c *GPUCollector) Collect() {
 	logger.Debug("Collecting gpu data...")
 
 	// Collect GPU metrics from all available GPU types
-	gpuMetrics := make([]*dto.GPUMetrics, 0)
+	var gpuMetrics []*dto.GPUMetrics
 
 	// Try Intel iGPU
 	logger.Debug("Attempting Intel GPU collection...")
@@ -86,8 +87,8 @@ func (c *GPUCollector) Collect() {
 	}
 
 	// Publish event
-	c.ctx.Hub.Pub(gpuMetrics, "gpu_metrics_update")
-	logger.Debug("Published gpu_metrics_update event for %d total GPU(s)", len(gpuMetrics))
+	domain.Publish(c.ctx.Hub, constants.TopicGPUMetricsUpdate, gpuMetrics)
+	logger.Debug("Published %s event for %d total GPU(s)", constants.TopicGPUMetricsUpdate.Name, len(gpuMetrics))
 }
 
 // Intel GPU collection using intel_gpu_top
@@ -108,7 +109,7 @@ func (c *GPUCollector) collectIntelGPU() ([]*dto.GPUMetrics, error) {
 		PCIID string
 		Model string
 	}
-	intelGPUs := make([]intelGPUInfo, 0)
+	var intelGPUs []intelGPUInfo
 
 	for line := range strings.SplitSeq(output, "\n") {
 		if (strings.Contains(line, "VGA") || strings.Contains(line, "Display")) && strings.Contains(line, "Intel Corporation") {
@@ -514,7 +515,7 @@ func (c *GPUCollector) collectAMDGPUWithRadeontop() ([]*dto.GPUMetrics, error) {
 		PCIID string
 		Model string
 	}
-	amdGPUs := make([]amdGPUInfo, 0)
+	var amdGPUs []amdGPUInfo
 
 	for line := range strings.SplitSeq(output, "\n") {
 		if (strings.Contains(line, "VGA") || strings.Contains(line, "Display")) &&
@@ -709,7 +710,7 @@ func (c *GPUCollector) collectAMDGPUWithROCm() ([]*dto.GPUMetrics, error) {
 		return nil, fmt.Errorf("failed to parse rocm-smi JSON: %w", err)
 	}
 
-	gpus := make([]*dto.GPUMetrics, 0)
+	var gpus []*dto.GPUMetrics
 	index := 0
 
 	// Parse each GPU

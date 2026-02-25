@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
@@ -77,8 +78,8 @@ func (c *SystemCollector) Collect() {
 	}
 
 	// Publish event
-	c.ctx.Hub.Pub(systemInfo, "system_update")
-	logger.Debug("Published system_update event")
+	domain.Publish(c.ctx.Hub, constants.TopicSystemUpdate, systemInfo)
+	logger.Debug("Published %s event", constants.TopicSystemUpdate.Name)
 }
 
 func (c *SystemCollector) collectSystemInfo() (*dto.SystemInfo, error) {

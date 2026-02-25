@@ -3,6 +3,7 @@ package lib
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -119,7 +120,7 @@ func readCSRFToken() (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("csrf_token not found in var.ini")
+	return "", errors.New("csrf_token not found in var.ini")
 }
 
 // IsEmhttpdAvailable checks if the emhttpd socket is available.

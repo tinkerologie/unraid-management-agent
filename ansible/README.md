@@ -50,13 +50,13 @@ ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --skip-tags tests
 
 ## Why Ansible?
 
-| Feature                  | deploy-plugin.sh | Ansible        |
-| ------------------------ | ---------------- | -------------- |
-| SSH connections          | 1 (ControlMaster)| 1 (built-in)  |
-| Endpoint tests via       | Local curl       | `uri` module   |
-| Idempotent               | No               | Yes            |
-| Error handling           | `set -e`         | Per-task       |
-| Selective execution      | No               | `--tags`       |
-| Setup overhead           | None             | Install Ansible|
+| Feature             | deploy-plugin.sh  | Ansible         |
+| ------------------- | ----------------- | --------------- |
+| SSH connections     | 1 (ControlMaster) | 1 (built-in)    |
+| Endpoint tests via  | Local curl        | `uri` module    |
+| Idempotent          | No                | Yes             |
+| Error handling      | `set -e`          | Per-task        |
+| Selective execution | No                | `--tags`        |
+| Setup overhead      | None              | Install Ansible |
 
 Both approaches are supported — use whichever fits your workflow.

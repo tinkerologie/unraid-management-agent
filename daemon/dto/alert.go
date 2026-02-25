@@ -73,6 +73,33 @@ type AlertEnv struct {
 	UPSBatteryCharge  float64 `expr:"UPSBatteryCharge"`
 	UPSLoadPercent    float64 `expr:"UPSLoadPercent"`
 	UPSRuntimeLeft    float64 `expr:"UPSRuntimeLeft"`
+
+	// GPU
+	GPUCount      int     `expr:"GPUCount"`
+	MaxGPUTemp    float64 `expr:"MaxGPUTemp"`
+	MaxGPUUtil    float64 `expr:"MaxGPUUtil"`
+	TotalGPUPower float64 `expr:"TotalGPUPower"`
+
+	// ZFS
+	ZFSPoolCount      int     `expr:"ZFSPoolCount"`
+	MaxZFSPoolUsedPct float64 `expr:"MaxZFSPoolUsedPct"`
+	ZFSDegradedPools  int     `expr:"ZFSDegradedPools"`
+	ZFSFaultedPools   int     `expr:"ZFSFaultedPools"`
+
+	// Network
+	NetworkErrors  uint64 `expr:"NetworkErrors"`
+	NetworkIFCount int    `expr:"NetworkIFCount"`
+
+	// NUT (Network UPS Tools)
+	NUTBatteryCharge  float64 `expr:"NUTBatteryCharge"`
+	NUTBatteryRuntime int     `expr:"NUTBatteryRuntime"`
+	NUTLoadPercent    float64 `expr:"NUTLoadPercent"`
+	NUTStatus         string  `expr:"NUTStatus"`
+
+	// Notifications
+	UnreadNotifications  int `expr:"UnreadNotifications"`
+	WarningNotifications int `expr:"WarningNotifications"`
+	AlertNotifications   int `expr:"AlertNotifications"`
 }
 
 // AlertRulesConfig is the top-level structure persisted to the JSON config file.

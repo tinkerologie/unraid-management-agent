@@ -23,7 +23,20 @@
       "Bash(gh api \"repos/jpawlowski/hacs.integration_blueprint/contents/docs/development/COPILOT_AGENT.md\" --jq '.content' | base64 -d 2>/dev/null)",
       "Bash(gh api \"repos/jpawlowski/hacs.integration_blueprint/contents/docs/development/ARCHITECTURE.md\" --jq '.content' | base64 -d 2>/dev/null)",
       "Bash(gh api:*)",
-      "Bash(tail:*)"
+      "Bash(tail:*)",
+      "mcp__tavily__tavily_search",
+      "mcp__exa__web_search_exa",
+      "mcp__exa__get_code_context_exa",
+      "WebFetch(domain:madflojo.dev)",
+      "WebFetch(domain:leapcell.io)",
+      "WebFetch(domain:deepwiki.com)",
+      "mcp__tavily__tavily_extract",
+      "Bash(git -C /Users/ruaandeysel/Github/unraid-management-agent status --short)",
+      "Bash(grep -n \"AlertEnv\" /Users/ruaandeysel/Github/unraid-management-agent/daemon/dto/*.go)",
+      "WebFetch(domain:antonz.org)",
+      "WebFetch(domain:golang.org)",
+      "Bash(gh repo view --json nameWithOwner --jq '.nameWithOwner')",
+      "Bash(gh issue:*)"
     ]
   }
 }

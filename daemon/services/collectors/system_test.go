@@ -7,12 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cskr/pubsub"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 )
 
 func TestNewSystemCollector(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{
 		Hub: hub,
 		Config: domain.Config{
@@ -32,7 +31,7 @@ func TestNewSystemCollector(t *testing.T) {
 }
 
 func TestSystemCollectorParseSensorsOutput(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewSystemCollector(ctx)
 
@@ -77,7 +76,7 @@ MB Temp:
 }
 
 func TestSystemCollectorParseFanSpeeds(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewSystemCollector(ctx)
 
@@ -136,7 +135,7 @@ func TestSystemCollectorUptimeParsing(t *testing.T) {
 }
 
 func TestSystemCollectorGetCPUSpecs(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewSystemCollector(ctx)
 
@@ -148,7 +147,7 @@ func TestSystemCollectorGetCPUSpecs(t *testing.T) {
 }
 
 func TestSystemCollectorIsHVMEnabled(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewSystemCollector(ctx)
 
@@ -157,7 +156,7 @@ func TestSystemCollectorIsHVMEnabled(t *testing.T) {
 }
 
 func TestSystemCollectorIsIOMMUEnabled(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewSystemCollector(ctx)
 
@@ -166,7 +165,7 @@ func TestSystemCollectorIsIOMMUEnabled(t *testing.T) {
 }
 
 func TestSystemCollectorGetOpenSSLVersion(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewSystemCollector(ctx)
 
@@ -175,7 +174,7 @@ func TestSystemCollectorGetOpenSSLVersion(t *testing.T) {
 }
 
 func TestSystemCollectorGetKernelVersion(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewSystemCollector(ctx)
 

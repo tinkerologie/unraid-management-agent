@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"reflect"
 	"sync"
 	"syscall"
-	"time"
 
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
@@ -41,9 +42,9 @@ func (o *Orchestrator) Run() error {
 	// WaitGroup to track all goroutines
 	var wg sync.WaitGroup
 
-	// Create context for cancellation
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	// Create context that cancels on shutdown signals
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
 
 	// Initialize collector manager
 	o.collectorManager = NewCollectorManager(o.ctx, &wg)
@@ -57,10 +58,10 @@ func (o *Orchestrator) Run() error {
 
 	// Start API server subscriptions and WebSocket hub
 	apiServer.StartSubscriptions()
-	logger.Success("API server subscriptions ready")
 
-	// Small delay to ensure subscriptions are fully set up
-	time.Sleep(100 * time.Millisecond)
+	// Wait for subscriptions to be fully wired (deterministic, replaces time.Sleep)
+	<-apiServer.Ready()
+	logger.Success("API server subscriptions ready")
 
 	// Initialize MQTT client if enabled
 	if o.ctx.MQTTConfig.Enabled {
@@ -106,7 +107,7 @@ func (o *Orchestrator) Run() error {
 	status := o.collectorManager.GetAllStatus()
 	logger.Success("%d collectors started", enabledCount)
 	if status.DisabledCount > 0 {
-		disabledNames := []string{}
+		var disabledNames []string
 		for _, c := range status.Collectors {
 			if !c.Enabled {
 				disabledNames = append(disabledNames, c.Name)
@@ -125,14 +126,10 @@ func (o *Orchestrator) Run() error {
 	logger.Success("API server started on port %d", o.ctx.Port)
 
 	// Wait for shutdown signal
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
-	sig := <-sigChan
+	<-ctx.Done()
+	stop() // unregister signal handler immediately
 
-	logger.Warning("Received %s signal, shutting down...", sig)
-
-	// Cancel the context to stop all goroutines
-	cancel()
+	logger.Warning("Received shutdown signal, shutting down...")
 
 	// Graceful shutdown
 	// 1. Stop MQTT client if running
@@ -174,10 +171,10 @@ func (o *Orchestrator) RunMCPStdio() error {
 	// Initialize API server for cache/subscriptions only (no HTTP)
 	apiServer := api.NewServerWithCollectorManager(o.ctx, o.collectorManager)
 	apiServer.StartSubscriptions()
-	logger.Success("API server subscriptions ready (cache mode)")
 
-	// Wait for subscriptions to be fully set up
-	time.Sleep(100 * time.Millisecond)
+	// Wait for subscriptions to be fully wired (deterministic, replaces time.Sleep)
+	<-apiServer.Ready()
+	logger.Success("API server subscriptions ready (cache mode)")
 
 	// Start all enabled collectors so cache gets populated
 	enabledCount := o.collectorManager.StartAll()
@@ -244,7 +241,7 @@ func (o *Orchestrator) initializeMQTT(ctx context.Context, wg *sync.WaitGroup, a
 	mqttConfig := o.ctx.MQTTConfig.ToDTOConfig()
 
 	// Create MQTT client
-	o.mqttClient = mqtt.NewClient(mqttConfig, hostname, o.ctx.Version)
+	o.mqttClient = mqtt.NewClient(mqttConfig, hostname, o.ctx.Version, o.ctx)
 
 	// Connect to broker
 	if err := o.mqttClient.Connect(ctx); err != nil {
@@ -263,24 +260,69 @@ func (o *Orchestrator) initializeMQTT(ctx context.Context, wg *sync.WaitGroup, a
 	})
 }
 
+// mqttBinding connects a topic to its MQTT publish function.
+type mqttBinding struct {
+	topicName string
+	msgType   reflect.Type
+	handle    func(any)
+}
+
+// mqttBind creates a type-safe mqttBinding using generics.
+func mqttBind[T any](topic domain.Topic[T], fn func(T) error) mqttBinding {
+	return mqttBinding{
+		topicName: topic.Name,
+		msgType:   reflect.TypeFor[T](),
+		handle: func(v any) {
+			if err := fn(v.(T)); err != nil {
+				logger.Debug("MQTT: Failed to publish %T: %v", v, err)
+			}
+		},
+	}
+}
+
 // subscribeMQTTEvents subscribes to collector events and publishes them via MQTT.
-func (o *Orchestrator) subscribeMQTTEvents(ctx context.Context, apiServer *api.Server) {
+func (o *Orchestrator) subscribeMQTTEvents(ctx context.Context, _ *api.Server) {
+	if o.mqttClient == nil {
+		logger.Debug("MQTT: Skipping event subscription — client is nil")
+		return
+	}
+
 	logger.Info("MQTT: Starting event subscription...")
 
-	// Subscribe to all relevant events
-	ch := o.ctx.Hub.Sub(
-		"system_update",
-		"array_status_update",
-		"disk_list_update",
-		"share_list_update",
-		"container_list_update",
-		"vm_list_update",
-		"ups_status_update",
-		"gpu_metrics_update",
-		"network_list_update",
-		"notifications_update",
-	)
+	bindings := []mqttBinding{
+		mqttBind(constants.TopicSystemUpdate, o.mqttClient.PublishSystemInfo),
+		mqttBind(constants.TopicArrayStatusUpdate, o.mqttClient.PublishArrayStatus),
+		mqttBind(constants.TopicDiskListUpdate, o.mqttClient.PublishDisks),
+		mqttBind(constants.TopicShareListUpdate, o.mqttClient.PublishShares),
+		mqttBind(constants.TopicContainerListUpdate, func(v []*dto.ContainerInfo) error {
+			containers := make([]dto.ContainerInfo, len(v))
+			for i, c := range v {
+				containers[i] = *c
+			}
+			return o.mqttClient.PublishContainers(containers)
+		}),
+		mqttBind(constants.TopicVMListUpdate, func(v []*dto.VMInfo) error {
+			vms := make([]dto.VMInfo, len(v))
+			for i, vm := range v {
+				vms[i] = *vm
+			}
+			return o.mqttClient.PublishVMs(vms)
+		}),
+		mqttBind(constants.TopicUPSStatusUpdate, o.mqttClient.PublishUPSStatus),
+		mqttBind(constants.TopicGPUMetricsUpdate, o.mqttClient.PublishGPUMetrics),
+		mqttBind(constants.TopicNetworkListUpdate, o.mqttClient.PublishNetworkInfo),
+		mqttBind(constants.TopicNotificationsUpdate, o.mqttClient.PublishNotifications),
+		mqttBind(constants.TopicZFSPoolsUpdate, o.mqttClient.PublishZFSPools),
+	}
 
+	topics := make([]string, len(bindings))
+	dispatch := make(map[reflect.Type]func(any), len(bindings))
+	for i, b := range bindings {
+		topics[i] = b.topicName
+		dispatch[b.msgType] = b.handle
+	}
+
+	ch := o.ctx.Hub.Sub(topics...)
 	defer o.ctx.Hub.Unsub(ch)
 
 	for {
@@ -289,67 +331,12 @@ func (o *Orchestrator) subscribeMQTTEvents(ctx context.Context, apiServer *api.S
 			logger.Info("MQTT: Event subscription stopping")
 			return
 		case msg := <-ch:
-			o.handleMQTTEvent(msg)
-		}
-	}
-}
-
-// handleMQTTEvent processes an event and publishes it via MQTT.
-func (o *Orchestrator) handleMQTTEvent(msg any) {
-	if o.mqttClient == nil || !o.mqttClient.IsConnected() {
-		return
-	}
-
-	switch v := msg.(type) {
-	case *dto.SystemInfo:
-		if err := o.mqttClient.PublishSystemInfo(v); err != nil {
-			logger.Debug("MQTT: Failed to publish system info: %v", err)
-		}
-	case *dto.ArrayStatus:
-		if err := o.mqttClient.PublishArrayStatus(v); err != nil {
-			logger.Debug("MQTT: Failed to publish array status: %v", err)
-		}
-	case []dto.DiskInfo:
-		if err := o.mqttClient.PublishDisks(v); err != nil {
-			logger.Debug("MQTT: Failed to publish disks: %v", err)
-		}
-	case []dto.ShareInfo:
-		if err := o.mqttClient.PublishShares(v); err != nil {
-			logger.Debug("MQTT: Failed to publish shares: %v", err)
-		}
-	case []*dto.ContainerInfo:
-		// Convert pointer slice to value slice
-		containers := make([]dto.ContainerInfo, len(v))
-		for i, c := range v {
-			containers[i] = *c
-		}
-		if err := o.mqttClient.PublishContainers(containers); err != nil {
-			logger.Debug("MQTT: Failed to publish containers: %v", err)
-		}
-	case []*dto.VMInfo:
-		// Convert pointer slice to value slice
-		vms := make([]dto.VMInfo, len(v))
-		for i, vm := range v {
-			vms[i] = *vm
-		}
-		if err := o.mqttClient.PublishVMs(vms); err != nil {
-			logger.Debug("MQTT: Failed to publish VMs: %v", err)
-		}
-	case *dto.UPSStatus:
-		if err := o.mqttClient.PublishUPSStatus(v); err != nil {
-			logger.Debug("MQTT: Failed to publish UPS status: %v", err)
-		}
-	case []*dto.GPUMetrics:
-		if err := o.mqttClient.PublishGPUMetrics(v); err != nil {
-			logger.Debug("MQTT: Failed to publish GPU metrics: %v", err)
-		}
-	case []dto.NetworkInfo:
-		if err := o.mqttClient.PublishNetworkInfo(v); err != nil {
-			logger.Debug("MQTT: Failed to publish network info: %v", err)
-		}
-	case *dto.NotificationList:
-		if err := o.mqttClient.PublishNotifications(v); err != nil {
-			logger.Debug("MQTT: Failed to publish notifications: %v", err)
+			if o.mqttClient == nil || !o.mqttClient.IsConnected() {
+				continue
+			}
+			if handler, ok := dispatch[reflect.TypeOf(msg)]; ok {
+				handler(msg)
+			}
 		}
 	}
 }

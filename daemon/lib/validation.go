@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -44,7 +45,7 @@ var (
 // Accepts both short (12 chars) and full (64 chars) hexadecimal IDs
 func ValidateContainerID(id string) error {
 	if id == "" {
-		return fmt.Errorf("container ID cannot be empty")
+		return errors.New("container ID cannot be empty")
 	}
 
 	// Convert to lowercase for validation
@@ -55,7 +56,7 @@ func ValidateContainerID(id string) error {
 		return nil
 	}
 
-	return fmt.Errorf("invalid container ID format: must be 12 or 64 hexadecimal characters")
+	return errors.New("invalid container ID format: must be 12 or 64 hexadecimal characters")
 }
 
 // ValidateVMName validates a virtual machine name
@@ -63,7 +64,7 @@ func ValidateContainerID(id string) error {
 // Maximum length: 253 characters (DNS hostname limit)
 func ValidateVMName(name string) error {
 	if name == "" {
-		return fmt.Errorf("VM name cannot be empty")
+		return errors.New("VM name cannot be empty")
 	}
 
 	if len(name) > 253 {
@@ -71,16 +72,16 @@ func ValidateVMName(name string) error {
 	}
 
 	if !vmNameRegex.MatchString(name) {
-		return fmt.Errorf("invalid VM name format: must contain only alphanumeric characters, spaces, hyphens, underscores, and dots")
+		return errors.New("invalid VM name format: must contain only alphanumeric characters, spaces, hyphens, underscores, and dots")
 	}
 
 	// Additional checks for common issues
 	if strings.HasPrefix(name, "-") || strings.HasSuffix(name, "-") {
-		return fmt.Errorf("invalid VM name: cannot start or end with hyphen")
+		return errors.New("invalid VM name: cannot start or end with hyphen")
 	}
 
 	if strings.HasPrefix(name, ".") || strings.HasSuffix(name, ".") {
-		return fmt.Errorf("invalid VM name: cannot start or end with dot")
+		return errors.New("invalid VM name: cannot start or end with dot")
 	}
 
 	return nil
@@ -90,11 +91,11 @@ func ValidateVMName(name string) error {
 // Supports common Linux disk naming patterns
 func ValidateDiskID(id string) error {
 	if id == "" {
-		return fmt.Errorf("disk ID cannot be empty")
+		return errors.New("disk ID cannot be empty")
 	}
 
 	if !diskIDRegex.MatchString(id) {
-		return fmt.Errorf("invalid disk ID format: must match Linux disk naming pattern (e.g., sda, nvme0n1, md0)")
+		return errors.New("invalid disk ID format: must match Linux disk naming pattern (e.g., sda, nvme0n1, md0)")
 	}
 
 	return nil
@@ -105,7 +106,7 @@ func ValidateDiskID(id string) error {
 // and does not contain path separators or parent directory references
 func ValidateShareName(name string) error {
 	if name == "" {
-		return fmt.Errorf("share name cannot be empty")
+		return errors.New("share name cannot be empty")
 	}
 
 	if len(name) > 255 {
@@ -114,22 +115,22 @@ func ValidateShareName(name string) error {
 
 	// Check for parent directory references first (more specific check)
 	if strings.Contains(name, "..") {
-		return fmt.Errorf("invalid share name: cannot contain parent directory references")
+		return errors.New("invalid share name: cannot contain parent directory references")
 	}
 
 	// Check for path separators
 	if strings.Contains(name, "/") || strings.Contains(name, "\\") {
-		return fmt.Errorf("invalid share name: cannot contain path separators")
+		return errors.New("invalid share name: cannot contain path separators")
 	}
 
 	// Validate against regex pattern (alphanumeric, hyphens, underscores only)
 	if !shareNameRegex.MatchString(name) {
-		return fmt.Errorf("invalid share name format: must contain only alphanumeric characters, hyphens, and underscores")
+		return errors.New("invalid share name format: must contain only alphanumeric characters, hyphens, and underscores")
 	}
 
 	// Additional checks for common issues
 	if strings.HasPrefix(name, "-") || strings.HasSuffix(name, "-") {
-		return fmt.Errorf("invalid share name: cannot start or end with hyphen")
+		return errors.New("invalid share name: cannot start or end with hyphen")
 	}
 
 	return nil
@@ -156,7 +157,7 @@ func ValidateMaxLength(value, fieldName string, maxLength int) error {
 // and does not contain path separators or parent directory references
 func ValidateUserScriptName(name string) error {
 	if name == "" {
-		return fmt.Errorf("user script name cannot be empty")
+		return errors.New("user script name cannot be empty")
 	}
 
 	if len(name) > 255 {
@@ -165,31 +166,31 @@ func ValidateUserScriptName(name string) error {
 
 	// Check for parent directory references first (more specific check)
 	if strings.Contains(name, "..") {
-		return fmt.Errorf("invalid user script name: cannot contain parent directory references")
+		return errors.New("invalid user script name: cannot contain parent directory references")
 	}
 
 	// Check for path separators
 	if strings.Contains(name, "/") || strings.Contains(name, "\\") {
-		return fmt.Errorf("invalid user script name: cannot contain path separators")
+		return errors.New("invalid user script name: cannot contain path separators")
 	}
 
 	// Check for absolute paths
 	if strings.HasPrefix(name, "/") || strings.HasPrefix(name, "\\") {
-		return fmt.Errorf("invalid user script name: cannot be an absolute path")
+		return errors.New("invalid user script name: cannot be an absolute path")
 	}
 
 	// Validate against regex pattern (alphanumeric, hyphens, underscores, dots only)
 	if !userScriptNameRegex.MatchString(name) {
-		return fmt.Errorf("invalid user script name format: must contain only alphanumeric characters, hyphens, underscores, and dots")
+		return errors.New("invalid user script name format: must contain only alphanumeric characters, hyphens, underscores, and dots")
 	}
 
 	// Additional checks for common issues
 	if strings.HasPrefix(name, "-") || strings.HasSuffix(name, "-") {
-		return fmt.Errorf("invalid user script name: cannot start or end with hyphen")
+		return errors.New("invalid user script name: cannot start or end with hyphen")
 	}
 
 	if strings.HasPrefix(name, ".") || strings.HasSuffix(name, ".") {
-		return fmt.Errorf("invalid user script name: cannot start or end with dot")
+		return errors.New("invalid user script name: cannot start or end with dot")
 	}
 
 	return nil
@@ -234,20 +235,20 @@ func ValidateLogFilename(name string) bool {
 // Accepts both short/full hex IDs and container names.
 func ValidateContainerRef(ref string) error {
 	if ref == "" {
-		return fmt.Errorf("container reference cannot be empty")
+		return errors.New("container reference cannot be empty")
 	}
 
 	if len(ref) > 255 {
-		return fmt.Errorf("container reference too long: maximum 255 characters")
+		return errors.New("container reference too long: maximum 255 characters")
 	}
 
 	// Check for path traversal and injection
 	if strings.Contains(ref, "..") || strings.Contains(ref, "/") || strings.Contains(ref, "\\") {
-		return fmt.Errorf("invalid container reference: cannot contain path separators or directory traversal")
+		return errors.New("invalid container reference: cannot contain path separators or directory traversal")
 	}
 
 	if strings.Contains(ref, "\x00") {
-		return fmt.Errorf("invalid container reference: cannot contain null bytes")
+		return errors.New("invalid container reference: cannot contain null bytes")
 	}
 
 	// Accept hex IDs (12 or 64 chars)
@@ -261,21 +262,21 @@ func ValidateContainerRef(ref string) error {
 		return nil
 	}
 
-	return fmt.Errorf("invalid container reference: must be a 12/64 hex ID or a valid container name")
+	return errors.New("invalid container reference: must be a 12/64 hex ID or a valid container name")
 }
 
 // ValidatePluginName validates an Unraid plugin name.
 func ValidatePluginName(name string) error {
 	if name == "" {
-		return fmt.Errorf("plugin name cannot be empty")
+		return errors.New("plugin name cannot be empty")
 	}
 
 	if strings.Contains(name, "..") || strings.Contains(name, "/") || strings.Contains(name, "\\") {
-		return fmt.Errorf("invalid plugin name: cannot contain path separators or directory traversal")
+		return errors.New("invalid plugin name: cannot contain path separators or directory traversal")
 	}
 
 	if !pluginNameRegex.MatchString(name) {
-		return fmt.Errorf("invalid plugin name format: must contain only alphanumeric characters, hyphens, underscores, and dots")
+		return errors.New("invalid plugin name format: must contain only alphanumeric characters, hyphens, underscores, and dots")
 	}
 
 	return nil
@@ -284,12 +285,12 @@ func ValidatePluginName(name string) error {
 // ValidateServiceName validates an Unraid service name.
 func ValidateServiceName(name string) error {
 	if name == "" {
-		return fmt.Errorf("service name cannot be empty")
+		return errors.New("service name cannot be empty")
 	}
 
 	nameLower := strings.ToLower(name)
 	if !serviceNameRegex.MatchString(nameLower) {
-		return fmt.Errorf("invalid service name format: must be lowercase alphanumeric with hyphens")
+		return errors.New("invalid service name format: must be lowercase alphanumeric with hyphens")
 	}
 
 	return nil
@@ -298,15 +299,15 @@ func ValidateServiceName(name string) error {
 // ValidateSnapshotName validates a VM snapshot name.
 func ValidateSnapshotName(name string) error {
 	if name == "" {
-		return fmt.Errorf("snapshot name cannot be empty")
+		return errors.New("snapshot name cannot be empty")
 	}
 
 	if strings.Contains(name, "..") || strings.Contains(name, "/") || strings.Contains(name, "\\") {
-		return fmt.Errorf("invalid snapshot name: cannot contain path separators or directory traversal")
+		return errors.New("invalid snapshot name: cannot contain path separators or directory traversal")
 	}
 
 	if !snapshotNameRegex.MatchString(name) {
-		return fmt.Errorf("invalid snapshot name format: must start with alphanumeric and contain only alphanumeric, hyphens, underscores, and dots")
+		return errors.New("invalid snapshot name format: must start with alphanumeric and contain only alphanumeric, hyphens, underscores, and dots")
 	}
 
 	return nil

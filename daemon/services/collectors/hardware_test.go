@@ -3,12 +3,11 @@ package collectors
 import (
 	"testing"
 
-	"github.com/cskr/pubsub"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 )
 
 func TestNewHardwareCollector(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 
 	collector := NewHardwareCollector(ctx)
@@ -23,7 +22,7 @@ func TestNewHardwareCollector(t *testing.T) {
 }
 
 func TestHardwareCollectorInit(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 
 	collector := NewHardwareCollector(ctx)

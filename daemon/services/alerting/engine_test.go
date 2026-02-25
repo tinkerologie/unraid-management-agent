@@ -18,12 +18,17 @@ type mockDataProvider struct {
 	ups        *dto.UPSStatus
 }
 
-func (m *mockDataProvider) GetSystemCache() *dto.SystemInfo     { return m.system }
-func (m *mockDataProvider) GetArrayCache() *dto.ArrayStatus     { return m.array }
-func (m *mockDataProvider) GetDisksCache() []dto.DiskInfo       { return m.disks }
-func (m *mockDataProvider) GetDockerCache() []dto.ContainerInfo { return m.containers }
-func (m *mockDataProvider) GetVMsCache() []dto.VMInfo           { return m.vms }
-func (m *mockDataProvider) GetUPSCache() *dto.UPSStatus         { return m.ups }
+func (m *mockDataProvider) GetSystemCache() *dto.SystemInfo              { return m.system }
+func (m *mockDataProvider) GetArrayCache() *dto.ArrayStatus              { return m.array }
+func (m *mockDataProvider) GetDisksCache() []dto.DiskInfo                { return m.disks }
+func (m *mockDataProvider) GetDockerCache() []dto.ContainerInfo          { return m.containers }
+func (m *mockDataProvider) GetVMsCache() []dto.VMInfo                    { return m.vms }
+func (m *mockDataProvider) GetUPSCache() *dto.UPSStatus                  { return m.ups }
+func (m *mockDataProvider) GetGPUCache() []*dto.GPUMetrics               { return nil }
+func (m *mockDataProvider) GetZFSPoolsCache() []dto.ZFSPool              { return nil }
+func (m *mockDataProvider) GetNetworkCache() []dto.NetworkInfo           { return nil }
+func (m *mockDataProvider) GetNUTCache() *dto.NUTResponse                { return nil }
+func (m *mockDataProvider) GetNotificationsCache() *dto.NotificationList { return nil }
 
 func newMockProvider() *mockDataProvider {
 	return &mockDataProvider{

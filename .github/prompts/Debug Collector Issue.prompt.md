@@ -19,16 +19,16 @@ Check the log file at `/var/log/unraid-management-agent.log` for errors. Look fo
 
 If possible, get the raw command output that the collector is trying to parse. Common commands:
 
-| Collector | Command / Source |
-|-----------|-----------------|
-| System | `/proc/cpuinfo`, `/proc/meminfo`, `sensors` |
-| Disk | `smartctl` output |
-| GPU | `nvidia-smi`, `intel_gpu_top` |
-| UPS | `apcaccess`, `upsc` |
-| Hardware | `dmidecode` |
-| Network | `ethtool`, `/sys/class/net/` |
-| VM | `virsh` via go-libvirt |
-| Docker | Docker Engine SDK |
+| Collector | Command / Source                            |
+| --------- | ------------------------------------------- |
+| System    | `/proc/cpuinfo`, `/proc/meminfo`, `sensors` |
+| Disk      | `smartctl` output                           |
+| GPU       | `nvidia-smi`, `intel_gpu_top`               |
+| UPS       | `apcaccess`, `upsc`                         |
+| Hardware  | `dmidecode`                                 |
+| Network   | `ethtool`, `/sys/class/net/`                |
+| VM        | `virsh` via go-libvirt                      |
+| Docker    | Docker Engine SDK                           |
 
 ## Step 3: Compare Expected vs Actual Output
 

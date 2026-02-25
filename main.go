@@ -3,6 +3,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -10,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kong"
-	"github.com/cskr/pubsub"
+
 	"gopkg.in/natefinch/lumberjack.v2"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/cmd"
@@ -45,6 +46,9 @@ var cli struct {
 	Port     int    `default:"8043" help:"HTTP server port"`
 	Debug    bool   `default:"false" help:"enable debug mode with stdout logging"`
 	LogLevel string `default:"info" help:"log level: debug, info, warning, error"`
+
+	// CORS
+	CORSOrigin string `default:"*" env:"CORS_ORIGIN" help:"Access-Control-Allow-Origin value (default: *)"`
 
 	// Low power mode - multiplies all intervals for resource-constrained systems
 	LowPowerMode bool `default:"false" env:"UNRAID_LOW_POWER" help:"enable low power mode (4x longer intervals for old/slow hardware)"`
@@ -109,6 +113,13 @@ func main() {
 
 	// Detect STDIO mode — stdout is reserved for MCP JSON-RPC
 	isStdio := ctx.Command() == "mcp-stdio"
+
+	// Load config file (defaults; CLI/env override)
+	fileCfg, err := domain.LoadConfigFile(domain.DefaultConfigPath)
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "WARNING: Failed to load config file: %v\n", err)
+	}
+	applyFileConfig(fileCfg)
 
 	// Set log level based on CLI flag
 	switch strings.ToLower(cli.LogLevel) {
@@ -205,10 +216,11 @@ func main() {
 	// Create application context with intervals from CLI/env
 	appCtx := &domain.Context{
 		Config: domain.Config{
-			Version: Version,
-			Port:    cli.Port,
+			Version:    Version,
+			Port:       cli.Port,
+			CORSOrigin: cli.CORSOrigin,
 		},
-		Hub: pubsub.New(1024), // Buffer size for event bus
+		Hub: domain.NewEventBus(1024), // Buffer size for event bus
 		MQTTConfig: domain.MQTTConfig{
 			Enabled:             cli.MQTTEnabled,
 			Broker:              cli.MQTTBroker,
@@ -245,6 +257,79 @@ func main() {
 	}
 
 	// Run the boot command
-	err := ctx.Run(appCtx)
+	err = ctx.Run(appCtx)
 	ctx.FatalIfErrorf(err)
+}
+
+// applyFileConfig merges config file values into the CLI struct.
+// Only fields not explicitly set via CLI/env are overridden.
+// Kong sets fields to their declared defaults before parsing, so file config
+// values are applied after kong.Parse to fill in non-defaulted values.
+// In practice this means file config acts as a "second default layer":
+// CLI flag > env var > config file > struct default.
+func applyFileConfig(cfg *domain.FileConfig) {
+	if cfg == nil {
+		return
+	}
+
+	setInt := func(dst *int, src *int) {
+		if src != nil {
+			*dst = *src
+		}
+	}
+	setStr := func(dst *string, src *string) {
+		if src != nil {
+			*dst = *src
+		}
+	}
+	setBool := func(dst *bool, src *bool) {
+		if src != nil {
+			*dst = *src
+		}
+	}
+
+	// Server settings
+	setInt(&cli.Port, cfg.Port)
+	setStr(&cli.LogLevel, cfg.LogLevel)
+	setStr(&cli.LogsDir, cfg.LogsDir)
+	setBool(&cli.Debug, cfg.Debug)
+	setBool(&cli.LowPowerMode, cfg.LowPowerMode)
+	setStr(&cli.DisableCollectors, cfg.DisableCollectors)
+	setStr(&cli.CORSOrigin, cfg.CORSOrigin)
+
+	// MQTT
+	if m := cfg.MQTT; m != nil {
+		setBool(&cli.MQTTEnabled, m.Enabled)
+		setStr(&cli.MQTTBroker, m.Broker)
+		setInt(&cli.MQTTPort, m.Port)
+		setStr(&cli.MQTTUsername, m.Username)
+		setStr(&cli.MQTTPassword, m.Password)
+		setStr(&cli.MQTTClientID, m.ClientID)
+		setStr(&cli.MQTTTopicPrefix, m.TopicPrefix)
+		setBool(&cli.MQTTUseTLS, m.UseTLS)
+		setBool(&cli.MQTTInsecureSkipVerify, m.InsecureSkipVerify)
+		setInt(&cli.MQTTQoS, m.QoS)
+		setBool(&cli.MQTTRetain, m.Retain)
+		setBool(&cli.MQTTHomeAssistant, m.HomeAssistant)
+		setStr(&cli.MQTTHAPrefix, m.HAPrefix)
+	}
+
+	// Intervals
+	if iv := cfg.Intervals; iv != nil {
+		setInt(&cli.IntervalSystem, iv.System)
+		setInt(&cli.IntervalArray, iv.Array)
+		setInt(&cli.IntervalDisk, iv.Disk)
+		setInt(&cli.IntervalDocker, iv.Docker)
+		setInt(&cli.IntervalVM, iv.VM)
+		setInt(&cli.IntervalUPS, iv.UPS)
+		setInt(&cli.IntervalNUT, iv.NUT)
+		setInt(&cli.IntervalGPU, iv.GPU)
+		setInt(&cli.IntervalShares, iv.Shares)
+		setInt(&cli.IntervalNetwork, iv.Network)
+		setInt(&cli.IntervalHardware, iv.Hardware)
+		setInt(&cli.IntervalZFS, iv.ZFS)
+		setInt(&cli.IntervalNotification, iv.Notification)
+		setInt(&cli.IntervalRegistration, iv.Registration)
+		setInt(&cli.IntervalUnassigned, iv.Unassigned)
+	}
 }

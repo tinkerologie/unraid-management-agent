@@ -1,16 +1,17 @@
 package services
 
 import (
+	"context"
 	"testing"
+	"time"
 
-	"github.com/cskr/pubsub"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/mqtt"
 )
 
 func TestCreateOrchestrator(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{
 		Hub:    hub,
 		Config: domain.Config{Version: "test", Port: 8080},
@@ -31,39 +32,30 @@ func TestCreateOrchestrator(t *testing.T) {
 	}
 }
 
-func TestHandleMQTTEvent_NilClient(t *testing.T) {
-	hub := pubsub.New(10)
+func TestSubscribeMQTTEvents_NilClient(t *testing.T) {
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
 	o := CreateOrchestrator(ctx)
 
-	// mqttClient is nil — all of these should return early without panic
-	testCases := []struct {
-		name string
-		msg  any
-	}{
-		{"SystemInfo", &dto.SystemInfo{Hostname: "test"}},
-		{"ArrayStatus", &dto.ArrayStatus{State: "Started"}},
-		{"DiskInfo", []dto.DiskInfo{{Name: "disk1"}}},
-		{"ShareInfo", []dto.ShareInfo{{Name: "appdata"}}},
-		{"ContainerInfo", []*dto.ContainerInfo{{ID: "abc", Name: "plex"}}},
-		{"VMInfo", []*dto.VMInfo{{ID: "1", Name: "win10"}}},
-		{"UPSStatus", &dto.UPSStatus{Status: "OL"}},
-		{"GPUMetrics", []*dto.GPUMetrics{{Name: "RTX 3080"}}},
-		{"NetworkInfo", []dto.NetworkInfo{{Name: "eth0"}}},
-		{"NotificationList", &dto.NotificationList{}},
-		{"UnknownType", "some string"},
-	}
+	// mqttClient is nil — subscribeMQTTEvents should return immediately without panic
+	goCtx := context.Background()
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			// Should not panic
-			o.handleMQTTEvent(tc.msg)
-		})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		o.subscribeMQTTEvents(goCtx, nil)
+	}()
+
+	select {
+	case <-done:
+		// Returned immediately as expected
+	case <-time.After(2 * time.Second):
+		t.Error("subscribeMQTTEvents did not return immediately for nil client")
 	}
 }
 
-func TestHandleMQTTEvent_NotConnected(t *testing.T) {
-	hub := pubsub.New(10)
+func TestSubscribeMQTTEvents_NotConnected(t *testing.T) {
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
 	o := CreateOrchestrator(ctx)
 
@@ -72,29 +64,23 @@ func TestHandleMQTTEvent_NotConnected(t *testing.T) {
 		Enabled: false,
 		Broker:  "tcp://localhost:1883",
 	}
-	o.mqttClient = mqtt.NewClient(mqttConfig, "test-host", "1.0.0")
-	// Client created but never connected — IsConnected() returns false
+	o.mqttClient = mqtt.NewClient(mqttConfig, "test-host", "1.0.0", ctx)
 
-	testCases := []struct {
-		name string
-		msg  any
-	}{
-		{"SystemInfo", &dto.SystemInfo{Hostname: "test"}},
-		{"ArrayStatus", &dto.ArrayStatus{State: "Started"}},
-		{"DiskInfo", []dto.DiskInfo{{Name: "disk1"}}},
-		{"ShareInfo", []dto.ShareInfo{{Name: "appdata"}}},
-		{"ContainerInfo", []*dto.ContainerInfo{{ID: "abc", Name: "plex"}}},
-		{"VMInfo", []*dto.VMInfo{{ID: "1", Name: "win10"}}},
-		{"UPSStatus", &dto.UPSStatus{Status: "OL"}},
-		{"GPUMetrics", []*dto.GPUMetrics{{Name: "RTX 3080"}}},
-		{"NetworkInfo", []dto.NetworkInfo{{Name: "eth0"}}},
-		{"NotificationList", &dto.NotificationList{}},
-	}
+	// Client created but never connected — subscribeMQTTEvents should block on
+	// the select loop but exit when the context is cancelled.
+	goCtx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			// Should not panic — early return because not connected
-			o.handleMQTTEvent(tc.msg)
-		})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		o.subscribeMQTTEvents(goCtx, nil)
+	}()
+
+	select {
+	case <-done:
+		// Returned via context cancellation as expected
+	case <-time.After(2 * time.Second):
+		t.Error("subscribeMQTTEvents did not return for disconnected client")
 	}
 }

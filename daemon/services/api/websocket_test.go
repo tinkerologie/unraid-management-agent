@@ -122,7 +122,7 @@ func TestWSHubBroadcast(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	testMessage := map[string]string{"test": "message"}
-	hub.Broadcast(testMessage)
+	hub.Broadcast("update", testMessage)
 
 	select {
 	case msg := <-clientSend:
@@ -165,7 +165,7 @@ func TestWSHubMultipleClients(t *testing.T) {
 	}
 
 	testMessage := "test broadcast"
-	hub.Broadcast(testMessage)
+	hub.Broadcast("update", testMessage)
 
 	for i := range numClients {
 		select {
@@ -264,6 +264,6 @@ func BenchmarkWSHubBroadcast(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		hub.Broadcast(map[string]int{"count": i})
+		hub.Broadcast("update", map[string]int{"count": i})
 	}
 }

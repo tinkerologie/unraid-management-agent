@@ -14,6 +14,9 @@ const (
 
 	// HealthCheckContainer checks if a Docker container is running.
 	HealthCheckContainer HealthCheckType = "container"
+
+	// HealthCheckPing sends an ICMP ping (via the ping binary) and checks for a response.
+	HealthCheckPing HealthCheckType = "ping"
 )
 
 // HealthCheck defines a user-configured health check probe.
@@ -24,10 +27,10 @@ type HealthCheck struct {
 	// Name is a human-readable name for this health check.
 	Name string `json:"name"`
 
-	// Type is the probe type: "http", "tcp", or "container".
+	// Type is the probe type: "http", "tcp", "container", or "ping".
 	Type HealthCheckType `json:"type"`
 
-	// Target is the probe target: URL for HTTP, host:port for TCP, container ID/name for container.
+	// Target is the probe target: URL for HTTP, host:port for TCP, container ID/name for container, hostname/IP for ping.
 	Target string `json:"target"`
 
 	// IntervalSeconds is how often the check runs (minimum 10, default 30).

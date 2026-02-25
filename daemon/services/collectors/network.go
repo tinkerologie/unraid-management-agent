@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
@@ -77,8 +78,8 @@ func (c *NetworkCollector) Collect() {
 
 	logger.Debug("Network: Successfully collected %d interfaces, publishing event", len(interfaces))
 	// Publish event
-	c.ctx.Hub.Pub(interfaces, "network_list_update")
-	logger.Debug("Network: Published network_list_update event with %d interfaces", len(interfaces))
+	domain.Publish(c.ctx.Hub, constants.TopicNetworkListUpdate, interfaces)
+	logger.Debug("Network: Published %s event with %d interfaces", constants.TopicNetworkListUpdate.Name, len(interfaces))
 }
 
 func (c *NetworkCollector) collectNetworkInterfaces() ([]dto.NetworkInfo, error) {

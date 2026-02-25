@@ -18,9 +18,10 @@ $config_file = "/boot/config/plugins/$plugin/config.cfg";
 $service_name = "unraid-management-agent";
 
 // Load current configuration
+// INI_SCANNER_RAW prevents PHP from converting "true"/"false" to "1"/""
 $config = [];
 if (file_exists($config_file)) {
-    $config = parse_ini_file($config_file);
+    $config = parse_ini_file($config_file, false, INI_SCANNER_RAW);
 }
 
 // Default values

@@ -73,7 +73,7 @@ func (c *NUTCollector) Collect() {
 	// Check if NUT plugin is installed
 	if _, err := os.Stat(constants.NutPluginDir); os.IsNotExist(err) {
 		response.Installed = false
-		c.ctx.Hub.Pub(response, "nut_status_update")
+		domain.Publish(c.ctx.Hub, constants.TopicNUTStatusUpdate, response)
 		logger.Debug("NUT plugin not installed")
 		return
 	}
@@ -91,7 +91,7 @@ func (c *NUTCollector) Collect() {
 	response.Running = c.isNUTRunning()
 
 	if !response.Running {
-		c.ctx.Hub.Pub(response, "nut_status_update")
+		domain.Publish(c.ctx.Hub, constants.TopicNUTStatusUpdate, response)
 		logger.Debug("NUT service not running")
 		return
 	}
@@ -114,8 +114,8 @@ func (c *NUTCollector) Collect() {
 		}
 	}
 
-	c.ctx.Hub.Pub(response, "nut_status_update")
-	logger.Debug("Published nut_status_update event")
+	domain.Publish(c.ctx.Hub, constants.TopicNUTStatusUpdate, response)
+	logger.Debug("Published %s event", constants.TopicNUTStatusUpdate.Name)
 }
 
 // loadNUTConfig reads the NUT plugin configuration file

@@ -69,8 +69,8 @@ func (c *RegistrationCollector) Collect() {
 	}
 
 	logger.Debug("Registration: Successfully collected, publishing event")
-	c.ctx.Hub.Pub(registration, "registration_update")
-	logger.Debug("Registration: Published registration_update event - type=%s, state=%s", registration.Type, registration.State)
+	domain.Publish(c.ctx.Hub, constants.TopicRegistrationUpdate, registration)
+	logger.Debug("Registration: Published %s event - type=%s, state=%s", constants.TopicRegistrationUpdate.Name, registration.Type, registration.State)
 }
 
 // collectRegistration reads registration information from var.ini

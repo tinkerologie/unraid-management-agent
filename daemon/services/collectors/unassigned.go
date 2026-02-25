@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
@@ -63,7 +64,7 @@ func (c *UnassignedCollector) collect() {
 	}
 
 	// Publish event
-	c.ctx.Hub.Pub(deviceList, "unassigned_devices_update")
+	domain.Publish(c.ctx.Hub, constants.TopicUnassignedDevicesUpdate, deviceList)
 	logger.Debug("Published unassigned devices update - devices=%d, remote_shares=%d",
 		len(devices), len(remoteShares))
 }

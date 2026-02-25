@@ -37,6 +37,16 @@ func (d *Dispatcher) sendToChannel(channel, message string, event dto.AlertEvent
 		return d.sendToUnraid(event)
 	}
 
+	// Action channels trigger controller operations instead of notifications.
+	// Format: action://action_type/target (e.g. action://restart_container/abc123)
+	if strings.HasPrefix(channel, "action://") {
+		// Only fire actions when the alert is firing, not on resolved.
+		if event.State != "firing" {
+			return nil
+		}
+		return d.executeAction(channel)
+	}
+
 	// Use shoutrrr for all other channel types (ntfy, gotify, discord, slack, webhook, etc.)
 	return d.sendViaShoutrrr(channel, message)
 }
@@ -101,8 +111,61 @@ func channelType(ch string) string {
 	if ch == "unraid" {
 		return "unraid"
 	}
+	if strings.HasPrefix(ch, "action://") {
+		return "action"
+	}
 	if before, _, ok := strings.Cut(ch, "://"); ok {
 		return before
 	}
 	return "unknown"
+}
+
+// executeAction parses an action://type/target channel and executes the corresponding controller operation.
+// Supported actions:
+//
+//	action://restart_container/<id>
+//	action://stop_container/<id>
+//	action://start_container/<id>
+//	action://restart_vm/<name>
+//	action://stop_vm/<name>
+//	action://start_vm/<name>
+//	action://force_stop_vm/<name>
+func (d *Dispatcher) executeAction(channel string) error {
+	// Strip "action://" prefix
+	rest := strings.TrimPrefix(channel, "action://")
+	actionType, target, ok := strings.Cut(rest, "/")
+	if !ok || target == "" {
+		return fmt.Errorf("invalid action channel format: %s (expected action://type/target)", channel)
+	}
+
+	logger.Info("Alerting: Executing action %s on %s", actionType, target)
+
+	switch actionType {
+	case "restart_container":
+		dc := controllers.NewDockerController()
+		defer func() { _ = dc.Close() }()
+		return dc.Restart(target)
+	case "stop_container":
+		dc := controllers.NewDockerController()
+		defer func() { _ = dc.Close() }()
+		return dc.Stop(target)
+	case "start_container":
+		dc := controllers.NewDockerController()
+		defer func() { _ = dc.Close() }()
+		return dc.Start(target)
+	case "restart_vm":
+		vc := controllers.NewVMController()
+		return vc.Restart(target)
+	case "stop_vm":
+		vc := controllers.NewVMController()
+		return vc.Stop(target)
+	case "start_vm":
+		vc := controllers.NewVMController()
+		return vc.Start(target)
+	case "force_stop_vm":
+		vc := controllers.NewVMController()
+		return vc.ForceStop(target)
+	default:
+		return fmt.Errorf("unknown action type: %s", actionType)
+	}
 }

@@ -4,11 +4,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cskr/pubsub"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 )
 
 func TestPubSubBasicFlow(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 
 	// Subscribe to a topic
 	ch := hub.Sub("test_topic")
@@ -30,7 +30,7 @@ func TestPubSubBasicFlow(t *testing.T) {
 }
 
 func TestPubSubMultipleSubscribers(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 
 	// Create multiple subscribers
 	ch1 := hub.Sub("events")
@@ -59,7 +59,7 @@ func TestPubSubMultipleSubscribers(t *testing.T) {
 }
 
 func TestPubSubMultipleTopics(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 
 	// Subscribe to different topics
 	systemCh := hub.Sub("system_update")
@@ -99,7 +99,7 @@ func TestPubSubMultipleTopics(t *testing.T) {
 }
 
 func TestPubSubUnsubscribe(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 
 	ch := hub.Sub("test")
 
@@ -121,7 +121,7 @@ func TestPubSubUnsubscribe(t *testing.T) {
 }
 
 func TestPubSubHighVolume(t *testing.T) {
-	hub := pubsub.New(1000)
+	hub := domain.NewEventBus(1000)
 
 	ch := hub.Sub("high_volume")
 
@@ -151,7 +151,7 @@ func TestPubSubHighVolume(t *testing.T) {
 }
 
 func TestPubSubTypedMessages(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 
 	ch := hub.Sub("typed")
 
@@ -183,7 +183,7 @@ func TestPubSubTypedMessages(t *testing.T) {
 }
 
 func BenchmarkPubSub(b *testing.B) {
-	hub := pubsub.New(1000)
+	hub := domain.NewEventBus(1000)
 	ch := hub.Sub("benchmark")
 
 	// Drain channel in background

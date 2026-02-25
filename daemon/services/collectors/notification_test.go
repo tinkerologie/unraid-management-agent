@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cskr/pubsub"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 )
@@ -39,7 +38,7 @@ func setupNotificationCollectorTestDirs(t *testing.T) (string, string, func()) {
 }
 
 func TestNewNotificationCollector(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 
 	collector := NewNotificationCollector(ctx)
@@ -54,7 +53,7 @@ func TestNewNotificationCollector(t *testing.T) {
 }
 
 func TestNotificationCollectorInit(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 
 	collector := NewNotificationCollector(ctx)
@@ -96,7 +95,7 @@ func TestNotificationCollectorStart(t *testing.T) {
 		t.Fatalf("Failed to create test notification file: %v", err)
 	}
 
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewNotificationCollector(ctx)
 
@@ -139,7 +138,7 @@ func TestNotificationCollectorCollect(t *testing.T) {
 		}
 	}
 
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewNotificationCollector(ctx)
 
@@ -173,7 +172,7 @@ func TestNotificationCollectorEmptyDirectories(t *testing.T) {
 	_, _, cleanup := setupNotificationCollectorTestDirs(t)
 	defer cleanup()
 
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewNotificationCollector(ctx)
 
@@ -232,7 +231,7 @@ func TestParseNotificationFile(t *testing.T) {
 		},
 	}
 
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewNotificationCollector(ctx)
 
@@ -255,7 +254,7 @@ func TestParseNotificationFile(t *testing.T) {
 }
 
 func TestCalculateOverview(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewNotificationCollector(ctx)
 
@@ -307,7 +306,7 @@ func TestCalculateOverview(t *testing.T) {
 }
 
 func TestCountByImportance(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewNotificationCollector(ctx)
 
@@ -336,7 +335,7 @@ func TestCountByImportance(t *testing.T) {
 }
 
 func TestNotificationCollectorPanic(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewNotificationCollector(ctx)
 

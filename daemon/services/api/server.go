@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"reflect"
 	"sync"
 	"time"
 
@@ -45,6 +46,7 @@ type Server struct {
 	wsHub            *WSHub
 	cancelCtx        context.Context
 	cancelFunc       context.CancelFunc
+	ready            chan struct{} // closed when subscriptions are fully wired
 	collectorManager CollectorManagerInterface
 	mqttClient       MQTTClientInterface
 	alertEngine      *alerting.Engine
@@ -52,26 +54,8 @@ type Server struct {
 	watchdogRunner   *watchdog.Runner
 	watchdogStore    *watchdog.Store
 
-	// Cache for latest data from collectors
-	cacheMutex         sync.RWMutex
-	systemCache        *dto.SystemInfo
-	arrayCache         *dto.ArrayStatus
-	disksCache         []dto.DiskInfo
-	sharesCache        []dto.ShareInfo
-	dockerCache        []dto.ContainerInfo
-	vmsCache           []dto.VMInfo
-	upsCache           *dto.UPSStatus
-	gpuCache           []*dto.GPUMetrics
-	networkCache       []dto.NetworkInfo
-	hardwareCache      *dto.HardwareInfo
-	registrationCache  *dto.Registration
-	notificationsCache *dto.NotificationList
-	unassignedCache    *dto.UnassignedDeviceList
-	zfsPoolsCache      []dto.ZFSPool
-	zfsDatasetsCache   []dto.ZFSDataset
-	zfsSnapshotsCache  []dto.ZFSSnapshot
-	zfsARCStatsCache   *dto.ZFSARCStats
-	nutCache           *dto.NUTResponse
+	// Embedded cache store for lock-free atomic access to collector data
+	*CacheStore
 }
 
 // NewServer creates a new API server instance with the given context.
@@ -89,7 +73,9 @@ func NewServerWithCollectorManager(ctx *domain.Context, cm CollectorManagerInter
 		wsHub:            NewWSHub(),
 		cancelCtx:        cancelCtx,
 		cancelFunc:       cancelFunc,
+		ready:            make(chan struct{}),
 		collectorManager: cm,
+		CacheStore:       &CacheStore{},
 	}
 
 	s.setupRoutes()
@@ -98,7 +84,7 @@ func NewServerWithCollectorManager(ctx *domain.Context, cm CollectorManagerInter
 
 func (s *Server) setupRoutes() {
 	// Apply middleware
-	s.router.Use(corsMiddleware)
+	s.router.Use(corsMiddleware(s.ctx.CORSOrigin))
 	s.router.Use(loggingMiddleware)
 	s.router.Use(recoveryMiddleware)
 
@@ -289,21 +275,36 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/ws", s.handleWebSocket)
 }
 
-// StartSubscriptions initializes event subscriptions and WebSocket hub
-// This should be called before collectors start to avoid race conditions
+// StartSubscriptions initializes event subscriptions and WebSocket hub.
+// This should be called before collectors start to avoid race conditions.
+// After calling this, use <-server.Ready() to block until subscriptions are fully wired.
 func (s *Server) StartSubscriptions() {
 	logger.Info("Starting API server subscriptions...")
+
+	var subWg sync.WaitGroup
+	subWg.Add(2) // subscribeToEvents + broadcastEvents
 
 	// Start WebSocket hub
 	go s.wsHub.Run(s.cancelCtx)
 
 	// Subscribe to events and update cache
-	go s.subscribeToEvents(s.cancelCtx)
+	go s.subscribeToEvents(s.cancelCtx, &subWg)
 
 	// Broadcast events to WebSocket clients
-	go s.broadcastEvents(s.cancelCtx)
+	go s.broadcastEvents(s.cancelCtx, &subWg)
 
-	logger.Info("API server subscriptions started")
+	// Wait for all subscriptions to be registered, then signal readiness
+	go func() {
+		subWg.Wait()
+		close(s.ready)
+		logger.Info("API server subscriptions ready")
+	}()
+}
+
+// Ready returns a channel that is closed when all event subscriptions are fully wired.
+// Use <-server.Ready() to block until the server is ready to receive events.
+func (s *Server) Ready() <-chan struct{} {
+	return s.ready
 }
 
 // StartHTTP starts the HTTP server
@@ -342,30 +343,19 @@ func (s *Server) Stop() {
 	}
 }
 
-func (s *Server) subscribeToEvents(ctx context.Context) {
-	// Subscribe to specific events to update cache
+func (s *Server) subscribeToEvents(ctx context.Context, readyWg *sync.WaitGroup) {
 	logger.Info("Cache: Subscribing to event topics...")
-	ch := s.ctx.Hub.Sub(
-		"system_update",
-		"array_status_update",
-		"disk_list_update",
-		"share_list_update",
-		"container_list_update",
-		"vm_list_update",
-		"ups_status_update",
-		"nut_status_update",
-		"gpu_metrics_update",
-		"network_list_update",
-		"hardware_update",
-		"registration_update",
-		"notifications_update",
-		"unassigned_devices_update",
-		"zfs_pools_update",
-		"zfs_datasets_update",
-		"zfs_snapshots_update",
-		"zfs_arc_stats_update",
-	)
-	logger.Info("Cache: Subscription ready, waiting for events...")
+
+	bindings := cacheBindings()
+	topics := make([]string, len(bindings))
+	for i, b := range bindings {
+		topics[i] = b.topicName
+	}
+	ch := s.ctx.Hub.Sub(topics...)
+	dispatch := buildCacheDispatch(bindings)
+
+	logger.Info("Cache: Subscription ready (%d topics), waiting for events...", len(bindings))
+	readyWg.Done()
 
 	for {
 		select {
@@ -374,145 +364,20 @@ func (s *Server) subscribeToEvents(ctx context.Context) {
 			s.ctx.Hub.Unsub(ch)
 			return
 		case msg := <-ch:
-			// Update cache based on message type
-			switch v := msg.(type) {
-			case *dto.SystemInfo:
-				s.cacheMutex.Lock()
-				s.systemCache = v
-				s.cacheMutex.Unlock()
-				logger.Debug("Cache: Updated system info - CPU: %.1f%%, RAM: %.1f%%", v.CPUUsage, v.RAMUsage)
-			case *dto.ArrayStatus:
-				s.cacheMutex.Lock()
-				s.arrayCache = v
-				s.cacheMutex.Unlock()
-				logger.Debug("Cache: Updated array status - state=%s, disks=%d", v.State, v.NumDisks)
-			case []dto.DiskInfo:
-				s.cacheMutex.Lock()
-				s.disksCache = v
-				s.cacheMutex.Unlock()
-				logger.Debug("Cache: Updated disk list - count=%d", len(v))
-			case []dto.ShareInfo:
-				s.cacheMutex.Lock()
-				s.sharesCache = v
-				s.cacheMutex.Unlock()
-				logger.Debug("Cache: Updated share list - count=%d", len(v))
-			case []*dto.ContainerInfo:
-				// Convert pointer slice to value slice for cache
-				containers := make([]dto.ContainerInfo, len(v))
-				for i, c := range v {
-					containers[i] = *c
-				}
-				s.cacheMutex.Lock()
-				s.dockerCache = containers
-				s.cacheMutex.Unlock()
-				logger.Debug("Cache: Updated container list - count=%d", len(v))
-			case []*dto.VMInfo:
-				// Convert pointer slice to value slice for cache
-				vms := make([]dto.VMInfo, len(v))
-				for i, vm := range v {
-					vms[i] = *vm
-				}
-				s.cacheMutex.Lock()
-				s.vmsCache = vms
-				s.cacheMutex.Unlock()
-				logger.Debug("Cache: Updated VM list - count=%d", len(v))
-			case *dto.UPSStatus:
-				s.cacheMutex.Lock()
-				s.upsCache = v
-				s.cacheMutex.Unlock()
-				logger.Debug("Cache: Updated UPS status - %s", v.Status)
-			case *dto.NUTResponse:
-				s.cacheMutex.Lock()
-				s.nutCache = v
-				s.cacheMutex.Unlock()
-				logger.Debug("Cache: Updated NUT status - installed=%t, running=%t", v.Installed, v.Running)
-			case []*dto.GPUMetrics:
-				s.cacheMutex.Lock()
-				s.gpuCache = v
-				s.cacheMutex.Unlock()
-				logger.Debug("Cache: Updated GPU metrics - count=%d", len(v))
-			case []dto.NetworkInfo:
-				s.cacheMutex.Lock()
-				s.networkCache = v
-				s.cacheMutex.Unlock()
-				logger.Debug("Cache: Updated network list - count=%d", len(v))
-			case *dto.HardwareInfo:
-				s.cacheMutex.Lock()
-				s.hardwareCache = v
-				s.cacheMutex.Unlock()
-				logger.Debug("Cache: Updated hardware info - BIOS: %s, Baseboard: %s",
-					func() string {
-						if v.BIOS != nil {
-							return v.BIOS.Vendor
-						}
-						return "N/A"
-					}(),
-					func() string {
-						if v.Baseboard != nil {
-							return v.Baseboard.Manufacturer
-						}
-						return "N/A"
-					}())
-			case *dto.Registration:
-				s.cacheMutex.Lock()
-				s.registrationCache = v
-				s.cacheMutex.Unlock()
-				logger.Debug("Cache: Updated registration info - type=%s, state=%s", v.Type, v.State)
-			case *dto.NotificationList:
-				s.cacheMutex.Lock()
-				s.notificationsCache = v
-				s.cacheMutex.Unlock()
-				logger.Debug("Cache: Updated notifications - unread=%d, archived=%d",
-					v.Overview.Unread.Total, v.Overview.Archive.Total)
-			case *dto.UnassignedDeviceList:
-				s.cacheMutex.Lock()
-				s.unassignedCache = v
-				s.cacheMutex.Unlock()
-				logger.Debug("Cache: Updated unassigned devices - devices=%d, remote_shares=%d",
-					len(v.Devices), len(v.RemoteShares))
-			case []dto.ZFSPool:
-				s.cacheMutex.Lock()
-				s.zfsPoolsCache = v
-				s.cacheMutex.Unlock()
-				logger.Debug("Cache: Updated ZFS pools - count=%d", len(v))
-			case []dto.ZFSDataset:
-				s.cacheMutex.Lock()
-				s.zfsDatasetsCache = v
-				s.cacheMutex.Unlock()
-				logger.Debug("Cache: Updated ZFS datasets - count=%d", len(v))
-			case []dto.ZFSSnapshot:
-				s.cacheMutex.Lock()
-				s.zfsSnapshotsCache = v
-				s.cacheMutex.Unlock()
-				logger.Debug("Cache: Updated ZFS snapshots - count=%d", len(v))
-			case dto.ZFSARCStats:
-				s.cacheMutex.Lock()
-				s.zfsARCStatsCache = &v
-				s.cacheMutex.Unlock()
-				logger.Debug("Cache: Updated ZFS ARC stats - hit_ratio=%.2f%%", v.HitRatioPct)
-			default:
+			if handler, ok := dispatch[reflect.TypeOf(msg)]; ok {
+				handler(s.CacheStore, msg)
+				logger.Debug("Cache: Updated %T", msg)
+			} else {
 				logger.Warning("Cache: Received unknown event type: %T", msg)
 			}
 		}
 	}
 }
 
-func (s *Server) broadcastEvents(ctx context.Context) {
-	// Subscribe to all event topics for WebSocket broadcasting
-	ch := s.ctx.Hub.Sub(
-		"system_update",
-		"array_status_update",
-		"disk_list_update",
-		"share_list_update",
-		"container_list_update",
-		"vm_list_update",
-		"ups_status_update",
-		"nut_status_update",
-		"gpu_metrics_update",
-		"network_list_update",
-		"hardware_update",
-		"collector_state_change",
-	)
+func (s *Server) broadcastEvents(ctx context.Context, readyWg *sync.WaitGroup) {
+	ch := s.ctx.Hub.Sub(broadcastTopicNames()...)
+	typeToTopic := buildTypeToTopicMap()
+	readyWg.Done()
 
 	for {
 		select {
@@ -521,146 +386,13 @@ func (s *Server) broadcastEvents(ctx context.Context) {
 			s.ctx.Hub.Unsub(ch)
 			return
 		case msg := <-ch:
-			s.wsHub.Broadcast(msg)
+			topic := "update"
+			if t, ok := typeToTopic[reflect.TypeOf(msg)]; ok {
+				topic = t
+			}
+			s.wsHub.Broadcast(topic, msg)
 		}
 	}
-}
-
-// CacheProvider interface implementation for MCP integration.
-// These methods provide read-only access to cached collector data.
-
-// GetSystemCache returns cached system information.
-func (s *Server) GetSystemCache() *dto.SystemInfo {
-	s.cacheMutex.RLock()
-	defer s.cacheMutex.RUnlock()
-	return s.systemCache
-}
-
-// GetArrayCache returns cached array status.
-func (s *Server) GetArrayCache() *dto.ArrayStatus {
-	s.cacheMutex.RLock()
-	defer s.cacheMutex.RUnlock()
-	return s.arrayCache
-}
-
-// GetDisksCache returns cached disk information.
-func (s *Server) GetDisksCache() []dto.DiskInfo {
-	s.cacheMutex.RLock()
-	defer s.cacheMutex.RUnlock()
-	return s.disksCache
-}
-
-// GetSharesCache returns cached share information.
-func (s *Server) GetSharesCache() []dto.ShareInfo {
-	s.cacheMutex.RLock()
-	defer s.cacheMutex.RUnlock()
-	return s.sharesCache
-}
-
-// GetDockerCache returns cached Docker container information.
-func (s *Server) GetDockerCache() []dto.ContainerInfo {
-	s.cacheMutex.RLock()
-	defer s.cacheMutex.RUnlock()
-	return s.dockerCache
-}
-
-// GetVMsCache returns cached VM information.
-func (s *Server) GetVMsCache() []dto.VMInfo {
-	s.cacheMutex.RLock()
-	defer s.cacheMutex.RUnlock()
-	return s.vmsCache
-}
-
-// GetUPSCache returns cached UPS status.
-func (s *Server) GetUPSCache() *dto.UPSStatus {
-	s.cacheMutex.RLock()
-	defer s.cacheMutex.RUnlock()
-	return s.upsCache
-}
-
-// GetGPUCache returns cached GPU metrics.
-func (s *Server) GetGPUCache() []*dto.GPUMetrics {
-	s.cacheMutex.RLock()
-	defer s.cacheMutex.RUnlock()
-	return s.gpuCache
-}
-
-// GetNetworkCache returns cached network information.
-func (s *Server) GetNetworkCache() []dto.NetworkInfo {
-	s.cacheMutex.RLock()
-	defer s.cacheMutex.RUnlock()
-	return s.networkCache
-}
-
-// GetHardwareCache returns cached hardware information.
-func (s *Server) GetHardwareCache() *dto.HardwareInfo {
-	s.cacheMutex.RLock()
-	defer s.cacheMutex.RUnlock()
-	return s.hardwareCache
-}
-
-// GetRegistrationCache returns cached registration information.
-func (s *Server) GetRegistrationCache() *dto.Registration {
-	s.cacheMutex.RLock()
-	defer s.cacheMutex.RUnlock()
-	return s.registrationCache
-}
-
-// GetNotificationsCache returns cached notifications.
-func (s *Server) GetNotificationsCache() *dto.NotificationList {
-	s.cacheMutex.RLock()
-	defer s.cacheMutex.RUnlock()
-	return s.notificationsCache
-}
-
-// GetZFSPoolsCache returns cached ZFS pool information.
-func (s *Server) GetZFSPoolsCache() []dto.ZFSPool {
-	s.cacheMutex.RLock()
-	defer s.cacheMutex.RUnlock()
-	return s.zfsPoolsCache
-}
-
-// GetZFSDatasetsCache returns cached ZFS dataset information.
-func (s *Server) GetZFSDatasetsCache() []dto.ZFSDataset {
-	s.cacheMutex.RLock()
-	defer s.cacheMutex.RUnlock()
-	return s.zfsDatasetsCache
-}
-
-// GetZFSSnapshotsCache returns cached ZFS snapshot information.
-func (s *Server) GetZFSSnapshotsCache() []dto.ZFSSnapshot {
-	s.cacheMutex.RLock()
-	defer s.cacheMutex.RUnlock()
-	return s.zfsSnapshotsCache
-}
-
-// GetZFSARCStatsCache returns cached ZFS ARC statistics.
-func (s *Server) GetZFSARCStatsCache() *dto.ZFSARCStats {
-	s.cacheMutex.RLock()
-	defer s.cacheMutex.RUnlock()
-	return s.zfsARCStatsCache
-}
-
-// GetUnassignedCache returns cached unassigned devices information.
-func (s *Server) GetUnassignedCache() *dto.UnassignedDeviceList {
-	s.cacheMutex.RLock()
-	defer s.cacheMutex.RUnlock()
-	return s.unassignedCache
-}
-
-// GetNUTCache returns cached NUT (Network UPS Tools) information.
-func (s *Server) GetNUTCache() *dto.NUTResponse {
-	s.cacheMutex.RLock()
-	defer s.cacheMutex.RUnlock()
-	return s.nutCache
-}
-
-// GetParityHistoryCache returns cached parity check history.
-// Note: This is dynamically loaded, not cached by a collector.
-func (s *Server) GetParityHistoryCache() *dto.ParityCheckHistory {
-	// Parity history is read from file on-demand, return nil for now
-	// The MCP server will call the controller directly for this data
-	return nil
 }
 
 // ListLogFiles returns a list of available log files.

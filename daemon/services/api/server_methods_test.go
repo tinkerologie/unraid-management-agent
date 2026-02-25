@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cskr/pubsub"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 )
@@ -375,9 +374,13 @@ func TestGetNUTCache(t *testing.T) {
 
 func TestGetParityHistoryCache(t *testing.T) {
 	server, _ := setupTestServer()
-	// Always returns nil (dynamically loaded)
-	if got := server.GetParityHistoryCache(); got != nil {
-		t.Errorf("expected nil, got %v", got)
+	// Returns an empty sentinel (never nil) so callers don't need nil checks.
+	got := server.GetParityHistoryCache()
+	if got == nil {
+		t.Fatal("expected non-nil empty sentinel, got nil")
+	}
+	if len(got.Records) != 0 {
+		t.Errorf("expected empty records, got %d entries", len(got.Records))
 	}
 }
 
@@ -635,15 +638,15 @@ func TestStartSubscriptions_And_Stop(t *testing.T) {
 	server, ctx := setupTestServer()
 	// Ensure Hub is initialized for subscription goroutines
 	if ctx.Hub == nil {
-		ctx.Hub = pubsub.New(10)
+		ctx.Hub = domain.NewEventBus(10)
 		server.ctx = ctx
 	}
 
 	// Start subscriptions (launches background goroutines)
 	server.StartSubscriptions()
 
-	// Give goroutines a moment to start
-	time.Sleep(50 * time.Millisecond)
+	// Wait for subscriptions to be fully wired
+	<-server.Ready()
 
 	// Stop should cancel all goroutines gracefully
 	server.Stop()

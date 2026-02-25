@@ -66,8 +66,8 @@ type CacheProvider interface {
 	GetHealthStatus() map[string]any
 }
 
-// ptr returns a pointer to the given bool value. Used for optional ToolAnnotations fields.
-func ptr(b bool) *bool { return &b }
+// ptr returns a pointer to the given value. Used for optional ToolAnnotations fields.
+func ptr[T any](v T) *T { return &v }
 
 // Server represents the MCP server that exposes Unraid capabilities to AI agents.
 type Server struct {

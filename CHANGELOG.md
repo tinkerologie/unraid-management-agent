@@ -9,8 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **EventBus goroutine leak** (GitHub Issue #67):
+  - `Unsub()` now closes the channel when it is no longer subscribed to any topic, unblocking `for msg := range ch` goroutines
+- **CollectorManager broadcastStateChange deadlock** (GitHub Issue #68):
+  - `EnableCollector()` and `DisableCollector()` now snapshot event data under lock, then publish outside the lock to prevent deadlock with subscribers calling `GetStatus`/`GetAllStatus`
+- **GPUCount inflated by nil entries** (GitHub Issue #70):
+  - `GPUCount` is now incremented inside the nil-guard loop, counting only non-nil GPU entries
+- **MQTT goroutine leak on reconnect** (GitHub Issue #71):
+  - `handleConnect()` goroutines are now cancelled via context on disconnect/reconnect; discovery, state publishing, and command subscription run sequentially
+- **EventBus zero-capacity channel** (GitHub Issue #72):
+  - `NewEventBus()` clamps `bufferSize < 1` to `1`, preventing zero-capacity channels that silently drop all messages
+- **WebSocket subscribe null resets topic filter** (GitHub Issue #73):
+  - `readPump` now uses `json.RawMessage` envelope to distinguish absent `subscribe` key from explicit `null`, correctly resetting topic filter to "all topics"
+- **GetParityHistoryCache always returns nil** (GitHub Issue #76):
+  - Returns `&dto.ParityCheckHistory{}` empty sentinel instead of `nil` so callers never need nil checks
+- **Test assertion improvements** (GitHub Issue #78):
+  - Added nil guard to `subscribeMQTTEvents` for nil mqttClient
+  - `TestSubscribeMQTTEvents_NilClient` asserts immediate return instead of relying on timeout
+  - `TestSubscribeMQTTEvents_NotConnected` passes domainCtx instead of nil
+  - EventBus tests updated for channel closure behavior; added `TestEventBus_UnsubPartial`
+- **VM cannot be resumed/started via API when pmsuspended** (GitHub Issue #65):
+  - Fixed `POST /api/v1/vm/{name}/resume` and `POST /api/v1/vm/{name}/start` failing when VM is in pmsuspended state (Windows sleep)
+  - libvirt DomainResume fails with "domain is pmsuspended"; DomainCreate fails with "domain is already running"
+  - VM controller now detects pmsuspended state and uses `virsh dompmwakeup` to wake the VM, equivalent to pressing Start in Unraid web UI
+
 ### Changed
 
+- **Hardcoded topic strings replaced with constants** (GitHub Issue #74):
+  - 11 hardcoded topic name strings in collector debug logs replaced with `constants.Topic*.Name` references
+- **Network services cache log level** (GitHub Issue #77):
+  - `CacheStore.GetNetworkServicesCache()` failure log changed from `Debug` to `Warning`
+- **Swagger healthcheck docs updated** (GitHub Issue #79):
+  - `HealthCheckConfig.Type` and `Target` field descriptions now include the `"ping"` probe type
+- **Nil-deref safety documented** (GitHub Issue #69):
+  - Added comment in alerting engine documenting that `NotificationOverview` and `NotificationCounts` are value types (nil deref not possible)
 - **Go 1.26.0 Upgrade**:
   - Upgraded from Go 1.25.0 to Go 1.26.0 for improved performance and latest language features
   - **Green Tea GC**: 10–40% lower garbage collection overhead (enabled automatically by runtime)
@@ -27,13 +61,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Refactored `RunMCPStdio()` signal handling to use `signal.NotifyContext` — replaces manual goroutine + channel pattern
   - Updated CI workflow, devcontainer, and documentation references to Go 1.26
   - All dependencies tested and compatible with Go 1.26
-
-### Fixed
-
-- **VM cannot be resumed/started via API when pmsuspended** (GitHub Issue #65):
-  - Fixed `POST /api/v1/vm/{name}/resume` and `POST /api/v1/vm/{name}/start` failing when VM is in pmsuspended state (Windows sleep)
-  - libvirt DomainResume fails with "domain is pmsuspended"; DomainCreate fails with "domain is already running"
-  - VM controller now detects pmsuspended state and uses `virsh dompmwakeup` to wake the VM, equivalent to pressing Start in Unraid web UI
 
 ## [2026.02.02] - 2026-02-21
 

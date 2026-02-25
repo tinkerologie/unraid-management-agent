@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -76,7 +77,7 @@ func ParseBIOSInfo() (*dto.BIOSInfo, error) {
 	}
 
 	if len(sections) == 0 {
-		return nil, fmt.Errorf("no BIOS information found")
+		return nil, errors.New("no BIOS information found")
 	}
 
 	return parseBIOSInfoFromSection(sections[0]), nil
@@ -113,7 +114,7 @@ func ParseBaseboardInfo() (*dto.BaseboardInfo, error) {
 	}
 
 	if len(sections) == 0 {
-		return nil, fmt.Errorf("no baseboard information found")
+		return nil, errors.New("no baseboard information found")
 	}
 
 	return parseBaseboardInfoFromSection(sections[0]), nil
@@ -150,7 +151,7 @@ func ParseCPUInfo() (*dto.CPUHardwareInfo, error) {
 	}
 
 	if len(sections) == 0 {
-		return nil, fmt.Errorf("no CPU information found")
+		return nil, errors.New("no CPU information found")
 	}
 
 	return parseCPUInfoFromSection(sections[0]), nil
@@ -273,7 +274,7 @@ func ParseMemoryArrayInfo() (*dto.MemoryArrayInfo, error) {
 	}
 
 	if len(sections) == 0 {
-		return nil, fmt.Errorf("no memory array information found")
+		return nil, errors.New("no memory array information found")
 	}
 
 	return parseMemoryArrayInfoFromSection(sections[0]), nil

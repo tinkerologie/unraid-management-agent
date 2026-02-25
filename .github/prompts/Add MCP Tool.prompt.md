@@ -35,11 +35,11 @@ The handler should:
 2. Call existing collector caches or controller methods
 3. Return a structured JSON response
 
-### For monitoring tools:
+### For monitoring tools
 
 Access cached data through the API server's cache fields.
 
-### For control tools:
+### For control tools
 
 Use existing controllers in `daemon/services/controllers/`. Always validate input before executing.
 

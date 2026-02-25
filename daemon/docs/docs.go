@@ -5279,7 +5279,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "target": {
-                    "description": "Target is the probe target: URL for HTTP, host:port for TCP, container ID/name for container.",
+                    "description": "Target is the probe target: URL for HTTP, host:port for TCP, container ID/name for container, hostname/IP for ping.",
                     "type": "string"
                 },
                 "timeout_seconds": {
@@ -5287,7 +5287,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "type": {
-                    "description": "Type is the probe type: \"http\", \"tcp\", or \"container\".",
+                    "description": "Type is the probe type: \"http\", \"tcp\", \"container\", or \"ping\".",
                     "allOf": [
                         {
                             "$ref": "#/definitions/dto.HealthCheckType"
@@ -5390,12 +5390,14 @@ const docTemplate = `{
             "enum": [
                 "http",
                 "tcp",
-                "container"
+                "container",
+                "ping"
             ],
             "x-enum-varnames": [
                 "HealthCheckHTTP",
                 "HealthCheckTCP",
-                "HealthCheckContainer"
+                "HealthCheckContainer",
+                "HealthCheckPing"
             ]
         },
         "dto.HealthChecksStatusResponse": {

@@ -6,14 +6,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/cskr/pubsub"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 )
 
 // TestHandlersWithEmptyCache tests all handlers when cache is empty
 func TestHandlersWithEmptyCache(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	server := NewServer(ctx)
 
@@ -68,7 +67,7 @@ func TestHandlersWithEmptyCache(t *testing.T) {
 
 // TestHandlersWithCachedData tests handlers when cache has data
 func TestHandlersWithCachedData(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	server := NewServer(ctx)
 
@@ -77,9 +76,7 @@ func TestHandlersWithCachedData(t *testing.T) {
 		Hostname: "test-system",
 		Uptime:   86400,
 	}
-	server.cacheMutex.Lock()
-	server.systemCache = systemInfo
-	server.cacheMutex.Unlock()
+	server.systemCache.Store(systemInfo)
 
 	req, err := http.NewRequest("GET", "/api/v1/system", nil)
 	if err != nil {
@@ -105,7 +102,7 @@ func TestHandlersWithCachedData(t *testing.T) {
 
 // TestParityCheckHistoryEdgeCases tests parity check history with edge cases
 func TestParityCheckHistoryEdgeCases(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	server := NewServer(ctx)
 
@@ -125,7 +122,7 @@ func TestParityCheckHistoryEdgeCases(t *testing.T) {
 
 // TestInvalidDiskIDHandling tests disk endpoint with invalid ID
 func TestInvalidDiskIDHandling(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	server := NewServer(ctx)
 
@@ -145,7 +142,7 @@ func TestInvalidDiskIDHandling(t *testing.T) {
 
 // TestCacheLocking tests concurrent cache access
 func TestCacheLocking(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	server := NewServer(ctx)
 
@@ -171,7 +168,7 @@ func TestCacheLocking(t *testing.T) {
 
 // TestResponseFormat tests that responses follow expected format
 func TestResponseFormat(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	server := NewServer(ctx)
 
@@ -197,7 +194,7 @@ func TestResponseFormat(t *testing.T) {
 
 // TestAPIErrorResponses tests error response format
 func TestAPIErrorResponses(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	server := NewServer(ctx)
 
@@ -217,7 +214,7 @@ func TestAPIErrorResponses(t *testing.T) {
 
 // TestZFSPoolsEndpointEdgeCases tests ZFS pools with edge cases
 func TestZFSPoolsEndpointEdgeCases(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	server := NewServer(ctx)
 
@@ -236,7 +233,7 @@ func TestZFSPoolsEndpointEdgeCases(t *testing.T) {
 
 // TestUnassignedDevicesEndpoint tests unassigned devices endpoint
 func TestUnassignedDevicesEndpoint(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	server := NewServer(ctx)
 
@@ -255,7 +252,7 @@ func TestUnassignedDevicesEndpoint(t *testing.T) {
 
 // TestNotificationEndpoints tests notification-related endpoints
 func TestNotificationEndpoints(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	server := NewServer(ctx)
 
@@ -287,7 +284,7 @@ func TestNotificationEndpoints(t *testing.T) {
 
 // TestLogEndpoints tests log-related endpoints
 func TestLogEndpoints(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	server := NewServer(ctx)
 
@@ -306,7 +303,7 @@ func TestLogEndpoints(t *testing.T) {
 
 // TestUserScriptsEndpointEdgeCases tests user scripts endpoint with edge cases
 func TestUserScriptsEndpointEdgeCases(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	server := NewServer(ctx)
 

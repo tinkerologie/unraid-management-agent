@@ -21,8 +21,7 @@ func TestHandleMetrics(t *testing.T) {
 	server := NewServer(ctx)
 
 	// Populate cache with test data
-	server.cacheMutex.Lock()
-	server.systemCache = &dto.SystemInfo{
+	server.systemCache.Store(&dto.SystemInfo{
 		Hostname:     "test-tower",
 		Version:      "7.2.3",
 		AgentVersion: "2026.01.01",
@@ -33,8 +32,8 @@ func TestHandleMetrics(t *testing.T) {
 		RAMUsed:      17179869184,
 		RAMUsage:     50.0,
 		Timestamp:    time.Now(),
-	}
-	server.arrayCache = &dto.ArrayStatus{
+	})
+	server.arrayCache.Store(&dto.ArrayStatus{
 		State:               "Started",
 		TotalBytes:          8000000000000,
 		FreeBytes:           3000000000000,
@@ -46,21 +45,20 @@ func TestHandleMetrics(t *testing.T) {
 		NumDataDisks:        3,
 		NumParityDisks:      2,
 		Timestamp:           time.Now(),
-	}
-	server.disksCache = []dto.DiskInfo{
-		{
-			Name:        "parity",
-			Device:      "sda",
-			Role:        "parity",
-			Status:      "DISK_OK",
-			Size:        4000000000000,
-			Used:        0,
-			Free:        0,
-			Temperature: 35.0,
-			SMARTStatus: "PASSED",
-			SpinState:   "active",
-			Timestamp:   time.Now(),
-		},
+	})
+	disksVal := []dto.DiskInfo{{
+		Name:        "parity",
+		Device:      "sda",
+		Role:        "parity",
+		Status:      "DISK_OK",
+		Size:        4000000000000,
+		Used:        0,
+		Free:        0,
+		Temperature: 35.0,
+		SMARTStatus: "PASSED",
+		SpinState:   "active",
+		Timestamp:   time.Now(),
+	},
 		{
 			Name:        "disk1",
 			Device:      "sdb",
@@ -75,20 +73,21 @@ func TestHandleMetrics(t *testing.T) {
 			Timestamp:   time.Now(),
 		},
 	}
-	server.dockerCache = []dto.ContainerInfo{
-		{ID: "abc123", Name: "plex", Image: "plexinc/pms-docker", State: "running"},
+	server.disksCache.Store(&disksVal)
+	dockerVal := []dto.ContainerInfo{{ID: "abc123", Name: "plex", Image: "plexinc/pms-docker", State: "running"},
 		{ID: "def456", Name: "sonarr", Image: "linuxserver/sonarr", State: "running"},
 		{ID: "ghi789", Name: "nginx", Image: "nginx:latest", State: "exited"},
 	}
-	server.vmsCache = []dto.VMInfo{
-		{ID: "1", Name: "Windows10", State: "running"},
+	server.dockerCache.Store(&dockerVal)
+	vmsVal := []dto.VMInfo{{ID: "1", Name: "Windows10", State: "running"},
 		{ID: "2", Name: "Ubuntu", State: "shutoff"},
 	}
-	server.sharesCache = []dto.ShareInfo{
-		{Name: "appdata", Used: 50000000000},
+	server.vmsCache.Store(&vmsVal)
+	sharesVal := []dto.ShareInfo{{Name: "appdata", Used: 50000000000},
 		{Name: "media", Used: 4000000000000},
 	}
-	server.upsCache = &dto.UPSStatus{
+	server.sharesCache.Store(&sharesVal)
+	server.upsCache.Store(&dto.UPSStatus{
 		Connected:     true,
 		Status:        "OL",
 		Model:         "APC Smart-UPS 1500",
@@ -96,8 +95,7 @@ func TestHandleMetrics(t *testing.T) {
 		LoadPercent:   25,
 		RuntimeLeft:   3600,
 		Timestamp:     time.Now(),
-	}
-	server.cacheMutex.Unlock()
+	})
 
 	// Create request
 	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
@@ -240,13 +238,11 @@ func TestMetricsArrayStateValues(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			server.cacheMutex.Lock()
-			server.arrayCache = &dto.ArrayStatus{
+			server.arrayCache.Store(&dto.ArrayStatus{
 				State:      tt.state,
 				TotalBytes: 1000,
 				FreeBytes:  500,
-			}
-			server.cacheMutex.Unlock()
+			})
 
 			req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
 			w := httptest.NewRecorder()

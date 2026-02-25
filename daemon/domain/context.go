@@ -1,7 +1,5 @@
 package domain
 
-import "github.com/cskr/pubsub"
-
 // Intervals holds collection interval settings in seconds.
 type Intervals struct {
 	System       int
@@ -23,7 +21,7 @@ type Intervals struct {
 
 // Context holds the application runtime context including the event hub and configuration.
 type Context struct {
-	Hub        *pubsub.PubSub
+	Hub        *EventBus
 	Intervals  Intervals
 	MQTTConfig MQTTConfig
 	Config

@@ -860,7 +860,7 @@ definitions:
         type: integer
       target:
         description: 'Target is the probe target: URL for HTTP, host:port for TCP,
-          container ID/name for container.'
+          container ID/name for container, hostname/IP for ping.'
         type: string
       timeout_seconds:
         description: TimeoutSeconds is the probe timeout (minimum 1, default 5).
@@ -868,7 +868,7 @@ definitions:
       type:
         allOf:
         - $ref: '#/definitions/dto.HealthCheckType'
-        description: 'Type is the probe type: "http", "tcp", or "container".'
+        description: 'Type is the probe type: "http", "tcp", "container", or "ping".'
     type: object
   dto.HealthCheckEvent:
     properties:
@@ -939,11 +939,13 @@ definitions:
     - http
     - tcp
     - container
+    - ping
     type: string
     x-enum-varnames:
     - HealthCheckHTTP
     - HealthCheckTCP
     - HealthCheckContainer
+    - HealthCheckPing
   dto.HealthChecksStatusResponse:
     properties:
       checks:

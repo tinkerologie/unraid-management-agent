@@ -4,12 +4,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cskr/pubsub"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 )
 
 func TestNewDockerCollector(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{
 		Hub: hub,
 	}
@@ -34,7 +33,7 @@ func TestNewDockerCollector(t *testing.T) {
 }
 
 func TestDockerCollector_InitClient_NoDocker(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{
 		Hub: hub,
 	}
@@ -57,7 +56,7 @@ func TestDockerCollector_InitClient_NoDocker(t *testing.T) {
 }
 
 func TestDockerCollector_Collect_NoDocker(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{
 		Hub: hub,
 	}

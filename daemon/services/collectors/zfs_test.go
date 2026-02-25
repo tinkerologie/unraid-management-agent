@@ -4,13 +4,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cskr/pubsub"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 )
 
 func TestNewZFSCollector(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 
 	collector := NewZFSCollector(ctx)
@@ -181,7 +180,7 @@ func TestZFSScanStatusParsing(t *testing.T) {
 		},
 	}
 
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewZFSCollector(ctx)
 
@@ -201,7 +200,7 @@ func TestZFSScanStatusParsing(t *testing.T) {
 }
 
 func TestZFSVdevLineParsing(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewZFSCollector(ctx)
 
@@ -339,7 +338,7 @@ func TestZFSPoolStates(t *testing.T) {
 
 // TestZFSVdevTypes tests parsing of different vdev types
 func TestZFSVdevTypes(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewZFSCollector(ctx)
 

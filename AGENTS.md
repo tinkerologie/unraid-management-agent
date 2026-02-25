@@ -5,14 +5,14 @@
 
 ## Project Identity
 
-| Key | Value |
-|-----|-------|
-| **Name** | Unraid Management Agent |
-| **Language** | Go 1.26 |
-| **Target** | Linux/amd64 (Unraid OS) |
-| **Type** | Third-party community plugin (not official Unraid) |
-| **Purpose** | REST API + WebSocket + MCP interface for system monitoring and control |
-| **Repo** | `github.com/ruaan-deysel/unraid-management-agent` |
+| Key          | Value                                                                  |
+| ------------ | ---------------------------------------------------------------------- |
+| **Name**     | Unraid Management Agent                                                |
+| **Language** | Go 1.26                                                                |
+| **Target**   | Linux/amd64 (Unraid OS)                                                |
+| **Type**     | Third-party community plugin (not official Unraid)                     |
+| **Purpose**  | REST API + WebSocket + MCP interface for system monitoring and control |
+| **Repo**     | `github.com/ruaan-deysel/unraid-management-agent`                      |
 
 ## Project Structure
 
@@ -73,11 +73,11 @@ In `daemon/services/orchestrator.go`:
 
 Prefer native Go libraries over shell commands:
 
-| Component | Library | Purpose |
-|-----------|---------|---------|
-| Docker | `github.com/moby/moby/client` | Docker Engine SDK |
-| VMs | `github.com/digitalocean/go-libvirt` | Native libvirt bindings |
-| System | Direct `/proc`, `/sys` access | Kernel interfaces |
+| Component | Library                              | Purpose                 |
+| --------- | ------------------------------------ | ----------------------- |
+| Docker    | `github.com/moby/moby/client`        | Docker Engine SDK       |
+| VMs       | `github.com/digitalocean/go-libvirt` | Native libvirt bindings |
+| System    | Direct `/proc`, `/sys` access        | Kernel interfaces       |
 
 ### Data Flow Example
 
@@ -107,22 +107,22 @@ All data structures shared between collectors, API, and WebSocket clients:
 
 Independent goroutines that collect data at fixed intervals (defined in `daemon/constants/const.go`):
 
-| Collector | Interval | Event Topic | Notes |
-|-----------|----------|-------------|-------|
-| System | 15s | `system_update` | CPU/RAM/temps — sensors is CPU intensive |
-| Array | 30s | `array_status_update` | Array state rarely changes |
-| Disk | 30s | `disk_list_update` | Per-disk SMART data |
-| Network | 30s | `network_list_update` | Interface status |
-| Docker | 30s | `container_list_update` | Very CPU intensive with many containers |
-| VM | 30s | `vm_list_update` | virsh commands spawn multiple processes |
-| UPS | 60s | `ups_status_update` | UPS status rarely changes |
-| GPU | 60s | `gpu_metrics_update` | intel_gpu_top is extremely CPU intensive |
-| Share | 60s | `share_list_update` | User share information |
-| Notification | 30s | `notifications_update` | System notifications |
-| Unassigned | 60s | `unassigned_devices_update` | Unassigned devices |
-| ZFS | 30s | `zfs_*_update` | Pools, datasets, snapshots |
-| Hardware | 300s | `hardware_update` | Rarely changes |
-| Registration | 300s | `registration_update` | License info |
+| Collector    | Interval | Event Topic                 | Notes                                    |
+| ------------ | -------- | --------------------------- | ---------------------------------------- |
+| System       | 15s      | `system_update`             | CPU/RAM/temps — sensors is CPU intensive |
+| Array        | 30s      | `array_status_update`       | Array state rarely changes               |
+| Disk         | 30s      | `disk_list_update`          | Per-disk SMART data                      |
+| Network      | 30s      | `network_list_update`       | Interface status                         |
+| Docker       | 30s      | `container_list_update`     | Very CPU intensive with many containers  |
+| VM           | 30s      | `vm_list_update`            | virsh commands spawn multiple processes  |
+| UPS          | 60s      | `ups_status_update`         | UPS status rarely changes                |
+| GPU          | 60s      | `gpu_metrics_update`        | intel_gpu_top is extremely CPU intensive |
+| Share        | 60s      | `share_list_update`         | User share information                   |
+| Notification | 30s      | `notifications_update`      | System notifications                     |
+| Unassigned   | 60s      | `unassigned_devices_update` | Unassigned devices                       |
+| ZFS          | 30s      | `zfs_*_update`              | Pools, datasets, snapshots               |
+| Hardware     | 300s     | `hardware_update`           | Rarely changes                           |
+| Registration | 300s     | `registration_update`       | License info                             |
 
 **Intervals optimized for power efficiency** — lower intervals increase CPU usage.
 
@@ -250,14 +250,14 @@ cp scripts/config.sh.example scripts/config.sh  # Add SSH credentials
 
 All user-provided input must be validated using functions in `daemon/lib/validation.go`:
 
-| Function | Purpose |
-|----------|---------|
-| `ValidateContainerID()` | Docker container IDs (12 or 64 hex chars) |
-| `ValidateVMName()` | VM names (alphanumeric, spaces, hyphens, underscores, dots) |
-| `ValidateShareName()` | Share names (path traversal protection) |
-| `ValidateConfigPath()` | File paths (CWE-22 protection) |
-| `ValidateNotificationFilename()` | Notification filenames |
-| `ValidateLogFilename()` | Log filenames (CWE-22 protection) |
+| Function                         | Purpose                                                     |
+| -------------------------------- | ----------------------------------------------------------- |
+| `ValidateContainerID()`          | Docker container IDs (12 or 64 hex chars)                   |
+| `ValidateVMName()`               | VM names (alphanumeric, spaces, hyphens, underscores, dots) |
+| `ValidateShareName()`            | Share names (path traversal protection)                     |
+| `ValidateConfigPath()`           | File paths (CWE-22 protection)                              |
+| `ValidateNotificationFilename()` | Notification filenames                                      |
+| `ValidateLogFilename()`          | Log filenames (CWE-22 protection)                           |
 
 - No directory traversal (`..`), absolute paths (`/`), or null bytes allowed
 - Protection against CWE-22 path traversal vulnerabilities
@@ -409,13 +409,13 @@ go test -v ./daemon/services/api/handlers_test.go  # Specific test
 **Location:** `/var/log/unraid-management-agent.log`
 **Logger:** `daemon/logger/logger.go` (wrapper around lumberjack for rotation)
 
-| Level | Function | Usage |
-|-------|----------|-------|
-| Debug | `logger.Debug()` | Detailed diagnostics (requires `--debug`) |
-| Info | `logger.Info()` | General operations |
-| Success | `logger.Success()` | Successful operations (green) |
-| Warning | `logger.Warning()` | Warning conditions (yellow) |
-| Error | `logger.Error()` | Error conditions (red) |
+| Level   | Function           | Usage                                     |
+| ------- | ------------------ | ----------------------------------------- |
+| Debug   | `logger.Debug()`   | Detailed diagnostics (requires `--debug`) |
+| Info    | `logger.Info()`    | General operations                        |
+| Success | `logger.Success()` | Successful operations (green)             |
+| Warning | `logger.Warning()` | Warning conditions (yellow)               |
+| Error   | `logger.Error()`   | Error conditions (red)                    |
 
 **Rotation:** 5 MB max, no backups, no age-based retention.
 
@@ -477,17 +477,17 @@ See `docs/api/` for complete endpoint documentation.
 
 ## Key Dependencies
 
-| Package | Purpose |
-|---------|---------|
-| `github.com/alecthomas/kong` | CLI framework |
-| `github.com/cskr/pubsub` | Event bus (PubSub pattern) |
-| `github.com/gorilla/mux` | HTTP router |
-| `github.com/gorilla/websocket` | WebSocket implementation |
-| `github.com/moby/moby/client` | Docker Engine SDK |
+| Package                              | Purpose                         |
+| ------------------------------------ | ------------------------------- |
+| `github.com/alecthomas/kong`         | CLI framework                   |
+| `github.com/cskr/pubsub`             | Event bus (PubSub pattern)      |
+| `github.com/gorilla/mux`             | HTTP router                     |
+| `github.com/gorilla/websocket`       | WebSocket implementation        |
+| `github.com/moby/moby/client`        | Docker Engine SDK               |
 | `github.com/digitalocean/go-libvirt` | Native libvirt bindings for VMs |
-| `github.com/metoro-io/mcp-golang` | Model Context Protocol server |
-| `gopkg.in/ini.v1` | INI file parsing |
-| `gopkg.in/natefinsh/lumberjack.v2` | Log rotation |
+| `github.com/metoro-io/mcp-golang`    | Model Context Protocol server   |
+| `gopkg.in/ini.v1`                    | INI file parsing                |
+| `gopkg.in/natefinsh/lumberjack.v2`   | Log rotation                    |
 
 ## Anti-Patterns (DO NOT)
 

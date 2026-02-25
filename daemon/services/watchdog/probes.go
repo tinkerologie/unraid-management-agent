@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os/exec"
 	"time"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
@@ -28,6 +29,8 @@ func RunProbe(ctx context.Context, check dto.HealthCheck) ProbeResult {
 		return probeTCP(ctx, check.Target, timeout)
 	case dto.HealthCheckContainer:
 		return probeContainer(ctx, check.Target)
+	case dto.HealthCheckPing:
+		return probePing(ctx, check.Target, timeout)
 	default:
 		return ProbeResult{Healthy: false, Error: fmt.Sprintf("unknown probe type: %s", check.Type)}
 	}
@@ -68,6 +71,17 @@ func probeTCP(_ context.Context, target string, timeout time.Duration) ProbeResu
 		return ProbeResult{Healthy: false, Error: fmt.Sprintf("TCP connect failed: %s", err)}
 	}
 	_ = conn.Close()
+	return ProbeResult{Healthy: true}
+}
+
+// probePing sends a single ICMP echo request via the ping binary.
+// Target should be a hostname or IP address.
+func probePing(ctx context.Context, target string, timeout time.Duration) ProbeResult {
+	timeoutSec := fmt.Sprintf("%d", max(1, int(timeout.Seconds())))
+	cmd := exec.CommandContext(ctx, "ping", "-c", "1", "-W", timeoutSec, target) //nolint:gosec //#nosec G204 -- Target is user-configured health check host
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return ProbeResult{Healthy: false, Error: fmt.Sprintf("ping failed: %s (%s)", err, string(output))}
+	}
 	return ProbeResult{Healthy: true}
 }
 

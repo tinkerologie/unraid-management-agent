@@ -107,8 +107,8 @@ func (c *ArrayCollector) Collect() {
 
 	logger.Debug("Array: Successfully collected, publishing event")
 	// Publish event
-	c.ctx.Hub.Pub(arrayStatus, "array_status_update")
-	logger.Debug("Array: Published array_status_update event - state=%s, disks=%d", arrayStatus.State, arrayStatus.NumDisks)
+	domain.Publish(c.ctx.Hub, constants.TopicArrayStatusUpdate, arrayStatus)
+	logger.Debug("Array: Published %s event - state=%s, disks=%d", constants.TopicArrayStatusUpdate.Name, arrayStatus.State, arrayStatus.NumDisks)
 }
 
 func (c *ArrayCollector) collectArrayStatus() (*dto.ArrayStatus, error) {

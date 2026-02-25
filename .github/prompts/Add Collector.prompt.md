@@ -110,7 +110,7 @@ func (s *Server) handleMyFeature(w http.ResponseWriter, _ *http.Request) {
 }
 ```
 
-3. Register the route in `setupRoutes()`
+1. Register the route in `setupRoutes()`
 
 ## Step 7: Test
 

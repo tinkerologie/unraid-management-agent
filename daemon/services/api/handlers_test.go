@@ -1369,11 +1369,8 @@ func TestDockerInfoEndpointWithCacheData(t *testing.T) {
 	server, _ := setupTestServer()
 
 	// Set up Docker cache with test data
-	server.cacheMutex.Lock()
-	server.dockerCache = []dto.ContainerInfo{
-		{ID: "abc123", Name: "test-container", State: "running"},
-	}
-	server.cacheMutex.Unlock()
+	dockerVal := []dto.ContainerInfo{{ID: "abc123", Name: "test-container", State: "running"}}
+	server.dockerCache.Store(&dockerVal)
 
 	req, err := http.NewRequest("GET", "/api/v1/docker/abc123", nil)
 	if err != nil {
@@ -1401,9 +1398,8 @@ func TestDockerInfoEndpointContainerNotFound(t *testing.T) {
 	server, _ := setupTestServer()
 
 	// Empty cache
-	server.cacheMutex.Lock()
-	server.dockerCache = []dto.ContainerInfo{}
-	server.cacheMutex.Unlock()
+	dockerVal := []dto.ContainerInfo{}
+	server.dockerCache.Store(&dockerVal)
 
 	req, err := http.NewRequest("GET", "/api/v1/docker/nonexistent", nil)
 	if err != nil {
@@ -1422,11 +1418,8 @@ func TestVMInfoEndpointWithCacheData(t *testing.T) {
 	server, _ := setupTestServer()
 
 	// Set up VM cache with test data
-	server.cacheMutex.Lock()
-	server.vmsCache = []dto.VMInfo{
-		{Name: "test-vm", State: "running", MemoryAllocated: 4096},
-	}
-	server.cacheMutex.Unlock()
+	vmsVal := []dto.VMInfo{{Name: "test-vm", State: "running", MemoryAllocated: 4096}}
+	server.vmsCache.Store(&vmsVal)
 
 	req, err := http.NewRequest("GET", "/api/v1/vm/test-vm", nil)
 	if err != nil {
@@ -1454,9 +1447,8 @@ func TestVMInfoEndpointVMNotFound(t *testing.T) {
 	server, _ := setupTestServer()
 
 	// Empty cache
-	server.cacheMutex.Lock()
-	server.vmsCache = []dto.VMInfo{}
-	server.cacheMutex.Unlock()
+	vmsVal := []dto.VMInfo{}
+	server.vmsCache.Store(&vmsVal)
 
 	req, err := http.NewRequest("GET", "/api/v1/vm/nonexistent-vm", nil)
 	if err != nil {
@@ -1475,11 +1467,8 @@ func TestDiskEndpointWithCacheData(t *testing.T) {
 	server, _ := setupTestServer()
 
 	// Set up disk cache with test data
-	server.cacheMutex.Lock()
-	server.disksCache = []dto.DiskInfo{
-		{Name: "disk1", Device: "/dev/sda", Status: "ok"},
-	}
-	server.cacheMutex.Unlock()
+	disksVal := []dto.DiskInfo{{Name: "disk1", Device: "/dev/sda", Status: "ok"}}
+	server.disksCache.Store(&disksVal)
 
 	req, err := http.NewRequest("GET", "/api/v1/disks/disk1", nil)
 	if err != nil {
@@ -1498,9 +1487,8 @@ func TestDiskEndpointDiskNotFound(t *testing.T) {
 	server, _ := setupTestServer()
 
 	// Empty cache
-	server.cacheMutex.Lock()
-	server.disksCache = []dto.DiskInfo{}
-	server.cacheMutex.Unlock()
+	disksVal := []dto.DiskInfo{}
+	server.disksCache.Store(&disksVal)
 
 	req, err := http.NewRequest("GET", "/api/v1/disks/nonexistent", nil)
 	if err != nil {

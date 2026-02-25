@@ -4,13 +4,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cskr/pubsub"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 )
 
 func TestNewVMCollector(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{
 		Hub: hub,
 	}
@@ -31,7 +30,7 @@ func TestNewVMCollector(t *testing.T) {
 }
 
 func TestVMCollector_Collect_NoLibvirt(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{
 		Hub: hub,
 	}
@@ -63,7 +62,7 @@ func TestVMCollector_Collect_NoLibvirt(t *testing.T) {
 }
 
 func TestVMCollector_FormatMemoryDisplay(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{
 		Hub: hub,
 	}
@@ -195,7 +194,7 @@ func TestExtractInterfaceTargets(t *testing.T) {
 }
 
 func TestVMCollector_ClearCPUStats(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{
 		Hub: hub,
 	}

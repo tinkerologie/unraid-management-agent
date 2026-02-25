@@ -5,13 +5,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cskr/pubsub"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 )
 
 // TestSystemCollectorStart tests the System collector's Start method
 func TestSystemCollectorStart(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewSystemCollector(ctx)
 
@@ -36,7 +35,7 @@ func TestSystemCollectorStart(t *testing.T) {
 
 // TestArrayCollectorStart tests the Array collector's Start method
 func TestArrayCollectorStart(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewArrayCollector(ctx)
 
@@ -57,7 +56,7 @@ func TestArrayCollectorStart(t *testing.T) {
 
 // TestDiskCollectorStart tests the Disk collector's Start method
 func TestDiskCollectorStart(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewDiskCollector(ctx)
 
@@ -78,7 +77,7 @@ func TestDiskCollectorStart(t *testing.T) {
 
 // TestShareCollectorStart tests the Share collector's Start method
 func TestShareCollectorStart(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewShareCollector(ctx)
 
@@ -99,7 +98,7 @@ func TestShareCollectorStart(t *testing.T) {
 
 // TestDockerCollectorStart tests the Docker collector's Start method
 func TestDockerCollectorStart(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewDockerCollector(ctx)
 
@@ -120,7 +119,7 @@ func TestDockerCollectorStart(t *testing.T) {
 
 // TestVMCollectorStart tests the VM collector's Start method
 func TestVMCollectorStart(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewVMCollector(ctx)
 
@@ -141,7 +140,7 @@ func TestVMCollectorStart(t *testing.T) {
 
 // TestNetworkCollectorStart tests the Network collector's Start method
 func TestNetworkCollectorStart(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewNetworkCollector(ctx)
 
@@ -162,7 +161,7 @@ func TestNetworkCollectorStart(t *testing.T) {
 
 // TestUPSCollectorStart tests the UPS collector's Start method
 func TestUPSCollectorStart(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewUPSCollector(ctx)
 
@@ -183,7 +182,7 @@ func TestUPSCollectorStart(t *testing.T) {
 
 // TestNUTCollectorStart tests the NUT collector's Start method
 func TestNUTCollectorStart(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewNUTCollector(ctx)
 
@@ -204,7 +203,7 @@ func TestNUTCollectorStart(t *testing.T) {
 
 // TestGPUCollectorStart tests the GPU collector's Start method
 func TestGPUCollectorStart(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewGPUCollector(ctx)
 
@@ -234,7 +233,7 @@ func TestParityCollectorCreation(t *testing.T) {
 
 // TestZFSCollectorStart tests the ZFS collector's Start method
 func TestZFSCollectorStart(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewZFSCollector(ctx)
 
@@ -255,7 +254,7 @@ func TestZFSCollectorStart(t *testing.T) {
 
 // TestHardwareCollectorStart tests the Hardware collector's Start method
 func TestHardwareCollectorStart(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewHardwareCollector(ctx)
 
@@ -276,7 +275,7 @@ func TestHardwareCollectorStart(t *testing.T) {
 
 // TestRegistrationCollectorStart tests the Registration collector's Start method
 func TestRegistrationCollectorStart(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewRegistrationCollector(ctx)
 
@@ -297,7 +296,7 @@ func TestRegistrationCollectorStart(t *testing.T) {
 
 // TestUnassignedCollectorStart tests the Unassigned collector's Start method
 func TestUnassignedCollectorStart(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 	collector := NewUnassignedCollector(ctx)
 

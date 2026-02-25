@@ -10,6 +10,7 @@ import (
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
@@ -84,7 +85,7 @@ func (c *DockerCollector) Collect() {
 	if err := c.initClient(); err != nil {
 		logger.Debug("Failed to initialize Docker client: %v (Docker may not be running)", err)
 		// Publish empty list
-		c.appCtx.Hub.Pub([]*dto.ContainerInfo{}, "container_list_update")
+		domain.Publish(c.appCtx.Hub, constants.TopicContainerListUpdate, []*dto.ContainerInfo{})
 		return
 	}
 
@@ -95,14 +96,14 @@ func (c *DockerCollector) Collect() {
 	result, err := c.dockerClient.ContainerList(ctx, client.ContainerListOptions{All: true})
 	if err != nil {
 		logger.Debug("Failed to list containers via SDK: %v", err)
-		c.appCtx.Hub.Pub([]*dto.ContainerInfo{}, "container_list_update")
+		domain.Publish(c.appCtx.Hub, constants.TopicContainerListUpdate, []*dto.ContainerInfo{})
 		return
 	}
 	apiContainers := result.Items
 	logger.Debug("Docker SDK: ContainerList took %v for %d containers", time.Since(startList), len(apiContainers))
 
 	containers := make([]*dto.ContainerInfo, 0, len(apiContainers))
-	runningContainers := make([]container.Summary, 0)
+	var runningContainers []container.Summary
 
 	// First pass: create basic container info
 	for _, apiContainer := range apiContainers {
@@ -214,7 +215,7 @@ func (c *DockerCollector) Collect() {
 	}
 
 	// Publish event
-	c.appCtx.Hub.Pub(containers, "container_list_update")
+	domain.Publish(c.appCtx.Hub, constants.TopicContainerListUpdate, containers)
 	logger.Debug("Docker SDK: Total collection took %v, published %d containers", time.Since(startTotal), len(containers))
 }
 

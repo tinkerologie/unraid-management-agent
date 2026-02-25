@@ -5,12 +5,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/cskr/pubsub"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 )
 
 func TestNewServer(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 
 	server := NewServer(ctx)
@@ -33,7 +32,7 @@ func TestNewServer(t *testing.T) {
 }
 
 func TestServerRouterSetup(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 
 	server := NewServer(ctx)
@@ -45,25 +44,25 @@ func TestServerRouterSetup(t *testing.T) {
 }
 
 func TestServerCacheInitialization(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 
 	server := NewServer(ctx)
 
 	// All caches should be nil initially (before collectors start)
-	if server.systemCache != nil {
+	if server.systemCache.Load() != nil {
 		t.Error("System cache should be nil initially")
 	}
-	if server.arrayCache != nil {
+	if server.arrayCache.Load() != nil {
 		t.Error("Array cache should be nil initially")
 	}
-	if server.dockerCache != nil {
+	if server.dockerCache.Load() != nil {
 		t.Error("Docker cache should be nil initially")
 	}
 }
 
 func TestServerHealthEndpoint(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 
 	server := NewServer(ctx)
@@ -83,7 +82,7 @@ func TestServerHealthEndpoint(t *testing.T) {
 }
 
 func TestAPIRoutes(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 
 	server := NewServer(ctx)
@@ -128,7 +127,7 @@ func TestAPIRoutes(t *testing.T) {
 }
 
 func TestZFSRoutes(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 
 	server := NewServer(ctx)
@@ -159,7 +158,7 @@ func TestZFSRoutes(t *testing.T) {
 }
 
 func TestHardwareRoutes(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 
 	server := NewServer(ctx)
@@ -181,7 +180,7 @@ func TestHardwareRoutes(t *testing.T) {
 }
 
 func TestControlRoutes(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 
 	server := NewServer(ctx)
@@ -220,7 +219,7 @@ func TestControlRoutes(t *testing.T) {
 }
 
 func TestNotificationRoutes(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 
 	server := NewServer(ctx)
@@ -251,7 +250,7 @@ func TestNotificationRoutes(t *testing.T) {
 }
 
 func TestServerMiddlewareChain(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 
 	server := NewServer(ctx)
@@ -271,7 +270,7 @@ func TestServerMiddlewareChain(t *testing.T) {
 }
 
 func TestCORSHeaders(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 
 	server := NewServer(ctx)
@@ -293,7 +292,7 @@ func TestCORSHeaders(t *testing.T) {
 }
 
 func TestWebSocketRouteExists(t *testing.T) {
-	hub := pubsub.New(10)
+	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}
 
 	server := NewServer(ctx)

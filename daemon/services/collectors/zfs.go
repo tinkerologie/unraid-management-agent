@@ -66,7 +66,7 @@ func (c *ZFSCollector) collect() {
 	if err != nil {
 		logger.Warning("Failed to collect ZFS pools", "error", err)
 	} else if len(pools) > 0 {
-		c.ctx.Hub.Pub(pools, "zfs_pools_update")
+		domain.Publish(c.ctx.Hub, constants.TopicZFSPoolsUpdate, pools)
 		logger.Debug("Published ZFS pools update", "count", len(pools))
 	}
 
@@ -75,7 +75,7 @@ func (c *ZFSCollector) collect() {
 	if err != nil {
 		logger.Warning("Failed to collect ZFS datasets", "error", err)
 	} else if len(datasets) > 0 {
-		c.ctx.Hub.Pub(datasets, "zfs_datasets_update")
+		domain.Publish(c.ctx.Hub, constants.TopicZFSDatasetsUpdate, datasets)
 		logger.Debug("Published ZFS datasets update", "count", len(datasets))
 	}
 
@@ -84,7 +84,7 @@ func (c *ZFSCollector) collect() {
 	if err != nil {
 		logger.Warning("Failed to collect ZFS snapshots", "error", err)
 	} else if len(snapshots) > 0 {
-		c.ctx.Hub.Pub(snapshots, "zfs_snapshots_update")
+		domain.Publish(c.ctx.Hub, constants.TopicZFSSnapshotsUpdate, snapshots)
 		logger.Debug("Published ZFS snapshots update", "count", len(snapshots))
 	}
 
@@ -93,7 +93,7 @@ func (c *ZFSCollector) collect() {
 	if err != nil {
 		logger.Warning("Failed to collect ZFS ARC stats", "error", err)
 	} else {
-		c.ctx.Hub.Pub(arcStats, "zfs_arc_stats_update")
+		domain.Publish(c.ctx.Hub, constants.TopicZFSARCStatsUpdate, arcStats)
 		logger.Debug("Published ZFS ARC stats update")
 	}
 }

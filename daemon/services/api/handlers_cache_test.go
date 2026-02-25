@@ -13,57 +13,60 @@ import (
 // ===== Helper to populate all caches for testing =====
 
 func populateTestCaches(server *Server) {
-	server.cacheMutex.Lock()
-	defer server.cacheMutex.Unlock()
-
-	server.systemCache = &dto.SystemInfo{
+	server.systemCache.Store(&dto.SystemInfo{
 		Hostname: "TestServer",
 		Uptime:   86400,
-	}
+	})
 
-	server.arrayCache = &dto.ArrayStatus{
+	server.arrayCache.Store(&dto.ArrayStatus{
 		State: "Started",
-	}
+	})
 
-	server.disksCache = []dto.DiskInfo{
+	disks := []dto.DiskInfo{
 		{ID: "disk1", Name: "disk1", Device: "sdb", Status: "active", Role: "data"},
 		{ID: "disk2", Name: "disk2", Device: "sdc", Status: "active", Role: "data"},
 		{ID: "parity", Name: "parity", Device: "sda", Status: "active", Role: "parity"},
 	}
+	server.disksCache.Store(&disks)
 
-	server.sharesCache = []dto.ShareInfo{
+	shares := []dto.ShareInfo{
 		{Name: "appdata"},
 		{Name: "isos"},
 	}
+	server.sharesCache.Store(&shares)
 
-	server.dockerCache = []dto.ContainerInfo{
+	docker := []dto.ContainerInfo{
 		{ID: "abc123def456", Name: "plex", State: "running", Image: "plexinc/plex-media-server"},
 		{ID: "deadbeef1234", Name: "nginx", State: "exited", Image: "nginx:latest"},
 	}
+	server.dockerCache.Store(&docker)
 
-	server.vmsCache = []dto.VMInfo{
+	vms := []dto.VMInfo{
 		{ID: "vm-uuid-1", Name: "Windows10", State: "running", CPUCount: 4},
 		{ID: "vm-uuid-2", Name: "Ubuntu", State: "shut off", CPUCount: 2},
 	}
+	server.vmsCache.Store(&vms)
 
-	server.upsCache = &dto.UPSStatus{
+	server.upsCache.Store(&dto.UPSStatus{
 		Model:         "APC Back-UPS 600",
 		Status:        "ONLINE",
 		BatteryCharge: 100.0,
 		NominalPower:  360.0,
 		LoadPercent:   25.0,
-	}
+	})
 
-	server.gpuCache = []*dto.GPUMetrics{
+	gpus := []*dto.GPUMetrics{
 		{Available: true, Vendor: "nvidia"},
 	}
+	server.gpuCache.Store(&gpus)
 
-	server.networkCache = []dto.NetworkInfo{
+	network := []dto.NetworkInfo{
 		{Name: "eth0", Speed: 1000, State: "up"},
 		{Name: "br0", Speed: 1000, State: "up"},
 	}
+	server.networkCache.Store(&network)
 
-	server.hardwareCache = &dto.HardwareInfo{
+	server.hardwareCache.Store(&dto.HardwareInfo{
 		BIOS: &dto.BIOSInfo{
 			Vendor:  "American Megatrends",
 			Version: "3.4",
@@ -84,14 +87,14 @@ func populateTestCaches(server *Server) {
 		MemoryDevices: []dto.MemoryDeviceInfo{
 			{Size: "16 GB", Type: "DDR4"},
 		},
-	}
+	})
 
-	server.registrationCache = &dto.Registration{
+	server.registrationCache.Store(&dto.Registration{
 		Type: "Pro",
-	}
+	})
 
 	now := time.Now()
-	server.notificationsCache = &dto.NotificationList{
+	server.notificationsCache.Store(&dto.NotificationList{
 		Overview: dto.NotificationOverview{
 			Unread:  dto.NotificationCounts{Info: 2, Warning: 1, Alert: 0, Total: 3},
 			Archive: dto.NotificationCounts{Info: 5, Warning: 2, Alert: 1, Total: 8},
@@ -103,9 +106,9 @@ func populateTestCaches(server *Server) {
 			{ID: "n4", Title: "Old alert", Importance: "alert", Type: "archive", Timestamp: now},
 		},
 		Timestamp: now,
-	}
+	})
 
-	server.unassignedCache = &dto.UnassignedDeviceList{
+	server.unassignedCache.Store(&dto.UnassignedDeviceList{
 		Devices: []dto.UnassignedDevice{
 			{Device: "sdd", Model: "Samsung 870 EVO", Status: "unmounted"},
 		},
@@ -113,27 +116,30 @@ func populateTestCaches(server *Server) {
 			{Type: "smb", Source: "//nas/share", Status: "mounted"},
 		},
 		Timestamp: now,
-	}
+	})
 
-	server.zfsPoolsCache = []dto.ZFSPool{
+	pools := []dto.ZFSPool{
 		{Name: "tank", Health: "ONLINE", SizeBytes: 4000000000000},
 	}
+	server.zfsPoolsCache.Store(&pools)
 
-	server.zfsDatasetsCache = []dto.ZFSDataset{
+	datasets := []dto.ZFSDataset{
 		{Name: "tank/data", Type: "filesystem", UsedBytes: 1000000000},
 	}
+	server.zfsDatasetsCache.Store(&datasets)
 
-	server.zfsSnapshotsCache = []dto.ZFSSnapshot{
+	snapshots := []dto.ZFSSnapshot{
 		{Name: "tank/data@backup1", Dataset: "tank/data", UsedBytes: 500000},
 	}
+	server.zfsSnapshotsCache.Store(&snapshots)
 
-	server.zfsARCStatsCache = &dto.ZFSARCStats{
+	server.zfsARCStatsCache.Store(&dto.ZFSARCStats{
 		SizeBytes: 8589934592,
-	}
+	})
 
-	server.nutCache = &dto.NUTResponse{
+	server.nutCache.Store(&dto.NUTResponse{
 		Installed: true,
-	}
+	})
 }
 
 // ===== Simple GET cache handler tests =====

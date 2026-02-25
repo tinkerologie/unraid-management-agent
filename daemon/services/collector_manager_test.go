@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cskr/pubsub"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 )
 
@@ -33,7 +32,7 @@ func (m *mockCollector) Start(ctx context.Context, interval time.Duration) {
 
 func createTestContext() *domain.Context {
 	return &domain.Context{
-		Hub: pubsub.New(100),
+		Hub: domain.NewEventBus(100),
 		Intervals: domain.Intervals{
 			System:       5,
 			Array:        10,
