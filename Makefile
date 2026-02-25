@@ -38,8 +38,9 @@ package: release
 	mkdir -p $(BUILD_DIR)/usr/local/emhttp/plugins/$(BINARY)
 	cp $(BUILD_DIR)/$(BINARY) $(BUILD_DIR)/usr/local/emhttp/plugins/$(BINARY)/
 	cp VERSION $(BUILD_DIR)/usr/local/emhttp/plugins/$(BINARY)/
-	cp -r $(PLUGIN_DIR)/* $(BUILD_DIR)/usr/local/emhttp/plugins/$(BINARY)/
-	cd $(BUILD_DIR) && tar --no-xattrs -czf $(BINARY)-$(VERSION).tgz usr/
+	COPYFILE_DISABLE=1 cp -r $(PLUGIN_DIR)/. $(BUILD_DIR)/usr/local/emhttp/plugins/$(BINARY)/
+	find $(BUILD_DIR)/usr/local/emhttp/plugins/$(BINARY) -name '._*' -delete 2>/dev/null || true
+	cd $(BUILD_DIR) && COPYFILE_DISABLE=1 tar -czf $(BINARY)-$(VERSION).tgz usr/
 	@echo "Package created: $(BUILD_DIR)/$(BINARY)-$(VERSION).tgz"
 
 test:

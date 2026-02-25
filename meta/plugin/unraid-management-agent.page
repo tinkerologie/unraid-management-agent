@@ -3,7 +3,7 @@ Title="Unraid Management Agent"
 Icon="/plugins/unraid-management-agent/images/unraid-management-agent.png"
 ---
 <?PHP
-/* Copyright 2026, Home Assistant Unraid Management Agent.
+/* Copyright 2026, Unraid Management Agent.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version 2,
@@ -15,10 +15,8 @@ Icon="/plugins/unraid-management-agent/images/unraid-management-agent.png"
 
 $plugin = "unraid-management-agent";
 $config_file = "/boot/config/plugins/$plugin/config.cfg";
-$service_name = "unraid-management-agent";
 
 // Load current configuration
-// INI_SCANNER_RAW prevents PHP from converting "true"/"false" to "1"/""
 $config = [];
 if (file_exists($config_file)) {
     $config = parse_ini_file($config_file, false, INI_SCANNER_RAW);
@@ -36,38 +34,30 @@ $mqtt_password = $config['MQTT_PASSWORD'] ?? '';
 $mqtt_topic_prefix = $config['MQTT_TOPIC_PREFIX'] ?? 'unraid';
 $mqtt_ha_enabled = $config['MQTT_HOME_ASSISTANT'] ?? 'false';
 
-// Collection interval defaults (industry-standard: Zabbix, Prometheus, Datadog)
+// Collection interval defaults
 $interval_system = $config['INTERVAL_SYSTEM'] ?? '15';
 $interval_array = $config['INTERVAL_ARRAY'] ?? '60';
 $interval_disk = $config['INTERVAL_DISK'] ?? '300';
 $interval_docker = $config['INTERVAL_DOCKER'] ?? '30';
 $interval_vm = $config['INTERVAL_VM'] ?? '60';
 $interval_ups = $config['INTERVAL_UPS'] ?? '60';
-$interval_nut = $config['INTERVAL_NUT'] ?? '0';  // Disabled by default - enable if using NUT plugin
+$interval_nut = $config['INTERVAL_NUT'] ?? '0';
 $interval_gpu = $config['INTERVAL_GPU'] ?? '60';
 $interval_shares = $config['INTERVAL_SHARES'] ?? '60';
 $interval_network = $config['INTERVAL_NETWORK'] ?? '60';
-$interval_zfs = $config['INTERVAL_ZFS'] ?? '300';
+$interval_zfs = $config['INTERVAL_ZFS'] ?? '0';
 $interval_notification = $config['INTERVAL_NOTIFICATION'] ?? '30';
 $interval_hardware = $config['INTERVAL_HARDWARE'] ?? '600';
 $interval_registration = $config['INTERVAL_REGISTRATION'] ?? '600';
 $interval_unassigned = $config['INTERVAL_UNASSIGNED'] ?? '60';
 
 // Check if service is running
-function isServiceRunning() {
-    exec("pgrep -f 'unraid-management-agent --logs-dir' 2>&1", $output, $return);
-    return $return === 0 && !empty($output);
-}
-
-$running = isServiceRunning();
-$status_text = $running ? "<span style='color:green;'>RUNNING</span>" : "<span style='color:red;'>STOPPED</span>";
+exec("pidof $plugin 2>/dev/null", $pids, $pid_rc);
+$running = ($pid_rc === 0 && !empty($pids));
 
 // Helper function to generate interval select options
-// All types now include Disabled option and extended ranges up to 24 hours
 function intervalOptions($selected, $type = 'standard') {
     $options = [];
-
-    // Common extended options (up to 24 hours)
     $extended = [
         '3600' => '1 hour',
         '7200' => '2 hours',
@@ -76,9 +66,7 @@ function intervalOptions($selected, $type = 'standard') {
         '43200' => '12 hours',
         '86400' => '24 hours',
     ];
-
     if ($type === 'fast') {
-        // For system metrics that can update quickly
         $options = [
             '0' => 'Disabled',
             '5' => '5 seconds',
@@ -93,7 +81,6 @@ function intervalOptions($selected, $type = 'standard') {
             '1800' => '30 minutes',
         ] + $extended;
     } elseif ($type === 'standard') {
-        // For most collectors
         $options = [
             '0' => 'Disabled',
             '10' => '10 seconds',
@@ -107,7 +94,6 @@ function intervalOptions($selected, $type = 'standard') {
             '1800' => '30 minutes',
         ] + $extended;
     } elseif ($type === 'slow') {
-        // For hardware/registration that rarely changes
         $options = [
             '0' => 'Disabled',
             '60' => '1 minute',
@@ -118,7 +104,6 @@ function intervalOptions($selected, $type = 'standard') {
             '1800' => '30 minutes',
         ] + $extended;
     }
-
     $html = '';
     foreach ($options as $value => $label) {
         $isSelected = ($selected == $value) ? 'selected' : '';
@@ -126,243 +111,115 @@ function intervalOptions($selected, $type = 'standard') {
     }
     return $html;
 }
-
-// Handle form submission
-if ($_POST) {
-    if (isset($_POST['start'])) {
-        exec("/usr/local/emhttp/plugins/$plugin/scripts/start > /dev/null 2>&1 &");
-    } elseif (isset($_POST['stop'])) {
-        exec("/usr/local/emhttp/plugins/$plugin/scripts/stop > /dev/null 2>&1 &");
-    } elseif (isset($_POST['restart'])) {
-        exec("/usr/local/emhttp/plugins/$plugin/scripts/stop > /dev/null 2>&1 && sleep 1 && /usr/local/emhttp/plugins/$plugin/scripts/start > /dev/null 2>&1 &");
-    } elseif (isset($_POST['apply'])) {
-        // Save configuration
-        $new_config = "# Unraid Management Agent Configuration\n\n";
-        $new_config .= "# API Server Configuration\n";
-        $new_config .= "PORT=" . $_POST['port'] . "\n\n";
-        $new_config .= "# MQTT Configuration\n";
-        $new_config .= "MQTT_ENABLED=" . (isset($_POST['mqtt_enabled']) ? 'true' : 'false') . "\n";
-        $new_config .= "MQTT_BROKER=" . $_POST['mqtt_broker'] . "\n";
-        $new_config .= "MQTT_PORT=" . $_POST['mqtt_port'] . "\n";
-        $new_config .= "MQTT_USERNAME=" . $_POST['mqtt_username'] . "\n";
-        $new_config .= "MQTT_PASSWORD=" . $_POST['mqtt_password'] . "\n";
-        $new_config .= "MQTT_TOPIC_PREFIX=" . $_POST['mqtt_topic_prefix'] . "\n";
-        $new_config .= "MQTT_HOME_ASSISTANT=" . (isset($_POST['mqtt_ha_enabled']) ? 'true' : 'false') . "\n\n";
-        $new_config .= "# Collection Intervals in seconds\n";
-        $new_config .= "INTERVAL_SYSTEM=" . $_POST['interval_system'] . "\n";
-        $new_config .= "INTERVAL_ARRAY=" . $_POST['interval_array'] . "\n";
-        $new_config .= "INTERVAL_DISK=" . $_POST['interval_disk'] . "\n";
-        $new_config .= "INTERVAL_DOCKER=" . $_POST['interval_docker'] . "\n";
-        $new_config .= "INTERVAL_VM=" . $_POST['interval_vm'] . "\n";
-        $new_config .= "INTERVAL_UPS=" . $_POST['interval_ups'] . "\n";
-        $new_config .= "INTERVAL_NUT=" . $_POST['interval_nut'] . "\n";
-        $new_config .= "INTERVAL_GPU=" . $_POST['interval_gpu'] . "\n";
-        $new_config .= "INTERVAL_SHARES=" . $_POST['interval_shares'] . "\n";
-        $new_config .= "INTERVAL_NETWORK=" . $_POST['interval_network'] . "\n";
-        $new_config .= "INTERVAL_ZFS=" . $_POST['interval_zfs'] . "\n";
-        $new_config .= "INTERVAL_NOTIFICATION=" . $_POST['interval_notification'] . "\n";
-        $new_config .= "INTERVAL_HARDWARE=" . $_POST['interval_hardware'] . "\n";
-        $new_config .= "INTERVAL_REGISTRATION=" . $_POST['interval_registration'] . "\n";
-        $new_config .= "INTERVAL_UNASSIGNED=" . $_POST['interval_unassigned'] . "\n";
-        file_put_contents($config_file, $new_config);
-
-        // Restart service in background if running
-        if ($running) {
-            exec("/usr/local/emhttp/plugins/$plugin/scripts/stop > /dev/null 2>&1 && sleep 1 && /usr/local/emhttp/plugins/$plugin/scripts/start > /dev/null 2>&1 &");
-        }
-    } elseif (isset($_POST['default'])) {
-        // Reset to defaults - power-optimized values
-        $default_config = "# Unraid Management Agent Configuration\n\n";
-        $default_config .= "# API Server Configuration\n";
-        $default_config .= "PORT=8043\n\n";
-        $default_config .= "# MQTT Configuration\n";
-        $default_config .= "MQTT_ENABLED=false\n";
-        $default_config .= "MQTT_BROKER=\n";
-        $default_config .= "MQTT_PORT=1883\n";
-        $default_config .= "MQTT_USERNAME=\n";
-        $default_config .= "MQTT_PASSWORD=\n";
-        $default_config .= "MQTT_TOPIC_PREFIX=unraid\n";
-        $default_config .= "MQTT_HOME_ASSISTANT=false\n\n";
-        $default_config .= "# Collection Intervals in seconds - Industry-standard defaults\n";
-        $default_config .= "INTERVAL_SYSTEM=15\n";
-        $default_config .= "INTERVAL_ARRAY=60\n";
-        $default_config .= "INTERVAL_DISK=300\n";
-        $default_config .= "INTERVAL_DOCKER=30\n";
-        $default_config .= "INTERVAL_VM=60\n";
-        $default_config .= "INTERVAL_UPS=60\n";
-        $default_config .= "INTERVAL_NUT=0\n";  # Disabled by default - enable if using NUT plugin
-        $default_config .= "INTERVAL_GPU=60\n";
-        $default_config .= "INTERVAL_SHARES=60\n";
-        $default_config .= "INTERVAL_NETWORK=60\n";
-        $default_config .= "INTERVAL_ZFS=300\n";
-        $default_config .= "INTERVAL_NOTIFICATION=30\n";
-        $default_config .= "INTERVAL_HARDWARE=600\n";
-        $default_config .= "INTERVAL_REGISTRATION=600\n";
-        $default_config .= "INTERVAL_UNASSIGNED=60\n";
-        file_put_contents($config_file, $default_config);
-
-        // Restart service in background if running
-        if ($running) {
-            exec("/usr/local/emhttp/plugins/$plugin/scripts/stop > /dev/null 2>&1 && sleep 1 && /usr/local/emhttp/plugins/$plugin/scripts/start > /dev/null 2>&1 &");
-        }
-    }
-
-    // Redirect using JavaScript (more reliable in Unraid's PHP environment)
-    echo "<script>window.location.href = window.location.pathname;</script>";
-    exit;
-}
 ?>
 
 <style>
-.agent-container {
-    margin: 20px;
-}
-.status-box {
-    padding: 15px;
+.uma-status {
     margin-bottom: 20px;
-    border: 1px solid var(--line-color, #ccc);
-    border-radius: 5px;
 }
-.config-box {
-    padding: 15px;
-    margin-bottom: 20px;
-    border: 1px solid var(--line-color, #ccc);
-    border-radius: 5px;
-}
-.form-row {
-    margin-bottom: 15px;
-}
-.form-label {
-    display: inline-block;
-    width: 200px;
+.uma-status-text {
     font-weight: bold;
 }
-.form-input {
-    padding: 5px;
-    width: 300px;
+.uma-status-text.running {
+    color: var(--green-500, green);
 }
-.button-row {
-    margin-top: 20px;
-    padding-top: 20px;
-    border-top: 1px solid var(--line-color, #ccc);
+.uma-status-text.stopped {
+    color: var(--red-500, red);
 }
-.btn {
-    padding: 10px 20px;
-    margin-right: 10px;
-    cursor: pointer;
-    border: none;
-    border-radius: 3px;
-    font-size: 14px;
+.uma-endpoints {
+    margin: 10px 0;
+    font-size: 0.9em;
 }
-.btn-primary {
-    background-color: #4CAF50;
-    color: white;
+.uma-endpoints p {
+    margin: 2px 0;
 }
-.btn-danger {
-    background-color: #f44336;
-    color: white;
+.uma-config-section {
+    margin-bottom: 20px;
 }
-.btn-warning {
-    background-color: #ff9800;
-    color: white;
-}
-.btn-secondary {
-    background-color: #2196F3;
-    color: white;
-}
-.btn-default {
-    background-color: var(--button-background, #e7e7e7);
-    color: inherit;
-}
-.help-text {
-    font-size: 12px;
-    color: var(--text-secondary, #666);
-    margin-top: 5px;
-}
-.interval-section {
+.uma-interval-section {
     margin-top: 8px;
     padding-top: 8px;
-    border-top: 1px solid var(--line-color, #eee);
+    border-top: 1px solid var(--gray-300, #eee);
 }
-.interval-section:first-of-type {
+.uma-interval-section:first-of-type {
     margin-top: 0;
     padding-top: 0;
     border-top: none;
 }
-.section-header {
+.uma-section-header {
     font-size: 11px;
     font-weight: bold;
-    color: var(--text-secondary, #666);
+    color: var(--gray-500, #666);
     margin-bottom: 4px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
-.interval-grid {
+.uma-interval-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, max-content));
     gap: 4px 40px;
 }
-.interval-row {
+.uma-interval-row {
     display: flex;
     align-items: center;
     gap: 10px;
     padding: 3px 0;
 }
-.interval-label {
+.uma-interval-label {
     font-size: 13px;
     color: inherit;
     min-width: 120px;
 }
-.interval-select {
+.uma-interval-select {
     width: 110px;
     padding: 3px 6px;
     font-size: 12px;
-    border: 1px solid var(--line-color, #ccc);
+    border: 1px solid var(--gray-300, #ccc);
     border-radius: 3px;
-    background-color: var(--input-background, #fff);
+    background-color: var(--gray-000, #fff);
     color: inherit;
 }
-.power-warning {
-    background-color: var(--notice-background, #fff3cd);
-    border: 1px solid var(--notice-border, #ffc107);
+.uma-power-warning {
+    background-color: var(--yellow-100, #fff3cd);
+    border: 1px solid var(--orange-200, #ffc107);
     border-radius: 5px;
     padding: 10px;
     margin-top: 15px;
     font-size: 12px;
     color: inherit;
 }
-.interval-select option[value="0"] {
-    color: #d32f2f;
+.uma-interval-select option[value="0"] {
+    color: var(--red-500, #d32f2f);
     font-weight: bold;
 }
-.interval-select.is-disabled {
-    border-color: #d32f2f;
-    background-color: var(--error-background, #ffebee);
+.uma-interval-select.is-disabled {
+    border-color: var(--red-500, #d32f2f);
+    background-color: var(--red-100, #ffebee);
 }
-.toggle-switch {
+.uma-toggle-switch {
     position: relative;
     display: inline-block;
     width: 50px;
     height: 26px;
     vertical-align: middle;
 }
-.toggle-switch input {
+.uma-toggle-switch input {
     opacity: 0;
     width: 0;
     height: 0;
 }
-.toggle-slider {
+.uma-toggle-slider {
     position: absolute;
     cursor: pointer;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: #ccc;
+    background-color: var(--gray-300, #ccc);
     transition: .3s;
     border-radius: 26px;
 }
-.toggle-slider:before {
+.uma-toggle-slider:before {
     position: absolute;
     content: "";
     height: 20px;
@@ -373,262 +230,338 @@ if ($_POST) {
     transition: .3s;
     border-radius: 50%;
 }
-.toggle-switch input:checked + .toggle-slider {
-    background-color: #4CAF50;
+.uma-toggle-switch input:checked + .uma-toggle-slider {
+    background-color: var(--green-500, #4CAF50);
 }
-.toggle-switch input:checked + .toggle-slider:before {
+.uma-toggle-switch input:checked + .uma-toggle-slider:before {
     transform: translateX(24px);
 }
 </style>
 
-<div class="agent-container">
-    <h1>Unraid Management Agent</h1>
-    <p>REST API and WebSocket integration for Unraid server monitoring and control</p>
+<div class="title"><span class="left"><i class="title fa fa-cogs"></i>Service Control</span></div>
 
-    <div class="status-box">
-        <h3>Service Status</h3>
-        <p><strong>Status:</strong> <?= $status_text ?></p>
-        <?php if ($running): ?>
-            <p><strong>API Endpoint:</strong> http://<?= $_SERVER['SERVER_ADDR'] ?>:<?= $port ?>/api/v1</p>
-            <p><strong>WebSocket:</strong> ws://<?= $_SERVER['SERVER_ADDR'] ?>:<?= $port ?>/api/v1/ws</p>
-            <p><strong>MCP Endpoint:</strong> http://<?= $_SERVER['SERVER_ADDR'] ?>:<?= $port ?>/mcp</p>
-        <?php endif; ?>
+<div class="uma-status">
+    <strong>Status:</strong>
+    <i id="uma-status-orb" class="fa fa-circle <?= $running ? 'green-orb' : 'grey-orb' ?>"></i>
+    <span id="uma-status-text" class="uma-status-text <?= $running ? 'running' : 'stopped' ?>">
+        <?= $running ? 'RUNNING' : 'STOPPED' ?>
+    </span>
 
-        <form method="post" style="margin-top: 15px;">
-            <?php if ($running): ?>
-                <button type="submit" name="stop" class="btn btn-danger">Stop</button>
-                <button type="submit" name="restart" class="btn btn-warning">Restart</button>
-            <?php else: ?>
-                <button type="submit" name="start" class="btn btn-primary">Start</button>
-            <?php endif; ?>
-        </form>
+    <?php
+        // Bracket-wrap IPv6 addresses for valid URLs (e.g. http://[::1]:8043/)
+        $raw_addr = $_SERVER['SERVER_ADDR'];
+        $addr_esc = htmlspecialchars(
+            (strpos($raw_addr, ':') !== false) ? "[$raw_addr]" : $raw_addr,
+            ENT_QUOTES, 'UTF-8'
+        );
+        $port_esc = htmlspecialchars($port, ENT_QUOTES, 'UTF-8');
+    ?>
+    <div id="uma-endpoints" class="uma-endpoints" style="display: <?= $running ? 'block' : 'none' ?>;">
+        <p><strong>API Endpoint:</strong> http://<?= $addr_esc ?>:<?= $port_esc ?>/api/v1</p>
+        <p><strong>WebSocket:</strong> ws://<?= $addr_esc ?>:<?= $port_esc ?>/api/v1/ws</p>
+        <p><strong>MCP Endpoint:</strong> http://<?= $addr_esc ?>:<?= $port_esc ?>/mcp</p>
     </div>
 
-    <form method="post">
-        <div class="config-box">
-            <h3>Configuration</h3>
+    <div style="margin-top: 10px;">
+        <?php if ($running): ?>
+            <input type="button" id="uma-btn-startstop" value="Stop" onclick="serviceControl('stop')">
+            <input type="button" id="uma-btn-restart" value="Restart" onclick="serviceControl('restart')">
+        <?php else: ?>
+            <input type="button" id="uma-btn-startstop" value="Start" onclick="serviceControl('start')">
+            <input type="button" id="uma-btn-restart" value="Restart" onclick="serviceControl('restart')" disabled>
+        <?php endif; ?>
+    </div>
+</div>
 
-            <div class="form-row">
-                <label class="form-label">API Port:</label>
-                <input type="number" name="port" value="<?= htmlspecialchars($port) ?>" class="form-input" min="1024" max="65535">
-                <div class="help-text">Port number for the API server (default: 8043)</div>
-            </div>
+<div class="title"><span class="left"><i class="title fa fa-wrench"></i>Configuration</span></div>
 
-        </div>
+<form markdown="1" id="agentConfigForm" method="POST" action="/update.php" target="progressFrame">
+<input type="hidden" name="#file" value="<?=$plugin?>/config.cfg">
+<input type="hidden" name="#include" value="plugins/<?=$plugin?>/include/update.php">
+<input type="hidden" name="#command" value="/usr/local/emhttp/plugins/<?=$plugin?>/scripts/apply">
 
-        <div class="config-box">
-            <h3>MQTT Integration</h3>
-            <p class="help-text" style="margin-bottom: 15px;">
-                Publish system data to an MQTT broker for Home Assistant or other automation platforms.
-            </p>
+_(API Port)_:
+: <input type="number" name="PORT" value="<?= htmlspecialchars($port) ?>" class="narrow" min="1024" max="65535">
 
-            <div class="form-row">
-                <label class="form-label">Enable MQTT:</label>
-                <label class="toggle-switch">
-                    <input type="checkbox" name="mqtt_enabled" id="mqtt_enabled" <?= ($mqtt_enabled === 'true') ? 'checked' : '' ?> onchange="toggleMQTTFields()">
-                    <span class="toggle-slider"></span>
-                </label>
-                <div class="help-text">Enable publishing system data to an MQTT broker</div>
-            </div>
+<blockquote class="inline_help">
+Port number for the API server (default: 8043).
+</blockquote>
 
-            <div id="mqtt_fields" style="display: <?= ($mqtt_enabled === 'true') ? 'block' : 'none' ?>;">
-                <div class="form-row">
-                    <label class="form-label">Broker Address:</label>
-                    <input type="text" name="mqtt_broker" value="<?= htmlspecialchars($mqtt_broker) ?>" class="form-input" placeholder="e.g. 192.168.1.100">
-                    <div class="help-text">IP address or hostname of your MQTT broker</div>
-                </div>
+<div class="title"><span class="left"><i class="title fa fa-comments"></i>MQTT Integration</span></div>
 
-                <div class="form-row">
-                    <label class="form-label">Broker Port:</label>
-                    <input type="number" name="mqtt_port" value="<?= htmlspecialchars($mqtt_port) ?>" class="form-input" min="1" max="65535" style="width: 120px;">
-                    <div class="help-text">MQTT broker port (default: 1883)</div>
-                </div>
+_(Enable MQTT)_:
+: <label class="uma-toggle-switch">
+    <input type="checkbox" name="MQTT_ENABLED_CB" id="mqtt_enabled" <?= ($mqtt_enabled === 'true') ? 'checked' : '' ?> onchange="toggleMQTTFields()">
+    <span class="uma-toggle-slider"></span>
+  </label>
+  <input type="hidden" name="MQTT_ENABLED" id="mqtt_enabled_val" value="<?= $mqtt_enabled ?>">
 
-                <div class="form-row">
-                    <label class="form-label">Username:</label>
-                    <input type="text" name="mqtt_username" value="<?= htmlspecialchars($mqtt_username) ?>" class="form-input" placeholder="Leave blank if not required" autocomplete="off">
-                    <div class="help-text">MQTT broker username (optional)</div>
-                </div>
+<blockquote class="inline_help">
+Enable publishing system data to an MQTT broker.
+</blockquote>
 
-                <div class="form-row">
-                    <label class="form-label">Password:</label>
-                    <input type="password" name="mqtt_password" value="<?= htmlspecialchars($mqtt_password) ?>" class="form-input" placeholder="Leave blank if not required" autocomplete="off">
-                    <div class="help-text">MQTT broker password (optional)</div>
-                </div>
+<div id="mqtt_fields" style="display: <?= ($mqtt_enabled === 'true') ? 'block' : 'none' ?>;">
 
-                <div class="form-row">
-                    <label class="form-label">Topic Prefix:</label>
-                    <input type="text" name="mqtt_topic_prefix" value="<?= htmlspecialchars($mqtt_topic_prefix) ?>" class="form-input" style="width: 200px;">
-                    <div class="help-text">Prefix for all MQTT topics (default: unraid). Messages published to: {prefix}/system, {prefix}/docker, etc.</div>
-                </div>
+_(Broker Address)_:
+: <input type="text" name="MQTT_BROKER" value="<?= htmlspecialchars($mqtt_broker) ?>" placeholder="e.g. 192.168.1.100">
 
-                <div class="form-row">
-                    <label class="form-label">Home Assistant:</label>
-                    <label class="toggle-switch">
-                        <input type="checkbox" name="mqtt_ha_enabled" <?= ($mqtt_ha_enabled === 'true') ? 'checked' : '' ?>>
-                        <span class="toggle-slider"></span>
-                    </label>
-                    <div class="help-text">Enable Home Assistant MQTT auto-discovery (entities appear automatically in HA)</div>
-                </div>
-            </div>
-        </div>
+<blockquote class="inline_help">
+IP address or hostname of your MQTT broker.
+</blockquote>
 
-        <div class="config-box">
-            <h3>Collection Intervals</h3>
-            <p class="help-text" style="margin-bottom: 10px;">
-                How often data is collected. Lower = faster updates but higher power usage.
-            </p>
+_(Broker Port)_:
+: <input type="number" name="MQTT_PORT" value="<?= htmlspecialchars($mqtt_port) ?>" class="narrow" min="1" max="65535">
 
-            <div class="interval-section">
-                <div class="section-header">System Monitoring</div>
-                <div class="interval-grid">
-                    <div class="interval-row">
-                        <span class="interval-label">System Metrics</span>
-                        <select name="interval_system" class="interval-select">
-                            <?= intervalOptions($interval_system, 'fast') ?>
-                        </select>
-                    </div>
-                    <div class="interval-row">
-                        <span class="interval-label">Array Status</span>
-                        <select name="interval_array" class="interval-select">
-                            <?= intervalOptions($interval_array, 'standard') ?>
-                        </select>
-                    </div>
-                    <div class="interval-row">
-                        <span class="interval-label">Disk Health</span>
-                        <select name="interval_disk" class="interval-select">
-                            <?= intervalOptions($interval_disk, 'slow') ?>
-                        </select>
-                    </div>
-                    <div class="interval-row">
-                        <span class="interval-label">Network</span>
-                        <select name="interval_network" class="interval-select">
-                            <?= intervalOptions($interval_network, 'standard') ?>
-                        </select>
-                    </div>
-                </div>
-            </div>
+<blockquote class="inline_help">
+MQTT broker port (default: 1883).
+</blockquote>
 
-            <div class="interval-section">
-                <div class="section-header">Containers & VMs</div>
-                <div class="interval-grid">
-                    <div class="interval-row">
-                        <span class="interval-label">Docker</span>
-                        <select name="interval_docker" class="interval-select">
-                            <?= intervalOptions($interval_docker, 'standard') ?>
-                        </select>
-                    </div>
-                    <div class="interval-row">
-                        <span class="interval-label">Virtual Machines</span>
-                        <select name="interval_vm" class="interval-select">
-                            <?= intervalOptions($interval_vm, 'standard') ?>
-                        </select>
-                    </div>
-                </div>
-            </div>
+_(Username)_:
+: <input type="text" name="MQTT_USERNAME" value="<?= htmlspecialchars($mqtt_username) ?>" placeholder="Leave blank if not required" autocomplete="off">
 
-            <div class="interval-section">
-                <div class="section-header">Hardware</div>
-                <div class="interval-grid">
-                    <div class="interval-row">
-                        <span class="interval-label">GPU Metrics</span>
-                        <select name="interval_gpu" class="interval-select">
-                            <?= intervalOptions($interval_gpu, 'standard') ?>
-                        </select>
-                    </div>
-                    <div class="interval-row">
-                        <span class="interval-label">UPS Status</span>
-                        <select name="interval_ups" class="interval-select">
-                            <?= intervalOptions($interval_ups, 'standard') ?>
-                        </select>
-                    </div>
-                    <div class="interval-row">
-                        <span class="interval-label">NUT Plugin</span>
-                        <select name="interval_nut" class="interval-select">
-                            <?= intervalOptions($interval_nut, 'standard') ?>
-                        </select>
-                    </div>
-                    <div class="interval-row">
-                        <span class="interval-label">Hardware Info</span>
-                        <select name="interval_hardware" class="interval-select">
-                            <?= intervalOptions($interval_hardware, 'slow') ?>
-                        </select>
-                    </div>
-                </div>
-            </div>
+<blockquote class="inline_help">
+MQTT broker username (optional).
+</blockquote>
 
-            <div class="interval-section">
-                <div class="section-header">Storage</div>
-                <div class="interval-grid">
-                    <div class="interval-row">
-                        <span class="interval-label">User Shares</span>
-                        <select name="interval_shares" class="interval-select">
-                            <?= intervalOptions($interval_shares, 'standard') ?>
-                        </select>
-                    </div>
-                    <div class="interval-row">
-                        <span class="interval-label">ZFS Pools</span>
-                        <select name="interval_zfs" class="interval-select">
-                            <?= intervalOptions($interval_zfs, 'slow') ?>
-                        </select>
-                    </div>
-                    <div class="interval-row">
-                        <span class="interval-label">Unassigned Devices</span>
-                        <select name="interval_unassigned" class="interval-select">
-                            <?= intervalOptions($interval_unassigned, 'standard') ?>
-                        </select>
-                    </div>
-                </div>
-            </div>
+_(Password)_:
+: <input type="password" name="MQTT_PASSWORD" value="" placeholder="<?= empty($mqtt_password) ? 'Leave blank if not required' : '••••••••' ?>" autocomplete="off">
 
-            <div class="interval-section">
-                <div class="section-header">Other</div>
-                <div class="interval-grid">
-                    <div class="interval-row">
-                        <span class="interval-label">Notifications</span>
-                        <select name="interval_notification" class="interval-select">
-                            <?= intervalOptions($interval_notification, 'standard') ?>
-                        </select>
-                    </div>
-                    <div class="interval-row">
-                        <span class="interval-label">License Info</span>
-                        <select name="interval_registration" class="interval-select">
-                            <?= intervalOptions($interval_registration, 'slow') ?>
-                        </select>
-                    </div>
-                </div>
-            </div>
+<blockquote class="inline_help">
+MQTT broker password (optional).
+</blockquote>
 
-            <div class="power-warning">
-                <strong>⚡ Power Tip:</strong> Defaults follow industry-standard monitoring intervals. Set to <strong>Disabled</strong> to completely stop a collector, or use longer intervals (up to 24 hours) for data that rarely changes. Click <strong>Reset to Defaults</strong> to restore industry-standard settings.
-            </div>
-        </div>
+_(Topic Prefix)_:
+: <input type="text" name="MQTT_TOPIC_PREFIX" value="<?= htmlspecialchars($mqtt_topic_prefix) ?>">
 
-        <div class="config-box">
-            <div class="help-text">
-                <strong>Note:</strong> Service auto-starts with array. Changes apply after clicking Apply.
-            </div>
-        </div>
+<blockquote class="inline_help">
+Prefix for all MQTT topics (default: unraid). Messages published to: {prefix}/system, {prefix}/docker, etc.
+</blockquote>
 
-        <div class="button-row">
-            <button type="submit" name="apply" class="btn btn-primary">Apply</button>
-            <button type="submit" name="default" class="btn btn-default">Reset to Defaults</button>
-            <button type="button" onclick="window.location='/Settings';" class="btn btn-secondary">Done</button>
-        </div>
-    </form>
+_(Home Assistant Auto-Discovery)_:
+: <label class="uma-toggle-switch">
+    <input type="checkbox" name="MQTT_HOME_ASSISTANT_CB" id="mqtt_ha_enabled" <?= ($mqtt_ha_enabled === 'true') ? 'checked' : '' ?> onchange="updateMQTTHA()">
+    <span class="uma-toggle-slider"></span>
+  </label>
+  <input type="hidden" name="MQTT_HOME_ASSISTANT" id="mqtt_ha_val" value="<?= $mqtt_ha_enabled ?>">
+
+<blockquote class="inline_help">
+Enable Home Assistant MQTT auto-discovery (entities appear automatically in HA).
+</blockquote>
 
 </div>
 
+<div class="title"><span class="left"><i class="title fa fa-clock-o"></i>Collection Intervals</span></div>
+
+<div class="uma-config-section">
+    <p style="font-size: 12px; color: var(--text-secondary, #666); margin-bottom: 10px;">
+        How often data is collected. Lower = faster updates but higher power usage.
+    </p>
+
+    <div class="uma-interval-section">
+        <div class="uma-section-header">System Monitoring</div>
+        <div class="uma-interval-grid">
+            <div class="uma-interval-row">
+                <span class="uma-interval-label">System Metrics</span>
+                <select name="INTERVAL_SYSTEM" class="uma-interval-select">
+                    <?= intervalOptions($interval_system, 'fast') ?>
+                </select>
+            </div>
+            <div class="uma-interval-row">
+                <span class="uma-interval-label">Array Status</span>
+                <select name="INTERVAL_ARRAY" class="uma-interval-select">
+                    <?= intervalOptions($interval_array, 'standard') ?>
+                </select>
+            </div>
+            <div class="uma-interval-row">
+                <span class="uma-interval-label">Disk Health</span>
+                <select name="INTERVAL_DISK" class="uma-interval-select">
+                    <?= intervalOptions($interval_disk, 'slow') ?>
+                </select>
+            </div>
+            <div class="uma-interval-row">
+                <span class="uma-interval-label">Network</span>
+                <select name="INTERVAL_NETWORK" class="uma-interval-select">
+                    <?= intervalOptions($interval_network, 'standard') ?>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="uma-interval-section">
+        <div class="uma-section-header">Containers & VMs</div>
+        <div class="uma-interval-grid">
+            <div class="uma-interval-row">
+                <span class="uma-interval-label">Docker</span>
+                <select name="INTERVAL_DOCKER" class="uma-interval-select">
+                    <?= intervalOptions($interval_docker, 'standard') ?>
+                </select>
+            </div>
+            <div class="uma-interval-row">
+                <span class="uma-interval-label">Virtual Machines</span>
+                <select name="INTERVAL_VM" class="uma-interval-select">
+                    <?= intervalOptions($interval_vm, 'standard') ?>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="uma-interval-section">
+        <div class="uma-section-header">Hardware</div>
+        <div class="uma-interval-grid">
+            <div class="uma-interval-row">
+                <span class="uma-interval-label">GPU Metrics</span>
+                <select name="INTERVAL_GPU" class="uma-interval-select">
+                    <?= intervalOptions($interval_gpu, 'standard') ?>
+                </select>
+            </div>
+            <div class="uma-interval-row">
+                <span class="uma-interval-label">UPS Status</span>
+                <select name="INTERVAL_UPS" class="uma-interval-select">
+                    <?= intervalOptions($interval_ups, 'standard') ?>
+                </select>
+            </div>
+            <div class="uma-interval-row">
+                <span class="uma-interval-label">NUT Plugin</span>
+                <select name="INTERVAL_NUT" class="uma-interval-select">
+                    <?= intervalOptions($interval_nut, 'standard') ?>
+                </select>
+            </div>
+            <div class="uma-interval-row">
+                <span class="uma-interval-label">Hardware Info</span>
+                <select name="INTERVAL_HARDWARE" class="uma-interval-select">
+                    <?= intervalOptions($interval_hardware, 'slow') ?>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="uma-interval-section">
+        <div class="uma-section-header">Storage</div>
+        <div class="uma-interval-grid">
+            <div class="uma-interval-row">
+                <span class="uma-interval-label">User Shares</span>
+                <select name="INTERVAL_SHARES" class="uma-interval-select">
+                    <?= intervalOptions($interval_shares, 'standard') ?>
+                </select>
+            </div>
+            <div class="uma-interval-row">
+                <span class="uma-interval-label">ZFS Pools</span>
+                <select name="INTERVAL_ZFS" class="uma-interval-select">
+                    <?= intervalOptions($interval_zfs, 'slow') ?>
+                </select>
+            </div>
+            <div class="uma-interval-row">
+                <span class="uma-interval-label">Unassigned Devices</span>
+                <select name="INTERVAL_UNASSIGNED" class="uma-interval-select">
+                    <?= intervalOptions($interval_unassigned, 'standard') ?>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="uma-interval-section">
+        <div class="uma-section-header">Other</div>
+        <div class="uma-interval-grid">
+            <div class="uma-interval-row">
+                <span class="uma-interval-label">Notifications</span>
+                <select name="INTERVAL_NOTIFICATION" class="uma-interval-select">
+                    <?= intervalOptions($interval_notification, 'standard') ?>
+                </select>
+            </div>
+            <div class="uma-interval-row">
+                <span class="uma-interval-label">License Info</span>
+                <select name="INTERVAL_REGISTRATION" class="uma-interval-select">
+                    <?= intervalOptions($interval_registration, 'slow') ?>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="uma-power-warning">
+        <strong>⚡ Power Tip:</strong> Defaults follow industry-standard monitoring intervals. Set to <strong>Disabled</strong> to completely stop a collector, or use longer intervals (up to 24 hours) for data that rarely changes. Click <strong>Default</strong> to restore industry-standard settings.
+    </div>
+</div>
+
+<blockquote class="inline_help">
+Service auto-starts with array. Changes apply after clicking Apply and will restart the service if it is running.
+</blockquote>
+
+<input type="submit" name="#default" value="_(Default)_">
+: <span class="inline-block">
+    <input type="submit" name="#apply" value="_(Apply)_" disabled>
+    <input type="button" value="_(Done)_" onclick="done()">
+  </span>
+</form>
+
 <script>
+// Service control via AJAX
+function serviceControl(action) {
+    var btn = document.getElementById('uma-btn-startstop');
+    var restartBtn = document.getElementById('uma-btn-restart');
+    btn.disabled = true;
+    restartBtn.disabled = true;
+    btn.value = action === 'stop' ? 'Stopping...' : action === 'start' ? 'Starting...' : 'Restarting...';
+
+    $.post('/plugins/<?=$plugin?>/include/exec.php', {action: action}, function() {
+        // Don't trust the immediate response — confirm with a status poll
+        setTimeout(pollStatus, 2500);
+    }, 'json').fail(function() {
+        setTimeout(pollStatus, 3000);
+    });
+}
+
+function pollStatus() {
+    $.post('/plugins/<?=$plugin?>/include/exec.php', {action: 'status'}, function(data) {
+        var running = (data.running === true || data.running === 'true');
+        updateServiceStatus(running);
+    }, 'json').fail(function() {
+        location.reload();
+    });
+}
+
+function updateServiceStatus(running) {
+    var statusOrb = document.getElementById('uma-status-orb');
+    var statusText = document.getElementById('uma-status-text');
+    var btn = document.getElementById('uma-btn-startstop');
+    var restartBtn = document.getElementById('uma-btn-restart');
+    var endpoints = document.getElementById('uma-endpoints');
+
+    if (running) {
+        statusOrb.className = 'fa fa-circle green-orb';
+        statusText.textContent = 'RUNNING';
+        statusText.className = 'uma-status-text running';
+        btn.value = 'Stop';
+        btn.onclick = function() { serviceControl('stop'); };
+        btn.disabled = false;
+        restartBtn.disabled = false;
+        endpoints.style.display = 'block';
+    } else {
+        statusOrb.className = 'fa fa-circle grey-orb';
+        statusText.textContent = 'STOPPED';
+        statusText.className = 'uma-status-text stopped';
+        btn.value = 'Start';
+        btn.onclick = function() { serviceControl('start'); };
+        btn.disabled = false;
+        restartBtn.disabled = true;
+        endpoints.style.display = 'none';
+    }
+}
+
 // Toggle MQTT fields visibility
 function toggleMQTTFields() {
     var enabled = document.getElementById('mqtt_enabled').checked;
     document.getElementById('mqtt_fields').style.display = enabled ? 'block' : 'none';
+    document.getElementById('mqtt_enabled_val').value = enabled ? 'true' : 'false';
+}
+
+function updateMQTTHA() {
+    var enabled = document.getElementById('mqtt_ha_enabled').checked;
+    document.getElementById('mqtt_ha_val').value = enabled ? 'true' : 'false';
 }
 
 // Highlight disabled interval selects
 function updateDisabledHighlighting() {
-    document.querySelectorAll('.interval-select').forEach(function(select) {
+    document.querySelectorAll('.uma-interval-select').forEach(function(select) {
         if (select.value === '0') {
             select.classList.add('is-disabled');
         } else {
@@ -637,10 +570,9 @@ function updateDisabledHighlighting() {
     });
 }
 
-// Run on page load and on any select change
-document.addEventListener('DOMContentLoaded', function() {
+$(function() {
     updateDisabledHighlighting();
-    document.querySelectorAll('.interval-select').forEach(function(select) {
+    document.querySelectorAll('.uma-interval-select').forEach(function(select) {
         select.addEventListener('change', updateDisabledHighlighting);
     });
 });

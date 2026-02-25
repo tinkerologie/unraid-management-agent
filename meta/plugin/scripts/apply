@@ -1,0 +1,48 @@
+#!/bin/bash
+# Apply configuration changes — restarts the service if running.
+# Called by Unraid's /update.php after config file is saved (#command).
+
+PLUGIN="unraid-management-agent"
+SCRIPTS_DIR="/usr/local/emhttp/plugins/$PLUGIN/scripts"
+CONFIG_FILE="/boot/config/plugins/$PLUGIN/config.cfg"
+
+# Ensure config file has restrictive permissions (contains MQTT password)
+if [ -f "$CONFIG_FILE" ]; then
+    if ! chmod 0600 "$CONFIG_FILE"; then
+        echo "Error: chmod 0600 failed on $CONFIG_FILE" >&2
+        exit 1
+    fi
+fi
+
+# Only restart if the service is currently running
+if pidof "$PLUGIN" > /dev/null 2>&1; then
+    "$SCRIPTS_DIR/stop"
+    stop_rc=$?
+
+    if [ $stop_rc -ne 0 ]; then
+        echo "Error: stop script failed (rc=$stop_rc)" >&2
+        exit $stop_rc
+    fi
+
+    # Poll until stopped or timeout (5 attempts x 500ms = 2.5s max)
+    for _ in {1..5}; do
+        if ! pidof "$PLUGIN" > /dev/null 2>&1; then
+            break
+        fi
+        usleep 500000 2>/dev/null || sleep 0.5
+    done
+
+    # Final check — abort if still running
+    if pidof "$PLUGIN" > /dev/null 2>&1; then
+        echo "Error: service did not stop within timeout" >&2
+        exit 1
+    fi
+
+    "$SCRIPTS_DIR/start"
+    start_rc=$?
+
+    if [ $start_rc -ne 0 ]; then
+        echo "Error: start script failed (rc=$start_rc)" >&2
+        exit $start_rc
+    fi
+fi
