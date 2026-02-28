@@ -36,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fixed `POST /api/v1/vm/{name}/resume` and `POST /api/v1/vm/{name}/start` failing when VM is in pmsuspended state (Windows sleep)
   - libvirt DomainResume fails with "domain is pmsuspended"; DomainCreate fails with "domain is already running"
   - VM controller now detects pmsuspended state and uses `virsh dompmwakeup` to wake the VM, equivalent to pressing Start in Unraid web UI
+- **Disk size reported at ~50% of actual size** (GitHub Issue #80):
+  - Unraid's `disks.ini` stores `size` in KiB (1024-byte blocks), but the disk collector multiplied by 512 (assuming sectors)
+  - Changed multiplier from 512 to 1024 so `size_bytes` now reports the correct disk capacity
+  - I/O statistics conversions (read/write bytes from `/sys/block/*/stat`) are unchanged as they correctly use 512-byte sectors per Linux kernel convention
 
 ### Changed
 

@@ -336,10 +336,10 @@ func TestParseDiskKeyValue(t *testing.T) {
 			expected:   "DISK_OK",
 		},
 		{
-			name:       "parse size (sectors to bytes)",
+			name:       "parse size (kibibytes to bytes)",
 			line:       "size=1000",
 			checkField: "size",
-			expected:   uint64(512000), // 1000 sectors * 512 bytes
+			expected:   uint64(1024000), // 1000 KiB * 1024 bytes
 		},
 		{
 			name:       "parse temperature",

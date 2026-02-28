@@ -211,7 +211,7 @@ func (c *DiskCollector) parseDiskKeyValue(disk *dto.DiskInfo, line string) {
 		disk.Status = value
 	case "size":
 		if size, err := strconv.ParseUint(value, 10, 64); err == nil {
-			disk.Size = size * 512 // Convert sectors to bytes
+			disk.Size = size * 1024 // Unraid disks.ini stores size in KiB (1024-byte blocks)
 		}
 	case "temp":
 		// Temperature might be "*" if spun down, or empty, or a number
