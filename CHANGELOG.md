@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.03.00] - 2026-03-01
+
 ### Fixed
 
 - **EventBus goroutine leak** (GitHub Issue #67):
