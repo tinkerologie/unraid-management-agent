@@ -19,12 +19,17 @@ import (
 // DiskCollector collects detailed information about all disks in the Unraid system.
 // It gathers disk metrics, SMART data, temperature, and usage statistics for array and cache disks.
 type DiskCollector struct {
-	ctx *domain.Context
+	ctx             *domain.Context
+	prevIOTicks     map[string]uint64 // previous io_ticks per device for delta calculation
+	prevCollectTime time.Time         // timestamp of the previous collection
 }
 
 // NewDiskCollector creates a new disk information collector with the given context.
 func NewDiskCollector(ctx *domain.Context) *DiskCollector {
-	return &DiskCollector{ctx: ctx}
+	return &DiskCollector{
+		ctx:         ctx,
+		prevIOTicks: make(map[string]uint64),
+	}
 }
 
 // Start begins the disk collector's periodic data collection.
@@ -118,6 +123,9 @@ func (c *DiskCollector) collectDisks() ([]dto.DiskInfo, error) {
 
 	// Enhance each disk with additional stats
 	c.enrichDisks(disks)
+
+	// Record the collection timestamp for delta-based IO utilization
+	c.prevCollectTime = time.Now()
 
 	logger.Debug("Disk: Parsed %d disks successfully", len(disks))
 
@@ -360,7 +368,9 @@ func (c *DiskCollector) parseModelSerialFromID(disk *dto.DiskInfo) {
 	}
 }
 
-// enrichWithIOStats adds I/O statistics from /sys/block
+// enrichWithIOStats adds I/O statistics from /sys/block.
+// IOUtilization is computed as a delta between the current and previous io_ticks
+// divided by the elapsed wall-clock time, producing a 0–100% value.
 func (c *DiskCollector) enrichWithIOStats(disk *dto.DiskInfo) {
 	if disk.Device == "" {
 		return
@@ -396,9 +406,22 @@ func (c *DiskCollector) enrichWithIOStats(disk *dto.DiskInfo) {
 		disk.WriteBytes = writeSectors * 512 // Sectors to bytes
 	}
 	if ioTicks, err := strconv.ParseUint(fields[9], 10, 64); err == nil {
-		// io_ticks is in milliseconds, calculate utilization
-		// This is a cumulative value, would need previous sample for rate
-		disk.IOUtilization = float64(ioTicks) / 10.0 // Rough estimate
+		// io_ticks is cumulative milliseconds spent doing I/O since boot.
+		// Compute utilization as delta(io_ticks) / delta(wall_time) * 100.
+		prev, hasPrev := c.prevIOTicks[disk.Device]
+		c.prevIOTicks[disk.Device] = ioTicks
+
+		if hasPrev && !c.prevCollectTime.IsZero() {
+			elapsedMs := time.Since(c.prevCollectTime).Milliseconds()
+			if elapsedMs > 0 && ioTicks >= prev {
+				util := float64(ioTicks-prev) / float64(elapsedMs) * 100.0
+				if util > 100.0 {
+					util = 100.0
+				}
+				disk.IOUtilization = util
+			}
+		}
+		// On the first collection, IOUtilization stays at zero (omitted from JSON).
 	}
 }
 

@@ -19,10 +19,12 @@ swagger:
 	@echo "Generating Swagger documentation..."
 	@if command -v swag >/dev/null 2>&1; then \
 		swag init -g daemon/docs/swagger.go -o daemon/docs --parseDependency --parseInternal; \
+	elif [ -x "$$(go env GOPATH)/bin/swag" ]; then \
+		"$$(go env GOPATH)/bin/swag" init -g daemon/docs/swagger.go -o daemon/docs --parseDependency --parseInternal; \
 	else \
 		echo "swag not found, installing..."; \
 		go install github.com/swaggo/swag/cmd/swag@latest; \
-		swag init -g daemon/docs/swagger.go -o daemon/docs --parseDependency --parseInternal; \
+		"$$(go env GOPATH)/bin/swag" init -g daemon/docs/swagger.go -o daemon/docs --parseDependency --parseInternal; \
 	fi
 
 local: deps swagger

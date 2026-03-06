@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.03.01] - 2026-03-05
+
+### Fixed
+
+- **`io_utilization_percent` reports cumulative I/O milliseconds, not a utilization percentage** (GitHub Issue #81):
+  - `enrichWithIOStats` previously divided the cumulative `io_ticks` counter from `/sys/block/*/stat` by 10, producing unbounded values (e.g. 29,832,950%) that grew indefinitely with uptime
+  - Now uses a delta-based calculation: tracks previous `io_ticks` per device and computes `(delta_io_ticks / delta_wall_time) * 100`, yielding a proper 0–100% utilization value
+  - On the first collection after startup, the field is omitted (no previous sample to compare against)
+
 ## [2026.03.00] - 2026-03-01
 
 ### Fixed
