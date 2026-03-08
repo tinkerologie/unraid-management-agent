@@ -4,7 +4,7 @@
 
 **Goal:** Fix the WebSocket hub defect, eliminate the current lint and security findings, and keep REST, WebSocket, and Home Assistant behavior compatible for LAN-only homelab users.
 
-**Architecture:** Use a targeted hardening pass. Fix the WebSocket client lifecycle so client-map mutation only happens under exclusive ownership, replace avoidable shell-outs with native Go implementations, and tighten boundary validation where it removes real risk. Keep existing API and MQTT contracts intact, and only use narrow `#nosec` suppressions where a generic abstraction is intentionally safe but cannot be proven to `gosec`.
+**Architecture:** Use a targeted hardening pass. Fix the WebSocket client lifecycle so client-map mutation only happens under exclusive ownership, replace avoidable shell-outs with native Go implementations, and tighten boundary validation where it removes real risk. Keep existing API and MQTT contracts intact, and only use narrow `#nosec` suppressions where a generic abstraction is intentionally safe but cannot be proven to `gosec`. Final integration confidence must come from the repository's Ansible workflow on real Unraid hardware, not local commands alone.
 
 **Tech Stack:** Go 1.26, gorilla/websocket, pahomqtt, standard library filesystem APIs, golangci-lint, gosec, govulncheck.
 
@@ -424,7 +424,18 @@ git commit -m "fix: clear remaining lint and security findings"
 
 - Verify only
 
-**Step 1: Run the full test suite**
+**Step 1: Confirm Ansible prerequisites**
+
+Run:
+
+```bash
+test -f ansible/inventory.yml
+ansible-playbook --version
+```
+
+Expected: the inventory file exists and Ansible is installed.
+
+**Step 2: Run the full local test suite**
 
 Run:
 
@@ -434,7 +445,7 @@ go test ./...
 
 Expected: pass.
 
-**Step 2: Run focused race coverage**
+**Step 3: Run focused race coverage**
 
 Run:
 
@@ -445,7 +456,7 @@ go test -race ./daemon/services
 
 Expected: both pass.
 
-**Step 3: Run the final quality gates**
+**Step 4: Run the final local quality gates**
 
 Run:
 
@@ -457,7 +468,47 @@ govulncheck ./...
 
 Expected: all pass with zero findings.
 
-**Step 4: Inspect the tree**
+**Step 5: Build via Ansible**
+
+Run:
+
+```bash
+ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --tags build
+```
+
+Expected: Ansible runs the `build` role, executes `make package`, and verifies the plugin bundle exists.
+
+**Step 6: Deploy via Ansible**
+
+Run:
+
+```bash
+ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --tags deploy
+```
+
+Expected: Ansible uploads the package, installs it on Unraid, starts the service, and waits for the health endpoint to return `200`.
+
+**Step 7: Validate endpoints via Ansible**
+
+Run:
+
+```bash
+ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --tags verify
+```
+
+Expected: Ansible executes the verify role and passes the endpoint, schema, MCP, Prometheus, Swagger, WebSocket, MQTT, alerting, and health check validations.
+
+**Step 8: Run the full Ansible lifecycle once**
+
+Run:
+
+```bash
+ansible-playbook -i ansible/inventory.yml ansible/deploy.yml
+```
+
+Expected: the combined build, deploy, and verify workflow completes successfully end to end.
+
+**Step 9: Inspect the tree**
 
 Run:
 
@@ -468,7 +519,7 @@ git log --oneline -n 5
 
 Expected: only the intended files are modified or committed.
 
-**Step 5: Commit any remaining docs-only cleanup**
+**Step 10: Commit any remaining docs-only cleanup**
 
 ```bash
 git add CHANGELOG.md

@@ -132,6 +132,13 @@ The implementation is only complete when all of the following succeed on a fresh
 - `golangci-lint run --config .golangci.yml --max-issues-per-linter 0 --max-same-issues 0 ./...`
 - `gosec ./...`
 - `govulncheck ./...`
+- `ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --tags build`
+- `ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --tags deploy`
+- `ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --tags verify`
+
+For final release confidence on real Unraid hardware, prefer the full lifecycle command:
+
+- `ansible-playbook -i ansible/inventory.yml ansible/deploy.yml`
 
 ## Out of Scope
 
