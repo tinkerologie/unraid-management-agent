@@ -1,0 +1,25 @@
+---
+# Build the plugin package on the local machine
+
+- name: Build plugin package
+  delegate_to: localhost
+  block:
+    - name: Run make package
+      ansible.builtin.command:
+        cmd: make package
+        chdir: "{{ playbook_dir }}/.."
+      changed_when: true
+
+    - name: Verify package exists
+      ansible.builtin.stat:
+        path: "{{ plugin_bundle }}"
+      register: bundle_stat
+
+    - name: Fail if package missing
+      ansible.builtin.fail:
+        msg: "Plugin bundle not found at {{ plugin_bundle }}"
+      when: not bundle_stat.stat.exists
+
+    - name: Show package info
+      ansible.builtin.debug:
+        msg: "Built {{ plugin_name }} v{{ version }} ({{ bundle_stat.stat.size | human_readable }})"

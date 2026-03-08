@@ -134,6 +134,83 @@ func TestWSHubBroadcast(t *testing.T) {
 	}
 }
 
+func TestWSHubBroadcastEvictsBlockedClientAndKeepsHealthyClients(t *testing.T) {
+	hub := NewWSHub()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go hub.Run(ctx)
+	time.Sleep(10 * time.Millisecond)
+
+	healthySend := make(chan dto.WSEvent, 4)
+	healthy := &WSClient{
+		hub:  hub,
+		send: healthySend,
+	}
+	hub.register <- healthy
+
+	blockedClients := make([]*WSClient, 32)
+	for i := range blockedClients {
+		send := make(chan dto.WSEvent, 1)
+		send <- dto.WSEvent{Event: "preloaded"}
+		blockedClients[i] = &WSClient{
+			hub:  hub,
+			send: send,
+		}
+		hub.register <- blockedClients[i]
+	}
+
+	time.Sleep(50 * time.Millisecond)
+
+	stopReaders := make(chan struct{})
+	readersDone := make(chan struct{})
+	go func() {
+		defer close(readersDone)
+		for {
+			select {
+			case <-stopReaders:
+				return
+			default:
+				hub.mu.RLock()
+				for client := range hub.clients {
+					_ = client
+				}
+				hub.mu.RUnlock()
+			}
+		}
+	}()
+
+	hub.Broadcast("update", map[string]string{"status": "ok"})
+
+	select {
+	case msg := <-healthySend:
+		if msg.Event != "update" {
+			t.Fatalf("healthy client received event %q, want %q", msg.Event, "update")
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("healthy client did not receive broadcast")
+	}
+
+	close(stopReaders)
+	<-readersDone
+	time.Sleep(50 * time.Millisecond)
+
+	hub.mu.RLock()
+	defer hub.mu.RUnlock()
+
+	if len(hub.clients) != 1 {
+		t.Fatalf("expected 1 remaining client, got %d", len(hub.clients))
+	}
+	if !hub.clients[healthy] {
+		t.Fatal("healthy client should remain registered")
+	}
+	for _, client := range blockedClients {
+		if hub.clients[client] {
+			t.Fatal("blocked client should have been evicted")
+		}
+	}
+}
+
 func TestWSHubMultipleClients(t *testing.T) {
 	hub := NewWSHub()
 	ctx := t.Context()

@@ -532,7 +532,8 @@ func (c *SettingsCollector) GetPluginList() (*dto.PluginList, error) {
 func (c *SettingsCollector) parsePluginFile(path string) (dto.PluginInfo, error) {
 	plugin := dto.PluginInfo{}
 
-	file, err := os.Open(path) //nolint:gosec // G304: path is from trusted plugin directory
+	// #nosec G304 -- path points to a discovered plugin file under the trusted plugin directory.
+	file, err := os.Open(path)
 	if err != nil {
 		return plugin, err
 	}
@@ -1005,7 +1006,8 @@ func (c *SettingsCollector) isServiceRunning(processName string) bool {
 		}
 
 		commPath := filepath.Join("/proc", entry, "comm")
-		commBytes, err := os.ReadFile(commPath) //nolint:gosec // G304: path is constructed from /proc
+		// #nosec G304 -- commPath is constructed from numeric /proc entries discovered from the local filesystem.
+		commBytes, err := os.ReadFile(commPath)
 		if err != nil {
 			continue
 		}

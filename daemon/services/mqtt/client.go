@@ -42,6 +42,15 @@ type Client struct {
 	connectCancel context.CancelFunc
 }
 
+func normalizeQoS(qos int) byte {
+	switch qos {
+	case 0, 1, 2:
+		return byte(qos)
+	default:
+		return 0
+	}
+}
+
 // NewClient creates a new MQTT client with the given configuration.
 func NewClient(config *dto.MQTTConfig, hostname, agentVersion string, domainCtx *domain.Context) *Client {
 	return &Client{
@@ -86,7 +95,7 @@ func (c *Client) Connect(ctx context.Context) error {
 
 	// Set will message for availability
 	availabilityTopic := c.buildTopic("availability")
-	opts.SetWill(availabilityTopic, "offline", byte(c.config.QoS), true)
+	opts.SetWill(availabilityTopic, "offline", normalizeQoS(c.config.QoS), true)
 
 	// Connection handlers
 	opts.SetOnConnectHandler(func(_ pahomqtt.Client) {
@@ -437,7 +446,7 @@ func (c *Client) publish(topic, payload string, retained bool) error {
 		return fmt.Errorf("MQTT client not initialized")
 	}
 
-	token := c.client.Publish(topic, byte(c.config.QoS), retained, payload)
+	token := c.client.Publish(topic, normalizeQoS(c.config.QoS), retained, payload)
 	token.Wait()
 
 	if token.Error() != nil {

@@ -8,6 +8,9 @@ import (
 	"time"
 )
 
+// These helpers execute binaries directly without shell expansion. Callers must
+// pass fixed internal commands or values that have already been validated.
+
 // ExecCommand executes a shell command with timeout
 func ExecCommand(command string, args ...string) ([]string, error) {
 	return ExecCommandWithTimeout(60*time.Second, command, args...)
@@ -18,7 +21,7 @@ func ExecCommandWithTimeout(timeout time.Duration, command string, args ...strin
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, command, args...)
+	cmd := exec.CommandContext(ctx, command, args...) // #nosec G204 -- callers pass validated commands and arguments without shell interpolation
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
@@ -54,7 +57,7 @@ func ExecCommandOutput(command string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, command, args...)
+	cmd := exec.CommandContext(ctx, command, args...) // #nosec G204 -- callers pass validated commands and arguments without shell interpolation
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return string(output), fmt.Errorf("command failed: %w", err)

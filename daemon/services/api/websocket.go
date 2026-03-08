@@ -88,24 +88,43 @@ func (h *WSHub) Run(ctx context.Context) {
 			h.mu.Unlock()
 
 		case msg := <-h.broadcast:
-			h.mu.RLock()
 			event := dto.WSEvent{
 				Event:     msg.Topic,
 				Timestamp: time.Now(),
 				Data:      msg.Data,
 			}
+
+			h.mu.RLock()
+			targets := make([]*WSClient, 0, len(h.clients))
 			for client := range h.clients {
 				if !client.wantsTopic(msg.Topic) {
 					continue
 				}
+				targets = append(targets, client)
+			}
+			h.mu.RUnlock()
+
+			staleClients := make([]*WSClient, 0)
+			for _, client := range targets {
 				select {
 				case client.send <- event:
 				default:
-					close(client.send)
-					delete(h.clients, client)
+					staleClients = append(staleClients, client)
 				}
 			}
-			h.mu.RUnlock()
+
+			if len(staleClients) == 0 {
+				continue
+			}
+
+			h.mu.Lock()
+			for _, client := range staleClients {
+				if _, ok := h.clients[client]; ok {
+					delete(h.clients, client)
+					close(client.send)
+				}
+			}
+			h.mu.Unlock()
 		}
 	}
 }

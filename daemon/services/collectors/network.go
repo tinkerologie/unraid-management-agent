@@ -189,7 +189,7 @@ func (c *NetworkCollector) parseNetDev() (map[string]netStats, error) {
 
 func (c *NetworkCollector) getMACAddress(ifName string) string {
 	path := fmt.Sprintf("/sys/class/net/%s/address", ifName)
-	//nolint:gosec // G304: Path is constructed from /sys/class/net system directory, ifName from trusted source
+	// #nosec G304 -- path is constructed from /sys/class/net with a trusted interface name.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return ""
@@ -224,7 +224,7 @@ func (c *NetworkCollector) getIPAddress(ifName string) string {
 
 func (c *NetworkCollector) getLinkSpeed(ifName string) int {
 	path := fmt.Sprintf("/sys/class/net/%s/speed", ifName)
-	//nolint:gosec // G304: Path is constructed from /sys/class/net system directory, ifName from trusted source
+	// #nosec G304 -- path is constructed from /sys/class/net with a trusted interface name.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return 0
@@ -239,7 +239,7 @@ func (c *NetworkCollector) getLinkSpeed(ifName string) int {
 
 func (c *NetworkCollector) getOperState(ifName string) string {
 	path := fmt.Sprintf("/sys/class/net/%s/operstate", ifName)
-	//nolint:gosec // G304: Path is constructed from /sys/class/net system directory, ifName from trusted source
+	// #nosec G304 -- path is constructed from /sys/class/net with a trusted interface name.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "unknown"

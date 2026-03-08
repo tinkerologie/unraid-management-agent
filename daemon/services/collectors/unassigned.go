@@ -6,12 +6,12 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
@@ -263,37 +263,35 @@ func (c *UnassignedCollector) getDeviceInfo(device string) *dto.UnassignedDevice
 	return unassignedDevice
 }
 
+func getFilesystemUsage(path string) (size, used, free uint64, usagePercent float64, err error) {
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs(path, &stat); err != nil {
+		return 0, 0, 0, 0, err
+	}
+
+	blockSize := uint64(stat.Bsize)
+	size = stat.Blocks * blockSize
+	used = (stat.Blocks - stat.Bfree) * blockSize
+	free = stat.Bavail * blockSize
+
+	if size > 0 {
+		usagePercent = float64(used) / float64(size) * 100.0
+	}
+
+	return size, used, free, usagePercent, nil
+}
+
 // getPartitionSizeInfo retrieves size information for a mounted partition
 func (c *UnassignedCollector) getPartitionSizeInfo(partition *dto.UnassignedPartition, mountPoint string) {
-	cmd := exec.Command("df", "-B1", mountPoint)
-	output, err := cmd.Output()
+	size, used, free, usagePercent, err := getFilesystemUsage(mountPoint)
 	if err != nil {
 		return
 	}
 
-	lines := strings.Split(string(output), "\n")
-	if len(lines) < 2 {
-		return
-	}
-
-	fields := strings.Fields(lines[1])
-	if len(fields) < 6 {
-		return
-	}
-
-	// Parse size, used, free
-	size := lib.ParseUint64(fields[1])
-	used := lib.ParseUint64(fields[2])
-	free := lib.ParseUint64(fields[3])
-
 	partition.Size = size
 	partition.Used = used
 	partition.Free = free
-
-	// Calculate usage percent
-	if size > 0 {
-		partition.UsagePercent = float64(used) / float64(size) * 100.0
-	}
+	partition.UsagePercent = usagePercent
 }
 
 // parseSMBMounts parses SMB mount configuration
@@ -352,33 +350,13 @@ func (c *UnassignedCollector) parseISOMounts() []dto.UnassignedRemoteShare {
 
 // getRemoteShareSizeInfo retrieves size information for a remote share
 func (c *UnassignedCollector) getRemoteShareSizeInfo(share *dto.UnassignedRemoteShare, mountPoint string) {
-	cmd := exec.Command("df", "-B1", mountPoint)
-	output, err := cmd.Output()
+	size, used, free, usagePercent, err := getFilesystemUsage(mountPoint)
 	if err != nil {
 		return
 	}
 
-	lines := strings.Split(string(output), "\n")
-	if len(lines) < 2 {
-		return
-	}
-
-	fields := strings.Fields(lines[1])
-	if len(fields) < 6 {
-		return
-	}
-
-	// Parse size, used, free
-	size := lib.ParseUint64(fields[1])
-	used := lib.ParseUint64(fields[2])
-	free := lib.ParseUint64(fields[3])
-
 	share.Size = size
 	share.Used = used
 	share.Free = free
-
-	// Calculate usage percent
-	if size > 0 {
-		share.UsagePercent = float64(used) / float64(size) * 100.0
-	}
+	share.UsagePercent = usagePercent
 }

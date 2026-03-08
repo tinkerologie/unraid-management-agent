@@ -509,6 +509,47 @@ func TestCollectorManager_IdempotentDisable(t *testing.T) {
 	}
 }
 
+func TestCollectorManager_DisableCollectorClearsRuntimeState(t *testing.T) {
+	ctx := createTestContext()
+	var wg sync.WaitGroup
+
+	cm := NewCollectorManager(ctx, &wg)
+	cm.Register("test", func(ctx *domain.Context) Collector {
+		return &mockCollector{}
+	}, 30, false)
+
+	if err := cm.EnableCollector("test"); err != nil {
+		t.Fatalf("EnableCollector failed: %v", err)
+	}
+
+	time.Sleep(50 * time.Millisecond)
+
+	cm.mu.RLock()
+	mc := cm.collectors["test"]
+	if mc.cancel == nil {
+		t.Fatal("expected cancel function to be set while collector is running")
+	}
+	if mc.ctx == nil {
+		t.Fatal("expected context to be set while collector is running")
+	}
+	cm.mu.RUnlock()
+
+	if err := cm.DisableCollector("test"); err != nil {
+		t.Fatalf("DisableCollector failed: %v", err)
+	}
+
+	time.Sleep(50 * time.Millisecond)
+
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+	if mc.cancel != nil {
+		t.Error("expected cancel function to be cleared after disable")
+	}
+	if mc.ctx != nil {
+		t.Error("expected context to be cleared after disable")
+	}
+}
+
 func TestCollectorManager_DefaultInterval(t *testing.T) {
 	ctx := createTestContext()
 	var wg sync.WaitGroup

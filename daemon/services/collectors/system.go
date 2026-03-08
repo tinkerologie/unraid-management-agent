@@ -450,7 +450,7 @@ func (c *SystemCollector) readHwmonTemperatures() (map[string]float64, error) {
 	for i := range 10 {
 		for j := 1; j < 20; j++ {
 			path := fmt.Sprintf("/sys/class/hwmon/hwmon%d/temp%d_input", i, j)
-			//nolint:gosec // G304: Path is constructed from /sys/class/hwmon system directory with numeric indices
+			// #nosec G304 -- path is constructed from /sys/class/hwmon using bounded numeric indices.
 			data, err := os.ReadFile(path)
 			if err != nil {
 				continue
@@ -463,7 +463,7 @@ func (c *SystemCollector) readHwmonTemperatures() (map[string]float64, error) {
 
 			// Try to get label
 			labelPath := fmt.Sprintf("/sys/class/hwmon/hwmon%d/temp%d_label", i, j)
-			//nolint:gosec // G304: Path is constructed from /sys/class/hwmon system directory with numeric indices
+			// #nosec G304 -- labelPath is constructed from /sys/class/hwmon using bounded numeric indices.
 			labelData, err := os.ReadFile(labelPath)
 			label := fmt.Sprintf("hwmon%d_temp%d", i, j)
 			if err == nil {
@@ -552,7 +552,7 @@ func (c *SystemCollector) readHwmonFanSpeeds() (map[string]int, error) {
 	for i := range 10 {
 		for j := 1; j < 20; j++ {
 			path := fmt.Sprintf("/sys/class/hwmon/hwmon%d/fan%d_input", i, j)
-			//nolint:gosec // G304: Path is constructed from /sys/class/hwmon system directory with numeric indices
+			// #nosec G304 -- path is constructed from /sys/class/hwmon using bounded numeric indices.
 			data, err := os.ReadFile(path)
 			if err != nil {
 				continue
@@ -565,7 +565,7 @@ func (c *SystemCollector) readHwmonFanSpeeds() (map[string]int, error) {
 
 			// Try to get label
 			labelPath := fmt.Sprintf("/sys/class/hwmon/hwmon%d/fan%d_label", i, j)
-			//nolint:gosec // G304: Path is constructed from /sys/class/hwmon system directory with numeric indices
+			// #nosec G304 -- labelPath is constructed from /sys/class/hwmon using bounded numeric indices.
 			labelData, err := os.ReadFile(labelPath)
 			label := fmt.Sprintf("hwmon%d_fan%d", i, j)
 			if err == nil {

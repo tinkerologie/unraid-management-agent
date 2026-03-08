@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **WebSocket client eviction no longer mutates the hub under a read lock**:
+  - Broadcast now snapshots clients before sending and removes stale clients under an exclusive lock, avoiding concurrent map mutation under load
+- **Unassigned device filesystem sizing no longer shells out to `df`**:
+  - Mounted partition and remote share usage now uses native `statfs` calls, reducing process overhead and removing subprocess findings
+- **Collector runtime shutdown state is now cleared explicitly**:
+  - Collector cancellation is released on disable, restart, stop-all, and collector exit, with regression coverage for runtime state cleanup
+- **MQTT QoS is normalized before publish/subscribe operations**:
+  - Invalid QoS values now fall back safely to `0` instead of flowing through unchecked conversions
+- **Alert message formatting avoids unnecessary temporary strings**:
+  - Dispatcher now writes formatted content directly to the builder
+
+### Security
+
+- **Log file reads are restricted to the known allowlist**:
+  - Arbitrary filesystem paths are rejected before stat/open, preserving the log API while removing path-traversal findings
+- **Security annotations were narrowed and documented for trusted system paths and direct argv process execution**:
+  - Raw `gosec`, `golangci-lint`, and the repo security checks now run cleanly with explicit rationale at each trusted boundary
+
 ## [2026.03.01] - 2026-03-05
 
 ### Fixed

@@ -6,6 +6,16 @@ import (
 	"testing"
 )
 
+func setTestAllowedLogPaths(t *testing.T, paths ...string) {
+	t.Helper()
+
+	oldPaths := commonLogPaths
+	commonLogPaths = append([]string(nil), paths...)
+	t.Cleanup(func() {
+		commonLogPaths = oldPaths
+	})
+}
+
 func TestGetLogContent_DirectoryTraversal(t *testing.T) {
 	server, _ := setupTestServer()
 
@@ -33,13 +43,50 @@ func TestGetLogContent_DirectoryTraversal(t *testing.T) {
 
 func TestGetLogContent_FileNotFound(t *testing.T) {
 	server, _ := setupTestServer()
+	missingPath := filepath.Join(t.TempDir(), "missing.log")
+	setTestAllowedLogPaths(t, missingPath)
 
-	_, err := server.getLogContent("/nonexistent/file.log", "", "")
+	_, err := server.getLogContent(missingPath, "", "")
 	if err == nil {
 		t.Fatal("Expected error for non-existent file")
 	}
-	if err.Error() != "log file not found: /nonexistent/file.log" {
+	if err.Error() != "log file not found: "+missingPath {
 		t.Errorf("Expected file not found error, got: %v", err)
+	}
+}
+
+func TestGetLogContent_RejectsPathOutsideAllowlist(t *testing.T) {
+	server, _ := setupTestServer()
+
+	logFile := filepath.Join(t.TempDir(), "rogue.log")
+	if err := os.WriteFile(logFile, []byte("line 1\n"), 0o644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	_, err := server.getLogContent(logFile, "", "")
+	if err == nil {
+		t.Fatal("Expected error for path outside allowlist")
+	}
+	if err.Error() != "log file not allowed" {
+		t.Fatalf("Expected disallowed-path error, got: %v", err)
+	}
+}
+
+func TestGetLogContent_AllowsKnownPath(t *testing.T) {
+	server, _ := setupTestServer()
+
+	logFile := filepath.Join(t.TempDir(), "allowed.log")
+	if err := os.WriteFile(logFile, []byte("line 1\nline 2\n"), 0o644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+	setTestAllowedLogPaths(t, logFile)
+
+	result, err := server.getLogContent(logFile, "", "")
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+	if result.TotalLines != 2 {
+		t.Fatalf("Expected 2 total lines, got %d", result.TotalLines)
 	}
 }
 
@@ -53,6 +100,7 @@ func TestGetLogContent_FullFile(t *testing.T) {
 	if err := os.WriteFile(logFile, []byte(content), 0644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
+	setTestAllowedLogPaths(t, logFile)
 
 	result, err := server.getLogContent(logFile, "", "")
 	if err != nil {
@@ -93,6 +141,7 @@ func TestGetLogContent_WithLinesParam(t *testing.T) {
 	if err := os.WriteFile(logFile, []byte(content), 0644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
+	setTestAllowedLogPaths(t, logFile)
 
 	// Test tail behavior - last 3 lines
 	result, err := server.getLogContent(logFile, "3", "")
@@ -130,6 +179,7 @@ func TestGetLogContent_WithStartAndLines(t *testing.T) {
 	if err := os.WriteFile(logFile, []byte(content), 0644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
+	setTestAllowedLogPaths(t, logFile)
 
 	// Get lines 2-4 (indices 2, 3, 4)
 	result, err := server.getLogContent(logFile, "3", "2")
@@ -163,6 +213,7 @@ func TestGetLogContent_StartBeyondFileSize(t *testing.T) {
 	if err := os.WriteFile(logFile, []byte(content), 0644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
+	setTestAllowedLogPaths(t, logFile)
 
 	result, err := server.getLogContent(logFile, "5", "100")
 	if err != nil {
@@ -187,6 +238,7 @@ func TestGetLogContent_NegativeStart(t *testing.T) {
 	if err := os.WriteFile(logFile, []byte(content), 0644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
+	setTestAllowedLogPaths(t, logFile)
 
 	result, err := server.getLogContent(logFile, "2", "-5")
 	if err != nil {
@@ -212,6 +264,7 @@ func TestGetLogContent_LinesMoreThanTotal(t *testing.T) {
 	if err := os.WriteFile(logFile, []byte(content), 0644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
+	setTestAllowedLogPaths(t, logFile)
 
 	// Request more lines than file has (tail behavior)
 	result, err := server.getLogContent(logFile, "100", "")
@@ -236,6 +289,7 @@ func TestGetLogContent_EmptyFile(t *testing.T) {
 	if err := os.WriteFile(logFile, []byte(""), 0644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
+	setTestAllowedLogPaths(t, logFile)
 
 	result, err := server.getLogContent(logFile, "", "")
 	if err != nil {
@@ -259,6 +313,7 @@ func TestGetLogContent_SingleLine(t *testing.T) {
 	if err := os.WriteFile(logFile, []byte("single line\n"), 0644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
+	setTestAllowedLogPaths(t, logFile)
 
 	result, err := server.getLogContent(logFile, "", "")
 	if err != nil {
@@ -283,6 +338,7 @@ func TestGetLogContent_InvalidLineParam(t *testing.T) {
 	if err := os.WriteFile(logFile, []byte(content), 0644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
+	setTestAllowedLogPaths(t, logFile)
 
 	// Invalid lines param - should be ignored, return all lines
 	result, err := server.getLogContent(logFile, "invalid", "")
@@ -340,6 +396,7 @@ func TestGetLogContent_PublicWrapper(t *testing.T) {
 	if err := os.WriteFile(logFile, []byte("a\nb\nc\n"), 0644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
+	setTestAllowedLogPaths(t, logFile)
 
 	content, err := server.GetLogContent(logFile, "", "")
 	if err != nil {

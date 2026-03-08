@@ -7,6 +7,29 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 )
 
+func TestNormalizeQoS(t *testing.T) {
+	tests := []struct {
+		name string
+		in   int
+		want byte
+	}{
+		{name: "negative", in: -1, want: 0},
+		{name: "zero", in: 0, want: 0},
+		{name: "one", in: 1, want: 1},
+		{name: "two", in: 2, want: 2},
+		{name: "too large", in: 3, want: 0},
+		{name: "very large", in: 99, want: 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := normalizeQoS(tt.in); got != tt.want {
+				t.Fatalf("normalizeQoS(%d) = %d, want %d", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestNewClient(t *testing.T) {
 	config := DefaultConfig()
 	client := NewClient(config, "test-server", "1.0.0", nil)

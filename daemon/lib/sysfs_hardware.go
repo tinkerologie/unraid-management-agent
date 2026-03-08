@@ -14,7 +14,7 @@ var SysfsDMIPath = "/sys/class/dmi/id"
 // readSysfsFile reads a file from sysfs and returns its trimmed content
 // This function only reads from /sys paths which are safe system directories
 func readSysfsFile(path string) string {
-	//nolint:gosec // G304: path is always from /sys system directory, not user input
+	// #nosec G304 -- path is always built from the fixed /sys system directory.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return ""

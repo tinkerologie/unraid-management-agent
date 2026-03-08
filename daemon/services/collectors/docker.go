@@ -225,7 +225,7 @@ func (c *DockerCollector) getMemoryFromCgroups(fullID string, cont *dto.Containe
 	cgroupPath := "/sys/fs/cgroup/docker/" + fullID
 
 	// Read memory.current
-	//nolint:gosec // G304: cgroupPath is constructed from trusted Docker container ID
+	// #nosec G304 -- cgroupPath is constructed from a trusted Docker container ID under /sys/fs/cgroup/docker.
 	if data, err := os.ReadFile(cgroupPath + "/memory.current"); err == nil {
 		var memUsage uint64
 		if _, err := fmt.Sscanf(strings.TrimSpace(string(data)), "%d", &memUsage); err == nil {
@@ -234,7 +234,7 @@ func (c *DockerCollector) getMemoryFromCgroups(fullID string, cont *dto.Containe
 	}
 
 	// Read memory.max
-	//nolint:gosec // G304: cgroupPath is constructed from trusted Docker container ID
+	// #nosec G304 -- cgroupPath is constructed from a trusted Docker container ID under /sys/fs/cgroup/docker.
 	if data, err := os.ReadFile(cgroupPath + "/memory.max"); err == nil {
 		content := strings.TrimSpace(string(data))
 		if content != "max" {

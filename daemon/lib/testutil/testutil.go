@@ -24,12 +24,10 @@ func TempDir(t *testing.T) (string, func()) {
 func WriteFile(t *testing.T, dir, filename, content string) string {
 	t.Helper()
 	path := filepath.Join(dir, filename)
-	//nolint:gosec // G301: Test directory permissions - 0755 is acceptable for tests
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		t.Fatalf("Failed to create directory: %v", err)
 	}
-	//nolint:gosec // G306: Test file permissions - 0644 is acceptable for tests
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatalf("Failed to write file %s: %v", path, err)
 	}
 	return path
@@ -38,7 +36,7 @@ func WriteFile(t *testing.T, dir, filename, content string) string {
 // ReadFileContent reads file content or fails the test.
 func ReadFileContent(t *testing.T, path string) string {
 	t.Helper()
-	//nolint:gosec // G304: Test utility - path comes from test code, not user input
+	// #nosec G304 -- path comes from test code, not user input.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("Failed to read file %s: %v", path, err)

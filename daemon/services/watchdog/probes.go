@@ -48,7 +48,8 @@ func probeHTTP(ctx context.Context, url string, expectedCode int, timeout time.D
 		return ProbeResult{Healthy: false, Error: fmt.Sprintf("creating request: %s", err)}
 	}
 
-	resp, err := client.Do(req) //nolint:gosec //#nosec G704 -- Target URL is user-configured health check endpoint
+	// #nosec G704 -- Target URL is a user-configured health check endpoint.
+	resp, err := client.Do(req)
 	if err != nil {
 		return ProbeResult{Healthy: false, Error: fmt.Sprintf("HTTP request failed: %s", err)}
 	}
@@ -78,7 +79,8 @@ func probeTCP(_ context.Context, target string, timeout time.Duration) ProbeResu
 // Target should be a hostname or IP address.
 func probePing(ctx context.Context, target string, timeout time.Duration) ProbeResult {
 	timeoutSec := fmt.Sprintf("%d", max(1, int(timeout.Seconds())))
-	cmd := exec.CommandContext(ctx, "ping", "-c", "1", "-W", timeoutSec, target) //nolint:gosec //#nosec G204 -- Target is user-configured health check host
+	// #nosec G204 -- Target is passed as a direct argv value to ping without shell interpolation.
+	cmd := exec.CommandContext(ctx, "ping", "-c", "1", "-W", timeoutSec, target)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return ProbeResult{Healthy: false, Error: fmt.Sprintf("ping failed: %s (%s)", err, string(output))}
 	}

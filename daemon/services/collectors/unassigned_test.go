@@ -261,6 +261,27 @@ func parseSize(s string) (int64, bool) {
 	return result, true
 }
 
+func TestGetFilesystemUsage(t *testing.T) {
+	path := t.TempDir()
+
+	size, used, free, usagePercent, err := getFilesystemUsage(path)
+	if err != nil {
+		t.Fatalf("getFilesystemUsage returned error: %v", err)
+	}
+	if size == 0 {
+		t.Fatal("expected non-zero filesystem size")
+	}
+	if used > size {
+		t.Fatalf("expected used <= size, got used=%d size=%d", used, size)
+	}
+	if free > size {
+		t.Fatalf("expected free <= size, got free=%d size=%d", free, size)
+	}
+	if usagePercent < 0 || usagePercent > 100 {
+		t.Fatalf("expected usage percent in range 0..100, got %f", usagePercent)
+	}
+}
+
 func TestSpindownDelayValues(t *testing.T) {
 	// Valid spindown delay values in minutes
 	validDelays := []int{0, 15, 30, 45, 60, 120, 180, 240, 300}

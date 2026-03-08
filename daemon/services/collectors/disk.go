@@ -303,7 +303,7 @@ func (c *DiskCollector) enrichWithModelAndSerial(disk *dto.DiskInfo) {
 	// Try to read model from sysfs first (most reliable)
 	if disk.Device != "" {
 		modelPath := "/sys/block/" + disk.Device + "/device/model"
-		//nolint:gosec // G304: Path is constructed from /sys/block system directory, device name from trusted source
+		// #nosec G304 -- modelPath is constructed from /sys/block with a trusted device name.
 		if data, err := os.ReadFile(modelPath); err == nil {
 			model := strings.TrimSpace(string(data))
 			if model != "" {
@@ -378,7 +378,7 @@ func (c *DiskCollector) enrichWithIOStats(disk *dto.DiskInfo) {
 
 	// Read from /sys/block/{device}/stat
 	statPath := "/sys/block/" + disk.Device + "/stat"
-	//nolint:gosec // G304: Path is constructed from /sys/block system directory, device name from trusted source
+	// #nosec G304 -- statPath is constructed from /sys/block with a trusted device name.
 	data, err := os.ReadFile(statPath)
 	if err != nil {
 		return // Device might be spun down or not available

@@ -22,7 +22,7 @@ func (c *Client) subscribeCommandTopics() {
 
 	// Subscribe to all commands under cmd/# using the wildcard router
 	cmdTopic := c.buildTopic("cmd/#")
-	token := c.client.Subscribe(cmdTopic, byte(c.config.QoS), func(_ pahomqtt.Client, msg pahomqtt.Message) {
+	token := c.client.Subscribe(cmdTopic, normalizeQoS(c.config.QoS), func(_ pahomqtt.Client, msg pahomqtt.Message) {
 		c.handleCommand(msg)
 	})
 	token.Wait()

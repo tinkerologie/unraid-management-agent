@@ -74,6 +74,7 @@ func TestHandleLogs_WithPathParam(t *testing.T) {
 	if err := os.WriteFile(tmpLog, []byte("line1\nline2\nline3\n"), 0644); err != nil {
 		t.Fatalf("Failed to create log: %v", err)
 	}
+	setTestAllowedLogPaths(t, tmpLog)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/logs?path="+tmpLog, nil)
 	w := httptest.NewRecorder()

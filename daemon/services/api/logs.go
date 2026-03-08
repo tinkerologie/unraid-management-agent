@@ -99,27 +99,49 @@ func (s *Server) listLogFiles() []dto.LogFile {
 	return logs
 }
 
+func (s *Server) resolveAllowedLogPath(path string) (string, error) {
+	if strings.Contains(path, "..") {
+		return "", fmt.Errorf("invalid path: directory traversal not allowed")
+	}
+
+	cleanPath := filepath.Clean(path)
+	for _, allowedPath := range commonLogPaths {
+		if filepath.Clean(allowedPath) == cleanPath {
+			return cleanPath, nil
+		}
+	}
+
+	for _, logFile := range s.listLogFiles() {
+		if filepath.Clean(logFile.Path) == cleanPath {
+			return cleanPath, nil
+		}
+	}
+
+	return "", fmt.Errorf("log file not allowed")
+}
+
 // getLogContent retrieves log file content with optional pagination
 func (s *Server) getLogContent(path, linesParam, startParam string) (*dto.LogFileContent, error) {
-	// Validate path (prevent directory traversal)
-	if strings.Contains(path, "..") {
-		return nil, fmt.Errorf("invalid path: directory traversal not allowed")
+	allowedPath, err := s.resolveAllowedLogPath(path)
+	if err != nil {
+		return nil, err
 	}
 
 	// Check if file exists
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return nil, fmt.Errorf("log file not found: %s", path)
+	// #nosec G703 -- allowedPath is resolved against the known log allowlist before filesystem access.
+	if _, err := os.Stat(allowedPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("log file not found: %s", allowedPath)
 	}
 
 	// Read file
-	file, err := os.Open(path) // #nosec G304 - path is validated above
+	file, err := os.Open(allowedPath) // #nosec G304,G703 -- allowedPath is resolved against the known log allowlist
 	if err != nil {
-		logger.Error("Failed to open log file %s: %v", path, err)
+		logger.Error("Failed to open log file %s: %v", allowedPath, err)
 		return nil, fmt.Errorf("failed to open log file: %v", err)
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			logger.Error("Failed to close log file %s: %v", path, err)
+			logger.Error("Failed to close log file %s: %v", allowedPath, err)
 		}
 	}()
 
@@ -131,7 +153,7 @@ func (s *Server) getLogContent(path, linesParam, startParam string) (*dto.LogFil
 	}
 
 	if err := scanner.Err(); err != nil {
-		logger.Error("Failed to read log file %s: %v", path, err)
+		logger.Error("Failed to read log file %s: %v", allowedPath, err)
 		return nil, fmt.Errorf("failed to read log file: %v", err)
 	}
 
@@ -156,7 +178,7 @@ func (s *Server) getLogContent(path, linesParam, startParam string) (*dto.LogFil
 	// Default: return all lines if no pagination specified
 	if !linesSpecified && !startSpecified {
 		return &dto.LogFileContent{
-			Path:          path,
+			Path:          allowedPath,
 			Content:       strings.Join(allLines, "\n"),
 			Lines:         allLines,
 			TotalLines:    totalLines,
@@ -180,7 +202,7 @@ func (s *Server) getLogContent(path, linesParam, startParam string) (*dto.LogFil
 	}
 	if startLine >= totalLines {
 		return &dto.LogFileContent{
-			Path:          path,
+			Path:          allowedPath,
 			Content:       "",
 			Lines:         []string{},
 			TotalLines:    totalLines,
@@ -195,7 +217,7 @@ func (s *Server) getLogContent(path, linesParam, startParam string) (*dto.LogFil
 	selectedLines := allLines[startLine:endLine]
 
 	return &dto.LogFileContent{
-		Path:          path,
+		Path:          allowedPath,
 		Content:       strings.Join(selectedLines, "\n"),
 		Lines:         selectedLines,
 		TotalLines:    totalLines,

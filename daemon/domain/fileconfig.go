@@ -73,7 +73,8 @@ type FileConfigIntervals struct {
 // LoadConfigFile reads and parses a YAML config file.
 // Returns nil without error if the file does not exist.
 func LoadConfigFile(path string) (*FileConfig, error) {
-	data, err := os.ReadFile(path) //nolint:gosec // path is a trusted config file path, not user input
+	// #nosec G304 -- path is an internal config file location, not direct user input.
+	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil

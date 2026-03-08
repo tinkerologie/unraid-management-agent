@@ -91,16 +91,16 @@ func (d *Dispatcher) formatMessage(event dto.AlertEvent) string {
 	var sb strings.Builder
 
 	if event.State == "firing" {
-		sb.WriteString(fmt.Sprintf("🔔 ALERT [%s]: %s\n", strings.ToUpper(event.Severity), event.RuleName))
+		_, _ = fmt.Fprintf(&sb, "🔔 ALERT [%s]: %s\n", strings.ToUpper(event.Severity), event.RuleName)
 	} else {
-		sb.WriteString(fmt.Sprintf("✅ RESOLVED: %s\n", event.RuleName))
+		_, _ = fmt.Fprintf(&sb, "✅ RESOLVED: %s\n", event.RuleName)
 	}
 
 	sb.WriteString(event.Message)
-	sb.WriteString(fmt.Sprintf("\nTime: %s", event.FiredAt.Format("2006-01-02 15:04:05")))
+	_, _ = fmt.Fprintf(&sb, "\nTime: %s", event.FiredAt.Format("2006-01-02 15:04:05"))
 
 	if event.State == "resolved" && !event.ResolvedAt.IsZero() {
-		sb.WriteString(fmt.Sprintf("\nResolved: %s", event.ResolvedAt.Format("2006-01-02 15:04:05")))
+		_, _ = fmt.Fprintf(&sb, "\nResolved: %s", event.ResolvedAt.Format("2006-01-02 15:04:05"))
 	}
 
 	return sb.String()

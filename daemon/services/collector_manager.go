@@ -48,6 +48,14 @@ type CollectorManager struct {
 	wg         *sync.WaitGroup
 }
 
+func (cm *CollectorManager) stopCollectorLocked(mc *ManagedCollector) {
+	if mc.cancel != nil {
+		mc.cancel()
+		mc.cancel = nil
+	}
+	mc.ctx = nil
+}
+
 // NewCollectorManager creates a new collector manager
 func NewCollectorManager(domainCtx *domain.Context, wg *sync.WaitGroup) *CollectorManager {
 	return &CollectorManager{
@@ -108,16 +116,19 @@ func (cm *CollectorManager) startCollectorLocked(name string) {
 	}
 
 	// Create new context for this collector
+	// #nosec G118 -- cancel is stored on ManagedCollector and released by DisableCollector, UpdateInterval, StopAll, and collector exit.
 	ctx, cancel := context.WithCancel(context.Background())
 	mc.ctx = ctx
 	mc.cancel = cancel
 
 	// Create collector instance
 	collector := mc.factory(mc.domainCtx)
+	interval := time.Duration(mc.Interval) * time.Second
 
 	// Start the collector goroutine
 	mc.wg.Go(func() {
-		collector.Start(ctx, time.Duration(mc.Interval)*time.Second)
+		defer cancel()
+		collector.Start(ctx, interval)
 	})
 
 	mc.Status = "running"
@@ -184,10 +195,7 @@ func (cm *CollectorManager) DisableCollector(name string) error {
 	}
 
 	// Cancel the collector's context
-	if mc.cancel != nil {
-		mc.cancel()
-		mc.cancel = nil
-	}
+	cm.stopCollectorLocked(mc)
 
 	mc.Status = "stopped"
 	mc.Enabled = false
@@ -222,9 +230,8 @@ func (cm *CollectorManager) UpdateInterval(name string, intervalSeconds int) err
 	wasRunning := mc.Status == "running"
 
 	// Stop the collector if running
-	if wasRunning && mc.cancel != nil {
-		mc.cancel()
-		mc.cancel = nil
+	if wasRunning {
+		cm.stopCollectorLocked(mc)
 		mc.Status = "stopped"
 		// Give time for graceful stop
 		time.Sleep(100 * time.Millisecond)
@@ -331,8 +338,7 @@ func (cm *CollectorManager) StopAll() {
 
 	for name, mc := range cm.collectors {
 		if mc.cancel != nil {
-			mc.cancel()
-			mc.cancel = nil
+			cm.stopCollectorLocked(mc)
 			mc.Status = "stopped"
 			logger.Debug("Stopped collector: %s", name)
 		}

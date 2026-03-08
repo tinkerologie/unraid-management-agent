@@ -86,7 +86,8 @@ func (r *Remediator) callWebhook(ctx context.Context, check dto.HealthCheck, res
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req) //nolint:gosec //#nosec G704 -- Webhook URL is user-configured
+	// #nosec G704 -- Webhook URL is user-configured and requested directly without shell execution.
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("webhook request failed: %w", err)
 	}
