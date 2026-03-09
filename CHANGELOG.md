@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.03.02] - 2026-03-09
+
 ### Fixed
 
 - **WebSocket client eviction no longer mutates the hub under a read lock**:
