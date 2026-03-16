@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2026.03.02] - 2026-03-09
+## [2026.03.02] - 2026-03-16
 
 ### Fixed
 
@@ -23,6 +23,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Invalid QoS values now fall back safely to `0` instead of flowing through unchecked conversions
 - **Alert message formatting avoids unnecessary temporary strings**:
   - Dispatcher now writes formatted content directly to the builder
+- **Parity check history endpoint no longer returns invalid JSON on systems without parity** ([#82](https://github.com/ruaan-deysel/unraid-management-agent/issues/82)):
+- `parseSpeed()` now guards against `NaN` and `Inf` float64 values that `strconv.ParseFloat` accepts but `encoding/json` cannot serialize
+- Systems that have never run a parity check (e.g., full ZFS setups) no longer trigger `json: unsupported value: NaN` errors every 30 seconds
+
+### Changed
+
+- **Plugin PLG now includes `project` and `readme` attributes** per [plugin-docs](https://github.com/mstrhakr/plugin-docs) best practices
+- **CA XML template uses `<Plugin>` root element** instead of legacy `<Containers>` wrapper per plugin-docs recommendations
+
+- **Removed the duplicate template PLG from the release process**:
+  - `unraid-management-agent.plg` is now the only maintained PLG file
+  - Release automation and deploy tooling no longer reference `meta/template/unraid-management-agent.plg`
+- **Retired redundant root maintenance scripts in favor of Ansible**:
+  - Local deploy, live validation, and diagnostics now flow through `ansible/deploy.yml`
+  - Ansible deploy remains cleanup-focused and does not create pre-deploy backup directories on the Unraid host
+- **Fixed the Ansible deployment summary counts**:
+  - Prometheus metric families and collector totals now use the same underlying verify data shown by the dedicated verification tasks
 
 ### Security
 
@@ -30,6 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Arbitrary filesystem paths are rejected before stat/open, preserving the log API while removing path-traversal findings
 - **Security annotations were narrowed and documented for trusted system paths and direct argv process execution**:
   - Raw `gosec`, `golangci-lint`, and the repo security checks now run cleanly with explicit rationale at each trusted boundary
+- **Upgraded `modelcontextprotocol/go-sdk` from v1.2.0 to v1.3.1** to fix GO-2026-4569 (improper handling of case sensitivity)
+- **Bumped Go from 1.26.0 to 1.26.1** (latest patch release)
 
 ## [2026.03.01] - 2026-03-05
 

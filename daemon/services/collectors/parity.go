@@ -3,6 +3,7 @@ package collectors
 import (
 	"bufio"
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -179,6 +180,10 @@ func (c *ParityCollector) parseSpeed(speedStr string) float64 {
 
 	// Try parsing as raw bytes/second first
 	if speed, err := strconv.ParseFloat(speedStr, 64); err == nil {
+		// strconv.ParseFloat accepts "NaN", "+Inf", "-Inf" which are not valid JSON
+		if math.IsNaN(speed) || math.IsInf(speed, 0) {
+			return 0
+		}
 		// It's a raw number - convert bytes/sec to MB/s
 		return speed / (1024 * 1024)
 	}
@@ -194,6 +199,11 @@ func (c *ParityCollector) parseSpeed(speedStr string) float64 {
 
 	value, err := strconv.ParseFloat(parts[0], 64)
 	if err != nil {
+		return 0
+	}
+
+	// Guard against NaN/Inf in human-readable format
+	if math.IsNaN(value) || math.IsInf(value, 0) {
 		return 0
 	}
 

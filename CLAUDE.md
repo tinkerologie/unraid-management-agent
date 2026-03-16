@@ -17,7 +17,6 @@ make swagger                  # Regenerate Swagger docs
 
 # Deploy to Unraid hardware (Ansible — preferred)
 ansible-playbook -i ansible/inventory.yml ansible/deploy.yml
-# Or: ./scripts/deploy-plugin.sh (legacy)
 ```
 
 ## Key Paths

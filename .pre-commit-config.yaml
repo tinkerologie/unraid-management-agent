@@ -155,7 +155,7 @@ repos:
         name: ShellCheck
         description: Shell script analysis tool
         args: ["--severity=error"]
-        exclude: '^(\.specify/|scripts/config\.sh\.example|scripts/validate-live\.sh\.example)'
+        exclude: '^(\.specify/)'
 
   # Detect secrets and credentials
   - repo: https://github.com/Yelp/detect-secrets

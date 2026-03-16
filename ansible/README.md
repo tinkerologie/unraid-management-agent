@@ -1,6 +1,6 @@
 # Ansible Deploy for Unraid Management Agent
 
-An alternative to `scripts/deploy-plugin.sh` using Ansible. Uses a **single persistent SSH connection** via ControlPersist, eliminating the "Too many authentication failures" problem.
+Primary workflow for local build, deploy, uninstall, and live verification. Uses a **single persistent SSH connection** via ControlPersist, eliminating the "Too many authentication failures" problem.
 
 ## Prerequisites
 
@@ -41,22 +41,10 @@ ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --tags deploy
 # Verify endpoints only (against already-running server)
 ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --tags verify
 
-# Deploy with backup
-ansible-playbook -i ansible/inventory.yml ansible/deploy.yml -e create_backup=yes
-
 # Skip endpoint tests
 ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --skip-tags tests
 ```
 
-## Why Ansible?
+## Notes
 
-| Feature             | deploy-plugin.sh  | Ansible         |
-| ------------------- | ----------------- | --------------- |
-| SSH connections     | 1 (ControlMaster) | 1 (built-in)    |
-| Endpoint tests via  | Local curl        | `uri` module    |
-| Idempotent          | No                | Yes             |
-| Error handling      | `set -e`          | Per-task        |
-| Selective execution | No                | `--tags`        |
-| Setup overhead      | None              | Install Ansible |
-
-Both approaches are supported — use whichever fits your workflow.
+- `--tags verify` supersedes the old local validation scripts with endpoint, schema, MCP, Prometheus, Swagger, WebSocket, and error-handling checks.

@@ -15,9 +15,6 @@
 #   --tags redeploy   — Full lifecycle: uninstall → build → deploy → verify
 #   --skip-tags tests — Skip endpoint verification tests
 #
-# Extra vars:
-#   -e create_backup=true — Backup existing plugin before deploy
-#
 # Prerequisites:
 #   brew install ansible sshpass   (macOS)
 #   pip install ansible            (Linux)
@@ -65,13 +62,13 @@
           Schema validations: system, array, disk, container ✓
           Parameterized:      disk, container, VM, collector, log ✓
           MCP protocol:       init, tools, resources, prompts, call, read ✓
-          Prometheus:         {{ prom_result.content.split('\n') | select('match', '^# HELP unraid_') | list | length }} metric families ✓
+          Prometheus:         {{ prom_result.content | regex_findall('(?m)^# HELP unraid_[^\n]+') | length }} metric families ✓
           Swagger:            {{ swagger_doc.paths | length }} paths documented ✓
           WebSocket:          101 Switching Protocols ✓
           Error handling:     8 cases (traversal, 404, bad JSON, MCP) ✓
           Alerting CRUD:      cleanup/create/verify/delete/confirm ✓
           Health Check CRUD:  cleanup/create/run/verify/delete/confirm ✓
-          Collectors:         {{ all_collectors.json | length }} registered ✓
+          Collectors:         {{ all_collectors.json.collectors | default([]) | selectattr('status', 'eq', 'running') | list | length }} running, {{ all_collectors.json.collectors | default([]) | selectattr('enabled', 'eq', true) | list | length }} enabled, {{ all_collectors.json.collectors | default([]) | length }} total ✓
           {% else %}
           ── Tests ──
           Use --tags verify to run endpoint tests

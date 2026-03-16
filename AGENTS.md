@@ -35,7 +35,7 @@
 │       └── watchdog/           # Health probes, remediation, runner
 ├── docs/                       # Documentation (API, MCP, WebSocket, guides)
 ├── meta/                       # Plugin metadata (XML, page files, scripts)
-├── scripts/                    # Utility scripts (deployment, testing)
+├── scripts/                    # Developer setup helpers
 ├── tests/                      # Integration tests
 ├── .github/
 │   ├── instructions/           # Path-specific AI instructions (applyTo globs)
@@ -227,13 +227,6 @@ ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --tags redeploy
 ```
 
 See `ansible/README.md` for full documentation including backup options and tag reference.
-
-**Alternative:** The legacy shell script is also available:
-
-```bash
-cp scripts/config.sh.example scripts/config.sh  # Add SSH credentials
-./scripts/deploy-plugin.sh                       # Build and deploy
-```
 
 ## Code Style and Conventions
 
@@ -428,13 +421,14 @@ Uses date-based versioning: `YYYY.MM.DD` (e.g., `2025.12.01`).
    - Follow format: `## [YYYY.MM.DD]` with date
    - Group changes: Added, Fixed, Changed, Security, Performance
 2. **Update `VERSION` file** with new version number
-3. **Update `.plg` files** (both root and `meta/template/`):
+3. **Update `unraid-management-agent.plg`**:
    - Set `<!ENTITY version "YYYY.MM.DD">`
    - Set `<!ENTITY md5 "...">` with checksum **from GitHub release** (not local build)
    - MD5 must match the GitHub release artifact
-4. **Tag and push:** `git tag vYYYY.MM.DD && git push origin vYYYY.MM.DD`
-5. GitHub Actions builds and releases automatically
-6. Verify MD5 matches published release artifact
+4. **Update `unraid-management-agent.xml`** as needed for listing metadata changes
+5. **Tag and push:** `git tag vYYYY.MM.DD && git push origin vYYYY.MM.DD`
+6. GitHub Actions builds and releases automatically
+7. Verify MD5 matches published release artifact
 
 ## Hardware Compatibility
 

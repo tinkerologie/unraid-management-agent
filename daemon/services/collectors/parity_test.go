@@ -251,6 +251,11 @@ func TestParityParseSpeed(t *testing.T) {
 		{"unavailable", "Unavailable", 0},
 		{"empty string", "", 0},
 		{"zero", "0", 0},
+		{"NaN string", "NaN", 0},
+		{"+Inf string", "+Inf", 0},
+		{"-Inf string", "-Inf", 0},
+		{"Inf string", "Inf", 0},
+		{"NaN MB/s", "NaN MB/s", 0},
 	}
 
 	for _, tt := range tests {
@@ -315,5 +320,41 @@ func TestGetParityHistory_EmptyRecordsNotNull(t *testing.T) {
 	data, _ = json.Marshal(nilSlice)
 	if string(data) != `{"records":null}` {
 		t.Errorf("Nil slice marshaled to %s, want {\"records\":null}", string(data))
+	}
+}
+
+func TestParityParseLine_NaNSpeedProducesValidJSON(t *testing.T) {
+	collector := NewParityCollector()
+
+	// Simulate a log line where speed is "NaN" (can occur on systems with no parity)
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"5-field with NaN speed", "2026 Mar 15 12:00:00|0|NaN|0|0"},
+		{"7-field with NaN speed", "2026 Mar 15 12:00:00|0|NaN|0|0|check P|0"},
+		{"5-field with Inf speed", "2026 Mar 15 12:00:00|0|+Inf|0|0"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			record, err := collector.parseLine(tt.input)
+			if err != nil {
+				t.Fatalf("parseLine(%q) unexpected error: %v", tt.input, err)
+			}
+
+			if record.Speed != 0 {
+				t.Errorf("parseLine(%q) Speed = %f, want 0", tt.input, record.Speed)
+			}
+
+			// The critical check: the record must be JSON-serializable
+			data, err := json.Marshal(record)
+			if err != nil {
+				t.Errorf("json.Marshal failed for record from %q: %v", tt.input, err)
+			}
+			if len(data) == 0 {
+				t.Errorf("json.Marshal produced empty output for record from %q", tt.input)
+			}
+		})
 	}
 }

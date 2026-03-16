@@ -217,26 +217,6 @@ For now, you can install manually using the plugin URL:
    - Create default configuration
    - Start the service on port 8043
 
-### Manual Installation from Release Package
-
-1. Download the latest release package:
-
-   ```bash
-   wget https://github.com/ruaan-deysel/unraid-management-agent/releases/download/v2025.11.0/unraid-management-agent-2025.11.0.tgz
-   ```
-
-2. Extract and install:
-
-   ```bash
-   tar xzf unraid-management-agent-2025.11.0.tgz -C /
-   ```
-
-3. Start the service:
-
-   ```bash
-   /usr/local/emhttp/plugins/unraid-management-agent/scripts/start
-   ```
-
 ### Building from Source
 
 ```bash
@@ -495,7 +475,7 @@ daemon/
     └── controllers/  # Control operations
 
 meta/                 # Unraid plugin metadata
-scripts/              # Test and deployment scripts
+scripts/              # Developer setup helpers
 tests/                # Unit and integration tests
 ```
 

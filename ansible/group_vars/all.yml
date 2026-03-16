@@ -11,4 +11,3 @@ plugin_bundle: "{{ build_dir }}/{{ plugin_name }}-{{ version }}.tgz"
 plugin_dir: "/usr/local/emhttp/plugins/{{ plugin_name }}"
 config_dir: "/boot/config/plugins/{{ plugin_name }}"
 api_port: "{{ hostvars[inventory_hostname].api_port | default(8043) }}"
-create_backup: false
