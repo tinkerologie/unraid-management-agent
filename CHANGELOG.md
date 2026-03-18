@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.03.03] - 2026-03-18
+
+### Fixed
+
+- **FileWatcher race condition causing silent agent exits every 1–4 hours** ([#84](https://github.com/ruaan-deysel/unraid-management-agent/issues/84)):
+  - Moved `fw.Close()` inside the goroutine running `fw.Run()` in array, disk, and share collectors so the fsnotify channels are no longer closed while the watcher loop is still selecting on them
+  - Added warning-level logging in `filewatcher.go` when the events or errors channel closes unexpectedly, making any future silent exits visible in the log
+- **Removed dead `ENABLE_UPS` and `ENABLE_GPU` config flags from PLG template** ([#83](https://github.com/ruaan-deysel/unraid-management-agent/issues/83)):
+  - The flags had no effect — collectors always started regardless of their value
+  - Setting `INTERVAL_UPS=0` or `INTERVAL_GPU=0` (or any collector interval to `0`) is the supported way to disable collectors, now documented in the config template comment
+
 ## [2026.03.02] - 2026-03-16
 
 ### Fixed

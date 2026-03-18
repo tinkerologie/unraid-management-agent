@@ -20,7 +20,6 @@ func TestFileWatcher_DetectsWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = fw.Close() }()
 
 	if err := fw.WatchFile(testFile); err != nil {
 		t.Fatal(err)
@@ -29,9 +28,12 @@ func TestFileWatcher_DetectsWrite(t *testing.T) {
 	var callCount atomic.Int32
 	ctx := t.Context()
 
-	go fw.Run(ctx, []string{testFile}, func() {
-		callCount.Add(1)
-	})
+	go func() {
+		defer func() { _ = fw.Close() }()
+		fw.Run(ctx, []string{testFile}, func() {
+			callCount.Add(1)
+		})
+	}()
 
 	// Give watcher time to start
 	time.Sleep(100 * time.Millisecond)
@@ -66,7 +68,6 @@ func TestFileWatcher_IgnoresUnwatchedFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = fw.Close() }()
 
 	// Watch the directory (via the watched file)
 	if err := fw.WatchFile(watchedFile); err != nil {
@@ -76,9 +77,12 @@ func TestFileWatcher_IgnoresUnwatchedFiles(t *testing.T) {
 	var callCount atomic.Int32
 	ctx := t.Context()
 
-	go fw.Run(ctx, []string{watchedFile}, func() {
-		callCount.Add(1)
-	})
+	go func() {
+		defer func() { _ = fw.Close() }()
+		fw.Run(ctx, []string{watchedFile}, func() {
+			callCount.Add(1)
+		})
+	}()
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -106,7 +110,6 @@ func TestFileWatcher_Debounce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = fw.Close() }()
 
 	if err := fw.WatchFile(testFile); err != nil {
 		t.Fatal(err)
@@ -115,9 +118,12 @@ func TestFileWatcher_Debounce(t *testing.T) {
 	var callCount atomic.Int32
 	ctx := t.Context()
 
-	go fw.Run(ctx, []string{testFile}, func() {
-		callCount.Add(1)
-	})
+	go func() {
+		defer func() { _ = fw.Close() }()
+		fw.Run(ctx, []string{testFile}, func() {
+			callCount.Add(1)
+		})
+	}()
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -171,5 +177,112 @@ func TestFileWatcher_ContextCancel(t *testing.T) {
 		// Success — Run exited
 	case <-time.After(2 * time.Second):
 		t.Fatal("Run did not exit after context cancellation")
+	}
+}
+
+// TestFileWatcher_CloseInsideGoroutine verifies the pattern used by collectors
+// where fw.Close() is deferred inside the same goroutine that calls fw.Run().
+// This is a regression test for #84: previously fw.Close() was deferred in the
+// parent Start() function, racing with fw.Run() and causing silent exits.
+func TestFileWatcher_CloseInsideGoroutine(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.ini")
+	if err := os.WriteFile(testFile, []byte("initial"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	fw, err := NewFileWatcher(50 * time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := fw.WatchFile(testFile); err != nil {
+		t.Fatal(err)
+	}
+
+	var callCount atomic.Int32
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Mimic the collector pattern: Close is deferred inside the goroutine
+	done := make(chan struct{})
+	go func() {
+		defer func() { _ = fw.Close() }()
+		defer close(done)
+		fw.Run(ctx, []string{testFile}, func() {
+			callCount.Add(1)
+		})
+	}()
+
+	// Let the watcher start
+	time.Sleep(100 * time.Millisecond)
+
+	// Write to trigger a callback
+	if err := os.WriteFile(testFile, []byte("modified"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(200 * time.Millisecond)
+
+	if callCount.Load() == 0 {
+		t.Error("expected callback before cancellation")
+	}
+
+	// Cancel context — Run should return, then Close fires in the same goroutine
+	cancel()
+
+	select {
+	case <-done:
+		// Success — goroutine exited cleanly, Close ran after Run
+	case <-time.After(2 * time.Second):
+		t.Fatal("goroutine did not exit after context cancellation")
+	}
+
+	// Verify Close was called: writing after close should not trigger callbacks
+	countBefore := callCount.Load()
+	// fw is closed — no more events should fire (ignore write errors on closed watcher)
+	_ = os.WriteFile(testFile, []byte("after-close"), 0644)
+	time.Sleep(200 * time.Millisecond)
+
+	if callCount.Load() != countBefore {
+		t.Error("callback triggered after fw.Close() — watcher not properly shut down")
+	}
+}
+
+// TestFileWatcher_CloseWhileRunning verifies that if fw.Close() is called
+// externally while fw.Run() is active, the Run loop exits (via closed channels).
+// This documents the old bug from #84 — the watcher exits but does so through
+// the channel-closed path rather than the context path.
+func TestFileWatcher_CloseWhileRunning(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.ini")
+	if err := os.WriteFile(testFile, []byte("initial"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	fw, err := NewFileWatcher(50 * time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := fw.WatchFile(testFile); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		fw.Run(ctx, []string{testFile}, func() {})
+		close(done)
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Close externally while Run is selecting — this was the #84 race condition
+	_ = fw.Close()
+
+	select {
+	case <-done:
+		// Run exited via channel-closed path (now with warning log)
+	case <-time.After(2 * time.Second):
+		t.Fatal("Run did not exit after external Close()")
 	}
 }

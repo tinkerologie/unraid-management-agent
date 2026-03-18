@@ -53,23 +53,26 @@ func (c *DiskCollector) Start(ctx context.Context, interval time.Duration) {
 	if err != nil {
 		logger.Warning("Disk collector: failed to create file watcher, using ticker only: %v", err)
 	} else {
-		defer func() { _ = fw.Close() }()
 		for _, f := range watchedFiles {
 			if watchErr := fw.WatchFile(f); watchErr != nil {
 				logger.Warning("Disk collector: failed to watch %s: %v", f, watchErr)
 			}
 		}
-		go fw.Run(ctx, watchedFiles, func() {
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						logger.Error("Disk collector PANIC on fsnotify: %v", r)
-					}
+		// Close is deferred inside the goroutine to avoid racing with fw.Run()
+		go func() {
+			defer func() { _ = fw.Close() }()
+			fw.Run(ctx, watchedFiles, func() {
+				func() {
+					defer func() {
+						if r := recover(); r != nil {
+							logger.Error("Disk collector PANIC on fsnotify: %v", r)
+						}
+					}()
+					logger.Debug("Disk collector: disks.ini changed, collecting immediately")
+					c.Collect()
 				}()
-				logger.Debug("Disk collector: disks.ini changed, collecting immediately")
-				c.Collect()
-			}()
-		})
+			})
+		}()
 		logger.Info("Disk collector: fsnotify watching %v for instant updates", watchedFiles)
 	}
 

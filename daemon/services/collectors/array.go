@@ -49,24 +49,27 @@ func (c *ArrayCollector) Start(ctx context.Context, interval time.Duration) {
 	if err != nil {
 		logger.Warning("Array collector: failed to create file watcher, using ticker only: %v", err)
 	} else {
-		defer func() { _ = fw.Close() }()
 		for _, f := range watchedArrayFiles {
 			if watchErr := fw.WatchFile(f); watchErr != nil {
 				logger.Warning("Array collector: failed to watch %s: %v", f, watchErr)
 			}
 		}
 		// Run watcher in background goroutine — triggers Collect on file changes
-		go fw.Run(ctx, watchedArrayFiles, func() {
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						logger.Error("Array collector PANIC on fsnotify: %v", r)
-					}
+		// Close is deferred inside the goroutine to avoid racing with fw.Run()
+		go func() {
+			defer func() { _ = fw.Close() }()
+			fw.Run(ctx, watchedArrayFiles, func() {
+				func() {
+					defer func() {
+						if r := recover(); r != nil {
+							logger.Error("Array collector PANIC on fsnotify: %v", r)
+						}
+					}()
+					logger.Debug("Array collector: INI file changed, collecting immediately")
+					c.Collect()
 				}()
-				logger.Debug("Array collector: INI file changed, collecting immediately")
-				c.Collect()
-			}()
-		})
+			})
+		}()
 		logger.Info("Array collector: fsnotify watching %v for instant updates", watchedArrayFiles)
 	}
 

@@ -65,6 +65,7 @@ func (fw *FileWatcher) Run(ctx context.Context, watchedFiles []string, onChange 
 			return
 		case event, ok := <-fw.watcher.Events:
 			if !ok {
+				logger.Warning("FileWatcher: events channel closed, watcher exiting")
 				return
 			}
 			// Only react to write and create events on watched files
@@ -82,6 +83,7 @@ func (fw *FileWatcher) Run(ctx context.Context, watchedFiles []string, onChange 
 			fw.debouncedCallback(abs, onChange)
 		case err, ok := <-fw.watcher.Errors:
 			if !ok {
+				logger.Warning("FileWatcher: errors channel closed, watcher exiting")
 				return
 			}
 			logger.Error("FileWatcher error: %v", err)
