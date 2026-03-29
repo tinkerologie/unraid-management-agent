@@ -1,6 +1,7 @@
 package collectors
 
 import (
+	"bufio"
 	"context"
 	"os"
 	"path/filepath"
@@ -15,21 +16,57 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
+const defaultNotificationsBase = "/boot/config/plugins/dynamix/notifications"
+
 // Package-level variables for notification directories (overridable in tests)
 var (
-	notificationsDir        = "/usr/local/emhttp/state/notifications"
-	notificationsArchiveDir = "/usr/local/emhttp/state/notifications/archive"
+	notificationsDir        = defaultNotificationsBase + "/unread"
+	notificationsArchiveDir = defaultNotificationsBase + "/archive"
 )
+
+// ResolveNotificationDirs reads the notification base path from the [notify] section of
+// dynamix.cfg. Falls back to the default flash path if the file cannot be read or path= is empty.
+// Exported so the controllers package can use the same resolved paths.
+func ResolveNotificationDirs(cfgPath string) (unread, archive string) {
+	base := defaultNotificationsBase
+	f, err := os.Open(cfgPath)
+	if err == nil {
+		defer f.Close() //nolint:errcheck
+		inNotify := false
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if strings.HasPrefix(line, "[") {
+				inNotify = line == "[notify]"
+				continue
+			}
+			if !inNotify {
+				continue
+			}
+			if key, val, ok := strings.Cut(line, "="); ok && strings.TrimSpace(key) == "path" {
+				if v := strings.Trim(strings.TrimSpace(val), `"`); v != "" {
+					base = v
+				}
+				break
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			logger.Debug("Error reading dynamix.cfg: %v", err)
+		}
+	}
+	return base + "/unread", base + "/archive"
+}
 
 // NotificationCollector collects Unraid notifications
 type NotificationCollector struct {
-	ctx     *domain.Context
-	watcher *fsnotify.Watcher
+	ctx            *domain.Context
+	watcher        *fsnotify.Watcher
+	dynamixCfgPath string // path to dynamix.cfg; injectable for tests
 }
 
 // NewNotificationCollector creates a new notification collector
 func NewNotificationCollector(ctx *domain.Context) *NotificationCollector {
-	return &NotificationCollector{ctx: ctx}
+	return &NotificationCollector{ctx: ctx, dynamixCfgPath: constants.DynamixCfg}
 }
 
 // Start begins collecting notification data
@@ -39,6 +76,12 @@ func (c *NotificationCollector) Start(ctx context.Context, interval time.Duratio
 			logger.Error("Notification collector panic: %v", r)
 		}
 	}()
+
+	// Resolve actual notification path from dynamix.cfg unless tests have already
+	// overridden the package-level vars via setupNotificationCollectorTestDirs.
+	if notificationsDir == defaultNotificationsBase+"/unread" {
+		notificationsDir, notificationsArchiveDir = ResolveNotificationDirs(c.dynamixCfgPath)
+	}
 
 	// Initialize file watcher
 	var err error
@@ -212,7 +255,7 @@ func (c *NotificationCollector) countByImportance(notifications []dto.Notificati
 			counts.Alert++
 		case "warning":
 			counts.Warning++
-		case "info":
+		case "info", "normal": // "normal" is Dynamix's importance level for informational notifications
 			counts.Info++
 		}
 	}

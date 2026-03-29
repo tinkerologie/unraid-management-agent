@@ -334,6 +334,80 @@ func TestCountByImportance(t *testing.T) {
 	}
 }
 
+func TestCountByImportanceNormal(t *testing.T) {
+	hub := domain.NewEventBus(10)
+	ctx := &domain.Context{Hub: hub}
+	c := NewNotificationCollector(ctx)
+
+	notifications := []dto.Notification{
+		{Importance: "normal"},
+		{Importance: "normal"},
+		{Importance: "warning"},
+		{Importance: "alert"},
+	}
+	counts := c.countByImportance(notifications)
+
+	if counts.Info != 2 {
+		t.Errorf("Info = %d, want 2 (normal maps to info)", counts.Info)
+	}
+	if counts.Warning != 1 {
+		t.Errorf("Warning = %d, want 1", counts.Warning)
+	}
+	if counts.Alert != 1 {
+		t.Errorf("Alert = %d, want 1", counts.Alert)
+	}
+	if counts.Total != 4 {
+		t.Errorf("Total = %d, want 4", counts.Total)
+	}
+}
+
+func TestResolveNotificationDirsDefault(t *testing.T) {
+	// When config file doesn't exist, should return the flash default
+	unread, archive := ResolveNotificationDirs("/nonexistent/dynamix.cfg")
+	const base = "/boot/config/plugins/dynamix/notifications"
+	if unread != base+"/unread" {
+		t.Errorf("unread = %q, want %q", unread, base+"/unread")
+	}
+	if archive != base+"/archive" {
+		t.Errorf("archive = %q, want %q", archive, base+"/archive")
+	}
+}
+
+func TestResolveNotificationDirsFromCfg(t *testing.T) {
+	f, err := os.CreateTemp("", "dynamix-*.cfg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	_, _ = f.WriteString("[display]\nsome=value\n[notify]\npath=\"/tmp/custom-notifications\"\nother=setting\n")
+	f.Close()
+
+	unread, archive := ResolveNotificationDirs(f.Name())
+	if unread != "/tmp/custom-notifications/unread" {
+		t.Errorf("unread = %q, want /tmp/custom-notifications/unread", unread)
+	}
+	if archive != "/tmp/custom-notifications/archive" {
+		t.Errorf("archive = %q, want /tmp/custom-notifications/archive", archive)
+	}
+}
+
+func TestResolveNotificationDirsEmptyPath(t *testing.T) {
+	// An empty path= value should fall back to the default, not produce "/unread"
+	f, err := os.CreateTemp("", "dynamix-*.cfg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	_, _ = f.WriteString("[notify]\npath=\"\"\n")
+	f.Close()
+
+	unread, _ := ResolveNotificationDirs(f.Name())
+	const base = "/boot/config/plugins/dynamix/notifications"
+	if unread != base+"/unread" {
+		t.Errorf("empty path= should fall back; got %q, want %q", unread, base+"/unread")
+	}
+}
+
 func TestNotificationCollectorPanic(t *testing.T) {
 	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{Hub: hub}

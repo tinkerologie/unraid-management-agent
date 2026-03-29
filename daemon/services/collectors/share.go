@@ -11,6 +11,7 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
@@ -37,7 +38,7 @@ func (c *ShareCollector) Start(ctx context.Context, interval time.Duration) {
 				logger.Error("Share collector PANIC on startup: %v", r)
 			}
 		}()
-		c.Collect()
+		c.Collect(ctx)
 	}()
 
 	// Set up fsnotify watcher for instant state updates on shares.ini changes
@@ -62,7 +63,7 @@ func (c *ShareCollector) Start(ctx context.Context, interval time.Duration) {
 						}
 					}()
 					logger.Debug("Share collector: shares.ini changed, collecting immediately")
-					c.Collect()
+					c.Collect(ctx)
 				}()
 			})
 		}()
@@ -84,7 +85,7 @@ func (c *ShareCollector) Start(ctx context.Context, interval time.Duration) {
 						logger.Error("Share collector PANIC in loop: %v", r)
 					}
 				}()
-				c.Collect()
+				c.Collect(ctx)
 			}()
 		}
 	}
@@ -92,11 +93,11 @@ func (c *ShareCollector) Start(ctx context.Context, interval time.Duration) {
 
 // Collect gathers user share information and publishes it to the event bus.
 // It reads share configuration from /boot/config/shares/ and enriches with usage data from df command.
-func (c *ShareCollector) Collect() {
+func (c *ShareCollector) Collect(ctx context.Context) {
 	logger.Debug("Collecting share data...")
 
 	// Collect share information
-	shares, err := c.collectShares()
+	shares, err := c.collectShares(ctx)
 	if err != nil {
 		logger.Error("Share: Failed to collect share data: %v", err)
 		return
@@ -108,7 +109,9 @@ func (c *ShareCollector) Collect() {
 	logger.Debug("Share: Published %s event with %d shares", constants.TopicShareListUpdate.Name, len(shares))
 }
 
-func (c *ShareCollector) collectShares() ([]dto.ShareInfo, error) {
+func (c *ShareCollector) collectShares(ctx context.Context) ([]dto.ShareInfo, error) {
+	const kibToBytes uint64 = 1024
+
 	logger.Debug("Share: Starting collection from %s", constants.SharesIni)
 	var shares []dto.ShareInfo
 
@@ -170,15 +173,15 @@ func (c *ShareCollector) collectShares() ([]dto.ShareInfo, error) {
 				currentShare.Name = value
 			case "size":
 				if size, err := strconv.ParseUint(value, 10, 64); err == nil {
-					currentShare.Total = size
+					currentShare.Total = size * kibToBytes // shares.ini stores size in KiB (1024-byte blocks)
 				}
 			case "free":
 				if free, err := strconv.ParseUint(value, 10, 64); err == nil {
-					currentShare.Free = free
+					currentShare.Free = free * kibToBytes // shares.ini stores free in KiB (1024-byte blocks)
 				}
 			case "used":
 				if used, err := strconv.ParseUint(value, 10, 64); err == nil {
-					currentShare.Used = used
+					currentShare.Used = used * kibToBytes // shares.ini stores used in KiB (1024-byte blocks)
 				}
 			// Cache settings from shares.ini (Issue #53)
 			case "useCache":
@@ -199,6 +202,35 @@ func (c *ShareCollector) collectShares() ([]dto.ShareInfo, error) {
 	if err := scanner.Err(); err != nil {
 		logger.Error("Share: Scanner error: %v", err)
 		return shares, err
+	}
+
+	// Enrich Used with per-share ZFS referenced bytes when ZFS collector is enabled.
+	// Each share can span multiple pools (cachePool, cachePool2, array).
+	// Sum all matching "<pool>/<sharename>" dataset sizes.
+	if c.ctx.Intervals.ZFS > 0 {
+		if zfsSizes := zfsDatasetSizes(ctx); zfsSizes != nil {
+			for i := range shares {
+				var total uint64
+				found := false
+				for dataset, bytes := range zfsSizes {
+					// Only count direct "<pool>/<sharename>" datasets (exactly one slash).
+					// Nested datasets like "pool/share/child" must not inflate the share total.
+					parts := strings.SplitN(dataset, "/", 3)
+					if len(parts) != 2 || parts[1] != shares[i].Name {
+						continue
+					}
+					total += bytes
+					found = true
+				}
+				// Only replace Used with ZFS referenced bytes when the share is
+				// guaranteed to be pool-only (useCache=only). Mixed cache+array shares
+				// ("yes"/"prefer") still hold data on the array, so overwriting Used
+				// with only the pool bytes would under-report actual usage.
+				if found && shares[i].UseCache == "only" {
+					shares[i].Used = total
+				}
+			}
+		}
 	}
 
 	// Calculate total and usage percentage for each share
@@ -289,6 +321,30 @@ func (c *ShareCollector) isSMBExported(export string, security string) bool {
 func (c *ShareCollector) isNFSExported(export string) bool {
 	// Check export field for NFS indicators
 	return strings.Contains(export, "nfs") || strings.Contains(export, "-n")
+}
+
+// zfsDatasetSizes runs "zfs list -Hp -o name,refer" and returns a map of
+// dataset name → referenced bytes. Returns nil if zfs is unavailable.
+func zfsDatasetSizes(ctx context.Context) map[string]uint64 {
+	cmdCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	out, err := lib.ExecCommandOutputWithContext(cmdCtx, "zfs", "list", "-Hp", "-o", "name,refer")
+	if err != nil {
+		logger.Debug("zfsDatasetSizes: zfs list failed: %v (output: %q)", err, out)
+		return nil
+	}
+	sizes := make(map[string]uint64)
+	for line := range strings.SplitSeq(out, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) != 2 {
+			continue
+		}
+		if bytes, err := strconv.ParseUint(fields[1], 10, 64); err == nil {
+			sizes[fields[0]] = bytes
+		}
+	}
+	return sizes
 }
 
 // determineMoverAction determines the mover action based on cache settings

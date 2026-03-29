@@ -174,14 +174,14 @@ function intervalOptions($selected, $type = 'standard') {
     width: 110px;
     padding: 3px 6px;
     font-size: 12px;
-    border: 1px solid var(--gray-300, #ccc);
+    border: 1px solid var(--input-border-color, #ccc);
     border-radius: 3px;
-    background-color: var(--gray-000, #fff);
-    color: inherit;
+    background-color: var(--input-bg-color, transparent);
+    color: var(--text-color, inherit);
 }
 .uma-power-warning {
-    background-color: var(--yellow-100, #fff3cd);
-    border: 1px solid var(--orange-200, #ffc107);
+    background-color: rgba(255, 211, 36, 0.12);
+    border: 1px solid var(--orange-200, #ff9900);
     border-radius: 5px;
     padding: 10px;
     margin-top: 15px;
@@ -189,12 +189,12 @@ function intervalOptions($selected, $type = 'standard') {
     color: inherit;
 }
 .uma-interval-select option[value="0"] {
-    color: var(--red-500, #d32f2f);
+    color: var(--red-500, #ff3300);
     font-weight: bold;
 }
 .uma-interval-select.is-disabled {
-    border-color: var(--red-500, #d32f2f);
-    background-color: var(--red-100, #ffebee);
+    border-color: var(--red-500, #ff3300);
+    background-color: rgba(255, 51, 0, 0.08);
 }
 .uma-toggle-switch {
     position: relative;

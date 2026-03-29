@@ -8,14 +8,23 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/collectors"
 )
 
 // Package-level variables for notification directories (overridable in tests)
 var (
-	notificationsDir        = "/usr/local/emhttp/state/notifications"
-	notificationsArchiveDir = "/usr/local/emhttp/state/notifications/archive"
+	notificationsDir        = "/boot/config/plugins/dynamix/notifications/unread"
+	notificationsArchiveDir = "/boot/config/plugins/dynamix/notifications/archive"
 )
+
+func init() {
+	// Resolve the actual notification paths from dynamix.cfg at startup so that
+	// controller operations (create/archive/delete) target the same directories
+	// the notification collector watches.
+	notificationsDir, notificationsArchiveDir = collectors.ResolveNotificationDirs(constants.DynamixCfg)
+}
 
 // CreateNotification creates a new notification file
 func CreateNotification(title, subject, description, importance, link string) error {
