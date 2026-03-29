@@ -46,6 +46,13 @@ func NewRunner(store *Store) *Runner {
 
 // Start runs the watchdog loop until context is cancelled.
 func (r *Runner) Start(ctx context.Context) {
+	// Top-level recovery for startup preamble (store loading, ticker creation)
+	defer func() {
+		if rec := recover(); rec != nil {
+			logger.LogPanicWithStack("Watchdog (top-level)", rec)
+		}
+	}()
+
 	if err := r.store.Load(); err != nil {
 		logger.Error("Watchdog: Failed to load health checks: %v", err)
 	}
@@ -59,7 +66,7 @@ func (r *Runner) Start(ctx context.Context) {
 	func() {
 		defer func() {
 			if rec := recover(); rec != nil {
-				logger.Error("Watchdog PANIC on startup: %v", rec)
+				logger.LogPanicWithStack("Watchdog", rec)
 			}
 		}()
 		r.tick(ctx)
@@ -74,7 +81,7 @@ func (r *Runner) Start(ctx context.Context) {
 			func() {
 				defer func() {
 					if rec := recover(); rec != nil {
-						logger.Error("Watchdog PANIC in loop: %v", rec)
+						logger.LogPanicWithStack("Watchdog", rec)
 					}
 				}()
 				r.tick(ctx)

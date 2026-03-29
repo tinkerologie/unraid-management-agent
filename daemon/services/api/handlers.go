@@ -4123,3 +4123,91 @@ func (s *Server) handleUpdateFanConfig(w http.ResponseWriter, r *http.Request) {
 		Timestamp: time.Now(),
 	})
 }
+
+// handleSetCPUGovernor godoc
+//
+//	@Summary		Set CPU scaling governor
+//	@Description	Set the CPU scaling governor for all cores (e.g. performance, powersave)
+//	@Tags			CPU
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		dto.CPUGovernorRequest	true	"CPU governor request"
+//	@Success		200		{object}	dto.Response			"Governor set"
+//	@Failure		400		{object}	dto.Response			"Invalid request"
+//	@Failure		500		{object}	dto.Response			"Failed to set governor"
+//	@Router			/cpu/governor [post]
+func (s *Server) handleSetCPUGovernor(w http.ResponseWriter, r *http.Request) {
+	if s.cpuController == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "CPU controller not initialized — cpufreq may not be available")
+		return
+	}
+
+	var req dto.CPUGovernorRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := s.cpuController.SetGovernor(req.Governor); err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   fmt.Sprintf("CPU governor set to %s on all cores", req.Governor),
+		Timestamp: time.Now(),
+	})
+}
+
+// handleDockerStats godoc
+//
+//	@Summary		Get Docker aggregate stats
+//	@Description	Returns aggregate CPU and memory statistics across all running containers
+//	@Tags			Docker
+//	@Produce		json
+//	@Success		200	{object}	dto.DockerAggregateStats	"Aggregate stats"
+//	@Router			/docker/stats [get]
+func (s *Server) handleDockerStats(w http.ResponseWriter, _ *http.Request) {
+	containers := s.GetDockerCache()
+	if containers == nil {
+		respondJSON(w, http.StatusOK, dto.DockerAggregateStats{Timestamp: time.Now()})
+		return
+	}
+
+	var stats dto.DockerAggregateStats
+	for i := range containers {
+		c := &containers[i]
+		stats.TotalContainers++
+		if c.Status == "running" {
+			stats.RunningContainers++
+			stats.TotalCPUPercent += c.CPUPercent
+			stats.TotalMemoryUsage += c.MemoryUsage
+			stats.TotalMemoryUsageMB += c.MemoryUsageMB
+			stats.TotalMemoryLimit += c.MemoryLimit
+		}
+	}
+	if stats.TotalMemoryLimit > 0 {
+		stats.MemoryUsagePercent = float64(stats.TotalMemoryUsage) / float64(stats.TotalMemoryLimit) * 100
+	}
+	stats.Timestamp = time.Now()
+
+	respondJSON(w, http.StatusOK, stats)
+}
+
+// handleTemperatures godoc
+//
+//	@Summary		Get all temperature sensors
+//	@Description	Returns all detected temperature sensor readings from hwmon
+//	@Tags			System
+//	@Produce		json
+//	@Success		200	{array}		dto.TemperatureReading	"Temperature readings"
+//	@Router			/temperatures [get]
+func (s *Server) handleTemperatures(w http.ResponseWriter, _ *http.Request) {
+	sys := s.GetSystemCache()
+	if sys == nil {
+		respondJSON(w, http.StatusOK, []dto.TemperatureReading{})
+		return
+	}
+	respondJSON(w, http.StatusOK, sys.Temperatures)
+}

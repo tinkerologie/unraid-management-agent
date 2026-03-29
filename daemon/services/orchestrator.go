@@ -29,6 +29,7 @@ type Orchestrator struct {
 	collectorManager *CollectorManager
 	mqttClient       *mqtt.Client
 	fanController    *controllers.FanController
+	cpuController    *controllers.CPUController
 }
 
 // CreateOrchestrator creates a new orchestrator with the given context.
@@ -39,6 +40,14 @@ func CreateOrchestrator(ctx *domain.Context) *Orchestrator {
 // Run starts all collectors and the API server, then waits for a termination signal.
 // It ensures proper initialization order and handles graceful shutdown of all components.
 func (o *Orchestrator) Run() error {
+	// Top-level crash recovery — ensure the panic is logged before the process dies
+	defer func() {
+		if r := recover(); r != nil {
+			logger.LogPanicWithStack("Agent crashing due to unrecovered panic", r)
+			panic(r) // re-panic so the process exits with a non-zero status
+		}
+	}()
+
 	logger.Info("Starting Unraid Management Agent v%s", o.ctx.Version)
 
 	// WaitGroup to track all goroutines
@@ -87,6 +96,11 @@ func (o *Orchestrator) Run() error {
 	apiServer.SetAlertEngine(alertEngine, alertStore)
 	mcpServer.SetAlertEngine(alertEngine, alertStore)
 	wg.Go(func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.LogPanicWithStack("Alerting engine goroutine", r)
+			}
+		}()
 		alertEngine.Start(ctx)
 	})
 	logger.Success("Alerting engine started")
@@ -98,6 +112,11 @@ func (o *Orchestrator) Run() error {
 	apiServer.SetWatchdog(watchdogRunner, watchdogStore)
 	mcpServer.SetWatchdog(watchdogRunner, watchdogStore)
 	wg.Go(func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.LogPanicWithStack("Watchdog goroutine", r)
+			}
+		}()
 		watchdogRunner.Start(ctx)
 	})
 	logger.Success("Watchdog started")
@@ -111,6 +130,17 @@ func (o *Orchestrator) Run() error {
 		apiServer.SetFanController(fanCtrl)
 		mcpServer.SetFanController(fanCtrl)
 		logger.Success("Fan controller initialized")
+	}
+
+	// Initialize CPU controller (for scaling governor management)
+	cpuCtrl := controllers.NewCPUController()
+	if err := cpuCtrl.Initialize(); err != nil {
+		logger.Warning("CPU controller initialization failed (cpufreq not available): %v", err)
+	} else {
+		o.cpuController = cpuCtrl
+		apiServer.SetCPUController(cpuCtrl)
+		mcpServer.SetCPUController(cpuCtrl)
+		logger.Success("CPU controller initialized")
 	}
 
 	// Start all enabled collectors
@@ -131,12 +161,18 @@ func (o *Orchestrator) Run() error {
 
 	// Start HTTP server
 	wg.Go(func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.LogPanicWithStack("HTTP server goroutine", r)
+			}
+		}()
 		if err := apiServer.StartHTTP(); err != nil {
 			logger.Error("API server error: %v", err)
 		}
 	})
 
 	logger.Success("API server started on port %d", o.ctx.Port)
+	logger.Success("Agent startup complete")
 
 	// Wait for shutdown signal
 	<-ctx.Done()
@@ -151,23 +187,30 @@ func (o *Orchestrator) Run() error {
 		logger.Info("Fan controller shut down")
 	}
 
-	// 2. Stop MQTT client if running
+	// 2. Stop CPU controller (restores original governor)
+	if o.cpuController != nil {
+		o.cpuController.Shutdown()
+		o.cpuController = nil
+		logger.Info("CPU controller shut down")
+	}
+
+	// 3. Stop MQTT client if running
 	if o.mqttClient != nil {
 		o.mqttClient.Disconnect()
 		logger.Info("MQTT client disconnected")
 	}
 
-	// 3. Stop all collectors via manager
+	// 4. Stop all collectors via manager
 	o.collectorManager.StopAll()
 
-	// 4. Stop API server (which also cancels its internal goroutines)
+	// 5. Stop API server (which also cancels its internal goroutines)
 	apiServer.Stop()
 
-	// 5. Wait for all goroutines to complete
+	// 6. Wait for all goroutines to complete
 	logger.Info("Waiting for all goroutines to complete...")
 	wg.Wait()
 
-	logger.Info("Shutdown complete")
+	logger.Success("Shutdown complete")
 
 	return nil
 }
@@ -215,6 +258,11 @@ func (o *Orchestrator) RunMCPStdio() error {
 	apiServer.SetAlertEngine(alertEngine, alertStore)
 	mcpServer.SetAlertEngine(alertEngine, alertStore)
 	wg.Go(func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.LogPanicWithStack("Alerting engine goroutine (STDIO)", r)
+			}
+		}()
 		alertEngine.Start(ctx)
 	})
 	logger.Success("Alerting engine started (STDIO mode)")
@@ -226,6 +274,11 @@ func (o *Orchestrator) RunMCPStdio() error {
 	apiServer.SetWatchdog(watchdogRunner, watchdogStore)
 	mcpServer.SetWatchdog(watchdogRunner, watchdogStore)
 	wg.Go(func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.LogPanicWithStack("Watchdog goroutine (STDIO)", r)
+			}
+		}()
 		watchdogRunner.Start(ctx)
 	})
 	logger.Success("Watchdog started (STDIO mode)")
@@ -239,6 +292,17 @@ func (o *Orchestrator) RunMCPStdio() error {
 		apiServer.SetFanController(fanCtrl)
 		mcpServer.SetFanController(fanCtrl)
 		logger.Success("Fan controller initialized (STDIO mode)")
+	}
+
+	// Initialize CPU controller for STDIO mode
+	cpuCtrl := controllers.NewCPUController()
+	if err := cpuCtrl.Initialize(); err != nil {
+		logger.Warning("CPU controller initialization failed (STDIO mode): %v", err)
+	} else {
+		o.cpuController = cpuCtrl
+		apiServer.SetCPUController(cpuCtrl)
+		mcpServer.SetCPUController(cpuCtrl)
+		logger.Success("CPU controller initialized (STDIO mode)")
 	}
 
 	// Cancel context on shutdown signals (SIGTERM, SIGINT)
@@ -289,6 +353,11 @@ func (o *Orchestrator) initializeMQTT(ctx context.Context, wg *sync.WaitGroup, a
 
 	// Start MQTT event subscriber
 	wg.Go(func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.LogPanicWithStack("MQTT subscriber goroutine", r)
+			}
+		}()
 		o.subscribeMQTTEvents(ctx, apiServer)
 	})
 }

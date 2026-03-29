@@ -55,6 +55,7 @@ type Server struct {
 	watchdogRunner   *watchdog.Runner
 	watchdogStore    *watchdog.Store
 	fanController    *controllers.FanController
+	cpuController    *controllers.CPUController
 
 	// Embedded cache store for lock-free atomic access to collector data
 	*CacheStore
@@ -283,6 +284,15 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/fans/defaults", s.handleRestoreFanDefaults).Methods("POST")
 	api.HandleFunc("/fans/config", s.handleUpdateFanConfig).Methods("PUT")
 
+	// CPU power management endpoints
+	api.HandleFunc("/cpu/governor", s.handleSetCPUGovernor).Methods("POST")
+
+	// Docker aggregate stats
+	api.HandleFunc("/docker/stats", s.handleDockerStats).Methods("GET")
+
+	// Temperature sensors
+	api.HandleFunc("/temperatures", s.handleTemperatures).Methods("GET")
+
 	// WebSocket endpoint
 	api.HandleFunc("/ws", s.handleWebSocket)
 }
@@ -297,16 +307,42 @@ func (s *Server) StartSubscriptions() {
 	subWg.Add(2) // subscribeToEvents + broadcastEvents
 
 	// Start WebSocket hub
-	go s.wsHub.Run(s.cancelCtx)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.LogPanicWithStack("WebSocket hub goroutine", r)
+			}
+		}()
+		s.wsHub.Run(s.cancelCtx)
+	}()
 
 	// Subscribe to events and update cache
-	go s.subscribeToEvents(s.cancelCtx, &subWg)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.LogPanicWithStack("Cache subscription goroutine", r)
+			}
+		}()
+		s.subscribeToEvents(s.cancelCtx, &subWg)
+	}()
 
 	// Broadcast events to WebSocket clients
-	go s.broadcastEvents(s.cancelCtx, &subWg)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.LogPanicWithStack("WebSocket broadcast goroutine", r)
+			}
+		}()
+		s.broadcastEvents(s.cancelCtx, &subWg)
+	}()
 
 	// Wait for all subscriptions to be registered, then signal readiness
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.LogPanicWithStack("API readiness goroutine", r)
+			}
+		}()
 		subWg.Wait()
 		close(s.ready)
 		logger.Info("API server subscriptions ready")
@@ -606,4 +642,9 @@ func (s *Server) SetWatchdog(runner *watchdog.Runner, store *watchdog.Store) {
 // SetFanController sets the fan controller for fan control API endpoints.
 func (s *Server) SetFanController(fc *controllers.FanController) {
 	s.fanController = fc
+}
+
+// SetCPUController injects the CPU controller after initialization.
+func (s *Server) SetCPUController(cc *controllers.CPUController) {
+	s.cpuController = cc
 }

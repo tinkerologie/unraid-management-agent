@@ -43,6 +43,16 @@ type SystemInfo struct {
 	ParityCheckSpeed string `json:"parity_check_speed,omitempty" example:"100 MB/s"`
 	KernelVersion    string `json:"kernel_version,omitempty" example:"6.1.64-Unraid"`
 
+	// CPU Power State (scaling governor)
+	CPUPowerState *CPUPowerState `json:"cpu_power_state,omitempty"`
+
+	// All Temperature Sensors
+	Temperatures []TemperatureReading `json:"temperatures,omitempty"`
+
+	// Convenience Memory Fields (MB)
+	RAMUsedMB  float64 `json:"ram_used_mb" example:"21504.0"`
+	RAMTotalMB float64 `json:"ram_total_mb" example:"32768.0"`
+
 	// Additional Metrics
 	Fans      []FanInfo `json:"fans"`
 	Timestamp time.Time `json:"timestamp"`
@@ -52,4 +62,27 @@ type SystemInfo struct {
 type FanInfo struct {
 	Name string `json:"name" example:"CPU Fan"`
 	RPM  int    `json:"rpm" example:"1200"`
+}
+
+// TemperatureReading represents a single temperature sensor reading
+type TemperatureReading struct {
+	Name       string  `json:"name" example:"coretemp_Core_0"`
+	Value      float64 `json:"value_celsius" example:"45.0"`
+	SensorType string  `json:"sensor_type" example:"cpu"` // cpu, motherboard, chipset, other
+	Source     string  `json:"source" example:"coretemp"` // hwmon chip name
+}
+
+// CPUPowerState represents the current CPU scaling governor configuration
+type CPUPowerState struct {
+	Governor           string   `json:"governor" example:"powersave"`
+	AvailableGovernors []string `json:"available_governors" example:"performance,powersave"`
+	Driver             string   `json:"driver,omitempty" example:"intel_pstate"`
+	MinFreqMHz         int      `json:"min_freq_mhz,omitempty" example:"800"`
+	MaxFreqMHz         int      `json:"max_freq_mhz,omitempty" example:"4900"`
+	CurrentFreqMHz     int      `json:"current_freq_mhz,omitempty" example:"3600"`
+}
+
+// CPUGovernorRequest is the JSON body for setting the CPU scaling governor.
+type CPUGovernorRequest struct {
+	Governor string `json:"governor" validate:"required" example:"performance"`
 }

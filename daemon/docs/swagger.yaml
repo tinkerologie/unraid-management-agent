@@ -210,6 +210,14 @@ definitions:
       system_type:
         type: string
     type: object
+  dto.CPUGovernorRequest:
+    properties:
+      governor:
+        example: performance
+        type: string
+    required:
+    - governor
+    type: object
   dto.CPUHardwareInfo:
     properties:
       asset_tag:
@@ -265,6 +273,31 @@ definitions:
       voltage:
         example: 1.0 V
         type: string
+    type: object
+  dto.CPUPowerState:
+    properties:
+      available_governors:
+        example:
+        - performance
+        - powersave
+        items:
+          type: string
+        type: array
+      current_freq_mhz:
+        example: 3600
+        type: integer
+      driver:
+        example: intel_pstate
+        type: string
+      governor:
+        example: powersave
+        type: string
+      max_freq_mhz:
+        example: 4900
+        type: integer
+      min_freq_mhz:
+        example: 800
+        type: integer
     type: object
   dto.CollectorIntervalRequest:
     properties:
@@ -356,9 +389,15 @@ definitions:
       memory_limit_bytes:
         example: 8589934592
         type: integer
+      memory_percent:
+        example: 12.5
+        type: number
       memory_usage_bytes:
         example: 1073741824
         type: integer
+      memory_usage_mb:
+        example: 1024
+        type: number
       name:
         example: plex
         type: string
@@ -679,6 +718,32 @@ definitions:
         description: Disk utilization warning threshold
         example: 70
         type: integer
+    type: object
+  dto.DockerAggregateStats:
+    properties:
+      memory_usage_percent:
+        example: 25
+        type: number
+      running_containers:
+        example: 10
+        type: integer
+      timestamp:
+        type: string
+      total_containers:
+        example: 15
+        type: integer
+      total_cpu_percent:
+        example: 12.5
+        type: number
+      total_memory_limit_bytes:
+        example: 34359738368
+        type: integer
+      total_memory_usage_bytes:
+        example: 8589934592
+        type: integer
+      total_memory_usage_mb:
+        example: 8192
+        type: number
     type: object
   dto.DockerSettings:
     properties:
@@ -2240,6 +2305,10 @@ definitions:
           format: float64
           type: number
         type: object
+      cpu_power_state:
+        allOf:
+        - $ref: '#/definitions/dto.CPUPowerState'
+        description: CPU Power State (scaling governor)
       cpu_power_watts:
         description: CPU package power in watts (only present when Intel RAPL is available)
         example: 65.5
@@ -2298,6 +2367,9 @@ definitions:
       ram_total_bytes:
         example: 34359738368
         type: integer
+      ram_total_mb:
+        example: 32768
+        type: number
       ram_usage_percent:
         description: Memory Information
         example: 65.5
@@ -2305,10 +2377,19 @@ definitions:
       ram_used_bytes:
         example: 22548578304
         type: integer
+      ram_used_mb:
+        description: Convenience Memory Fields (MB)
+        example: 21504
+        type: number
       server_model:
         description: System Information
         example: Supermicro X11SCL-F
         type: string
+      temperatures:
+        description: All Temperature Sensors
+        items:
+          $ref: '#/definitions/dto.TemperatureReading'
+        type: array
       timestamp:
         type: string
       uptime_seconds:
@@ -2337,6 +2418,23 @@ definitions:
         type: string
       timezone:
         type: string
+    type: object
+  dto.TemperatureReading:
+    properties:
+      name:
+        example: coretemp_Core_0
+        type: string
+      sensor_type:
+        description: cpu, motherboard, chipset, other
+        example: cpu
+        type: string
+      source:
+        description: hwmon chip name
+        example: coretemp
+        type: string
+      value_celsius:
+        example: 45
+        type: number
     type: object
   dto.UPSStatus:
     properties:
@@ -2733,12 +2831,20 @@ definitions:
         description: ARC Size
         example: 8589934592
         type: integer
+      size_mb:
+        description: Current ARC size in MB
+        example: 8192
+        type: number
       target_size_bytes:
         description: Target ARC size
         example: 16106127360
         type: integer
       timestamp:
         type: string
+      usage_percent:
+        description: ARC usage as % of max size
+        example: 53.3
+        type: number
     type: object
   dto.ZFSDataset:
     properties:
@@ -3463,6 +3569,36 @@ paths:
       summary: Get all collectors status
       tags:
       - Collectors
+  /cpu/governor:
+    post:
+      consumes:
+      - application/json
+      description: Set the CPU scaling governor for all cores (e.g. performance, powersave)
+      parameters:
+      - description: CPU governor request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CPUGovernorRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Governor set
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to set governor
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Set CPU scaling governor
+      tags:
+      - CPU
   /disks:
     get:
       description: Retrieve information about all disks including SMART data
@@ -3796,6 +3932,20 @@ paths:
           schema:
             $ref: '#/definitions/dto.Response'
       summary: Update a specific container
+      tags:
+      - Docker
+  /docker/stats:
+    get:
+      description: Returns aggregate CPU and memory statistics across all running
+        containers
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Aggregate stats
+          schema:
+            $ref: '#/definitions/dto.DockerAggregateStats'
+      summary: Get Docker aggregate stats
       tags:
       - Docker
   /docker/update-all:
@@ -5266,6 +5416,21 @@ paths:
       summary: Shutdown system
       tags:
       - System
+  /temperatures:
+    get:
+      description: Returns all detected temperature sensor readings from hwmon
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Temperature readings
+          schema:
+            items:
+              $ref: '#/definitions/dto.TemperatureReading'
+            type: array
+      summary: Get all temperature sensors
+      tags:
+      - System
   /unassigned:
     get:
       description: Retrieve all unassigned devices and remote shares
@@ -5925,6 +6090,8 @@ tags:
   name: User Scripts
 - description: Runtime collector management (enable/disable/interval)
   name: Collectors
+- description: CPU power management and scaling governor control
+  name: CPU
 - description: Real-time event streaming via WebSocket
   name: WebSocket
 - description: Unassigned devices and remote shares

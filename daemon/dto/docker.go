@@ -14,7 +14,9 @@ type ContainerInfo struct {
 	IPAddress      string          `json:"ip_address" example:"172.17.0.2"`
 	CPUPercent     float64         `json:"cpu_percent" example:"5.2"`
 	MemoryUsage    uint64          `json:"memory_usage_bytes" example:"1073741824"`
+	MemoryUsageMB  float64         `json:"memory_usage_mb" example:"1024.0"`
 	MemoryLimit    uint64          `json:"memory_limit_bytes" example:"8589934592"`
+	MemoryPercent  float64         `json:"memory_percent" example:"12.5"`
 	MemoryDisplay  string          `json:"memory_display" example:"1 GiB / 8 GiB"`
 	NetworkRX      uint64          `json:"network_rx_bytes" example:"104857600"`
 	NetworkTX      uint64          `json:"network_tx_bytes" example:"52428800"`
@@ -81,6 +83,18 @@ type ContainerUpdatesResult struct {
 	TotalCount       int                   `json:"total_count" example:"10"`
 	UpdatesAvailable int                   `json:"updates_available" example:"2"`
 	Timestamp        time.Time             `json:"timestamp"`
+}
+
+// DockerAggregateStats contains aggregate Docker resource usage statistics
+type DockerAggregateStats struct {
+	TotalCPUPercent    float64   `json:"total_cpu_percent" example:"12.5"`
+	TotalMemoryUsage   uint64    `json:"total_memory_usage_bytes" example:"8589934592"`
+	TotalMemoryUsageMB float64   `json:"total_memory_usage_mb" example:"8192.0"`
+	TotalMemoryLimit   uint64    `json:"total_memory_limit_bytes" example:"34359738368"`
+	MemoryUsagePercent float64   `json:"memory_usage_percent" example:"25.0"`
+	RunningContainers  int       `json:"running_containers" example:"10"`
+	TotalContainers    int       `json:"total_containers" example:"15"`
+	Timestamp          time.Time `json:"timestamp"`
 }
 
 // ContainerBulkUpdateResult contains results of updating multiple containers

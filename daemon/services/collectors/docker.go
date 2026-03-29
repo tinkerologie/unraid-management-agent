@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -16,12 +17,19 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
+// cpuSnapshot holds a point-in-time cgroup CPU usage reading for delta calculation.
+type cpuSnapshot struct {
+	usageUsec int64
+	readAt    time.Time
+}
+
 // DockerCollector collects Docker container information using the Docker SDK.
 // This is significantly faster than CLI commands as it avoids process spawning.
 type DockerCollector struct {
 	appCtx       *domain.Context
 	dockerClient *client.Client
 	initialized  bool
+	prevCPU      map[string]cpuSnapshot // keyed by full container ID
 }
 
 // NewDockerCollector creates a new Docker SDK-based collector
@@ -29,6 +37,7 @@ func NewDockerCollector(ctx *domain.Context) *DockerCollector {
 	return &DockerCollector{
 		appCtx:      ctx,
 		initialized: false,
+		prevCPU:     make(map[string]cpuSnapshot),
 	}
 }
 
@@ -55,6 +64,17 @@ func (c *DockerCollector) initClient() error {
 // Start begins the Docker collector's periodic data collection
 func (c *DockerCollector) Start(ctx context.Context, interval time.Duration) {
 	logger.Info("Starting docker collector (interval: %v)", interval)
+
+	// Run once immediately with panic recovery
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.LogPanicWithStack("Docker collector", r)
+			}
+		}()
+		c.Collect()
+	}()
+
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	defer func() {
@@ -71,7 +91,14 @@ func (c *DockerCollector) Start(ctx context.Context, interval time.Duration) {
 			logger.Info("Docker collector stopping due to context cancellation")
 			return
 		case <-ticker.C:
-			c.Collect()
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.LogPanicWithStack("Docker collector", r)
+					}
+				}()
+				c.Collect()
+			}()
 		}
 	}
 }
@@ -209,10 +236,16 @@ func (c *DockerCollector) Collect() {
 
 				// Memory stats from cgroups (much faster than ContainerStats API)
 				c.getMemoryFromCgroups(apiContainer.ID, cont)
+
+				// CPU stats from cgroups (delta between collections)
+				c.getCPUFromCgroups(apiContainer.ID, cont)
 			}
 		}
 		logger.Debug("Docker SDK: Inspect + cgroup stats took %v for %d containers", time.Since(startInspect), len(runningContainers))
 	}
+
+	// Prune stale CPU snapshots for containers that no longer exist
+	c.pruneStaleSnapshots(runningContainers)
 
 	// Publish event
 	domain.Publish(c.appCtx.Hub, constants.TopicContainerListUpdate, containers)
@@ -251,7 +284,9 @@ func (c *DockerCollector) getMemoryFromCgroups(fullID string, cont *dto.Containe
 	// Format memory display
 	if cont.MemoryLimit > 0 {
 		cont.MemoryDisplay = dockerFormatMemoryDisplay(cont.MemoryUsage, cont.MemoryLimit)
+		cont.MemoryPercent = float64(cont.MemoryUsage) / float64(cont.MemoryLimit) * 100
 	}
+	cont.MemoryUsageMB = float64(cont.MemoryUsage) / (1024 * 1024)
 }
 
 // convertPorts converts Docker API port format to our DTO format
@@ -319,4 +354,67 @@ func dockerGetSystemMemoryTotal() uint64 {
 		}
 	}
 	return 0
+}
+
+// getCPUFromCgroups reads cpu.stat from cgroup v2 to compute per-container CPU%.
+// Requires two consecutive readings; the first call for a container records the
+// baseline and leaves CPUPercent at 0.
+func (c *DockerCollector) getCPUFromCgroups(fullID string, cont *dto.ContainerInfo) {
+	cgroupPath := "/sys/fs/cgroup/docker/" + fullID + "/cpu.stat"
+
+	// #nosec G304 -- cgroupPath is constructed from a trusted Docker container ID under /sys/fs/cgroup/docker.
+	data, err := os.ReadFile(cgroupPath)
+	if err != nil {
+		return
+	}
+
+	var usageUsec int64
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(line, "usage_usec ") {
+			if _, err := fmt.Sscanf(line, "usage_usec %d", &usageUsec); err != nil {
+				return
+			}
+			break
+		}
+	}
+
+	now := time.Now()
+	snap := cpuSnapshot{usageUsec: usageUsec, readAt: now}
+
+	prev, hasPrev := c.prevCPU[fullID]
+	c.prevCPU[fullID] = snap
+
+	if !hasPrev {
+		return
+	}
+
+	elapsedUsec := now.Sub(prev.readAt).Microseconds()
+	if elapsedUsec <= 0 {
+		return
+	}
+
+	deltaUsec := usageUsec - prev.usageUsec
+	if deltaUsec < 0 {
+		return
+	}
+
+	// CPU% = (cpu time used / wall time) / num_cpus * 100
+	numCPU := float64(runtime.NumCPU())
+	if numCPU < 1 {
+		numCPU = 1
+	}
+	cont.CPUPercent = (float64(deltaUsec) / float64(elapsedUsec)) / numCPU * 100
+}
+
+// pruneStaleSnapshots removes CPU snapshots for containers that are no longer running.
+func (c *DockerCollector) pruneStaleSnapshots(running []container.Summary) {
+	active := make(map[string]struct{}, len(running))
+	for _, rc := range running {
+		active[rc.ID] = struct{}{}
+	}
+	for id := range c.prevCPU {
+		if _, ok := active[id]; !ok {
+			delete(c.prevCPU, id)
+		}
+	}
 }

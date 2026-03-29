@@ -42,6 +42,17 @@ func NewVMCollector(ctx *domain.Context) *VMCollector {
 // Start begins the VM collector's periodic data collection
 func (c *VMCollector) Start(ctx context.Context, interval time.Duration) {
 	logger.Info("Starting VM collector (interval: %v)", interval)
+
+	// Run once immediately with panic recovery
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.LogPanicWithStack("VM collector", r)
+			}
+		}()
+		c.Collect()
+	}()
+
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -51,7 +62,14 @@ func (c *VMCollector) Start(ctx context.Context, interval time.Duration) {
 			logger.Info("VM collector stopping due to context cancellation")
 			return
 		case <-ticker.C:
-			c.Collect()
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.LogPanicWithStack("VM collector", r)
+					}
+				}()
+				c.Collect()
+			}()
 		}
 	}
 }

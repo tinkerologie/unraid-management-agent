@@ -162,6 +162,11 @@ func (c *Client) handleConnect() {
 	// Publish Home Assistant discovery if enabled
 	if c.config.HomeAssistantMode {
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.LogPanicWithStack("MQTT HA discovery goroutine", r)
+				}
+			}()
 			// Run discovery, initial states, then subscribe — sequentially —
 			// so command subscriptions exist only after discovery completes.
 			if ctx.Err() != nil {

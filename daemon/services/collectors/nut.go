@@ -35,7 +35,7 @@ func (c *NUTCollector) Start(ctx context.Context, interval time.Duration) {
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				logger.Error("NUT collector PANIC on startup: %v", r)
+				logger.LogPanicWithStack("NUT collector", r)
 			}
 		}()
 		c.Collect()
@@ -53,7 +53,7 @@ func (c *NUTCollector) Start(ctx context.Context, interval time.Duration) {
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
-						logger.Error("NUT collector PANIC in loop: %v", r)
+						logger.LogPanicWithStack("NUT collector", r)
 					}
 				}()
 				c.Collect()

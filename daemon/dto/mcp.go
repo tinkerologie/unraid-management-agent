@@ -272,3 +272,9 @@ type MCPCreateFanProfileArgs struct {
 	Description string `json:"description,omitempty" jsonschema:"Human-readable description of the profile"`
 	CurvePoints string `json:"curve_points" jsonschema:"JSON array of {temp_celsius, speed_percent} objects defining the fan curve"`
 }
+
+// MCPSetCPUGovernorArgs represents arguments for setting the CPU scaling governor.
+type MCPSetCPUGovernorArgs struct {
+	Governor string `json:"governor" jsonschema:"The CPU scaling governor to set (e.g. performance, powersave, ondemand, conservative, schedutil)"`
+	Confirm  bool   `json:"confirm" jsonschema:"Must be set to true to confirm the governor change"`
+}

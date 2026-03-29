@@ -31,7 +31,7 @@ func (c *RegistrationCollector) Start(ctx context.Context, interval time.Duratio
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				logger.Error("Registration collector PANIC on startup: %v", r)
+				logger.LogPanicWithStack("Registration collector", r)
 			}
 		}()
 		c.Collect()
@@ -49,7 +49,7 @@ func (c *RegistrationCollector) Start(ctx context.Context, interval time.Duratio
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
-						logger.Error("Registration collector PANIC in loop: %v", r)
+						logger.LogPanicWithStack("Registration collector", r)
 					}
 				}()
 				c.Collect()

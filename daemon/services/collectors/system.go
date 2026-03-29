@@ -39,7 +39,7 @@ func (c *SystemCollector) Start(ctx context.Context, interval time.Duration) {
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				logger.Error("System collector PANIC on startup: %v", r)
+				logger.LogPanicWithStack("System collector", r)
 			}
 		}()
 		c.Collect()
@@ -57,7 +57,7 @@ func (c *SystemCollector) Start(ctx context.Context, interval time.Duration) {
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
-						logger.Error("System collector PANIC in loop: %v", r)
+						logger.LogPanicWithStack("System collector", r)
 					}
 				}()
 				c.Collect()
@@ -145,6 +145,8 @@ func (c *SystemCollector) collectSystemInfo() (*dto.SystemInfo, error) {
 		if memTotal > 0 {
 			info.RAMUsage = float64(memUsed) / float64(memTotal) * 100
 		}
+		info.RAMUsedMB = float64(memUsed) / (1024 * 1024)
+		info.RAMTotalMB = float64(memTotal) / (1024 * 1024)
 	}
 
 	// Get server model and BIOS info
@@ -158,24 +160,44 @@ func (c *SystemCollector) collectSystemInfo() (*dto.SystemInfo, error) {
 	if err != nil {
 		logger.Warning("Failed to get temperatures: %v", err)
 	} else {
-		// Extract CPU and motherboard temps if available
+		// Build full temperature readings list and extract CPU/MB temps
+		tempReadings := make([]dto.TemperatureReading, 0, len(temperatures))
 		for name, temp := range temperatures {
+			if !lib.IsPlausibleTempC(temp) {
+				continue
+			}
+
 			nameLower := strings.ToLower(name)
-			// CPU temperature - look for Core temps, Package, or CPUTIN
-			// Filter with IsPlausibleTempC to reject stuck/bogus readings (e.g. 127.5°C TjMax sentinel)
+
+			// Classify sensor type
+			sensorType := "other"
+			source := ""
+			if parts := strings.SplitN(name, "_", 2); len(parts) > 0 {
+				source = parts[0]
+			}
+
 			if strings.Contains(nameLower, "core") || strings.Contains(nameLower, "package") || strings.Contains(nameLower, "cputin") {
-				if lib.IsPlausibleTempC(temp) && (info.CPUTemp == 0 || temp > info.CPUTemp) {
+				sensorType = "cpu"
+				if info.CPUTemp == 0 || temp > info.CPUTemp {
 					info.CPUTemp = temp
 				}
-			}
-			// Motherboard temperature - look for "MB Temp" or "MB_Temp" specifically from coretemp
-			// Ignore SYSTIN and AUXTIN as they often have bogus readings
-			if strings.Contains(nameLower, "mb_temp") {
-				if lib.IsPlausibleTempC(temp) {
+			} else if strings.Contains(nameLower, "mb_temp") {
+				sensorType = "motherboard"
+				if info.MotherboardTemp == 0 || temp > info.MotherboardTemp {
 					info.MotherboardTemp = temp
 				}
+			} else if strings.Contains(nameLower, "pch") || strings.Contains(nameLower, "chipset") {
+				sensorType = "chipset"
 			}
+
+			tempReadings = append(tempReadings, dto.TemperatureReading{
+				Name:       name,
+				Value:      temp,
+				SensorType: sensorType,
+				Source:     source,
+			})
 		}
+		info.Temperatures = tempReadings
 	}
 
 	// Get fan speeds
@@ -199,6 +221,9 @@ func (c *SystemCollector) collectSystemInfo() (*dto.SystemInfo, error) {
 	cpuPower, dramPower := c.getCPUPower()
 	info.CPUPowerWatts = cpuPower
 	info.DRAMPowerWatts = dramPower
+
+	// Get CPU power state (scaling governor)
+	info.CPUPowerState = c.getCPUPowerState()
 
 	// Set timestamp
 	info.Timestamp = time.Now()
@@ -937,4 +962,26 @@ func (c *SystemCollector) getCPUPower() (cpuPower *float64, dramPower *float64) 
 	}
 
 	return &cpu, dram
+}
+
+// getCPUPowerState reads the current CPU scaling governor configuration.
+func (c *SystemCollector) getCPUPowerState() *dto.CPUPowerState {
+	gov, err := lib.ReadCPUGovernor()
+	if err != nil {
+		logger.Debug("CPU governor not available: %v", err)
+		return nil
+	}
+
+	state := &dto.CPUPowerState{
+		Governor: gov,
+		Driver:   lib.ReadCPUFreqDriver(),
+	}
+
+	if available, err := lib.ReadAvailableGovernors(); err == nil {
+		state.AvailableGovernors = available
+	}
+
+	state.MinFreqMHz, state.MaxFreqMHz, state.CurrentFreqMHz = lib.ReadCPUFreqLimits()
+
+	return state
 }

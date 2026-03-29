@@ -41,7 +41,7 @@ func (c *DiskCollector) Start(ctx context.Context, interval time.Duration) {
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				logger.Error("Disk collector PANIC on startup: %v", r)
+				logger.LogPanicWithStack("Disk collector", r)
 			}
 		}()
 		c.Collect()
@@ -65,7 +65,7 @@ func (c *DiskCollector) Start(ctx context.Context, interval time.Duration) {
 				func() {
 					defer func() {
 						if r := recover(); r != nil {
-							logger.Error("Disk collector PANIC on fsnotify: %v", r)
+							logger.LogPanicWithStack("Disk collector (fsnotify)", r)
 						}
 					}()
 					logger.Debug("Disk collector: disks.ini changed, collecting immediately")
@@ -88,7 +88,7 @@ func (c *DiskCollector) Start(ctx context.Context, interval time.Duration) {
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
-						logger.Error("Disk collector PANIC in loop: %v", r)
+						logger.LogPanicWithStack("Disk collector", r)
 					}
 				}()
 				c.Collect()

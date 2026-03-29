@@ -71,9 +71,10 @@ func NewNotificationCollector(ctx *domain.Context) *NotificationCollector {
 
 // Start begins collecting notification data
 func (c *NotificationCollector) Start(ctx context.Context, interval time.Duration) {
+	// Top-level safety net for startup preamble panics
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Error("Notification collector panic: %v", r)
+			logger.LogPanicWithStack("Notification collector (top-level)", r)
 		}
 	}()
 
@@ -117,8 +118,15 @@ func (c *NotificationCollector) Start(ctx context.Context, interval time.Duratio
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	// Initial collection
-	c.collect()
+	// Initial collection with panic recovery
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.LogPanicWithStack("Notification collector", r)
+			}
+		}()
+		c.collect()
+	}()
 
 	for {
 		select {
@@ -126,15 +134,29 @@ func (c *NotificationCollector) Start(ctx context.Context, interval time.Duratio
 			logger.Info("Notification collector stopped")
 			return
 		case <-ticker.C:
-			c.collect()
-		case event := <-c.watcher.Events:
-			// Trigger immediate collection on file changes
-			if event.Op&fsnotify.Create == fsnotify.Create ||
-				event.Op&fsnotify.Remove == fsnotify.Remove ||
-				event.Op&fsnotify.Write == fsnotify.Write {
-				logger.Debug("Notification file change detected: %s", event.Name)
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.LogPanicWithStack("Notification collector", r)
+					}
+				}()
 				c.collect()
-			}
+			}()
+		case event := <-c.watcher.Events:
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.LogPanicWithStack("Notification collector (watcher)", r)
+					}
+				}()
+				// Trigger immediate collection on file changes
+				if event.Op&fsnotify.Create == fsnotify.Create ||
+					event.Op&fsnotify.Remove == fsnotify.Remove ||
+					event.Op&fsnotify.Write == fsnotify.Write {
+					logger.Debug("Notification file change detected: %s", event.Name)
+					c.collect()
+				}
+			}()
 		case err := <-c.watcher.Errors:
 			logger.Error("File watcher error: %v", err)
 		}

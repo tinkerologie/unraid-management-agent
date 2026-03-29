@@ -3,6 +3,7 @@ package collectors
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"syscall"
@@ -38,7 +39,7 @@ func (c *ArrayCollector) Start(ctx context.Context, interval time.Duration) {
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				logger.Error("Array collector PANIC on startup: %v", r)
+				logger.LogPanicWithStack("Array collector", r)
 			}
 		}()
 		c.Collect()
@@ -62,7 +63,7 @@ func (c *ArrayCollector) Start(ctx context.Context, interval time.Duration) {
 				func() {
 					defer func() {
 						if r := recover(); r != nil {
-							logger.Error("Array collector PANIC on fsnotify: %v", r)
+							logger.LogPanicWithStack("Array collector (fsnotify)", r)
 						}
 					}()
 					logger.Debug("Array collector: INI file changed, collecting immediately")
@@ -85,7 +86,7 @@ func (c *ArrayCollector) Start(ctx context.Context, interval time.Duration) {
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
-						logger.Error("Array collector PANIC in loop: %v", r)
+						logger.LogPanicWithStack("Array collector", r)
 					}
 				}()
 				c.Collect()
@@ -114,15 +115,17 @@ func (c *ArrayCollector) Collect() {
 	logger.Debug("Array: Published %s event - state=%s, disks=%d", constants.TopicArrayStatusUpdate.Name, arrayStatus.State, arrayStatus.NumDisks)
 }
 
-func (c *ArrayCollector) collectArrayStatus() (*dto.ArrayStatus, error) {
+func (c *ArrayCollector) collectArrayStatus() (status *dto.ArrayStatus, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Error("Array: PANIC during collection: %v", r)
+			logger.LogPanicWithStack("Array collector (collect)", r)
+			err = fmt.Errorf("panic in collectArrayStatus: %v", r)
+			status = nil
 		}
 	}()
 
 	logger.Debug("Array: Starting collection from %s", constants.VarIni)
-	status := &dto.ArrayStatus{
+	status = &dto.ArrayStatus{
 		Timestamp: time.Now(),
 	}
 

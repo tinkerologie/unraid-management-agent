@@ -4,7 +4,14 @@ package logger
 import (
 	"fmt"
 	"log"
+	"runtime/debug"
 )
+
+// stackBuf captures a goroutine stack trace and returns it as a string.
+// Extracted to avoid direct debug.Stack() calls in hot paths.
+func stackBuf() string {
+	return string(debug.Stack())
+}
 
 // LogLevel represents the logging verbosity level
 type LogLevel int
@@ -116,6 +123,11 @@ func Printf(format string, v ...any) {
 	if currentLevel <= LevelInfo {
 		log.Printf(format, v...)
 	}
+}
+
+// LogPanicWithStack logs a recovered panic value along with a stack trace for diagnostics.
+func LogPanicWithStack(prefix string, r any) {
+	Error("%s PANIC: %v\n%s", prefix, r, stackBuf())
 }
 
 // Println is a wrapper for standard log.Println

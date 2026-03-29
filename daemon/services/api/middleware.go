@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"runtime/debug"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -67,7 +66,7 @@ func recoveryMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
-				logger.Error("Panic recovered: %v\n%s", err, debug.Stack())
+				logger.LogPanicWithStack("HTTP handler", err)
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			}
 		}()

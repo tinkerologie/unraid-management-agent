@@ -50,6 +50,8 @@ package docs
 //	@tag.description			User script management and execution
 //	@tag.name					Collectors
 //	@tag.description			Runtime collector management (enable/disable/interval)
+//	@tag.name					CPU
+//	@tag.description			CPU power management and scaling governor control
 //	@tag.name					WebSocket
 //	@tag.description			Real-time event streaming via WebSocket
 //	@tag.name					Unassigned Devices

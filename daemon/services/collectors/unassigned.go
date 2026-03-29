@@ -27,16 +27,24 @@ func NewUnassignedCollector(ctx *domain.Context) *UnassignedCollector {
 
 // Start begins collecting unassigned device information
 func (c *UnassignedCollector) Start(ctx context.Context, interval time.Duration) {
+	// Top-level safety net for startup preamble panics
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Error("Unassigned collector panic: %v", r)
+			logger.LogPanicWithStack("Unassigned collector (top-level)", r)
 		}
 	}()
 
 	logger.Info("Starting unassigned devices collector (interval: %v)", interval)
 
-	// Initial collection
-	c.collect()
+	// Initial collection with panic recovery
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.LogPanicWithStack("Unassigned collector", r)
+			}
+		}()
+		c.collect()
+	}()
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -47,7 +55,14 @@ func (c *UnassignedCollector) Start(ctx context.Context, interval time.Duration)
 			logger.Info("Stopping unassigned devices collector")
 			return
 		case <-ticker.C:
-			c.collect()
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.LogPanicWithStack("Unassigned collector", r)
+					}
+				}()
+				c.collect()
+			}()
 		}
 	}
 }

@@ -81,6 +81,7 @@ type Server struct {
 	watchdogRunner *watchdog.Runner
 	watchdogStore  *watchdog.Store
 	fanController  *controllers.FanController
+	cpuController  *controllers.CPUController
 }
 
 // NewServer creates a new MCP server instance.
@@ -114,6 +115,7 @@ func (s *Server) Initialize() error {
 	s.registerAlertingTools()
 	s.registerWatchdogTools()
 	s.registerFanControlTools()
+	s.registerCPUControlTools()
 
 	// Create the Streamable HTTP handler (implements MCP 2025-06-18 transport)
 	s.httpHandler = mcp.NewStreamableHTTPHandler(
@@ -140,6 +142,11 @@ func (s *Server) SetWatchdog(runner *watchdog.Runner, store *watchdog.Store) {
 // SetFanController sets the fan controller for MCP fan control tools.
 func (s *Server) SetFanController(fc *controllers.FanController) {
 	s.fanController = fc
+}
+
+// SetCPUController sets the CPU controller for MCP CPU control tools.
+func (s *Server) SetCPUController(cc *controllers.CPUController) {
+	s.cpuController = cc
 }
 
 // GetHTTPHandler returns the Streamable HTTP handler for the MCP endpoint.
@@ -2454,4 +2461,74 @@ func (s *Server) registerFanControlTools() {
 	})
 
 	logger.Debug("MCP fan control tools registered (6 tools)")
+}
+
+// registerCPUControlTools registers MCP tools for CPU power management and Docker stats.
+func (s *Server) registerCPUControlTools() {
+	// Set CPU scaling governor (control)
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "set_cpu_governor",
+		Description: "Set the CPU scaling governor for all cores. Common governors: performance (max speed), powersave (power saving), ondemand/schedutil (dynamic). Equivalent to Unraid Tips & Tweaks CPU governor setting.",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(true),
+			IdempotentHint:  true,
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPSetCPUGovernorArgs) (*mcp.CallToolResult, any, error) {
+		if s.cpuController == nil {
+			return textResult("CPU controller not initialized — cpufreq may not be available on this system"), nil, nil
+		}
+		logger.Info("MCP: Set CPU governor requested: %s", args.Governor)
+		if err := s.cpuController.SetGovernor(args.Governor); err != nil {
+			return textResult(fmt.Sprintf("Failed to set CPU governor: %v", err)), nil, nil
+		}
+		return textResult(fmt.Sprintf("CPU governor set to '%s' on all cores", args.Governor)), nil, nil
+	})
+
+	// Get Docker aggregate stats (monitoring)
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "get_docker_stats",
+		Description: "Get aggregate CPU and memory statistics across all running Docker containers, including total CPU%, total memory usage (bytes and MB), and per-container breakdown",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		containers := s.cacheProvider.GetDockerCache()
+		if containers == nil {
+			return textResult("Docker information not available yet"), nil, nil
+		}
+
+		var stats dto.DockerAggregateStats
+		for i := range containers {
+			c := &containers[i]
+			stats.TotalContainers++
+			if c.Status == "running" {
+				stats.RunningContainers++
+				stats.TotalCPUPercent += c.CPUPercent
+				stats.TotalMemoryUsage += c.MemoryUsage
+				stats.TotalMemoryUsageMB += c.MemoryUsageMB
+				stats.TotalMemoryLimit += c.MemoryLimit
+			}
+		}
+		if stats.TotalMemoryLimit > 0 {
+			stats.MemoryUsagePercent = float64(stats.TotalMemoryUsage) / float64(stats.TotalMemoryLimit) * 100
+		}
+		stats.Timestamp = time.Now()
+		return jsonResult(stats)
+	})
+
+	// Get all temperature sensors (monitoring)
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "get_temperatures",
+		Description: "Get all detected temperature sensor readings including CPU, motherboard, chipset, and other sensors from hwmon",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		sys := s.cacheProvider.GetSystemCache()
+		if sys == nil {
+			return textResult("System information not available yet"), nil, nil
+		}
+		if len(sys.Temperatures) == 0 {
+			return textResult("No temperature sensors detected"), nil, nil
+		}
+		return jsonResult(sys.Temperatures)
+	})
+
+	logger.Debug("MCP CPU control tools registered (3 tools)")
 }

@@ -33,7 +33,7 @@ func (c *UPSCollector) Start(ctx context.Context, interval time.Duration) {
 	runCollectSafely := func(phase string) {
 		defer func() {
 			if r := recover(); r != nil {
-				logger.Error("UPS collector PANIC during %s: %v", phase, r)
+				logger.LogPanicWithStack("UPS collector ("+phase+")", r)
 			}
 		}()
 		c.Collect()

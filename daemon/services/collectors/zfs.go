@@ -33,8 +33,15 @@ func (c *ZFSCollector) Start(ctx context.Context, interval time.Duration) {
 
 	logger.Info("ZFS collector started (interval: %v)", interval)
 
-	// Collect immediately on start
-	c.collect()
+	// Collect immediately on start with panic recovery
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.LogPanicWithStack("ZFS collector", r)
+			}
+		}()
+		c.collect()
+	}()
 
 	for {
 		select {
@@ -42,7 +49,14 @@ func (c *ZFSCollector) Start(ctx context.Context, interval time.Duration) {
 			logger.Info("ZFS collector stopped")
 			return
 		case <-ticker.C:
-			c.collect()
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.LogPanicWithStack("ZFS collector", r)
+					}
+				}()
+				c.collect()
+			}()
 		}
 	}
 }
@@ -51,7 +65,7 @@ func (c *ZFSCollector) Start(ctx context.Context, interval time.Duration) {
 func (c *ZFSCollector) collect() {
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Error("ZFS collector panic recovered: %v", r)
+			logger.LogPanicWithStack("ZFS collector (collect)", r)
 		}
 	}()
 
@@ -560,6 +574,12 @@ func (c *ZFSCollector) collectARCStats() (dto.ZFSARCStats, error) {
 	stats.MaxSizeBytes = arcData["c_max"]
 	stats.Hits = arcData["hits"]
 	stats.Misses = arcData["misses"]
+
+	// Convenience fields
+	stats.SizeMB = float64(stats.SizeBytes) / (1024 * 1024)
+	if stats.MaxSizeBytes > 0 {
+		stats.UsagePercent = float64(stats.SizeBytes) / float64(stats.MaxSizeBytes) * 100
+	}
 
 	// Calculate hit ratio
 	totalAccesses := stats.Hits + stats.Misses

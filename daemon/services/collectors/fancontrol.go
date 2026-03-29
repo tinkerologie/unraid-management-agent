@@ -27,7 +27,7 @@ func (c *FanControlCollector) Start(ctx context.Context, interval time.Duration)
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				logger.Error("Fan control collector PANIC on startup: %v", r)
+				logger.LogPanicWithStack("Fan control collector", r)
 			}
 		}()
 		c.Collect()
@@ -44,7 +44,7 @@ func (c *FanControlCollector) Start(ctx context.Context, interval time.Duration)
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
-						logger.Error("Fan control collector PANIC in loop: %v", r)
+						logger.LogPanicWithStack("Fan control collector", r)
 					}
 				}()
 				c.Collect()

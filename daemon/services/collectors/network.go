@@ -47,7 +47,7 @@ func (c *NetworkCollector) Start(ctx context.Context, interval time.Duration) {
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				logger.Error("Network collector PANIC on startup: %v", r)
+				logger.LogPanicWithStack("Network collector", r)
 			}
 		}()
 		c.Collect()
@@ -65,7 +65,7 @@ func (c *NetworkCollector) Start(ctx context.Context, interval time.Duration) {
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
-						logger.Error("Network collector PANIC in loop: %v", r)
+						logger.LogPanicWithStack("Network collector", r)
 					}
 				}()
 				c.Collect()

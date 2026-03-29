@@ -739,6 +739,52 @@ const docTemplate = `{
                 }
             }
         },
+        "/cpu/governor": {
+            "post": {
+                "description": "Set the CPU scaling governor for all cores (e.g. performance, powersave)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "CPU"
+                ],
+                "summary": "Set CPU scaling governor",
+                "parameters": [
+                    {
+                        "description": "CPU governor request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CPUGovernorRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Governor set",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to set governor",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/disks": {
             "get": {
                 "description": "Retrieve information about all disks including SMART data",
@@ -815,6 +861,26 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/dto.ContainerInfo"
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/docker/stats": {
+            "get": {
+                "description": "Returns aggregate CPU and memory statistics across all running containers",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Docker"
+                ],
+                "summary": "Get Docker aggregate stats",
+                "responses": {
+                    "200": {
+                        "description": "Aggregate stats",
+                        "schema": {
+                            "$ref": "#/definitions/dto.DockerAggregateStats"
                         }
                     }
                 }
@@ -3462,6 +3528,29 @@ const docTemplate = `{
                 }
             }
         },
+        "/temperatures": {
+            "get": {
+                "description": "Returns all detected temperature sensor readings from hwmon",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System"
+                ],
+                "summary": "Get all temperature sensors",
+                "responses": {
+                    "200": {
+                        "description": "Temperature readings",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.TemperatureReading"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/unassigned": {
             "get": {
                 "description": "Retrieve all unassigned devices and remote shares",
@@ -4669,6 +4758,18 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.CPUGovernorRequest": {
+            "type": "object",
+            "required": [
+                "governor"
+            ],
+            "properties": {
+                "governor": {
+                    "type": "string",
+                    "example": "performance"
+                }
+            }
+        },
         "dto.CPUHardwareInfo": {
             "type": "object",
             "properties": {
@@ -4743,6 +4844,41 @@ const docTemplate = `{
                 "voltage": {
                     "type": "string",
                     "example": "1.0 V"
+                }
+            }
+        },
+        "dto.CPUPowerState": {
+            "type": "object",
+            "properties": {
+                "available_governors": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "performance",
+                        "powersave"
+                    ]
+                },
+                "current_freq_mhz": {
+                    "type": "integer",
+                    "example": 3600
+                },
+                "driver": {
+                    "type": "string",
+                    "example": "intel_pstate"
+                },
+                "governor": {
+                    "type": "string",
+                    "example": "powersave"
+                },
+                "max_freq_mhz": {
+                    "type": "integer",
+                    "example": 4900
+                },
+                "min_freq_mhz": {
+                    "type": "integer",
+                    "example": 800
                 }
             }
         },
@@ -4877,9 +5013,17 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 8589934592
                 },
+                "memory_percent": {
+                    "type": "number",
+                    "example": 12.5
+                },
                 "memory_usage_bytes": {
                     "type": "integer",
                     "example": 1073741824
+                },
+                "memory_usage_mb": {
+                    "type": "number",
+                    "example": 1024
                 },
                 "name": {
                     "type": "string",
@@ -5313,6 +5457,42 @@ const docTemplate = `{
                     "description": "Disk utilization warning threshold",
                     "type": "integer",
                     "example": 70
+                }
+            }
+        },
+        "dto.DockerAggregateStats": {
+            "type": "object",
+            "properties": {
+                "memory_usage_percent": {
+                    "type": "number",
+                    "example": 25
+                },
+                "running_containers": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "total_containers": {
+                    "type": "integer",
+                    "example": 15
+                },
+                "total_cpu_percent": {
+                    "type": "number",
+                    "example": 12.5
+                },
+                "total_memory_limit_bytes": {
+                    "type": "integer",
+                    "example": 34359738368
+                },
+                "total_memory_usage_bytes": {
+                    "type": "integer",
+                    "example": 8589934592
+                },
+                "total_memory_usage_mb": {
+                    "type": "number",
+                    "example": 8192
                 }
             }
         },
@@ -7517,6 +7697,14 @@ const docTemplate = `{
                         "format": "float64"
                     }
                 },
+                "cpu_power_state": {
+                    "description": "CPU Power State (scaling governor)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.CPUPowerState"
+                        }
+                    ]
+                },
                 "cpu_power_watts": {
                     "description": "CPU package power in watts (only present when Intel RAPL is available)",
                     "type": "number",
@@ -7593,6 +7781,10 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 34359738368
                 },
+                "ram_total_mb": {
+                    "type": "number",
+                    "example": 32768
+                },
                 "ram_usage_percent": {
                     "description": "Memory Information",
                     "type": "number",
@@ -7602,10 +7794,22 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 22548578304
                 },
+                "ram_used_mb": {
+                    "description": "Convenience Memory Fields (MB)",
+                    "type": "number",
+                    "example": 21504
+                },
                 "server_model": {
                     "description": "System Information",
                     "type": "string",
                     "example": "Supermicro X11SCL-F"
+                },
+                "temperatures": {
+                    "description": "All Temperature Sensors",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.TemperatureReading"
+                    }
                 },
                 "timestamp": {
                     "type": "string"
@@ -7647,6 +7851,29 @@ const docTemplate = `{
                 },
                 "timezone": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.TemperatureReading": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "example": "coretemp_Core_0"
+                },
+                "sensor_type": {
+                    "description": "cpu, motherboard, chipset, other",
+                    "type": "string",
+                    "example": "cpu"
+                },
+                "source": {
+                    "description": "hwmon chip name",
+                    "type": "string",
+                    "example": "coretemp"
+                },
+                "value_celsius": {
+                    "type": "number",
+                    "example": 45
                 }
             }
         },
@@ -8207,6 +8434,11 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 8589934592
                 },
+                "size_mb": {
+                    "description": "Current ARC size in MB",
+                    "type": "number",
+                    "example": 8192
+                },
                 "target_size_bytes": {
                     "description": "Target ARC size",
                     "type": "integer",
@@ -8214,6 +8446,11 @@ const docTemplate = `{
                 },
                 "timestamp": {
                     "type": "string"
+                },
+                "usage_percent": {
+                    "description": "ARC usage as % of max size",
+                    "type": "number",
+                    "example": 53.3
                 }
             }
         },
@@ -8589,6 +8826,10 @@ const docTemplate = `{
         {
             "description": "Runtime collector management (enable/disable/interval)",
             "name": "Collectors"
+        },
+        {
+            "description": "CPU power management and scaling governor control",
+            "name": "CPU"
         },
         {
             "description": "Real-time event streaming via WebSocket",

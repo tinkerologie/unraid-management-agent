@@ -60,6 +60,13 @@ func NewEngine(store *Store, provider DataProvider) *Engine {
 
 // Start begins the alert evaluation loop. It blocks until ctx is cancelled.
 func (e *Engine) Start(ctx context.Context) {
+	// Top-level recovery for startup preamble (store loading, ticker creation)
+	defer func() {
+		if r := recover(); r != nil {
+			logger.LogPanicWithStack("Alerting engine (top-level)", r)
+		}
+	}()
+
 	// Load rules from disk
 	if err := e.store.Load(); err != nil {
 		logger.Error("Alerting: Failed to load rules: %v", err)
@@ -82,7 +89,7 @@ func (e *Engine) Start(ctx context.Context) {
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
-						logger.Error("Alerting: PANIC during evaluation: %v", r)
+						logger.LogPanicWithStack("Alerting engine", r)
 					}
 				}()
 				e.evaluate()

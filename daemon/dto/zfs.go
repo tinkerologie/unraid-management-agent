@@ -100,10 +100,12 @@ type ZFSSnapshot struct {
 // ZFSARCStats represents ZFS ARC (Adaptive Replacement Cache) statistics
 type ZFSARCStats struct {
 	// ARC Size
-	SizeBytes       uint64 `json:"size_bytes" example:"8589934592"`         // Current ARC size
-	TargetSizeBytes uint64 `json:"target_size_bytes" example:"16106127360"` // Target ARC size
-	MinSizeBytes    uint64 `json:"min_size_bytes" example:"2013265920"`     // Minimum ARC size
-	MaxSizeBytes    uint64 `json:"max_size_bytes" example:"16106127360"`    // Maximum ARC size
+	SizeBytes       uint64  `json:"size_bytes" example:"8589934592"`         // Current ARC size
+	SizeMB          float64 `json:"size_mb" example:"8192.0"`                // Current ARC size in MB
+	TargetSizeBytes uint64  `json:"target_size_bytes" example:"16106127360"` // Target ARC size
+	MinSizeBytes    uint64  `json:"min_size_bytes" example:"2013265920"`     // Minimum ARC size
+	MaxSizeBytes    uint64  `json:"max_size_bytes" example:"16106127360"`    // Maximum ARC size
+	UsagePercent    float64 `json:"usage_percent" example:"53.3"`            // ARC usage as % of max size
 
 	// Hit Ratios
 	HitRatioPct    float64 `json:"hit_ratio_percent" example:"95.5"`     // Overall hit ratio %

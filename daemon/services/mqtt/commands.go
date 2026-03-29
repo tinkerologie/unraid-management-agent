@@ -44,7 +44,7 @@ func (c *Client) buildCommandTopic(parts ...string) string {
 func (c *Client) handleCommand(msg pahomqtt.Message) {
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Error("MQTT: PANIC in command handler for %s: %v", msg.Topic(), r)
+			logger.LogPanicWithStack("MQTT command handler", r)
 		}
 	}()
 

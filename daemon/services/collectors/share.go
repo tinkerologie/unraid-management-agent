@@ -35,7 +35,7 @@ func (c *ShareCollector) Start(ctx context.Context, interval time.Duration) {
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				logger.Error("Share collector PANIC on startup: %v", r)
+				logger.LogPanicWithStack("Share collector", r)
 			}
 		}()
 		c.Collect(ctx)
@@ -59,7 +59,7 @@ func (c *ShareCollector) Start(ctx context.Context, interval time.Duration) {
 				func() {
 					defer func() {
 						if r := recover(); r != nil {
-							logger.Error("Share collector PANIC on fsnotify: %v", r)
+							logger.LogPanicWithStack("Share collector (fsnotify)", r)
 						}
 					}()
 					logger.Debug("Share collector: shares.ini changed, collecting immediately")
@@ -82,7 +82,7 @@ func (c *ShareCollector) Start(ctx context.Context, interval time.Duration) {
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
-						logger.Error("Share collector PANIC in loop: %v", r)
+						logger.LogPanicWithStack("Share collector", r)
 					}
 				}()
 				c.Collect(ctx)

@@ -355,3 +355,23 @@ func ValidateFanControlMode(mode string) error {
 		return fmt.Errorf("invalid fan control mode %q: must be 'automatic' or 'manual'", mode)
 	}
 }
+
+// ValidateCPUGovernor validates a CPU scaling governor name against the set of
+// governors actually supported by the running kernel.
+func ValidateCPUGovernor(governor string) error {
+	if governor == "" {
+		return errors.New("governor cannot be empty")
+	}
+
+	available, err := ReadAvailableGovernors()
+	if err != nil {
+		return fmt.Errorf("cannot determine available governors: %w", err)
+	}
+
+	for _, g := range available {
+		if g == governor {
+			return nil
+		}
+	}
+	return fmt.Errorf("invalid governor %q: available governors are %v", governor, available)
+}

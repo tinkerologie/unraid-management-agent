@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.03.06] - 2026-03-30
+
+### Fixed
+
+- **Agent keeps entering stopped state due to unrecovered panics** ([#99](https://github.com/ruaan-deysel/unraid-management-agent/issues/99)):
+  - Added `LogPanicWithStack` helper for stack-trace-enriched panic logging across all recovery blocks
+  - Added missing panic recovery to Docker, GPU, and VM collectors (previously had none)
+  - Fixed Notification collector: restructured from top-level-only recovery to per-iteration recovery
+  - Added top-level crash recovery to Alerting engine and Watchdog runner
+  - Wrapped all Orchestrator goroutines (alert engine, watchdog, HTTP server, MQTT, STDIO mode) with panic recovery
+  - Upgraded all existing collector recovery blocks to use `LogPanicWithStack` for better crash diagnostics
+  - Added lifecycle logging: "Agent startup complete" and "Shutdown complete" messages
+
 ## [2026.03.05] - 2026-03-30
 
 ### Fixed
