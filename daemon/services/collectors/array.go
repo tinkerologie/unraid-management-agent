@@ -167,22 +167,36 @@ func (c *ArrayCollector) collectArrayStatus() (*dto.ArrayStatus, error) {
 	logger.Debug("Array: Calculated NumDataDisks=%d (total=%d - parity=%d)",
 		status.NumDataDisks, status.NumDisks, status.NumParityDisks)
 
-	// Parity validity - check if parity sync has completed and has no errors
-	// sbSynced contains a timestamp when parity was last synced, or "0" if never synced
-	// sbSyncErrs contains the number of errors from the last parity check
+	// Parity validity — determine whether the array's parity data is intact.
+	// Primary signal: sbSynced holds a Unix timestamp of the last successful parity sync;
+	// a non-zero value means parity was synced at least once.
+	// Fallback: mdNumInvalid counts disabled/missing disks in the array; if it is 0 and
+	// parity disks exist, the array is in a healthy state even when sbSynced is absent
+	// or zero (e.g. freshly cleared parity, or Unraid versions that omit the field).
 	parityValid := false
 	if section.HasKey("sbSynced") {
 		sbSynced := strings.Trim(section.Key("sbSynced").String(), `"`)
-		// If sbSynced is a non-zero number (timestamp), parity has been synced
+		logger.Debug("Array: sbSynced=%q", sbSynced)
 		if sbSynced != "0" && sbSynced != "" {
 			parityValid = true
 		}
 	}
 
-	// Check for parity errors - if there are any errors, parity is not valid
+	// Fallback: if sbSynced is missing or zero, check mdNumInvalid.
+	// A started array with parity disks and zero invalid disks has valid parity.
+	if !parityValid && section.HasKey("mdNumInvalid") {
+		mdNumInvalid := strings.Trim(section.Key("mdNumInvalid").String(), `"`)
+		logger.Debug("Array: mdNumInvalid=%q (fallback parity check)", mdNumInvalid)
+		if n, err := strconv.Atoi(mdNumInvalid); err == nil && n == 0 && status.NumParityDisks > 0 {
+			parityValid = true
+		}
+	}
+
+	// Parity errors override: any sync errors invalidate parity
 	if section.HasKey("sbSyncErrs") {
 		sbSyncErrs := strings.Trim(section.Key("sbSyncErrs").String(), `"`)
 		if n, err := strconv.Atoi(sbSyncErrs); err == nil && n > 0 {
+			logger.Debug("Array: sbSyncErrs=%d, marking parity as invalid", n)
 			parityValid = false
 		}
 	}
@@ -193,6 +207,7 @@ func (c *ArrayCollector) collectArrayStatus() (*dto.ArrayStatus, error) {
 	} else {
 		status.ParityValid = false
 	}
+	logger.Debug("Array: parityValid=%v (numParityDisks=%d)", status.ParityValid, status.NumParityDisks)
 
 	// Parity check status - need to check multiple fields to detect state properly
 	// Key fields:

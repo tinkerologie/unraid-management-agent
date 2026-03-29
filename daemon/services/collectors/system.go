@@ -162,16 +162,16 @@ func (c *SystemCollector) collectSystemInfo() (*dto.SystemInfo, error) {
 		for name, temp := range temperatures {
 			nameLower := strings.ToLower(name)
 			// CPU temperature - look for Core temps, Package, or CPUTIN
+			// Filter with IsPlausibleTempC to reject stuck/bogus readings (e.g. 127.5°C TjMax sentinel)
 			if strings.Contains(nameLower, "core") || strings.Contains(nameLower, "package") || strings.Contains(nameLower, "cputin") {
-				if info.CPUTemp == 0 || temp > info.CPUTemp {
+				if lib.IsPlausibleTempC(temp) && (info.CPUTemp == 0 || temp > info.CPUTemp) {
 					info.CPUTemp = temp
 				}
 			}
 			// Motherboard temperature - look for "MB Temp" or "MB_Temp" specifically from coretemp
 			// Ignore SYSTIN and AUXTIN as they often have bogus readings
 			if strings.Contains(nameLower, "mb_temp") {
-				// Sanity check: temperature should be reasonable (0-100°C)
-				if temp > 0 && temp < 100 {
+				if lib.IsPlausibleTempC(temp) {
 					info.MotherboardTemp = temp
 				}
 			}

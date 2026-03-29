@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.03.05] - 2026-03-30
+
+### Fixed
+
+- **`parity_valid` returns false on Unraid 7.2.4 when parity is actually valid** ([#98](https://github.com/ruaan-deysel/unraid-management-agent/issues/98)):
+  - Added `mdNumInvalid` fallback for parity validity when `sbSynced` is missing or zero
+  - A started array with parity disks and zero invalid disks is now correctly reported as parity-valid
+  - Fixes false "Parity Invalid" repair notifications in the Home Assistant integration
+  - Added debug logging of `sbSynced`, `mdNumInvalid`, and `sbSyncErrs` values during array collection
+- **CPU temperature sensor returns incorrect/stuck value (127.5°C) on some hardware** ([#97](https://github.com/ruaan-deysel/unraid-management-agent/issues/97)):
+  - CPU and motherboard temperature extraction now uses `IsPlausibleTempC()` to reject readings outside the -40°C to 125°C range
+  - Filters out stuck 127.5°C TjMax sentinel values reported by some hwmon sensors on Intel systems
+  - Motherboard temp check unified to use the same plausibility function instead of a hardcoded 0–100°C range
+
 ## [2026.03.04] - 2026-03-29
 
 ### Added
