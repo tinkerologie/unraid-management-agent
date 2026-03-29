@@ -129,6 +129,9 @@ const (
 	IntervalRegistration = 300
 	// IntervalUnassigned is the collection interval for unassigned devices in seconds.
 	IntervalUnassigned = 60
+	// IntervalFanControl is the collection interval for fan control status in seconds.
+	// Shorter interval for responsive fan monitoring (5s matches typical fan curve evaluation).
+	IntervalFanControl = 5
 
 	// WSPingInterval is the WebSocket ping interval in seconds.
 	WSPingInterval = 30

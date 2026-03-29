@@ -89,7 +89,7 @@ func (c *SystemCollector) collectSystemInfo() (*dto.SystemInfo, error) {
 	// Get hostname
 	hostname, err := os.Hostname()
 	if err != nil {
-		logger.Warning("Failed to get hostname", "error", err)
+		logger.Warning("Failed to get hostname: %v", err)
 		info.Hostname = "unknown"
 	} else {
 		info.Hostname = hostname
@@ -104,7 +104,7 @@ func (c *SystemCollector) collectSystemInfo() (*dto.SystemInfo, error) {
 	// Get uptime
 	uptime, err := c.getUptime()
 	if err != nil {
-		logger.Warning("Failed to get uptime", "error", err)
+		logger.Warning("Failed to get uptime: %v", err)
 	} else {
 		info.Uptime = uptime
 	}
@@ -112,7 +112,7 @@ func (c *SystemCollector) collectSystemInfo() (*dto.SystemInfo, error) {
 	// Get CPU info
 	cpuPercent, err := c.getCPUInfo()
 	if err != nil {
-		logger.Warning("Failed to get CPU info", "error", err)
+		logger.Warning("Failed to get CPU info: %v", err)
 	} else {
 		info.CPUUsage = cpuPercent
 	}
@@ -135,7 +135,7 @@ func (c *SystemCollector) collectSystemInfo() (*dto.SystemInfo, error) {
 	// Get memory info
 	memUsed, memTotal, memFree, memBuffers, memCached, err := c.getMemoryInfo()
 	if err != nil {
-		logger.Warning("Failed to get memory info", "error", err)
+		logger.Warning("Failed to get memory info: %v", err)
 	} else {
 		info.RAMUsed = memUsed
 		info.RAMTotal = memTotal
@@ -156,7 +156,7 @@ func (c *SystemCollector) collectSystemInfo() (*dto.SystemInfo, error) {
 	// Get temperatures
 	temperatures, err := c.getTemperatures()
 	if err != nil {
-		logger.Warning("Failed to get temperatures", "error", err)
+		logger.Warning("Failed to get temperatures: %v", err)
 	} else {
 		// Extract CPU and motherboard temps if available
 		for name, temp := range temperatures {
@@ -181,7 +181,7 @@ func (c *SystemCollector) collectSystemInfo() (*dto.SystemInfo, error) {
 	// Get fan speeds
 	fans, err := c.getFans()
 	if err != nil {
-		logger.Warning("Failed to get fan speeds", "error", err)
+		logger.Debug("Failed to get fan speeds: %v", err)
 	} else {
 		info.Fans = fans
 	}
@@ -229,7 +229,7 @@ func (c *SystemCollector) getCPUInfo() (float64, error) {
 	// Get CPU usage by reading /proc/stat
 	cpuPercent, err := c.calculateCPUPercent()
 	if err != nil {
-		logger.Warning("Failed to calculate CPU percent", "error", err)
+		logger.Warning("Failed to calculate CPU percent: %v", err)
 		return 0, err
 	}
 

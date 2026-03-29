@@ -46,6 +46,7 @@ type CacheProvider interface {
 	GetUnassignedCache() *dto.UnassignedDeviceList
 	GetNUTCache() *dto.NUTResponse
 	GetParityHistoryCache() *dto.ParityCheckHistory
+	GetFanControlCache() *dto.FanControlStatus
 	// Logs
 	ListLogFiles() []dto.LogFile
 	GetLogContent(path, lines, start string) (*dto.LogFileContent, error)
@@ -79,6 +80,7 @@ type Server struct {
 	alertStore     *alerting.Store
 	watchdogRunner *watchdog.Runner
 	watchdogStore  *watchdog.Store
+	fanController  *controllers.FanController
 }
 
 // NewServer creates a new MCP server instance.
@@ -111,6 +113,7 @@ func (s *Server) Initialize() error {
 	s.registerPrompts()
 	s.registerAlertingTools()
 	s.registerWatchdogTools()
+	s.registerFanControlTools()
 
 	// Create the Streamable HTTP handler (implements MCP 2025-06-18 transport)
 	s.httpHandler = mcp.NewStreamableHTTPHandler(
@@ -132,6 +135,11 @@ func (s *Server) SetAlertEngine(engine *alerting.Engine, store *alerting.Store) 
 func (s *Server) SetWatchdog(runner *watchdog.Runner, store *watchdog.Store) {
 	s.watchdogRunner = runner
 	s.watchdogStore = store
+}
+
+// SetFanController sets the fan controller for MCP fan control tools.
+func (s *Server) SetFanController(fc *controllers.FanController) {
+	s.fanController = fc
 }
 
 // GetHTTPHandler returns the Streamable HTTP handler for the MCP endpoint.
@@ -2322,4 +2330,128 @@ func resourceResult(uri, text string) (*mcp.ReadResourceResult, error) {
 			Text:     text,
 		}},
 	}, nil
+}
+
+// registerFanControlTools registers MCP tools for fan monitoring and control.
+func (s *Server) registerFanControlTools() {
+	// Get fan control status (monitoring)
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "get_fan_status",
+		Description: "Get fan control status including all fan speeds, modes, profiles, and configuration",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		cache := s.cacheProvider.GetFanControlCache()
+		if cache == nil {
+			return textResult("Fan control information not available yet"), nil, nil
+		}
+		return jsonResult(cache)
+	})
+
+	// Set fan speed (control)
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "set_fan_speed",
+		Description: "Set the PWM speed for a specific fan. Requires fan control to be enabled. Speed is clamped to safety minimums.",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(true),
+			IdempotentHint:  true,
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPFanSpeedArgs) (*mcp.CallToolResult, any, error) {
+		if s.fanController == nil {
+			return textResult("Fan controller not initialized"), nil, nil
+		}
+		logger.Info("MCP: Set fan speed requested for '%s' to %d%%", args.FanID, args.PWMPercent)
+		if err := s.fanController.SetSpeed(args.FanID, args.PWMPercent); err != nil {
+			return textResult(fmt.Sprintf("Failed to set fan speed: %v", err)), nil, nil
+		}
+		return textResult(fmt.Sprintf("Fan %s speed set to %d%%", args.FanID, args.PWMPercent)), nil, nil
+	})
+
+	// Set fan mode (control)
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "set_fan_mode",
+		Description: "Set the control mode for a specific fan (automatic = BIOS-controlled, manual = software-controlled)",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(true),
+			IdempotentHint:  true,
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPFanModeArgs) (*mcp.CallToolResult, any, error) {
+		if s.fanController == nil {
+			return textResult("Fan controller not initialized"), nil, nil
+		}
+		logger.Info("MCP: Set fan mode requested for '%s' to '%s'", args.FanID, args.Mode)
+		if err := s.fanController.SetMode(args.FanID, args.Mode); err != nil {
+			return textResult(fmt.Sprintf("Failed to set fan mode: %v", err)), nil, nil
+		}
+		return textResult(fmt.Sprintf("Fan %s mode set to %s", args.FanID, args.Mode)), nil, nil
+	})
+
+	// Assign fan profile (control)
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "set_fan_profile",
+		Description: "Assign a temperature curve profile to a fan. Built-in profiles: quiet, balanced, performance. Provide a temperature sensor path for automatic curve-based control.",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(true),
+			IdempotentHint:  true,
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPFanProfileArgs) (*mcp.CallToolResult, any, error) {
+		if s.fanController == nil {
+			return textResult("Fan controller not initialized"), nil, nil
+		}
+		logger.Info("MCP: Set fan profile '%s' for '%s'", args.ProfileName, args.FanID)
+		if err := s.fanController.SetProfile(args.FanID, args.ProfileName, args.TempSensorPath); err != nil {
+			return textResult(fmt.Sprintf("Failed to assign fan profile: %v", err)), nil, nil
+		}
+		return textResult(fmt.Sprintf("Profile %s assigned to fan %s", args.ProfileName, args.FanID)), nil, nil
+	})
+
+	// Create custom fan profile (control)
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "create_fan_profile",
+		Description: "Create a custom temperature curve profile. Provide curve_points as a JSON array of {\"temp_celsius\": N, \"speed_percent\": N} objects.",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(true),
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPCreateFanProfileArgs) (*mcp.CallToolResult, any, error) {
+		if s.fanController == nil {
+			return textResult("Fan controller not initialized"), nil, nil
+		}
+
+		var points []dto.FanCurvePoint
+		if err := json.Unmarshal([]byte(args.CurvePoints), &points); err != nil {
+			return textResult(fmt.Sprintf("Invalid curve_points JSON: %v", err)), nil, nil
+		}
+
+		profile := dto.FanProfile{
+			Name:        args.Name,
+			Description: args.Description,
+			CurvePoints: points,
+		}
+
+		logger.Info("MCP: Create fan profile '%s' with %d curve points", args.Name, len(points))
+		if err := s.fanController.CreateProfile(profile); err != nil {
+			return textResult(fmt.Sprintf("Failed to create fan profile: %v", err)), nil, nil
+		}
+		return textResult(fmt.Sprintf("Profile %s created with %d curve points", args.Name, len(points))), nil, nil
+	})
+
+	// Restore fan defaults (control)
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "restore_fan_defaults",
+		Description: "Restore all fans to automatic (BIOS-controlled) mode. Safe operation that returns control to hardware.",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(true),
+			IdempotentHint:  true,
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		if s.fanController == nil {
+			return textResult("Fan controller not initialized"), nil, nil
+		}
+		logger.Info("MCP: Restore fan defaults requested")
+		if err := s.fanController.RestoreDefaults(); err != nil {
+			return textResult(fmt.Sprintf("Failed to restore fan defaults: %v", err)), nil, nil
+		}
+		return textResult("All fans restored to automatic (BIOS-controlled) mode"), nil, nil
+	})
+
+	logger.Debug("MCP fan control tools registered (6 tools)")
 }

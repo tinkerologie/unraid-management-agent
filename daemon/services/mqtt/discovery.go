@@ -1781,9 +1781,9 @@ func (c *Client) publishZFSARCDiscovery() {
 	c.publishHAEntity(haEntityOpts{
 		entityType: "sensor", stateTopic: topic,
 		id: "arc_target_size", name: "ZFS ARC: Target Size", unit: "B",
-		icon:           "mdi:memory",
-		template:       "{{ value_json.target_size_bytes }}",
-		deviceClass:    "data_size", stateClass: "measurement",
+		icon:        "mdi:memory",
+		template:    "{{ value_json.target_size_bytes }}",
+		deviceClass: "data_size", stateClass: "measurement",
 		entityCategory: "diagnostic",
 	})
 	c.publishHAEntity(haEntityOpts{
@@ -1796,9 +1796,9 @@ func (c *Client) publishZFSARCDiscovery() {
 	c.publishHAEntity(haEntityOpts{
 		entityType: "sensor", stateTopic: topic,
 		id: "arc_l2_size", name: "ZFS L2ARC: Size", unit: "B",
-		icon:           "mdi:memory",
-		template:       "{{ value_json.l2_size_bytes | default(0) }}",
-		deviceClass:    "data_size", stateClass: "measurement",
+		icon:        "mdi:memory",
+		template:    "{{ value_json.l2_size_bytes | default(0) }}",
+		deviceClass: "data_size", stateClass: "measurement",
 		entityCategory: "diagnostic",
 	})
 	c.publishHAEntity(haEntityOpts{
@@ -1809,6 +1809,73 @@ func (c *Client) publishZFSARCDiscovery() {
 		stateClass:     "measurement",
 		entityCategory: "diagnostic",
 	})
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Fan Control Discovery
+// ──────────────────────────────────────────────────────────────────────────────
+
+// publishFanControlDiscovery publishes per-fan HA discovery entities from fan control data.
+func (c *Client) publishFanControlDiscovery(status *dto.FanControlStatus) {
+	if !c.config.HomeAssistantMode {
+		return
+	}
+
+	topic := c.buildTopic("fancontrol")
+	var currentIDs []string
+
+	for _, fan := range status.Fans {
+		fanID := "fanctrl_" + sanitizeID(fan.ID)
+
+		// Fan RPM sensor
+		rpmID := fanID + "_rpm"
+		c.publishHAEntity(haEntityOpts{
+			entityType: "sensor", stateTopic: topic,
+			id: rpmID, name: fmt.Sprintf("Fan Control: %s RPM", fan.Name), unit: "RPM",
+			icon:       "mdi:fan",
+			template:   fmt.Sprintf(`{{ (value_json.fans | selectattr('id', 'eq', '%s') | map(attribute='rpm') | first | default(0)) }}`, fan.ID),
+			stateClass: "measurement",
+		})
+		currentIDs = append(currentIDs, rpmID)
+
+		// Fan PWM percent sensor
+		pwmID := fanID + "_pwm"
+		c.publishHAEntity(haEntityOpts{
+			entityType: "sensor", stateTopic: topic,
+			id: pwmID, name: fmt.Sprintf("Fan Control: %s PWM", fan.Name), unit: "%",
+			icon:       "mdi:fan",
+			template:   fmt.Sprintf(`{{ (value_json.fans | selectattr('id', 'eq', '%s') | map(attribute='pwm_percent') | first | default(0)) }}`, fan.ID),
+			stateClass: "measurement",
+		})
+		currentIDs = append(currentIDs, pwmID)
+
+		// Fan mode sensor
+		modeID := fanID + "_mode"
+		c.publishHAEntity(haEntityOpts{
+			entityType: "sensor", stateTopic: topic,
+			id: modeID, name: fmt.Sprintf("Fan Control: %s Mode", fan.Name),
+			icon:     "mdi:fan-clock",
+			template: fmt.Sprintf(`{{ (value_json.fans | selectattr('id', 'eq', '%s') | map(attribute='mode') | first | default('unknown')) }}`, fan.ID),
+		})
+		currentIDs = append(currentIDs, modeID)
+	}
+
+	// Fan control enabled binary sensor
+	enabledID := "fanctrl_enabled"
+	c.publishHAEntity(haEntityOpts{
+		entityType: "binary_sensor", stateTopic: topic,
+		id: enabledID, name: "Fan Control: Enabled",
+		icon:       "mdi:fan-alert",
+		template:   `{{ value_json.config.control_enabled }}`,
+		payloadOn:  "true",
+		payloadOff: "false",
+	})
+	currentIDs = append(currentIDs, enabledID)
+
+	removed := c.tracker.update("fancontrol", currentIDs)
+	for _, id := range removed {
+		c.removeHAEntities(id)
+	}
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

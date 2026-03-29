@@ -68,6 +68,7 @@ type FileConfigIntervals struct {
 	Notification *int `yaml:"notification,omitempty"`
 	Registration *int `yaml:"registration,omitempty"`
 	Unassigned   *int `yaml:"unassigned,omitempty"`
+	FanControl   *int `yaml:"fancontrol,omitempty"`
 }
 
 // LoadConfigFile reads and parses a YAML config file.

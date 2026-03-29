@@ -47,4 +47,6 @@ var (
 	TopicZFSARCStatsUpdate = domain.NewTopic[dto.ZFSARCStats]("zfs_arc_stats_update")
 	// TopicCollectorStateChange is published by the collector manager with dto.CollectorStateEvent.
 	TopicCollectorStateChange = domain.NewTopic[dto.CollectorStateEvent]("collector_state_change")
+	// TopicFanControlUpdate is published by the fan control collector with *dto.FanControlStatus.
+	TopicFanControlUpdate = domain.NewTopic[*dto.FanControlStatus]("fan_control_update")
 )

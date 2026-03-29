@@ -304,12 +304,12 @@ func TestComputeRates(t *testing.T) {
 	const tolerance = 5.0 // percent
 
 	tests := []struct {
-		name    string
-		setup   func(c *NetworkCollector)
-		rx      uint64
-		tx      uint64
-		wantRx  float64
-		wantTx  float64
+		name   string
+		setup  func(c *NetworkCollector)
+		rx     uint64
+		tx     uint64
+		wantRx float64
+		wantTx float64
 	}{
 		{
 			name:   "first cycle — no prev stats, rates must be zero",
@@ -320,10 +320,10 @@ func TestComputeRates(t *testing.T) {
 			wantTx: 0,
 		},
 		{
-			name:  "normal rx+tx increase — delta/elapsed logic",
-			setup: func(c *NetworkCollector) { seedPrev(c, ifName, 0, 0, time.Second) },
-			rx:    10240,
-			tx:    5120,
+			name:   "normal rx+tx increase — delta/elapsed logic",
+			setup:  func(c *NetworkCollector) { seedPrev(c, ifName, 0, 0, time.Second) },
+			rx:     10240,
+			tx:     5120,
 			wantRx: 10240,
 			wantTx: 5120,
 		},

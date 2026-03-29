@@ -9,6 +9,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.03.04] - 2026-03-29
+
+### Added
+
+- **Full fan control system** — monitor and control chassis fans via REST API, WebSocket, MCP, and Prometheus:
+  - New `GET /fans` endpoint returning per-fan RPM, PWM %, mode, and controllability
+  - `POST /fans/speed` — set fan speed by percentage (manual mode)
+  - `POST /fans/mode` — switch between off/manual/automatic modes
+  - `POST /fans/profile` — assign a temperature-responsive fan curve profile to a fan
+  - `POST /fans/profile/create` — create custom fan curve profiles with temperature→speed points
+  - `POST /fans/defaults` — restore all fans to their original state
+  - `PUT /fans/config` — enable/disable fan control and update safety thresholds
+  - Hwmon-based fan discovery scanning `/sys/class/hwmon` for all fan channels and PWM controls
+  - Fan curve engine with linear interpolation between temperature→speed curve points
+  - Built-in profiles: silent, balanced, performance, full-speed
+  - Safety guard with emergency full-speed on critical temperature, fan stall detection, minimum speed enforcement, and original state capture/restore on shutdown
+  - IPMI fan provider stub for future BMC-based fan control
+  - Fan control collector publishing `fan_control_update` events to the event bus
+  - WebSocket broadcast of real-time fan status changes
+  - 6 MCP tools: `get_fan_status`, `set_fan_speed`, `set_fan_mode`, `create_fan_profile`, `assign_fan_profile`, `restore_fan_defaults`
+  - 10 Prometheus gauges: `unraid_fan_rpm`, `unraid_fan_pwm_percent` per fan
+  - MQTT Home Assistant discovery for per-fan sensor entities
+  - Input validation for fan IDs, speed percentages, mode values, and profile names
+- **MQTT Home Assistant sensor coverage for network throughput rates** ([#96](https://github.com/ruaan-deysel/unraid-management-agent/pull/96)):
+  - New `RxBytesPerSec` and `TxBytesPerSec` fields in `NetworkInfo` DTO for per-interface throughput
+  - Delta-based rate calculation with mutex-protected previous sample state
+  - Stale interface entries pruned automatically when interfaces disappear
+- **MQTT Home Assistant discovery for fan sensors** ([#96](https://github.com/ruaan-deysel/unraid-management-agent/pull/96)):
+  - Dynamic per-fan HA sensor entities discovered from system fan data
+  - Fan discovery goroutine publishes entities on first `PublishSystemInfo` call
+- **MQTT Home Assistant discovery for NUT UPS, hardware, registration, unassigned devices, and ZFS** ([#96](https://github.com/ruaan-deysel/unraid-management-agent/pull/96)):
+  - 7 new MQTT Publish methods: NUT, Hardware, Registration, Unassigned, ZFS Datasets, ZFS Snapshots, ZFS ARC Stats
+  - 7 new `mqttBind` entries in orchestrator for new event topics
+  - HA discovery entities for NUT UPS sensors, hardware info, registration/license, per-unassigned-device sensors, per-ZFS-dataset sensors, ZFS snapshot aggregates, and ZFS ARC stats
+- **Context-aware shell command execution** ([#93](https://github.com/ruaan-deysel/unraid-management-agent/pull/93)):
+  - New `ExecCommandOutputWithContext()` in `daemon/lib/shell.go` for commands that need timeout/cancellation support
+- **ZFS per-share sizing** ([#93](https://github.com/ruaan-deysel/unraid-management-agent/pull/93)):
+  - Share collector now queries ZFS dataset sizes via `zfs list` for `useCache=only` shares
+  - 60-second timeout prevents a hung `zfs list` from blocking the share collector goroutine
+
+### Fixed
+
+- **Share sizes reported at ~50% of actual size** ([#93](https://github.com/ruaan-deysel/unraid-management-agent/pull/93)):
+  - Unraid's share `.ini` files store sizes in KiB, but the share collector multiplied by 1 (treating as bytes)
+  - Changed to multiply by 1024 so `free_bytes` and `used_bytes` report correct values
+- **Notification collector reads paths from dynamix.cfg** ([#93](https://github.com/ruaan-deysel/unraid-management-agent/pull/93)):
+  - `ResolveNotificationDirs()` now reads the Dynamix notification directory from `dynamix.cfg` at startup
+  - Notification controller resolves paths via `collectors.ResolveNotificationDirs` at `init()` so create/archive/delete target the correct directories
+  - Dynamix `"normal"` importance now correctly maps to `"info"` in notification counts
+- **Dark mode UI fixes for plugin settings page** ([#93](https://github.com/ruaan-deysel/unraid-management-agent/pull/93)):
+  - Plugin page now uses proper Unraid CSS variables for dark theme compatibility
+- **Log spammed with UPS and fan warnings** ([#95](https://github.com/ruaan-deysel/unraid-management-agent/issues/95)):
+  - Fan speed "no fan sensors found" downgraded from `Warning` to `Debug` — no longer spams logs every 15 seconds on systems without fan sensors
+  - NUT UPS fallback failure downgraded from `Warning` to `Debug`
+  - Fixed broken printf format strings in 19 logger calls across system, ZFS, and UPS collectors
+    that used structured-logging style args (`"msg", "key", value`) instead of printf verbs
+    (`"msg: %v", value`), causing `%!(EXTRA ...)` garbage in log output
+- **UPS collector panic recovery** ([#93](https://github.com/ruaan-deysel/unraid-management-agent/pull/93)):
+  - Periodic `Collect()` call now wrapped in defer/recover to prevent a panic from killing the goroutine
+- **MQTT nil dereference guard** ([#96](https://github.com/ruaan-deysel/unraid-management-agent/pull/96)):
+  - `PublishSystemInfo` now guards against nil `SystemInfo` to prevent panic on first publish before data is available
+- **Fan speed parsing improved for `sensors -u` format** ([#96](https://github.com/ruaan-deysel/unraid-management-agent/pull/96)):
+  - Fan RPM parsing now uses `ParseFloat` for the raw `sensors -u` output format
+  - Hwmon fan labels simplified to `"Fan %d"` format
+  - Zero RPM fan channels (no fan connected) are skipped
+- **Bogus sensor filtering hardened against unreliable motherboard hardware**:
+  - Fan RPM readings above 25 000 RPM (`MaxPlausibleRPM`) are treated as non-detected — fixes fan5 reporting 56 784 RPM from a bogus hwmon sensor
+  - Temperature sensors with known-unreliable labels (AUXTIN, SYSTIN, intrusion) are now skipped
+    in `ReadMaxHwmonTemp()` — prevents phantom readings from unpopulated Nuvoton/ITE chipset headers
+    triggering false emergency full-speed
+  - Plausible temperature range tightened from 150 °C to 125 °C to reject I²C/SMBus "not connected" sentinel values (127–128 °C)
+  - Fan curve per-sensor temperature reads now validated with `IsPlausibleTempC()` before use in speed interpolation
+
+### Changed
+
+- **APC UPS fallback log level** ([#93](https://github.com/ruaan-deysel/unraid-management-agent/pull/93)):
+  - `apcaccess` failure message downgraded from `Warning` to `Debug` to reduce log noise on systems without APC UPS
+
 ## [2026.03.03] - 2026-03-18
 
 ### Fixed

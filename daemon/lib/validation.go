@@ -39,6 +39,10 @@ var (
 
 	// Snapshot names: alphanumeric, hyphens, underscores, dots (max 255 chars)
 	snapshotNameRegex = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,254}$`)
+
+	// Fan IDs: alphanumeric, underscores, hyphens (max 100 chars)
+	// e.g. "hwmon0_fan1", "it8721_fan2", "ipmi_fan3"
+	fanIDRegex = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$`)
 )
 
 // ValidateContainerID validates a Docker container ID format
@@ -311,4 +315,43 @@ func ValidateSnapshotName(name string) error {
 	}
 
 	return nil
+}
+
+// ValidateFanID validates a fan device identifier.
+func ValidateFanID(id string) error {
+	if id == "" {
+		return errors.New("fan ID cannot be empty")
+	}
+
+	if strings.Contains(id, "..") || strings.Contains(id, "/") || strings.Contains(id, "\\") {
+		return errors.New("invalid fan ID: cannot contain path separators or directory traversal")
+	}
+
+	if strings.Contains(id, "\x00") {
+		return errors.New("invalid fan ID: cannot contain null bytes")
+	}
+
+	if !fanIDRegex.MatchString(id) {
+		return errors.New("invalid fan ID format: must start with alphanumeric and contain only alphanumeric, hyphens, and underscores (max 100)")
+	}
+
+	return nil
+}
+
+// ValidatePWMPercent validates a PWM percentage value (0-100).
+func ValidatePWMPercent(pct int) error {
+	if pct < 0 || pct > 100 {
+		return fmt.Errorf("PWM percent must be between 0 and 100, got %d", pct)
+	}
+	return nil
+}
+
+// ValidateFanControlMode validates a fan control mode string.
+func ValidateFanControlMode(mode string) error {
+	switch mode {
+	case "automatic", "manual":
+		return nil
+	default:
+		return fmt.Errorf("invalid fan control mode %q: must be 'automatic' or 'manual'", mode)
+	}
 }

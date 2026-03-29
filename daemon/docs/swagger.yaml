@@ -695,6 +695,118 @@ definitions:
       timestamp:
         type: string
     type: object
+  dto.FanControlConfig:
+    properties:
+      control_enabled:
+        example: false
+        type: boolean
+      control_method:
+        allOf:
+        - $ref: '#/definitions/dto.FanControlMethod'
+        example: hwmon
+      enabled:
+        example: true
+        type: boolean
+      poll_interval_seconds:
+        example: 5
+        type: integer
+      safety:
+        $ref: '#/definitions/dto.FanSafetyConfig'
+    type: object
+  dto.FanControlMethod:
+    enum:
+    - hwmon
+    - ipmi
+    type: string
+    x-enum-varnames:
+    - FanMethodHwmon
+    - FanMethodIPMI
+  dto.FanControlMode:
+    enum:
+    - automatic
+    - manual
+    - "off"
+    type: string
+    x-enum-varnames:
+    - FanModeAutomatic
+    - FanModeManual
+    - FanModeOff
+  dto.FanControlStatus:
+    properties:
+      config:
+        $ref: '#/definitions/dto.FanControlConfig'
+      fans:
+        items:
+          $ref: '#/definitions/dto.FanDevice'
+        type: array
+      profiles:
+        items:
+          $ref: '#/definitions/dto.FanProfile'
+        type: array
+      summary:
+        $ref: '#/definitions/dto.FanControlSummary'
+      timestamp:
+        type: string
+    type: object
+  dto.FanControlSummary:
+    properties:
+      controllable_fans:
+        example: 2
+        type: integer
+      failed_fans:
+        items:
+          type: string
+        type: array
+      total_fans:
+        example: 3
+        type: integer
+    type: object
+  dto.FanCurvePoint:
+    properties:
+      speed_percent:
+        example: 30
+        type: integer
+      temp_celsius:
+        example: 40
+        type: number
+    type: object
+  dto.FanDevice:
+    properties:
+      active_profile:
+        example: balanced
+        type: string
+      controllable:
+        example: true
+        type: boolean
+      hwmon_index:
+        example: 1
+        type: integer
+      hwmon_path:
+        example: /sys/class/hwmon/hwmon0
+        type: string
+      id:
+        example: hwmon0_fan1
+        type: string
+      mode:
+        allOf:
+        - $ref: '#/definitions/dto.FanControlMode'
+        example: automatic
+      name:
+        example: CPU Fan
+        type: string
+      pwm_percent:
+        example: 71
+        type: integer
+      pwm_value:
+        example: 180
+        type: integer
+      rpm:
+        example: 1200
+        type: integer
+      temp_sensor_path:
+        example: /sys/class/hwmon/hwmon0/temp1_input
+        type: string
+    type: object
   dto.FanInfo:
     properties:
       name:
@@ -702,6 +814,77 @@ definitions:
         type: string
       rpm:
         example: 1200
+        type: integer
+    type: object
+  dto.FanModeRequest:
+    properties:
+      fan_id:
+        example: hwmon0_fan1
+        type: string
+      mode:
+        example: manual
+        type: string
+    type: object
+  dto.FanProfile:
+    properties:
+      built_in:
+        example: true
+        type: boolean
+      curve_points:
+        items:
+          $ref: '#/definitions/dto.FanCurvePoint'
+        type: array
+      description:
+        example: Balanced cooling and noise
+        type: string
+      name:
+        example: balanced
+        type: string
+    type: object
+  dto.FanProfileCreateRequest:
+    properties:
+      curve_points:
+        items:
+          $ref: '#/definitions/dto.FanCurvePoint'
+        type: array
+      description:
+        example: Custom quiet profile
+        type: string
+      name:
+        example: custom_quiet
+        type: string
+    type: object
+  dto.FanProfileRequest:
+    properties:
+      fan_id:
+        example: hwmon0_fan1
+        type: string
+      profile_name:
+        example: balanced
+        type: string
+      temp_sensor_path:
+        example: /sys/class/hwmon/hwmon0/temp1_input
+        type: string
+    type: object
+  dto.FanSafetyConfig:
+    properties:
+      critical_temp_celsius:
+        example: 90
+        type: number
+      failure_rpm_threshold:
+        example: 100
+        type: integer
+      min_speed_percent:
+        example: 20
+        type: integer
+    type: object
+  dto.FanSpeedRequest:
+    properties:
+      fan_id:
+        example: hwmon0_fan1
+        type: string
+      pwm_percent:
+        example: 50
         type: integer
     type: object
   dto.FlashDriveHealth:
@@ -3650,6 +3833,188 @@ paths:
       summary: Check all containers for updates
       tags:
       - Docker
+  /fans:
+    get:
+      description: Retrieve current fan speeds, modes, profiles, and configuration
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Fan control status
+          schema:
+            $ref: '#/definitions/dto.FanControlStatus'
+      summary: Get fan control status
+      tags:
+      - Fans
+  /fans/config:
+    put:
+      consumes:
+      - application/json
+      description: Update fan control settings (enable/disable control, safety thresholds,
+        etc.)
+      parameters:
+      - description: Fan control configuration
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.FanControlConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Configuration updated
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to update configuration
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Update fan control configuration
+      tags:
+      - Fans
+  /fans/defaults:
+    post:
+      description: Restore all fans to automatic (BIOS-controlled) mode
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Defaults restored
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to restore defaults
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Restore fan defaults
+      tags:
+      - Fans
+  /fans/mode:
+    post:
+      consumes:
+      - application/json
+      description: Set the control mode (automatic/manual) for a specific fan
+      parameters:
+      - description: Fan mode request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.FanModeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Mode set
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to set mode
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Set fan control mode
+      tags:
+      - Fans
+  /fans/profile:
+    post:
+      consumes:
+      - application/json
+      description: Assign a temperature curve profile to a specific fan
+      parameters:
+      - description: Fan profile request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.FanProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Profile assigned
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to assign profile
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Assign fan profile
+      tags:
+      - Fans
+  /fans/profile/create:
+    post:
+      consumes:
+      - application/json
+      description: Create a new temperature curve profile for fan control
+      parameters:
+      - description: Fan profile create request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.FanProfileCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Profile created
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to create profile
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Create fan profile
+      tags:
+      - Fans
+  /fans/speed:
+    post:
+      consumes:
+      - application/json
+      description: Set the PWM speed for a specific fan (requires fan control to be
+        enabled)
+      parameters:
+      - description: Fan speed request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.FanSpeedRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Speed set
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to set speed
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Set fan speed
+      tags:
+      - Fans
   /gpu:
     get:
       description: Retrieve GPU metrics for NVIDIA and AMD GPUs

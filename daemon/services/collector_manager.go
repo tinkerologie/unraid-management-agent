@@ -468,4 +468,9 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 	cm.Register("unassigned", func(ctx *domain.Context) Collector {
 		return collectors.NewUnassignedCollector(ctx)
 	}, intervals.Unassigned, false)
+
+	// Fan control collector
+	cm.Register("fancontrol", func(ctx *domain.Context) Collector {
+		return collectors.NewFanControlCollector(ctx)
+	}, intervals.FanControl, false)
 }

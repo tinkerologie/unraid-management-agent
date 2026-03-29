@@ -17,6 +17,7 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/alerting"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/collectors"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/controllers"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/watchdog"
 )
 
@@ -53,6 +54,7 @@ type Server struct {
 	alertStore       *alerting.Store
 	watchdogRunner   *watchdog.Runner
 	watchdogStore    *watchdog.Store
+	fanController    *controllers.FanController
 
 	// Embedded cache store for lock-free atomic access to collector data
 	*CacheStore
@@ -270,6 +272,16 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/alerts/status", s.handleAlertStatus).Methods("GET")
 	api.HandleFunc("/alerts/history", s.handleAlertHistory).Methods("GET")
 	api.HandleFunc("/alerts/firing", s.handleFiringAlerts).Methods("GET")
+
+	// Fan control endpoints (monitoring)
+	api.HandleFunc("/fans", s.handleFanControl).Methods("GET")
+	// Fan control endpoints (control)
+	api.HandleFunc("/fans/speed", s.handleSetFanSpeed).Methods("POST")
+	api.HandleFunc("/fans/mode", s.handleSetFanMode).Methods("POST")
+	api.HandleFunc("/fans/profile", s.handleSetFanProfile).Methods("POST")
+	api.HandleFunc("/fans/profile/create", s.handleCreateFanProfile).Methods("POST")
+	api.HandleFunc("/fans/defaults", s.handleRestoreFanDefaults).Methods("POST")
+	api.HandleFunc("/fans/config", s.handleUpdateFanConfig).Methods("PUT")
 
 	// WebSocket endpoint
 	api.HandleFunc("/ws", s.handleWebSocket)
@@ -589,4 +601,9 @@ func (s *Server) SetAlertEngine(engine *alerting.Engine, store *alerting.Store) 
 func (s *Server) SetWatchdog(runner *watchdog.Runner, store *watchdog.Store) {
 	s.watchdogRunner = runner
 	s.watchdogStore = store
+}
+
+// SetFanController sets the fan controller for fan control API endpoints.
+func (s *Server) SetFanController(fc *controllers.FanController) {
+	s.fanController = fc
 }

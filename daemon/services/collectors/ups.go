@@ -83,7 +83,7 @@ func (c *UPSCollector) Collect() {
 			logger.Debug("Published %s event (NUT)", constants.TopicUPSStatusUpdate.Name)
 			return
 		}
-		logger.Warning("Failed to collect NUT UPS data", "error", err)
+		logger.Debug("Failed to collect NUT UPS data: %v", err)
 	}
 
 	// No UPS available

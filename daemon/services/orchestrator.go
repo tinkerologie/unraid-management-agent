@@ -16,6 +16,7 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/alerting"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/api"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/controllers"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/mcp"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/mqtt"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/watchdog"
@@ -27,6 +28,7 @@ type Orchestrator struct {
 	ctx              *domain.Context
 	collectorManager *CollectorManager
 	mqttClient       *mqtt.Client
+	fanController    *controllers.FanController
 }
 
 // CreateOrchestrator creates a new orchestrator with the given context.
@@ -100,6 +102,17 @@ func (o *Orchestrator) Run() error {
 	})
 	logger.Success("Watchdog started")
 
+	// Initialize fan controller (disabled by default, enabled via config)
+	fanCtrl := controllers.NewFanController()
+	if err := fanCtrl.Initialize(); err != nil {
+		logger.Warning("Fan controller initialization failed (fan control disabled): %v", err)
+	} else {
+		o.fanController = fanCtrl
+		apiServer.SetFanController(fanCtrl)
+		mcpServer.SetFanController(fanCtrl)
+		logger.Success("Fan controller initialized")
+	}
+
 	// Start all enabled collectors
 	enabledCount := o.collectorManager.StartAll()
 
@@ -132,19 +145,25 @@ func (o *Orchestrator) Run() error {
 	logger.Warning("Received shutdown signal, shutting down...")
 
 	// Graceful shutdown
-	// 1. Stop MQTT client if running
+	// 1. Stop fan controller (restores fans to automatic mode)
+	if o.fanController != nil {
+		o.fanController.Shutdown()
+		logger.Info("Fan controller shut down")
+	}
+
+	// 2. Stop MQTT client if running
 	if o.mqttClient != nil {
 		o.mqttClient.Disconnect()
 		logger.Info("MQTT client disconnected")
 	}
 
-	// 2. Stop all collectors via manager
+	// 3. Stop all collectors via manager
 	o.collectorManager.StopAll()
 
-	// 3. Stop API server (which also cancels its internal goroutines)
+	// 4. Stop API server (which also cancels its internal goroutines)
 	apiServer.Stop()
 
-	// 4. Wait for all goroutines to complete
+	// 5. Wait for all goroutines to complete
 	logger.Info("Waiting for all goroutines to complete...")
 	wg.Wait()
 
@@ -211,6 +230,17 @@ func (o *Orchestrator) RunMCPStdio() error {
 	})
 	logger.Success("Watchdog started (STDIO mode)")
 
+	// Initialize fan controller for STDIO mode
+	fanCtrl := controllers.NewFanController()
+	if err := fanCtrl.Initialize(); err != nil {
+		logger.Warning("Fan controller initialization failed (STDIO mode): %v", err)
+	} else {
+		o.fanController = fanCtrl
+		apiServer.SetFanController(fanCtrl)
+		mcpServer.SetFanController(fanCtrl)
+		logger.Success("Fan controller initialized (STDIO mode)")
+	}
+
 	// Cancel context on shutdown signals (SIGTERM, SIGINT)
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
@@ -221,6 +251,9 @@ func (o *Orchestrator) RunMCPStdio() error {
 
 	// Graceful cleanup
 	logger.Info("MCP STDIO transport stopped, cleaning up...")
+	if o.fanController != nil {
+		o.fanController.Shutdown()
+	}
 	o.collectorManager.StopAll()
 	apiServer.Stop()
 	wg.Wait()
@@ -320,6 +353,7 @@ func (o *Orchestrator) subscribeMQTTEvents(ctx context.Context, _ *api.Server) {
 		mqttBind(constants.TopicZFSDatasetsUpdate, o.mqttClient.PublishZFSDatasets),
 		mqttBind(constants.TopicZFSSnapshotsUpdate, o.mqttClient.PublishZFSSnapshots),
 		mqttBind(constants.TopicZFSARCStatsUpdate, o.mqttClient.PublishZFSARCStats),
+		mqttBind(constants.TopicFanControlUpdate, o.mqttClient.PublishFanControlStatus),
 	}
 
 	topics := make([]string, len(bindings))

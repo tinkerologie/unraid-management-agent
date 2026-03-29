@@ -31,7 +31,7 @@ func (c *ZFSCollector) Start(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	logger.Info("ZFS collector started", "interval", interval)
+	logger.Info("ZFS collector started (interval: %v)", interval)
 
 	// Collect immediately on start
 	c.collect()
@@ -51,7 +51,7 @@ func (c *ZFSCollector) Start(ctx context.Context, interval time.Duration) {
 func (c *ZFSCollector) collect() {
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Error("ZFS collector panic recovered", "error", r)
+			logger.Error("ZFS collector panic recovered: %v", r)
 		}
 	}()
 
@@ -64,34 +64,34 @@ func (c *ZFSCollector) collect() {
 	// Collect pools
 	pools, err := c.collectPools()
 	if err != nil {
-		logger.Warning("Failed to collect ZFS pools", "error", err)
+		logger.Warning("Failed to collect ZFS pools: %v", err)
 	} else if len(pools) > 0 {
 		domain.Publish(c.ctx.Hub, constants.TopicZFSPoolsUpdate, pools)
-		logger.Debug("Published ZFS pools update", "count", len(pools))
+		logger.Debug("Published ZFS pools update (count: %d)", len(pools))
 	}
 
 	// Collect datasets
 	datasets, err := c.collectDatasets()
 	if err != nil {
-		logger.Warning("Failed to collect ZFS datasets", "error", err)
+		logger.Warning("Failed to collect ZFS datasets: %v", err)
 	} else if len(datasets) > 0 {
 		domain.Publish(c.ctx.Hub, constants.TopicZFSDatasetsUpdate, datasets)
-		logger.Debug("Published ZFS datasets update", "count", len(datasets))
+		logger.Debug("Published ZFS datasets update (count: %d)", len(datasets))
 	}
 
 	// Collect snapshots
 	snapshots, err := c.collectSnapshots()
 	if err != nil {
-		logger.Warning("Failed to collect ZFS snapshots", "error", err)
+		logger.Warning("Failed to collect ZFS snapshots: %v", err)
 	} else if len(snapshots) > 0 {
 		domain.Publish(c.ctx.Hub, constants.TopicZFSSnapshotsUpdate, snapshots)
-		logger.Debug("Published ZFS snapshots update", "count", len(snapshots))
+		logger.Debug("Published ZFS snapshots update (count: %d)", len(snapshots))
 	}
 
 	// Collect ARC stats
 	arcStats, err := c.collectARCStats()
 	if err != nil {
-		logger.Warning("Failed to collect ZFS ARC stats", "error", err)
+		logger.Warning("Failed to collect ZFS ARC stats: %v", err)
 	} else {
 		domain.Publish(c.ctx.Hub, constants.TopicZFSARCStatsUpdate, arcStats)
 		logger.Debug("Published ZFS ARC stats update")
@@ -132,7 +132,7 @@ func (c *ZFSCollector) collectPools() ([]dto.ZFSPool, error) {
 
 		pool, err := c.collectPoolDetails(name)
 		if err != nil {
-			logger.Warning("Failed to collect pool details", "pool", name, "error", err)
+			logger.Warning("Failed to collect pool details for %s: %v", name, err)
 			continue
 		}
 
@@ -188,12 +188,12 @@ func (c *ZFSCollector) collectPoolDetails(name string) (dto.ZFSPool, error) {
 
 	// Get pool properties for additional details
 	if err := c.enrichPoolProperties(&pool); err != nil {
-		logger.Warning("Failed to enrich pool properties", "pool", name, "error", err)
+		logger.Warning("Failed to enrich pool properties for %s: %v", name, err)
 	}
 
 	// Get pool status (vdevs, errors, scrub info)
 	if err := c.parsePoolStatus(&pool); err != nil {
-		logger.Warning("Failed to parse pool status", "pool", name, "error", err)
+		logger.Warning("Failed to parse pool status for %s: %v", name, err)
 	}
 
 	return pool, nil

@@ -34,8 +34,8 @@ type Client struct {
 	deviceInfo   *dto.HADeviceInfo
 	hostname     string
 	agentVersion string
-	tracker   *discoveryTracker
-	domainCtx *domain.Context // domain context for controllers (array, system)
+	tracker      *discoveryTracker
+	domainCtx    *domain.Context // domain context for controllers (array, system)
 
 	// connectCancel cancels the context for goroutines spawned by handleConnect.
 	// Protected by mu.
@@ -498,6 +498,18 @@ func (c *Client) PublishZFSARCStats(stats dto.ZFSARCStats) error {
 		return nil
 	}
 	return c.publishJSON(c.buildTopic("zfs/arc"), stats)
+}
+
+// PublishFanControlStatus publishes fan control status to MQTT.
+func (c *Client) PublishFanControlStatus(status *dto.FanControlStatus) error {
+	if !c.shouldPublish() {
+		return nil
+	}
+	err := c.publishJSON(c.buildTopic("fancontrol"), status)
+	if status != nil {
+		go c.publishFanControlDiscovery(status)
+	}
+	return err
 }
 
 // PublishCustom publishes a custom message to the specified topic.

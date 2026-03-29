@@ -246,3 +246,29 @@ type MCPDeleteHealthCheckArgs struct {
 type MCPRunHealthCheckArgs struct {
 	CheckID string `json:"check_id" jsonschema:"The unique identifier of the health check to run"`
 }
+
+// MCPFanSpeedArgs represents arguments for setting a fan's PWM speed.
+type MCPFanSpeedArgs struct {
+	FanID      string `json:"fan_id" jsonschema:"The fan device identifier (e.g. hwmon0_fan1)"`
+	PWMPercent int    `json:"pwm_percent" jsonschema:"Target speed as a percentage (0-100)"`
+}
+
+// MCPFanModeArgs represents arguments for setting a fan's control mode.
+type MCPFanModeArgs struct {
+	FanID string `json:"fan_id" jsonschema:"The fan device identifier (e.g. hwmon0_fan1)"`
+	Mode  string `json:"mode" jsonschema:"Control mode: automatic or manual"`
+}
+
+// MCPFanProfileArgs represents arguments for assigning a profile to a fan.
+type MCPFanProfileArgs struct {
+	FanID          string `json:"fan_id" jsonschema:"The fan device identifier (e.g. hwmon0_fan1)"`
+	ProfileName    string `json:"profile_name" jsonschema:"Name of the profile to apply (quiet, balanced, performance, or a custom name)"`
+	TempSensorPath string `json:"temp_sensor_path,omitempty" jsonschema:"Sysfs path to the temperature sensor to link (e.g. /sys/class/hwmon/hwmon0/temp1_input)"`
+}
+
+// MCPCreateFanProfileArgs represents arguments for creating a custom fan profile.
+type MCPCreateFanProfileArgs struct {
+	Name        string `json:"name" jsonschema:"Unique profile name (alphanumeric, underscores, hyphens)"`
+	Description string `json:"description,omitempty" jsonschema:"Human-readable description of the profile"`
+	CurvePoints string `json:"curve_points" jsonschema:"JSON array of {temp_celsius, speed_percent} objects defining the fan curve"`
+}

@@ -3875,3 +3875,251 @@ func (s *Server) handleRunHealthCheck(w http.ResponseWriter, r *http.Request) {
 
 	respondJSON(w, http.StatusOK, status)
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// Fan Control Handlers
+// ────────────────────────────────────────────────────────────────────────────
+
+// handleFanControl godoc
+//
+//	@Summary		Get fan control status
+//	@Description	Retrieve current fan speeds, modes, profiles, and configuration
+//	@Tags			Fans
+//	@Produce		json
+//	@Success		200	{object}	dto.FanControlStatus	"Fan control status"
+//	@Router			/fans [get]
+func (s *Server) handleFanControl(w http.ResponseWriter, _ *http.Request) {
+	// If a controller is available, use it for the most accurate status
+	if s.fanController != nil {
+		status := s.fanController.GetStatus()
+		if status != nil {
+			respondJSON(w, http.StatusOK, status)
+			return
+		}
+	}
+
+	// Fall back to cached collector data
+	cache := s.fanControlCache.Load()
+	if cache == nil {
+		respondJSON(w, http.StatusOK, &dto.FanControlStatus{
+			Fans:      []dto.FanDevice{},
+			Profiles:  []dto.FanProfile{},
+			Timestamp: time.Now(),
+		})
+		return
+	}
+	respondJSON(w, http.StatusOK, cache)
+}
+
+// handleSetFanSpeed godoc
+//
+//	@Summary		Set fan speed
+//	@Description	Set the PWM speed for a specific fan (requires fan control to be enabled)
+//	@Tags			Fans
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		dto.FanSpeedRequest	true	"Fan speed request"
+//	@Success		200		{object}	dto.Response		"Speed set"
+//	@Failure		400		{object}	dto.Response		"Invalid request"
+//	@Failure		500		{object}	dto.Response		"Failed to set speed"
+//	@Router			/fans/speed [post]
+func (s *Server) handleSetFanSpeed(w http.ResponseWriter, r *http.Request) {
+	if s.fanController == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Fan controller not initialized")
+		return
+	}
+
+	var req dto.FanSpeedRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := s.fanController.SetSpeed(req.FanID, req.PWMPercent); err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   fmt.Sprintf("Fan %s speed set to %d%%", req.FanID, req.PWMPercent),
+		Timestamp: time.Now(),
+	})
+}
+
+// handleSetFanMode godoc
+//
+//	@Summary		Set fan control mode
+//	@Description	Set the control mode (automatic/manual) for a specific fan
+//	@Tags			Fans
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		dto.FanModeRequest	true	"Fan mode request"
+//	@Success		200		{object}	dto.Response		"Mode set"
+//	@Failure		400		{object}	dto.Response		"Invalid request"
+//	@Failure		500		{object}	dto.Response		"Failed to set mode"
+//	@Router			/fans/mode [post]
+func (s *Server) handleSetFanMode(w http.ResponseWriter, r *http.Request) {
+	if s.fanController == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Fan controller not initialized")
+		return
+	}
+
+	var req dto.FanModeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := s.fanController.SetMode(req.FanID, req.Mode); err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   fmt.Sprintf("Fan %s mode set to %s", req.FanID, req.Mode),
+		Timestamp: time.Now(),
+	})
+}
+
+// handleSetFanProfile godoc
+//
+//	@Summary		Assign fan profile
+//	@Description	Assign a temperature curve profile to a specific fan
+//	@Tags			Fans
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		dto.FanProfileRequest	true	"Fan profile request"
+//	@Success		200		{object}	dto.Response			"Profile assigned"
+//	@Failure		400		{object}	dto.Response			"Invalid request"
+//	@Failure		500		{object}	dto.Response			"Failed to assign profile"
+//	@Router			/fans/profile [post]
+func (s *Server) handleSetFanProfile(w http.ResponseWriter, r *http.Request) {
+	if s.fanController == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Fan controller not initialized")
+		return
+	}
+
+	var req dto.FanProfileRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := s.fanController.SetProfile(req.FanID, req.ProfileName, req.TempSensorPath); err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   fmt.Sprintf("Profile %s assigned to fan %s", req.ProfileName, req.FanID),
+		Timestamp: time.Now(),
+	})
+}
+
+// handleCreateFanProfile godoc
+//
+//	@Summary		Create fan profile
+//	@Description	Create a new temperature curve profile for fan control
+//	@Tags			Fans
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		dto.FanProfileCreateRequest	true	"Fan profile create request"
+//	@Success		200		{object}	dto.Response				"Profile created"
+//	@Failure		400		{object}	dto.Response				"Invalid request"
+//	@Failure		500		{object}	dto.Response				"Failed to create profile"
+//	@Router			/fans/profile/create [post]
+func (s *Server) handleCreateFanProfile(w http.ResponseWriter, r *http.Request) {
+	if s.fanController == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Fan controller not initialized")
+		return
+	}
+
+	var req dto.FanProfileCreateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	profile := dto.FanProfile{
+		Name:        req.Name,
+		Description: req.Description,
+		CurvePoints: req.CurvePoints,
+	}
+
+	if err := s.fanController.CreateProfile(profile); err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   fmt.Sprintf("Profile %s created", req.Name),
+		Timestamp: time.Now(),
+	})
+}
+
+// handleRestoreFanDefaults godoc
+//
+//	@Summary		Restore fan defaults
+//	@Description	Restore all fans to automatic (BIOS-controlled) mode
+//	@Tags			Fans
+//	@Produce		json
+//	@Success		200	{object}	dto.Response	"Defaults restored"
+//	@Failure		500	{object}	dto.Response	"Failed to restore defaults"
+//	@Router			/fans/defaults [post]
+func (s *Server) handleRestoreFanDefaults(w http.ResponseWriter, _ *http.Request) {
+	if s.fanController == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Fan controller not initialized")
+		return
+	}
+
+	if err := s.fanController.RestoreDefaults(); err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   "Fan defaults restored — all fans set to automatic mode",
+		Timestamp: time.Now(),
+	})
+}
+
+// handleUpdateFanConfig godoc
+//
+//	@Summary		Update fan control configuration
+//	@Description	Update fan control settings (enable/disable control, safety thresholds, etc.)
+//	@Tags			Fans
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		dto.FanControlConfig	true	"Fan control configuration"
+//	@Success		200		{object}	dto.Response			"Configuration updated"
+//	@Failure		400		{object}	dto.Response			"Invalid request"
+//	@Failure		500		{object}	dto.Response			"Failed to update configuration"
+//	@Router			/fans/config [put]
+func (s *Server) handleUpdateFanConfig(w http.ResponseWriter, r *http.Request) {
+	if s.fanController == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Fan controller not initialized")
+		return
+	}
+
+	var config dto.FanControlConfig
+	if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
+		respondWithError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := s.fanController.UpdateConfig(config); err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   "Fan control configuration updated",
+		Timestamp: time.Now(),
+	})
+}

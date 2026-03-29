@@ -93,6 +93,9 @@ func cacheBindings() []eventBinding {
 		bind(constants.TopicZFSARCStatsUpdate, func(c *CacheStore, v dto.ZFSARCStats) {
 			c.zfsARCStatsCache.Store(&v)
 		}),
+		bind(constants.TopicFanControlUpdate, func(c *CacheStore, v *dto.FanControlStatus) {
+			c.fanControlCache.Store(v)
+		}),
 	}
 }
 

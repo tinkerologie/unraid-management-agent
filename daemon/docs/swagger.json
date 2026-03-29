@@ -1292,6 +1292,282 @@
                 }
             }
         },
+        "/fans": {
+            "get": {
+                "description": "Retrieve current fan speeds, modes, profiles, and configuration",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Fans"
+                ],
+                "summary": "Get fan control status",
+                "responses": {
+                    "200": {
+                        "description": "Fan control status",
+                        "schema": {
+                            "$ref": "#/definitions/dto.FanControlStatus"
+                        }
+                    }
+                }
+            }
+        },
+        "/fans/config": {
+            "put": {
+                "description": "Update fan control settings (enable/disable control, safety thresholds, etc.)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Fans"
+                ],
+                "summary": "Update fan control configuration",
+                "parameters": [
+                    {
+                        "description": "Fan control configuration",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.FanControlConfig"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Configuration updated",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to update configuration",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/fans/defaults": {
+            "post": {
+                "description": "Restore all fans to automatic (BIOS-controlled) mode",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Fans"
+                ],
+                "summary": "Restore fan defaults",
+                "responses": {
+                    "200": {
+                        "description": "Defaults restored",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to restore defaults",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/fans/mode": {
+            "post": {
+                "description": "Set the control mode (automatic/manual) for a specific fan",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Fans"
+                ],
+                "summary": "Set fan control mode",
+                "parameters": [
+                    {
+                        "description": "Fan mode request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.FanModeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Mode set",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to set mode",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/fans/profile": {
+            "post": {
+                "description": "Assign a temperature curve profile to a specific fan",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Fans"
+                ],
+                "summary": "Assign fan profile",
+                "parameters": [
+                    {
+                        "description": "Fan profile request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.FanProfileRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Profile assigned",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to assign profile",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/fans/profile/create": {
+            "post": {
+                "description": "Create a new temperature curve profile for fan control",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Fans"
+                ],
+                "summary": "Create fan profile",
+                "parameters": [
+                    {
+                        "description": "Fan profile create request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.FanProfileCreateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Profile created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to create profile",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/fans/speed": {
+            "post": {
+                "description": "Set the PWM speed for a specific fan (requires fan control to be enabled)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Fans"
+                ],
+                "summary": "Set fan speed",
+                "parameters": [
+                    {
+                        "description": "Fan speed request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.FanSpeedRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Speed set",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to set speed",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/gpu": {
             "get": {
                 "description": "Retrieve GPU metrics for NVIDIA and AMD GPUs",
@@ -5061,6 +5337,169 @@
                 }
             }
         },
+        "dto.FanControlConfig": {
+            "type": "object",
+            "properties": {
+                "control_enabled": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "control_method": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.FanControlMethod"
+                        }
+                    ],
+                    "example": "hwmon"
+                },
+                "enabled": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "poll_interval_seconds": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "safety": {
+                    "$ref": "#/definitions/dto.FanSafetyConfig"
+                }
+            }
+        },
+        "dto.FanControlMethod": {
+            "type": "string",
+            "enum": [
+                "hwmon",
+                "ipmi"
+            ],
+            "x-enum-varnames": [
+                "FanMethodHwmon",
+                "FanMethodIPMI"
+            ]
+        },
+        "dto.FanControlMode": {
+            "type": "string",
+            "enum": [
+                "automatic",
+                "manual",
+                "off"
+            ],
+            "x-enum-varnames": [
+                "FanModeAutomatic",
+                "FanModeManual",
+                "FanModeOff"
+            ]
+        },
+        "dto.FanControlStatus": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "$ref": "#/definitions/dto.FanControlConfig"
+                },
+                "fans": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.FanDevice"
+                    }
+                },
+                "profiles": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.FanProfile"
+                    }
+                },
+                "summary": {
+                    "$ref": "#/definitions/dto.FanControlSummary"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.FanControlSummary": {
+            "type": "object",
+            "properties": {
+                "controllable_fans": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "failed_fans": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "total_fans": {
+                    "type": "integer",
+                    "example": 3
+                }
+            }
+        },
+        "dto.FanCurvePoint": {
+            "type": "object",
+            "properties": {
+                "speed_percent": {
+                    "type": "integer",
+                    "example": 30
+                },
+                "temp_celsius": {
+                    "type": "number",
+                    "example": 40
+                }
+            }
+        },
+        "dto.FanDevice": {
+            "type": "object",
+            "properties": {
+                "active_profile": {
+                    "type": "string",
+                    "example": "balanced"
+                },
+                "controllable": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "hwmon_index": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "hwmon_path": {
+                    "type": "string",
+                    "example": "/sys/class/hwmon/hwmon0"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "hwmon0_fan1"
+                },
+                "mode": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.FanControlMode"
+                        }
+                    ],
+                    "example": "automatic"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "CPU Fan"
+                },
+                "pwm_percent": {
+                    "type": "integer",
+                    "example": 71
+                },
+                "pwm_value": {
+                    "type": "integer",
+                    "example": 180
+                },
+                "rpm": {
+                    "type": "integer",
+                    "example": 1200
+                },
+                "temp_sensor_path": {
+                    "type": "string",
+                    "example": "/sys/class/hwmon/hwmon0/temp1_input"
+                }
+            }
+        },
         "dto.FanInfo": {
             "type": "object",
             "properties": {
@@ -5071,6 +5510,108 @@
                 "rpm": {
                     "type": "integer",
                     "example": 1200
+                }
+            }
+        },
+        "dto.FanModeRequest": {
+            "type": "object",
+            "properties": {
+                "fan_id": {
+                    "type": "string",
+                    "example": "hwmon0_fan1"
+                },
+                "mode": {
+                    "type": "string",
+                    "example": "manual"
+                }
+            }
+        },
+        "dto.FanProfile": {
+            "type": "object",
+            "properties": {
+                "built_in": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "curve_points": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.FanCurvePoint"
+                    }
+                },
+                "description": {
+                    "type": "string",
+                    "example": "Balanced cooling and noise"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "balanced"
+                }
+            }
+        },
+        "dto.FanProfileCreateRequest": {
+            "type": "object",
+            "properties": {
+                "curve_points": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.FanCurvePoint"
+                    }
+                },
+                "description": {
+                    "type": "string",
+                    "example": "Custom quiet profile"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "custom_quiet"
+                }
+            }
+        },
+        "dto.FanProfileRequest": {
+            "type": "object",
+            "properties": {
+                "fan_id": {
+                    "type": "string",
+                    "example": "hwmon0_fan1"
+                },
+                "profile_name": {
+                    "type": "string",
+                    "example": "balanced"
+                },
+                "temp_sensor_path": {
+                    "type": "string",
+                    "example": "/sys/class/hwmon/hwmon0/temp1_input"
+                }
+            }
+        },
+        "dto.FanSafetyConfig": {
+            "type": "object",
+            "properties": {
+                "critical_temp_celsius": {
+                    "type": "number",
+                    "example": 90
+                },
+                "failure_rpm_threshold": {
+                    "type": "integer",
+                    "example": 100
+                },
+                "min_speed_percent": {
+                    "type": "integer",
+                    "example": 20
+                }
+            }
+        },
+        "dto.FanSpeedRequest": {
+            "type": "object",
+            "properties": {
+                "fan_id": {
+                    "type": "string",
+                    "example": "hwmon0_fan1"
+                },
+                "pwm_percent": {
+                    "type": "integer",
+                    "example": 50
                 }
             }
         },

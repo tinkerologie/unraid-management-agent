@@ -39,6 +39,7 @@ type CacheStore struct {
 	zfsARCStatsCache     atomic.Pointer[dto.ZFSARCStats]
 	nutCache             atomic.Pointer[dto.NUTResponse]
 	networkServicesCache atomic.Pointer[dto.NetworkServicesStatus]
+	fanControlCache      atomic.Pointer[dto.FanControlStatus]
 }
 
 // ---------- Pointer-type getters (direct Load) ----------
@@ -86,6 +87,11 @@ func (c *CacheStore) GetUnassignedCache() *dto.UnassignedDeviceList {
 // GetNUTCache returns cached NUT (Network UPS Tools) information.
 func (c *CacheStore) GetNUTCache() *dto.NUTResponse {
 	return c.nutCache.Load()
+}
+
+// GetFanControlCache returns cached fan control status.
+func (c *CacheStore) GetFanControlCache() *dto.FanControlStatus {
+	return c.fanControlCache.Load()
 }
 
 // ---------- Slice-type getters (dereference atomic pointer) ----------

@@ -265,6 +265,22 @@ var (
 		},
 		[]string{"gpu", "name"},
 	)
+
+	// Fan metrics
+	fanRPM = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "unraid_fan_rpm",
+			Help: "Fan speed in revolutions per minute",
+		},
+		[]string{"fan_id", "name"},
+	)
+	fanPWMPercent = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "unraid_fan_pwm_percent",
+			Help: "Fan PWM duty cycle percentage (0-100)",
+		},
+		[]string{"fan_id", "name"},
+	)
 )
 
 // metricsRegistry is a custom registry for Unraid metrics
@@ -326,6 +342,9 @@ func init() {
 		// CPU Power
 		cpuPowerWatts,
 		dramPowerWatts,
+		// Fans
+		fanRPM,
+		fanPWMPercent,
 	)
 }
 
@@ -524,6 +543,17 @@ func (s *Server) updateMetrics() {
 			gpuMemoryUsed.WithLabelValues(idx, gpu.Name).Set(float64(gpu.MemoryUsed))
 			gpuMemoryTotal.WithLabelValues(idx, gpu.Name).Set(float64(gpu.MemoryTotal))
 			gpuPowerWatts.WithLabelValues(idx, gpu.Name).Set(gpu.PowerDraw)
+		}
+	}
+
+	// Update fan metrics
+	if fanCache := s.fanControlCache.Load(); fanCache != nil {
+		fanRPM.Reset()
+		fanPWMPercent.Reset()
+
+		for _, fan := range fanCache.Fans {
+			fanRPM.WithLabelValues(fan.ID, fan.Name).Set(float64(fan.RPM))
+			fanPWMPercent.WithLabelValues(fan.ID, fan.Name).Set(float64(fan.PWMPercent))
 		}
 	}
 }

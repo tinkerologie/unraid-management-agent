@@ -33,7 +33,7 @@ repos:
       # - id: check-executables-have-shebangs
       # - id: check-shebang-scripts-are-executable
 
-  # Go formatting - gofmt
+  # Go formatting and imports
   - repo: https://github.com/dnephin/pre-commit-golang
     rev: v0.5.1
     hooks:
@@ -44,17 +44,23 @@ repos:
         files: '\.go$'
         exclude: "^vendor/"
 
-      - id: go-imports
-        name: Go Imports (goimports)
-        description: Run goimports to organize imports
-        files: '\.go$'
-        exclude: "^vendor/"
-
       - id: go-vet
         name: Go Vet
         description: Run go vet for static analysis
         files: '\.go$'
         exclude: "^(vendor/|tests/)"
+
+  # goimports as local hook so it inherits the user PATH (~/go/bin)
+  - repo: local
+    hooks:
+      - id: go-imports
+        name: Go Imports (goimports)
+        description: Run goimports to organize imports
+        entry: goimports
+        language: system
+        args: ["-w"]
+        files: '\.go$'
+        exclude: "^vendor/"
 
   # Local Go build hook for better control
   - repo: local
