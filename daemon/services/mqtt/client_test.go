@@ -227,6 +227,13 @@ func TestClientGetTopics(t *testing.T) {
 		{"Shares", topics.Shares, "unraid/shares"},
 		{"Notification", topics.Notification, "unraid/notifications"},
 		{"Availability", topics.Availability, "unraid/availability"},
+		{"NUT", topics.NUT, "unraid/nut/status"},
+		{"Hardware", topics.Hardware, "unraid/hardware"},
+		{"Registration", topics.Registration, "unraid/registration"},
+		{"Unassigned", topics.Unassigned, "unraid/unassigned/devices"},
+		{"ZFSDatasets", topics.ZFSDatasets, "unraid/zfs/datasets"},
+		{"ZFSSnapshots", topics.ZFSSnapshots, "unraid/zfs/snapshots"},
+		{"ZFSARC", topics.ZFSARC, "unraid/zfs/arc"},
 	}
 
 	for _, tc := range testCases {
@@ -427,6 +434,55 @@ func TestPublishMethodsWithoutConnection(t *testing.T) {
 			t.Errorf("PublishNotifications() error = %v, want nil", err)
 		}
 	})
+
+	t.Run("PublishNUTStatus", func(t *testing.T) {
+		err := client.PublishNUTStatus(&dto.NUTResponse{})
+		if err != nil {
+			t.Errorf("PublishNUTStatus() error = %v, want nil", err)
+		}
+	})
+
+	t.Run("PublishHardwareInfo", func(t *testing.T) {
+		err := client.PublishHardwareInfo(&dto.HardwareInfo{})
+		if err != nil {
+			t.Errorf("PublishHardwareInfo() error = %v, want nil", err)
+		}
+	})
+
+	t.Run("PublishRegistration", func(t *testing.T) {
+		err := client.PublishRegistration(&dto.Registration{})
+		if err != nil {
+			t.Errorf("PublishRegistration() error = %v, want nil", err)
+		}
+	})
+
+	t.Run("PublishUnassignedDevices", func(t *testing.T) {
+		err := client.PublishUnassignedDevices(&dto.UnassignedDeviceList{})
+		if err != nil {
+			t.Errorf("PublishUnassignedDevices() error = %v, want nil", err)
+		}
+	})
+
+	t.Run("PublishZFSDatasets", func(t *testing.T) {
+		err := client.PublishZFSDatasets([]dto.ZFSDataset{})
+		if err != nil {
+			t.Errorf("PublishZFSDatasets() error = %v, want nil", err)
+		}
+	})
+
+	t.Run("PublishZFSSnapshots", func(t *testing.T) {
+		err := client.PublishZFSSnapshots([]dto.ZFSSnapshot{})
+		if err != nil {
+			t.Errorf("PublishZFSSnapshots() error = %v, want nil", err)
+		}
+	})
+
+	t.Run("PublishZFSARCStats", func(t *testing.T) {
+		err := client.PublishZFSARCStats(dto.ZFSARCStats{})
+		if err != nil {
+			t.Errorf("PublishZFSARCStats() error = %v, want nil", err)
+		}
+	})
 }
 
 func TestPublishCustomWithoutConnection(t *testing.T) {
@@ -599,5 +655,26 @@ func TestTestConnectionWithEmptyClientID(t *testing.T) {
 	// Should not panic and should return a result
 	if result.Timestamp.IsZero() {
 		t.Error("Timestamp should not be zero")
+	}
+}
+
+// TestPublishSystemInfoNilSafe verifies that PublishSystemInfo does not panic when called with nil.
+func TestPublishSystemInfoNilSafe(t *testing.T) {
+	config := DefaultConfig()
+	config.Enabled = true
+	client := NewClient(config, "test", "1.0.0", nil)
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("PublishSystemInfo(nil) panicked: %v", r)
+		}
+	}()
+	// shouldPublish returns false (not connected) so this reaches nil dereference
+	// only if the nil guard is missing after a successful publishJSON path.
+	// With Enabled=true but no broker, shouldPublish=false → returns early.
+	// The guard still protects against callers that reach the fan-discovery line.
+	err := client.PublishSystemInfo(nil)
+	if err != nil {
+		t.Errorf("PublishSystemInfo(nil) = %v, want nil", err)
 	}
 }

@@ -69,8 +69,8 @@ func TestParseFanSpeeds(t *testing.T) {
 		minCount int
 	}{
 		{
-			name:     "typical fan output",
-			output:   "nct6775-isa-0a20\n  fan1_input: 1200\n  fan2_input: 850\n",
+			name:     "typical fan output (sensors -u float format)",
+			output:   "nct6775-isa-0a20\nAdapter: ISA adapter\nfan1:\n  fan1_input: 1200.000\nfan2:\n  fan2_input: 850.000\n",
 			minCount: 2,
 		},
 		{
@@ -84,9 +84,14 @@ func TestParseFanSpeeds(t *testing.T) {
 			minCount: 0,
 		},
 		{
-			name:     "single fan",
-			output:   "nct6775-isa-0a20\n  fan1_input: 900\n",
+			name:     "single fan (sensors -u float format)",
+			output:   "nct6775-isa-0a20\nAdapter: ISA adapter\nfan1:\n  fan1_input: 900.000\n",
 			minCount: 1,
+		},
+		{
+			name:     "integer RPM values still parse correctly",
+			output:   "nct6775-isa-0a20\n  fan1_input: 1200\n  fan2_input: 850\n",
+			minCount: 2,
 		},
 	}
 

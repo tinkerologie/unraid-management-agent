@@ -379,7 +379,9 @@ func TestResolveNotificationDirsFromCfg(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.Remove(f.Name())
-	_, _ = f.WriteString("[display]\nsome=value\n[notify]\npath=\"/tmp/custom-notifications\"\nother=setting\n")
+	if _, err := f.WriteString("[display]\nsome=value\n[notify]\npath=\"/tmp/custom-notifications\"\nother=setting\n"); err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
 	f.Close()
 
 	unread, archive := ResolveNotificationDirs(f.Name())
@@ -398,7 +400,9 @@ func TestResolveNotificationDirsEmptyPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.Remove(f.Name())
-	_, _ = f.WriteString("[notify]\npath=\"\"\n")
+	if _, err := f.WriteString("[notify]\npath=\"\"\n"); err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
 	f.Close()
 
 	unread, _ := ResolveNotificationDirs(f.Name())

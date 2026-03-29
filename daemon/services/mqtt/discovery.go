@@ -200,6 +200,11 @@ func (c *Client) publishHADiscovery() {
 	c.publishNotificationDiscovery()
 	c.publishServiceDiscovery()
 	c.publishSystemControlDiscovery()
+	c.publishNUTDiscovery()
+	c.publishHardwareDiscovery()
+	c.publishRegistrationDiscovery()
+	c.publishZFSSnapshotDiscovery()
+	c.publishZFSARCDiscovery()
 
 	logger.Success("MQTT: Home Assistant discovery published")
 }
@@ -333,6 +338,35 @@ func (c *Client) publishSystemDiscovery() {
 		icon: "mdi:chip", template: "{{ 'ON' if value_json.iommu_enabled else 'OFF' }}",
 		entityCategory: "diagnostic",
 	})
+}
+
+// publishFanDiscovery publishes per-fan HA discovery entities.
+// Fans are embedded in the system JSON payload; each entity uses a Jinja2 selectattr
+// template to extract the RPM for its specific fan by name.
+func (c *Client) publishFanDiscovery(fans []dto.FanInfo) {
+	if !c.config.HomeAssistantMode {
+		return
+	}
+
+	topic := c.buildTopic("system")
+	var currentIDs []string
+
+	for _, fan := range fans {
+		fanID := "fan_" + sanitizeID(fan.Name)
+		c.publishHAEntity(haEntityOpts{
+			entityType: "sensor", stateTopic: topic,
+			id: fanID, name: fmt.Sprintf("System: %s", fan.Name), unit: "RPM",
+			icon:       "mdi:fan",
+			template:   fmt.Sprintf(`{{ (value_json.fans | selectattr('name', 'eq', '%s') | map(attribute='rpm') | first | default(0)) }}`, fan.Name),
+			stateClass: "measurement",
+		})
+		currentIDs = append(currentIDs, fanID)
+	}
+
+	removed := c.tracker.update("fans", currentIDs)
+	for _, id := range removed {
+		c.removeHAEntities(id)
+	}
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -474,7 +508,7 @@ func (c *Client) publishUPSDiscovery() {
 	c.publishHAEntity(haEntityOpts{
 		entityType: "sensor", stateTopic: topic,
 		id: "ups_power", name: "UPS: Power Draw", unit: "W",
-		icon: "mdi:lightning-bolt", template: "{{ value_json.nominal_power_watts | default(0) | round(0) }}",
+		icon: "mdi:lightning-bolt", template: "{{ value_json.power_watts | default(0) | round(0) }}",
 		deviceClass: "power", stateClass: "measurement",
 	})
 	c.publishHAEntity(haEntityOpts{
@@ -1217,15 +1251,15 @@ func (c *Client) publishNetworkEntities(topic, prefix, displayName string) []str
 	})
 	c.publishHAEntity(haEntityOpts{
 		entityType: "sensor", stateTopic: topic,
-		id: prefix + "_rx", name: fmt.Sprintf("Network: %s Bytes Received", displayName), unit: "B",
-		icon: "mdi:download", template: "{{ value_json.bytes_received }}",
-		deviceClass: "data_size", stateClass: "total_increasing",
+		id: prefix + "_rx", name: fmt.Sprintf("Network: %s Throughput In", displayName), unit: "B/s",
+		icon: "mdi:download", template: "{{ value_json.rx_bytes_per_sec | round(1) }}",
+		deviceClass: "data_rate", stateClass: "measurement",
 	})
 	c.publishHAEntity(haEntityOpts{
 		entityType: "sensor", stateTopic: topic,
-		id: prefix + "_tx", name: fmt.Sprintf("Network: %s Bytes Sent", displayName), unit: "B",
-		icon: "mdi:upload", template: "{{ value_json.bytes_sent }}",
-		deviceClass: "data_size", stateClass: "total_increasing",
+		id: prefix + "_tx", name: fmt.Sprintf("Network: %s Throughput Out", displayName), unit: "B/s",
+		icon: "mdi:upload", template: "{{ value_json.tx_bytes_per_sec | round(1) }}",
+		deviceClass: "data_rate", stateClass: "measurement",
 	})
 	c.publishHAEntity(haEntityOpts{
 		entityType: "sensor", stateTopic: topic,
@@ -1390,6 +1424,391 @@ func (c *Client) publishZFSEntities(topic, prefix, displayName string) []string 
 	})
 
 	return ids
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// NUT UPS
+// ──────────────────────────────────────────────────────────────────────────────
+
+// publishNUTDiscovery publishes HA discovery for NUT UPS metrics.
+// NUTResponse.Status is a pointer — templates use | default() guards for nil safety.
+func (c *Client) publishNUTDiscovery() {
+	topic := c.buildTopic("nut/status")
+	c.publishHAEntity(haEntityOpts{
+		entityType: "binary_sensor", stateTopic: topic,
+		id: "nut_connected", name: "NUT: UPS Connected",
+		icon:        "mdi:battery-charging",
+		template:    "{{ 'ON' if value_json.status.connected | default(false) else 'OFF' }}",
+		deviceClass: "connectivity",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "nut_status", name: "NUT: UPS Status",
+		icon:     "mdi:battery-charging",
+		template: "{{ value_json.status.status | default('unknown') }}",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "nut_battery_charge", name: "NUT: Battery Charge", unit: "%",
+		icon:        "mdi:battery",
+		template:    "{{ value_json.status.battery_charge_percent | default(0) | round(0) }}",
+		deviceClass: "battery", stateClass: "measurement",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "nut_battery_runtime", name: "NUT: Battery Runtime", unit: "s",
+		icon:        "mdi:clock-outline",
+		template:    "{{ value_json.status.battery_runtime_seconds | default(0) }}",
+		deviceClass: "duration", stateClass: "measurement",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "nut_load", name: "NUT: Load", unit: "%",
+		icon:       "mdi:gauge",
+		template:   "{{ value_json.status.load_percent | default(0) | round(1) }}",
+		stateClass: "measurement",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "nut_realpower", name: "NUT: Real Power", unit: "W",
+		icon:        "mdi:lightning-bolt",
+		template:    "{{ value_json.status.realpower_watts | default(0) | round(0) }}",
+		deviceClass: "power", stateClass: "measurement",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "nut_input_voltage", name: "NUT: Input Voltage", unit: "V",
+		icon:        "mdi:sine-wave",
+		template:    "{{ value_json.status.input_voltage | default(0) | round(1) }}",
+		deviceClass: "voltage", stateClass: "measurement",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "nut_output_voltage", name: "NUT: Output Voltage", unit: "V",
+		icon:        "mdi:sine-wave",
+		template:    "{{ value_json.status.output_voltage | default(0) | round(1) }}",
+		deviceClass: "voltage", stateClass: "measurement",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "nut_model", name: "NUT: UPS Model",
+		icon:           "mdi:battery-charging",
+		template:       "{{ value_json.status.model | default('') }}",
+		entityCategory: "diagnostic",
+	})
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Hardware Info
+// ──────────────────────────────────────────────────────────────────────────────
+
+// publishHardwareDiscovery publishes HA discovery for hardware information.
+func (c *Client) publishHardwareDiscovery() {
+	topic := c.buildTopic("hardware")
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "bios_version", name: "Hardware: BIOS Version",
+		icon:           "mdi:chip",
+		template:       "{{ value_json.bios.version | default('') }}",
+		entityCategory: "diagnostic",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "bios_date", name: "Hardware: BIOS Release Date",
+		icon:           "mdi:calendar",
+		template:       "{{ value_json.bios.release_date | default('') }}",
+		entityCategory: "diagnostic",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "board_manufacturer", name: "Hardware: Board Manufacturer",
+		icon:           "mdi:factory",
+		template:       "{{ value_json.baseboard.manufacturer | default('') }}",
+		entityCategory: "diagnostic",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "board_model", name: "Hardware: Board Model",
+		icon:           "mdi:circuit-board",
+		template:       "{{ value_json.baseboard.product_name | default('') }}",
+		entityCategory: "diagnostic",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "cpu_max_speed", name: "Hardware: CPU Max Speed", unit: "MHz",
+		icon:           "mdi:cpu-64-bit",
+		template:       "{{ value_json.cpu.max_speed_mhz | default(0) }}",
+		entityCategory: "diagnostic",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "memory_slots_total", name: "Hardware: Memory Slots",
+		icon:           "mdi:memory",
+		template:       "{{ value_json.memory_array.number_of_devices | default(0) }}",
+		entityCategory: "diagnostic",
+	})
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Registration / License
+// ──────────────────────────────────────────────────────────────────────────────
+
+// publishRegistrationDiscovery publishes HA discovery for Unraid license/registration info.
+func (c *Client) publishRegistrationDiscovery() {
+	topic := c.buildTopic("registration")
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "registration_state", name: "Registration: State",
+		icon:     "mdi:license",
+		template: "{{ value_json.state }}",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "registration_type", name: "Registration: Type",
+		icon:           "mdi:tag",
+		template:       "{{ value_json.type }}",
+		entityCategory: "diagnostic",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "binary_sensor", stateTopic: topic,
+		id: "registration_valid", name: "Registration: Valid",
+		icon:        "mdi:check-decagram",
+		template:    "{{ 'ON' if value_json.state == 'valid' else 'OFF' }}",
+		deviceClass: "safety",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "registration_expiry", name: "Registration: Expiry",
+		icon:        "mdi:calendar-clock",
+		template:    "{{ value_json.expiration }}",
+		deviceClass: "timestamp",
+	})
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Unassigned Devices
+// ──────────────────────────────────────────────────────────────────────────────
+
+// publishUnassignedDiscovery publishes per-device HA discovery for unassigned devices.
+func (c *Client) publishUnassignedDiscovery(list *dto.UnassignedDeviceList) {
+	if !c.config.HomeAssistantMode {
+		return
+	}
+	if list == nil {
+		return
+	}
+	var currentIDs []string
+	for _, dev := range list.Devices {
+		if dev.Device == "" {
+			continue
+		}
+		devID := sanitizeID(dev.Device)
+		devTopic := c.buildTopic(fmt.Sprintf("unassigned/%s", devID))
+		if err := c.publishJSON(devTopic, dev); err != nil {
+			logger.Debug("MQTT: Failed to publish unassigned device %s: %v", devID, err)
+			continue
+		}
+		displayName := dev.Model
+		if displayName == "" {
+			displayName = dev.Device
+		}
+		ids := c.publishUnassignedEntities(devTopic, fmt.Sprintf("unassigned_%s", devID), displayName, dev)
+		currentIDs = append(currentIDs, ids...)
+	}
+	removed := c.tracker.update("unassigned", currentIDs)
+	for _, id := range removed {
+		c.removeHAEntities(id)
+	}
+}
+
+// publishUnassignedEntities publishes HA entity discovery for a single unassigned device.
+func (c *Client) publishUnassignedEntities(topic, prefix, displayName string, dev dto.UnassignedDevice) []string {
+	ids := []string{prefix + "_connected", prefix + "_temp", prefix + "_spin_state"}
+	c.publishHAEntity(haEntityOpts{
+		entityType: "binary_sensor", stateTopic: topic,
+		id: prefix + "_connected", name: fmt.Sprintf("Unassigned: %s Connected", displayName),
+		icon:        "mdi:harddisk",
+		template:    "{{ 'ON' if value_json.status != 'error' else 'OFF' }}",
+		deviceClass: "connectivity",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: prefix + "_temp", name: fmt.Sprintf("Unassigned: %s Temperature", displayName), unit: "°C",
+		icon:        "mdi:thermometer",
+		template:    "{{ value_json.temperature_celsius | default(0) }}",
+		deviceClass: "temperature", stateClass: "measurement",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: prefix + "_spin_state", name: fmt.Sprintf("Unassigned: %s Spin State", displayName),
+		icon:     "mdi:rotate-3d-variant",
+		template: "{{ value_json.spin_state | default('unknown') }}",
+	})
+	for i, part := range dev.Partitions {
+		partPrefix := fmt.Sprintf("%s_part%d", prefix, i+1)
+		partLabel := part.Label
+		if partLabel == "" {
+			partLabel = fmt.Sprintf("Part %d", part.PartitionNumber)
+		}
+		ids = append(ids, partPrefix+"_usage", partPrefix+"_used", partPrefix+"_free")
+		c.publishHAEntity(haEntityOpts{
+			entityType: "sensor", stateTopic: topic,
+			id:   partPrefix + "_usage",
+			name: fmt.Sprintf("Unassigned: %s %s Usage", displayName, partLabel), unit: "%",
+			icon:       "mdi:harddisk",
+			template:   fmt.Sprintf("{{ value_json.partitions[%d].usage_percent | default(0) | round(1) }}", i),
+			stateClass: "measurement",
+		})
+		c.publishHAEntity(haEntityOpts{
+			entityType: "sensor", stateTopic: topic,
+			id:   partPrefix + "_used",
+			name: fmt.Sprintf("Unassigned: %s %s Used", displayName, partLabel), unit: "B",
+			icon:        "mdi:harddisk",
+			template:    fmt.Sprintf("{{ value_json.partitions[%d].used_bytes | default(0) }}", i),
+			deviceClass: "data_size", stateClass: "measurement",
+		})
+		c.publishHAEntity(haEntityOpts{
+			entityType: "sensor", stateTopic: topic,
+			id:   partPrefix + "_free",
+			name: fmt.Sprintf("Unassigned: %s %s Free", displayName, partLabel), unit: "B",
+			icon:        "mdi:harddisk",
+			template:    fmt.Sprintf("{{ value_json.partitions[%d].free_bytes | default(0) }}", i),
+			deviceClass: "data_size", stateClass: "measurement",
+		})
+	}
+	return ids
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// ZFS Datasets
+// ──────────────────────────────────────────────────────────────────────────────
+
+// publishZFSDatasetDiscovery publishes per-dataset HA discovery for ZFS datasets.
+func (c *Client) publishZFSDatasetDiscovery(datasets []dto.ZFSDataset) {
+	if !c.config.HomeAssistantMode {
+		return
+	}
+	var currentIDs []string
+	for _, ds := range datasets {
+		if ds.Name == "" {
+			continue
+		}
+		dsID := sanitizeID(ds.Name)
+		dsTopic := c.buildTopic(fmt.Sprintf("zfs/datasets/%s", dsID))
+		if err := c.publishJSON(dsTopic, ds); err != nil {
+			logger.Debug("MQTT: Failed to publish ZFS dataset %s: %v", dsID, err)
+			continue
+		}
+		ids := c.publishZFSDatasetEntities(dsTopic, fmt.Sprintf("zfs_ds_%s", dsID), ds.Name)
+		currentIDs = append(currentIDs, ids...)
+	}
+	removed := c.tracker.update("zfs_datasets", currentIDs)
+	for _, id := range removed {
+		c.removeHAEntities(id)
+	}
+}
+
+// publishZFSDatasetEntities publishes HA entity discovery for a single ZFS dataset.
+func (c *Client) publishZFSDatasetEntities(topic, prefix, displayName string) []string {
+	ids := []string{prefix + "_used", prefix + "_available", prefix + "_compress_ratio", prefix + "_readonly"}
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: prefix + "_used", name: fmt.Sprintf("ZFS Dataset: %s Used", displayName), unit: "B",
+		icon:        "mdi:database",
+		template:    "{{ value_json.used_bytes }}",
+		deviceClass: "data_size", stateClass: "measurement",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: prefix + "_available", name: fmt.Sprintf("ZFS Dataset: %s Available", displayName), unit: "B",
+		icon:        "mdi:database",
+		template:    "{{ value_json.available_bytes }}",
+		deviceClass: "data_size", stateClass: "measurement",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: prefix + "_compress_ratio", name: fmt.Sprintf("ZFS Dataset: %s Compression Ratio", displayName),
+		icon:       "mdi:zip-box",
+		template:   "{{ value_json.compress_ratio | round(2) }}",
+		stateClass: "measurement",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "binary_sensor", stateTopic: topic,
+		id: prefix + "_readonly", name: fmt.Sprintf("ZFS Dataset: %s Read-Only", displayName),
+		icon:     "mdi:lock",
+		template: "{{ 'ON' if value_json.readonly else 'OFF' }}",
+	})
+	return ids
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// ZFS Snapshots
+// ──────────────────────────────────────────────────────────────────────────────
+
+// publishZFSSnapshotDiscovery publishes aggregate HA discovery for ZFS snapshots.
+func (c *Client) publishZFSSnapshotDiscovery() {
+	topic := c.buildTopic("zfs/snapshots")
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "zfs_snapshot_count", name: "ZFS: Snapshot Count",
+		icon:       "mdi:camera",
+		template:   "{{ value_json | length }}",
+		stateClass: "measurement",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "zfs_snapshot_total_size", name: "ZFS: Snapshot Total Size", unit: "B",
+		icon:        "mdi:camera",
+		template:    "{{ value_json | sum(attribute='used_bytes') | default(0) }}",
+		deviceClass: "data_size", stateClass: "measurement",
+	})
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// ZFS ARC Stats
+// ──────────────────────────────────────────────────────────────────────────────
+
+// publishZFSARCDiscovery publishes HA discovery for ZFS ARC cache statistics.
+func (c *Client) publishZFSARCDiscovery() {
+	topic := c.buildTopic("zfs/arc")
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "arc_size", name: "ZFS ARC: Size", unit: "B",
+		icon:        "mdi:memory",
+		template:    "{{ value_json.size_bytes }}",
+		deviceClass: "data_size", stateClass: "measurement",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "arc_target_size", name: "ZFS ARC: Target Size", unit: "B",
+		icon:           "mdi:memory",
+		template:       "{{ value_json.target_size_bytes }}",
+		deviceClass:    "data_size", stateClass: "measurement",
+		entityCategory: "diagnostic",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "arc_hit_ratio", name: "ZFS ARC: Hit Ratio", unit: "%",
+		icon:       "mdi:chart-line",
+		template:   "{{ value_json.hit_ratio_percent | round(1) }}",
+		stateClass: "measurement",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "arc_l2_size", name: "ZFS L2ARC: Size", unit: "B",
+		icon:           "mdi:memory",
+		template:       "{{ value_json.l2_size_bytes | default(0) }}",
+		deviceClass:    "data_size", stateClass: "measurement",
+		entityCategory: "diagnostic",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "arc_l2_hit_ratio", name: "ZFS L2ARC: Hit Ratio", unit: "%",
+		icon:           "mdi:chart-line",
+		template:       "{{ ((value_json.l2_hits | default(0)) / ((value_json.l2_hits | default(0)) + (value_json.l2_misses | default(0))) * 100) | round(1) if ((value_json.l2_hits | default(0)) + (value_json.l2_misses | default(0))) > 0 else 0 }}",
+		stateClass:     "measurement",
+		entityCategory: "diagnostic",
+	})
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

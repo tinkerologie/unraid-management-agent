@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -533,10 +534,13 @@ func (c *SystemCollector) parseFanSpeeds(output string) map[string]int {
 			if len(parts) == 2 {
 				key := strings.TrimSpace(parts[0])
 				valueStr := strings.TrimSpace(parts[1])
-				if value, err := strconv.Atoi(valueStr); err == nil {
-					name := fmt.Sprintf("%s_%s", currentChip, key)
-					name = strings.ReplaceAll(name, " ", "_")
-					fanSpeeds[name] = value
+				if floatVal, err := strconv.ParseFloat(valueStr, 64); err == nil {
+					value := int(math.Round(floatVal))
+					// Use short chip model (first segment before "-") + fan number without "_input".
+					// e.g. "it8721-isa-0290" + "fan1_input" → "it8721_fan1"
+					chipShort := strings.Split(currentChip, "-")[0]
+					fanLabel := strings.TrimSuffix(key, "_input")
+					fanSpeeds[chipShort+"_"+fanLabel] = value
 				}
 			}
 		}
@@ -562,12 +566,17 @@ func (c *SystemCollector) readHwmonFanSpeeds() (map[string]int, error) {
 			if err != nil {
 				continue
 			}
+			// Skip unpopulated channels — hwmon lists every slot on the chip,
+			// including ones with no fan connected (always read 0 RPM).
+			if value == 0 {
+				continue
+			}
 
 			// Try to get label
 			labelPath := fmt.Sprintf("/sys/class/hwmon/hwmon%d/fan%d_label", i, j)
 			// #nosec G304 -- labelPath is constructed from /sys/class/hwmon using bounded numeric indices.
 			labelData, err := os.ReadFile(labelPath)
-			label := fmt.Sprintf("hwmon%d_fan%d", i, j)
+			label := fmt.Sprintf("Fan %d", j)
 			if err == nil {
 				label = strings.TrimSpace(string(labelData))
 			}

@@ -83,8 +83,10 @@ func TestSystemCollectorParseFanSpeeds(t *testing.T) {
 	t.Run("parse fan output", func(t *testing.T) {
 		output := `nct6792-isa-0a20
 Adapter: ISA adapter
-fan1_input: 1200
-fan2_input: 800
+fan1:
+  fan1_input: 1200.000
+fan2:
+  fan2_input: 800.000
 `
 		fans := collector.parseFanSpeeds(output)
 

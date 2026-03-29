@@ -508,6 +508,13 @@ func TestMQTTTopics(t *testing.T) {
 		Shares:       "unraid/shares",
 		Notification: "unraid/notifications",
 		Availability: "unraid/availability",
+		NUT:          "unraid/nut/status",
+		Hardware:     "unraid/hardware",
+		Registration: "unraid/registration",
+		Unassigned:   "unraid/unassigned/devices",
+		ZFSDatasets:  "unraid/zfs/datasets",
+		ZFSSnapshots: "unraid/zfs/snapshots",
+		ZFSARC:       "unraid/zfs/arc",
 	}
 
 	data, err := json.Marshal(topics)
@@ -555,6 +562,27 @@ func TestMQTTTopics(t *testing.T) {
 	}
 	if decoded.Availability != topics.Availability {
 		t.Errorf("Availability = %q, want %q", decoded.Availability, topics.Availability)
+	}
+	if decoded.NUT != topics.NUT {
+		t.Errorf("NUT = %q, want %q", decoded.NUT, topics.NUT)
+	}
+	if decoded.Hardware != topics.Hardware {
+		t.Errorf("Hardware = %q, want %q", decoded.Hardware, topics.Hardware)
+	}
+	if decoded.Registration != topics.Registration {
+		t.Errorf("Registration = %q, want %q", decoded.Registration, topics.Registration)
+	}
+	if decoded.Unassigned != topics.Unassigned {
+		t.Errorf("Unassigned = %q, want %q", decoded.Unassigned, topics.Unassigned)
+	}
+	if decoded.ZFSDatasets != topics.ZFSDatasets {
+		t.Errorf("ZFSDatasets = %q, want %q", decoded.ZFSDatasets, topics.ZFSDatasets)
+	}
+	if decoded.ZFSSnapshots != topics.ZFSSnapshots {
+		t.Errorf("ZFSSnapshots = %q, want %q", decoded.ZFSSnapshots, topics.ZFSSnapshots)
+	}
+	if decoded.ZFSARC != topics.ZFSARC {
+		t.Errorf("ZFSARC = %q, want %q", decoded.ZFSARC, topics.ZFSARC)
 	}
 }
 

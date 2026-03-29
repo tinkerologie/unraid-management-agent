@@ -201,6 +201,13 @@ func TestPerItemDiscovery_NotConnected(t *testing.T) {
 	client.publishShareDiscovery([]dto.ShareInfo{{Name: "Media"}})
 	// ZFS
 	client.publishZFSDiscovery([]dto.ZFSPool{{Name: "tank", Health: "ONLINE"}})
+	// Unassigned
+	client.publishUnassignedDiscovery(&dto.UnassignedDeviceList{
+		Devices: []dto.UnassignedDevice{{Device: "sdc", Model: "WD Black",
+			Partitions: []dto.UnassignedPartition{{PartitionNumber: 1, Label: "Data"}}}},
+	})
+	// ZFS Datasets
+	client.publishZFSDatasetDiscovery([]dto.ZFSDataset{{Name: "tank/media"}})
 
 	if client.IsConnected() {
 		t.Error("client should not be connected")
@@ -344,6 +351,15 @@ func TestPublishMethodsWithEnabledButNotConnected(t *testing.T) {
 		{"PublishShares", func() error { return client.PublishShares([]dto.ShareInfo{}) }},
 		{"PublishNotifications", func() error { return client.PublishNotifications(&dto.NotificationList{}) }},
 		{"PublishZFSPools", func() error { return client.PublishZFSPools([]dto.ZFSPool{}) }},
+		{"PublishNUTStatus", func() error { return client.PublishNUTStatus(&dto.NUTResponse{}) }},
+		{"PublishHardwareInfo", func() error { return client.PublishHardwareInfo(&dto.HardwareInfo{}) }},
+		{"PublishRegistration", func() error { return client.PublishRegistration(&dto.Registration{}) }},
+		{"PublishUnassignedDevices", func() error {
+			return client.PublishUnassignedDevices(&dto.UnassignedDeviceList{})
+		}},
+		{"PublishZFSDatasets", func() error { return client.PublishZFSDatasets([]dto.ZFSDataset{}) }},
+		{"PublishZFSSnapshots", func() error { return client.PublishZFSSnapshots([]dto.ZFSSnapshot{}) }},
+		{"PublishZFSARCStats", func() error { return client.PublishZFSARCStats(dto.ZFSARCStats{}) }},
 	}
 
 	for _, tt := range tests {

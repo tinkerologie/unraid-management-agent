@@ -313,6 +313,13 @@ func (o *Orchestrator) subscribeMQTTEvents(ctx context.Context, _ *api.Server) {
 		mqttBind(constants.TopicNetworkListUpdate, o.mqttClient.PublishNetworkInfo),
 		mqttBind(constants.TopicNotificationsUpdate, o.mqttClient.PublishNotifications),
 		mqttBind(constants.TopicZFSPoolsUpdate, o.mqttClient.PublishZFSPools),
+		mqttBind(constants.TopicNUTStatusUpdate, o.mqttClient.PublishNUTStatus),
+		mqttBind(constants.TopicHardwareUpdate, o.mqttClient.PublishHardwareInfo),
+		mqttBind(constants.TopicRegistrationUpdate, o.mqttClient.PublishRegistration),
+		mqttBind(constants.TopicUnassignedDevicesUpdate, o.mqttClient.PublishUnassignedDevices),
+		mqttBind(constants.TopicZFSDatasetsUpdate, o.mqttClient.PublishZFSDatasets),
+		mqttBind(constants.TopicZFSSnapshotsUpdate, o.mqttClient.PublishZFSSnapshots),
+		mqttBind(constants.TopicZFSARCStatsUpdate, o.mqttClient.PublishZFSARCStats),
 	}
 
 	topics := make([]string, len(bindings))

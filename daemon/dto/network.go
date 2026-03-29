@@ -16,6 +16,11 @@ type NetworkInfo struct {
 	ErrorsReceived  uint64 `json:"errors_received" example:"0"`
 	ErrorsSent      uint64 `json:"errors_sent" example:"0"`
 
+	// RxBytesPerSec is the receive throughput (computed from successive collection cycles; 0 on first cycle)
+	RxBytesPerSec float64 `json:"rx_bytes_per_sec" example:"10485760"`
+	// TxBytesPerSec is the transmit throughput (computed from successive collection cycles; 0 on first cycle)
+	TxBytesPerSec float64 `json:"tx_bytes_per_sec" example:"5242880"`
+
 	// Enhanced ethtool information
 	SupportedPorts       []string `json:"supported_ports,omitempty"`
 	SupportedLinkModes   []string `json:"supported_link_modes,omitempty"`

@@ -6070,6 +6070,11 @@ const docTemplate = `{
                     "type": "string",
                     "example": "Twisted Pair"
                 },
+                "rx_bytes_per_sec": {
+                    "description": "RxBytesPerSec is the receive throughput (computed from successive collection cycles; 0 on first cycle)",
+                    "type": "number",
+                    "example": 10485760
+                },
                 "speed_mbps": {
                     "type": "integer",
                     "example": 1000
@@ -6117,6 +6122,11 @@ const docTemplate = `{
                 "transceiver": {
                     "type": "string",
                     "example": "internal"
+                },
+                "tx_bytes_per_sec": {
+                    "description": "TxBytesPerSec is the transmit throughput (computed from successive collection cycles; 0 on first cycle)",
+                    "type": "number",
+                    "example": 5242880
                 },
                 "wake_on": {
                     "type": "string",

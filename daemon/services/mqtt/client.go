@@ -34,8 +34,8 @@ type Client struct {
 	deviceInfo   *dto.HADeviceInfo
 	hostname     string
 	agentVersion string
-	tracker      *discoveryTracker
-	domainCtx    *domain.Context // domain context for controllers (array, system)
+	tracker   *discoveryTracker
+	domainCtx *domain.Context // domain context for controllers (array, system)
 
 	// connectCancel cancels the context for goroutines spawned by handleConnect.
 	// Protected by mu.
@@ -314,6 +314,13 @@ func (c *Client) GetTopics() *dto.MQTTTopics {
 		Notification: c.buildTopic("notifications"),
 		ZFSPools:     c.buildTopic("zfs/pools"),
 		Availability: c.buildTopic("availability"),
+		NUT:          c.buildTopic("nut/status"),
+		Hardware:     c.buildTopic("hardware"),
+		Registration: c.buildTopic("registration"),
+		Unassigned:   c.buildTopic("unassigned/devices"),
+		ZFSDatasets:  c.buildTopic("zfs/datasets"),
+		ZFSSnapshots: c.buildTopic("zfs/snapshots"),
+		ZFSARC:       c.buildTopic("zfs/arc"),
 	}
 }
 
@@ -322,7 +329,14 @@ func (c *Client) PublishSystemInfo(info *dto.SystemInfo) error {
 	if !c.shouldPublish() {
 		return nil
 	}
-	return c.publishJSON(c.buildTopic("system"), info)
+	if err := c.publishJSON(c.buildTopic("system"), info); err != nil {
+		return err
+	}
+	if info == nil {
+		return nil
+	}
+	go c.publishFanDiscovery(info.Fans)
+	return nil
 }
 
 // PublishArrayStatus publishes array status to MQTT.
@@ -424,6 +438,66 @@ func (c *Client) PublishZFSPools(pools []dto.ZFSPool) error {
 	// Publish per-pool topics and HA discovery
 	go c.publishZFSDiscovery(pools)
 	return err
+}
+
+// PublishNUTStatus publishes NUT UPS status to MQTT.
+func (c *Client) PublishNUTStatus(data *dto.NUTResponse) error {
+	if !c.shouldPublish() {
+		return nil
+	}
+	return c.publishJSON(c.buildTopic("nut/status"), data)
+}
+
+// PublishHardwareInfo publishes hardware information to MQTT.
+func (c *Client) PublishHardwareInfo(info *dto.HardwareInfo) error {
+	if !c.shouldPublish() {
+		return nil
+	}
+	return c.publishJSON(c.buildTopic("hardware"), info)
+}
+
+// PublishRegistration publishes registration/license information to MQTT.
+func (c *Client) PublishRegistration(reg *dto.Registration) error {
+	if !c.shouldPublish() {
+		return nil
+	}
+	return c.publishJSON(c.buildTopic("registration"), reg)
+}
+
+// PublishUnassignedDevices publishes unassigned device information to MQTT.
+func (c *Client) PublishUnassignedDevices(list *dto.UnassignedDeviceList) error {
+	if !c.shouldPublish() {
+		return nil
+	}
+	err := c.publishJSON(c.buildTopic("unassigned/devices"), list)
+	go c.publishUnassignedDiscovery(list)
+	return err
+}
+
+// PublishZFSDatasets publishes ZFS dataset information to MQTT.
+func (c *Client) PublishZFSDatasets(datasets []dto.ZFSDataset) error {
+	if !c.shouldPublish() {
+		return nil
+	}
+	err := c.publishJSON(c.buildTopic("zfs/datasets"), datasets)
+	go c.publishZFSDatasetDiscovery(datasets)
+	return err
+}
+
+// PublishZFSSnapshots publishes ZFS snapshot list to MQTT.
+func (c *Client) PublishZFSSnapshots(snapshots []dto.ZFSSnapshot) error {
+	if !c.shouldPublish() {
+		return nil
+	}
+	return c.publishJSON(c.buildTopic("zfs/snapshots"), snapshots)
+}
+
+// PublishZFSARCStats publishes ZFS ARC statistics to MQTT.
+func (c *Client) PublishZFSARCStats(stats dto.ZFSARCStats) error {
+	if !c.shouldPublish() {
+		return nil
+	}
+	return c.publishJSON(c.buildTopic("zfs/arc"), stats)
 }
 
 // PublishCustom publishes a custom message to the specified topic.

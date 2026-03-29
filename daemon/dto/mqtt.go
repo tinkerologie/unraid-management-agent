@@ -123,6 +123,13 @@ type MQTTTopics struct {
 	Notification string `json:"notifications" example:"unraid/notifications"`
 	ZFSPools     string `json:"zfs_pools" example:"unraid/zfs/pools"`
 	Availability string `json:"availability" example:"unraid/availability"`
+	NUT          string `json:"nut" example:"unraid/nut/status"`
+	Hardware     string `json:"hardware" example:"unraid/hardware"`
+	Registration string `json:"registration" example:"unraid/registration"`
+	Unassigned   string `json:"unassigned" example:"unraid/unassigned/devices"`
+	ZFSDatasets  string `json:"zfs_datasets" example:"unraid/zfs/datasets"`
+	ZFSSnapshots string `json:"zfs_snapshots" example:"unraid/zfs/snapshots"`
+	ZFSARC       string `json:"zfs_arc" example:"unraid/zfs/arc"`
 }
 
 // MQTTEnableRequest represents a request to enable/disable MQTT.

@@ -422,6 +422,13 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 		return collectors.NewNUTCollector(ctx)
 	}, intervals.NUT, false)
 
+	// NUT requires UPS to be enabled — UPS collector handles MQTT publishing
+	// for both APC and NUT devices via upsc fallback.
+	if intervals.NUT > 0 && intervals.UPS == 0 {
+		logger.Warning("NUT interval is set but UPS interval is disabled. " +
+			"UPS MQTT sensors will not update. Enable the UPS collector to report NUT data via MQTT.")
+	}
+
 	// GPU collector
 	cm.Register("gpu", func(ctx *domain.Context) Collector {
 		return collectors.NewGPUCollector(ctx)

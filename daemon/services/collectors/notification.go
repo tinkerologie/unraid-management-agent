@@ -29,7 +29,7 @@ var (
 // Exported so the controllers package can use the same resolved paths.
 func ResolveNotificationDirs(cfgPath string) (unread, archive string) {
 	base := defaultNotificationsBase
-	f, err := os.Open(cfgPath)
+	f, err := os.Open(cfgPath) // #nosec G304 -- cfgPath is constants.DynamixCfg (compile-time constant) or test-injected
 	if err == nil {
 		defer f.Close() //nolint:errcheck
 		inNotify := false

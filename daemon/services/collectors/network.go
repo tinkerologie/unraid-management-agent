@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
@@ -17,15 +18,24 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
+// prevNetStats holds the previous collection's byte counts for rate calculation.
+type prevNetStats struct {
+	bytesReceived uint64
+	bytesSent     uint64
+	timestamp     time.Time
+}
+
 // NetworkCollector collects network interface information including status, speed, and statistics.
 // It gathers data from network interfaces, bonds, bridges, and VLANs.
 type NetworkCollector struct {
-	ctx *domain.Context
+	ctx       *domain.Context
+	mu        sync.Mutex
+	prevStats map[string]prevNetStats
 }
 
 // NewNetworkCollector creates a new network interface collector with the given context.
 func NewNetworkCollector(ctx *domain.Context) *NetworkCollector {
-	return &NetworkCollector{ctx: ctx}
+	return &NetworkCollector{ctx: ctx, prevStats: make(map[string]prevNetStats)}
 }
 
 // Start begins the network collector's periodic data collection.
@@ -92,6 +102,8 @@ func (c *NetworkCollector) collectNetworkInterfaces() ([]dto.NetworkInfo, error)
 		logger.Error("Network: Failed to parse /proc/net/dev: %v", err)
 		return nil, err
 	}
+	sampleTime := time.Now()
+	c.pruneGoneInterfaces(stats)
 
 	// Get interface details from /sys/class/net
 	for ifName, ifStats := range stats {
@@ -108,7 +120,7 @@ func (c *NetworkCollector) collectNetworkInterfaces() ([]dto.NetworkInfo, error)
 			PacketsSent:     ifStats.PacketsSent,
 			ErrorsReceived:  ifStats.ErrorsReceived,
 			ErrorsSent:      ifStats.ErrorsSent,
-			Timestamp:       time.Now(),
+			Timestamp:       sampleTime,
 		}
 
 		// Get MAC address
@@ -126,11 +138,53 @@ func (c *NetworkCollector) collectNetworkInterfaces() ([]dto.NetworkInfo, error)
 		// Get ethtool information (enhanced network details)
 		c.enrichWithEthtool(&netInfo, ifName)
 
+		// Compute throughput rates from successive reads
+		c.computeRates(ifName, sampleTime, &netInfo)
+
 		interfaces = append(interfaces, netInfo)
 	}
 
 	logger.Debug("Network: Parsed %d interfaces successfully", len(interfaces))
 	return interfaces, nil
+}
+
+// computeRates calculates RxBytesPerSec and TxBytesPerSec from the difference
+// between the current byte counters and those recorded in the previous collection cycle.
+// On the first call for a given interface, both rates remain zero.
+// Counter resets and wraps (new count < previous count) are silently ignored.
+// sampleTime must be captured once per scan cycle and passed consistently for all interfaces.
+func (c *NetworkCollector) computeRates(ifName string, sampleTime time.Time, netInfo *dto.NetworkInfo) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if prev, ok := c.prevStats[ifName]; ok {
+		elapsed := sampleTime.Sub(prev.timestamp).Seconds()
+		if elapsed > 0 {
+			rx := float64(netInfo.BytesReceived) - float64(prev.bytesReceived)
+			tx := float64(netInfo.BytesSent) - float64(prev.bytesSent)
+			if rx >= 0 {
+				netInfo.RxBytesPerSec = rx / elapsed
+			}
+			if tx >= 0 {
+				netInfo.TxBytesPerSec = tx / elapsed
+			}
+		}
+	}
+	c.prevStats[ifName] = prevNetStats{
+		bytesReceived: netInfo.BytesReceived,
+		bytesSent:     netInfo.BytesSent,
+		timestamp:     sampleTime,
+	}
+}
+
+// pruneGoneInterfaces removes prevStats entries for interfaces no longer present in current.
+func (c *NetworkCollector) pruneGoneInterfaces(current map[string]netStats) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for ifName := range c.prevStats {
+		if _, ok := current[ifName]; !ok {
+			delete(c.prevStats, ifName)
+		}
+	}
 }
 
 type netStats struct {

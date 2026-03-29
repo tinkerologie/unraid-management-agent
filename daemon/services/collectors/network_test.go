@@ -1,9 +1,14 @@
 package collectors
 
 import (
+	"fmt"
+	"math"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 )
 
 func TestNewNetworkCollector(t *testing.T) {
@@ -258,5 +263,169 @@ func TestParseUint64(t *testing.T) {
 				t.Errorf("parseUint64(%q) = %d, want %d", tt.input, result, tt.expected)
 			}
 		})
+	}
+}
+
+// seedPrev injects a previous-stats entry for ifName into the collector,
+// backdated by the given duration so elapsed time is approximately ago.Seconds().
+func seedPrev(c *NetworkCollector, ifName string, rx, tx uint64, ago time.Duration) {
+	c.prevStats[ifName] = prevNetStats{
+		bytesReceived: rx,
+		bytesSent:     tx,
+		timestamp:     time.Now().Add(-ago),
+	}
+}
+
+// approxEqual fails the test if got differs from want by more than tolerancePct percent.
+// When want == 0 it requires got == 0 exactly.
+func approxEqual(t *testing.T, label string, got, want, tolerancePct float64) {
+	t.Helper()
+	if want == 0 {
+		if got != 0 {
+			t.Errorf("%s: got %.2f, want 0", label, got)
+		}
+		return
+	}
+	delta := math.Abs(got-want) / want * 100
+	if delta > tolerancePct {
+		t.Errorf("%s: got %.2f, want ~%.2f (%.1f%% off, tolerance %.1f%%)", label, got, want, delta, tolerancePct)
+	}
+}
+
+func newTestCollector(t *testing.T) *NetworkCollector {
+	t.Helper()
+	hub := domain.NewEventBus(10)
+	return NewNetworkCollector(&domain.Context{Hub: hub})
+}
+
+// TestComputeRates covers the delta/elapsed logic, counter wraps, and first-cycle zero.
+func TestComputeRates(t *testing.T) {
+	const ifName = "eth0"
+	const tolerance = 5.0 // percent
+
+	tests := []struct {
+		name    string
+		setup   func(c *NetworkCollector)
+		rx      uint64
+		tx      uint64
+		wantRx  float64
+		wantTx  float64
+	}{
+		{
+			name:   "first cycle — no prev stats, rates must be zero",
+			setup:  func(_ *NetworkCollector) {},
+			rx:     1000,
+			tx:     500,
+			wantRx: 0,
+			wantTx: 0,
+		},
+		{
+			name:  "normal rx+tx increase — delta/elapsed logic",
+			setup: func(c *NetworkCollector) { seedPrev(c, ifName, 0, 0, time.Second) },
+			rx:    10240,
+			tx:    5120,
+			wantRx: 10240,
+			wantTx: 5120,
+		},
+		{
+			name:   "rx counter wrap (new < prev by uint64 distance)",
+			setup:  func(c *NetworkCollector) { seedPrev(c, ifName, math.MaxUint64-100, 0, time.Second) },
+			rx:     100,
+			tx:     5120,
+			wantRx: 0, // float64 delta is negative → ignored
+			wantTx: 5120,
+		},
+		{
+			name:   "tx counter wrap (new < prev by uint64 distance)",
+			setup:  func(c *NetworkCollector) { seedPrev(c, ifName, 0, math.MaxUint64-100, time.Second) },
+			rx:     10240,
+			tx:     100,
+			wantRx: 10240,
+			wantTx: 0, // float64 delta is negative → ignored
+		},
+		{
+			name:   "rx counter reset without wrap",
+			setup:  func(c *NetworkCollector) { seedPrev(c, ifName, 5000, 0, time.Second) },
+			rx:     100,
+			tx:     5120,
+			wantRx: 0,
+			wantTx: 5120,
+		},
+		{
+			name:   "tx counter reset without wrap",
+			setup:  func(c *NetworkCollector) { seedPrev(c, ifName, 0, 5000, time.Second) },
+			rx:     10240,
+			tx:     100,
+			wantRx: 10240,
+			wantTx: 0,
+		},
+		{
+			name:   "bytes unchanged — rates are zero",
+			setup:  func(c *NetworkCollector) { seedPrev(c, ifName, 8192, 4096, time.Second) },
+			rx:     8192,
+			tx:     4096,
+			wantRx: 0,
+			wantTx: 0,
+		},
+		{
+			name:   "high throughput — 1 GiB/s rx, 512 MiB/s tx",
+			setup:  func(c *NetworkCollector) { seedPrev(c, ifName, 0, 0, time.Second) },
+			rx:     1 << 30,
+			tx:     1 << 29,
+			wantRx: float64(1 << 30),
+			wantTx: float64(1 << 29),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := newTestCollector(t)
+			tt.setup(c)
+			netInfo := &dto.NetworkInfo{BytesReceived: tt.rx, BytesSent: tt.tx}
+			c.computeRates(ifName, time.Now(), netInfo)
+			approxEqual(t, "RxBytesPerSec", netInfo.RxBytesPerSec, tt.wantRx, tolerance)
+			approxEqual(t, "TxBytesPerSec", netInfo.TxBytesPerSec, tt.wantTx, tolerance)
+		})
+	}
+}
+
+// TestComputeRatesConcurrent verifies mutex protection under the race detector.
+func TestComputeRatesConcurrent(t *testing.T) {
+	c := newTestCollector(t)
+	var wg sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			ifName := fmt.Sprintf("eth%d", i%4)
+			netInfo := &dto.NetworkInfo{
+				BytesReceived: uint64(i * 1000),
+				BytesSent:     uint64(i * 500),
+			}
+			c.computeRates(ifName, time.Now(), netInfo)
+			c.computeRates(ifName, time.Now(), netInfo)
+		}(i)
+	}
+	wg.Wait()
+}
+
+// TestPrevStatsPruning verifies stale interface entries are removed from prevStats.
+func TestPrevStatsPruning(t *testing.T) {
+	c := newTestCollector(t)
+	seedPrev(c, "eth0", 0, 0, time.Second)
+	seedPrev(c, "veth123abc", 0, 0, time.Second)
+
+	current := map[string]netStats{
+		"eth0": {BytesReceived: 1000, BytesSent: 500},
+	}
+	c.pruneGoneInterfaces(current)
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if _, ok := c.prevStats["veth123abc"]; ok {
+		t.Error("expected veth123abc to be pruned from prevStats")
+	}
+	if _, ok := c.prevStats["eth0"]; !ok {
+		t.Error("expected eth0 to be retained in prevStats")
 	}
 }
