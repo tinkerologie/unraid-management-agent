@@ -68,15 +68,16 @@ type NICRingBufferInfo struct {
 
 // TurboBoostRequest is the JSON body for enabling/disabling turbo boost.
 type TurboBoostRequest struct {
-	Enabled bool `json:"enabled" example:"true"`
+	Enabled bool `json:"enabled" validate:"required" example:"true"`
 }
 
 // DiskCacheRequest is the JSON body for setting disk cache parameters.
+// All fields are optional pointers — omitted fields keep current kernel values.
 type DiskCacheRequest struct {
-	DirtyBackgroundRatio int `json:"dirty_background_ratio" example:"10"`
-	DirtyRatio           int `json:"dirty_ratio" example:"20"`
-	DirtyWritebackCenti  int `json:"dirty_writeback_centisecs" example:"500"`
-	DirtyExpireCenti     int `json:"dirty_expire_centisecs" example:"3000"`
+	DirtyBackgroundRatio *int `json:"dirty_background_ratio,omitempty" example:"10"`
+	DirtyRatio           *int `json:"dirty_ratio,omitempty" example:"20"`
+	DirtyWritebackCenti  *int `json:"dirty_writeback_centisecs,omitempty" example:"500"`
+	DirtyExpireCenti     *int `json:"dirty_expire_centisecs,omitempty" example:"3000"`
 }
 
 // InotifyLimitsRequest is the JSON body for setting inotify limits.

@@ -3626,6 +3626,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/dto.Response"
                         }
                     },
+                    "500": {
+                        "description": "Internal server error applying tuning",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
                     "503": {
                         "description": "Tuning controller not available",
                         "schema": {
@@ -3672,6 +3678,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/dto.Response"
                         }
                     },
+                    "500": {
+                        "description": "Internal server error applying tuning",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
                     "503": {
                         "description": "Tuning controller not available",
                         "schema": {
@@ -3714,6 +3726,12 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error applying tuning",
                         "schema": {
                             "$ref": "#/definitions/dto.Response"
                         }
@@ -8261,6 +8279,9 @@ const docTemplate = `{
         },
         "dto.TurboBoostRequest": {
             "type": "object",
+            "required": [
+                "enabled"
+            ],
             "properties": {
                 "enabled": {
                     "type": "boolean",

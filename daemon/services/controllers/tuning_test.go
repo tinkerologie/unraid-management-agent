@@ -8,12 +8,12 @@ func TestTuningController_SetDiskCache_Validation(t *testing.T) {
 	c := NewTuningController()
 
 	tests := []struct {
-		name                string
-		bgRatio, ratio      int
-		writebackCenti      int
-		expireCenti         int
-		wantErr             bool
-		errContains         string
+		name           string
+		bgRatio, ratio int
+		writebackCenti int
+		expireCenti    int
+		wantErr        bool
+		errContains    string
 	}{
 		{"valid defaults", 10, 20, 500, 3000, false, ""},
 		{"valid equal ratios", 50, 50, 500, 3000, false, ""},
@@ -40,9 +40,12 @@ func TestTuningController_SetDiskCache_Validation(t *testing.T) {
 						t.Errorf("error %q should contain %q", err.Error(), tt.errContains)
 					}
 				}
+			} else if err != nil {
+				// Allow runtime/write errors (no /proc/sys) but catch validation rejections for valid inputs
+				if containsStr(err.Error(), "invalid") || containsStr(err.Error(), "must be") || containsStr(err.Error(), "must not") {
+					t.Errorf("validation failed for valid input: %v", err)
+				}
 			}
-			// For valid cases on a machine without /proc/sys, we'll get a write error.
-			// Validation is the important test here.
 		})
 	}
 }
@@ -51,12 +54,12 @@ func TestTuningController_SetInotifyLimits_Validation(t *testing.T) {
 	c := NewTuningController()
 
 	tests := []struct {
-		name           string
-		watches        int
-		instances      int
-		events         int
-		wantErr        bool
-		errContains    string
+		name        string
+		watches     int
+		instances   int
+		events      int
+		wantErr     bool
+		errContains string
 	}{
 		{"valid defaults", 524288, 128, 16384, false, ""},
 		{"valid minimums", 1, 1, 1, false, ""},
@@ -80,6 +83,11 @@ func TestTuningController_SetInotifyLimits_Validation(t *testing.T) {
 					if !containsStr(err.Error(), tt.errContains) {
 						t.Errorf("error %q should contain %q", err.Error(), tt.errContains)
 					}
+				}
+			} else if err != nil {
+				// Allow runtime/write errors (no /proc/sys) but catch validation rejections for valid inputs
+				if containsStr(err.Error(), "must be") {
+					t.Errorf("unexpected error: %v", err)
 				}
 			}
 		})

@@ -2583,6 +2583,8 @@ definitions:
       enabled:
         example: true
         type: boolean
+    required:
+    - enabled
     type: object
   dto.UPSStatus:
     properties:
@@ -5628,6 +5630,10 @@ paths:
           description: Invalid request
           schema:
             $ref: '#/definitions/dto.Response'
+        "500":
+          description: Internal server error applying tuning
+          schema:
+            $ref: '#/definitions/dto.Response'
         "503":
           description: Tuning controller not available
           schema:
@@ -5658,6 +5664,10 @@ paths:
           description: Invalid request
           schema:
             $ref: '#/definitions/dto.Response'
+        "500":
+          description: Internal server error applying tuning
+          schema:
+            $ref: '#/definitions/dto.Response'
         "503":
           description: Tuning controller not available
           schema:
@@ -5686,6 +5696,10 @@ paths:
             $ref: '#/definitions/dto.Response'
         "400":
           description: Invalid request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Internal server error applying tuning
           schema:
             $ref: '#/definitions/dto.Response'
         "503":

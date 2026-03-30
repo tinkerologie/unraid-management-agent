@@ -4242,6 +4242,7 @@ func (s *Server) handleTuning(w http.ResponseWriter, _ *http.Request) {
 //	@Param			request	body		dto.TurboBoostRequest	true	"Turbo boost request"
 //	@Success		200		{object}	dto.Response			"Turbo boost set"
 //	@Failure		400		{object}	dto.Response			"Invalid request"
+//	@Failure		500		{object}	dto.Response			"Internal server error applying tuning"
 //	@Failure		503		{object}	dto.Response			"Tuning controller not available"
 //	@Router			/tuning/turbo [post]
 func (s *Server) handleSetTurboBoost(w http.ResponseWriter, r *http.Request) {
@@ -4257,7 +4258,7 @@ func (s *Server) handleSetTurboBoost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.tuningController.SetTurboBoost(req.Enabled); err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
+		respondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -4282,6 +4283,7 @@ func (s *Server) handleSetTurboBoost(w http.ResponseWriter, r *http.Request) {
 //	@Param			request	body		dto.DiskCacheRequest	true	"Disk cache request"
 //	@Success		200		{object}	dto.Response			"Disk cache updated"
 //	@Failure		400		{object}	dto.Response			"Invalid request"
+//	@Failure		500		{object}	dto.Response			"Internal server error applying tuning"
 //	@Failure		503		{object}	dto.Response			"Tuning controller not available"
 //	@Router			/tuning/disk-cache [post]
 func (s *Server) handleSetDiskCache(w http.ResponseWriter, r *http.Request) {
@@ -4296,11 +4298,38 @@ func (s *Server) handleSetDiskCache(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.tuningController.SetDiskCache(
-		req.DirtyBackgroundRatio, req.DirtyRatio,
-		req.DirtyWritebackCenti, req.DirtyExpireCenti,
-	); err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
+	if req.DirtyBackgroundRatio == nil && req.DirtyRatio == nil &&
+		req.DirtyWritebackCenti == nil && req.DirtyExpireCenti == nil {
+		respondWithError(w, http.StatusBadRequest, "at least one field must be provided")
+		return
+	}
+
+	// Read current values for any omitted fields
+	current, err := lib.ReadDiskCacheSettings()
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "failed to read current disk cache settings")
+		return
+	}
+
+	bgRatio := current.DirtyBackgroundRatio
+	if req.DirtyBackgroundRatio != nil {
+		bgRatio = *req.DirtyBackgroundRatio
+	}
+	ratio := current.DirtyRatio
+	if req.DirtyRatio != nil {
+		ratio = *req.DirtyRatio
+	}
+	wbCenti := current.DirtyWritebackCenti
+	if req.DirtyWritebackCenti != nil {
+		wbCenti = *req.DirtyWritebackCenti
+	}
+	expCenti := current.DirtyExpireCenti
+	if req.DirtyExpireCenti != nil {
+		expCenti = *req.DirtyExpireCenti
+	}
+
+	if err := s.tuningController.SetDiskCache(bgRatio, ratio, wbCenti, expCenti); err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -4321,6 +4350,7 @@ func (s *Server) handleSetDiskCache(w http.ResponseWriter, r *http.Request) {
 //	@Param			request	body		dto.InotifyLimitsRequest	true	"Inotify limits request"
 //	@Success		200		{object}	dto.Response				"Inotify limits updated"
 //	@Failure		400		{object}	dto.Response				"Invalid request"
+//	@Failure		500		{object}	dto.Response				"Internal server error applying tuning"
 //	@Failure		503		{object}	dto.Response				"Tuning controller not available"
 //	@Router			/tuning/inotify [post]
 func (s *Server) handleSetInotifyLimits(w http.ResponseWriter, r *http.Request) {
@@ -4338,7 +4368,7 @@ func (s *Server) handleSetInotifyLimits(w http.ResponseWriter, r *http.Request) 
 	if err := s.tuningController.SetInotifyLimits(
 		req.MaxUserWatches, req.MaxUserInstances, req.MaxQueuedEvents,
 	); err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
+		respondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 

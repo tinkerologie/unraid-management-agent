@@ -148,8 +148,8 @@ func TestWriteSysctl(t *testing.T) {
 
 func TestReadDiskCacheSettings(t *testing.T) {
 	setupProcSys(t, map[string]string{
-		"vm/dirty_background_ratio":   "10\n",
-		"vm/dirty_ratio":              "20\n",
+		"vm/dirty_background_ratio":    "10\n",
+		"vm/dirty_ratio":               "20\n",
 		"vm/dirty_writeback_centisecs": "500\n",
 		"vm/dirty_expire_centisecs":    "3000\n",
 	})
@@ -176,8 +176,8 @@ func TestReadDiskCacheSettings(t *testing.T) {
 func TestReadInotifySettings(t *testing.T) {
 	setupProcSys(t, map[string]string{
 		"fs/inotify/max_user_watches":   "524288\n",
-		"fs/inotify/max_user_instances":  "128\n",
-		"fs/inotify/max_queued_events":   "16384\n",
+		"fs/inotify/max_user_instances": "128\n",
+		"fs/inotify/max_queued_events":  "16384\n",
 	})
 
 	ino, err := ReadInotifySettings()
