@@ -123,7 +123,7 @@ func TestCollectorManager_RegisterAllCollectors(t *testing.T) {
 	expectedNames := []string{
 		"system", "array", "disk", "docker", "vm", "ups", "nut",
 		"gpu", "shares", "network", "hardware", "zfs", "notification",
-		"registration", "unassigned", "fancontrol",
+		"registration", "unassigned", "fancontrol", "tuning",
 	}
 
 	if len(names) != len(expectedNames) {

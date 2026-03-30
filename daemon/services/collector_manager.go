@@ -285,6 +285,7 @@ func (cm *CollectorManager) GetAllStatus() dto.CollectorsStatusResponse {
 		"system", "array", "disk", "docker", "vm",
 		"ups", "nut", "gpu", "shares", "network",
 		"hardware", "zfs", "notification", "registration", "unassigned",
+		"fancontrol", "tuning",
 	}
 
 	for _, name := range collectorOrder {
@@ -375,6 +376,8 @@ func (cm *CollectorManager) getDefaultInterval(name string) int {
 		"notification": 30,
 		"registration": 300,
 		"unassigned":   60,
+		"fancontrol":   30,
+		"tuning":       120,
 	}
 
 	if interval, ok := defaults[name]; ok {
@@ -473,4 +476,9 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 	cm.Register("fancontrol", func(ctx *domain.Context) Collector {
 		return collectors.NewFanControlCollector(ctx)
 	}, intervals.FanControl, false)
+
+	// Tuning collector (kernel parameters, NIC offloads, ring buffers)
+	cm.Register("tuning", func(ctx *domain.Context) Collector {
+		return collectors.NewTuningCollector(ctx)
+	}, intervals.Tuning, false)
 }

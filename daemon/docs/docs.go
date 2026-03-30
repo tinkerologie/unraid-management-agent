@@ -882,6 +882,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/dto.DockerAggregateStats"
                         }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
                     }
                 }
             }
@@ -3547,6 +3553,176 @@ const docTemplate = `{
                                 "$ref": "#/definitions/dto.TemperatureReading"
                             }
                         }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/tuning": {
+            "get": {
+                "description": "Retrieve current kernel tuning parameters (turbo boost, disk cache, inotify, NIC offloads, ring buffers)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tuning"
+                ],
+                "summary": "Get system tuning parameters",
+                "responses": {
+                    "200": {
+                        "description": "Tuning parameters",
+                        "schema": {
+                            "$ref": "#/definitions/dto.TuningInfo"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/tuning/disk-cache": {
+            "post": {
+                "description": "Set Linux vm.dirty_* kernel parameters for disk cache tuning",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tuning"
+                ],
+                "summary": "Set disk cache parameters",
+                "parameters": [
+                    {
+                        "description": "Disk cache request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.DiskCacheRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Disk cache updated",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "503": {
+                        "description": "Tuning controller not available",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/tuning/inotify": {
+            "post": {
+                "description": "Set Linux inotify kernel parameters (max watches, instances, events)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tuning"
+                ],
+                "summary": "Set inotify limits",
+                "parameters": [
+                    {
+                        "description": "Inotify limits request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.InotifyLimitsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Inotify limits updated",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "503": {
+                        "description": "Tuning controller not available",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/tuning/turbo": {
+            "post": {
+                "description": "Enable or disable Intel Turbo Boost / AMD Performance Boost",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tuning"
+                ],
+                "summary": "Set turbo boost state",
+                "parameters": [
+                    {
+                        "description": "Turbo boost request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.TurboBoostRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Turbo boost set",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "503": {
+                        "description": "Tuning controller not available",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
                     }
                 }
             }
@@ -5233,6 +5409,48 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.DiskCacheInfo": {
+            "type": "object",
+            "properties": {
+                "dirty_background_ratio": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "dirty_expire_centisecs": {
+                    "type": "integer",
+                    "example": 1000
+                },
+                "dirty_ratio": {
+                    "type": "integer",
+                    "example": 20
+                },
+                "dirty_writeback_centisecs": {
+                    "type": "integer",
+                    "example": 200
+                }
+            }
+        },
+        "dto.DiskCacheRequest": {
+            "type": "object",
+            "properties": {
+                "dirty_background_ratio": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "dirty_expire_centisecs": {
+                    "type": "integer",
+                    "example": 3000
+                },
+                "dirty_ratio": {
+                    "type": "integer",
+                    "example": 20
+                },
+                "dirty_writeback_centisecs": {
+                    "type": "integer",
+                    "example": 500
+                }
+            }
+        },
         "dto.DiskInfo": {
             "type": "object",
             "properties": {
@@ -6132,6 +6350,45 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.InotifyInfo": {
+            "type": "object",
+            "properties": {
+                "max_queued_events": {
+                    "type": "integer",
+                    "example": 16384
+                },
+                "max_user_instances": {
+                    "type": "integer",
+                    "example": 128
+                },
+                "max_user_watches": {
+                    "type": "integer",
+                    "example": 524288
+                }
+            }
+        },
+        "dto.InotifyLimitsRequest": {
+            "type": "object",
+            "required": [
+                "max_queued_events",
+                "max_user_instances",
+                "max_user_watches"
+            ],
+            "properties": {
+                "max_queued_events": {
+                    "type": "integer",
+                    "example": 16384
+                },
+                "max_user_instances": {
+                    "type": "integer",
+                    "example": 512
+                },
+                "max_user_watches": {
+                    "type": "integer",
+                    "example": 524288
+                }
+            }
+        },
         "dto.LogFileContent": {
             "type": "object",
             "properties": {
@@ -6365,6 +6622,68 @@ const docTemplate = `{
                 },
                 "timestamp": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.NICOffloadInfo": {
+            "type": "object",
+            "properties": {
+                "generic_receive_offload": {
+                    "type": "string",
+                    "example": "on"
+                },
+                "generic_segmentation_offload": {
+                    "type": "string",
+                    "example": "on"
+                },
+                "large_receive_offload": {
+                    "type": "string",
+                    "example": "off"
+                },
+                "rx_checksumming": {
+                    "type": "string",
+                    "example": "on"
+                },
+                "rx_vlan_offload": {
+                    "type": "string",
+                    "example": "on"
+                },
+                "scatter_gather": {
+                    "type": "string",
+                    "example": "on"
+                },
+                "tcp_segmentation_offload": {
+                    "type": "string",
+                    "example": "on"
+                },
+                "tx_checksumming": {
+                    "type": "string",
+                    "example": "on"
+                },
+                "tx_vlan_offload": {
+                    "type": "string",
+                    "example": "on"
+                }
+            }
+        },
+        "dto.NICRingBufferInfo": {
+            "type": "object",
+            "properties": {
+                "rx_current": {
+                    "type": "integer",
+                    "example": 256
+                },
+                "rx_max": {
+                    "type": "integer",
+                    "example": 4096
+                },
+                "tx_current": {
+                    "type": "integer",
+                    "example": 256
+                },
+                "tx_max": {
+                    "type": "integer",
+                    "example": 4096
                 }
             }
         },
@@ -7877,6 +8196,78 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.TuningInfo": {
+            "type": "object",
+            "properties": {
+                "disk_cache": {
+                    "description": "Disk Cache (vm.dirty_* parameters)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.DiskCacheInfo"
+                        }
+                    ]
+                },
+                "inotify": {
+                    "description": "Inotify limits",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.InotifyInfo"
+                        }
+                    ]
+                },
+                "nic_offloads": {
+                    "description": "NIC Offload settings per interface",
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/dto.NICOffloadInfo"
+                    }
+                },
+                "nic_ring_buffers": {
+                    "description": "NIC Ring Buffers per interface",
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/dto.NICRingBufferInfo"
+                    }
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "turbo_boost": {
+                    "description": "CPU Power Management",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.TurboBoostInfo"
+                        }
+                    ]
+                }
+            }
+        },
+        "dto.TurboBoostInfo": {
+            "type": "object",
+            "properties": {
+                "available": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "enabled": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "vendor": {
+                    "type": "string",
+                    "example": "intel"
+                }
+            }
+        },
+        "dto.TurboBoostRequest": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
         "dto.UPSStatus": {
             "type": "object",
             "properties": {
@@ -8846,6 +9237,10 @@ const docTemplate = `{
         {
             "description": "Unraid OS and plugin update availability",
             "name": "Updates"
+        },
+        {
+            "description": "System tuning endpoints (turbo boost, disk cache, inotify, NIC offloads, ring buffers)",
+            "name": "Tuning"
         }
     ]
 }`

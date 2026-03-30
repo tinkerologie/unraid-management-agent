@@ -96,6 +96,9 @@ func cacheBindings() []eventBinding {
 		bind(constants.TopicFanControlUpdate, func(c *CacheStore, v *dto.FanControlStatus) {
 			c.fanControlCache.Store(v)
 		}),
+		bind(constants.TopicTuningUpdate, func(c *CacheStore, v *dto.TuningInfo) {
+			c.tuningCache.Store(v)
+		}),
 	}
 }
 

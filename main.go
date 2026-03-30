@@ -40,6 +40,7 @@ var validCollectorNames = map[string]bool{
 	"registration": true,
 	"unassigned":   true,
 	"fancontrol":   true,
+	"tuning":       true,
 }
 
 var cli struct {
@@ -91,6 +92,7 @@ var cli struct {
 	IntervalRegistration int `default:"600" env:"INTERVAL_REGISTRATION" help:"registration interval (seconds, 0=disabled, max 86400)"`
 	IntervalUnassigned   int `default:"60" env:"INTERVAL_UNASSIGNED" help:"unassigned devices interval (seconds, 0=disabled, max 86400)"`
 	IntervalFanControl   int `default:"5" env:"INTERVAL_FAN_CONTROL" help:"fan control interval (seconds, 0=disabled, max 86400)"`
+	IntervalTuning       int `default:"120" env:"INTERVAL_TUNING" help:"tuning parameters interval (seconds, 0=disabled, max 86400)"`
 
 	Boot     cmd.Boot     `cmd:"" default:"1" help:"start the management agent"`
 	MCPStdio cmd.MCPStdio `cmd:"mcp-stdio" help:"run MCP server over stdin/stdout for local AI clients"`
@@ -256,6 +258,7 @@ func main() {
 			Registration: getInterval("registration", cli.IntervalRegistration),
 			Unassigned:   getInterval("unassigned", cli.IntervalUnassigned),
 			FanControl:   getInterval("fancontrol", cli.IntervalFanControl),
+			Tuning:       getInterval("tuning", cli.IntervalTuning),
 		},
 	}
 
@@ -335,5 +338,6 @@ func applyFileConfig(cfg *domain.FileConfig) {
 		setInt(&cli.IntervalRegistration, iv.Registration)
 		setInt(&cli.IntervalUnassigned, iv.Unassigned)
 		setInt(&cli.IntervalFanControl, iv.FanControl)
+		setInt(&cli.IntervalTuning, iv.Tuning)
 	}
 }

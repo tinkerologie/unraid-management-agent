@@ -278,3 +278,26 @@ type MCPSetCPUGovernorArgs struct {
 	Governor string `json:"governor" jsonschema:"The CPU scaling governor to set (e.g. performance, powersave, ondemand, conservative, schedutil)"`
 	Confirm  bool   `json:"confirm" jsonschema:"Must be set to true to confirm the governor change"`
 }
+
+// MCPSetTurboBoostArgs represents arguments for enabling/disabling turbo boost.
+type MCPSetTurboBoostArgs struct {
+	Enabled bool `json:"enabled" jsonschema:"Set to true to enable turbo boost, false to disable"`
+	Confirm bool `json:"confirm" jsonschema:"Must be set to true to confirm the turbo boost change"`
+}
+
+// MCPSetDiskCacheArgs represents arguments for setting disk cache parameters.
+type MCPSetDiskCacheArgs struct {
+	DirtyBackgroundRatio int  `json:"dirty_background_ratio" jsonschema:"Background dirty page writeback threshold (0-100 percent of RAM)"`
+	DirtyRatio           int  `json:"dirty_ratio" jsonschema:"Maximum dirty page ratio before forced writeback (0-100 percent of RAM)"`
+	DirtyWritebackCenti  int  `json:"dirty_writeback_centisecs" jsonschema:"Interval between writeback daemon wakeups in centiseconds (e.g. 500 = 5 seconds)"`
+	DirtyExpireCenti     int  `json:"dirty_expire_centisecs" jsonschema:"Age at which dirty pages are eligible for writeback in centiseconds (e.g. 3000 = 30 seconds)"`
+	Confirm              bool `json:"confirm" jsonschema:"Must be set to true to confirm the disk cache change"`
+}
+
+// MCPSetInotifyLimitsArgs represents arguments for setting inotify kernel limits.
+type MCPSetInotifyLimitsArgs struct {
+	MaxUserWatches   int  `json:"max_user_watches" jsonschema:"Maximum number of inotify watches per user (e.g. 524288)"`
+	MaxUserInstances int  `json:"max_user_instances" jsonschema:"Maximum number of inotify instances per user (e.g. 512)"`
+	MaxQueuedEvents  int  `json:"max_queued_events" jsonschema:"Maximum number of queued inotify events (e.g. 16384)"`
+	Confirm          bool `json:"confirm" jsonschema:"Must be set to true to confirm the inotify limits change"`
+}

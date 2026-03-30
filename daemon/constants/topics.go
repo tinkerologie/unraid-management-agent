@@ -49,4 +49,6 @@ var (
 	TopicCollectorStateChange = domain.NewTopic[dto.CollectorStateEvent]("collector_state_change")
 	// TopicFanControlUpdate is published by the fan control collector with *dto.FanControlStatus.
 	TopicFanControlUpdate = domain.NewTopic[*dto.FanControlStatus]("fan_control_update")
+	// TopicTuningUpdate is published by the tuning collector with *dto.TuningInfo.
+	TopicTuningUpdate = domain.NewTopic[*dto.TuningInfo]("tuning_update")
 )

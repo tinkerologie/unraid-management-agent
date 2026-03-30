@@ -61,6 +61,7 @@ func (m *MockCacheProvider) GetUnassignedCache() *dto.UnassignedDeviceList  { re
 func (m *MockCacheProvider) GetNUTCache() *dto.NUTResponse                  { return m.nutResponse }
 func (m *MockCacheProvider) GetParityHistoryCache() *dto.ParityCheckHistory { return m.parityHistory }
 func (m *MockCacheProvider) GetFanControlCache() *dto.FanControlStatus      { return nil }
+func (m *MockCacheProvider) GetTuningCache() *dto.TuningInfo                { return nil }
 
 // Log methods
 func (m *MockCacheProvider) ListLogFiles() []dto.LogFile { return m.logFiles }

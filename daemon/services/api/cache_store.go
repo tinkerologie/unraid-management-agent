@@ -40,6 +40,7 @@ type CacheStore struct {
 	nutCache             atomic.Pointer[dto.NUTResponse]
 	networkServicesCache atomic.Pointer[dto.NetworkServicesStatus]
 	fanControlCache      atomic.Pointer[dto.FanControlStatus]
+	tuningCache          atomic.Pointer[dto.TuningInfo]
 }
 
 // ---------- Pointer-type getters (direct Load) ----------
@@ -92,6 +93,11 @@ func (c *CacheStore) GetNUTCache() *dto.NUTResponse {
 // GetFanControlCache returns cached fan control status.
 func (c *CacheStore) GetFanControlCache() *dto.FanControlStatus {
 	return c.fanControlCache.Load()
+}
+
+// GetTuningCache returns cached system tuning information.
+func (c *CacheStore) GetTuningCache() *dto.TuningInfo {
+	return c.tuningCache.Load()
 }
 
 // ---------- Slice-type getters (dereference atomic pointer) ----------

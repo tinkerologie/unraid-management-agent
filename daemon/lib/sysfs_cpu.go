@@ -87,3 +87,64 @@ func WriteCPUGovernor(governor string) error {
 	}
 	return nil
 }
+
+// Turbo boost sysfs paths for Intel and AMD processors.
+var (
+	intelTurboPath = filepath.Join(cpufreqBasePath, "intel_pstate", "no_turbo")
+	amdBoostPath   = filepath.Join(cpufreqBasePath, "cpufreq", "boost")
+)
+
+// TurboBoostStatus represents the current turbo/boost state.
+type TurboBoostStatus struct {
+	Available bool   // Whether turbo/boost control is available
+	Enabled   bool   // Whether turbo/boost is currently enabled
+	Vendor    string // "intel", "amd", or ""
+}
+
+// ReadTurboBoost reads the current Intel Turbo Boost or AMD Performance Boost state.
+func ReadTurboBoost() TurboBoostStatus {
+	// Try Intel pstate first: no_turbo = 0 means turbo ON, 1 means turbo OFF
+	val := ReadSysfsString(intelTurboPath)
+	if val != "" {
+		return TurboBoostStatus{
+			Available: true,
+			Enabled:   val == "0",
+			Vendor:    "intel",
+		}
+	}
+
+	// Try AMD boost: boost = 1 means boost ON, 0 means boost OFF
+	val = ReadSysfsString(amdBoostPath)
+	if val != "" {
+		return TurboBoostStatus{
+			Available: true,
+			Enabled:   val == "1",
+			Vendor:    "amd",
+		}
+	}
+
+	return TurboBoostStatus{}
+}
+
+// WriteTurboBoost enables or disables Intel Turbo Boost / AMD Performance Boost.
+func WriteTurboBoost(enabled bool) error {
+	// Try Intel pstate: write "0" to enable turbo (no_turbo=0), "1" to disable
+	if ReadSysfsString(intelTurboPath) != "" {
+		val := "0"
+		if !enabled {
+			val = "1"
+		}
+		return WriteSysfs(intelTurboPath, val)
+	}
+
+	// Try AMD boost: write "1" to enable, "0" to disable
+	if ReadSysfsString(amdBoostPath) != "" {
+		val := "1"
+		if !enabled {
+			val = "0"
+		}
+		return WriteSysfs(amdBoostPath, val)
+	}
+
+	return fmt.Errorf("turbo/boost control not available on this system")
+}

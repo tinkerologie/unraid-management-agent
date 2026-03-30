@@ -545,6 +545,36 @@ definitions:
         example: 2
         type: integer
     type: object
+  dto.DiskCacheInfo:
+    properties:
+      dirty_background_ratio:
+        example: 10
+        type: integer
+      dirty_expire_centisecs:
+        example: 1000
+        type: integer
+      dirty_ratio:
+        example: 20
+        type: integer
+      dirty_writeback_centisecs:
+        example: 200
+        type: integer
+    type: object
+  dto.DiskCacheRequest:
+    properties:
+      dirty_background_ratio:
+        example: 10
+        type: integer
+      dirty_expire_centisecs:
+        example: 3000
+        type: integer
+      dirty_ratio:
+        example: 20
+        type: integer
+      dirty_writeback_centisecs:
+        example: 500
+        type: integer
+    type: object
   dto.DiskInfo:
     properties:
       device:
@@ -1201,6 +1231,34 @@ definitions:
           $ref: '#/definitions/dto.HealthCheckStatus'
         type: array
     type: object
+  dto.InotifyInfo:
+    properties:
+      max_queued_events:
+        example: 16384
+        type: integer
+      max_user_instances:
+        example: 128
+        type: integer
+      max_user_watches:
+        example: 524288
+        type: integer
+    type: object
+  dto.InotifyLimitsRequest:
+    properties:
+      max_queued_events:
+        example: 16384
+        type: integer
+      max_user_instances:
+        example: 512
+        type: integer
+      max_user_watches:
+        example: 524288
+        type: integer
+    required:
+    - max_queued_events
+    - max_user_instances
+    - max_user_watches
+    type: object
   dto.LogFileContent:
     properties:
       content:
@@ -1364,6 +1422,51 @@ definitions:
         type: string
       timestamp:
         type: string
+    type: object
+  dto.NICOffloadInfo:
+    properties:
+      generic_receive_offload:
+        example: "on"
+        type: string
+      generic_segmentation_offload:
+        example: "on"
+        type: string
+      large_receive_offload:
+        example: "off"
+        type: string
+      rx_checksumming:
+        example: "on"
+        type: string
+      rx_vlan_offload:
+        example: "on"
+        type: string
+      scatter_gather:
+        example: "on"
+        type: string
+      tcp_segmentation_offload:
+        example: "on"
+        type: string
+      tx_checksumming:
+        example: "on"
+        type: string
+      tx_vlan_offload:
+        example: "on"
+        type: string
+    type: object
+  dto.NICRingBufferInfo:
+    properties:
+      rx_current:
+        example: 256
+        type: integer
+      rx_max:
+        example: 4096
+        type: integer
+      tx_current:
+        example: 256
+        type: integer
+      tx_max:
+        example: 4096
+        type: integer
     type: object
   dto.NUTConfig:
     properties:
@@ -2435,6 +2538,51 @@ definitions:
       value_celsius:
         example: 45
         type: number
+    type: object
+  dto.TuningInfo:
+    properties:
+      disk_cache:
+        allOf:
+        - $ref: '#/definitions/dto.DiskCacheInfo'
+        description: Disk Cache (vm.dirty_* parameters)
+      inotify:
+        allOf:
+        - $ref: '#/definitions/dto.InotifyInfo'
+        description: Inotify limits
+      nic_offloads:
+        additionalProperties:
+          $ref: '#/definitions/dto.NICOffloadInfo'
+        description: NIC Offload settings per interface
+        type: object
+      nic_ring_buffers:
+        additionalProperties:
+          $ref: '#/definitions/dto.NICRingBufferInfo'
+        description: NIC Ring Buffers per interface
+        type: object
+      timestamp:
+        type: string
+      turbo_boost:
+        allOf:
+        - $ref: '#/definitions/dto.TurboBoostInfo'
+        description: CPU Power Management
+    type: object
+  dto.TurboBoostInfo:
+    properties:
+      available:
+        example: true
+        type: boolean
+      enabled:
+        example: true
+        type: boolean
+      vendor:
+        example: intel
+        type: string
+    type: object
+  dto.TurboBoostRequest:
+    properties:
+      enabled:
+        example: true
+        type: boolean
     type: object
   dto.UPSStatus:
     properties:
@@ -3945,6 +4093,10 @@ paths:
           description: Aggregate stats
           schema:
             $ref: '#/definitions/dto.DockerAggregateStats'
+        "500":
+          description: Internal error
+          schema:
+            $ref: '#/definitions/dto.Response'
       summary: Get Docker aggregate stats
       tags:
       - Docker
@@ -5428,9 +5580,121 @@ paths:
             items:
               $ref: '#/definitions/dto.TemperatureReading'
             type: array
+        "500":
+          description: Internal error
+          schema:
+            $ref: '#/definitions/dto.Response'
       summary: Get all temperature sensors
       tags:
       - System
+  /tuning:
+    get:
+      description: Retrieve current kernel tuning parameters (turbo boost, disk cache,
+        inotify, NIC offloads, ring buffers)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Tuning parameters
+          schema:
+            $ref: '#/definitions/dto.TuningInfo'
+        "500":
+          description: Internal error
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get system tuning parameters
+      tags:
+      - Tuning
+  /tuning/disk-cache:
+    post:
+      consumes:
+      - application/json
+      description: Set Linux vm.dirty_* kernel parameters for disk cache tuning
+      parameters:
+      - description: Disk cache request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.DiskCacheRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Disk cache updated
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Tuning controller not available
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Set disk cache parameters
+      tags:
+      - Tuning
+  /tuning/inotify:
+    post:
+      consumes:
+      - application/json
+      description: Set Linux inotify kernel parameters (max watches, instances, events)
+      parameters:
+      - description: Inotify limits request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.InotifyLimitsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Inotify limits updated
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Tuning controller not available
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Set inotify limits
+      tags:
+      - Tuning
+  /tuning/turbo:
+    post:
+      consumes:
+      - application/json
+      description: Enable or disable Intel Turbo Boost / AMD Performance Boost
+      parameters:
+      - description: Turbo boost request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.TurboBoostRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Turbo boost set
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Tuning controller not available
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Set turbo boost state
+      tags:
+      - Tuning
   /unassigned:
     get:
       description: Retrieve all unassigned devices and remote shares
@@ -6100,3 +6364,6 @@ tags:
   name: Plugins
 - description: Unraid OS and plugin update availability
   name: Updates
+- description: System tuning endpoints (turbo boost, disk cache, inotify, NIC offloads,
+    ring buffers)
+  name: Tuning

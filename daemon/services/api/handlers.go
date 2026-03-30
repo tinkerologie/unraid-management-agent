@@ -4167,6 +4167,7 @@ func (s *Server) handleSetCPUGovernor(w http.ResponseWriter, r *http.Request) {
 //	@Tags			Docker
 //	@Produce		json
 //	@Success		200	{object}	dto.DockerAggregateStats	"Aggregate stats"
+//	@Failure		500	{object}	dto.Response				"Internal error"
 //	@Router			/docker/stats [get]
 func (s *Server) handleDockerStats(w http.ResponseWriter, _ *http.Request) {
 	containers := s.GetDockerCache()
@@ -4179,7 +4180,7 @@ func (s *Server) handleDockerStats(w http.ResponseWriter, _ *http.Request) {
 	for i := range containers {
 		c := &containers[i]
 		stats.TotalContainers++
-		if c.Status == "running" {
+		if c.State == "running" {
 			stats.RunningContainers++
 			stats.TotalCPUPercent += c.CPUPercent
 			stats.TotalMemoryUsage += c.MemoryUsage
@@ -4202,6 +4203,7 @@ func (s *Server) handleDockerStats(w http.ResponseWriter, _ *http.Request) {
 //	@Tags			System
 //	@Produce		json
 //	@Success		200	{array}		dto.TemperatureReading	"Temperature readings"
+//	@Failure		500	{object}	dto.Response			"Internal error"
 //	@Router			/temperatures [get]
 func (s *Server) handleTemperatures(w http.ResponseWriter, _ *http.Request) {
 	sys := s.GetSystemCache()
@@ -4210,4 +4212,139 @@ func (s *Server) handleTemperatures(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	respondJSON(w, http.StatusOK, sys.Temperatures)
+}
+
+// handleTuning godoc
+//
+//	@Summary		Get system tuning parameters
+//	@Description	Retrieve current kernel tuning parameters (turbo boost, disk cache, inotify, NIC offloads, ring buffers)
+//	@Tags			Tuning
+//	@Produce		json
+//	@Success		200	{object}	dto.TuningInfo	"Tuning parameters"
+//	@Failure		500	{object}	dto.Response	"Internal error"
+//	@Router			/tuning [get]
+func (s *Server) handleTuning(w http.ResponseWriter, _ *http.Request) {
+	cache := s.GetTuningCache()
+	if cache == nil {
+		respondJSON(w, http.StatusOK, &dto.TuningInfo{Timestamp: time.Now()})
+		return
+	}
+	respondJSON(w, http.StatusOK, cache)
+}
+
+// handleSetTurboBoost godoc
+//
+//	@Summary		Set turbo boost state
+//	@Description	Enable or disable Intel Turbo Boost / AMD Performance Boost
+//	@Tags			Tuning
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		dto.TurboBoostRequest	true	"Turbo boost request"
+//	@Success		200		{object}	dto.Response			"Turbo boost set"
+//	@Failure		400		{object}	dto.Response			"Invalid request"
+//	@Failure		503		{object}	dto.Response			"Tuning controller not available"
+//	@Router			/tuning/turbo [post]
+func (s *Server) handleSetTurboBoost(w http.ResponseWriter, r *http.Request) {
+	if s.tuningController == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Tuning controller not initialized")
+		return
+	}
+
+	var req dto.TurboBoostRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := s.tuningController.SetTurboBoost(req.Enabled); err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	state := "enabled"
+	if !req.Enabled {
+		state = "disabled"
+	}
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   fmt.Sprintf("Turbo boost %s", state),
+		Timestamp: time.Now(),
+	})
+}
+
+// handleSetDiskCache godoc
+//
+//	@Summary		Set disk cache parameters
+//	@Description	Set Linux vm.dirty_* kernel parameters for disk cache tuning
+//	@Tags			Tuning
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		dto.DiskCacheRequest	true	"Disk cache request"
+//	@Success		200		{object}	dto.Response			"Disk cache updated"
+//	@Failure		400		{object}	dto.Response			"Invalid request"
+//	@Failure		503		{object}	dto.Response			"Tuning controller not available"
+//	@Router			/tuning/disk-cache [post]
+func (s *Server) handleSetDiskCache(w http.ResponseWriter, r *http.Request) {
+	if s.tuningController == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Tuning controller not initialized")
+		return
+	}
+
+	var req dto.DiskCacheRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := s.tuningController.SetDiskCache(
+		req.DirtyBackgroundRatio, req.DirtyRatio,
+		req.DirtyWritebackCenti, req.DirtyExpireCenti,
+	); err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   "Disk cache parameters updated",
+		Timestamp: time.Now(),
+	})
+}
+
+// handleSetInotifyLimits godoc
+//
+//	@Summary		Set inotify limits
+//	@Description	Set Linux inotify kernel parameters (max watches, instances, events)
+//	@Tags			Tuning
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		dto.InotifyLimitsRequest	true	"Inotify limits request"
+//	@Success		200		{object}	dto.Response				"Inotify limits updated"
+//	@Failure		400		{object}	dto.Response				"Invalid request"
+//	@Failure		503		{object}	dto.Response				"Tuning controller not available"
+//	@Router			/tuning/inotify [post]
+func (s *Server) handleSetInotifyLimits(w http.ResponseWriter, r *http.Request) {
+	if s.tuningController == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Tuning controller not initialized")
+		return
+	}
+
+	var req dto.InotifyLimitsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := s.tuningController.SetInotifyLimits(
+		req.MaxUserWatches, req.MaxUserInstances, req.MaxQueuedEvents,
+	); err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   "Inotify limits updated",
+		Timestamp: time.Now(),
+	})
 }

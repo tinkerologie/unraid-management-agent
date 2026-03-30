@@ -60,3 +60,5 @@ package docs
 //	@tag.description			Installed plugin list and versions
 //	@tag.name					Updates
 //	@tag.description			Unraid OS and plugin update availability
+//	@tag.name					Tuning
+//	@tag.description			System tuning endpoints (turbo boost, disk cache, inotify, NIC offloads, ring buffers)

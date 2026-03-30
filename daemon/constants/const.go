@@ -132,6 +132,9 @@ const (
 	// IntervalFanControl is the collection interval for fan control status in seconds.
 	// Shorter interval for responsive fan monitoring (5s matches typical fan curve evaluation).
 	IntervalFanControl = 5
+	// IntervalTuning is the collection interval for system tuning parameters in seconds.
+	// Kernel parameters rarely change; 120s is sufficient.
+	IntervalTuning = 120
 
 	// WSPingInterval is the WebSocket ping interval in seconds.
 	WSPingInterval = 30

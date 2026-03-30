@@ -56,6 +56,7 @@ type Server struct {
 	watchdogStore    *watchdog.Store
 	fanController    *controllers.FanController
 	cpuController    *controllers.CPUController
+	tuningController *controllers.TuningController
 
 	// Embedded cache store for lock-free atomic access to collector data
 	*CacheStore
@@ -286,6 +287,12 @@ func (s *Server) setupRoutes() {
 
 	// CPU power management endpoints
 	api.HandleFunc("/cpu/governor", s.handleSetCPUGovernor).Methods("POST")
+
+	// System tuning endpoints
+	api.HandleFunc("/tuning", s.handleTuning).Methods("GET")
+	api.HandleFunc("/tuning/turbo", s.handleSetTurboBoost).Methods("POST")
+	api.HandleFunc("/tuning/disk-cache", s.handleSetDiskCache).Methods("POST")
+	api.HandleFunc("/tuning/inotify", s.handleSetInotifyLimits).Methods("POST")
 
 	// Docker aggregate stats
 	api.HandleFunc("/docker/stats", s.handleDockerStats).Methods("GET")
@@ -647,4 +654,9 @@ func (s *Server) SetFanController(fc *controllers.FanController) {
 // SetCPUController injects the CPU controller after initialization.
 func (s *Server) SetCPUController(cc *controllers.CPUController) {
 	s.cpuController = cc
+}
+
+// SetTuningController injects the tuning controller after initialization.
+func (s *Server) SetTuningController(tc *controllers.TuningController) {
+	s.tuningController = tc
 }

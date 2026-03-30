@@ -64,6 +64,7 @@ func (e *Engine) Start(ctx context.Context) {
 	defer func() {
 		if r := recover(); r != nil {
 			logger.LogPanicWithStack("Alerting engine (top-level)", r)
+			panic(r)
 		}
 	}()
 

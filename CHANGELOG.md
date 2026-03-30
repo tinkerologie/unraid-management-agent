@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026.03.06] - 2026-03-30
 
+### Added
+
+- **System Tuning (Tips & Tweaks)** — new collector, controller, REST endpoints, and MCP tools:
+  - **Turbo Boost**: read/write Intel Turbo Boost and AMD Performance Boost via sysfs
+  - **Disk Cache**: read/write `vm.dirty_*` kernel parameters (background ratio, ratio, writeback, expire)
+  - **Inotify Limits**: read/write `fs.inotify.*` kernel parameters (max watches, instances, queued events)
+  - **NIC Offloads**: read hardware offload feature states via `ethtool -k` (rx/tx checksumming, scatter-gather, TSO, GSO, GRO, LRO, VLAN)
+  - **NIC Ring Buffers**: read ring buffer sizes via `ethtool -g` (RX/TX max and current)
+  - REST API: `GET /api/v1/tuning`, `POST /api/v1/tuning/turbo`, `POST /api/v1/tuning/disk-cache`, `POST /api/v1/tuning/inotify`
+  - MCP tools: `get_tuning_status`, `set_turbo_boost`, `set_disk_cache`, `set_inotify_limits`
+  - Tuning controller restores original values on agent shutdown
+  - Configurable collection interval (default 120s, env `INTERVAL_TUNING`)
+
 ### Fixed
 
 - **Agent keeps entering stopped state due to unrecovered panics** ([#99](https://github.com/ruaan-deysel/unraid-management-agent/issues/99)):

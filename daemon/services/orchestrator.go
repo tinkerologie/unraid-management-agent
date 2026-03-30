@@ -30,6 +30,7 @@ type Orchestrator struct {
 	mqttClient       *mqtt.Client
 	fanController    *controllers.FanController
 	cpuController    *controllers.CPUController
+	tuningController *controllers.TuningController
 }
 
 // CreateOrchestrator creates a new orchestrator with the given context.
@@ -143,6 +144,17 @@ func (o *Orchestrator) Run() error {
 		logger.Success("CPU controller initialized")
 	}
 
+	// Initialize tuning controller (for turbo boost, disk cache, inotify)
+	tuningCtrl := controllers.NewTuningController()
+	if err := tuningCtrl.Initialize(); err != nil {
+		logger.Warning("Tuning controller initialization failed: %v", err)
+	} else {
+		o.tuningController = tuningCtrl
+		apiServer.SetTuningController(tuningCtrl)
+		mcpServer.SetTuningController(tuningCtrl)
+		logger.Success("Tuning controller initialized")
+	}
+
 	// Start all enabled collectors
 	enabledCount := o.collectorManager.StartAll()
 
@@ -194,19 +206,26 @@ func (o *Orchestrator) Run() error {
 		logger.Info("CPU controller shut down")
 	}
 
-	// 3. Stop MQTT client if running
+	// 3. Stop tuning controller (restores original parameters)
+	if o.tuningController != nil {
+		o.tuningController.Shutdown()
+		o.tuningController = nil
+		logger.Info("Tuning controller shut down")
+	}
+
+	// 4. Stop MQTT client if running
 	if o.mqttClient != nil {
 		o.mqttClient.Disconnect()
 		logger.Info("MQTT client disconnected")
 	}
 
-	// 4. Stop all collectors via manager
+	// 5. Stop all collectors via manager
 	o.collectorManager.StopAll()
 
-	// 5. Stop API server (which also cancels its internal goroutines)
+	// 6. Stop API server (which also cancels its internal goroutines)
 	apiServer.Stop()
 
-	// 6. Wait for all goroutines to complete
+	// 7. Wait for all goroutines to complete
 	logger.Info("Waiting for all goroutines to complete...")
 	wg.Wait()
 
@@ -303,6 +322,17 @@ func (o *Orchestrator) RunMCPStdio() error {
 		apiServer.SetCPUController(cpuCtrl)
 		mcpServer.SetCPUController(cpuCtrl)
 		logger.Success("CPU controller initialized (STDIO mode)")
+	}
+
+	// Initialize tuning controller for STDIO mode
+	tuningCtrl := controllers.NewTuningController()
+	if err := tuningCtrl.Initialize(); err != nil {
+		logger.Warning("Tuning controller initialization failed (STDIO mode): %v", err)
+	} else {
+		o.tuningController = tuningCtrl
+		apiServer.SetTuningController(tuningCtrl)
+		mcpServer.SetTuningController(tuningCtrl)
+		logger.Success("Tuning controller initialized (STDIO mode)")
 	}
 
 	// Cancel context on shutdown signals (SIGTERM, SIGINT)

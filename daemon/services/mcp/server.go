@@ -47,6 +47,7 @@ type CacheProvider interface {
 	GetNUTCache() *dto.NUTResponse
 	GetParityHistoryCache() *dto.ParityCheckHistory
 	GetFanControlCache() *dto.FanControlStatus
+	GetTuningCache() *dto.TuningInfo
 	// Logs
 	ListLogFiles() []dto.LogFile
 	GetLogContent(path, lines, start string) (*dto.LogFileContent, error)
@@ -72,16 +73,17 @@ func ptr[T any](v T) *T { return &v }
 
 // Server represents the MCP server that exposes Unraid capabilities to AI agents.
 type Server struct {
-	ctx            *domain.Context
-	mcpServer      *mcp.Server
-	httpHandler    *mcp.StreamableHTTPHandler
-	cacheProvider  CacheProvider
-	alertEngine    *alerting.Engine
-	alertStore     *alerting.Store
-	watchdogRunner *watchdog.Runner
-	watchdogStore  *watchdog.Store
-	fanController  *controllers.FanController
-	cpuController  *controllers.CPUController
+	ctx              *domain.Context
+	mcpServer        *mcp.Server
+	httpHandler      *mcp.StreamableHTTPHandler
+	cacheProvider    CacheProvider
+	alertEngine      *alerting.Engine
+	alertStore       *alerting.Store
+	watchdogRunner   *watchdog.Runner
+	watchdogStore    *watchdog.Store
+	fanController    *controllers.FanController
+	cpuController    *controllers.CPUController
+	tuningController *controllers.TuningController
 }
 
 // NewServer creates a new MCP server instance.
@@ -116,6 +118,7 @@ func (s *Server) Initialize() error {
 	s.registerWatchdogTools()
 	s.registerFanControlTools()
 	s.registerCPUControlTools()
+	s.registerTuningTools()
 
 	// Create the Streamable HTTP handler (implements MCP 2025-06-18 transport)
 	s.httpHandler = mcp.NewStreamableHTTPHandler(
@@ -147,6 +150,11 @@ func (s *Server) SetFanController(fc *controllers.FanController) {
 // SetCPUController sets the CPU controller for MCP CPU control tools.
 func (s *Server) SetCPUController(cc *controllers.CPUController) {
 	s.cpuController = cc
+}
+
+// SetTuningController sets the tuning controller for MCP tuning tools.
+func (s *Server) SetTuningController(tc *controllers.TuningController) {
+	s.tuningController = tc
 }
 
 // GetHTTPHandler returns the Streamable HTTP handler for the MCP endpoint.
@@ -2499,7 +2507,7 @@ func (s *Server) registerCPUControlTools() {
 		for i := range containers {
 			c := &containers[i]
 			stats.TotalContainers++
-			if c.Status == "running" {
+			if c.State == "running" {
 				stats.RunningContainers++
 				stats.TotalCPUPercent += c.CPUPercent
 				stats.TotalMemoryUsage += c.MemoryUsage
@@ -2531,4 +2539,101 @@ func (s *Server) registerCPUControlTools() {
 	})
 
 	logger.Debug("MCP CPU control tools registered (3 tools)")
+}
+
+// registerTuningTools registers MCP tools for system tuning (turbo boost, disk cache, inotify).
+func (s *Server) registerTuningTools() {
+	// Get system tuning status (monitoring)
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "get_tuning_status",
+		Description: "Get system tuning parameters including turbo boost state, disk cache (vm.dirty_*), inotify limits, NIC offloads, and ring buffers. Equivalent to Unraid Tips & Tweaks overview.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		tuning := s.cacheProvider.GetTuningCache()
+		if tuning == nil {
+			return textResult("Tuning information not available yet"), nil, nil
+		}
+		return jsonResult(tuning)
+	})
+
+	// Set turbo boost (control)
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "set_turbo_boost",
+		Description: "Enable or disable Intel Turbo Boost / AMD Performance Boost. Affects CPU maximum frequency.",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(true),
+			IdempotentHint:  true,
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPSetTurboBoostArgs) (*mcp.CallToolResult, any, error) {
+		if s.tuningController == nil {
+			return textResult("Tuning controller not initialized — turbo boost control may not be available"), nil, nil
+		}
+		if !args.Confirm {
+			return textResult("Please set confirm=true to apply turbo boost changes"), nil, nil
+		}
+		logger.Info("MCP: Set turbo boost requested: enabled=%v", args.Enabled)
+		if err := s.tuningController.SetTurboBoost(args.Enabled); err != nil {
+			return textResult(fmt.Sprintf("Failed to set turbo boost: %v", err)), nil, nil
+		}
+		state := "enabled"
+		if !args.Enabled {
+			state = "disabled"
+		}
+		return textResult(fmt.Sprintf("Turbo boost %s", state)), nil, nil
+	})
+
+	// Set disk cache parameters (control)
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "set_disk_cache",
+		Description: "Set Linux disk cache parameters (vm.dirty_*). Controls how aggressively dirty pages are written to disk. Higher ratios = more caching = better performance but more data at risk.",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(true),
+			IdempotentHint:  true,
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPSetDiskCacheArgs) (*mcp.CallToolResult, any, error) {
+		if s.tuningController == nil {
+			return textResult("Tuning controller not initialized"), nil, nil
+		}
+		if !args.Confirm {
+			return textResult("Please set confirm=true to apply disk cache changes"), nil, nil
+		}
+		logger.Info("MCP: Set disk cache requested: bg=%d, ratio=%d, wb=%d, expire=%d",
+			args.DirtyBackgroundRatio, args.DirtyRatio, args.DirtyWritebackCenti, args.DirtyExpireCenti)
+		if err := s.tuningController.SetDiskCache(
+			args.DirtyBackgroundRatio, args.DirtyRatio,
+			args.DirtyWritebackCenti, args.DirtyExpireCenti,
+		); err != nil {
+			return textResult(fmt.Sprintf("Failed to set disk cache: %v", err)), nil, nil
+		}
+		return textResult(fmt.Sprintf("Disk cache updated: bg_ratio=%d%%, ratio=%d%%, writeback=%dcs, expire=%dcs",
+			args.DirtyBackgroundRatio, args.DirtyRatio, args.DirtyWritebackCenti, args.DirtyExpireCenti)), nil, nil
+	})
+
+	// Set inotify limits (control)
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "set_inotify_limits",
+		Description: "Set Linux inotify kernel limits. Increase max_user_watches if applications report 'too many open files' or inotify watch limit errors.",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(true),
+			IdempotentHint:  true,
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPSetInotifyLimitsArgs) (*mcp.CallToolResult, any, error) {
+		if s.tuningController == nil {
+			return textResult("Tuning controller not initialized"), nil, nil
+		}
+		if !args.Confirm {
+			return textResult("Please set confirm=true to apply inotify limits changes"), nil, nil
+		}
+		logger.Info("MCP: Set inotify limits requested: watches=%d, instances=%d, events=%d",
+			args.MaxUserWatches, args.MaxUserInstances, args.MaxQueuedEvents)
+		if err := s.tuningController.SetInotifyLimits(
+			args.MaxUserWatches, args.MaxUserInstances, args.MaxQueuedEvents,
+		); err != nil {
+			return textResult(fmt.Sprintf("Failed to set inotify limits: %v", err)), nil, nil
+		}
+		return textResult(fmt.Sprintf("Inotify limits updated: watches=%d, instances=%d, events=%d",
+			args.MaxUserWatches, args.MaxUserInstances, args.MaxQueuedEvents)), nil, nil
+	})
+
+	logger.Debug("MCP tuning tools registered (4 tools)")
 }

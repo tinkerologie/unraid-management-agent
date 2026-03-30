@@ -18,6 +18,7 @@ type Intervals struct {
 	Registration int
 	Unassigned   int
 	FanControl   int
+	Tuning       int
 }
 
 // Context holds the application runtime context including the event hub and configuration.
