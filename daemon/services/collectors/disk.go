@@ -8,6 +8,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"sync"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
@@ -19,9 +20,10 @@ import (
 // DiskCollector collects detailed information about all disks in the Unraid system.
 // It gathers disk metrics, SMART data, temperature, and usage statistics for array and cache disks.
 type DiskCollector struct {
-	ctx             *domain.Context
-	prevIOTicks     map[string]uint64 // previous io_ticks per device for delta calculation
-	prevCollectTime time.Time         // timestamp of the previous collection
+    ctx             *domain.Context
+    mu              sync.Mutex
+    prevIOTicks     map[string]uint64
+    prevCollectTime time.Time
 }
 
 // NewDiskCollector creates a new disk information collector with the given context.
@@ -100,6 +102,9 @@ func (c *DiskCollector) Start(ctx context.Context, interval time.Duration) {
 // Collect gathers detailed disk information and publishes it to the event bus.
 // It collects data from multiple sources including lsblk, smartctl, and Unraid configuration files.
 func (c *DiskCollector) Collect() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	logger.Debug("Collecting disk data...")
 
 	// Collect disk information
