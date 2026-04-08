@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.04.00] - 2026-04-08
+
+### Added
+
+- **Diagnostic Logging System** ([#102](https://github.com/ruaan-deysel/unraid-management-agent/issues/102)):
+  - **Structured diagnostic logger** — JSON Lines format with lumberjack rotation (5 MB max, 1 backup)
+  - **Correlation IDs** — UUID-based request/operation correlation via context propagation
+  - **Sensitive data redaction** — regex-based redaction for passwords, bearer tokens, Shoutrrr URLs, webhooks, CSRF tokens; reflection-based struct/map redaction for sensitive field names
+  - **Diagnostic bundle CLI** — `diagnostics` command collects system state, array status, containers, VMs, network info, logs, and configuration into a timestamped ZIP archive
+  - **Diagnostic bundle service** — collects metadata, system state from `/proc`, array/disk info, Docker/VM listings, network interfaces, agent logs, and redacted configuration
+  - New DTOs: `DiagnosticLogEntry`, `DiagnosticBundle`, `BundleMetadata`, `BundleSystemState`, `BundleArrayStatus`, `BundleDisk`, `BundleContainer`, `BundleVM`, `BundleNetwork`, `BundleLogs`, `BundleConfiguration`
+
+### Fixed
+
+- **Concurrent map access in DiskCollector** ([#100](https://github.com/ruaan-deysel/unraid-management-agent/pull/100)):
+  - Added `sync.Mutex` to protect shared map access during disk data collection
+
 ## [2026.03.06] - 2026-03-30
 
 ### Added

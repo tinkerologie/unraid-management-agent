@@ -94,8 +94,9 @@ var cli struct {
 	IntervalFanControl   int `default:"5" env:"INTERVAL_FAN_CONTROL" help:"fan control interval (seconds, 0=disabled, max 86400)"`
 	IntervalTuning       int `default:"120" env:"INTERVAL_TUNING" help:"tuning parameters interval (seconds, 0=disabled, max 86400)"`
 
-	Boot     cmd.Boot     `cmd:"" default:"1" help:"start the management agent"`
-	MCPStdio cmd.MCPStdio `cmd:"mcp-stdio" help:"run MCP server over stdin/stdout for local AI clients"`
+	Boot        cmd.Boot        `cmd:"" default:"1" help:"start the management agent"`
+	MCPStdio    cmd.MCPStdio    `cmd:"mcp-stdio" help:"run MCP server over stdin/stdout for local AI clients"`
+	Diagnostics cmd.Diagnostics `cmd:"diagnostics" help:"collect and download diagnostic bundle"`
 }
 
 // cleanupOldLogs removes old rotated log files from previous versions
@@ -217,6 +218,12 @@ func main() {
 		log.Printf("Low power mode enabled - all intervals multiplied by 4x")
 	}
 
+	// Create diagnostic logger for structured JSON logging
+	diagLogger := logger.NewDiagnosticLogger(
+		filepath.Join(cli.LogsDir, "diagnostic.jsonl"),
+		"unraid-management-agent",
+	)
+
 	// Create application context with intervals from CLI/env
 	appCtx := &domain.Context{
 		Config: domain.Config{
@@ -241,6 +248,8 @@ func main() {
 			HomeAssistantPrefix: cli.MQTTHAPrefix,
 			DiscoveryEnabled:    cli.MQTTHomeAssistant, // Enable discovery when HA mode is enabled
 		},
+		DiagnosticLogger: diagLogger,
+		LogsDir:          cli.LogsDir,
 		Intervals: domain.Intervals{
 			System:       getInterval("system", cli.IntervalSystem),
 			Array:        getInterval("array", cli.IntervalArray),

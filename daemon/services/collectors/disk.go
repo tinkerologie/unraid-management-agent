@@ -6,9 +6,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
-	"sync"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
@@ -20,10 +20,10 @@ import (
 // DiskCollector collects detailed information about all disks in the Unraid system.
 // It gathers disk metrics, SMART data, temperature, and usage statistics for array and cache disks.
 type DiskCollector struct {
-    ctx             *domain.Context
-    mu              sync.Mutex
-    prevIOTicks     map[string]uint64
-    prevCollectTime time.Time
+	ctx             *domain.Context
+	mu              sync.Mutex
+	prevIOTicks     map[string]uint64
+	prevCollectTime time.Time
 }
 
 // NewDiskCollector creates a new disk information collector with the given context.
