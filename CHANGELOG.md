@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Fix shell injection vulnerability in start script** — replaced unsafe `bash -c` with unquoted
+  variable interpolation with `env(1)` for safe variable passing; added input sanitization helpers
+  (`sanitize_int`, `sanitize_csv`, `sanitize_str`, `sanitize_bool`) to validate all config values
+- **Sanitize all config values** — integer-only validation for ports/intervals, boolean allowlist
+  for flags, shell metacharacter stripping for freeform strings, LOG_LEVEL allowlist
+
+### Added
+
+- **Log action handler in exec.php** — new `log` action returns last 20 log lines for display in settings UI
+- **Default config additions** — added `LOG_LEVEL` and `MQTT_CLIENT_ID` defaults to `default.cfg`
+
 ## [2026.04.00] - 2026-04-08
 
 ### Added

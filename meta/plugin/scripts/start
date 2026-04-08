@@ -1,15 +1,16 @@
 #!/bin/bash
-CONFIG_FILE="/boot/config/plugins/unraid-management-agent/config.cfg"
-PROG="/usr/local/emhttp/plugins/unraid-management-agent/unraid-management-agent"
+PLUGIN="unraid-management-agent"
+CONFIG_FILE="/boot/config/plugins/$PLUGIN/config.cfg"
+PROG="/usr/local/emhttp/plugins/$PLUGIN/$PLUGIN"
 LOGS_DIR="/var/log"
 
 # Create config directory if it doesn't exist
-mkdir -p /boot/config/plugins/unraid-management-agent
+mkdir -p "/boot/config/plugins/$PLUGIN"
 
 # Create default config file if it doesn't exist
 if [ ! -f "$CONFIG_FILE" ]; then
-    cat > "$CONFIG_FILE" << EOF
-PORT=8043
+    cat > "$CONFIG_FILE" << 'EOF'
+PORT="8043"
 EOF
 fi
 
@@ -17,11 +18,21 @@ fi
 source "$CONFIG_FILE"
 
 # Stop if it's already running
-killall unraid-management-agent >/dev/null 2>&1
+killall "$PLUGIN" >/dev/null 2>&1
 
-# Set defaults for all values
+# ── Input validation helpers ──────────────────────────────────
+# Strip anything that isn't a digit
+sanitize_int() { echo "$1" | tr -cd '0-9'; }
+# Strip anything that isn't alphanumeric, comma, or hyphen
+sanitize_csv() { echo "$1" | tr -cd 'a-zA-Z0-9,_-'; }
+# Strip shell metacharacters from freeform strings
+sanitize_str() { echo "$1" | tr -d "'\"\`\$\\"; }
+# Validate boolean: only "true" passes, everything else is "false"
+sanitize_bool() { [ "$1" = "true" ] && echo "true" || echo "false"; }
+
+# ── Set defaults ──────────────────────────────────────────────
 PORT="${PORT:-8043}"
-# Log level is always info by default (use --debug or --log-level CLI flag to change)
+LOG_LEVEL="${LOG_LEVEL:-info}"
 # Defaults follow industry standards (Zabbix, Prometheus, Datadog)
 INTERVAL_SYSTEM="${INTERVAL_SYSTEM:-15}"
 INTERVAL_ARRAY="${INTERVAL_ARRAY:-60}"
@@ -29,6 +40,7 @@ INTERVAL_DISK="${INTERVAL_DISK:-300}"
 INTERVAL_DOCKER="${INTERVAL_DOCKER:-30}"
 INTERVAL_VM="${INTERVAL_VM:-60}"
 INTERVAL_UPS="${INTERVAL_UPS:-60}"
+INTERVAL_NUT="${INTERVAL_NUT:-0}"
 INTERVAL_GPU="${INTERVAL_GPU:-60}"
 INTERVAL_SHARES="${INTERVAL_SHARES:-60}"
 INTERVAL_NETWORK="${INTERVAL_NETWORK:-60}"
@@ -48,31 +60,52 @@ MQTT_CLIENT_ID="${MQTT_CLIENT_ID:-unraid-management-agent}"
 MQTT_TOPIC_PREFIX="${MQTT_TOPIC_PREFIX:-unraid}"
 MQTT_HOME_ASSISTANT="${MQTT_HOME_ASSISTANT:-false}"
 
-# Run the application with all interval settings passed as environment variables
-nohup sudo -H bash -c "
-  INTERVAL_SYSTEM=$INTERVAL_SYSTEM \
-  INTERVAL_ARRAY=$INTERVAL_ARRAY \
-  INTERVAL_DISK=$INTERVAL_DISK \
-  INTERVAL_DOCKER=$INTERVAL_DOCKER \
-  INTERVAL_VM=$INTERVAL_VM \
-  INTERVAL_UPS=$INTERVAL_UPS \
-  INTERVAL_GPU=$INTERVAL_GPU \
-  INTERVAL_SHARES=$INTERVAL_SHARES \
-  INTERVAL_NETWORK=$INTERVAL_NETWORK \
-  INTERVAL_HARDWARE=$INTERVAL_HARDWARE \
-  INTERVAL_ZFS=$INTERVAL_ZFS \
-  INTERVAL_NOTIFICATION=$INTERVAL_NOTIFICATION \
-  INTERVAL_REGISTRATION=$INTERVAL_REGISTRATION \
-  INTERVAL_UNASSIGNED=$INTERVAL_UNASSIGNED \
-  MQTT_ENABLED=$MQTT_ENABLED \
-  MQTT_BROKER=$MQTT_BROKER \
-  MQTT_PORT=$MQTT_PORT \
-  MQTT_USERNAME=$MQTT_USERNAME \
-  MQTT_PASSWORD=$MQTT_PASSWORD \
-  MQTT_CLIENT_ID=$MQTT_CLIENT_ID \
-  MQTT_TOPIC_PREFIX=$MQTT_TOPIC_PREFIX \
-  MQTT_HOME_ASSISTANT=$MQTT_HOME_ASSISTANT \
-  $PROG --logs-dir $LOGS_DIR --port $PORT --log-level info boot
-" >/dev/null 2>&1 &
+# ── Sanitize all config values ────────────────────────────────
+PORT=$(sanitize_int "$PORT");                       PORT="${PORT:-8043}"
+LOG_LEVEL=$(echo "$LOG_LEVEL" | grep -xE 'debug|info|warning|error' || echo "info")
+LOG_LEVEL="${LOG_LEVEL:-info}"
 
-echo "Unraid Management Agent started on port $PORT"
+for var in INTERVAL_SYSTEM INTERVAL_ARRAY INTERVAL_DISK INTERVAL_DOCKER \
+           INTERVAL_VM INTERVAL_UPS INTERVAL_NUT INTERVAL_GPU INTERVAL_SHARES \
+           INTERVAL_NETWORK INTERVAL_HARDWARE INTERVAL_ZFS INTERVAL_UNASSIGNED \
+           INTERVAL_NOTIFICATION INTERVAL_REGISTRATION; do
+    eval "$var=\$(sanitize_int \"\$$var\")"
+done
+
+for var in MQTT_ENABLED MQTT_HOME_ASSISTANT; do
+    eval "$var=\$(sanitize_bool \"\$$var\")"
+done
+for var in MQTT_BROKER MQTT_USERNAME MQTT_PASSWORD MQTT_CLIENT_ID MQTT_TOPIC_PREFIX; do
+    eval "$var=\$(sanitize_str \"\$$var\")"
+done
+MQTT_PORT=$(sanitize_int "$MQTT_PORT");             MQTT_PORT="${MQTT_PORT:-1883}"
+
+# ── Launch using env(1) to pass variables safely ──────────────
+nohup env \
+  INTERVAL_SYSTEM="$INTERVAL_SYSTEM" \
+  INTERVAL_ARRAY="$INTERVAL_ARRAY" \
+  INTERVAL_DISK="$INTERVAL_DISK" \
+  INTERVAL_DOCKER="$INTERVAL_DOCKER" \
+  INTERVAL_VM="$INTERVAL_VM" \
+  INTERVAL_UPS="$INTERVAL_UPS" \
+  INTERVAL_NUT="$INTERVAL_NUT" \
+  INTERVAL_GPU="$INTERVAL_GPU" \
+  INTERVAL_SHARES="$INTERVAL_SHARES" \
+  INTERVAL_NETWORK="$INTERVAL_NETWORK" \
+  INTERVAL_HARDWARE="$INTERVAL_HARDWARE" \
+  INTERVAL_ZFS="$INTERVAL_ZFS" \
+  INTERVAL_NOTIFICATION="$INTERVAL_NOTIFICATION" \
+  INTERVAL_REGISTRATION="$INTERVAL_REGISTRATION" \
+  INTERVAL_UNASSIGNED="$INTERVAL_UNASSIGNED" \
+  MQTT_ENABLED="$MQTT_ENABLED" \
+  MQTT_BROKER="$MQTT_BROKER" \
+  MQTT_PORT="$MQTT_PORT" \
+  MQTT_USERNAME="$MQTT_USERNAME" \
+  MQTT_PASSWORD="$MQTT_PASSWORD" \
+  MQTT_CLIENT_ID="$MQTT_CLIENT_ID" \
+  MQTT_TOPIC_PREFIX="$MQTT_TOPIC_PREFIX" \
+  MQTT_HOME_ASSISTANT="$MQTT_HOME_ASSISTANT" \
+  "$PROG" --logs-dir "$LOGS_DIR" --port "$PORT" --log-level "$LOG_LEVEL" boot \
+  >/dev/null 2>&1 &
+
+echo "$PLUGIN started on port $PORT"
