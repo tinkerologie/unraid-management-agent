@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.04.00] - 2026-04-08
+
 ### Security
 
 - **Fix shell injection vulnerability in start script** — replaced unsafe `bash -c` with unquoted
@@ -21,11 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Log action handler in exec.php** — new `log` action returns last 20 log lines for display in settings UI
 - **Default config additions** — added `LOG_LEVEL` and `MQTT_CLIENT_ID` defaults to `default.cfg`
-
-## [2026.04.00] - 2026-04-08
-
-### Added
-
 - **Diagnostic Logging System** ([#102](https://github.com/ruaan-deysel/unraid-management-agent/issues/102)):
   - **Structured diagnostic logger** — JSON Lines format with lumberjack rotation (5 MB max, 1 backup)
   - **Correlation IDs** — UUID-based request/operation correlation via context propagation
