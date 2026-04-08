@@ -1,0 +1,47 @@
+---
+version: 2
+
+updates:
+  # Go modules
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Australia/Brisbane
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+      - go
+    commit-message:
+      prefix: "deps(go):"
+    groups:
+      # Group minor/patch updates together to reduce PR noise
+      go-minor-patch:
+        update-types:
+          - minor
+          - patch
+      # Keep major updates separate for careful review
+      go-major:
+        update-types:
+          - major
+
+  # GitHub Actions
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Australia/Brisbane
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: "deps(actions):"
+    groups:
+      actions-all:
+        patterns:
+          - "*"
