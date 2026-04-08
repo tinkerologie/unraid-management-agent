@@ -76,13 +76,22 @@ func TestCollectDiagnostics_RedactsMQTTConfig(t *testing.T) {
 		t.Fatal("expected non-nil MQTT config")
 	}
 
-	// Password field has json:"-" tag, so it should be redacted
-	if pw, ok := mqtt["-"]; ok && pw != "[REDACTED]" {
-		t.Errorf("MQTT password should be redacted, got %v", pw)
+	// Password field has json:"-" tag, so it should be omitted entirely
+	if _, ok := mqtt["password"]; ok {
+		t.Error("MQTT password should be omitted (json:\"-\" tag), but was present")
+	}
+	if _, ok := mqtt["-"]; ok {
+		t.Error("MQTT config should not contain key \"-\"")
+	}
+	if _, ok := mqtt["Password"]; ok {
+		t.Error("MQTT Password should be omitted (json:\"-\" tag), but was present")
 	}
 
 	// Broker should not be redacted
-	if broker, ok := mqtt["broker"]; ok && broker != "mqtt.example.com" {
+	broker, ok := mqtt["broker"]
+	if !ok {
+		t.Error("expected broker key to exist in MQTT config")
+	} else if broker != "mqtt.example.com" {
 		t.Errorf("MQTT broker = %v, want %v", broker, "mqtt.example.com")
 	}
 }

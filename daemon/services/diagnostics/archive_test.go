@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
@@ -67,7 +68,7 @@ func TestCreateArchive(t *testing.T) {
 
 	// Verify filename format
 	base := filepath.Base(outputPath)
-	if !contains(base, "unraid-diagnostics-testhost-") || !contains(base, ".zip") {
+	if !strings.Contains(base, "unraid-diagnostics-testhost-") || !strings.Contains(base, ".zip") {
 		t.Errorf("unexpected filename: %s", base)
 	}
 
@@ -134,20 +135,7 @@ func TestCreateArchive_EmptyHostname(t *testing.T) {
 	}
 
 	base := filepath.Base(outputPath)
-	if !contains(base, "unraid-diagnostics-unknown-") {
+	if !strings.Contains(base, "unraid-diagnostics-unknown-") {
 		t.Errorf("expected 'unknown' hostname in filename, got: %s", base)
 	}
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsSubstr(s, substr))
-}
-
-func containsSubstr(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

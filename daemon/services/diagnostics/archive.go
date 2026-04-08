@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 )
+
+var hostnameCleanRe = regexp.MustCompile(`[^a-zA-Z0-9._-]+`)
 
 // CreateArchive creates a ZIP archive from a diagnostic bundle.
 // The archive filename follows the pattern: unraid-diagnostics-{hostname}-{timestamp}.zip
@@ -19,6 +22,11 @@ func CreateArchive(bundle *dto.DiagnosticBundle, outputDir string) (string, erro
 	hostname := bundle.Metadata.Hostname
 	if hostname == "" {
 		hostname = "unknown"
+	} else {
+		hostname = hostnameCleanRe.ReplaceAllString(hostname, "_")
+		if hostname == "" {
+			hostname = "unknown"
+		}
 	}
 
 	filename := fmt.Sprintf("unraid-diagnostics-%s-%s.zip", hostname, timestamp)
@@ -28,10 +36,15 @@ func CreateArchive(bundle *dto.DiagnosticBundle, outputDir string) (string, erro
 	if err != nil {
 		return "", fmt.Errorf("creating archive file: %w", err)
 	}
-	defer func() { _ = file.Close() }()
+	archiveOK := false
+	defer func() {
+		_ = file.Close()
+		if !archiveOK {
+			_ = os.Remove(outputPath)
+		}
+	}()
 
 	w := zip.NewWriter(file)
-	defer func() { _ = w.Close() }()
 
 	// Write metadata.json
 	if err := writeJSON(w, "metadata.json", bundle.Metadata); err != nil {
@@ -89,6 +102,17 @@ func CreateArchive(bundle *dto.DiagnosticBundle, outputDir string) (string, erro
 		}
 	}
 
+	// Explicitly close zip writer to flush central directory
+	if err := w.Close(); err != nil {
+		return "", fmt.Errorf("finalizing archive: %w", err)
+	}
+
+	// Close file and check for write errors
+	if err := file.Close(); err != nil {
+		return "", fmt.Errorf("closing archive file: %w", err)
+	}
+
+	archiveOK = true
 	return outputPath, nil
 }
 

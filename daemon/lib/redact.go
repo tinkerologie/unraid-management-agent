@@ -12,9 +12,17 @@ var sensitiveFields = []string{
 	"password",
 	"token",
 	"secret",
-	"key",
 	"credential",
 	"api_key",
+	"apikey",
+	"secret_key",
+	"secretkey",
+	"auth_key",
+	"authkey",
+	"private_key",
+	"privatekey",
+	"access_key",
+	"accesskey",
 }
 
 // Compiled regex patterns for sensitive data detection in string values.
@@ -146,13 +154,12 @@ func redactStructValue(val reflect.Value) map[string]any {
 		name := field.Name
 		if tag := field.Tag.Get("json"); tag != "" {
 			parts := strings.SplitN(tag, ",", 2)
-			if parts[0] != "" && parts[0] != "-" {
-				name = parts[0]
-			}
-			// Skip fields with json:"-"
+			// Skip fields with json:"-" — they should be omitted entirely
 			if parts[0] == "-" {
-				result[name] = "[REDACTED]"
 				continue
+			}
+			if parts[0] != "" {
+				name = parts[0]
 			}
 		}
 

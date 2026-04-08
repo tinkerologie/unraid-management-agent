@@ -32,7 +32,10 @@ type DiagnosticLogger struct {
 // NewDiagnosticLogger creates a new diagnostic logger that writes JSON Lines to logPath.
 // Uses lumberjack for log rotation consistent with the main application logger.
 func NewDiagnosticLogger(logPath, serviceName string) *DiagnosticLogger {
-	hostname, _ := os.Hostname()
+	hostname, err := os.Hostname()
+	if err != nil {
+		Warning("failed to get hostname for diagnostic logger: %v", err)
+	}
 
 	writer := &lumberjack.Logger{
 		Filename:   logPath,
@@ -51,6 +54,9 @@ func NewDiagnosticLogger(logPath, serviceName string) *DiagnosticLogger {
 
 // correlationIDFromContext retrieves the correlation ID from context.
 func correlationIDFromContext(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
 	if id, ok := ctx.Value(CorrelationContextKey).(string); ok {
 		return id
 	}
