@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os/exec"
 	"time"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
@@ -78,11 +78,13 @@ func probeTCP(_ context.Context, target string, timeout time.Duration) ProbeResu
 // probePing sends a single ICMP echo request via the ping binary.
 // Target should be a hostname or IP address.
 func probePing(ctx context.Context, target string, timeout time.Duration) ProbeResult {
+	if err := lib.ValidateHostOrIP(target); err != nil {
+		return ProbeResult{Healthy: false, Error: fmt.Sprintf("invalid ping target: %s", err)}
+	}
 	timeoutSec := fmt.Sprintf("%d", max(1, int(timeout.Seconds())))
-	// #nosec G204 -- Target is passed as a direct argv value to ping without shell interpolation.
-	cmd := exec.CommandContext(ctx, "ping", "-c", "1", "-W", timeoutSec, target)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return ProbeResult{Healthy: false, Error: fmt.Sprintf("ping failed: %s (%s)", err, string(output))}
+	output, err := lib.ExecCommandOutputWithContext(ctx, "ping", "-c", "1", "-W", timeoutSec, target)
+	if err != nil {
+		return ProbeResult{Healthy: false, Error: fmt.Sprintf("ping failed: %s (%s)", err, output)}
 	}
 	return ProbeResult{Healthy: true}
 }

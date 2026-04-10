@@ -88,9 +88,12 @@ func NewServerWithCollectorManager(ctx *domain.Context, cm CollectorManagerInter
 
 func (s *Server) setupRoutes() {
 	// Apply middleware
-	s.router.Use(corsMiddleware(s.ctx.CORSOrigin))
-	s.router.Use(loggingMiddleware)
 	s.router.Use(recoveryMiddleware)
+	s.router.Use(securityHeadersMiddleware)
+	s.router.Use(corsMiddleware(s.ctx.CORSOrigin))
+	s.router.Use(csrfMiddleware(s.ctx.CORSOrigin))
+	s.router.Use(bodySizeLimitMiddleware)
+	s.router.Use(loggingMiddleware)
 
 	// Prometheus metrics endpoint (at root level, no /api/v1 prefix)
 	s.router.HandleFunc("/metrics", s.handleMetrics).Methods("GET")
@@ -365,10 +368,12 @@ func (s *Server) Ready() <-chan struct{} {
 // StartHTTP starts the HTTP server
 func (s *Server) StartHTTP() error {
 	s.httpServer = &http.Server{
-		Addr:         fmt.Sprintf(":%d", s.ctx.Port),
-		Handler:      s.router,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
+		Addr:              fmt.Sprintf(":%d", s.ctx.Port),
+		Handler:           s.router,
+		ReadTimeout:       30 * time.Second,
+		ReadHeaderTimeout: 10 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	logger.Info("HTTP server listening on %s", s.httpServer.Addr)

@@ -3,7 +3,9 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
@@ -13,11 +15,8 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(_ *http.Request) bool {
-		return true // Allow all origins
-	},
-}
+// maxWSMessageSize is the maximum allowed size (bytes) for an incoming WebSocket message.
+const maxWSMessageSize = 64 * 1024 // 64 KB
 
 // broadcastMessage carries an event with its topic name through the broadcast channel.
 type broadcastMessage struct {
@@ -191,11 +190,82 @@ func (h *WSHub) Broadcast(topic string, data any) {
 //	@Tags			WebSocket
 //	@Router			/ws [get]
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
+	u := websocket.Upgrader{
+		CheckOrigin: func(req *http.Request) bool {
+			origin := req.Header.Get("Origin")
+			if origin == "" {
+				return true // non-browser clients don't send Origin
+			}
+			corsOrigin := s.ctx.CORSOrigin
+			if corsOrigin == "" {
+				corsOrigin = "*"
+			}
+
+			if corsOrigin == "*" {
+				// In wildcard mode, verify origin matches request origin (scheme + host + port)
+				// to prevent drive-by CSRF from arbitrary external sites.
+				parsed, err := url.Parse(origin)
+				if err != nil {
+					return false
+				}
+
+				originScheme := parsed.Scheme
+				originHostPort := parsed.Host // includes port if present
+
+				requestScheme := "http"
+				if req.TLS != nil {
+					requestScheme = "https"
+				}
+				requestHostPort := req.Host
+
+				// Exact origin match (scheme, host, and port)
+				if originScheme == requestScheme && originHostPort == requestHostPort {
+					return true
+				}
+
+				// Allow localhost aliases to match each other only if scheme and port also match
+				originHost := parsed.Hostname()
+				requestHost := stripHostPort(req.Host)
+				if isLocalhost(originHost) && isLocalhost(requestHost) {
+					// Both are localhost variants, now verify scheme and port match
+					originPort := parsed.Port()
+					if originPort == "" {
+						if originScheme == "https" {
+							originPort = "443"
+						} else {
+							originPort = "80"
+						}
+					}
+
+					requestPort := ""
+					if _, port, err := net.SplitHostPort(requestHostPort); err == nil {
+						requestPort = port
+					} else {
+						if requestScheme == "https" {
+							requestPort = "443"
+						} else {
+							requestPort = "80"
+						}
+					}
+
+					if originScheme == requestScheme && originPort == requestPort {
+						return true
+					}
+				}
+
+				return false
+			}
+			return origin == corsOrigin
+		},
+	}
+
+	conn, err := u.Upgrade(w, r, nil)
 	if err != nil {
 		logger.Error("WebSocket upgrade error: %v", err)
 		return
 	}
+
+	conn.SetReadLimit(maxWSMessageSize)
 
 	client := &WSClient{
 		hub:  s.wsHub,

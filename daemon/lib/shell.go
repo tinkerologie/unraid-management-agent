@@ -11,6 +11,10 @@ import (
 // These helpers execute binaries directly without shell expansion. Callers must
 // pass fixed internal commands or values that have already been validated.
 
+// execCommand is a package-level variable that defaults to exec.CommandContext.
+// It can be overridden in tests to inject mock command execution.
+var execCommand = exec.CommandContext
+
 // ExecCommand executes a shell command with timeout
 func ExecCommand(command string, args ...string) ([]string, error) {
 	return ExecCommandWithTimeout(60*time.Second, command, args...)
@@ -75,6 +79,21 @@ func ExecCommandOutputWithContext(ctx context.Context, command string, args ...s
 		return string(output), fmt.Errorf("command failed: %w", err)
 	}
 	return string(output), nil
+}
+
+// ExecCommandStdout executes a command and returns only stdout, discarding
+// stderr. Use this instead of ExecCommandOutput when the output is
+// machine-parsed (e.g. JSON) and stderr warnings could contaminate results.
+func ExecCommandStdout(command string, args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	cmd := execCommand(ctx, command, args...) // #nosec G204 -- callers pass validated commands and arguments without shell interpolation
+	out, err := cmd.Output()
+	if err != nil {
+		return string(out), fmt.Errorf("command failed: %w", err)
+	}
+	return string(out), nil
 }
 
 // CommandExists checks if a command exists in PATH

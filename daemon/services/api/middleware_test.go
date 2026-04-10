@@ -20,8 +20,8 @@ func TestCorsMiddleware(t *testing.T) {
 		if got := rr.Header().Get("Access-Control-Allow-Origin"); got != "*" {
 			t.Errorf("Access-Control-Allow-Origin = %q, want %q", got, "*")
 		}
-		if got := rr.Header().Get("Access-Control-Allow-Methods"); got != "GET, POST, PUT, DELETE, OPTIONS" {
-			t.Errorf("Access-Control-Allow-Methods = %q, want %q", got, "GET, POST, PUT, DELETE, OPTIONS")
+		if got := rr.Header().Get("Access-Control-Allow-Methods"); got != "GET, POST, PUT, PATCH, DELETE, OPTIONS" {
+			t.Errorf("Access-Control-Allow-Methods = %q, want %q", got, "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		}
 		if got := rr.Header().Get("Access-Control-Allow-Headers"); got != "Content-Type, Authorization" {
 			t.Errorf("Access-Control-Allow-Headers = %q, want %q", got, "Content-Type, Authorization")

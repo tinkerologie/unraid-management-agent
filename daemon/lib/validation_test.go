@@ -5,6 +5,64 @@ import (
 	"testing"
 )
 
+func TestValidateHostOrIP(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+		errMsg  string
+	}{
+		// Valid hostnames
+		{name: "simple hostname", input: "localhost", wantErr: false},
+		{name: "hostname with hyphen", input: "my-server", wantErr: false},
+		{name: "FQDN", input: "server.example.com", wantErr: false},
+		{name: "multi-label FQDN", input: "a.b.c.example.org", wantErr: false},
+		{name: "hostname with numbers", input: "server01", wantErr: false},
+		{name: "single letter", input: "a", wantErr: false},
+		// Valid IPs
+		{name: "IPv4 loopback", input: "127.0.0.1", wantErr: false},
+		{name: "IPv4 address", input: "192.168.1.100", wantErr: false},
+		{name: "IPv6 loopback", input: "::1", wantErr: false},
+		{name: "IPv6 full", input: "2001:db8::1", wantErr: false},
+		// Invalid: empty
+		{name: "empty string", input: "", wantErr: true, errMsg: "cannot be empty"},
+		// Invalid: flag injection via leading hyphen
+		{name: "leading hyphen", input: "-n", wantErr: true, errMsg: "must not start with a hyphen"},
+		{name: "leading double hyphen", input: "--verbose", wantErr: true, errMsg: "must not start with a hyphen"},
+		// Invalid: whitespace
+		{name: "space only", input: " ", wantErr: true},
+		{name: "embedded space", input: "my server", wantErr: true},
+		{name: "tab character", input: "host\tname", wantErr: true},
+		// Invalid: special / shell characters
+		{name: "semicolon injection", input: "host;rm -rf /", wantErr: true},
+		{name: "backtick injection", input: "host`cmd`", wantErr: true},
+		{name: "dollar sign", input: "host$VAR", wantErr: true},
+		{name: "ampersand", input: "host&cmd", wantErr: true},
+		{name: "pipe", input: "host|cmd", wantErr: true},
+		// Invalid: null byte
+		{name: "null byte", input: "host\x00name", wantErr: true},
+		// Invalid: length
+		{name: "exceeds 253 chars", input: strings.Repeat("a", 254), wantErr: true, errMsg: "exceeds 253"},
+		// Edge: labels ending with a hyphen are rejected by the RFC-1123 hostname regex.
+		{name: "label ending hyphen", input: "host-", wantErr: true},
+		// Edge: a trailing dot makes an otherwise valid label not match the regex.
+		{name: "trailing dot", input: "host.", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateHostOrIP(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateHostOrIP(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+				return
+			}
+			if tt.wantErr && tt.errMsg != "" && !strings.Contains(err.Error(), tt.errMsg) {
+				t.Errorf("ValidateHostOrIP(%q) error = %q, want to contain %q", tt.input, err.Error(), tt.errMsg)
+			}
+		})
+	}
+}
+
 func TestValidateContainerID(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -609,85 +667,85 @@ func TestValidateLogFilename(t *testing.T) {
 	tests := []struct {
 		name     string
 		filename string
-		expected bool
+		wantErr  bool
 	}{
 		{
 			name:     "valid simple filename",
 			filename: "syslog",
-			expected: true,
+			wantErr:  false,
 		},
 		{
 			name:     "valid filename with extension",
 			filename: "app.log",
-			expected: true,
+			wantErr:  false,
 		},
 		{
 			name:     "valid plugin log path",
 			filename: "plugin/my-plugin.log",
-			expected: true,
+			wantErr:  false,
 		},
 		{
 			name:     "valid nested path",
 			filename: "logs/2024/01/app.log",
-			expected: true,
+			wantErr:  false,
 		},
 		{
 			name:     "empty filename",
 			filename: "",
-			expected: false,
+			wantErr:  true,
 		},
 		{
 			name:     "too long",
 			filename: strings.Repeat("a", 256),
-			expected: false,
+			wantErr:  true,
 		},
 		{
 			name:     "path traversal with ../",
 			filename: "../etc/passwd",
-			expected: false,
+			wantErr:  true,
 		},
 		{
 			name:     "path traversal with ..",
 			filename: "logs/../etc/passwd",
-			expected: false,
+			wantErr:  true,
 		},
 		{
 			name:     "backslash",
 			filename: "path\\to\\file",
-			expected: false,
+			wantErr:  true,
 		},
 		{
 			name:     "absolute path",
 			filename: "/var/log/syslog",
-			expected: false,
+			wantErr:  true,
 		},
 		{
 			name:     "null byte injection",
 			filename: "file\x00.log",
-			expected: false,
+			wantErr:  true,
 		},
 		{
 			name:     "valid with numbers",
 			filename: "log123.txt",
-			expected: true,
+			wantErr:  false,
 		},
 		{
 			name:     "valid with hyphen",
 			filename: "my-log-file.log",
-			expected: true,
+			wantErr:  false,
 		},
 		{
 			name:     "valid with underscore",
 			filename: "my_log_file.log",
-			expected: true,
+			wantErr:  false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ValidateLogFilename(tt.filename)
-			if result != tt.expected {
-				t.Errorf("ValidateLogFilename(%q) = %v, want %v", tt.filename, result, tt.expected)
+			err := ValidateLogFilename(tt.filename)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateLogFilename(%q) error = %v, wantErr %v", tt.filename, err, tt.wantErr)
 			}
 		})
 	}

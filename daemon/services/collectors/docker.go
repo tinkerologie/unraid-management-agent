@@ -6,6 +6,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/moby/moby/api/types/container"
@@ -29,6 +30,7 @@ type DockerCollector struct {
 	appCtx       *domain.Context
 	dockerClient *client.Client
 	initialized  bool
+	mu           sync.Mutex             // protects prevCPU
 	prevCPU      map[string]cpuSnapshot // keyed by full container ID
 }
 
@@ -381,8 +383,10 @@ func (c *DockerCollector) getCPUFromCgroups(fullID string, cont *dto.ContainerIn
 	now := time.Now()
 	snap := cpuSnapshot{usageUsec: usageUsec, readAt: now}
 
+	c.mu.Lock()
 	prev, hasPrev := c.prevCPU[fullID]
 	c.prevCPU[fullID] = snap
+	c.mu.Unlock()
 
 	if !hasPrev {
 		return
@@ -412,9 +416,11 @@ func (c *DockerCollector) pruneStaleSnapshots(running []container.Summary) {
 	for _, rc := range running {
 		active[rc.ID] = struct{}{}
 	}
+	c.mu.Lock()
 	for id := range c.prevCPU {
 		if _, ok := active[id]; !ok {
 			delete(c.prevCPU, id)
 		}
 	}
+	c.mu.Unlock()
 }

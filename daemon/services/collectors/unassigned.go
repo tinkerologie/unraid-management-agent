@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"os/exec"
 	"strings"
 	"syscall"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
@@ -176,14 +176,13 @@ func (c *UnassignedCollector) getArrayDisks() map[string]bool {
 
 // getAllBlockDevices returns a list of all block device names
 func (c *UnassignedCollector) getAllBlockDevices() []string {
-	cmd := exec.Command("lsblk", "-d", "-n", "-o", "NAME")
-	output, err := cmd.Output()
+	output, err := lib.ExecCommandOutput("lsblk", "-d", "-n", "-o", "NAME")
 	if err != nil {
 		logger.Error("Failed to list block devices: %v", err)
 		return []string{}
 	}
 
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	lines := strings.Split(strings.TrimSpace(output), "\n")
 	return lines
 }
 
@@ -195,8 +194,8 @@ func (c *UnassignedCollector) isArrayDisk(device string, arrayDisks map[string]b
 // getDeviceInfo retrieves detailed information about a device
 func (c *UnassignedCollector) getDeviceInfo(device string) *dto.UnassignedDevice {
 	// Get device info using lsblk
-	cmd := exec.Command("lsblk", "-J", "-o", "NAME,SIZE,TYPE,MOUNTPOINT,FSTYPE,LABEL,SERIAL,MODEL", "/dev/"+device) // #nosec G204 - device is validated from lsblk output
-	output, err := cmd.Output()
+	// Use stdout-only helper so stderr warnings don't contaminate JSON output.
+	output, err := lib.ExecCommandStdout("lsblk", "-J", "-o", "NAME,SIZE,TYPE,MOUNTPOINT,FSTYPE,LABEL,SERIAL,MODEL", "/dev/"+device)
 	if err != nil {
 		logger.Debug("Failed to get info for device %s: %v", device, err)
 		return nil
@@ -223,7 +222,7 @@ func (c *UnassignedCollector) getDeviceInfo(device string) *dto.UnassignedDevice
 		} `json:"blockdevices"`
 	}
 
-	if err := json.Unmarshal(output, &lsblkOutput); err != nil {
+	if err := json.Unmarshal([]byte(output), &lsblkOutput); err != nil {
 		logger.Debug("Failed to parse lsblk output for %s: %v", device, err)
 		return nil
 	}

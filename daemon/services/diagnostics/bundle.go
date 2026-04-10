@@ -229,7 +229,8 @@ func (s *BundleService) collectLogs(ctx context.Context) dto.BundleLogs {
 
 	// Collect diagnostic log entries (structured JSON)
 	diagPath := filepath.Join(s.ctx.LogsDir, "diagnostic.jsonl")
-	if data, err := os.ReadFile(diagPath); err == nil { // #nosec G304 -- path built from trusted LogsDir config
+	// #nosec G304 -- path built from trusted LogsDir config
+	if data, err := os.ReadFile(diagPath); err == nil {
 		for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
 			if line == "" {
 				continue

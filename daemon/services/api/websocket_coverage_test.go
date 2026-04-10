@@ -437,3 +437,177 @@ func TestWebSocketGracefulCloseFromClient(t *testing.T) {
 		t.Errorf("Expected 0 clients after graceful close, got %d", count)
 	}
 }
+
+// newTestServerWithCORSOrigin creates a Server with the given CORSOrigin configuration.
+func newTestServerWithCORSOrigin(t *testing.T, corsOrigin string) (*Server, func()) {
+	t.Helper()
+	hub := domain.NewEventBus(10)
+	ctx := &domain.Context{
+		Hub: hub,
+		Config: domain.Config{
+			Version:    "test",
+			CORSOrigin: corsOrigin,
+		},
+	}
+	server := NewServer(ctx)
+	populateTestCaches(server)
+	go server.wsHub.Run(server.cancelCtx)
+	return server, server.cancelFunc
+}
+
+// dialWSWithOrigin dials a WebSocket connection sending the given Origin header.
+// It returns the connection and response; the caller decides whether to expect success
+// or failure.
+func dialWSWithOrigin(ts *httptest.Server, origin string) (*websocket.Conn, *http.Response, error) {
+	wsURL := "ws" + strings.TrimPrefix(ts.URL, "http") + "/api/v1/ws"
+	headers := http.Header{}
+	if origin != "" {
+		headers.Set("Origin", origin)
+	}
+	return websocket.DefaultDialer.Dial(wsURL, headers)
+}
+
+// TestWebSocketOriginWildcardSameHost verifies that with an empty (wildcard) CORSOrigin,
+// a browser Origin that matches the server host is accepted.
+func TestWebSocketOriginWildcardSameHost(t *testing.T) {
+	server, cancel := newTestServerWithCORSOrigin(t, "")
+	defer cancel()
+
+	ts := httptest.NewServer(server.router)
+	defer ts.Close()
+
+	// Construct an Origin that matches the test server's host (ts.URL is already "http://host:port").
+	sameOrigin := ts.URL
+	conn, resp, err := dialWSWithOrigin(ts, sameOrigin)
+	if err != nil {
+		t.Fatalf("Expected same-host Origin to be accepted, got error: %v", err)
+	}
+	if resp != nil {
+		resp.Body.Close()
+	}
+	conn.Close()
+}
+
+// TestWebSocketOriginWildcardMismatch verifies that with an empty (wildcard) CORSOrigin,
+// a browser Origin from a different host is rejected.
+func TestWebSocketOriginWildcardMismatch(t *testing.T) {
+	server, cancel := newTestServerWithCORSOrigin(t, "")
+	defer cancel()
+
+	ts := httptest.NewServer(server.router)
+	defer ts.Close()
+
+	_, resp, err := dialWSWithOrigin(ts, "http://evil.example.com")
+	if err == nil {
+		t.Error("Expected mismatched Origin to be rejected, but dial succeeded")
+		return
+	}
+	// Expect 403 Forbidden from the upgrade rejection.
+	if resp != nil {
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusForbidden {
+			t.Errorf("Expected 403 for mismatched Origin, got %d", resp.StatusCode)
+		}
+	}
+}
+
+// TestWebSocketOriginNoHeader verifies that clients without an Origin header (non-browser
+// clients such as CLI tools) are always accepted regardless of CORSOrigin config.
+func TestWebSocketOriginNoHeader(t *testing.T) {
+	server, cancel := newTestServerWithCORSOrigin(t, "http://specific.example.com")
+	defer cancel()
+
+	ts := httptest.NewServer(server.router)
+	defer ts.Close()
+
+	// Dial without any Origin header — should succeed.
+	conn, resp, err := dialWSWithOrigin(ts, "")
+	if err != nil {
+		t.Fatalf("Expected no-Origin request to succeed, got error: %v", err)
+	}
+	if resp != nil {
+		resp.Body.Close()
+	}
+	conn.Close()
+}
+
+// TestWebSocketOriginSpecificMatch verifies that when CORSOrigin is set to a specific value,
+// a matching Origin is accepted.
+func TestWebSocketOriginSpecificMatch(t *testing.T) {
+	allowed := "http://allowed.example.com"
+	server, cancel := newTestServerWithCORSOrigin(t, allowed)
+	defer cancel()
+
+	ts := httptest.NewServer(server.router)
+	defer ts.Close()
+
+	conn, resp, err := dialWSWithOrigin(ts, allowed)
+	if err != nil {
+		t.Fatalf("Expected allowed Origin to be accepted, got error: %v", err)
+	}
+	if resp != nil {
+		resp.Body.Close()
+	}
+	conn.Close()
+}
+
+// TestWebSocketOriginSpecificMismatch verifies that when CORSOrigin is set to a specific value,
+// a different Origin is rejected.
+func TestWebSocketOriginSpecificMismatch(t *testing.T) {
+	server, cancel := newTestServerWithCORSOrigin(t, "http://allowed.example.com")
+	defer cancel()
+
+	ts := httptest.NewServer(server.router)
+	defer ts.Close()
+
+	_, resp, err := dialWSWithOrigin(ts, "http://evil.example.com")
+	if err == nil {
+		t.Error("Expected mismatched Origin to be rejected, but dial succeeded")
+		return
+	}
+	if resp != nil {
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusForbidden {
+			t.Errorf("Expected 403 for mismatched Origin, got %d", resp.StatusCode)
+		}
+	}
+}
+
+// TestWebSocketReadLimitEnforced verifies that sending a message exceeding the 64 KB
+// read limit causes the server to close the connection (DoS protection).
+func TestWebSocketReadLimitEnforced(t *testing.T) {
+	server, cancel := newTestServerWithHub(t)
+	defer cancel()
+
+	ts := httptest.NewServer(server.router)
+	defer ts.Close()
+
+	conn, resp, err := dialWSWithOrigin(ts, "")
+	if err != nil {
+		t.Fatalf("WebSocket dial failed: %v", err)
+	}
+	if resp != nil {
+		resp.Body.Close()
+	}
+	defer conn.Close()
+
+	// Send a message that exceeds the 64 KB limit.
+	oversized := make([]byte, maxWSMessageSize+1)
+	for i := range oversized {
+		oversized[i] = 'A'
+	}
+	if err := conn.WriteMessage(websocket.TextMessage, oversized); err != nil {
+		// If the write fails the server may have already closed the connection —
+		// that also satisfies the requirement.
+		t.Logf("Write failed (server likely already closed connection): %v", err)
+		return
+	}
+
+	// The server's readPump should close the connection after reading the
+	// oversized message. The client should receive a close frame or an error.
+	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_, _, readErr := conn.ReadMessage()
+	if readErr == nil {
+		t.Error("Expected connection to be closed after oversized message, but read succeeded")
+	}
+}

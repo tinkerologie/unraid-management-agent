@@ -1467,10 +1467,10 @@ func (s *Server) handleLogFile(w http.ResponseWriter, r *http.Request) {
 	logger.Debug("API: Getting log file: %s", filename)
 
 	// Validate filename to prevent directory traversal (CWE-22)
-	if !lib.ValidateLogFilename(filename) {
+	if err := lib.ValidateLogFilename(filename); err != nil {
 		respondJSON(w, http.StatusBadRequest, dto.Response{
 			Success:   false,
-			Message:   "Invalid filename",
+			Message:   fmt.Sprintf("Invalid filename: %v", err),
 			Timestamp: time.Now(),
 		})
 		return
