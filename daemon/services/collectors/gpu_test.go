@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 )
 
 func TestNewGPUCollector(t *testing.T) {
@@ -190,6 +191,67 @@ func TestGPUUtilizationRanges(t *testing.T) {
 			isValid := tt.utilization >= 0 && tt.utilization <= 100
 			if isValid != tt.valid {
 				t.Errorf("Utilization %d: valid = %v, want %v", tt.utilization, isValid, tt.valid)
+			}
+		})
+	}
+}
+
+func Test_assignGlobalGPUIndices(t *testing.T) {
+	tests := []struct {
+		name            string
+		input           []*dto.GPUMetrics
+		expectedIndices []int
+	}{
+		{
+			name: "multi-vendor with duplicate vendor-local indices",
+			input: []*dto.GPUMetrics{
+				{Available: true, Index: 0, Vendor: "intel", Name: "UHD Graphics 630"},
+				{Available: true, Index: 1, Vendor: "intel", Name: "UHD Graphics 770"},
+				{Available: true, Index: 0, Vendor: "nvidia", Name: "GeForce RTX 5060 Ti"},
+				{Available: true, Index: 0, Vendor: "amd", Name: "Radeon RX 7900"},
+			},
+			expectedIndices: []int{0, 1, 2, 3},
+		},
+		{
+			name: "single vendor already sequential",
+			input: []*dto.GPUMetrics{
+				{Available: true, Index: 0, Vendor: "nvidia", Name: "GeForce RTX 3060"},
+				{Available: true, Index: 1, Vendor: "nvidia", Name: "GeForce RTX 5060 Ti"},
+				{Available: true, Index: 2, Vendor: "nvidia", Name: "GeForce RTX 5060 Ti"},
+			},
+			expectedIndices: []int{0, 1, 2},
+		},
+		{
+			name: "single vendor with non-sequential starting indices",
+			input: []*dto.GPUMetrics{
+				{Available: true, Index: 5, Vendor: "nvidia", Name: "GeForce RTX 3060"},
+				{Available: true, Index: 10, Vendor: "nvidia", Name: "GeForce RTX 5060 Ti"},
+			},
+			expectedIndices: []int{0, 1},
+		},
+		{
+			name:            "empty slice",
+			input:           []*dto.GPUMetrics{},
+			expectedIndices: []int{},
+		},
+		{
+			name: "single GPU",
+			input: []*dto.GPUMetrics{
+				{Available: true, Index: 42, Vendor: "intel", Name: "UHD Graphics 630"},
+			},
+			expectedIndices: []int{0},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assignGlobalGPUIndices(tt.input)
+
+			for i, gpu := range tt.input {
+				if gpu.Index != tt.expectedIndices[i] {
+					t.Errorf("GPU[%d] Index = %d, want %d (vendor=%s, name=%s)",
+						i, gpu.Index, tt.expectedIndices[i], gpu.Vendor, gpu.Name)
+				}
 			}
 		})
 	}

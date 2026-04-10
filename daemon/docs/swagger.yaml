@@ -1053,7 +1053,8 @@ definitions:
         example: 65
         type: number
       index:
-        description: GPU index for multi-GPU systems
+        description: Globally unique GPU index across all vendors (Intel → NVIDIA
+          → AMD order)
         example: 0
         type: integer
       memory_total_bytes:

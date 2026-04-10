@@ -5,7 +5,7 @@ import "time"
 // GPUMetrics contains GPU metrics
 type GPUMetrics struct {
 	Available         bool      `json:"available" example:"true"`
-	Index             int       `json:"index" example:"0"`                                                 // GPU index for multi-GPU systems
+	Index             int       `json:"index" example:"0"`                                                 // Globally unique GPU index across all vendors (Intel → NVIDIA → AMD order)
 	PCIID             string    `json:"pci_id,omitempty" example:"0000:01:00.0"`                           // PCI bus ID (e.g., "0000:01:00.0")
 	Vendor            string    `json:"vendor" example:"nvidia"`                                           // "nvidia", "intel", "amd"
 	UUID              string    `json:"uuid,omitempty" example:"GPU-12345678-1234-1234-1234-123456789012"` // Device UUID (NVIDIA only)

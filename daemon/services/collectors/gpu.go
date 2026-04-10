@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -104,9 +105,21 @@ func (c *GPUCollector) Collect() {
 		return
 	}
 
+	// Reassign indices globally to ensure uniqueness across vendors.
+	// Collection order is deterministic: Intel → NVIDIA → AMD.
+	assignGlobalGPUIndices(gpuMetrics)
+
 	// Publish event
 	domain.Publish(c.ctx.Hub, constants.TopicGPUMetricsUpdate, gpuMetrics)
 	logger.Debug("Published %s event for %d total GPU(s)", constants.TopicGPUMetricsUpdate.Name, len(gpuMetrics))
+}
+
+// assignGlobalGPUIndices reassigns GPU indices sequentially (0, 1, 2, ...)
+// to ensure global uniqueness across all vendors.
+func assignGlobalGPUIndices(gpus []*dto.GPUMetrics) {
+	for i, gpu := range gpus {
+		gpu.Index = i
+	}
 }
 
 // Intel GPU collection using intel_gpu_top
@@ -731,11 +744,25 @@ func (c *GPUCollector) collectAMDGPUWithROCm() ([]*dto.GPUMetrics, error) {
 	var gpus []*dto.GPUMetrics
 	index := 0
 
-	// Parse each GPU
-	for gpuID, gpuDataInterface := range rocmData {
-		if !strings.HasPrefix(gpuID, "card") {
-			continue
+	// Extract and sort card identifiers numerically for deterministic ordering
+	cardIDs := make([]string, 0, len(rocmData))
+	for gpuID := range rocmData {
+		if strings.HasPrefix(gpuID, "card") {
+			cardIDs = append(cardIDs, gpuID)
 		}
+	}
+	sort.Slice(cardIDs, func(i, j int) bool {
+		ai, errI := strconv.Atoi(strings.TrimPrefix(cardIDs[i], "card"))
+		aj, errJ := strconv.Atoi(strings.TrimPrefix(cardIDs[j], "card"))
+		if errI == nil && errJ == nil {
+			return ai < aj
+		}
+		return cardIDs[i] < cardIDs[j]
+	})
+
+	// Parse each GPU in deterministic card order
+	for _, gpuID := range cardIDs {
+		gpuDataInterface := rocmData[gpuID]
 
 		gpuData, ok := gpuDataInterface.(map[string]any)
 		if !ok {

@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.04.10] - 2026-04-10
+
+### Fixed
+
+- **Individual GPU metrics for multi-vendor systems** — GPU indices are now globally unique
+  across all vendors (Intel → NVIDIA → AMD ordering), fixing MQTT topic collisions and
+  Home Assistant entity conflicts when multiple GPU vendors are present (e.g., Intel iGPU +
+  NVIDIA discrete GPUs). Previously, each vendor assigned indices starting from 0, causing
+  `unraid/gpu/0` to be shared by different GPUs. Closes #105
+- **Stabilise ROCm GPU ordering** — AMD GPU collection via `rocm-smi` now sorts card
+  identifiers numerically before processing, preventing non-deterministic index assignment
+  across collection cycles
+- **Replace direct `exec.Command` usage** — replaced 2 occurrences in `unassigned.go` and 1 in
+  `probes.go` with `lib.ExecCommandOutput` / `lib.ExecCommandOutputWithContext` wrappers for
+  consistent command execution and error handling
+- **Race condition in DockerCollector** — added `sync.Mutex` to protect concurrent access to the
+  `prevCPU` map in `getCPUFromCgroups` and `pruneStaleSnapshots`
+- **CORS missing PATCH method** — added `PATCH` to `Access-Control-Allow-Methods` in CORS
+  middleware so preflight requests for `PATCH /api/v1/collectors/{name}/interval` succeed
+- **WebSocket localhost alias matching** — added `isLocalhost()` equivalence check in WebSocket
+  `CheckOrigin` for consistency with CSRF middleware (allows `localhost`/`127.0.0.1`/`::1` to
+  match interchangeably)
+- **Zombie processes from background scripts** — replaced `proc.Release()` with
+  `go proc.Wait()` in `executeScriptBackground` to properly reap child processes
+- **lsblk stderr contaminating JSON** — added `ExecCommandStdout` helper and switched
+  `getDeviceInfo` in unassigned collector to use stdout-only output, preventing stderr
+  warnings from corrupting JSON parsing
+- **Ping target validation** — added `ValidateHostOrIP` validator and applied it in
+  `probePing` to reject empty, flag-prefixed, or malformed targets before execution
+
 ### Security
 
 - **Fix shell injection in userscripts controller** — removed the `sh -c` + `fmt.Sprintf`
@@ -29,26 +59,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ValidateUserScriptName`, `ValidatePluginName`, and `ValidateSnapshotName`
 - **Consistent validation error reporting** — refactored `ValidateLogFilename` from `bool` return
   to `error` return with descriptive messages matching other validators
-
-### Fixed
-
-- **Replace direct `exec.Command` usage** — replaced 2 occurrences in `unassigned.go` and 1 in
-  `probes.go` with `lib.ExecCommandOutput` / `lib.ExecCommandOutputWithContext` wrappers for
-  consistent command execution and error handling
-- **Race condition in DockerCollector** — added `sync.Mutex` to protect concurrent access to the
-  `prevCPU` map in `getCPUFromCgroups` and `pruneStaleSnapshots`
-- **CORS missing PATCH method** — added `PATCH` to `Access-Control-Allow-Methods` in CORS
-  middleware so preflight requests for `PATCH /api/v1/collectors/{name}/interval` succeed
-- **WebSocket localhost alias matching** — added `isLocalhost()` equivalence check in WebSocket
-  `CheckOrigin` for consistency with CSRF middleware (allows `localhost`/`127.0.0.1`/`::1` to
-  match interchangeably)
-- **Zombie processes from background scripts** — replaced `proc.Release()` with
-  `go proc.Wait()` in `executeScriptBackground` to properly reap child processes
-- **lsblk stderr contaminating JSON** — added `ExecCommandStdout` helper and switched
-  `getDeviceInfo` in unassigned collector to use stdout-only output, preventing stderr
-  warnings from corrupting JSON parsing
-- **Ping target validation** — added `ValidateHostOrIP` validator and applied it in
-  `probePing` to reject empty, flag-prefixed, or malformed targets before execution
 
 ## [2026.04.00] - 2026-04-08
 

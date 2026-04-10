@@ -6124,7 +6124,7 @@ const docTemplate = `{
                     "example": 65
                 },
                 "index": {
-                    "description": "GPU index for multi-GPU systems",
+                    "description": "Globally unique GPU index across all vendors (Intel → NVIDIA → AMD order)",
                     "type": "integer",
                     "example": 0
                 },
