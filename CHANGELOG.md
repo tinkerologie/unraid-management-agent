@@ -41,6 +41,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Sanitize verbose error responses** — Removed raw error details from 40+ REST API
+  500 Internal Server Error responses. Internal errors are now logged server-side only;
+  clients receive generic error messages without implementation details (OWASP A05:2021)
+- **Upgrade OpenTelemetry to v1.41.0** — Fixes CVE-2026-29181 (CWE-770 uncontrolled
+  resource consumption) in go.opentelemetry.io/otel v1.39.0
+- **Add global rate limiting middleware** — New rate limiter (10 req/s, burst of 20)
+  mitigates denial-of-service and brute-force attacks on REST API endpoints
+- **Restrict CORS default** — CORS headers are no longer set when `CORS_ORIGIN` is not
+  explicitly configured. Previously defaulted to `Access-Control-Allow-Origin: *` which
+  allowed any website to make cross-origin API requests. Set `CORS_ORIGIN` explicitly
+  to restore cross-origin access if needed
+- **Warn on insecure MQTT TLS** — Log a warning at startup when MQTT
+  `InsecureSkipVerify` is enabled to flag insecure TLS configurations
 - **Fix shell injection in userscripts controller** — removed the `sh -c` + `fmt.Sprintf`
   command-construction pattern in favor of direct argument passing to eliminate CWE-78
   command injection risk

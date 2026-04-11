@@ -73,15 +73,15 @@ func TestCorsMiddleware(t *testing.T) {
 		}
 	})
 
-	t.Run("empty origin defaults to wildcard", func(t *testing.T) {
+	t.Run("empty origin omits CORS headers", func(t *testing.T) {
 		h := corsMiddleware("")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}))
 		req := httptest.NewRequest("GET", "/test", nil)
 		rr := httptest.NewRecorder()
 		h.ServeHTTP(rr, req)
-		if got := rr.Header().Get("Access-Control-Allow-Origin"); got != "*" {
-			t.Errorf("Access-Control-Allow-Origin = %q, want %q", got, "*")
+		if got := rr.Header().Get("Access-Control-Allow-Origin"); got != "" {
+			t.Errorf("Access-Control-Allow-Origin = %q, want empty (no CORS headers when origin unconfigured)", got)
 		}
 	})
 }

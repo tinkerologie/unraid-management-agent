@@ -289,9 +289,9 @@ func TestCORS(t *testing.T) {
 		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
 	}
 
-	// Check CORS headers are set by middleware
-	if rr.Header().Get("Access-Control-Allow-Origin") == "" {
-		t.Error("expected Access-Control-Allow-Origin header to be set")
+	// When CORSOrigin is not configured, CORS headers should not be set
+	if rr.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Error("expected Access-Control-Allow-Origin header to be empty when CORS origin is not configured")
 	}
 }
 

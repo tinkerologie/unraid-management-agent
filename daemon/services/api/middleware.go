@@ -10,19 +10,22 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"golang.org/x/time/rate"
+
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
 func corsMiddleware(allowedOrigin string) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			origin := allowedOrigin
-			if origin == "" {
-				origin = "*"
+			// Only set CORS headers when explicitly configured.
+			// When no origin is set, cross-origin browser requests are blocked
+			// by default (same-origin policy). Non-browser clients are unaffected.
+			if allowedOrigin != "" {
+				w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 			}
-			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
 			if r.Method == "OPTIONS" {
 				w.WriteHeader(http.StatusOK)
@@ -107,6 +110,20 @@ func bodySizeLimitMiddleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// rateLimitMiddleware applies a global rate limit to incoming requests to
+// mitigate denial-of-service and brute-force attacks.
+func rateLimitMiddleware(limiter *rate.Limiter) mux.MiddlewareFunc {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !limiter.Allow() {
+				http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 // csrfMiddleware validates the Origin header on state-changing requests to

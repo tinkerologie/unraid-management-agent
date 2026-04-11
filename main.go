@@ -271,6 +271,11 @@ func main() {
 		},
 	}
 
+	// Warn about insecure MQTT TLS configuration
+	if appCtx.MQTTConfig.InsecureSkipVerify && appCtx.MQTTConfig.Enabled {
+		logger.Warning("MQTT TLS certificate verification is disabled (InsecureSkipVerify). This is insecure and should only be used for testing.")
+	}
+
 	// Run the boot command
 	err = ctx.Run(appCtx)
 	ctx.FatalIfErrorf(err)

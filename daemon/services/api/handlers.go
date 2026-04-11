@@ -71,7 +71,7 @@ func (s *Server) handleSystemReboot(w http.ResponseWriter, _ *http.Request) {
 		logger.Error("API: Failed to initiate reboot: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to initiate reboot: %v", err),
+			Message:   "Failed to initiate reboot",
 			Timestamp: time.Now(),
 		})
 		return
@@ -103,7 +103,7 @@ func (s *Server) handleSystemShutdown(w http.ResponseWriter, _ *http.Request) {
 		logger.Error("API: Failed to initiate shutdown: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to initiate shutdown: %v", err),
+			Message:   "Failed to initiate shutdown",
 			Timestamp: time.Now(),
 		})
 		return
@@ -433,7 +433,7 @@ func (s *Server) handleDockerOperation(w http.ResponseWriter, r *http.Request, o
 		logger.Error("Failed to %s container %s: %v", operation, containerID, err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to %s container: %v", operation, err),
+			Message:   fmt.Sprintf("Failed to %s container", operation),
 			Timestamp: time.Now(),
 		})
 		return
@@ -470,7 +470,7 @@ func (s *Server) handleVMOperation(w http.ResponseWriter, r *http.Request, opera
 		logger.Error("Failed to %s VM %s: %v", operation, vmName, err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to %s VM: %v", operation, err),
+			Message:   fmt.Sprintf("Failed to %s VM", operation),
 			Timestamp: time.Now(),
 		})
 		return
@@ -694,7 +694,7 @@ func (s *Server) handleArrayStart(w http.ResponseWriter, _ *http.Request) {
 		logger.Error("API: Failed to start array: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to start array: %v", err),
+			Message:   "Failed to start array",
 			Timestamp: time.Now(),
 		})
 		return
@@ -726,7 +726,7 @@ func (s *Server) handleArrayStop(w http.ResponseWriter, _ *http.Request) {
 		logger.Error("API: Failed to stop array: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to stop array: %v", err),
+			Message:   "Failed to stop array",
 			Timestamp: time.Now(),
 		})
 		return
@@ -761,7 +761,7 @@ func (s *Server) handleParityCheckStart(w http.ResponseWriter, r *http.Request) 
 		logger.Error("API: Failed to start parity check: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to start parity check: %v", err),
+			Message:   "Failed to start parity check",
 			Timestamp: time.Now(),
 		})
 		return
@@ -793,7 +793,7 @@ func (s *Server) handleParityCheckStop(w http.ResponseWriter, _ *http.Request) {
 		logger.Error("API: Failed to stop parity check: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to stop parity check: %v", err),
+			Message:   "Failed to stop parity check",
 			Timestamp: time.Now(),
 		})
 		return
@@ -825,7 +825,7 @@ func (s *Server) handleParityCheckPause(w http.ResponseWriter, _ *http.Request) 
 		logger.Error("API: Failed to pause parity check: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to pause parity check: %v", err),
+			Message:   "Failed to pause parity check",
 			Timestamp: time.Now(),
 		})
 		return
@@ -857,7 +857,7 @@ func (s *Server) handleParityCheckResume(w http.ResponseWriter, _ *http.Request)
 		logger.Error("API: Failed to resume parity check: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to resume parity check: %v", err),
+			Message:   "Failed to resume parity check",
 			Timestamp: time.Now(),
 		})
 		return
@@ -889,7 +889,7 @@ func (s *Server) handleParityCheckHistory(w http.ResponseWriter, _ *http.Request
 		logger.Error("API: Failed to get parity check history: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to get parity check history: %v", err),
+			Message:   "Failed to get parity check history",
 			Timestamp: time.Now(),
 		})
 		return
@@ -932,7 +932,7 @@ func (s *Server) handleShareConfig(w http.ResponseWriter, r *http.Request) {
 		logger.Error("API: Failed to get share config: %v", err)
 		respondJSON(w, http.StatusNotFound, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to get share config: %v", err),
+			Message:   "Failed to get share config",
 			Timestamp: time.Now(),
 		})
 		return
@@ -963,7 +963,7 @@ func (s *Server) handleNetworkConfig(w http.ResponseWriter, r *http.Request) {
 		logger.Error("API: Failed to get network config: %v", err)
 		respondJSON(w, http.StatusNotFound, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to get network config: %v", err),
+			Message:   "Failed to get network config",
 			Timestamp: time.Now(),
 		})
 		return
@@ -991,7 +991,7 @@ func (s *Server) handleSystemSettings(w http.ResponseWriter, _ *http.Request) {
 		logger.Error("API: Failed to get system settings: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to get system settings: %v", err),
+			Message:   "Failed to get system settings",
 			Timestamp: time.Now(),
 		})
 		return
@@ -1019,7 +1019,7 @@ func (s *Server) handleDockerSettings(w http.ResponseWriter, _ *http.Request) {
 		logger.Error("API: Failed to get Docker settings: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to get Docker settings: %v", err),
+			Message:   "Failed to get Docker settings",
 			Timestamp: time.Now(),
 		})
 		return
@@ -1047,7 +1047,7 @@ func (s *Server) handleVMSettings(w http.ResponseWriter, _ *http.Request) {
 		logger.Error("API: Failed to get VM settings: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to get VM settings: %v", err),
+			Message:   "Failed to get VM settings",
 			Timestamp: time.Now(),
 		})
 		return
@@ -1075,7 +1075,7 @@ func (s *Server) handleDiskSettings(w http.ResponseWriter, _ *http.Request) {
 		logger.Error("API: Failed to get disk settings: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to get disk settings: %v", err),
+			Message:   "Failed to get disk settings",
 			Timestamp: time.Now(),
 		})
 		return
@@ -1131,7 +1131,7 @@ func (s *Server) handleUpdateShareConfig(w http.ResponseWriter, r *http.Request)
 		logger.Error("API: Failed to update share config: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to update share config: %v", err),
+			Message:   "Failed to update share config",
 			Timestamp: time.Now(),
 		})
 		return
@@ -1174,7 +1174,7 @@ func (s *Server) handleUpdateSystemSettings(w http.ResponseWriter, r *http.Reque
 		logger.Error("API: Failed to update system settings: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to update system settings: %v", err),
+			Message:   "Failed to update system settings",
 			Timestamp: time.Now(),
 		})
 		return
@@ -1202,7 +1202,7 @@ func (s *Server) handleUserScripts(w http.ResponseWriter, _ *http.Request) {
 		logger.Error("API: Failed to list user scripts: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to list user scripts: %v", err),
+			Message:   "Failed to list user scripts",
 			Timestamp: time.Now(),
 		})
 		return
@@ -1440,7 +1440,8 @@ func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
 	// Get log content with optional pagination
 	content, err := s.getLogContent(path, linesParam, startParam)
 	if err != nil {
-		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		logger.Error("API: Failed to read log content: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to read log content"})
 		return
 	}
 
@@ -1503,9 +1504,10 @@ func (s *Server) handleLogFile(w http.ResponseWriter, r *http.Request) {
 	// Get log content
 	content, err := s.getLogContent(foundPath, linesParam, startParam)
 	if err != nil {
+		logger.Error("API: Failed to read log file %s: %v", filename, err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   err.Error(),
+			Message:   "Failed to read log file",
 			Timestamp: time.Now(),
 		})
 		return
@@ -1723,7 +1725,8 @@ func (s *Server) handleCreateNotification(w http.ResponseWriter, r *http.Request
 	}
 
 	if err := controllers.CreateNotification(req.Title, req.Subject, req.Description, req.Importance, req.Link); err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		logger.Error("API: Failed to create notification: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to create notification")
 		return
 	}
 
@@ -1745,7 +1748,8 @@ func (s *Server) handleArchiveNotification(w http.ResponseWriter, r *http.Reques
 	id := vars["id"]
 
 	if err := controllers.ArchiveNotification(id); err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		logger.Error("API: Failed to archive notification %s: %v", id, err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to archive notification")
 		return
 	}
 
@@ -1767,7 +1771,8 @@ func (s *Server) handleUnarchiveNotification(w http.ResponseWriter, r *http.Requ
 	id := vars["id"]
 
 	if err := controllers.UnarchiveNotification(id); err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		logger.Error("API: Failed to unarchive notification %s: %v", id, err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to unarchive notification")
 		return
 	}
 
@@ -1793,7 +1798,8 @@ func (s *Server) handleDeleteNotification(w http.ResponseWriter, r *http.Request
 	isArchived := r.URL.Query().Get("archived") == "true"
 
 	if err := controllers.DeleteNotification(id, isArchived); err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		logger.Error("API: Failed to delete notification %s: %v", id, err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to delete notification")
 		return
 	}
 
@@ -1811,7 +1817,8 @@ func (s *Server) handleDeleteNotification(w http.ResponseWriter, r *http.Request
 //	@Router			/notifications/archive/all [post]
 func (s *Server) handleArchiveAllNotifications(w http.ResponseWriter, _ *http.Request) {
 	if err := controllers.ArchiveAllNotifications(); err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		logger.Error("API: Failed to archive all notifications: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to archive all notifications")
 		return
 	}
 
@@ -2282,7 +2289,7 @@ func (s *Server) handleDiskSettingsExtended(w http.ResponseWriter, _ *http.Reque
 		logger.Error("API: Failed to get extended disk settings: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to get extended disk settings: %v", err),
+			Message:   "Failed to get extended disk settings",
 			Timestamp: time.Now(),
 		})
 		return
@@ -2310,7 +2317,7 @@ func (s *Server) handleMoverSettings(w http.ResponseWriter, _ *http.Request) {
 		logger.Error("API: Failed to get mover settings: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to get mover settings: %v", err),
+			Message:   "Failed to get mover settings",
 			Timestamp: time.Now(),
 		})
 		return
@@ -2338,7 +2345,7 @@ func (s *Server) handleParitySchedule(w http.ResponseWriter, _ *http.Request) {
 		logger.Error("API: Failed to get parity schedule: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to get parity schedule: %v", err),
+			Message:   "Failed to get parity schedule",
 			Timestamp: time.Now(),
 		})
 		return
@@ -2366,7 +2373,7 @@ func (s *Server) handleServiceStatus(w http.ResponseWriter, _ *http.Request) {
 		logger.Error("API: Failed to get service status: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to get service status: %v", err),
+			Message:   "Failed to get service status",
 			Timestamp: time.Now(),
 		})
 		return
@@ -2394,7 +2401,7 @@ func (s *Server) handlePluginList(w http.ResponseWriter, _ *http.Request) {
 		logger.Error("API: Failed to get plugin list: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to get plugin list: %v", err),
+			Message:   "Failed to get plugin list",
 			Timestamp: time.Now(),
 		})
 		return
@@ -2422,7 +2429,7 @@ func (s *Server) handleUpdateStatus(w http.ResponseWriter, _ *http.Request) {
 		logger.Error("API: Failed to get update status: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to get update status: %v", err),
+			Message:   "Failed to get update status",
 			Timestamp: time.Now(),
 		})
 		return
@@ -2450,7 +2457,7 @@ func (s *Server) handleFlashHealth(w http.ResponseWriter, _ *http.Request) {
 		logger.Error("API: Failed to get flash drive health: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to get flash drive health: %v", err),
+			Message:   "Failed to get flash drive health",
 			Timestamp: time.Now(),
 		})
 		return
@@ -2478,7 +2485,7 @@ func (s *Server) handleNetworkServices(w http.ResponseWriter, _ *http.Request) {
 		logger.Error("API: Failed to get network services status: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to get network services status: %v", err),
+			Message:   "Failed to get network services status",
 			Timestamp: time.Now(),
 		})
 		return
@@ -2544,7 +2551,7 @@ func (s *Server) handleMQTTTest(w http.ResponseWriter, _ *http.Request) {
 		logger.Error("API: MQTT test failed: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.MQTTTestResponse{
 			Success:   false,
-			Message:   fmt.Sprintf("MQTT connection test failed: %v", err),
+			Message:   "MQTT connection test failed",
 			Timestamp: time.Now(),
 		})
 		return
@@ -2605,7 +2612,7 @@ func (s *Server) handleMQTTPublish(w http.ResponseWriter, r *http.Request) {
 		logger.Error("API: Failed to publish MQTT message: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to publish message: %v", err),
+			Message:   "Failed to publish message",
 			Timestamp: time.Now(),
 		})
 		return
@@ -2640,7 +2647,7 @@ func (s *Server) handleDockerCheckUpdates(w http.ResponseWriter, _ *http.Request
 		logger.Error("API: Failed to check container updates: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to check for updates: %v", err),
+			Message:   "Failed to check for updates",
 			Timestamp: time.Now(),
 		})
 		return
@@ -2681,7 +2688,7 @@ func (s *Server) handleDockerCheckUpdate(w http.ResponseWriter, r *http.Request)
 		logger.Error("API: Failed to check container update for %s: %v", containerRef, err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to check for update: %v", err),
+			Message:   "Failed to check for update",
 			Timestamp: time.Now(),
 		})
 		return
@@ -2722,7 +2729,7 @@ func (s *Server) handleDockerSize(w http.ResponseWriter, r *http.Request) {
 		logger.Error("API: Failed to get container size for %s: %v", containerRef, err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to get container size: %v", err),
+			Message:   "Failed to get container size",
 			Timestamp: time.Now(),
 		})
 		return
@@ -2766,7 +2773,7 @@ func (s *Server) handleDockerUpdate(w http.ResponseWriter, r *http.Request) {
 		logger.Error("API: Failed to update container %s: %v", containerRef, err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to update container: %v", err),
+			Message:   "Failed to update container",
 			Timestamp: time.Now(),
 		})
 		return
@@ -2795,7 +2802,7 @@ func (s *Server) handleDockerUpdateAll(w http.ResponseWriter, _ *http.Request) {
 		logger.Error("API: Failed to update all containers: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to update containers: %v", err),
+			Message:   "Failed to update containers",
 			Timestamp: time.Now(),
 		})
 		return
@@ -2824,7 +2831,7 @@ func (s *Server) handlePluginCheckUpdates(w http.ResponseWriter, _ *http.Request
 		logger.Error("API: Failed to check plugin updates: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to check for plugin updates: %v", err),
+			Message:   "Failed to check for plugin updates",
 			Timestamp: time.Now(),
 		})
 		return
@@ -2867,7 +2874,7 @@ func (s *Server) handlePluginUpdate(w http.ResponseWriter, r *http.Request) {
 		logger.Error("API: Failed to update plugin %s: %v", pluginName, err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to update plugin: %v", err),
+			Message:   "Failed to update plugin",
 			Timestamp: time.Now(),
 		})
 		return
@@ -2898,7 +2905,7 @@ func (s *Server) handlePluginUpdateAll(w http.ResponseWriter, _ *http.Request) {
 		logger.Error("API: Failed to update all plugins: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to update plugins: %v", err),
+			Message:   "Failed to update plugins",
 			Timestamp: time.Now(),
 		})
 		return
@@ -2974,7 +2981,7 @@ func (s *Server) handleVMClone(w http.ResponseWriter, r *http.Request) {
 		logger.Error("API: Failed to clone VM %s: %v", vmName, err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to clone VM: %v", err),
+			Message:   "Failed to clone VM",
 			Timestamp: time.Now(),
 		})
 		return
@@ -3036,7 +3043,7 @@ func (s *Server) handleVMCreateSnapshot(w http.ResponseWriter, r *http.Request) 
 		logger.Error("API: Failed to create snapshot for VM %s: %v", vmName, err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to create snapshot: %v", err),
+			Message:   "Failed to create snapshot",
 			Timestamp: time.Now(),
 		})
 		return
@@ -3079,7 +3086,7 @@ func (s *Server) handleVMListSnapshots(w http.ResponseWriter, r *http.Request) {
 		logger.Error("API: Failed to list snapshots for VM %s: %v", vmName, err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to list snapshots: %v", err),
+			Message:   "Failed to list snapshots",
 			Timestamp: time.Now(),
 		})
 		return
@@ -3129,7 +3136,7 @@ func (s *Server) handleVMDeleteSnapshot(w http.ResponseWriter, r *http.Request) 
 		logger.Error("API: Failed to delete snapshot %s for VM %s: %v", snapshotName, vmName, err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to delete snapshot: %v", err),
+			Message:   "Failed to delete snapshot",
 			Timestamp: time.Now(),
 		})
 		return
@@ -3183,7 +3190,7 @@ func (s *Server) handleVMRestoreSnapshot(w http.ResponseWriter, r *http.Request)
 		logger.Error("API: Failed to restore snapshot %s for VM %s: %v", snapshotName, vmName, err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to restore snapshot: %v", err),
+			Message:   "Failed to restore snapshot",
 			Timestamp: time.Now(),
 		})
 		return
@@ -3241,7 +3248,7 @@ func (s *Server) handleDockerLogs(w http.ResponseWriter, r *http.Request) {
 		logger.Error("API: Failed to get logs for container %s: %v", containerRef, err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to get container logs: %v", err),
+			Message:   "Failed to get container logs",
 			Timestamp: time.Now(),
 		})
 		return
@@ -3302,7 +3309,7 @@ func (s *Server) handleServiceAction(w http.ResponseWriter, r *http.Request) {
 		logger.Error("API: Failed to %s service %s: %v", action, serviceName, err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to %s service %s: %v", action, serviceName, err),
+			Message:   fmt.Sprintf("Failed to %s service", action),
 			Timestamp: time.Now(),
 		})
 		return
@@ -3380,7 +3387,7 @@ func (s *Server) handleProcessList(w http.ResponseWriter, r *http.Request) {
 		logger.Error("API: Failed to list processes: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,
-			Message:   fmt.Sprintf("Failed to list processes: %v", err),
+			Message:   "Failed to list processes",
 			Timestamp: time.Now(),
 		})
 		return
@@ -3484,7 +3491,8 @@ func (s *Server) handleCreateAlertRule(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.alertStore.CreateRule(rule); err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		logger.Error("API: Failed to create alert rule: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to create alert rule")
 		return
 	}
 
@@ -3936,7 +3944,8 @@ func (s *Server) handleSetFanSpeed(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.fanController.SetSpeed(req.FanID, req.PWMPercent); err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		logger.Error("API: Failed to set fan speed: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to set fan speed")
 		return
 	}
 
@@ -3972,7 +3981,8 @@ func (s *Server) handleSetFanMode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.fanController.SetMode(req.FanID, req.Mode); err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		logger.Error("API: Failed to set fan mode: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to set fan mode")
 		return
 	}
 
@@ -4008,7 +4018,8 @@ func (s *Server) handleSetFanProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.fanController.SetProfile(req.FanID, req.ProfileName, req.TempSensorPath); err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		logger.Error("API: Failed to assign fan profile: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to assign fan profile")
 		return
 	}
 
@@ -4050,7 +4061,8 @@ func (s *Server) handleCreateFanProfile(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err := s.fanController.CreateProfile(profile); err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		logger.Error("API: Failed to create fan profile: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to create fan profile")
 		return
 	}
 
@@ -4077,7 +4089,8 @@ func (s *Server) handleRestoreFanDefaults(w http.ResponseWriter, _ *http.Request
 	}
 
 	if err := s.fanController.RestoreDefaults(); err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		logger.Error("API: Failed to restore fan defaults: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to restore fan defaults")
 		return
 	}
 
@@ -4113,7 +4126,8 @@ func (s *Server) handleUpdateFanConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.fanController.UpdateConfig(config); err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		logger.Error("API: Failed to update fan config: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to update fan control configuration")
 		return
 	}
 
@@ -4258,7 +4272,8 @@ func (s *Server) handleSetTurboBoost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.tuningController.SetTurboBoost(req.Enabled); err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		logger.Error("API: Failed to set turbo boost: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to set turbo boost")
 		return
 	}
 
@@ -4329,7 +4344,8 @@ func (s *Server) handleSetDiskCache(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.tuningController.SetDiskCache(bgRatio, ratio, wbCenti, expCenti); err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		logger.Error("API: Failed to set disk cache: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to update disk cache parameters")
 		return
 	}
 
@@ -4368,7 +4384,8 @@ func (s *Server) handleSetInotifyLimits(w http.ResponseWriter, r *http.Request) 
 	if err := s.tuningController.SetInotifyLimits(
 		req.MaxUserWatches, req.MaxUserInstances, req.MaxQueuedEvents,
 	); err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		logger.Error("API: Failed to set inotify limits: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to update inotify limits")
 		return
 	}
 

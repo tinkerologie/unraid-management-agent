@@ -263,15 +263,15 @@ func TestServerMiddlewareChain(t *testing.T) {
 	rr := httptest.NewRecorder()
 	server.router.ServeHTTP(rr, req)
 
-	// CORS middleware should add headers
-	if rr.Header().Get("Access-Control-Allow-Origin") == "" {
-		t.Error("CORS middleware should set Access-Control-Allow-Origin header")
+	// When CORSOrigin is not configured, CORS headers should not be set
+	if rr.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Error("CORS middleware should not set Access-Control-Allow-Origin header when origin is not configured")
 	}
 }
 
 func TestCORSHeaders(t *testing.T) {
 	hub := domain.NewEventBus(10)
-	ctx := &domain.Context{Hub: hub}
+	ctx := &domain.Context{Hub: hub, Config: domain.Config{CORSOrigin: "http://localhost:3000"}}
 
 	server := NewServer(ctx)
 
@@ -284,10 +284,10 @@ func TestCORSHeaders(t *testing.T) {
 	rr := httptest.NewRecorder()
 	server.router.ServeHTTP(rr, req)
 
-	// CORS middleware should add headers on regular requests
+	// CORS middleware should add headers when origin is explicitly configured
 	origin := rr.Header().Get("Access-Control-Allow-Origin")
-	if origin != "*" {
-		t.Errorf("Expected Access-Control-Allow-Origin header to be '*', got %q", origin)
+	if origin != "http://localhost:3000" {
+		t.Errorf("Expected Access-Control-Allow-Origin header to be 'http://localhost:3000', got %q", origin)
 	}
 }
 
