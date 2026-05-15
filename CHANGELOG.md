@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **ZFS cache/pool disk usage in `/api/v1/disks`** — disk collection now resolves ZFS-backed
+  cache and pool members to their owning zpool and uses `zpool list` capacity data instead of
+  `statfs()` on `/mnt/<disk>`, fixing near-zero usage on root datasets and `null` usage for
+  mirrored members like `cache2`
+
 ## [2026.04.01] - 2026-04-10
 
 ### Fixed
