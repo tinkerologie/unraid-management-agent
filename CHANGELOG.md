@@ -9,12 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.05.00] - 2026-05-16
+
+### Changed
+
+- **Go version upgraded to 1.26.3** — Latest stable Go release with improved performance (Green Tea GC, ~30% faster cgo, ~2x faster `io.ReadAll`)
+- **All dependencies updated to latest versions** — 16 direct dependencies and 30+ transitive dependencies bumped to their latest compatible versions including:
+  - `go.opentelemetry.io/*` → v1.43.0
+  - `github.com/prometheus/common` → v0.67.5
+  - `github.com/prometheus/procfs` → v0.20.1
+  - `golang.org/x/*` tooling packages (crypto, mod, net, sys, term, tools)
+  - `github.com/go-openapi/swag/*` → v0.26.0
+  - All other dependencies audit-tested with `govulncheck` — zero vulnerabilities found
+
 ### Fixed
 
 - **ZFS cache/pool disk usage in `/api/v1/disks`** — disk collection now resolves ZFS-backed
   cache and pool members to their owning zpool and uses `zpool list` capacity data instead of
   `statfs()` on `/mnt/<disk>`, fixing near-zero usage on root datasets and `null` usage for
-  mirrored members like `cache2`
+  mirrored members like `cache2` Thanks for the contribution @laurensguijt
 
 ## [2026.04.01] - 2026-04-10
 
