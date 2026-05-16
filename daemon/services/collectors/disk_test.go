@@ -617,6 +617,206 @@ func TestEnrichWithModelAndSerialNoDevice(t *testing.T) {
 	}
 }
 
+func TestResolveZFSPoolName(t *testing.T) {
+	poolUsages := map[string]zfsPoolUsage{
+		"cache":    {},
+		"fastpool": {},
+		"cache2":   {},
+	}
+
+	tests := []struct {
+		name     string
+		disk     dto.DiskInfo
+		pools    map[string]zfsPoolUsage
+		wantPool string
+		wantOK   bool
+	}{
+		{
+			name:     "exact pool name match",
+			disk:     dto.DiskInfo{Name: "cache"},
+			pools:    poolUsages,
+			wantPool: "cache",
+			wantOK:   true,
+		},
+		{
+			name: "mirror member resolves by stripping suffix digits",
+			disk: dto.DiskInfo{Name: "cache2"},
+			pools: map[string]zfsPoolUsage{
+				"cache": {},
+			},
+			wantPool: "cache",
+			wantOK:   true,
+		},
+		{
+			name: "other pool member resolves by stripping suffix digits",
+			disk: dto.DiskInfo{Name: "fastpool2"},
+			pools: map[string]zfsPoolUsage{
+				"fastpool": {},
+			},
+			wantPool: "fastpool",
+			wantOK:   true,
+		},
+		{
+			name:     "non matching disk name does not resolve",
+			disk:     dto.DiskInfo{Name: "disk1"},
+			pools:    poolUsages,
+			wantPool: "",
+			wantOK:   false,
+		},
+		{
+			name: "exact pool name wins before stripping digits",
+			disk: dto.DiskInfo{Name: "cache2"},
+			pools: map[string]zfsPoolUsage{
+				"cache2": {},
+				"cache":  {},
+			},
+			wantPool: "cache2",
+			wantOK:   true,
+		},
+		{
+			name:  "mount point can resolve pool",
+			disk:  dto.DiskInfo{Name: "member1", MountPoint: "/mnt/cache/appdata"},
+			pools: poolUsages,
+			wantPool: "cache",
+			wantOK:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotPool, gotOK := resolveZFSPoolName(&tt.disk, tt.pools)
+			if gotOK != tt.wantOK {
+				t.Fatalf("resolveZFSPoolName() ok = %v, want %v", gotOK, tt.wantOK)
+			}
+			if gotPool != tt.wantPool {
+				t.Errorf("resolveZFSPoolName() pool = %q, want %q", gotPool, tt.wantPool)
+			}
+		})
+	}
+}
+
+func TestParseZFSPoolUsageLine(t *testing.T) {
+	tests := []struct {
+		name    string
+		output  string
+		wantPool string
+		want    zfsPoolUsage
+		wantOK  bool
+	}{
+		{
+			name:   "plain capacity number",
+			output: "cache\t965845127168\t180000000000\t785845127168\t18",
+			wantPool: "cache",
+			want: zfsPoolUsage{
+				Size:         965845127168,
+				Used:         180000000000,
+				Free:         785845127168,
+				UsagePercent: 18,
+			},
+			wantOK: true,
+		},
+		{
+			name:   "capacity with percent suffix",
+			output: "cache\t965845127168\t180000000000\t785845127168\t18%",
+			wantPool: "cache",
+			want: zfsPoolUsage{
+				Size:         965845127168,
+				Used:         180000000000,
+				Free:         785845127168,
+				UsagePercent: 18,
+			},
+			wantOK: true,
+		},
+		{
+			name:   "invalid output is rejected",
+			output: "cache\tbad\t180000000000\t785845127168\t18",
+			wantOK: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotPool, got, gotOK := parseZFSPoolUsageLine(tt.output)
+			if gotOK != tt.wantOK {
+				t.Fatalf("parseZFSPoolUsageLine() ok = %v, want %v", gotOK, tt.wantOK)
+			}
+			if !tt.wantOK {
+				return
+			}
+
+			if gotPool != tt.wantPool {
+				t.Errorf("parseZFSPoolUsageLine() pool = %q, want %q", gotPool, tt.wantPool)
+			}
+			if got != tt.want {
+				t.Errorf("parseZFSPoolUsageLine() = %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEnrichWithZFSPoolUsage(t *testing.T) {
+	collector := &DiskCollector{}
+	poolUsages := map[string]zfsPoolUsage{
+		"cache": {
+			Size:         965845127168,
+			Used:         180000000000,
+			Free:         785845127168,
+			UsagePercent: 18,
+		},
+	}
+
+	t.Run("zfs cache disk gets pool usage", func(t *testing.T) {
+		disk := &dto.DiskInfo{
+			Name:          "cache2",
+			Role:          "cache",
+			FileSystem:    "zfs",
+			Size:          1,
+			Used:          2,
+			Free:          3,
+			UsagePercent:  4,
+		}
+
+		applied := collector.enrichWithZFSPoolUsage(disk, poolUsages)
+		if !applied {
+			t.Fatal("enrichWithZFSPoolUsage() = false, want true")
+		}
+
+		if disk.Size != poolUsages["cache"].Size {
+			t.Errorf("Size = %d, want %d", disk.Size, poolUsages["cache"].Size)
+		}
+		if disk.Used != poolUsages["cache"].Used {
+			t.Errorf("Used = %d, want %d", disk.Used, poolUsages["cache"].Used)
+		}
+		if disk.Free != poolUsages["cache"].Free {
+			t.Errorf("Free = %d, want %d", disk.Free, poolUsages["cache"].Free)
+		}
+		if disk.UsagePercent != poolUsages["cache"].UsagePercent {
+			t.Errorf("UsagePercent = %f, want %f", disk.UsagePercent, poolUsages["cache"].UsagePercent)
+		}
+	})
+
+	t.Run("non zfs non pool disk is unchanged", func(t *testing.T) {
+		disk := &dto.DiskInfo{
+			Name:         "disk1",
+			Role:         "data",
+			FileSystem:   "xfs",
+			Size:         10,
+			Used:         20,
+			Free:         30,
+			UsagePercent: 40,
+		}
+
+		applied := collector.enrichWithZFSPoolUsage(disk, poolUsages)
+		if applied {
+			t.Fatal("enrichWithZFSPoolUsage() = true, want false")
+		}
+
+		if disk.Size != 10 || disk.Used != 20 || disk.Free != 30 || disk.UsagePercent != 40 {
+			t.Errorf("disk was modified unexpectedly: %+v", disk)
+		}
+	})
+}
+
 // TestEnrichWithModelAndSerialEmptyID tests enrichment when ID is empty
 func TestEnrichWithModelAndSerialEmptyID(t *testing.T) {
 	hub := domain.NewEventBus(10)

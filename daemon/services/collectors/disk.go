@@ -26,6 +26,13 @@ type DiskCollector struct {
 	prevCollectTime time.Time
 }
 
+type zfsPoolUsage struct {
+	Size         uint64
+	Used         uint64
+	Free         uint64
+	UsagePercent float64
+}
+
 // NewDiskCollector creates a new disk information collector with the given context.
 func NewDiskCollector(ctx *domain.Context) *DiskCollector {
 	return &DiskCollector{
@@ -271,6 +278,8 @@ func (c *DiskCollector) parseDiskKeyValue(disk *dto.DiskInfo, line string) {
 
 // enrichDisks enhances each disk with additional statistics
 func (c *DiskCollector) enrichDisks(disks []dto.DiskInfo) {
+	zfsPoolUsages := c.getZFSPoolUsages()
+
 	for i := range disks {
 		// Get model and serial number
 		c.enrichWithModelAndSerial(&disks[i])
@@ -288,6 +297,10 @@ func (c *DiskCollector) enrichDisks(disks []dto.DiskInfo) {
 
 		// Get disk role
 		c.enrichWithRole(&disks[i])
+
+		// For ZFS cache/pool disks, override statfs values with pool-level usage
+		// so mirrored pools and child datasets report the same numbers as Unraid.
+		c.enrichWithZFSPoolUsage(&disks[i], zfsPoolUsages)
 
 		// Get spin state
 		if disks[i].Device != "" {
@@ -685,6 +698,126 @@ func (c *DiskCollector) enrichWithRole(disk *dto.DiskInfo) {
 	default:
 		disk.Role = "unknown"
 	}
+}
+
+func shouldUseZFSPoolUsage(disk *dto.DiskInfo) bool {
+	if strings.EqualFold(disk.FileSystem, "zfs") {
+		return true
+	}
+
+	return disk.Role == "cache" || disk.Role == "pool"
+}
+
+func resolveZFSPoolName(disk *dto.DiskInfo, poolUsages map[string]zfsPoolUsage) (string, bool) {
+	if len(poolUsages) == 0 {
+		return "", false
+	}
+
+	diskName := strings.TrimSpace(disk.Name)
+	if _, ok := poolUsages[diskName]; ok {
+		return diskName, true
+	}
+
+	trimmedName := strings.TrimRightFunc(diskName, func(r rune) bool {
+		return r >= '0' && r <= '9'
+	})
+	if trimmedName != "" && trimmedName != diskName {
+		if _, ok := poolUsages[trimmedName]; ok {
+			return trimmedName, true
+		}
+	}
+
+	if disk.MountPoint != "" && strings.HasPrefix(disk.MountPoint, "/mnt/") {
+		poolName := strings.TrimPrefix(disk.MountPoint, "/mnt/")
+		poolName = strings.SplitN(poolName, "/", 2)[0]
+		if _, ok := poolUsages[poolName]; ok {
+			return poolName, true
+		}
+	}
+
+	return "", false
+}
+
+func (c *DiskCollector) enrichWithZFSPoolUsage(disk *dto.DiskInfo, poolUsages map[string]zfsPoolUsage) bool {
+	if !shouldUseZFSPoolUsage(disk) {
+		return false
+	}
+
+	poolName, ok := resolveZFSPoolName(disk, poolUsages)
+	if !ok {
+		return false
+	}
+
+	usage := poolUsages[poolName]
+
+	disk.Size = usage.Size
+	disk.Used = usage.Used
+	disk.Free = usage.Free
+	disk.UsagePercent = usage.UsagePercent
+
+	return true
+}
+
+func (c *DiskCollector) getZFSPoolUsages() map[string]zfsPoolUsage {
+	output, err := lib.ExecCommandOutput(constants.ZpoolBin, "list", "-Hp", "-o",
+		"name,size,allocated,free,capacity")
+	if err != nil {
+		logger.Debug("Disk: Failed to load ZFS pool usage: %v", err)
+		return nil
+	}
+
+	usages := make(map[string]zfsPoolUsage)
+	for _, line := range strings.Split(output, "\n") {
+		name, usage, ok := parseZFSPoolUsageLine(line)
+		if ok {
+			usages[name] = usage
+		}
+	}
+
+	if len(usages) == 0 {
+		logger.Debug("Disk: No parseable ZFS pool usage found in zpool output")
+	}
+
+	return usages
+}
+
+func parseZFSPoolUsageLine(line string) (string, zfsPoolUsage, bool) {
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return "", zfsPoolUsage{}, false
+	}
+
+	fields := strings.Fields(line)
+	if len(fields) < 5 {
+		return "", zfsPoolUsage{}, false
+	}
+
+	size, err := strconv.ParseUint(fields[1], 10, 64)
+	if err != nil {
+		return "", zfsPoolUsage{}, false
+	}
+
+	used, err := strconv.ParseUint(fields[2], 10, 64)
+	if err != nil {
+		return "", zfsPoolUsage{}, false
+	}
+
+	free, err := strconv.ParseUint(fields[3], 10, 64)
+	if err != nil {
+		return "", zfsPoolUsage{}, false
+	}
+
+	usagePercent, err := strconv.ParseFloat(strings.TrimSuffix(fields[4], "%"), 64)
+	if err != nil {
+		return "", zfsPoolUsage{}, false
+	}
+
+	return fields[0], zfsPoolUsage{
+		Size:         size,
+		Used:         used,
+		Free:         free,
+		UsagePercent: usagePercent,
+	}, true
 }
 
 // enrichWithSpinState checks the current spin state of the disk
