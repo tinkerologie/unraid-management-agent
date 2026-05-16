@@ -3,7 +3,7 @@
 <!DOCTYPE PLUGIN [
     <!ENTITY name        "unraid-management-agent">
     <!ENTITY author      "Ruaan Deysel">
-    <!ENTITY version     "2026.04.01">
+    <!ENTITY version     "2026.05.00">
     <!ENTITY gitURL      "https://github.com/ruaan-deysel/&name;">
     <!ENTITY pluginURL   "&gitURL;/raw/main/&name;.plg">
     <!ENTITY supportURL  "https://forums.unraid.net/topic/196675-plugin-unraid-management-agent">
