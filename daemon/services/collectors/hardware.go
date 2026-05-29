@@ -96,6 +96,12 @@ func (c *HardwareCollector) collectHardwareInfo() (*dto.HardwareInfo, error) {
 			info.Baseboard = baseboard
 			logger.Debug("Hardware: Collected baseboard info via sysfs - Manufacturer: %s, Product: %s", baseboard.Manufacturer, baseboard.ProductName)
 		}
+
+		// Collect chassis information from sysfs (Unraid 7.3 surfaces chassis serial)
+		if chassis := lib.ParseChassisInfoSysfs(); chassis != nil && (chassis.SerialNumber != "" || chassis.Manufacturer != "" || chassis.Type != "") {
+			info.Chassis = chassis
+			logger.Debug("Hardware: Collected chassis info via sysfs - Serial: %s, Type: %s", chassis.SerialNumber, chassis.Type)
+		}
 	}
 
 	// Use dmidecode for detailed info not available in sysfs (CPU, cache, memory)
@@ -116,6 +122,16 @@ func (c *HardwareCollector) collectHardwareInfo() (*dto.HardwareInfo, error) {
 				logger.Debug("Hardware: Collected baseboard info via dmidecode - Manufacturer: %s, Product: %s", baseboard.Manufacturer, baseboard.ProductName)
 			} else {
 				logger.Debug("Hardware: Failed to collect baseboard info: %v", err)
+			}
+		}
+
+		// Chassis info via dmidecode (type 3) if sysfs didn't provide a serial
+		if info.Chassis == nil || info.Chassis.SerialNumber == "" {
+			if chassis, err := lib.ParseChassisInfo(); err == nil {
+				info.Chassis = chassis
+				logger.Debug("Hardware: Collected chassis info via dmidecode - Serial: %s, Type: %s", chassis.SerialNumber, chassis.Type)
+			} else {
+				logger.Debug("Hardware: Failed to collect chassis info: %v", err)
 			}
 		}
 
@@ -152,6 +168,18 @@ func (c *HardwareCollector) collectHardwareInfo() (*dto.HardwareInfo, error) {
 		}
 	} else {
 		logger.Warning("dmidecode command not found, skipping detailed hardware collection")
+	}
+
+	// TPM presence/version (Unraid 7.3 supports TPM-based licensing)
+	if tpm := lib.ReadTPMInfo(); tpm != nil && tpm.Present {
+		info.TPM = tpm
+		logger.Debug("Hardware: TPM present - Version: %s", tpm.Version)
+	}
+
+	// Boot device / boot pool (Unraid 7.3 internal boot support)
+	if boot := lib.DetectBootInfo(); boot != nil {
+		info.Boot = boot
+		logger.Debug("Hardware: Boot device type: %s, device: %s, pool: %s", boot.DeviceType, boot.Device, boot.BootPool)
 	}
 
 	return info, nil

@@ -4,7 +4,7 @@ Complete reference for all Unraid Management Agent API endpoints.
 
 **Base URL**: `http://YOUR_UNRAID_IP:8043/api/v1`  
 **Version**: 1.0.0  
-**Total Endpoints**: 57
+**Total Endpoints**: 58
 
 ---
 
@@ -796,6 +796,11 @@ Get system information including CPU, memory, temperatures, and uptime.
   "ram_free_bytes": 19390496768,
   "ram_buffers_bytes": 1073741824,
   "ram_cached_bytes": 8589934592,
+  "swap_usage_percent": 12.5,
+  "swap_total_bytes": 8589934592,
+  "swap_used_bytes": 1073741824,
+  "swap_free_bytes": 7516192768,
+  "swappiness": 60,
   "server_model": "System Product Name",
   "bios_version": "1.0",
   "bios_date": "01/01/2020",
@@ -833,6 +838,11 @@ Get system information including CPU, memory, temperatures, and uptime.
 - `ram_free_bytes`: Free RAM in bytes
 - `ram_buffers_bytes`: RAM used for buffers in bytes
 - `ram_cached_bytes`: RAM used for cache in bytes
+- `swap_usage_percent`: Swap usage percentage (0 when no swap configured)
+- `swap_total_bytes`: Total swap in bytes (from `/proc/meminfo`)
+- `swap_used_bytes`: Used swap in bytes
+- `swap_free_bytes`: Free swap in bytes
+- `swappiness`: Kernel `vm.swappiness` tunable (0–200; `-1` when unavailable)
 - `server_model`: Server/motherboard model
 - `bios_version`: BIOS version
 - `bios_date`: BIOS date
@@ -926,6 +936,41 @@ curl -X POST http://192.168.20.21:8043/api/v1/system/shutdown
 - Home Assistant integration for scheduled server shutdowns
 - Power-saving automation (shutdown during off-peak hours)
 - Emergency shutdown via remote access
+
+---
+
+### GET /processes
+
+List running processes, sorted by CPU (default), memory, or pid.
+
+**Query parameters**: `sort_by` (`cpu`|`memory`|`pid`), `limit` (default 50, max 500).
+
+---
+
+### GET /processes/io
+
+Top processes by current disk I/O rate (bytes/sec), sampled natively from
+`/proc/<pid>/io` over a short interval. A lightweight alternative to `iotop-c`
+(bundled in Unraid 7.3) with no always-on collection cost.
+
+**Query parameters**: `limit` (default 20, max 500).
+
+**Response**:
+
+```json
+{
+  "processes": [
+    {
+      "pid": 1234,
+      "command": "shfs",
+      "disk_read_bytes_per_sec": 1048576,
+      "disk_write_bytes_per_sec": 524288
+    }
+  ],
+  "total_count": 1,
+  "timestamp": "2026-05-29T13:41:13+10:00"
+}
+```
 
 ---
 
@@ -1501,6 +1546,8 @@ List all Docker containers.
     "image": "linuxserver/jackett:latest",
     "state": "running",
     "status": "Up 9 hours",
+    "ip_address": "172.17.0.2",
+    "mac_address": "02:42:ac:11:00:02",
     "cpu_usage_percent": 0.5,
     "memory_usage_bytes": 104857600,
     "network_rx_bytes": 1000000,
@@ -1509,6 +1556,8 @@ List all Docker containers.
   }
 ]
 ```
+
+> `mac_address` is populated from `docker inspect` (Docker 29 / Unraid 7.3 fixed-MAC support).
 
 ---
 

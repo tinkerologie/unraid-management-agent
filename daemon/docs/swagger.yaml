@@ -181,6 +181,29 @@ definitions:
         example: "1.02"
         type: string
     type: object
+  dto.BootInfo:
+    properties:
+      boot_pool:
+        description: ZFS boot pool name when present
+        example: boot
+        type: string
+      boot_pool_type:
+        description: '"single", "mirror" when on a ZFS boot pool'
+        example: mirror
+        type: string
+      device:
+        description: Backing device of the boot partition
+        example: sda1
+        type: string
+      device_type:
+        description: '"usb" (flash) or "internal"'
+        example: usb
+        type: string
+      filesystem:
+        description: Boot partition filesystem
+        example: vfat
+        type: string
+    type: object
   dto.CPUCacheInfo:
     properties:
       associativity:
@@ -299,6 +322,24 @@ definitions:
         example: 800
         type: integer
     type: object
+  dto.ChassisInfo:
+    properties:
+      asset_tag:
+        example: To be filled by O.E.M.
+        type: string
+      manufacturer:
+        example: Supermicro
+        type: string
+      serial_number:
+        example: C1234567890
+        type: string
+      type:
+        example: Tower
+        type: string
+      version:
+        example: "0123456789"
+        type: string
+    type: object
   dto.CollectorIntervalRequest:
     properties:
       interval:
@@ -382,6 +423,10 @@ definitions:
         type: string
       ip_address:
         example: 172.17.0.2
+        type: string
+      mac_address:
+        description: Container MAC (Docker 29 / Unraid 7.3 fixed-MAC support)
+        example: 02:42:ac:11:00:02
         type: string
       memory_display:
         example: 1 GiB / 8 GiB
@@ -1099,10 +1144,14 @@ definitions:
         $ref: '#/definitions/dto.BaseboardInfo'
       bios:
         $ref: '#/definitions/dto.BIOSInfo'
+      boot:
+        $ref: '#/definitions/dto.BootInfo'
       cache:
         items:
           $ref: '#/definitions/dto.CPUCacheInfo'
         type: array
+      chassis:
+        $ref: '#/definitions/dto.ChassisInfo'
       cpu:
         $ref: '#/definitions/dto.CPUHardwareInfo'
       memory_array:
@@ -1113,6 +1162,8 @@ definitions:
         type: array
       timestamp:
         type: string
+      tpm:
+        $ref: '#/definitions/dto.TPMInfo'
     type: object
   dto.HealthCheck:
     properties:
@@ -2163,6 +2214,18 @@ definitions:
       cpu_percent:
         example: 5.2
         type: number
+      disk_read_bytes_per_sec:
+        description: |-
+          DiskReadBytesPerSec is the per-process disk read rate (bytes/sec), populated by
+          the /processes/io endpoint from /proc/<pid>/io. Omitted from the standard process list.
+        example: 1048576
+        type: integer
+      disk_write_bytes_per_sec:
+        description: |-
+          DiskWriteBytesPerSec is the per-process disk write rate (bytes/sec), populated by
+          the /processes/io endpoint from /proc/<pid>/io. Omitted from the standard process list.
+        example: 524288
+        type: integer
       memory_percent:
         example: 2.1
         type: number
@@ -2539,6 +2602,21 @@ definitions:
       timestamp:
         type: string
       timezone:
+        type: string
+    type: object
+  dto.TPMInfo:
+    properties:
+      manufacturer:
+        description: Vendor ID when available
+        example: IFX
+        type: string
+      present:
+        description: A TPM device exists (/sys/class/tpm/tpm0)
+        example: true
+        type: boolean
+      version:
+        description: '"2.0" or "1.2" when detectable'
+        example: "2.0"
         type: string
     type: object
   dto.TemperatureReading:
@@ -2956,6 +3034,12 @@ definitions:
     type: object
   dto.ZFSARCStats:
     properties:
+      configured_max_bytes:
+        description: |-
+          ConfiguredMaxBytes is the user-set zfs_arc_max module parameter
+          (0 = auto). Unraid 7.3 exposes this as a first-class tunable.
+        example: 0
+        type: integer
       hit_ratio_percent:
         description: Hit Ratios
         example: 95.5
@@ -2977,7 +3061,7 @@ definitions:
         example: 107374182400
         type: integer
       max_size_bytes:
-        description: Maximum ARC size
+        description: Effective maximum ARC size (arcstats c_max)
         example: 16106127360
         type: integer
       mfu_hit_ratio_percent:
@@ -3117,6 +3201,13 @@ definitions:
         description: Compression ratio (e.g., 1.50 = 1.5x)
         example: 1.5
         type: number
+      corrupted_files:
+        description: |-
+          CorruptedFiles lists files with permanent (checksum) errors, as reported
+          by `zpool status -v`. Unraid 7.3 (ZFS 2.4.1) surfaces these without a scrub.
+        items:
+          type: string
+        type: array
       dedup_ratio:
         description: Deduplication and Compression
         example: 1
@@ -3137,6 +3228,11 @@ definitions:
         description: Health and Status
         example: ONLINE
         type: string
+      is_boot_pool:
+        description: IsBootPool flags the ZFS-mirrored/dedicated boot pool (Unraid
+          7.3 internal boot).
+        example: false
+        type: boolean
       name:
         description: Pool Identification
         example: tank
@@ -5218,6 +5314,29 @@ paths:
           schema:
             $ref: '#/definitions/dto.Response'
       summary: List running processes
+      tags:
+      - System
+  /processes/io:
+    get:
+      description: Get processes ranked by current disk I/O rate (bytes/sec), sampled
+        from /proc/<pid>/io. Native, lightweight alternative to iotop-c.
+      parameters:
+      - description: 'Max processes to return (default: 20)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Processes ranked by disk I/O
+          schema:
+            $ref: '#/definitions/dto.ProcessList'
+        "500":
+          description: Failed to sample process I/O
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Top processes by disk I/O
       tags:
       - System
   /registration:

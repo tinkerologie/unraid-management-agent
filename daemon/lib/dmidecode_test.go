@@ -530,3 +530,19 @@ func TestParseMemoryType(t *testing.T) {
 		})
 	}
 }
+
+func TestParseChassisInfoFromSection(t *testing.T) {
+	section := map[string]string{
+		"Manufacturer":  "Supermicro",
+		"Type":          "Tower",
+		"Serial Number": "C1234567890",
+		"Asset Tag":     "ASSET-1",
+	}
+	chassis := parseChassisInfoFromSection(section)
+	if chassis.SerialNumber != "C1234567890" {
+		t.Errorf("SerialNumber = %q, want C1234567890", chassis.SerialNumber)
+	}
+	if chassis.Type != "Tower" {
+		t.Errorf("Type = %q, want Tower", chassis.Type)
+	}
+}

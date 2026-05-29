@@ -307,6 +307,7 @@ func (e *Engine) buildEnv() dto.AlertEnv {
 	// ZFS pools
 	if pools := e.provider.GetZFSPoolsCache(); pools != nil {
 		env.ZFSPoolCount = len(pools)
+		env.BootPoolHealthy = true // default: no boot pool present
 		for _, p := range pools {
 			if p.CapacityPct > env.MaxZFSPoolUsedPct {
 				env.MaxZFSPoolUsedPct = p.CapacityPct
@@ -316,6 +317,11 @@ func (e *Engine) buildEnv() dto.AlertEnv {
 				env.ZFSDegradedPools++
 			case "FAULTED":
 				env.ZFSFaultedPools++
+			}
+			env.ZFSCorruptedFiles += len(p.CorruptedFiles)
+			if p.IsBootPool {
+				env.BootPoolHealth = p.Health
+				env.BootPoolHealthy = p.Health == "ONLINE"
 			}
 		}
 	}

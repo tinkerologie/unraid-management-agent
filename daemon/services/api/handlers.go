@@ -3396,6 +3396,42 @@ func (s *Server) handleProcessList(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, result)
 }
 
+// handleProcessIO godoc
+//
+//	@Summary		Top processes by disk I/O
+//	@Description	Get processes ranked by current disk I/O rate (bytes/sec), sampled from /proc/<pid>/io. Native, lightweight alternative to iotop-c.
+//	@Tags			System
+//	@Produce		json
+//	@Param			limit	query		int				false	"Max processes to return (default: 20)"
+//	@Success		200		{object}	dto.ProcessList	"Processes ranked by disk I/O"
+//	@Failure		500		{object}	dto.Response	"Failed to sample process I/O"
+//	@Router			/processes/io [get]
+func (s *Server) handleProcessIO(w http.ResponseWriter, r *http.Request) {
+	limit := 20
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+	if limit > 500 {
+		limit = 500
+	}
+
+	controller := controllers.NewProcessController()
+	result, err := controller.ListProcessIO(limit)
+	if err != nil {
+		logger.Error("API: Failed to sample process I/O: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   "Failed to sample process I/O",
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
 // =============================================================================
 // Alert Rule Management Handlers
 // =============================================================================

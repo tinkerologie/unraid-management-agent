@@ -1034,6 +1034,28 @@ func (s *Server) registerNewMonitoringTools() {
 		return jsonResult(result)
 	})
 
+	// Top processes by disk I/O (native /proc/<pid>/io sampling)
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "list_process_io",
+		Description: "List the top processes by current disk I/O rate (bytes/sec), sampled from /proc. Useful for finding what is driving disk activity.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPProcessListArgs) (*mcp.CallToolResult, any, error) {
+		limit := args.Limit
+		if limit <= 0 {
+			limit = 20
+		}
+		if limit > 500 {
+			limit = 500
+		}
+		logger.Info("MCP: Listing top processes by disk I/O (limit=%d)", limit)
+		processCtrl := controllers.NewProcessController()
+		result, err := processCtrl.ListProcessIO(limit)
+		if err != nil {
+			return textResult(fmt.Sprintf("Failed to sample process I/O: %v", err)), nil, nil
+		}
+		return jsonResult(result)
+	})
+
 	// Get container logs (per-container stdout/stderr)
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "get_container_logs",

@@ -12,6 +12,7 @@ type ContainerInfo struct {
 	Status         string          `json:"status" example:"Up 2 days"`
 	NetworkMode    string          `json:"network_mode" example:"bridge"`
 	IPAddress      string          `json:"ip_address" example:"172.17.0.2"`
+	MACAddress     string          `json:"mac_address,omitempty" example:"02:42:ac:11:00:02"` // Container MAC (Docker 29 / Unraid 7.3 fixed-MAC support)
 	CPUPercent     float64         `json:"cpu_percent" example:"5.2"`
 	MemoryUsage    uint64          `json:"memory_usage_bytes" example:"1073741824"`
 	MemoryUsageMB  float64         `json:"memory_usage_mb" example:"1024.0"`

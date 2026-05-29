@@ -259,6 +259,7 @@ func (s *Server) setupRoutes() {
 
 	// Process listing endpoint
 	api.HandleFunc("/processes", s.handleProcessList).Methods("GET")
+	api.HandleFunc("/processes/io", s.handleProcessIO).Methods("GET")
 
 	// Health check / Watchdog endpoints
 	api.HandleFunc("/healthchecks", s.handleListHealthChecks).Methods("GET")

@@ -9,8 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.06.00] - 2026-05-29
+
 ### Added
 
+- **Unraid 7.3 support — new data exposed across the API/MQTT/MCP:**
+  - **Chassis serial number** in `/api/v1/hardware` (`chassis` block: manufacturer,
+    type, version, serial, asset tag) via sysfs DMI with dmidecode (type 3) fallback.
+    New HA sensor `Hardware: Chassis Serial`.
+  - **TPM presence/version** in `/api/v1/hardware` (`tpm` block) from
+    `/sys/class/tpm/tpm0` — supports Unraid 7.3 TPM-based licensing. New HA
+    binary sensor `Hardware: TPM Present`.
+  - **Boot device / boot pool** in `/api/v1/hardware` (`boot` block: device type
+    usb vs internal, backing device, filesystem, ZFS boot pool) — Unraid 7.3
+    internal-boot support. New HA sensor `Hardware: Boot Device Type`.
+  - **ZFS corrupted files** per pool (`corrupted_files`) parsed from
+    `zpool status -v` (ZFS 2.4.1 surfaces these without a scrub), plus
+    `is_boot_pool` flag. New HA sensor `ZFS: <pool> Corrupted Files`.
+  - **ZFS configured ARC max** (`configured_max_bytes`) from
+    `/sys/module/zfs/parameters/zfs_arc_max` (0 = auto) — Unraid 7.3 first-class
+    tunable. New HA sensor `ZFS ARC: Configured Max`.
+  - **Docker container MAC address** (`mac_address`) from `docker inspect`
+    (Docker 29 / Unraid 7.3 fixed-MAC support). New per-container HA sensor.
+  - **Per-process disk I/O** via new `GET /api/v1/processes/io` and MCP tool
+    `list_process_io` — top processes by I/O rate sampled natively from
+    `/proc/<pid>/io` (lighter than spawning iotop-c, no always-on cost).
+  - **New alert-rule fields:** `ZFSCorruptedFiles`, `BootPoolHealthy`,
+    `BootPoolHealth` (degraded ZFS boot pool / corrupted files alerting).
 - **Swap memory metrics in `/api/v1/system`** — the system collector now reports
   `swap_total_bytes`, `swap_used_bytes`, `swap_free_bytes`, and `swap_usage_percent`
   parsed from `/proc/meminfo`, plus the kernel `swappiness` tunable from
@@ -38,6 +63,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dependencies bumped** — `github.com/nicholas-fedor/shoutrrr` → v0.15.1,
   `golang.org/x/net` → v0.55.0, `golang.org/x/sys` → v0.45.0,
   `golang.org/x/crypto` → v0.52.0; `go mod tidy` run. `go vet` clean.
+- **Unraid 7.3 regression checks (no change required):** verified RAM reporting is
+  unaffected by the 7.3 dmidecode unit-label change (memory device size is a
+  passthrough string; system memory comes from `/proc/meminfo`), and confirmed disk
+  SMART polling already uses `smartctl -n standby` so routine collection never wakes
+  spun-down drives (aligns with 7.3's "don't spin up the array on reads" fix).
 
 ## [2026.05.00] - 2026-05-16
 

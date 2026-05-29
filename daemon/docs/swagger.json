@@ -2978,6 +2978,40 @@
                 }
             }
         },
+        "/processes/io": {
+            "get": {
+                "description": "Get processes ranked by current disk I/O rate (bytes/sec), sampled from /proc/\u003cpid\u003e/io. Native, lightweight alternative to iotop-c.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System"
+                ],
+                "summary": "Top processes by disk I/O",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Max processes to return (default: 20)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Processes ranked by disk I/O",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ProcessList"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to sample process I/O",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/registration": {
             "get": {
                 "description": "Retrieve Unraid license/registration information",
@@ -4906,6 +4940,36 @@
                 }
             }
         },
+        "dto.BootInfo": {
+            "type": "object",
+            "properties": {
+                "boot_pool": {
+                    "description": "ZFS boot pool name when present",
+                    "type": "string",
+                    "example": "boot"
+                },
+                "boot_pool_type": {
+                    "description": "\"single\", \"mirror\" when on a ZFS boot pool",
+                    "type": "string",
+                    "example": "mirror"
+                },
+                "device": {
+                    "description": "Backing device of the boot partition",
+                    "type": "string",
+                    "example": "sda1"
+                },
+                "device_type": {
+                    "description": "\"usb\" (flash) or \"internal\"",
+                    "type": "string",
+                    "example": "usb"
+                },
+                "filesystem": {
+                    "description": "Boot partition filesystem",
+                    "type": "string",
+                    "example": "vfat"
+                }
+            }
+        },
         "dto.CPUCacheInfo": {
             "type": "object",
             "properties": {
@@ -5074,6 +5138,31 @@
                 }
             }
         },
+        "dto.ChassisInfo": {
+            "type": "object",
+            "properties": {
+                "asset_tag": {
+                    "type": "string",
+                    "example": "To be filled by O.E.M."
+                },
+                "manufacturer": {
+                    "type": "string",
+                    "example": "Supermicro"
+                },
+                "serial_number": {
+                    "type": "string",
+                    "example": "C1234567890"
+                },
+                "type": {
+                    "type": "string",
+                    "example": "Tower"
+                },
+                "version": {
+                    "type": "string",
+                    "example": "0123456789"
+                }
+            }
+        },
         "dto.CollectorIntervalRequest": {
             "type": "object",
             "properties": {
@@ -5196,6 +5285,11 @@
                 "ip_address": {
                     "type": "string",
                     "example": "172.17.0.2"
+                },
+                "mac_address": {
+                    "description": "Container MAC (Docker 29 / Unraid 7.3 fixed-MAC support)",
+                    "type": "string",
+                    "example": "02:42:ac:11:00:02"
                 },
                 "memory_display": {
                     "type": "string",
@@ -6183,11 +6277,17 @@
                 "bios": {
                     "$ref": "#/definitions/dto.BIOSInfo"
                 },
+                "boot": {
+                    "$ref": "#/definitions/dto.BootInfo"
+                },
                 "cache": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/dto.CPUCacheInfo"
                     }
+                },
+                "chassis": {
+                    "$ref": "#/definitions/dto.ChassisInfo"
                 },
                 "cpu": {
                     "$ref": "#/definitions/dto.CPUHardwareInfo"
@@ -6203,6 +6303,9 @@
                 },
                 "timestamp": {
                     "type": "string"
+                },
+                "tpm": {
+                    "$ref": "#/definitions/dto.TPMInfo"
                 }
             }
         },
@@ -7697,6 +7800,16 @@
                     "type": "number",
                     "example": 5.2
                 },
+                "disk_read_bytes_per_sec": {
+                    "description": "DiskReadBytesPerSec is the per-process disk read rate (bytes/sec), populated by\nthe /processes/io endpoint from /proc/\u003cpid\u003e/io. Omitted from the standard process list.",
+                    "type": "integer",
+                    "example": 1048576
+                },
+                "disk_write_bytes_per_sec": {
+                    "description": "DiskWriteBytesPerSec is the per-process disk write rate (bytes/sec), populated by\nthe /processes/io endpoint from /proc/\u003cpid\u003e/io. Omitted from the standard process list.",
+                    "type": "integer",
+                    "example": 524288
+                },
                 "memory_percent": {
                     "type": "number",
                     "example": 2.1
@@ -8208,6 +8321,26 @@
                 },
                 "timezone": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.TPMInfo": {
+            "type": "object",
+            "properties": {
+                "manufacturer": {
+                    "description": "Vendor ID when available",
+                    "type": "string",
+                    "example": "IFX"
+                },
+                "present": {
+                    "description": "A TPM device exists (/sys/class/tpm/tpm0)",
+                    "type": "boolean",
+                    "example": true
+                },
+                "version": {
+                    "description": "\"2.0\" or \"1.2\" when detectable",
+                    "type": "string",
+                    "example": "2.0"
                 }
             }
         },
@@ -8811,6 +8944,11 @@
         "dto.ZFSARCStats": {
             "type": "object",
             "properties": {
+                "configured_max_bytes": {
+                    "description": "ConfiguredMaxBytes is the user-set zfs_arc_max module parameter\n(0 = auto). Unraid 7.3 exposes this as a first-class tunable.",
+                    "type": "integer",
+                    "example": 0
+                },
                 "hit_ratio_percent": {
                     "description": "Hit Ratios",
                     "type": "number",
@@ -8837,7 +8975,7 @@
                     "example": 107374182400
                 },
                 "max_size_bytes": {
-                    "description": "Maximum ARC size",
+                    "description": "Effective maximum ARC size (arcstats c_max)",
                     "type": "integer",
                     "example": 16106127360
                 },
@@ -9018,6 +9156,13 @@
                     "type": "number",
                     "example": 1.5
                 },
+                "corrupted_files": {
+                    "description": "CorruptedFiles lists files with permanent (checksum) errors, as reported\nby `zpool status -v`. Unraid 7.3 (ZFS 2.4.1) surfaces these without a scrub.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "dedup_ratio": {
                     "description": "Deduplication and Compression",
                     "type": "number",
@@ -9042,6 +9187,11 @@
                     "description": "Health and Status",
                     "type": "string",
                     "example": "ONLINE"
+                },
+                "is_boot_pool": {
+                    "description": "IsBootPool flags the ZFS-mirrored/dedicated boot pool (Unraid 7.3 internal boot).",
+                    "type": "boolean",
+                    "example": false
                 },
                 "name": {
                     "description": "Pool Identification",

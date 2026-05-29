@@ -137,6 +137,12 @@ func (c *ZFSCollector) collectPools() ([]dto.ZFSPool, error) {
 		return []dto.ZFSPool{}, nil
 	}
 
+	// Identify the ZFS boot pool (Unraid 7.3 internal boot) once per cycle.
+	bootPool := ""
+	if boot := lib.DetectBootInfo(); boot != nil {
+		bootPool = boot.BootPool
+	}
+
 	pools := make([]dto.ZFSPool, 0, len(poolNames))
 	for _, name := range poolNames {
 		name = strings.TrimSpace(name)
@@ -148,6 +154,10 @@ func (c *ZFSCollector) collectPools() ([]dto.ZFSPool, error) {
 		if err != nil {
 			logger.Warning("Failed to collect pool details for %s: %v", name, err)
 			continue
+		}
+
+		if bootPool != "" && name == bootPool {
+			pool.IsBootPool = true
 		}
 
 		pools = append(pools, pool)
@@ -260,6 +270,7 @@ func (c *ZFSCollector) parsePoolStatus(pool *dto.ZFSPool) error {
 
 	scanner := bufio.NewScanner(strings.NewReader(output))
 	inConfig := false
+	inErrors := false
 	var currentVdev *dto.ZFSVdev
 
 	for scanner.Scan() {
@@ -276,9 +287,26 @@ func (c *ZFSCollector) parsePoolStatus(pool *dto.ZFSPool) error {
 			c.parseScanInfo(pool, trimmed)
 		}
 
-		// Parse errors line
-		if strings.HasPrefix(trimmed, "errors:") {
-			// Error summary is in the line, but individual errors are in vdev stats
+		// Parse errors line. When permanent errors exist, `zpool status -v`
+		// lists affected files on the following indented lines.
+		if errSummary, found := strings.CutPrefix(trimmed, "errors:"); found {
+			inConfig = false
+			summary := strings.TrimSpace(errSummary)
+			inErrors = summary != "" && !strings.Contains(summary, "No known data errors")
+			continue
+		}
+
+		// Collect corrupted-file paths in the errors section.
+		if inErrors {
+			if trimmed == "" {
+				inErrors = false
+				continue
+			}
+			// Skip the introductory sentence ("Permanent errors have been detected...").
+			if strings.HasSuffix(trimmed, ":") || strings.HasPrefix(trimmed, "Permanent errors") {
+				continue
+			}
+			pool.CorruptedFiles = append(pool.CorruptedFiles, trimmed)
 			continue
 		}
 
@@ -575,6 +603,10 @@ func (c *ZFSCollector) collectARCStats() (dto.ZFSARCStats, error) {
 	stats.Hits = arcData["hits"]
 	stats.Misses = arcData["misses"]
 
+	// User-configured zfs_arc_max module parameter (0 = auto). Unraid 7.3
+	// promotes this to a first-class Disk Settings tunable.
+	stats.ConfiguredMaxBytes = readZFSArcMaxParam()
+
 	// Convenience fields
 	stats.SizeMB = float64(stats.SizeBytes) / (1024 * 1024)
 	if stats.MaxSizeBytes > 0 {
@@ -608,4 +640,20 @@ func (c *ZFSCollector) collectARCStats() (dto.ZFSARCStats, error) {
 	stats.L2Misses = arcData["l2_misses"]
 
 	return stats, nil
+}
+
+// readZFSArcMaxParam reads the user-configured zfs_arc_max module parameter.
+// Returns 0 when unset (auto) or unavailable.
+func readZFSArcMaxParam() uint64 {
+	data, err := os.ReadFile(constants.SysZFSArcMax)
+	if err != nil {
+		logger.Debug("ZFS: zfs_arc_max parameter not readable: %v", err)
+		return 0
+	}
+	value, err := strconv.ParseUint(strings.TrimSpace(string(data)), 10, 64)
+	if err != nil {
+		logger.Debug("ZFS: failed to parse zfs_arc_max value %q: %v", strings.TrimSpace(string(data)), err)
+		return 0
+	}
+	return value
 }

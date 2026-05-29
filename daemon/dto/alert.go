@@ -89,6 +89,9 @@ type AlertEnv struct {
 	MaxZFSPoolUsedPct float64 `expr:"MaxZFSPoolUsedPct"`
 	ZFSDegradedPools  int     `expr:"ZFSDegradedPools"`
 	ZFSFaultedPools   int     `expr:"ZFSFaultedPools"`
+	ZFSCorruptedFiles int     `expr:"ZFSCorruptedFiles"` // Total corrupted files across all pools
+	BootPoolHealthy   bool    `expr:"BootPoolHealthy"`   // True when the ZFS boot pool is ONLINE (or no boot pool)
+	BootPoolHealth    string  `expr:"BootPoolHealth"`    // Boot pool health ("ONLINE", "DEGRADED", ...); empty when no ZFS boot pool exists
 
 	// Network
 	NetworkErrors  uint64 `expr:"NetworkErrors"`

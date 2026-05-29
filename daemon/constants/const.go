@@ -79,6 +79,8 @@ const (
 
 	// ProcSPLARCStats is the path to the ZFS ARC statistics file.
 	ProcSPLARCStats = "/proc/spl/kstat/zfs/arcstats"
+	// SysZFSArcMax is the path to the configurable zfs_arc_max module parameter.
+	SysZFSArcMax = "/sys/module/zfs/parameters/zfs_arc_max"
 
 	// NutPidFile is the path to the NUT UPS monitor PID file.
 	NutPidFile = "/var/run/nut/upsmon.pid"

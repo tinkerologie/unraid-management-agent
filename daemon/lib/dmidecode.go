@@ -143,6 +143,31 @@ func parseBaseboardInfoFromSection(section map[string]string) *dto.BaseboardInfo
 	return baseboard
 }
 
+// ParseChassisInfo parses chassis information from dmidecode type 3.
+func ParseChassisInfo() (*dto.ChassisInfo, error) {
+	sections, err := ParseDmidecodeType("3")
+	if err != nil {
+		return nil, err
+	}
+
+	if len(sections) == 0 {
+		return nil, errors.New("no chassis information found")
+	}
+
+	return parseChassisInfoFromSection(sections[0]), nil
+}
+
+// parseChassisInfoFromSection extracts chassis info from a pre-parsed section map.
+func parseChassisInfoFromSection(section map[string]string) *dto.ChassisInfo {
+	return &dto.ChassisInfo{
+		Manufacturer: section["Manufacturer"],
+		Type:         section["Type"],
+		Version:      section["Version"],
+		SerialNumber: section["Serial Number"],
+		AssetTag:     section["Asset Tag"],
+	}
+}
+
 // ParseCPUInfo parses CPU information from dmidecode type 4
 func ParseCPUInfo() (*dto.CPUHardwareInfo, error) {
 	sections, err := ParseDmidecodeType("4")

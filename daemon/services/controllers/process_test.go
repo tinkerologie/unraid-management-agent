@@ -13,6 +13,37 @@ func TestNewProcessController(t *testing.T) {
 	}
 }
 
+func TestSortProcessesByIO(t *testing.T) {
+	procs := []dto.ProcessInfo{
+		{PID: 1, DiskReadBytesPerSec: 100, DiskWriteBytesPerSec: 0},
+		{PID: 2, DiskReadBytesPerSec: 500, DiskWriteBytesPerSec: 500},
+		{PID: 3, DiskReadBytesPerSec: 0, DiskWriteBytesPerSec: 50},
+	}
+	sortProcessesByIO(procs)
+
+	if procs[0].PID != 2 {
+		t.Errorf("expected highest-I/O process (PID 2) first, got PID %d", procs[0].PID)
+	}
+	if procs[len(procs)-1].PID != 3 {
+		t.Errorf("expected lowest-I/O process (PID 3) last, got PID %d", procs[len(procs)-1].PID)
+	}
+}
+
+func TestListProcessIONoPanic(t *testing.T) {
+	// Smoke test: must not panic and must return a non-nil result on any platform.
+	pc := NewProcessController()
+	result, err := pc.ListProcessIO(5)
+	if err != nil {
+		t.Fatalf("ListProcessIO returned error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("ListProcessIO returned nil result")
+	}
+	if len(result.Processes) > 5 {
+		t.Errorf("limit not respected: got %d processes", len(result.Processes))
+	}
+}
+
 func TestParseProcessLine(t *testing.T) {
 	tests := []struct {
 		name    string

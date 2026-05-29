@@ -6,11 +6,43 @@ import "time"
 type HardwareInfo struct {
 	BIOS          *BIOSInfo          `json:"bios,omitempty"`
 	Baseboard     *BaseboardInfo     `json:"baseboard,omitempty"`
+	Chassis       *ChassisInfo       `json:"chassis,omitempty"`
 	CPU           *CPUHardwareInfo   `json:"cpu,omitempty"`
 	Cache         []CPUCacheInfo     `json:"cache,omitempty"`
 	MemoryArray   *MemoryArrayInfo   `json:"memory_array,omitempty"`
 	MemoryDevices []MemoryDeviceInfo `json:"memory_devices,omitempty"`
+	TPM           *TPMInfo           `json:"tpm,omitempty"`
+	Boot          *BootInfo          `json:"boot,omitempty"`
 	Timestamp     time.Time          `json:"timestamp"`
+}
+
+// ChassisInfo contains chassis (enclosure) information from dmidecode type 3 / sysfs.
+// New in Unraid 7.3, which surfaces the chassis serial number in System Info.
+type ChassisInfo struct {
+	Manufacturer string `json:"manufacturer,omitempty" example:"Supermicro"`
+	Type         string `json:"type,omitempty" example:"Tower"`
+	Version      string `json:"version,omitempty" example:"0123456789"`
+	SerialNumber string `json:"serial_number,omitempty" example:"C1234567890"`
+	AssetTag     string `json:"asset_tag,omitempty" example:"To be filled by O.E.M."`
+}
+
+// TPMInfo describes the Trusted Platform Module state. Unraid 7.3 bundles
+// tpm2-tools and can tie licensing to a TPM 2.0 chip.
+type TPMInfo struct {
+	Present      bool   `json:"present" example:"true"`               // A TPM device exists (/sys/class/tpm/tpm0)
+	Version      string `json:"version,omitempty" example:"2.0"`      // "2.0" or "1.2" when detectable
+	Manufacturer string `json:"manufacturer,omitempty" example:"IFX"` // Vendor ID when available
+}
+
+// BootInfo describes the Unraid boot device. Unraid 7.3 added internal boot
+// (NVMe/SSD/eMMC) and optional ZFS-mirrored boot pools; terminology changed
+// from "Flash" to "Boot".
+type BootInfo struct {
+	DeviceType   string `json:"device_type" example:"usb"`                 // "usb" (flash) or "internal"
+	Device       string `json:"device,omitempty" example:"sda1"`           // Backing device of the boot partition
+	FileSystem   string `json:"filesystem,omitempty" example:"vfat"`       // Boot partition filesystem
+	BootPool     string `json:"boot_pool,omitempty" example:"boot"`        // ZFS boot pool name when present
+	BootPoolType string `json:"boot_pool_type,omitempty" example:"mirror"` // "single", "mirror" when on a ZFS boot pool
 }
 
 // BIOSInfo contains BIOS information from dmidecode

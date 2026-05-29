@@ -47,6 +47,13 @@ type ZFSPool struct {
 	WriteErrors    uint64 `json:"write_errors" example:"0"`
 	ChecksumErrors uint64 `json:"checksum_errors" example:"0"`
 
+	// CorruptedFiles lists files with permanent (checksum) errors, as reported
+	// by `zpool status -v`. Unraid 7.3 (ZFS 2.4.1) surfaces these without a scrub.
+	CorruptedFiles []string `json:"corrupted_files,omitempty"`
+
+	// IsBootPool flags the ZFS-mirrored/dedicated boot pool (Unraid 7.3 internal boot).
+	IsBootPool bool `json:"is_boot_pool" example:"false"`
+
 	Timestamp time.Time `json:"timestamp"`
 }
 
@@ -104,8 +111,11 @@ type ZFSARCStats struct {
 	SizeMB          float64 `json:"size_mb" example:"8192.0"`                // Current ARC size in MB
 	TargetSizeBytes uint64  `json:"target_size_bytes" example:"16106127360"` // Target ARC size
 	MinSizeBytes    uint64  `json:"min_size_bytes" example:"2013265920"`     // Minimum ARC size
-	MaxSizeBytes    uint64  `json:"max_size_bytes" example:"16106127360"`    // Maximum ARC size
-	UsagePercent    float64 `json:"usage_percent" example:"53.3"`            // ARC usage as % of max size
+	MaxSizeBytes    uint64  `json:"max_size_bytes" example:"16106127360"`    // Effective maximum ARC size (arcstats c_max)
+	// ConfiguredMaxBytes is the user-set zfs_arc_max module parameter
+	// (0 = auto). Unraid 7.3 exposes this as a first-class tunable.
+	ConfiguredMaxBytes uint64  `json:"configured_max_bytes" example:"0"`
+	UsagePercent       float64 `json:"usage_percent" example:"53.3"` // ARC usage as % of max size
 
 	// Hit Ratios
 	HitRatioPct    float64 `json:"hit_ratio_percent" example:"95.5"`     // Overall hit ratio %

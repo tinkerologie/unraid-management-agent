@@ -909,6 +909,7 @@ func (c *Client) publishContainerEntities(topic, prefix, displayName, nameID str
 		prefix + "_memory",
 		prefix + "_net_rx",
 		prefix + "_net_tx",
+		prefix + "_mac",
 		prefix + "_switch",
 		prefix + "_restart",
 		prefix + "_pause",
@@ -944,6 +945,14 @@ func (c *Client) publishContainerEntities(topic, prefix, displayName, nameID str
 		id: prefix + "_net_tx", name: fmt.Sprintf("Docker: %s Network TX", displayName), unit: "B",
 		icon: "mdi:upload", template: "{{ value_json.network_tx_bytes }}",
 		deviceClass: "data_size", stateClass: "total_increasing",
+	})
+	// MAC address (Docker 29 / Unraid 7.3 fixed-MAC support)
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: prefix + "_mac", name: fmt.Sprintf("Docker: %s MAC Address", displayName),
+		icon:           "mdi:ethernet",
+		template:       "{{ value_json.mac_address | default('') }}",
+		entityCategory: "diagnostic",
 	})
 
 	// Power switch (start/stop)
@@ -1433,6 +1442,7 @@ func (c *Client) publishZFSEntities(topic, prefix, displayName string) []string 
 		prefix + "_fragmentation",
 		prefix + "_errors",
 		prefix + "_healthy",
+		prefix + "_corrupted_files",
 	}
 
 	c.publishHAEntity(haEntityOpts{
@@ -1470,6 +1480,14 @@ func (c *Client) publishZFSEntities(topic, prefix, displayName string) []string 
 		id: prefix + "_healthy", name: fmt.Sprintf("ZFS: %s Healthy", displayName),
 		icon: "mdi:check-circle", template: "{{ 'ON' if value_json.health == 'ONLINE' else 'OFF' }}",
 		deviceClass: "safety",
+	})
+	// Corrupted file count (Unraid 7.3 / ZFS 2.4.1 surfaces these without a scrub)
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: prefix + "_corrupted_files", name: fmt.Sprintf("ZFS: %s Corrupted Files", displayName),
+		icon:       "mdi:file-alert",
+		template:   "{{ value_json.corrupted_files | default([]) | count }}",
+		stateClass: "measurement",
 	})
 
 	return ids
@@ -1594,6 +1612,30 @@ func (c *Client) publishHardwareDiscovery() {
 		id: "memory_slots_total", name: "Hardware: Memory Slots",
 		icon:           "mdi:memory",
 		template:       "{{ value_json.memory_array.number_of_devices | default(0) }}",
+		entityCategory: "diagnostic",
+	})
+	// Chassis serial (new in Unraid 7.3)
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "chassis_serial", name: "Hardware: Chassis Serial",
+		icon:           "mdi:barcode",
+		template:       "{{ value_json.chassis.serial_number | default('') }}",
+		entityCategory: "diagnostic",
+	})
+	// TPM presence (Unraid 7.3 TPM-based licensing)
+	c.publishHAEntity(haEntityOpts{
+		entityType: "binary_sensor", stateTopic: topic,
+		id: "tpm_present", name: "Hardware: TPM Present",
+		icon:           "mdi:shield-key",
+		template:       "{{ 'ON' if value_json.tpm.present | default(false) else 'OFF' }}",
+		entityCategory: "diagnostic",
+	})
+	// Boot device type (Unraid 7.3 internal boot)
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "boot_device_type", name: "Hardware: Boot Device Type",
+		icon:           "mdi:usb-flash-drive",
+		template:       "{{ value_json.boot.device_type | default('unknown') }}",
 		entityCategory: "diagnostic",
 	})
 }
@@ -1832,6 +1874,15 @@ func (c *Client) publishZFSARCDiscovery() {
 		id: "arc_target_size", name: "ZFS ARC: Target Size", unit: "B",
 		icon:        "mdi:memory",
 		template:    "{{ value_json.target_size_bytes }}",
+		deviceClass: "data_size", stateClass: "measurement",
+		entityCategory: "diagnostic",
+	})
+	// Configured zfs_arc_max (0 = auto) — Unraid 7.3 first-class tunable
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "arc_configured_max", name: "ZFS ARC: Configured Max", unit: "B",
+		icon:        "mdi:memory",
+		template:    "{{ value_json.configured_max_bytes | default(0) }}",
 		deviceClass: "data_size", stateClass: "measurement",
 		entityCategory: "diagnostic",
 	})

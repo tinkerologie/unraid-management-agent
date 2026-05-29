@@ -188,12 +188,24 @@ func (c *DockerCollector) Collect() {
 					cont.NetworkMode = string(inspectData.HostConfig.NetworkMode)
 				}
 
-				// IP Address (get first available)
+				// IP Address and MAC (get first available)
 				if inspectData.NetworkSettings != nil {
 					for _, network := range inspectData.NetworkSettings.Networks {
 						if network.IPAddress.IsValid() {
 							cont.IPAddress = network.IPAddress.String()
+							if mac := network.MacAddress.String(); mac != "" {
+								cont.MACAddress = mac
+							}
 							break
+						}
+					}
+					// Fall back to any network that exposes a MAC even without a valid IP.
+					if cont.MACAddress == "" {
+						for _, network := range inspectData.NetworkSettings.Networks {
+							if mac := network.MacAddress.String(); mac != "" {
+								cont.MACAddress = mac
+								break
+							}
 						}
 					}
 				}

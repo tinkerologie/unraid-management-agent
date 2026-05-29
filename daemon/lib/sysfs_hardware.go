@@ -59,6 +59,43 @@ func ParseBaseboardInfoSysfs() (*dto.BaseboardInfo, error) {
 	return baseboard, nil
 }
 
+// ParseChassisInfoSysfs reads chassis information from sysfs DMI.
+// Returns nil values gracefully when fields are absent.
+func ParseChassisInfoSysfs() *dto.ChassisInfo {
+	return &dto.ChassisInfo{
+		Manufacturer: readSysfsFile(SysfsDMIPath + "/chassis_vendor"),
+		// sysfs exposes chassis_type as the raw SMBIOS numeric code; map it to a
+		// human-readable label (dmidecode's type 3 already returns the label).
+		Type:         chassisTypeName(readSysfsFile(SysfsDMIPath + "/chassis_type")),
+		Version:      readSysfsFile(SysfsDMIPath + "/chassis_version"),
+		SerialNumber: readSysfsFile(SysfsDMIPath + "/chassis_serial"),
+		AssetTag:     readSysfsFile(SysfsDMIPath + "/chassis_asset_tag"),
+	}
+}
+
+// chassisTypeName maps an SMBIOS System Enclosure type code (DMI type 3) to a
+// human-readable label. Non-numeric input (e.g. dmidecode's already-decoded
+// label) is returned unchanged.
+func chassisTypeName(code string) string {
+	names := map[string]string{
+		"1": "Other", "2": "Unknown", "3": "Desktop", "4": "Low Profile Desktop",
+		"5": "Pizza Box", "6": "Mini Tower", "7": "Tower", "8": "Portable",
+		"9": "Laptop", "10": "Notebook", "11": "Hand Held", "12": "Docking Station",
+		"13": "All In One", "14": "Sub Notebook", "15": "Space-saving",
+		"16": "Lunch Box", "17": "Main Server Chassis", "18": "Expansion Chassis",
+		"19": "SubChassis", "20": "Bus Expansion Chassis", "21": "Peripheral Chassis",
+		"22": "RAID Chassis", "23": "Rack Mount Chassis", "24": "Sealed-case PC",
+		"25": "Multi-system Chassis", "26": "Compact PCI", "27": "Advanced TCA",
+		"28": "Blade", "29": "Blade Enclosure", "30": "Tablet", "31": "Convertible",
+		"32": "Detachable", "33": "IoT Gateway", "34": "Embedded PC",
+		"35": "Mini PC", "36": "Stick PC",
+	}
+	if name, ok := names[strings.TrimSpace(code)]; ok {
+		return name
+	}
+	return code
+}
+
 // ParseSystemInfoSysfs reads system information from sysfs
 func ParseSystemInfoSysfs() map[string]string {
 	return map[string]string{
