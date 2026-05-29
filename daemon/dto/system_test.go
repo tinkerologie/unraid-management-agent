@@ -19,6 +19,11 @@ func TestSystemInfoJSON(t *testing.T) {
 		RAMTotal:        16 * 1024 * 1024 * 1024, // 16 GB
 		RAMUsed:         10 * 1024 * 1024 * 1024, // 10 GB
 		RAMFree:         6 * 1024 * 1024 * 1024,  // 6 GB
+		SwapUsage:       12.5,
+		SwapTotal:       8 * 1024 * 1024 * 1024, // 8 GB
+		SwapUsed:        1 * 1024 * 1024 * 1024, // 1 GB
+		SwapFree:        7 * 1024 * 1024 * 1024, // 7 GB
+		Swappiness:      60,
 		CPUTemp:         65.0,
 		CPUPowerWatts:   &cpuPower,
 		DRAMPowerWatts:  &dramPower,
@@ -55,6 +60,17 @@ func TestSystemInfoJSON(t *testing.T) {
 	}
 	if len(decoded.Fans) != len(info.Fans) {
 		t.Errorf("Fans count mismatch: got %d, want %d", len(decoded.Fans), len(info.Fans))
+	}
+
+	// Verify swap fields
+	if decoded.SwapTotal != info.SwapTotal {
+		t.Errorf("SwapTotal mismatch: got %d, want %d", decoded.SwapTotal, info.SwapTotal)
+	}
+	if decoded.SwapUsed != info.SwapUsed {
+		t.Errorf("SwapUsed mismatch: got %d, want %d", decoded.SwapUsed, info.SwapUsed)
+	}
+	if decoded.Swappiness != info.Swappiness {
+		t.Errorf("Swappiness mismatch: got %d, want %d", decoded.Swappiness, info.Swappiness)
 	}
 
 	// Verify power fields

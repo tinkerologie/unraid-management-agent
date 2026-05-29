@@ -64,7 +64,8 @@ The agent publishes to hierarchical topics under your configured prefix.
 <prefix>/ups             # UPS status (if configured)
 <prefix>/gpu             # GPU metrics (if available)
 <prefix>/network         # Network interface info
-<prefix>/notifications   # System notifications
+<prefix>/notifications   # System notifications (full list + counts)
+<prefix>/notifications/event  # Per-notification event (fires once per new notification)
 ```
 
 ### Message Format
@@ -91,9 +92,18 @@ All messages are published as JSON payloads with QoS 1 (at least once delivery).
   "ram_used": 8589934592,
   "ram_total": 34359738368,
   "ram_usage": 25.0,
+  "swap_total_bytes": 8589934592,
+  "swap_used_bytes": 1073741824,
+  "swap_free_bytes": 7516192768,
+  "swap_usage_percent": 12.5,
+  "swappiness": 60,
   "timestamp": "2025-01-20T10:30:00Z"
 }
 ```
+
+> Swap fields are parsed from `/proc/meminfo`; `swappiness` reflects
+> `/proc/sys/vm/swappiness` (`-1` when unavailable). Byte fields are
+> machine-readable; `swap_usage_percent` is the human-friendly view.
 
 #### Array Topic Example
 
@@ -277,6 +287,39 @@ Configure an MQTT In node:
   }
 ]
 ```
+
+## Notification Events (Home Assistant)
+
+In addition to the `notifications` topic (full list + unread counts), the agent
+publishes a per-notification **event** to `<prefix>/notifications/event` and
+registers a Home Assistant MQTT `event` entity for it. One message is published
+the first time each notification ID is seen; the existing backlog is seeded
+silently on startup so an agent restart never replays old notifications. Event
+messages are **not retained**, so Home Assistant does not refire them on reconnect.
+
+**Topic**: `unraid/notifications/event`
+
+**Payload**:
+
+```json
+{
+  "event_type": "alert",
+  "id": "notify_1737368400_0",
+  "title": "Array Started",
+  "subject": "Array Status",
+  "description": "The array has been started",
+  "importance": "alert",
+  "type": "unread",
+  "link": "/Dashboard",
+  "timestamp": "2025-01-20T10:30:00Z",
+  "formatted_timestamp": "2025-01-20 10:30:00"
+}
+```
+
+`event_type` is one of `alert`, `warning`, or `info` (HA fires the event under
+this type). All notification details are carried as event attributes so
+automations have the full context. `timestamp` is machine-readable (RFC 3339);
+`formatted_timestamp` is the human-readable form.
 
 ## Testing MQTT
 

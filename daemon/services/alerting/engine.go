@@ -222,6 +222,10 @@ func (e *Engine) buildEnv() dto.AlertEnv {
 		env.RAMTotalBytes = sys.RAMTotal
 		env.RAMUsedBytes = sys.RAMUsed
 		env.RAMFreeBytes = sys.RAMFree
+		env.SwapUsedPct = sys.SwapUsage
+		env.SwapTotalBytes = sys.SwapTotal
+		env.SwapUsedBytes = sys.SwapUsed
+		env.SwapFreeBytes = sys.SwapFree
 		env.CPUTemp = sys.CPUTemp
 		env.MotherboardTemp = sys.MotherboardTemp
 		env.Uptime = sys.Uptime

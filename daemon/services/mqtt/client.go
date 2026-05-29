@@ -37,6 +37,13 @@ type Client struct {
 	tracker      *discoveryTracker
 	domainCtx    *domain.Context // domain context for controllers (array, system)
 
+	// Notification event tracking. seenNotifications holds IDs already
+	// emitted as HA events; notifSeeded guards against replaying the
+	// existing backlog as events on the first collection cycle.
+	notifMu           sync.Mutex
+	seenNotifications map[string]bool
+	notifSeeded       bool
+
 	// connectCancel cancels the context for goroutines spawned by handleConnect.
 	// Protected by mu.
 	connectCancel context.CancelFunc
@@ -306,26 +313,27 @@ func (c *Client) GetConfig() *dto.MQTTConfig {
 // GetTopics returns the MQTT topics used by the client.
 func (c *Client) GetTopics() *dto.MQTTTopics {
 	return &dto.MQTTTopics{
-		Status:       c.buildTopic("status"),
-		System:       c.buildTopic("system"),
-		Array:        c.buildTopic("array"),
-		Disks:        c.buildTopic("disks"),
-		Containers:   c.buildTopic("docker/containers"),
-		VMs:          c.buildTopic("vm/list"),
-		UPS:          c.buildTopic("ups"),
-		GPU:          c.buildTopic("gpu"),
-		Network:      c.buildTopic("network"),
-		Shares:       c.buildTopic("shares"),
-		Notification: c.buildTopic("notifications"),
-		ZFSPools:     c.buildTopic("zfs/pools"),
-		Availability: c.buildTopic("availability"),
-		NUT:          c.buildTopic("nut/status"),
-		Hardware:     c.buildTopic("hardware"),
-		Registration: c.buildTopic("registration"),
-		Unassigned:   c.buildTopic("unassigned/devices"),
-		ZFSDatasets:  c.buildTopic("zfs/datasets"),
-		ZFSSnapshots: c.buildTopic("zfs/snapshots"),
-		ZFSARC:       c.buildTopic("zfs/arc"),
+		Status:            c.buildTopic("status"),
+		System:            c.buildTopic("system"),
+		Array:             c.buildTopic("array"),
+		Disks:             c.buildTopic("disks"),
+		Containers:        c.buildTopic("docker/containers"),
+		VMs:               c.buildTopic("vm/list"),
+		UPS:               c.buildTopic("ups"),
+		GPU:               c.buildTopic("gpu"),
+		Network:           c.buildTopic("network"),
+		Shares:            c.buildTopic("shares"),
+		Notification:      c.buildTopic("notifications"),
+		NotificationEvent: c.buildTopic("notifications/event"),
+		ZFSPools:          c.buildTopic("zfs/pools"),
+		Availability:      c.buildTopic("availability"),
+		NUT:               c.buildTopic("nut/status"),
+		Hardware:          c.buildTopic("hardware"),
+		Registration:      c.buildTopic("registration"),
+		Unassigned:        c.buildTopic("unassigned/devices"),
+		ZFSDatasets:       c.buildTopic("zfs/datasets"),
+		ZFSSnapshots:      c.buildTopic("zfs/snapshots"),
+		ZFSARC:            c.buildTopic("zfs/arc"),
 	}
 }
 
@@ -431,7 +439,75 @@ func (c *Client) PublishNotifications(notifications *dto.NotificationList) error
 	if !c.shouldPublish() {
 		return nil
 	}
-	return c.publishJSON(c.buildTopic("notifications"), notifications)
+	if err := c.publishJSON(c.buildTopic("notifications"), notifications); err != nil {
+		return err
+	}
+	if notifications != nil {
+		c.publishNewNotificationEvents(notifications.Notifications)
+	}
+	return nil
+}
+
+// publishNewNotificationEvents emits an HA event payload for each notification
+// not previously seen. On the first cycle it seeds the seen-set without firing,
+// so an agent restart does not replay the existing notification backlog as events.
+func (c *Client) publishNewNotificationEvents(notifications []dto.Notification) {
+	c.notifMu.Lock()
+	if c.seenNotifications == nil {
+		c.seenNotifications = make(map[string]bool)
+	}
+
+	var toFire []map[string]any
+
+	for _, n := range notifications {
+		// Only fire on active (unread) notifications with a stable ID.
+		if n.ID == "" || n.Type == "archive" {
+			continue
+		}
+		if c.seenNotifications[n.ID] {
+			continue
+		}
+		c.seenNotifications[n.ID] = true
+
+		if !c.notifSeeded {
+			continue // seeding pass — record but don't fire
+		}
+
+		importance := n.Importance
+		if importance != "alert" && importance != "warning" && importance != "info" {
+			importance = "info"
+		}
+		// event_type selects the HA event class; all notification details are
+		// carried as event attributes so automations have the full context.
+		payload := map[string]any{
+			"event_type":          importance,
+			"id":                  n.ID,
+			"title":               n.Title,
+			"subject":             n.Subject,
+			"description":         n.Description,
+			"importance":          n.Importance,
+			"type":                n.Type,
+			"link":                n.Link,
+			"timestamp":           n.Timestamp.Format(time.RFC3339),
+			"formatted_timestamp": n.FormattedTimestamp,
+		}
+		toFire = append(toFire, payload)
+	}
+	c.notifSeeded = true
+	c.notifMu.Unlock()
+
+	topic := c.buildTopic("notifications/event")
+	for _, p := range toFire {
+		data, err := json.Marshal(p)
+		if err != nil {
+			logger.Warning("MQTT: Failed to marshal notification event: %v", err)
+			continue
+		}
+		// Never retain event payloads — HA must not replay the last event on reconnect.
+		if err := c.publish(topic, string(data), false); err != nil {
+			logger.Warning("MQTT: Failed to publish notification event: %v", err)
+		}
+	}
 }
 
 // PublishZFSPools publishes ZFS pool information to MQTT.

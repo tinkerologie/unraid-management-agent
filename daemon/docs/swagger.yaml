@@ -2489,6 +2489,24 @@ definitions:
         description: System Information
         example: Supermicro X11SCL-F
         type: string
+      swap_free_bytes:
+        example: 7516192768
+        type: integer
+      swap_total_bytes:
+        example: 8589934592
+        type: integer
+      swap_usage_percent:
+        description: Swap Information
+        example: 12.5
+        type: number
+      swap_used_bytes:
+        example: 1073741824
+        type: integer
+      swappiness:
+        description: Swappiness is the kernel vm.swappiness tunable (0-200); -1 means
+          unavailable.
+        example: 60
+        type: integer
       temperatures:
         description: All Temperature Sensors
         items:

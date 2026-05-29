@@ -28,6 +28,14 @@ type SystemInfo struct {
 	RAMBuffers uint64  `json:"ram_buffers_bytes" example:"1073741824"`
 	RAMCached  uint64  `json:"ram_cached_bytes" example:"8589934592"`
 
+	// Swap Information
+	SwapUsage float64 `json:"swap_usage_percent" example:"12.5"`
+	SwapTotal uint64  `json:"swap_total_bytes" example:"8589934592"`
+	SwapUsed  uint64  `json:"swap_used_bytes" example:"1073741824"`
+	SwapFree  uint64  `json:"swap_free_bytes" example:"7516192768"`
+	// Swappiness is the kernel vm.swappiness tunable (0-200); -1 means unavailable.
+	Swappiness int `json:"swappiness" example:"60"`
+
 	// System Information
 	ServerModel     string  `json:"server_model" example:"Supermicro X11SCL-F"`
 	BIOSVersion     string  `json:"bios_version" example:"1.4"`

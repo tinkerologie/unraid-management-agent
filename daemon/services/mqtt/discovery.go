@@ -24,12 +24,13 @@ type haEntityOpts struct {
 	deviceClass    string
 	stateClass     string
 	entityCategory string
-	payloadOn      string // for binary_sensor and switch
-	payloadOff     string // for binary_sensor and switch
-	payloadPress   string // for button
-	stateOn        string // for switch (value that means ON)
-	stateOff       string // for switch (value that means OFF)
-	optimistic     bool   // for switch (no state feedback)
+	payloadOn      string   // for binary_sensor and switch
+	payloadOff     string   // for binary_sensor and switch
+	payloadPress   string   // for button
+	stateOn        string   // for switch (value that means ON)
+	stateOff       string   // for switch (value that means OFF)
+	optimistic     bool     // for switch (no state feedback)
+	eventTypes     []string // for event entity type
 }
 
 // discoveryTracker tracks published per-item HA discovery entities
@@ -163,6 +164,12 @@ func (c *Client) publishHAEntity(opts haEntityOpts) {
 		config["payload_press"] = press
 	}
 
+	// event-specific config — HA fires an event each time a JSON payload
+	// containing "event_type" (one of event_types) arrives on the state topic.
+	if opts.entityType == "event" {
+		config["event_types"] = opts.eventTypes
+	}
+
 	if err := c.publishJSON(discoveryTopic, config); err != nil {
 		logger.Warning("MQTT: Failed to publish HA discovery for %s: %v", opts.id, err)
 	}
@@ -273,6 +280,38 @@ func (c *Client) publishSystemDiscovery() {
 		id: "ram_total", name: "System: RAM Total", unit: "B",
 		icon: "mdi:memory", template: "{{ value_json.ram_total_bytes }}",
 		deviceClass: "data_size", stateClass: "measurement", entityCategory: "diagnostic",
+	})
+
+	// Swap sensors
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "swap_usage", name: "System: Swap Usage", unit: "%",
+		icon: "mdi:harddisk", template: "{{ value_json.swap_usage_percent | round(1) }}",
+		stateClass: "measurement",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "swap_used", name: "System: Swap Used", unit: "B",
+		icon: "mdi:harddisk", template: "{{ value_json.swap_used_bytes }}",
+		deviceClass: "data_size", stateClass: "measurement",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "swap_free", name: "System: Swap Free", unit: "B",
+		icon: "mdi:harddisk", template: "{{ value_json.swap_free_bytes }}",
+		deviceClass: "data_size", stateClass: "measurement",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "swap_total", name: "System: Swap Total", unit: "B",
+		icon: "mdi:harddisk", template: "{{ value_json.swap_total_bytes }}",
+		deviceClass: "data_size", stateClass: "measurement", entityCategory: "diagnostic",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: "swappiness", name: "System: Swappiness",
+		icon: "mdi:tune-variant", template: "{{ value_json.swappiness }}",
+		stateClass: "measurement", entityCategory: "diagnostic",
 	})
 
 	// Motherboard temperature
@@ -558,6 +597,16 @@ func (c *Client) publishNotificationDiscovery() {
 		commandTopic: c.buildCommandTopic("notifications", "archive_all"),
 		id:           "notif_archive_all", name: "Notifications: Archive All",
 		icon: "mdi:archive-arrow-down",
+	})
+
+	// Notification event entity — fires an HA event for each new Unraid
+	// notification, carrying its title/subject/description/importance as
+	// event attributes so automations can react to individual notifications.
+	c.publishHAEntity(haEntityOpts{
+		entityType: "event", stateTopic: c.buildTopic("notifications/event"),
+		id: "notif_event", name: "Notifications: Event",
+		icon:       "mdi:bell-ring",
+		eventTypes: []string{"alert", "warning", "info"},
 	})
 }
 

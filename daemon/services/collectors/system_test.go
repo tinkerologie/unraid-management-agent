@@ -214,6 +214,71 @@ Cached:          4876900 kB
 	}
 }
 
+func TestSystemSwapParsing(t *testing.T) {
+	// Test parsing swap fields from /proc/meminfo format
+	meminfo := `MemTotal:       32653968 kB
+SwapTotal:       8388604 kB
+SwapFree:        7340028 kB
+`
+	var swapTotal, swapFree uint64
+	for _, line := range strings.Split(meminfo, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		key := strings.TrimSuffix(fields[0], ":")
+		value, _ := strconv.ParseUint(fields[1], 10, 64)
+		value *= 1024
+		switch key {
+		case "SwapTotal":
+			swapTotal = value
+		case "SwapFree":
+			swapFree = value
+		}
+	}
+
+	wantTotal := uint64(8388604) * 1024
+	if swapTotal != wantTotal {
+		t.Errorf("SwapTotal = %d, want %d", swapTotal, wantTotal)
+	}
+
+	swapUsed := swapTotal - swapFree
+	wantUsed := wantTotal - uint64(7340028)*1024
+	if swapUsed != wantUsed {
+		t.Errorf("SwapUsed = %d, want %d", swapUsed, wantUsed)
+	}
+
+	usage := float64(swapUsed) / float64(swapTotal) * 100
+	if usage < 12.0 || usage > 13.0 {
+		t.Errorf("SwapUsage = %f, want ~12.5", usage)
+	}
+}
+
+func TestSystemCollectorGetSwapInfo(t *testing.T) {
+	hub := domain.NewEventBus(10)
+	ctx := &domain.Context{Hub: hub}
+	collector := NewSystemCollector(ctx)
+
+	// Smoke test — must not panic. Values are environment-dependent.
+	total, free, err := collector.getSwapInfo()
+	_ = err
+	if free > total && total != 0 {
+		t.Errorf("SwapFree (%d) should not exceed SwapTotal (%d)", free, total)
+	}
+}
+
+func TestSystemCollectorGetSwappiness(t *testing.T) {
+	hub := domain.NewEventBus(10)
+	ctx := &domain.Context{Hub: hub}
+	collector := NewSystemCollector(ctx)
+
+	// Returns a kernel value (0-200) on Linux, or -1 when unavailable.
+	val := collector.getSwappiness()
+	if val < -1 || val > 200 {
+		t.Errorf("getSwappiness() = %d, want -1..200", val)
+	}
+}
+
 func TestSystemInfoCPUStatParsing(t *testing.T) {
 	// Test parsing /proc/stat format
 	stat := `cpu  10132153 290696 3084719 46828483 16683 0 25195 0 0 0

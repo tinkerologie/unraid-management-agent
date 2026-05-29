@@ -8141,6 +8141,28 @@ const docTemplate = `{
                     "type": "string",
                     "example": "Supermicro X11SCL-F"
                 },
+                "swap_free_bytes": {
+                    "type": "integer",
+                    "example": 7516192768
+                },
+                "swap_total_bytes": {
+                    "type": "integer",
+                    "example": 8589934592
+                },
+                "swap_usage_percent": {
+                    "description": "Swap Information",
+                    "type": "number",
+                    "example": 12.5
+                },
+                "swap_used_bytes": {
+                    "type": "integer",
+                    "example": 1073741824
+                },
+                "swappiness": {
+                    "description": "Swappiness is the kernel vm.swappiness tunable (0-200); -1 means unavailable.",
+                    "type": "integer",
+                    "example": 60
+                },
                 "temperatures": {
                     "description": "All Temperature Sensors",
                     "type": "array",

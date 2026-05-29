@@ -45,6 +45,10 @@ type AlertEnv struct {
 	RAMTotalBytes   uint64  `expr:"RAMTotalBytes"`
 	RAMUsedBytes    uint64  `expr:"RAMUsedBytes"`
 	RAMFreeBytes    uint64  `expr:"RAMFreeBytes"`
+	SwapUsedPct     float64 `expr:"SwapUsedPct"`
+	SwapTotalBytes  uint64  `expr:"SwapTotalBytes"`
+	SwapUsedBytes   uint64  `expr:"SwapUsedBytes"`
+	SwapFreeBytes   uint64  `expr:"SwapFreeBytes"`
 	CPUTemp         float64 `expr:"CPUTemp"`
 	MotherboardTemp float64 `expr:"MotherboardTemp"`
 	Uptime          int64   `expr:"Uptime"`

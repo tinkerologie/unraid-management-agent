@@ -30,6 +30,42 @@ func TestNormalizeQoS(t *testing.T) {
 	}
 }
 
+func TestPublishNewNotificationEventsSeeding(t *testing.T) {
+	client := NewClient(DefaultConfig(), "test-server", "1.0.0", nil)
+
+	// First cycle seeds the existing backlog without firing events.
+	client.publishNewNotificationEvents([]dto.Notification{
+		{ID: "n1", Importance: "alert", Type: "unread"},
+		{ID: "n2", Importance: "info", Type: "unread"},
+	})
+
+	if !client.notifSeeded {
+		t.Error("expected notifSeeded to be true after first cycle")
+	}
+	if len(client.seenNotifications) != 2 {
+		t.Fatalf("expected 2 seeded notifications, got %d", len(client.seenNotifications))
+	}
+
+	// Second cycle: one new notification should be recorded (and would fire);
+	// archived notifications and already-seen IDs are ignored.
+	client.publishNewNotificationEvents([]dto.Notification{
+		{ID: "n1", Importance: "alert", Type: "unread"},
+		{ID: "n3", Importance: "warning", Type: "unread"},
+		{ID: "n4", Importance: "info", Type: "archive"}, // archived -> skipped
+		{ID: "", Importance: "info", Type: "unread"},     // no ID -> skipped
+	})
+
+	if !client.seenNotifications["n3"] {
+		t.Error("expected new notification n3 to be recorded as seen")
+	}
+	if client.seenNotifications["n4"] {
+		t.Error("archived notification n4 should not be recorded")
+	}
+	if len(client.seenNotifications) != 3 {
+		t.Fatalf("expected 3 seen notifications (n1,n2,n3), got %d", len(client.seenNotifications))
+	}
+}
+
 func TestNewClient(t *testing.T) {
 	config := DefaultConfig()
 	client := NewClient(config, "test-server", "1.0.0", nil)

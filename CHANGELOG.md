@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Swap memory metrics in `/api/v1/system`** — the system collector now reports
+  `swap_total_bytes`, `swap_used_bytes`, `swap_free_bytes`, and `swap_usage_percent`
+  parsed from `/proc/meminfo`, plus the kernel `swappiness` tunable from
+  `/proc/sys/vm/swappiness` (`-1` when unavailable). Addresses the Home Assistant
+  integration swap-sensor request (ha-unraid-management-agent #45).
+- **Swap & swappiness Home Assistant sensors** — new MQTT discovery sensors
+  (`swap_usage`, `swap_used`, `swap_free`, `swap_total`, `swappiness`).
+- **Swap fields available to the alerting engine** — `SwapUsedPct`, `SwapTotalBytes`,
+  `SwapUsedBytes`, and `SwapFreeBytes` can now be used in alert rule expressions.
+- **Home Assistant notification event entity** — a new MQTT `event` entity
+  (`notifications/event` topic) fires a Home Assistant event for each new Unraid
+  notification, exposing the full notification details (id, title, subject,
+  description, importance, type, link, timestamp) as event attributes. The existing
+  backlog is seeded silently on startup so a restart does not replay old notifications.
+
+### Security
+
+- **Fixed reachable vulnerability GO-2026-5013** — bumped `golang.org/x/crypto`
+  v0.51.0 → v0.52.0 (byte-arithmetic underflow/panic in `golang.org/x/crypto/ssh`,
+  reachable via libvirt `ConnectToURI` → `ssh.Dial` in the VM collector).
+  `govulncheck ./...` now reports zero vulnerabilities.
+
+### Changed
+
+- **Dependencies bumped** — `github.com/nicholas-fedor/shoutrrr` → v0.15.1,
+  `golang.org/x/net` → v0.55.0, `golang.org/x/sys` → v0.45.0,
+  `golang.org/x/crypto` → v0.52.0; `go mod tidy` run. `go vet` clean.
+
 ## [2026.05.00] - 2026-05-16
 
 ### Changed

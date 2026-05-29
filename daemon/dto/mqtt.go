@@ -110,26 +110,27 @@ type HADeviceInfo struct {
 
 // MQTTTopics represents the standard MQTT topics used by the agent.
 type MQTTTopics struct {
-	Status       string `json:"status" example:"unraid/status"`
-	System       string `json:"system" example:"unraid/system"`
-	Array        string `json:"array" example:"unraid/array"`
-	Disks        string `json:"disks" example:"unraid/disks"`
-	Containers   string `json:"containers" example:"unraid/docker/containers"`
-	VMs          string `json:"vms" example:"unraid/vm/list"`
-	UPS          string `json:"ups" example:"unraid/ups"`
-	GPU          string `json:"gpu" example:"unraid/gpu"`
-	Network      string `json:"network" example:"unraid/network"`
-	Shares       string `json:"shares" example:"unraid/shares"`
-	Notification string `json:"notifications" example:"unraid/notifications"`
-	ZFSPools     string `json:"zfs_pools" example:"unraid/zfs/pools"`
-	Availability string `json:"availability" example:"unraid/availability"`
-	NUT          string `json:"nut" example:"unraid/nut/status"`
-	Hardware     string `json:"hardware" example:"unraid/hardware"`
-	Registration string `json:"registration" example:"unraid/registration"`
-	Unassigned   string `json:"unassigned" example:"unraid/unassigned/devices"`
-	ZFSDatasets  string `json:"zfs_datasets" example:"unraid/zfs/datasets"`
-	ZFSSnapshots string `json:"zfs_snapshots" example:"unraid/zfs/snapshots"`
-	ZFSARC       string `json:"zfs_arc" example:"unraid/zfs/arc"`
+	Status            string `json:"status" example:"unraid/status"`
+	System            string `json:"system" example:"unraid/system"`
+	Array             string `json:"array" example:"unraid/array"`
+	Disks             string `json:"disks" example:"unraid/disks"`
+	Containers        string `json:"containers" example:"unraid/docker/containers"`
+	VMs               string `json:"vms" example:"unraid/vm/list"`
+	UPS               string `json:"ups" example:"unraid/ups"`
+	GPU               string `json:"gpu" example:"unraid/gpu"`
+	Network           string `json:"network" example:"unraid/network"`
+	Shares            string `json:"shares" example:"unraid/shares"`
+	Notification      string `json:"notifications" example:"unraid/notifications"`
+	NotificationEvent string `json:"notification_event" example:"unraid/notifications/event"`
+	ZFSPools          string `json:"zfs_pools" example:"unraid/zfs/pools"`
+	Availability      string `json:"availability" example:"unraid/availability"`
+	NUT               string `json:"nut" example:"unraid/nut/status"`
+	Hardware          string `json:"hardware" example:"unraid/hardware"`
+	Registration      string `json:"registration" example:"unraid/registration"`
+	Unassigned        string `json:"unassigned" example:"unraid/unassigned/devices"`
+	ZFSDatasets       string `json:"zfs_datasets" example:"unraid/zfs/datasets"`
+	ZFSSnapshots      string `json:"zfs_snapshots" example:"unraid/zfs/snapshots"`
+	ZFSARC            string `json:"zfs_arc" example:"unraid/zfs/arc"`
 }
 
 // MQTTEnableRequest represents a request to enable/disable MQTT.

@@ -149,6 +149,22 @@ func (c *SystemCollector) collectSystemInfo() (*dto.SystemInfo, error) {
 		info.RAMTotalMB = float64(memTotal) / (1024 * 1024)
 	}
 
+	// Get swap info
+	swapTotal, swapFree, err := c.getSwapInfo()
+	if err != nil {
+		logger.Warning("Failed to collect swap info: %v", err)
+	} else {
+		info.SwapTotal = swapTotal
+		info.SwapFree = swapFree
+		info.SwapUsed = swapTotal - swapFree
+		if swapTotal > 0 {
+			info.SwapUsage = float64(info.SwapUsed) / float64(swapTotal) * 100
+		}
+	}
+
+	// Get swappiness kernel tunable
+	info.Swappiness = c.getSwappiness()
+
 	// Get server model and BIOS info
 	serverModel, biosVersion, biosDate := c.getSystemHardwareInfo()
 	info.ServerModel = serverModel
@@ -396,6 +412,67 @@ func (c *SystemCollector) getMemoryInfo() (uint64, uint64, uint64, uint64, uint6
 	memActualFree := memFree + memBuffers + memCached
 
 	return memUsed, memTotal, memActualFree, memBuffers, memCached, nil
+}
+
+// getSwapInfo reads swap totals from /proc/meminfo.
+// It returns the total and free swap in bytes. A system with no swap configured
+// reports SwapTotal=0, which is valid and not an error.
+func (c *SystemCollector) getSwapInfo() (swapTotal, swapFree uint64, err error) {
+	file, err := os.Open("/proc/meminfo")
+	if err != nil {
+		return 0, 0, err
+	}
+	defer func() {
+		if cerr := file.Close(); cerr != nil {
+			logger.Debug("Error closing meminfo file: %v", cerr)
+		}
+	}()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) < 2 {
+			continue
+		}
+
+		key := strings.TrimSuffix(fields[0], ":")
+		value, perr := strconv.ParseUint(fields[1], 10, 64)
+		if perr != nil {
+			continue
+		}
+		value *= 1024 // Convert from KB to bytes
+
+		switch key {
+		case "SwapTotal":
+			swapTotal = value
+		case "SwapFree":
+			swapFree = value
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return 0, 0, err
+	}
+
+	return swapTotal, swapFree, nil
+}
+
+// getSwappiness reads the kernel vm.swappiness tunable from /proc/sys/vm/swappiness.
+// It returns -1 when the value is unavailable (e.g. not running on Linux).
+func (c *SystemCollector) getSwappiness() int {
+	data, err := os.ReadFile("/proc/sys/vm/swappiness")
+	if err != nil {
+		logger.Debug("Failed to read swappiness: %v", err)
+		return -1
+	}
+
+	value, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	if err != nil {
+		logger.Debug("Failed to parse swappiness %q: %v", string(data), err)
+		return -1
+	}
+
+	return value
 }
 
 func (c *SystemCollector) getTemperatures() (map[string]float64, error) {

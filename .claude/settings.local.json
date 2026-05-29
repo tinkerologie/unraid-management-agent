@@ -36,7 +36,24 @@
       "WebFetch(domain:antonz.org)",
       "WebFetch(domain:golang.org)",
       "Bash(gh repo view --json nameWithOwner --jq '.nameWithOwner')",
-      "Bash(gh issue:*)"
+      "Bash(gh issue:*)",
+      "Bash(go version *)",
+      "Bash(go list *)",
+      "Bash(grep -v \"^$\")",
+      "Bash(go build *)",
+      "Bash(go test *)",
+      "Bash(go get *)",
+      "Bash(go mod *)",
+      "Bash(gofmt -l daemon/services/collectors/system.go daemon/dto/system.go daemon/dto/alert.go daemon/services/alerting/engine.go daemon/services/mqtt/discovery.go daemon/services/collectors/system_test.go daemon/dto/system_test.go)",
+      "Bash(gofmt -w daemon/services/mqtt/client.go daemon/services/mqtt/discovery.go daemon/dto/mqtt.go)",
+      "Bash(gofmt -w daemon/services/mqtt/client.go)",
+      "Bash(make swagger *)",
+      "Bash(go vet *)",
+      "Bash(make release *)",
+      "Bash(ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --tags build,deploy,verify)",
+      "Bash(curl -s http://192.168.20.21:8043/api/v1/system)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({k:v for k,v in d.items\\(\\) if 'swap' in k.lower\\(\\) or k=='swappiness' or 'ram' in k.lower\\(\\)}, indent=2\\)\\)\")",
+      "Bash(go run *)"
     ]
   }
 }
