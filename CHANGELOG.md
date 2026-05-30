@@ -9,47 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2026.06.00] - 2026-05-30
+## [2026.06.01] - 2026-06-01
 
 ### Added
 
-- **Unraid 7.3 support — new data exposed across the API/MQTT/MCP:**
-  - **Chassis serial number** in `/api/v1/hardware` (`chassis` block: manufacturer,
-    type, version, serial, asset tag) via sysfs DMI with dmidecode (type 3) fallback.
-    New HA sensor `Hardware: Chassis Serial`.
-  - **TPM presence/version** in `/api/v1/hardware` (`tpm` block) from
-    `/sys/class/tpm/tpm0` — supports Unraid 7.3 TPM-based licensing. New HA
-    binary sensor `Hardware: TPM Present`.
-  - **Boot device / boot pool** in `/api/v1/hardware` (`boot` block: device type
-    usb vs internal, backing device, filesystem, ZFS boot pool) — Unraid 7.3
-    internal-boot support. New HA sensor `Hardware: Boot Device Type`.
-  - **ZFS corrupted files** per pool (`corrupted_files`) parsed from
-    `zpool status -v` (ZFS 2.4.1 surfaces these without a scrub), plus
-    `is_boot_pool` flag. New HA sensor `ZFS: <pool> Corrupted Files`.
-  - **ZFS configured ARC max** (`configured_max_bytes`) from
-    `/sys/module/zfs/parameters/zfs_arc_max` (0 = auto) — Unraid 7.3 first-class
-    tunable. New HA sensor `ZFS ARC: Configured Max`.
-  - **Docker container MAC address** (`mac_address`) from `docker inspect`
-    (Docker 29 / Unraid 7.3 fixed-MAC support). New per-container HA sensor.
-  - **Per-process disk I/O** via new `GET /api/v1/processes/io` and MCP tool
-    `list_process_io` — top processes by I/O rate sampled natively from
-    `/proc/<pid>/io` (lighter than spawning iotop-c, no always-on cost).
-  - **New alert-rule fields:** `ZFSCorruptedFiles`, `BootPoolHealthy`,
-    `BootPoolHealth` (degraded ZFS boot pool / corrupted files alerting).
-- **Swap memory metrics in `/api/v1/system`** — the system collector now reports
-  `swap_total_bytes`, `swap_used_bytes`, `swap_free_bytes`, and `swap_usage_percent`
-  parsed from `/proc/meminfo`, plus the kernel `swappiness` tunable from
-  `/proc/sys/vm/swappiness` (`-1` when unavailable). Addresses the Home Assistant
-  integration swap-sensor request (ha-unraid-management-agent #45).
-- **Swap & swappiness Home Assistant sensors** — new MQTT discovery sensors
-  (`swap_usage`, `swap_used`, `swap_free`, `swap_total`, `swappiness`).
-- **Swap fields available to the alerting engine** — `SwapUsedPct`, `SwapTotalBytes`,
-  `SwapUsedBytes`, and `SwapFreeBytes` can now be used in alert rule expressions.
-- **Home Assistant notification event entity** — a new MQTT `event` entity
-  (`notifications/event` topic) fires a Home Assistant event for each new Unraid
-  notification, exposing the full notification details (id, title, subject,
-  description, importance, type, link, timestamp) as event attributes. The existing
-  backlog is seeded silently on startup so a restart does not replay old notifications.
 - **Continuous Docker container update detection** — a new background `docker_update`
   collector (default 6 h interval, staggered start, registry-rate-limit-safe) performs
   periodic digest comparisons for all running containers without blocking normal Docker
@@ -136,6 +99,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `INTERVAL_DOCKER_NETWORKS`, `INTERVAL_PLUGIN_UPDATE`, `INTERVAL_OS_UPDATE`,
   `INTERVAL_MOVER`.
 
+### Changed
+
+- **`GET /api/v1/docker/updates`** now returns the cached result immediately instead
+  of performing a live registry check on each request; use the new `POST
+/api/v1/docker/updates/refresh` to force an on-demand re-check.
+- **Runtime collector interval cap** raised from 3 600 s to 86 400 s (24 h) to
+  accommodate the new `docker_update` collector's default 6 h schedule.
+
+## [2026.06.00] - 2026-05-30
+
+### Added
+
+- **Unraid 7.3 support — new data exposed across the API/MQTT/MCP:**
+  - **Chassis serial number** in `/api/v1/hardware` (`chassis` block: manufacturer,
+    type, version, serial, asset tag) via sysfs DMI with dmidecode (type 3) fallback.
+    New HA sensor `Hardware: Chassis Serial`.
+  - **TPM presence/version** in `/api/v1/hardware` (`tpm` block) from
+    `/sys/class/tpm/tpm0` — supports Unraid 7.3 TPM-based licensing. New HA
+    binary sensor `Hardware: TPM Present`.
+  - **Boot device / boot pool** in `/api/v1/hardware` (`boot` block: device type
+    usb vs internal, backing device, filesystem, ZFS boot pool) — Unraid 7.3
+    internal-boot support. New HA sensor `Hardware: Boot Device Type`.
+  - **ZFS corrupted files** per pool (`corrupted_files`) parsed from
+    `zpool status -v` (ZFS 2.4.1 surfaces these without a scrub), plus
+    `is_boot_pool` flag. New HA sensor `ZFS: <pool> Corrupted Files`.
+  - **ZFS configured ARC max** (`configured_max_bytes`) from
+    `/sys/module/zfs/parameters/zfs_arc_max` (0 = auto) — Unraid 7.3 first-class
+    tunable. New HA sensor `ZFS ARC: Configured Max`.
+  - **Docker container MAC address** (`mac_address`) from `docker inspect`
+    (Docker 29 / Unraid 7.3 fixed-MAC support). New per-container HA sensor.
+  - **Per-process disk I/O** via new `GET /api/v1/processes/io` and MCP tool
+    `list_process_io` — top processes by I/O rate sampled natively from
+    `/proc/<pid>/io` (lighter than spawning iotop-c, no always-on cost).
+  - **New alert-rule fields:** `ZFSCorruptedFiles`, `BootPoolHealthy`,
+    `BootPoolHealth` (degraded ZFS boot pool / corrupted files alerting).
+- **Swap memory metrics in `/api/v1/system`** — the system collector now reports
+  `swap_total_bytes`, `swap_used_bytes`, `swap_free_bytes`, and `swap_usage_percent`
+  parsed from `/proc/meminfo`, plus the kernel `swappiness` tunable from
+  `/proc/sys/vm/swappiness` (`-1` when unavailable). Addresses the Home Assistant
+  integration swap-sensor request (ha-unraid-management-agent #45).
+- **Swap & swappiness Home Assistant sensors** — new MQTT discovery sensors
+  (`swap_usage`, `swap_used`, `swap_free`, `swap_total`, `swappiness`).
+- **Swap fields available to the alerting engine** — `SwapUsedPct`, `SwapTotalBytes`,
+  `SwapUsedBytes`, and `SwapFreeBytes` can now be used in alert rule expressions.
+- **Home Assistant notification event entity** — a new MQTT `event` entity
+  (`notifications/event` topic) fires a Home Assistant event for each new Unraid
+  notification, exposing the full notification details (id, title, subject,
+  description, importance, type, link, timestamp) as event attributes. The existing
+  backlog is seeded silently on startup so a restart does not replay old notifications.
+
 ### Security
 
 - **Fixed reachable vulnerability GO-2026-5013** — bumped `golang.org/x/crypto`
@@ -153,11 +166,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   passthrough string; system memory comes from `/proc/meminfo`), and confirmed disk
   SMART polling already uses `smartctl -n standby` so routine collection never wakes
   spun-down drives (aligns with 7.3's "don't spin up the array on reads" fix).
-- **`GET /api/v1/docker/updates`** now returns the cached result immediately instead
-  of performing a live registry check on each request; use the new `POST
-/api/v1/docker/updates/refresh` to force an on-demand re-check.
-- **Runtime collector interval cap** raised from 3 600 s to 86 400 s (24 h) to
-  accommodate the new `docker_update` collector's default 6 h schedule.
 
 ## [2026.05.00] - 2026-05-16
 
