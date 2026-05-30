@@ -51,6 +51,7 @@ type CacheProvider interface {
 	GetTuningCache() *dto.TuningInfo
 	GetDockerNetworksCache() *dto.DockerNetworkList
 	GetPluginUpdatesCache() *dto.PluginList
+	GetOSUpdateCache() *dto.OSUpdateStatus
 	// Logs
 	ListLogFiles() []dto.LogFile
 	GetLogContent(path, lines, start string) (*dto.LogFileContent, error)
@@ -971,6 +972,22 @@ func (s *Server) registerNewMonitoringTools() {
 			return textResult(fmt.Sprintf("Failed to get container size: %v", err)), nil, nil
 		}
 		return jsonResult(result)
+	})
+
+	// Get OS update status (local-file only, no network calls)
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "get_os_update",
+		Description: "Return the cached Unraid OS update availability. Sources local files only — no outbound network calls are made. Status is 'unknown' until the os_update collector has run.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		logger.Info("MCP: Getting cached OS update status")
+		if cached := s.cacheProvider.GetOSUpdateCache(); cached != nil {
+			return jsonResult(cached)
+		}
+		return jsonResult(&dto.OSUpdateStatus{
+			Status:    dto.OSUpdateStatusUnknown,
+			Timestamp: time.Now(),
+		})
 	})
 
 	// Check plugin updates (returns cached result)

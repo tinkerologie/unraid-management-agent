@@ -4491,3 +4491,22 @@ func (s *Server) handleSetInotifyLimits(w http.ResponseWriter, r *http.Request) 
 		Timestamp: time.Now(),
 	})
 }
+
+// handleOSUpdate godoc
+//
+//	@Summary		Get OS update availability
+//	@Description	Returns the cached OS update status. No outbound network calls are made; the result is based on local files only. Returns an "unknown" sentinel when no local latest-version data is available.
+//	@Tags			OS
+//	@Produce		json
+//	@Success		200	{object}	dto.OSUpdateStatus	"OS update status"
+//	@Router			/os/update [get]
+func (s *Server) handleOSUpdate(w http.ResponseWriter, _ *http.Request) {
+	if cached := s.GetOSUpdateCache(); cached != nil {
+		respondJSON(w, http.StatusOK, cached)
+		return
+	}
+	respondJSON(w, http.StatusOK, &dto.OSUpdateStatus{
+		Status:    dto.OSUpdateStatusUnknown,
+		Timestamp: time.Now(),
+	})
+}

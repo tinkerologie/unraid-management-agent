@@ -44,6 +44,7 @@ type CacheStore struct {
 	dockerUpdatesCache   atomic.Pointer[dto.ContainerUpdatesResult]
 	dockerNetworksCache  atomic.Pointer[dto.DockerNetworkList]
 	pluginUpdatesCache   atomic.Pointer[dto.PluginList]
+	osUpdateCache        atomic.Pointer[dto.OSUpdateStatus]
 }
 
 // ---------- Pointer-type getters (direct Load) ----------
@@ -178,6 +179,11 @@ func (c *CacheStore) GetDockerNetworksCache() *dto.DockerNetworkList {
 // GetPluginUpdatesCache returns the cached plugin update list, or nil.
 func (c *CacheStore) GetPluginUpdatesCache() *dto.PluginList {
 	return c.pluginUpdatesCache.Load()
+}
+
+// GetOSUpdateCache returns the cached OS update status, or nil.
+func (c *CacheStore) GetOSUpdateCache() *dto.OSUpdateStatus {
+	return c.osUpdateCache.Load()
 }
 
 // GetVMsCache returns cached VM information.

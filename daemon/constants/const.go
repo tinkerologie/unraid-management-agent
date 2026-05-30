@@ -148,6 +148,9 @@ const (
 	// Long by design: plugin check runs a network request and parses temp files.
 	// Default 1 hour.
 	IntervalPluginUpdate = 3600
+	// IntervalOSUpdate is the interval for checking OS update availability in seconds.
+	// Long by design: the check reads local files only; daily is sufficient.
+	IntervalOSUpdate = 86400
 
 	// WSPingInterval is the WebSocket ping interval in seconds.
 	WSPingInterval = 30

@@ -289,6 +289,7 @@ func (cm *CollectorManager) GetAllStatus() dto.CollectorsStatusResponse {
 		"ups", "nut", "gpu", "shares", "network",
 		"hardware", "zfs", "notification", "registration", "unassigned",
 		"fancontrol", "tuning", "docker_update", "docker_networks", "plugin_update",
+		"os_update",
 	}
 
 	for _, name := range collectorOrder {
@@ -384,6 +385,7 @@ func (cm *CollectorManager) getDefaultInterval(name string) int {
 		"docker_update":   constants.IntervalDockerUpdate,
 		"docker_networks": constants.IntervalDockerNetworks,
 		"plugin_update":   constants.IntervalPluginUpdate,
+		"os_update":       constants.IntervalOSUpdate,
 	}
 
 	if interval, ok := defaults[name]; ok {
@@ -554,4 +556,23 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 		}
 		return c
 	}, intervals.PluginUpdate, false)
+
+	// OSUpdate collector — best-effort local-file-only OS update availability check.
+	// The default CheckFn reads only local files (no outbound network calls).
+	// NotifyFn is injected here to avoid a collectors→controllers import cycle.
+	cm.Register("os_update", func(ctx *domain.Context) Collector {
+		c := collectors.NewOSUpdateCollector(ctx)
+		c.NotifyFn = func(latest string) {
+			if err := controllers.CreateNotification(
+				"Unraid OS update available",
+				"System",
+				fmt.Sprintf("A new Unraid OS version is available: %s", latest),
+				"info",
+				"",
+			); err != nil {
+				logger.Warning("os_update: failed to create notification: %v", err)
+			}
+		}
+		return c
+	}, intervals.OSUpdate, false)
 }

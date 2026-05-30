@@ -108,6 +108,9 @@ func cacheBindings() []eventBinding {
 		bind(constants.TopicPluginUpdatesUpdate, func(c *CacheStore, v *dto.PluginList) {
 			c.pluginUpdatesCache.Store(v)
 		}),
+		bind(constants.TopicOSUpdateUpdate, func(c *CacheStore, v *dto.OSUpdateStatus) {
+			c.osUpdateCache.Store(v)
+		}),
 	}
 }
 

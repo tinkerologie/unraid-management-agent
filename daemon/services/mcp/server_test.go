@@ -64,6 +64,7 @@ func (m *MockCacheProvider) GetFanControlCache() *dto.FanControlStatus          
 func (m *MockCacheProvider) GetTuningCache() *dto.TuningInfo                    { return nil }
 func (m *MockCacheProvider) GetDockerNetworksCache() *dto.DockerNetworkList { return nil }
 func (m *MockCacheProvider) GetPluginUpdatesCache() *dto.PluginList         { return nil }
+func (m *MockCacheProvider) GetOSUpdateCache() *dto.OSUpdateStatus          { return nil }
 
 // Log methods
 func (m *MockCacheProvider) ListLogFiles() []dto.LogFile { return m.logFiles }
