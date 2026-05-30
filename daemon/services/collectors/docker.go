@@ -248,6 +248,9 @@ func (c *DockerCollector) Collect() {
 					}
 				}
 
+				// RestartCount
+				cont.RestartCount = inspectData.RestartCount
+
 				// Memory stats from cgroups (much faster than ContainerStats API)
 				c.getMemoryFromCgroups(apiContainer.ID, cont)
 

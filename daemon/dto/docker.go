@@ -33,6 +33,7 @@ type ContainerInfo struct {
 	VolumeMappings []VolumeMapping `json:"volume_mappings"`
 	RestartPolicy  string          `json:"restart_policy" example:"unless-stopped"`
 	Uptime         string          `json:"uptime" example:"2 days"`
+	RestartCount   int             `json:"restart_count" example:"0"`
 	// Update status — populated by merging the DockerUpdate collector's cache at read time.
 	UpdateStatus    string     `json:"update_status" example:"up_to_date"` // see UpdateStatus* constants
 	UpdateAvailable *bool      `json:"update_available,omitempty"`         // null when not yet checked / registry unreachable (field omitted in JSON)
