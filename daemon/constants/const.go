@@ -151,6 +151,9 @@ const (
 	// IntervalOSUpdate is the interval for checking OS update availability in seconds.
 	// Long by design: the check reads local files only; daily is sufficient.
 	IntervalOSUpdate = 86400
+	// IntervalMover is the interval for collecting mover status in seconds.
+	// 30 seconds balances responsiveness with low overhead (reads two local files).
+	IntervalMover = 30
 
 	// WSPingInterval is the WebSocket ping interval in seconds.
 	WSPingInterval = 30

@@ -4510,3 +4510,21 @@ func (s *Server) handleOSUpdate(w http.ResponseWriter, _ *http.Request) {
 		Timestamp: time.Now(),
 	})
 }
+
+// handleMover godoc
+//
+//	@Summary		Get mover status
+//	@Description	Returns the cached mover status including active state, schedule, and last-run statistics. Returns a zero-value sentinel when no data is available yet.
+//	@Tags			Mover
+//	@Produce		json
+//	@Success		200	{object}	dto.MoverStatus	"Mover status"
+//	@Router			/mover [get]
+func (s *Server) handleMover(w http.ResponseWriter, _ *http.Request) {
+	if cached := s.GetMoverCache(); cached != nil {
+		respondJSON(w, http.StatusOK, cached)
+		return
+	}
+	respondJSON(w, http.StatusOK, &dto.MoverStatus{
+		Timestamp: time.Now(),
+	})
+}

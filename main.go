@@ -45,6 +45,7 @@ var validCollectorNames = map[string]bool{
 	"docker_networks": true,
 	"plugin_update":   true,
 	"os_update":       true,
+	"mover":           true,
 }
 
 var cli struct {
@@ -101,6 +102,7 @@ var cli struct {
 	IntervalDockerNetworks int  `default:"60" env:"INTERVAL_DOCKER_NETWORKS" help:"docker networks listing interval (seconds, 0=disabled, max 86400)"`
 	IntervalPluginUpdate   int  `default:"3600" env:"INTERVAL_PLUGIN_UPDATE" help:"plugin update check interval (seconds, 0=disabled, max 86400)"`
 	IntervalOSUpdate       int  `default:"86400" env:"INTERVAL_OS_UPDATE" help:"OS update availability check interval (seconds, 0=disabled, max 86400)"`
+	IntervalMover          int  `default:"30" env:"INTERVAL_MOVER" help:"mover status collection interval (seconds, 0=disabled, max 86400)"`
 	DockerUpdateNotify     bool `default:"false" env:"DOCKER_UPDATE_NOTIFY" help:"raise an Unraid notification when new container updates become available"`
 
 	Boot        cmd.Boot        `cmd:"" default:"1" help:"start the management agent"`
@@ -282,6 +284,7 @@ func main() {
 			DockerNetworks: getInterval("docker_networks", cli.IntervalDockerNetworks),
 			PluginUpdate:   getInterval("plugin_update", cli.IntervalPluginUpdate),
 			OSUpdate:       getInterval("os_update", cli.IntervalOSUpdate),
+			Mover:          getInterval("mover", cli.IntervalMover),
 		},
 	}
 
@@ -371,5 +374,6 @@ func applyFileConfig(cfg *domain.FileConfig) {
 		setInt(&cli.IntervalDockerNetworks, iv.DockerNetworks)
 		setInt(&cli.IntervalPluginUpdate, iv.PluginUpdate)
 		setInt(&cli.IntervalOSUpdate, iv.OSUpdate)
+		setInt(&cli.IntervalMover, iv.Mover)
 	}
 }

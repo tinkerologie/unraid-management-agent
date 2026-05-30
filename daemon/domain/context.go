@@ -25,6 +25,7 @@ type Intervals struct {
 	DockerNetworks int
 	PluginUpdate   int
 	OSUpdate       int
+	Mover          int
 }
 
 // Context holds the application runtime context including the event hub and configuration.

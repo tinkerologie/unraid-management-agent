@@ -52,6 +52,7 @@ type CacheProvider interface {
 	GetDockerNetworksCache() *dto.DockerNetworkList
 	GetPluginUpdatesCache() *dto.PluginList
 	GetOSUpdateCache() *dto.OSUpdateStatus
+	GetMoverCache() *dto.MoverStatus
 	// Logs
 	ListLogFiles() []dto.LogFile
 	GetLogContent(path, lines, start string) (*dto.LogFileContent, error)
@@ -988,6 +989,19 @@ func (s *Server) registerNewMonitoringTools() {
 			Status:    dto.OSUpdateStatusUnknown,
 			Timestamp: time.Now(),
 		})
+	})
+
+	// Get mover status (local files only: var.ini + mover.log)
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "get_mover_status",
+		Description: "Return the cached mover status (active state, schedule, and last-run duration/files/bytes parsed from /var/log/mover.log). Local files only — no outbound network calls.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		logger.Info("MCP: Getting cached mover status")
+		if cached := s.cacheProvider.GetMoverCache(); cached != nil {
+			return jsonResult(cached)
+		}
+		return jsonResult(&dto.MoverStatus{Timestamp: time.Now()})
 	})
 
 	// Check plugin updates (returns cached result)

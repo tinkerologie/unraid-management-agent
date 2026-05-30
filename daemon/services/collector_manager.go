@@ -289,7 +289,7 @@ func (cm *CollectorManager) GetAllStatus() dto.CollectorsStatusResponse {
 		"ups", "nut", "gpu", "shares", "network",
 		"hardware", "zfs", "notification", "registration", "unassigned",
 		"fancontrol", "tuning", "docker_update", "docker_networks", "plugin_update",
-		"os_update",
+		"os_update", "mover",
 	}
 
 	for _, name := range collectorOrder {
@@ -386,6 +386,7 @@ func (cm *CollectorManager) getDefaultInterval(name string) int {
 		"docker_networks": constants.IntervalDockerNetworks,
 		"plugin_update":   constants.IntervalPluginUpdate,
 		"os_update":       constants.IntervalOSUpdate,
+		"mover":           constants.IntervalMover,
 	}
 
 	if interval, ok := defaults[name]; ok {
@@ -575,4 +576,9 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 		}
 		return c
 	}, intervals.OSUpdate, false)
+
+	// Mover collector — reads var.ini state + /var/log/mover.log (local files only).
+	cm.Register("mover", func(ctx *domain.Context) Collector {
+		return collectors.NewMoverCollector(ctx)
+	}, intervals.Mover, false)
 }

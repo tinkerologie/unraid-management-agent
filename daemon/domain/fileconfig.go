@@ -74,6 +74,7 @@ type FileConfigIntervals struct {
 	DockerNetworks *int `yaml:"docker_networks,omitempty"`
 	PluginUpdate   *int `yaml:"plugin_update,omitempty"`
 	OSUpdate       *int `yaml:"os_update,omitempty"`
+	Mover          *int `yaml:"mover,omitempty"`
 }
 
 // LoadConfigFile reads and parses a YAML config file.

@@ -213,6 +213,9 @@ func (s *Server) setupRoutes() {
 	// OS update availability (local-file only, no network calls)
 	api.HandleFunc("/os/update", s.handleOSUpdate).Methods("GET")
 
+	// Mover status (state + schedule + last-run stats from /var/log/mover.log)
+	api.HandleFunc("/mover", s.handleMover).Methods("GET")
+
 	// Configuration endpoints (write)
 	api.HandleFunc("/shares/{name}/config", s.handleUpdateShareConfig).Methods("POST")
 	api.HandleFunc("/settings/system", s.handleUpdateSystemSettings).Methods("POST")

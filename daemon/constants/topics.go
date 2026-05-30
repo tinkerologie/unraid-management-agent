@@ -59,4 +59,6 @@ var (
 	TopicPluginUpdatesUpdate = domain.NewTopic[*dto.PluginList]("plugin_updates_update")
 	// TopicOSUpdateUpdate is published by the os_update collector with *dto.OSUpdateStatus.
 	TopicOSUpdateUpdate = domain.NewTopic[*dto.OSUpdateStatus]("os_update_update")
+	// TopicMoverUpdate is published by the mover collector with *dto.MoverStatus.
+	TopicMoverUpdate = domain.NewTopic[*dto.MoverStatus]("mover_update")
 )
