@@ -124,6 +124,7 @@ func TestCollectorManager_RegisterAllCollectors(t *testing.T) {
 		"system", "array", "disk", "docker", "vm", "ups", "nut",
 		"gpu", "shares", "network", "hardware", "zfs", "notification",
 		"registration", "unassigned", "fancontrol", "tuning", "docker_update",
+		"docker_networks",
 	}
 
 	if len(names) != len(expectedNames) {

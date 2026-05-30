@@ -49,6 +49,7 @@ type CacheProvider interface {
 	GetParityHistoryCache() *dto.ParityCheckHistory
 	GetFanControlCache() *dto.FanControlStatus
 	GetTuningCache() *dto.TuningInfo
+	GetDockerNetworksCache() *dto.DockerNetworkList
 	// Logs
 	ListLogFiles() []dto.LogFile
 	GetLogContent(path, lines, start string) (*dto.LogFileContent, error)
@@ -301,6 +302,19 @@ func (s *Server) registerMonitoringTools() {
 			}
 		}
 		return textResult(fmt.Sprintf("Container '%s' not found", args.ContainerID)), nil, nil
+	})
+
+	// List Docker networks tool
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "list_docker_networks",
+		Description: "List all Docker networks on the Unraid server with their driver, scope, IPAM settings, and connected containers",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
+		cached := s.cacheProvider.GetDockerNetworksCache()
+		if cached == nil {
+			return textResult("Docker network information not available yet"), nil, nil
+		}
+		return jsonResult(cached)
 	})
 
 	// List VMs tool

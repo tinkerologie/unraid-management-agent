@@ -141,6 +141,9 @@ const (
 	// Long by design: DistributionInspect hits the registry and Docker Hub rate-limits
 	// anonymous manifest requests. Default 6 hours.
 	IntervalDockerUpdate = 21600
+	// IntervalDockerNetworks is the collection interval for Docker network listing in seconds.
+	// Networks change rarely; 60s is a reasonable default.
+	IntervalDockerNetworks = 60
 
 	// WSPingInterval is the WebSocket ping interval in seconds.
 	WSPingInterval = 30

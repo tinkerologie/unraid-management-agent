@@ -102,6 +102,9 @@ func cacheBindings() []eventBinding {
 		bind(constants.TopicDockerUpdatesUpdate, func(c *CacheStore, v *dto.ContainerUpdatesResult) {
 			c.dockerUpdatesCache.Store(v)
 		}),
+		bind(constants.TopicDockerNetworksUpdate, func(c *CacheStore, v *dto.DockerNetworkList) {
+			c.dockerNetworksCache.Store(v)
+		}),
 	}
 }
 

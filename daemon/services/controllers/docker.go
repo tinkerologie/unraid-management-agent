@@ -625,6 +625,76 @@ func shortID(id string) string {
 	return id
 }
 
+// ListNetworks returns all Docker networks with their IPAM and connected-container metadata.
+// NetworkList is called first for the full list; NetworkInspect is called per network to
+// retrieve the connected-container map, which is not included in the list response.
+func (dc *DockerController) ListNetworks() ([]dto.DockerNetworkInfo, error) {
+	logger.Debug("Listing Docker networks")
+
+	if err := dc.initClient(); err != nil {
+		return nil, err
+	}
+	defer func() { _ = dc.Close() }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	listResult, err := dc.client.NetworkList(ctx, client.NetworkListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list docker networks: %w", err)
+	}
+
+	now := time.Now()
+	result := make([]dto.DockerNetworkInfo, 0, len(listResult.Items))
+	for _, s := range listResult.Items {
+		info := dto.DockerNetworkInfo{
+			ID:             s.ID,
+			Name:           s.Name,
+			Driver:         s.Driver,
+			Scope:          s.Scope,
+			Internal:       s.Internal,
+			Attachable:     s.Attachable,
+			Labels:         s.Labels,
+			ContainerNames: []string{},
+			Timestamp:      now,
+		}
+
+		if !s.Created.IsZero() {
+			info.Created = s.Created.UTC().Format(time.RFC3339)
+		}
+
+		// Extract first subnet and gateway from IPAM config (may be empty for host/none networks).
+		for _, cfg := range s.IPAM.Config {
+			if info.Subnet == "" && cfg.Subnet.IsValid() {
+				info.Subnet = cfg.Subnet.String()
+			}
+			if info.Gateway == "" && cfg.Gateway.IsValid() {
+				info.Gateway = cfg.Gateway.String()
+			}
+			if info.Subnet != "" && info.Gateway != "" {
+				break
+			}
+		}
+
+		// Retrieve connected-container names via NetworkInspect (not included in list response).
+		inspectResult, inspectErr := dc.client.NetworkInspect(ctx, s.ID, client.NetworkInspectOptions{})
+		if inspectErr != nil {
+			logger.Warning("DockerNetworks: inspect failed for %s (%s): %v", s.Name, s.ID[:12], inspectErr)
+		} else {
+			for _, ep := range inspectResult.Network.Containers {
+				if ep.Name != "" {
+					info.ContainerNames = append(info.ContainerNames, ep.Name)
+				}
+			}
+		}
+
+		result = append(result, info)
+	}
+
+	logger.Info("Listed %d Docker networks", len(result))
+	return result, nil
+}
+
 // shortDigest returns a truncated digest for logging.
 func shortDigest(digest string) string {
 	digest = strings.TrimPrefix(digest, "sha256:")

@@ -2670,6 +2670,26 @@ func (s *Server) handleDockerUpdatesRefresh(w http.ResponseWriter, _ *http.Reque
 	respondJSON(w, http.StatusOK, result)
 }
 
+// handleDockerNetworks godoc
+//
+//	@Summary		Get Docker networks
+//	@Description	Serves the cached Docker network list. Returns an empty list when no cache is available yet.
+//	@Tags			Docker
+//	@Produce		json
+//	@Success		200	{object}	dto.DockerNetworkList	"Docker network list"
+//	@Router			/docker/networks [get]
+func (s *Server) handleDockerNetworks(w http.ResponseWriter, _ *http.Request) {
+	if cached := s.GetDockerNetworksCache(); cached != nil {
+		respondJSON(w, http.StatusOK, cached)
+		return
+	}
+	respondJSON(w, http.StatusOK, dto.DockerNetworkList{
+		Networks:  []dto.DockerNetworkInfo{},
+		Count:     0,
+		Timestamp: time.Now(),
+	})
+}
+
 // handleDockerCheckUpdate godoc
 //
 //	@Summary		Check a specific container for updates

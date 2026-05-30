@@ -288,7 +288,7 @@ func (cm *CollectorManager) GetAllStatus() dto.CollectorsStatusResponse {
 		"system", "array", "disk", "docker", "vm",
 		"ups", "nut", "gpu", "shares", "network",
 		"hardware", "zfs", "notification", "registration", "unassigned",
-		"fancontrol", "tuning", "docker_update",
+		"fancontrol", "tuning", "docker_update", "docker_networks",
 	}
 
 	for _, name := range collectorOrder {
@@ -364,24 +364,25 @@ func (cm *CollectorManager) buildStateEvent(name string, enabled bool) dto.Colle
 // getDefaultInterval returns the default interval for a collector
 func (cm *CollectorManager) getDefaultInterval(name string) int {
 	defaults := map[string]int{
-		"system":        5,
-		"array":         10,
-		"disk":          30,
-		"docker":        10,
-		"vm":            10,
-		"ups":           10,
-		"nut":           10,
-		"gpu":           10,
-		"shares":        60,
-		"network":       15,
-		"hardware":      60,
-		"zfs":           30,
-		"notification":  30,
-		"registration":  300,
-		"unassigned":    60,
-		"fancontrol":    30,
-		"tuning":        120,
-		"docker_update": constants.IntervalDockerUpdate,
+		"system":          5,
+		"array":           10,
+		"disk":            30,
+		"docker":          10,
+		"vm":              10,
+		"ups":             10,
+		"nut":             10,
+		"gpu":             10,
+		"shares":          60,
+		"network":         15,
+		"hardware":        60,
+		"zfs":             30,
+		"notification":    30,
+		"registration":    300,
+		"unassigned":      60,
+		"fancontrol":      30,
+		"tuning":          120,
+		"docker_update":   constants.IntervalDockerUpdate,
+		"docker_networks": constants.IntervalDockerNetworks,
 	}
 
 	if interval, ok := defaults[name]; ok {
@@ -509,4 +510,16 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 		}
 		return c
 	}, intervals.DockerUpdate, false)
+
+	// DockerNetworks collector — lists all Docker networks.
+	// ListFn is injected here (not in the collector) to avoid a
+	// collectors→controllers import cycle.
+	cm.Register("docker_networks", func(ctx *domain.Context) Collector {
+		c := collectors.NewDockerNetworksCollector(ctx)
+		c.ListFn = func() ([]dto.DockerNetworkInfo, error) {
+			dc := controllers.NewDockerController()
+			return dc.ListNetworks()
+		}
+		return c
+	}, intervals.DockerNetworks, false)
 }

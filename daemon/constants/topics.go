@@ -53,4 +53,6 @@ var (
 	TopicTuningUpdate = domain.NewTopic[*dto.TuningInfo]("tuning_update")
 	// TopicDockerUpdatesUpdate is published by the docker_update collector with *dto.ContainerUpdatesResult.
 	TopicDockerUpdatesUpdate = domain.NewTopic[*dto.ContainerUpdatesResult]("docker_updates_update")
+	// TopicDockerNetworksUpdate is published by the docker_networks collector with *dto.DockerNetworkList.
+	TopicDockerNetworksUpdate = domain.NewTopic[*dto.DockerNetworkList]("docker_networks_update")
 )
