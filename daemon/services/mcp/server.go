@@ -926,7 +926,9 @@ func (s *Server) registerNewMonitoringTools() {
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "refresh_container_updates",
 		Description: "Force an immediate registry digest re-check for all containers and publish the result (updates cache, WebSocket, and alerts).",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+		Annotations: &mcp.ToolAnnotations{
+			IdempotentHint: true,
+		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
 		logger.Info("MCP: Refreshing container updates")
 		dockerCtrl := controllers.NewDockerController()

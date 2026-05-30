@@ -193,7 +193,7 @@ The MCP server supports two transports — use the one that fits your deployment
 
 All 73 tools include MCP safety annotations to help AI agents make safe decisions automatically:
 
-### Read-Only Tools (50 tools)
+### Read-Only Tools (49 tools)
 
 All monitoring and query tools are annotated with `readOnlyHint: true`, signaling to AI agents that these tools are safe to call without side effects:
 
@@ -204,7 +204,7 @@ get_ups_status, get_nut_status, get_gpu_metrics, list_disks, get_disk_info,
 get_disk_settings, list_shares, get_share_config, get_unassigned_devices,
 get_zfs_pools, get_zfs_datasets, get_zfs_snapshots, get_zfs_arc_stats,
 list_containers, get_container_info, search_containers, get_docker_settings,
-check_container_updates, check_container_update, refresh_container_updates,
+check_container_updates, check_container_update,
 get_container_logs, get_container_size,
 list_vms, get_vm_info, search_vms, get_vm_settings, list_vm_snapshots,
 check_plugin_updates, get_service_status, list_services, list_processes,
