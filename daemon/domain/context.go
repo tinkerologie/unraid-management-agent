@@ -26,10 +26,11 @@ type Intervals struct {
 
 // Context holds the application runtime context including the event hub and configuration.
 type Context struct {
-	Hub              *EventBus
-	Intervals        Intervals
-	MQTTConfig       MQTTConfig
-	DiagnosticLogger *logger.DiagnosticLogger
-	LogsDir          string
+	Hub                *EventBus
+	Intervals          Intervals
+	MQTTConfig         MQTTConfig
+	DiagnosticLogger   *logger.DiagnosticLogger
+	LogsDir            string
+	DockerUpdateNotify bool
 	Config
 }

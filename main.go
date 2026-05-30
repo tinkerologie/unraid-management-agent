@@ -77,24 +77,25 @@ var cli struct {
 	// Collection intervals (overridable via environment variables)
 	// Use 0 to disable a collector completely
 	// Maximum interval: 86400 seconds (24 hours)
-	IntervalSystem       int `default:"15" env:"INTERVAL_SYSTEM" help:"system metrics interval (seconds, 0=disabled, max 86400)"`
-	IntervalArray        int `default:"60" env:"INTERVAL_ARRAY" help:"array metrics interval (seconds, 0=disabled, max 86400)"`
-	IntervalDisk         int `default:"300" env:"INTERVAL_DISK" help:"disk metrics interval (seconds, 0=disabled, max 86400)"`
-	IntervalDocker       int `default:"30" env:"INTERVAL_DOCKER" help:"docker metrics interval (seconds, 0=disabled, max 86400)"`
-	IntervalVM           int `default:"60" env:"INTERVAL_VM" help:"VM metrics interval (seconds, 0=disabled, max 86400)"`
-	IntervalUPS          int `default:"60" env:"INTERVAL_UPS" help:"UPS metrics interval (seconds, 0=disabled, max 86400)"`
-	IntervalNUT          int `default:"0" env:"INTERVAL_NUT" help:"NUT plugin metrics interval (seconds, 0=disabled, max 86400)"`
-	IntervalGPU          int `default:"60" env:"INTERVAL_GPU" help:"GPU metrics interval (seconds, 0=disabled, max 86400)"`
-	IntervalShares       int `default:"60" env:"INTERVAL_SHARES" help:"shares metrics interval (seconds, 0=disabled, max 86400)"`
-	IntervalNetwork      int `default:"60" env:"INTERVAL_NETWORK" help:"network metrics interval (seconds, 0=disabled, max 86400)"`
-	IntervalHardware     int `default:"600" env:"INTERVAL_HARDWARE" help:"hardware metrics interval (seconds, 0=disabled, max 86400)"`
-	IntervalZFS          int `default:"300" env:"INTERVAL_ZFS" help:"ZFS metrics interval (seconds, 0=disabled, max 86400)"`
-	IntervalNotification int `default:"30" env:"INTERVAL_NOTIFICATION" help:"notification interval (seconds, 0=disabled, max 86400)"`
-	IntervalRegistration int `default:"600" env:"INTERVAL_REGISTRATION" help:"registration interval (seconds, 0=disabled, max 86400)"`
-	IntervalUnassigned   int `default:"60" env:"INTERVAL_UNASSIGNED" help:"unassigned devices interval (seconds, 0=disabled, max 86400)"`
-	IntervalFanControl   int `default:"5" env:"INTERVAL_FAN_CONTROL" help:"fan control interval (seconds, 0=disabled, max 86400)"`
-	IntervalTuning       int `default:"120" env:"INTERVAL_TUNING" help:"tuning parameters interval (seconds, 0=disabled, max 86400)"`
-	IntervalDockerUpdate int `default:"21600" env:"INTERVAL_DOCKER_UPDATE" help:"container update check interval (seconds, 0=disabled, max 86400)"`
+	IntervalSystem       int  `default:"15" env:"INTERVAL_SYSTEM" help:"system metrics interval (seconds, 0=disabled, max 86400)"`
+	IntervalArray        int  `default:"60" env:"INTERVAL_ARRAY" help:"array metrics interval (seconds, 0=disabled, max 86400)"`
+	IntervalDisk         int  `default:"300" env:"INTERVAL_DISK" help:"disk metrics interval (seconds, 0=disabled, max 86400)"`
+	IntervalDocker       int  `default:"30" env:"INTERVAL_DOCKER" help:"docker metrics interval (seconds, 0=disabled, max 86400)"`
+	IntervalVM           int  `default:"60" env:"INTERVAL_VM" help:"VM metrics interval (seconds, 0=disabled, max 86400)"`
+	IntervalUPS          int  `default:"60" env:"INTERVAL_UPS" help:"UPS metrics interval (seconds, 0=disabled, max 86400)"`
+	IntervalNUT          int  `default:"0" env:"INTERVAL_NUT" help:"NUT plugin metrics interval (seconds, 0=disabled, max 86400)"`
+	IntervalGPU          int  `default:"60" env:"INTERVAL_GPU" help:"GPU metrics interval (seconds, 0=disabled, max 86400)"`
+	IntervalShares       int  `default:"60" env:"INTERVAL_SHARES" help:"shares metrics interval (seconds, 0=disabled, max 86400)"`
+	IntervalNetwork      int  `default:"60" env:"INTERVAL_NETWORK" help:"network metrics interval (seconds, 0=disabled, max 86400)"`
+	IntervalHardware     int  `default:"600" env:"INTERVAL_HARDWARE" help:"hardware metrics interval (seconds, 0=disabled, max 86400)"`
+	IntervalZFS          int  `default:"300" env:"INTERVAL_ZFS" help:"ZFS metrics interval (seconds, 0=disabled, max 86400)"`
+	IntervalNotification int  `default:"30" env:"INTERVAL_NOTIFICATION" help:"notification interval (seconds, 0=disabled, max 86400)"`
+	IntervalRegistration int  `default:"600" env:"INTERVAL_REGISTRATION" help:"registration interval (seconds, 0=disabled, max 86400)"`
+	IntervalUnassigned   int  `default:"60" env:"INTERVAL_UNASSIGNED" help:"unassigned devices interval (seconds, 0=disabled, max 86400)"`
+	IntervalFanControl   int  `default:"5" env:"INTERVAL_FAN_CONTROL" help:"fan control interval (seconds, 0=disabled, max 86400)"`
+	IntervalTuning       int  `default:"120" env:"INTERVAL_TUNING" help:"tuning parameters interval (seconds, 0=disabled, max 86400)"`
+	IntervalDockerUpdate int  `default:"21600" env:"INTERVAL_DOCKER_UPDATE" help:"container update check interval (seconds, 0=disabled, max 86400)"`
+	DockerUpdateNotify   bool `default:"false" env:"DOCKER_UPDATE_NOTIFY" help:"raise an Unraid notification when new container updates become available"`
 
 	Boot        cmd.Boot        `cmd:"" default:"1" help:"start the management agent"`
 	MCPStdio    cmd.MCPStdio    `cmd:"mcp-stdio" help:"run MCP server over stdin/stdout for local AI clients"`
@@ -250,8 +251,9 @@ func main() {
 			HomeAssistantPrefix: cli.MQTTHAPrefix,
 			DiscoveryEnabled:    cli.MQTTHomeAssistant, // Enable discovery when HA mode is enabled
 		},
-		DiagnosticLogger: diagLogger,
-		LogsDir:          cli.LogsDir,
+		DiagnosticLogger:   diagLogger,
+		LogsDir:            cli.LogsDir,
+		DockerUpdateNotify: cli.DockerUpdateNotify,
 		Intervals: domain.Intervals{
 			System:       getInterval("system", cli.IntervalSystem),
 			Array:        getInterval("array", cli.IntervalArray),

@@ -110,3 +110,48 @@ func TestDockerUpdateCollector_CheckErrorNoPublish(t *testing.T) {
 	case <-time.After(150 * time.Millisecond):
 	}
 }
+
+func TestDockerUpdateNotify_FiresOnNewTransitionOnly(t *testing.T) {
+	hub := domain.NewEventBus(16)
+	var notified []string
+	c := NewDockerUpdateCollector(&domain.Context{Hub: hub, DockerUpdateNotify: true})
+	c.NotifyFn = func(names []string) { notified = append(notified, names...) }
+
+	step1 := &dto.ContainerUpdatesResult{
+		Containers: []dto.ContainerUpdateInfo{{ContainerID: "a", ContainerName: "plex", LatestDigest: "x", UpdateAvailable: true}},
+		TotalCount: 1, UpdatesAvailable: 1,
+	}
+	c.CheckFn = func() (*dto.ContainerUpdatesResult, error) { return step1, nil }
+	c.Collect() // baseline → no notify
+	if len(notified) != 0 {
+		t.Fatalf("first run should not notify, got %v", notified)
+	}
+
+	step2 := &dto.ContainerUpdatesResult{
+		Containers: []dto.ContainerUpdateInfo{
+			{ContainerID: "a", ContainerName: "plex", LatestDigest: "x", UpdateAvailable: true},
+			{ContainerID: "b", ContainerName: "sonarr", LatestDigest: "y", UpdateAvailable: true},
+		},
+		TotalCount: 2, UpdatesAvailable: 2,
+	}
+	c.CheckFn = func() (*dto.ContainerUpdatesResult, error) { return step2, nil }
+	c.Collect() // sonarr newly available → notify only sonarr
+	if len(notified) != 1 || notified[0] != "sonarr" {
+		t.Fatalf("expected notify [sonarr], got %v", notified)
+	}
+}
+
+func TestDockerUpdateNotify_DisabledByDefault(t *testing.T) {
+	hub := domain.NewEventBus(16)
+	called := false
+	c := NewDockerUpdateCollector(&domain.Context{Hub: hub}) // DockerUpdateNotify false
+	c.NotifyFn = func(names []string) { called = true }
+	c.CheckFn = func() (*dto.ContainerUpdatesResult, error) {
+		return &dto.ContainerUpdatesResult{Containers: []dto.ContainerUpdateInfo{{ContainerID: "a", ContainerName: "plex", LatestDigest: "x", UpdateAvailable: true}}, TotalCount: 1, UpdatesAvailable: 1}, nil
+	}
+	c.Collect()
+	c.Collect()
+	if called {
+		t.Fatal("notify must not fire when DockerUpdateNotify is false")
+	}
+}

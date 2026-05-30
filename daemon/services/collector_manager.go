@@ -4,6 +4,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -485,13 +486,23 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 	}, intervals.Tuning, false)
 
 	// DockerUpdate collector — checks container images for available updates.
-	// CheckFn is injected here (not in the collector) to avoid a collectors→controllers import cycle.
+	// CheckFn and NotifyFn are injected here (not in the collector) to avoid a
+	// collectors→controllers import cycle.
 	cm.Register("docker_update", func(ctx *domain.Context) Collector {
 		c := collectors.NewDockerUpdateCollector(ctx)
 		c.CheckFn = func() (*dto.ContainerUpdatesResult, error) {
 			dc := controllers.NewDockerController()
 			defer func() { _ = dc.Close() }()
 			return dc.CheckAllContainerUpdates()
+		}
+		c.NotifyFn = func(names []string) {
+			_ = controllers.CreateNotification(
+				"Container updates available",
+				"Docker",
+				fmt.Sprintf("Updates available for: %s", strings.Join(names, ", ")),
+				"info",
+				"",
+			)
 		}
 		return c
 	}, intervals.DockerUpdate, false)

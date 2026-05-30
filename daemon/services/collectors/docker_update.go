@@ -27,15 +27,23 @@ type DockerUpdateCollector struct {
 	// services injects the controller-backed implementation to avoid a
 	// collectors→controllers import cycle.
 	CheckFn func() (*dto.ContainerUpdatesResult, error)
-	lastSig string
+	// NotifyFn is called with the names of containers that newly became
+	// update-available since the previous run. Injected by the factory in
+	// package services to avoid a collectors→controllers import cycle.
+	NotifyFn      func(names []string)
+	lastSig       string
+	prevAvailable map[string]bool
+	baselineSet   bool
 }
 
-// NewDockerUpdateCollector creates a new DockerUpdate collector. CheckFn must be
-// set by the caller (the collector factory in package services) before Start or
-// Collect is invoked — this avoids a collectors→controllers import cycle.
+// NewDockerUpdateCollector creates a new DockerUpdate collector. CheckFn and
+// NotifyFn must be set by the caller (the collector factory in package services)
+// before Start or Collect is invoked — this avoids a collectors→controllers
+// import cycle.
 func NewDockerUpdateCollector(ctx *domain.Context) *DockerUpdateCollector {
 	return &DockerUpdateCollector{
-		appCtx: ctx,
+		appCtx:        ctx,
+		prevAvailable: make(map[string]bool),
 	}
 }
 
@@ -93,6 +101,36 @@ func (c *DockerUpdateCollector) Collect() {
 	}
 	if result == nil {
 		return
+	}
+
+	// Notification logic: fires only when opt-in is enabled and NotifyFn is set.
+	// The first run establishes a baseline without notifying; subsequent runs
+	// notify for containers that newly transitioned into update-available.
+	if c.appCtx.DockerUpdateNotify && c.NotifyFn != nil {
+		current := make(map[string]bool, len(result.Containers))
+		for _, container := range result.Containers {
+			if container.UpdateAvailable {
+				current[container.ContainerID] = true
+			}
+		}
+
+		if !c.baselineSet {
+			// First run: record the baseline, do not notify.
+			c.prevAvailable = current
+			c.baselineSet = true
+		} else {
+			// Subsequent runs: find containers newly transitioned into available.
+			var newlyAvailable []string
+			for _, container := range result.Containers {
+				if container.UpdateAvailable && !c.prevAvailable[container.ContainerID] {
+					newlyAvailable = append(newlyAvailable, container.ContainerName)
+				}
+			}
+			c.prevAvailable = current
+			if len(newlyAvailable) > 0 {
+				c.NotifyFn(newlyAvailable)
+			}
+		}
 	}
 
 	sig := updateSignature(result)
