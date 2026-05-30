@@ -477,6 +477,7 @@ definitions:
       update_available:
         description: nil = not yet checked / registry unreachable
         type: boolean
+        x-nullable: "true"
       update_checked:
         type: string
       update_status:
@@ -4256,7 +4257,7 @@ paths:
           description: Container update status
           schema:
             $ref: '#/definitions/dto.ContainerUpdatesResult'
-      summary: Check all containers for updates
+      summary: Get cached container update status
       tags:
       - Docker
   /docker/updates/refresh:

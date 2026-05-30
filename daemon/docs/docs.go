@@ -927,7 +927,7 @@ const docTemplate = `{
                 "tags": [
                     "Docker"
                 ],
-                "summary": "Check all containers for updates",
+                "summary": "Get cached container update status",
                 "responses": {
                     "200": {
                         "description": "Container update status",
@@ -5378,7 +5378,8 @@ const docTemplate = `{
                 },
                 "update_available": {
                     "description": "nil = not yet checked / registry unreachable",
-                    "type": "boolean"
+                    "type": "boolean",
+                    "x-nullable": "true"
                 },
                 "update_checked": {
                     "type": "string"

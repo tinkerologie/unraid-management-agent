@@ -149,6 +149,8 @@ func (c *CacheStore) GetDockerCache() []dto.ContainerInfo {
 			if status != dto.UpdateStatusUnknown {
 				avail := info.UpdateAvailable
 				ci.UpdateAvailable = &avail
+			} else {
+				ci.UpdateAvailable = nil
 			}
 			ci.UpdateChecked = checkedAt
 		} else {

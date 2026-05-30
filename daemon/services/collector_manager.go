@@ -3,6 +3,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -226,7 +227,7 @@ func (cm *CollectorManager) UpdateInterval(name string, intervalSeconds int) err
 	}
 
 	if intervalSeconds < 5 || intervalSeconds > 86400 {
-		return fmt.Errorf("invalid interval: must be between 5 and 86400 seconds")
+		return errors.New("invalid interval: must be between 5 and 86400 seconds")
 	}
 
 	wasRunning := mc.Status == "running"
@@ -496,13 +497,15 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 			return dc.CheckAllContainerUpdates()
 		}
 		c.NotifyFn = func(names []string) {
-			_ = controllers.CreateNotification(
+			if err := controllers.CreateNotification(
 				"Container updates available",
 				"Docker",
 				fmt.Sprintf("Updates available for: %s", strings.Join(names, ", ")),
 				"info",
 				"",
-			)
+			); err != nil {
+				logger.Warning("docker_update: failed to create notification: %v", err)
+			}
 		}
 		return c
 	}, intervals.DockerUpdate, false)

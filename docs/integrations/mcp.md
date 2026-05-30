@@ -87,7 +87,7 @@ The MCP server supports two transports — use the one that fits your deployment
 > | ------------------ | ------------------------------------------- | --------------------------------------------- |
 > | `update_status`    | `up_to_date`, `update_available`, `unknown` | Human-readable update state for the container |
 > | `update_available` | `true` / `false`                            | Whether a newer image digest is available     |
-> | `update_checked`   | RFC 3339 timestamp or empty string          | When the update check was last performed      |
+> | `update_checked`   | RFC 3339 timestamp (omitted if never checked) | When the update check was last performed      |
 >
 > Use `refresh_container_updates` to force a fresh registry check and push results to the cache, WebSocket hub, and alerting engine. Use `check_container_updates` / `check_container_update` for synchronous on-demand checks that return results directly without publishing.
 

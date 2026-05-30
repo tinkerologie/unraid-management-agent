@@ -145,11 +145,11 @@ func (c *DockerUpdateCollector) Collect() {
 }
 
 // updateSignature builds an order-independent fingerprint of update status
-// (container ID + available flag), ignoring the timestamp.
+// (container ID + available flag + latest digest), ignoring the timestamp.
 func updateSignature(r *dto.ContainerUpdatesResult) string {
 	parts := make([]string, 0, len(r.Containers))
 	for _, c := range r.Containers {
-		parts = append(parts, fmt.Sprintf("%s=%t", c.ContainerID, c.UpdateAvailable))
+		parts = append(parts, fmt.Sprintf("%s=%t:%s", c.ContainerID, c.UpdateAvailable, c.LatestDigest))
 	}
 	sort.Strings(parts)
 	return strings.Join(parts, ",")

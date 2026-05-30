@@ -2631,7 +2631,7 @@ func (s *Server) handleMQTTPublish(w http.ResponseWriter, r *http.Request) {
 
 // handleDockerCheckUpdates godoc
 //
-//	@Summary		Check all containers for updates
+//	@Summary		Get cached container update status
 //	@Description	Serves the cached container update result. Returns an empty result when no cache is available yet.
 //	@Tags			Docker
 //	@Produce		json
@@ -2642,7 +2642,7 @@ func (s *Server) handleDockerCheckUpdates(w http.ResponseWriter, _ *http.Request
 		respondJSON(w, http.StatusOK, cached)
 		return
 	}
-	respondJSON(w, http.StatusOK, dto.ContainerUpdatesResult{Timestamp: time.Now()})
+	respondJSON(w, http.StatusOK, dto.ContainerUpdatesResult{})
 }
 
 // handleDockerUpdatesRefresh godoc
@@ -2659,8 +2659,9 @@ func (s *Server) handleDockerUpdatesRefresh(w http.ResponseWriter, _ *http.Reque
 	defer func() { _ = dc.Close() }()
 	result, err := dc.CheckAllContainerUpdates()
 	if err != nil {
+		logger.Error("API: container update refresh failed: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
-			Success: false, Message: fmt.Sprintf("update check failed: %v", err), Timestamp: time.Now(),
+			Success: false, Message: "update check failed", Timestamp: time.Now(),
 		})
 		return
 	}

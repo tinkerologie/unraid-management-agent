@@ -2031,4 +2031,14 @@ func TestDockerUpdatesEmptyWhenUncached(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rr.Code)
 	}
+	var got dto.ContainerUpdatesResult
+	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.TotalCount != 0 {
+		t.Errorf("TotalCount = %d, want 0", got.TotalCount)
+	}
+	if got.UpdatesAvailable != 0 {
+		t.Errorf("UpdatesAvailable = %d, want 0", got.UpdatesAvailable)
+	}
 }
