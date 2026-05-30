@@ -33,7 +33,7 @@ The MCP server supports two transports — use the one that fits your deployment
 > - Use **Streamable HTTP** if the AI client (Cursor, VS Code, etc.) runs on a different machine than the Unraid server.
 > - Use **STDIO** if the AI client (Claude Desktop, Cursor) runs locally on the Unraid server itself — it has zero network overhead and requires no authentication.
 
-## Available Tools (72 total)
+## Available Tools (73 total)
 
 ### System Monitoring Tools
 
@@ -69,16 +69,27 @@ The MCP server supports two transports — use the one that fits your deployment
 
 ### Docker Tools
 
-| Tool                      | Description                                           |
-| ------------------------- | ----------------------------------------------------- |
-| `list_containers`         | Docker containers, optionally filtered by state       |
-| `get_container_info`      | Detailed information about a specific container       |
-| `get_container_logs`      | Container stdout/stderr logs with tail/since opts     |
-| `search_containers`       | Search containers by name or state                    |
-| `get_docker_settings`     | Docker daemon configuration settings                  |
-| `check_container_updates` | Check all containers for available image updates      |
-| `check_container_update`  | Check a specific container for an image update        |
-| `get_container_size`      | Get disk usage (image size + rw layer) of a container |
+| Tool                          | Description                                                                   |
+| ----------------------------- | ----------------------------------------------------------------------------- |
+| `list_containers`             | Docker containers, optionally filtered by state (includes update status)      |
+| `get_container_info`          | Detailed information about a specific container (includes update status)      |
+| `get_container_logs`          | Container stdout/stderr logs with tail/since opts                             |
+| `search_containers`           | Search containers by name or state                                            |
+| `get_docker_settings`         | Docker daemon configuration settings                                          |
+| `check_container_updates`     | Synchronous on-demand check of all containers for available image updates     |
+| `check_container_update`      | Synchronous on-demand check of a specific container for an image update       |
+| `refresh_container_updates`   | Force an immediate registry digest re-check for all containers and publish the result (updates cache, WebSocket, and alerts) |
+| `get_container_size`          | Get disk usage (image size + rw layer) of a container                        |
+
+> **Update status fields:** `list_containers` and `get_container_info` now include the following fields populated from the cached update check results:
+>
+> | Field            | Values                                      | Description                                   |
+> | ---------------- | ------------------------------------------- | --------------------------------------------- |
+> | `update_status`  | `up_to_date`, `update_available`, `unknown` | Human-readable update state for the container |
+> | `update_available` | `true` / `false`                          | Whether a newer image digest is available     |
+> | `update_checked` | RFC 3339 timestamp or empty string          | When the update check was last performed      |
+>
+> Use `refresh_container_updates` to force a fresh registry check and push results to the cache, WebSocket hub, and alerting engine. Use `check_container_updates` / `check_container_update` for synchronous on-demand checks that return results directly without publishing.
 
 ### VM Tools
 
@@ -180,9 +191,9 @@ The MCP server supports two transports — use the one that fits your deployment
 
 ## Tool Safety Annotations
 
-All 70 tools include MCP safety annotations to help AI agents make safe decisions automatically:
+All 73 tools include MCP safety annotations to help AI agents make safe decisions automatically:
 
-### Read-Only Tools (49 tools)
+### Read-Only Tools (50 tools)
 
 All monitoring and query tools are annotated with `readOnlyHint: true`, signaling to AI agents that these tools are safe to call without side effects:
 
@@ -193,7 +204,8 @@ get_ups_status, get_nut_status, get_gpu_metrics, list_disks, get_disk_info,
 get_disk_settings, list_shares, get_share_config, get_unassigned_devices,
 get_zfs_pools, get_zfs_datasets, get_zfs_snapshots, get_zfs_arc_stats,
 list_containers, get_container_info, search_containers, get_docker_settings,
-check_container_updates, check_container_update, get_container_logs, get_container_size,
+check_container_updates, check_container_update, refresh_container_updates,
+get_container_logs, get_container_size,
 list_vms, get_vm_info, search_vms, get_vm_settings, list_vm_snapshots,
 check_plugin_updates, get_service_status, list_services, list_processes,
 get_notifications, get_notifications_overview, list_log_files, get_log_content,

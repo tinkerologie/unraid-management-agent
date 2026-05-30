@@ -17,6 +17,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
@@ -918,6 +919,23 @@ func (s *Server) registerNewMonitoringTools() {
 		if err != nil {
 			return textResult(fmt.Sprintf("Failed to check container update: %v", err)), nil, nil
 		}
+		return jsonResult(result)
+	})
+
+	// Force refresh of all container update checks and publish results
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "refresh_container_updates",
+		Description: "Force an immediate registry digest re-check for all containers and publish the result (updates cache, WebSocket, and alerts).",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		logger.Info("MCP: Refreshing container updates")
+		dockerCtrl := controllers.NewDockerController()
+		defer dockerCtrl.Close() //nolint:errcheck
+		result, err := dockerCtrl.CheckAllContainerUpdates()
+		if err != nil {
+			return textResult(fmt.Sprintf("Failed to refresh container updates: %v", err)), nil, nil
+		}
+		domain.Publish(s.ctx.Hub, constants.TopicDockerUpdatesUpdate, result)
 		return jsonResult(result)
 	})
 
