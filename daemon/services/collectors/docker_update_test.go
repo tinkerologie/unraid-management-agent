@@ -22,7 +22,7 @@ func TestDockerUpdateCollector_PublishesAndDedupes(t *testing.T) {
 	}
 
 	c := NewDockerUpdateCollector(&domain.Context{Hub: hub})
-	c.checkFn = func() (*dto.ContainerUpdatesResult, error) { return result, nil }
+	c.CheckFn = func() (*dto.ContainerUpdatesResult, error) { return result, nil }
 
 	c.Collect()
 	select {

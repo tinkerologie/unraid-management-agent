@@ -22,8 +22,11 @@ const dockerUpdateStartupStagger = 45 * time.Second
 // long interval because DistributionInspect hits the registry and Docker Hub
 // rate-limits anonymous manifest requests.
 type DockerUpdateCollector struct {
-	appCtx  *domain.Context
-	checkFn func() (*dto.ContainerUpdatesResult, error)
+	appCtx *domain.Context
+	// CheckFn fetches container update status; the collector factory in package
+	// services injects the controller-backed implementation to avoid a
+	// collectors→controllers import cycle.
+	CheckFn func() (*dto.ContainerUpdatesResult, error)
 	lastSig string
 }
 
@@ -81,11 +84,11 @@ func (c *DockerUpdateCollector) Start(ctx context.Context, interval time.Duratio
 // Collect runs an update check and publishes the result only if it changed
 // since the last publish (dedupe to avoid no-op WebSocket broadcasts).
 func (c *DockerUpdateCollector) Collect() {
-	if c.checkFn == nil {
-		logger.Warning("DockerUpdate: checkFn not set, skipping collect")
+	if c.CheckFn == nil {
+		logger.Warning("DockerUpdate: CheckFn not set, skipping collect")
 		return
 	}
-	result, err := c.checkFn()
+	result, err := c.CheckFn()
 	if err != nil {
 		logger.Warning("DockerUpdate: check failed: %v", err)
 		return
