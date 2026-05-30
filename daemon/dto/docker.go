@@ -2,6 +2,13 @@ package dto
 
 import "time"
 
+// Container update status values for ContainerInfo.UpdateStatus.
+const (
+	UpdateStatusUpToDate  = "up_to_date"
+	UpdateStatusAvailable = "update_available"
+	UpdateStatusUnknown   = "unknown"
+)
+
 // ContainerInfo contains Docker container information
 type ContainerInfo struct {
 	ID             string          `json:"id" example:"abc123def456"`
@@ -26,6 +33,10 @@ type ContainerInfo struct {
 	VolumeMappings []VolumeMapping `json:"volume_mappings"`
 	RestartPolicy  string          `json:"restart_policy" example:"unless-stopped"`
 	Uptime         string          `json:"uptime" example:"2 days"`
+	// Update status — populated by merging the DockerUpdate collector's cache at read time.
+	UpdateStatus    string     `json:"update_status" example:"up_to_date"` // up_to_date | update_available | unknown
+	UpdateAvailable *bool      `json:"update_available,omitempty"`          // nil = not yet checked / registry unreachable
+	UpdateChecked   *time.Time `json:"update_checked,omitempty"`
 	Timestamp      time.Time       `json:"timestamp"`
 }
 
@@ -52,6 +63,19 @@ type ContainerUpdateInfo struct {
 	LatestDigest    string    `json:"latest_digest,omitempty"`
 	UpdateAvailable bool      `json:"update_available" example:"true"`
 	Timestamp       time.Time `json:"timestamp"`
+}
+
+// Status derives the tri-state update status from the digests.
+// Returns "unknown" when the latest (remote) digest could not be determined,
+// so callers never report "up to date" when the check actually failed.
+func (u ContainerUpdateInfo) Status() string {
+	if u.LatestDigest == "" {
+		return UpdateStatusUnknown
+	}
+	if u.UpdateAvailable {
+		return UpdateStatusAvailable
+	}
+	return UpdateStatusUpToDate
 }
 
 // ContainerUpdateResult contains the result of a container update operation

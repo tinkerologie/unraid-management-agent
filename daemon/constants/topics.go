@@ -51,4 +51,6 @@ var (
 	TopicFanControlUpdate = domain.NewTopic[*dto.FanControlStatus]("fan_control_update")
 	// TopicTuningUpdate is published by the tuning collector with *dto.TuningInfo.
 	TopicTuningUpdate = domain.NewTopic[*dto.TuningInfo]("tuning_update")
+	// TopicDockerUpdatesUpdate is published by the docker_update collector with *dto.ContainerUpdatesResult.
+	TopicDockerUpdatesUpdate = domain.NewTopic[*dto.ContainerUpdatesResult]("docker_updates_update")
 )
