@@ -22,7 +22,9 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/alerting"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/api"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/controllers"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/remediation"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/watchdog"
 )
 
@@ -117,6 +119,7 @@ func (s *Server) Initialize() error {
 	s.registerNewMonitoringTools()
 	s.registerControlTools()
 	s.registerNewControlTools()
+	s.registerRemediationTools()
 	s.registerResources()
 	s.registerPrompts()
 	s.registerAlertingTools()
@@ -1788,6 +1791,75 @@ func (s *Server) registerNewControlTools() {
 	})
 
 	logger.Debug("MCP new control tools registered (8 additional control tools)")
+}
+
+// registerRemediationTools registers the system_health_report tool which aggregates
+// health signals and optionally executes remediation actions with explicit confirm.
+func (s *Server) registerRemediationTools() {
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name: "system_health_report",
+		Description: "Aggregate health signals from array, disks, containers, and firing alerts into a " +
+			"prioritised list of findings with recommended actions. " +
+			"Without confirm=true the tool is read-only. " +
+			"To execute remediation actions set confirm=true AND provide the actions list from a previous report. " +
+			"Only executor-supported actions (start/stop/restart_container, start/stop/restart/force_stop_vm) are ever executed.",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(true),
+			IdempotentHint:  false,
+		},
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, args dto.MCPHealthReportArgs) (*mcp.CallToolResult, any, error) {
+		containers := s.cacheProvider.GetDockerCache()
+		if containers == nil {
+			containers = []dto.ContainerInfo{}
+		}
+		disks := s.cacheProvider.GetDisksCache()
+		if disks == nil {
+			disks = []dto.DiskInfo{}
+		}
+
+		// Gather firing alerts if the cache provider exposes a health status.
+		// The CacheProvider interface does not expose GetFiringAlerts directly, so
+		// we derive a nil slice here; the REST handler uses alertEngine directly.
+		var firing []dto.AlertStatus
+
+		report := api.BuildHealthReport(containers, s.cacheProvider.GetArrayCache(), disks, firing)
+
+		// Recommend-only path (no confirm or no actions).
+		if !args.Confirm || len(args.Actions) == 0 {
+			return jsonResult(map[string]any{
+				"report":   report,
+				"executed": false,
+			})
+		}
+
+		// Execute path — construct executor from live controllers.
+		exec := remediation.NewExecutor(controllers.NewDockerController(), controllers.NewVMController())
+
+		results := make([]dto.ActionResult, 0, len(args.Actions))
+		for _, a := range args.Actions {
+			logger.Info("MCP system_health_report: executing action=%s target=%s", a.Action, a.Target)
+			ok, dur, err := exec.Execute(ctx, a.Action, a.Target)
+			ar := dto.ActionResult{
+				Action:     a.Action,
+				Target:     a.Target,
+				Succeeded:  ok,
+				DurationMs: dur,
+			}
+			if err != nil {
+				ar.Error = err.Error()
+				logger.Warning("MCP system_health_report: action=%s target=%s failed: %v", a.Action, a.Target, err)
+			}
+			results = append(results, ar)
+		}
+
+		return jsonResult(map[string]any{
+			"report":   report,
+			"executed": true,
+			"results":  results,
+		})
+	})
+
+	logger.Debug("MCP remediation tools registered (1 tool)")
 }
 
 // registerAlertingTools registers MCP tools for alert rule management and monitoring.

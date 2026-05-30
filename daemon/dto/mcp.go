@@ -301,3 +301,11 @@ type MCPSetInotifyLimitsArgs struct {
 	MaxQueuedEvents  int  `json:"max_queued_events" jsonschema:"Maximum number of queued inotify events (e.g. 16384)"`
 	Confirm          bool `json:"confirm" jsonschema:"Must be set to true to confirm the inotify limits change"`
 }
+
+// MCPHealthReportArgs represents arguments for the system_health_report tool.
+// When Confirm is false (or Actions is empty) the tool returns a recommend-only report.
+// When Confirm is true AND Actions is non-empty the executor runs each listed action.
+type MCPHealthReportArgs struct {
+	Confirm bool        `json:"confirm,omitempty" jsonschema:"Set to true together with a non-empty actions list to execute remediation actions"`
+	Actions []ActionRef `json:"actions,omitempty" jsonschema:"List of recommended actions to execute (from a previous report). Leave empty to receive a report only."`
+}
