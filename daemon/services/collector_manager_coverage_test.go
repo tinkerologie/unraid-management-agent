@@ -142,6 +142,25 @@ func TestCollectorManager_RegisterAllCollectors(t *testing.T) {
 	}
 }
 
+func TestRegisterAllCollectors_IncludesDockerUpdate(t *testing.T) {
+	cm := NewCollectorManager(&domain.Context{
+		Hub:       domain.NewEventBus(16),
+		Intervals: domain.Intervals{System: 15, DockerUpdate: 21600},
+	}, &sync.WaitGroup{})
+	cm.RegisterAllCollectors()
+
+	st, err := cm.GetStatus("docker_update")
+	if err != nil {
+		t.Fatalf("docker_update not registered: %v", err)
+	}
+	if st.Interval != 21600 {
+		t.Errorf("default interval = %d, want 21600", st.Interval)
+	}
+	if err := cm.UpdateInterval("docker_update", 43200); err != nil {
+		t.Errorf("UpdateInterval(43200) rejected: %v", err)
+	}
+}
+
 func TestCollectorManager_UpdateIntervalRestartsRunning(t *testing.T) {
 	ctx := createTestContext()
 	var wg sync.WaitGroup

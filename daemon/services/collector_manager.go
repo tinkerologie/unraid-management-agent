@@ -12,6 +12,7 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/collectors"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/controllers"
 )
 
 // Collector is the interface that all collectors must implement for runtime management
@@ -223,8 +224,8 @@ func (cm *CollectorManager) UpdateInterval(name string, intervalSeconds int) err
 		return fmt.Errorf("unknown collector: %s", name)
 	}
 
-	if intervalSeconds < 5 || intervalSeconds > 3600 {
-		return fmt.Errorf("invalid interval: must be between 5 and 3600 seconds")
+	if intervalSeconds < 5 || intervalSeconds > 86400 {
+		return fmt.Errorf("invalid interval: must be between 5 and 86400 seconds")
 	}
 
 	wasRunning := mc.Status == "running"
@@ -285,7 +286,7 @@ func (cm *CollectorManager) GetAllStatus() dto.CollectorsStatusResponse {
 		"system", "array", "disk", "docker", "vm",
 		"ups", "nut", "gpu", "shares", "network",
 		"hardware", "zfs", "notification", "registration", "unassigned",
-		"fancontrol", "tuning",
+		"fancontrol", "tuning", "docker_update",
 	}
 
 	for _, name := range collectorOrder {
@@ -361,23 +362,24 @@ func (cm *CollectorManager) buildStateEvent(name string, enabled bool) dto.Colle
 // getDefaultInterval returns the default interval for a collector
 func (cm *CollectorManager) getDefaultInterval(name string) int {
 	defaults := map[string]int{
-		"system":       5,
-		"array":        10,
-		"disk":         30,
-		"docker":       10,
-		"vm":           10,
-		"ups":          10,
-		"nut":          10,
-		"gpu":          10,
-		"shares":       60,
-		"network":      15,
-		"hardware":     60,
-		"zfs":          30,
-		"notification": 30,
-		"registration": 300,
-		"unassigned":   60,
-		"fancontrol":   30,
-		"tuning":       120,
+		"system":        5,
+		"array":         10,
+		"disk":          30,
+		"docker":        10,
+		"vm":            10,
+		"ups":           10,
+		"nut":           10,
+		"gpu":           10,
+		"shares":        60,
+		"network":       15,
+		"hardware":      60,
+		"zfs":           30,
+		"notification":  30,
+		"registration":  300,
+		"unassigned":    60,
+		"fancontrol":    30,
+		"tuning":        120,
+		"docker_update": 21600,
 	}
 
 	if interval, ok := defaults[name]; ok {
@@ -481,4 +483,14 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 	cm.Register("tuning", func(ctx *domain.Context) Collector {
 		return collectors.NewTuningCollector(ctx)
 	}, intervals.Tuning, false)
+
+	// DockerUpdate collector — checks container images for available updates.
+	// CheckFn is injected here (not in the collector) to avoid a collectors→controllers import cycle.
+	cm.Register("docker_update", func(ctx *domain.Context) Collector {
+		c := collectors.NewDockerUpdateCollector(ctx)
+		c.CheckFn = func() (*dto.ContainerUpdatesResult, error) {
+			return controllers.NewDockerController().CheckAllContainerUpdates()
+		}
+		return c
+	}, intervals.DockerUpdate, false)
 }

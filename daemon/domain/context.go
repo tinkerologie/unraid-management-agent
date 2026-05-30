@@ -21,6 +21,7 @@ type Intervals struct {
 	Unassigned   int
 	FanControl   int
 	Tuning       int
+	DockerUpdate int
 }
 
 // Context holds the application runtime context including the event hub and configuration.

@@ -137,6 +137,10 @@ const (
 	// IntervalTuning is the collection interval for system tuning parameters in seconds.
 	// Kernel parameters rarely change; 120s is sufficient.
 	IntervalTuning = 120
+	// IntervalDockerUpdate is the interval for checking container image updates in seconds.
+	// Long by design: DistributionInspect hits the registry and Docker Hub rate-limits
+	// anonymous manifest requests. Default 6 hours.
+	IntervalDockerUpdate = 21600
 
 	// WSPingInterval is the WebSocket ping interval in seconds.
 	WSPingInterval = 30

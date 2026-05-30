@@ -70,6 +70,7 @@ type FileConfigIntervals struct {
 	Unassigned   *int `yaml:"unassigned,omitempty"`
 	FanControl   *int `yaml:"fancontrol,omitempty"`
 	Tuning       *int `yaml:"tuning,omitempty"`
+	DockerUpdate *int `yaml:"docker_update,omitempty"`
 }
 
 // LoadConfigFile reads and parses a YAML config file.

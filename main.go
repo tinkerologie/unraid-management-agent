@@ -24,23 +24,24 @@ var Version = "dev"
 
 // validCollectorNames contains all valid collector names for validation
 var validCollectorNames = map[string]bool{
-	"system":       true,
-	"array":        true,
-	"disk":         true,
-	"docker":       true,
-	"vm":           true,
-	"ups":          true,
-	"nut":          true,
-	"gpu":          true,
-	"shares":       true,
-	"network":      true,
-	"hardware":     true,
-	"zfs":          true,
-	"notification": true,
-	"registration": true,
-	"unassigned":   true,
-	"fancontrol":   true,
-	"tuning":       true,
+	"system":        true,
+	"array":         true,
+	"disk":          true,
+	"docker":        true,
+	"vm":            true,
+	"ups":           true,
+	"nut":           true,
+	"gpu":           true,
+	"shares":        true,
+	"network":       true,
+	"hardware":      true,
+	"zfs":           true,
+	"notification":  true,
+	"registration":  true,
+	"unassigned":    true,
+	"fancontrol":    true,
+	"tuning":        true,
+	"docker_update": true,
 }
 
 var cli struct {
@@ -93,6 +94,7 @@ var cli struct {
 	IntervalUnassigned   int `default:"60" env:"INTERVAL_UNASSIGNED" help:"unassigned devices interval (seconds, 0=disabled, max 86400)"`
 	IntervalFanControl   int `default:"5" env:"INTERVAL_FAN_CONTROL" help:"fan control interval (seconds, 0=disabled, max 86400)"`
 	IntervalTuning       int `default:"120" env:"INTERVAL_TUNING" help:"tuning parameters interval (seconds, 0=disabled, max 86400)"`
+	IntervalDockerUpdate int `default:"21600" env:"INTERVAL_DOCKER_UPDATE" help:"container update check interval (seconds, 0=disabled, max 86400)"`
 
 	Boot        cmd.Boot        `cmd:"" default:"1" help:"start the management agent"`
 	MCPStdio    cmd.MCPStdio    `cmd:"mcp-stdio" help:"run MCP server over stdin/stdout for local AI clients"`
@@ -268,6 +270,7 @@ func main() {
 			Unassigned:   getInterval("unassigned", cli.IntervalUnassigned),
 			FanControl:   getInterval("fancontrol", cli.IntervalFanControl),
 			Tuning:       getInterval("tuning", cli.IntervalTuning),
+			DockerUpdate: getInterval("docker_update", cli.IntervalDockerUpdate),
 		},
 	}
 
@@ -353,5 +356,6 @@ func applyFileConfig(cfg *domain.FileConfig) {
 		setInt(&cli.IntervalUnassigned, iv.Unassigned)
 		setInt(&cli.IntervalFanControl, iv.FanControl)
 		setInt(&cli.IntervalTuning, iv.Tuning)
+		setInt(&cli.IntervalDockerUpdate, iv.DockerUpdate)
 	}
 }
