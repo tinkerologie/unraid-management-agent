@@ -1817,10 +1817,11 @@ func (s *Server) registerRemediationTools() {
 			disks = []dto.DiskInfo{}
 		}
 
-		// Gather firing alerts if the cache provider exposes a health status.
-		// The CacheProvider interface does not expose GetFiringAlerts directly, so
-		// we derive a nil slice here; the REST handler uses alertEngine directly.
+		// Gather firing alerts from the alert engine (same as the REST handler).
 		var firing []dto.AlertStatus
+		if s.alertEngine != nil {
+			firing = s.alertEngine.GetFiringAlerts()
+		}
 
 		report := api.BuildHealthReport(containers, s.cacheProvider.GetArrayCache(), disks, firing)
 

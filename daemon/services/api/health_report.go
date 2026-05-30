@@ -9,8 +9,8 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 )
 
-// diskTempCritical is the temperature threshold (°C) above which a disk finding is critical.
-const diskTempCritical = 55.0
+// diskTempWarning is the temperature threshold (°C) above which a disk finding is emitted as a warning.
+const diskTempWarning = 55.0
 
 // BuildHealthReport aggregates health signals from plain data and returns a
 // prioritised, ranked HealthReport. Keeping inputs as plain values makes the
@@ -43,11 +43,11 @@ func BuildHealthReport(
 				Detail:   fmt.Sprintf("Disk %s reported SMART status %q. Backup data and replace the disk.", diskLabel(d), d.SMARTStatus),
 			})
 		}
-		if d.Temperature > diskTempCritical {
+		if d.Temperature > diskTempWarning {
 			findings = append(findings, dto.HealthFinding{
 				Severity: "warning",
 				Title:    fmt.Sprintf("Disk %s high temperature", diskLabel(d)),
-				Detail:   fmt.Sprintf("Disk %s temperature is %.0f °C (threshold: %.0f °C). Improve airflow or reduce load.", diskLabel(d), d.Temperature, diskTempCritical),
+				Detail:   fmt.Sprintf("Disk %s temperature is %.0f °C (threshold: %.0f °C). Improve airflow or reduce load.", diskLabel(d), d.Temperature, diskTempWarning),
 			})
 		}
 	}
