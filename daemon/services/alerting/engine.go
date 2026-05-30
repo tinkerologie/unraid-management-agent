@@ -3,6 +3,8 @@ package alerting
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -42,19 +44,21 @@ type Engine struct {
 	evaluator  *Evaluator
 	dispatcher *Dispatcher
 	provider   DataProvider
+	history    *MetricsHistory
 
-	mu      sync.RWMutex
-	history []dto.AlertEvent
+	mu           sync.RWMutex
+	alertHistory []dto.AlertEvent
 }
 
 // NewEngine creates and initializes the alerting engine.
 func NewEngine(store *Store, provider DataProvider) *Engine {
 	return &Engine{
-		store:      store,
-		evaluator:  NewEvaluator(),
-		dispatcher: NewDispatcher(),
-		provider:   provider,
-		history:    make([]dto.AlertEvent, 0, MaxHistoryEvents),
+		store:        store,
+		evaluator:    NewEvaluator(),
+		dispatcher:   NewDispatcher(),
+		provider:     provider,
+		history:      NewMetricsHistory(240, time.Hour),
+		alertHistory: make([]dto.AlertEvent, 0, MaxHistoryEvents),
 	}
 }
 
@@ -101,7 +105,10 @@ func (e *Engine) Start(ctx context.Context) {
 
 // evaluate runs one evaluation cycle for all enabled rules.
 func (e *Engine) evaluate() {
+	now := time.Now()
+	e.sampleHistory(now)
 	env := e.buildEnv()
+	e.overlayTrends(&env)
 	rules := e.store.GetEnabledRules()
 
 	results := e.evaluator.Evaluate(env, rules)
@@ -156,8 +163,8 @@ func (e *Engine) isCoolingDown(rule dto.AlertRule) bool {
 	}
 
 	// Search backward through history for the most recent firing event for this rule
-	for i := len(e.history) - 1; i >= 0; i-- {
-		ev := e.history[i]
+	for i := len(e.alertHistory) - 1; i >= 0; i-- {
+		ev := e.alertHistory[i]
 		if ev.RuleID == rule.ID && ev.State == "firing" {
 			return time.Since(ev.FiredAt) < cooldown
 		}
@@ -165,16 +172,16 @@ func (e *Engine) isCoolingDown(rule dto.AlertRule) bool {
 	return false
 }
 
-// addHistory appends an event to the history ring buffer.
+// addHistory appends an event to the alertHistory ring buffer.
 func (e *Engine) addHistory(event dto.AlertEvent) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	if len(e.history) >= MaxHistoryEvents {
+	if len(e.alertHistory) >= MaxHistoryEvents {
 		// Drop oldest
-		e.history = e.history[1:]
+		e.alertHistory = e.alertHistory[1:]
 	}
-	e.history = append(e.history, event)
+	e.alertHistory = append(e.alertHistory, event)
 }
 
 // GetHistory returns a copy of recent alert events.
@@ -182,8 +189,8 @@ func (e *Engine) GetHistory() []dto.AlertEvent {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	events := make([]dto.AlertEvent, len(e.history))
-	copy(events, e.history)
+	events := make([]dto.AlertEvent, len(e.alertHistory))
+	copy(events, e.alertHistory)
 	return events
 }
 
@@ -209,6 +216,162 @@ func (e *Engine) compileEnabledRules() {
 	rules := e.store.GetEnabledRules()
 	errs := e.evaluator.CompileRules(rules)
 	logger.Info("Alerting: Compiled %d enabled rules (%d errors)", len(rules), len(errs))
+}
+
+// smartRawInt parses the integer portion of a SMART RawValue string (e.g. "5" or "5 (raw)").
+func smartRawInt(raw string) int {
+	s := strings.Fields(raw)
+	if len(s) == 0 {
+		return 0
+	}
+	v, err := strconv.Atoi(s[0])
+	if err != nil {
+		return 0
+	}
+	return v
+}
+
+// sampleHistory records one tick of metrics into the trend history.
+func (e *Engine) sampleHistory(now time.Time) {
+	if sys := e.provider.GetSystemCache(); sys != nil {
+		e.history.Record("cpu_temp", "", sys.CPUTemp, now)
+	}
+	if arr := e.provider.GetArrayCache(); arr != nil {
+		e.history.Record("array_used_pct", "", arr.UsedPercent, now)
+	}
+
+	diskIDs := map[string]bool{}
+	if disks := e.provider.GetDisksCache(); disks != nil {
+		for _, d := range disks {
+			if d.ID == "" {
+				continue
+			}
+			id := d.ID
+			diskIDs[id] = true
+			e.history.Record("disk_temp", id, d.Temperature, now)
+			e.history.Record("disk_used_pct", id, d.UsagePercent, now)
+			e.history.Record("disk_errors", id, float64(d.SMARTErrors), now)
+
+			// Extract reallocated (ID 5) and pending (ID 197) from SMARTAttributes
+			var reallocated, pending float64
+			for _, attr := range d.SMARTAttributes {
+				switch attr.ID {
+				case 5:
+					reallocated = float64(smartRawInt(attr.RawValue))
+				case 197:
+					pending = float64(smartRawInt(attr.RawValue))
+				}
+			}
+			e.history.Record("reallocated", id, reallocated, now)
+			e.history.Record("pending", id, pending, now)
+		}
+	}
+	for _, metric := range []string{"disk_temp", "disk_used_pct", "disk_errors", "reallocated", "pending"} {
+		e.history.pruneEntities(metric, diskIDs)
+	}
+
+	containerIDs := map[string]bool{}
+	if containers := e.provider.GetDockerCache(); containers != nil {
+		for _, c := range containers {
+			if c.ID == "" {
+				continue
+			}
+			containerIDs[c.ID] = true
+			e.history.Record("restart_count", c.ID, float64(c.RestartCount), now)
+		}
+	}
+	e.history.pruneEntities("restart_count", containerIDs)
+}
+
+// overlayTrends computes trend/predictive fields from the MetricsHistory and
+// overlays them onto env. Called after buildEnv() each evaluation tick.
+func (e *Engine) overlayTrends(env *dto.AlertEnv) {
+	e.history.mu.RLock()
+	defer e.history.mu.RUnlock()
+
+	// Global series
+	if s := e.history.globalSeries["cpu_temp"]; len(s) >= 2 {
+		env.CPUTempSlopePerMin = e.history.slope(s) * 60
+	}
+	if s := e.history.globalSeries["array_used_pct"]; len(s) >= 2 {
+		eta := e.history.etaToThreshold(s, 100)
+		if eta > 0 {
+			env.ArrayFillETAHours = eta
+		}
+	}
+
+	// Per-disk series
+	var maxDiskTempSlope float64
+	var minDiskFillETA float64 // soonest (smallest positive) = worst-case
+	for id, s := range e.history.entitySeries["disk_temp"] {
+		_ = id
+		if len(s) < 2 {
+			continue
+		}
+		sl := e.history.slope(s) * 60
+		if sl > maxDiskTempSlope {
+			maxDiskTempSlope = sl
+		}
+	}
+	env.MaxDiskTempSlopePerMin = maxDiskTempSlope
+
+	for id, s := range e.history.entitySeries["disk_used_pct"] {
+		_ = id
+		if len(s) < 2 {
+			continue
+		}
+		eta := e.history.etaToThreshold(s, 100)
+		if eta > 0 && (minDiskFillETA == 0 || eta < minDiskFillETA) {
+			minDiskFillETA = eta
+		}
+	}
+	env.MaxDiskFillETAHours = minDiskFillETA
+
+	// Max reallocated and pending sectors (last sample value)
+	for _, s := range e.history.entitySeries["reallocated"] {
+		if len(s) == 0 {
+			continue
+		}
+		v := int(s[len(s)-1].v)
+		if v > env.MaxReallocatedSectors {
+			env.MaxReallocatedSectors = v
+		}
+	}
+	for _, s := range e.history.entitySeries["pending"] {
+		if len(s) == 0 {
+			continue
+		}
+		v := int(s[len(s)-1].v)
+		if v > env.MaxPendingSectors {
+			env.MaxPendingSectors = v
+		}
+	}
+
+	// DiskErrorsIncreasing: any per-disk reallocated/pending/disk_errors slope > 0
+	for _, metric := range []string{"reallocated", "pending", "disk_errors"} {
+		for _, s := range e.history.entitySeries[metric] {
+			if len(s) >= 2 && e.history.slope(s) > 0 {
+				env.DiskErrorsIncreasing = true
+				break
+			}
+		}
+		if env.DiskErrorsIncreasing {
+			break
+		}
+	}
+
+	// Per-container restart slope
+	var maxRestartSlope float64
+	for _, s := range e.history.entitySeries["restart_count"] {
+		if len(s) < 2 {
+			continue
+		}
+		sl := e.history.slope(s) * 3600
+		if sl > maxRestartSlope {
+			maxRestartSlope = sl
+		}
+	}
+	env.MaxContainerRestartsPerHour = maxRestartSlope
 }
 
 // buildEnv constructs an AlertEnv from the current cached collector data.

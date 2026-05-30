@@ -280,6 +280,24 @@ func TestContainerUpdatesAvailableMetric(t *testing.T) {
 	}
 }
 
+func TestEngineTrendFields(t *testing.T) {
+	provider := &mockDataProvider{}
+	e := NewEngine(NewStore(t.TempDir()+"/r.json"), provider)
+	base := time.Unix(1_700_000_000, 0)
+	for i := 0; i < 30; i++ {
+		e.history.Record("cpu_temp", "", 40+0.5*float64(i), base.Add(time.Duration(i)*15*time.Second))
+		e.history.Record("array_used_pct", "", 80+0.03*float64(i), base.Add(time.Duration(i)*15*time.Second))
+	}
+	var env dto.AlertEnv
+	e.overlayTrends(&env)
+	if env.CPUTempSlopePerMin <= 0 {
+		t.Errorf("CPUTempSlopePerMin = %v, want > 0", env.CPUTempSlopePerMin)
+	}
+	if env.ArrayFillETAHours <= 0 {
+		t.Errorf("ArrayFillETAHours = %v, want > 0", env.ArrayFillETAHours)
+	}
+}
+
 func TestEngineEvaluateIntegration(t *testing.T) {
 	dir := t.TempDir()
 	store := NewStore(dir)
