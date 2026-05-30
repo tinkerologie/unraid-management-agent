@@ -1834,7 +1834,10 @@ func (s *Server) registerRemediationTools() {
 		}
 
 		// Execute path — construct executor from live controllers.
-		exec := remediation.NewExecutor(controllers.NewDockerController(), controllers.NewVMController())
+		dockerCtrl := controllers.NewDockerController()
+		defer func() { _ = dockerCtrl.Close() }()
+		vmCtrl := controllers.NewVMController()
+		exec := remediation.NewExecutor(dockerCtrl, vmCtrl)
 
 		results := make([]dto.ActionResult, 0, len(args.Actions))
 		for _, a := range args.Actions {
@@ -1894,7 +1897,10 @@ func (s *Server) registerRemediationTools() {
 			}
 		}
 
-		exec := remediation.NewExecutor(controllers.NewDockerController(), controllers.NewVMController())
+		dockerCtrl := controllers.NewDockerController()
+		defer func() { _ = dockerCtrl.Close() }()
+		vmCtrl := controllers.NewVMController()
+		exec := remediation.NewExecutor(dockerCtrl, vmCtrl)
 		results, steps, err := remediation.RunRunbook(ctx, exec, args.Name, args.Confirm, targets)
 		if err != nil {
 			return textResult(fmt.Sprintf("run_runbook error: %v", err)), nil, nil

@@ -104,7 +104,7 @@ func BuildHealthReport(
 			msg = fmt.Sprintf("Alert rule %q is firing.", a.RuleName)
 		}
 		findings = append(findings, dto.HealthFinding{
-			Severity: sev,
+			Severity: normalizeSeverity(sev),
 			Title:    fmt.Sprintf("Firing alert: %s", a.RuleName),
 			Detail:   msg,
 		})
@@ -114,8 +114,14 @@ func BuildHealthReport(
 
 	severityOrder := map[string]int{"critical": 0, "warning": 1, "info": 2}
 	sort.SliceStable(findings, func(i, j int) bool {
-		oi := severityOrder[findings[i].Severity]
-		oj := severityOrder[findings[j].Severity]
+		oi, ok := severityOrder[findings[i].Severity]
+		if !ok {
+			oi = severityOrder["info"]
+		}
+		oj, ok := severityOrder[findings[j].Severity]
+		if !ok {
+			oj = severityOrder["info"]
+		}
 		return oi < oj
 	})
 
@@ -143,6 +149,18 @@ func BuildHealthReport(
 		Warning:     warning,
 		Info:        info,
 		GeneratedAt: time.Now(),
+	}
+}
+
+// normalizeSeverity returns exactly one of "critical", "warning", or "info".
+// Any unrecognised value is treated as "info" so that unknown severities sort
+// and count consistently.
+func normalizeSeverity(s string) string {
+	switch s {
+	case "critical", "warning", "info":
+		return s
+	default:
+		return "info"
 	}
 }
 

@@ -634,7 +634,6 @@ func (dc *DockerController) ListNetworks() ([]dto.DockerNetworkInfo, error) {
 	if err := dc.initClient(); err != nil {
 		return nil, err
 	}
-	defer func() { _ = dc.Close() }()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

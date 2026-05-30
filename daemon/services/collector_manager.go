@@ -522,6 +522,7 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 		c := collectors.NewDockerNetworksCollector(ctx)
 		c.ListFn = func() ([]dto.DockerNetworkInfo, error) {
 			dc := controllers.NewDockerController()
+			defer func() { _ = dc.Close() }()
 			return dc.ListNetworks()
 		}
 		return c
