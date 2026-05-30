@@ -266,6 +266,9 @@ func (e *Engine) buildEnv() dto.AlertEnv {
 			} else {
 				env.StoppedContainers++
 			}
+			if c.UpdateAvailable != nil && *c.UpdateAvailable {
+				env.ContainerUpdatesAvailable++
+			}
 		}
 	}
 
