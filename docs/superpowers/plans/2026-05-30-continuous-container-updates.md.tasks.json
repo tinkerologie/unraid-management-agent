@@ -1,0 +1,68 @@
+{
+  "planPath": "docs/superpowers/plans/2026-05-30-continuous-container-updates.md",
+  "tasks": [
+    {
+      "id": 1,
+      "subject": "Task 1: Data model — update fields, status helper, event topic",
+      "status": "pending",
+      "description": "**Goal:** Add update status fields to ContainerInfo, a status-derivation helper, status constants, and the new typed event topic.\n\n**Files:** daemon/dto/docker.go, daemon/constants/topics.go, daemon/dto/docker_test.go\n\n**Verify:** go test ./daemon/dto/... -run TestContainerUpdate -v\n\n```json:metadata\n{\"files\": [\"daemon/dto/docker.go\", \"daemon/constants/topics.go\", \"daemon/dto/docker_test.go\"], \"verifyCommand\": \"go test ./daemon/dto/... -run TestContainerUpdate -v\", \"acceptanceCriteria\": [\"ContainerInfo update fields\", \"status constants\", \"Status() tri-state\", \"TopicDockerUpdatesUpdate\", \"nil bool omitted\"]}\n```"
+    },
+    {
+      "id": 2,
+      "subject": "Task 2: DockerUpdate collector",
+      "status": "pending",
+      "blockedBy": [1],
+      "description": "**Goal:** Collector that periodically checks updates, publishes on TopicDockerUpdatesUpdate, dedupes unchanged results.\n\n**Files:** daemon/services/collectors/docker_update.go, daemon/services/collectors/docker_update_test.go\n\n**Verify:** go test ./daemon/services/collectors/... -run TestDockerUpdateCollector -v\n\n```json:metadata\n{\"files\": [\"daemon/services/collectors/docker_update.go\", \"daemon/services/collectors/docker_update_test.go\"], \"verifyCommand\": \"go test ./daemon/services/collectors/... -run TestDockerUpdateCollector -v\", \"acceptanceCriteria\": [\"Start panic recovery + ctx.Done\", \"checkFn injectable\", \"publish first, dedupe unchanged\", \"startup stagger\"]}\n```"
+    },
+    {
+      "id": 3,
+      "subject": "Task 3: Interval plumbing + collector registration",
+      "status": "pending",
+      "blockedBy": [2],
+      "description": "**Goal:** Wire CLI/config/interval + register docker_update (default 6h); raise runtime interval cap to 86400.\n\n**Files:** daemon/constants/const.go, daemon/domain/context.go, daemon/domain/fileconfig.go, main.go, daemon/services/collector_manager.go, daemon/services/collector_manager_coverage_test.go\n\n**Verify:** go build ./... && go test ./daemon/services/ -run TestRegisterAllCollectors_IncludesDockerUpdate -v\n\n```json:metadata\n{\"files\": [\"daemon/constants/const.go\", \"daemon/domain/context.go\", \"daemon/domain/fileconfig.go\", \"main.go\", \"daemon/services/collector_manager.go\", \"daemon/services/collector_manager_coverage_test.go\"], \"verifyCommand\": \"go build ./... && go test ./daemon/services/ -run TestRegisterAllCollectors_IncludesDockerUpdate -v\", \"acceptanceCriteria\": [\"IntervalDockerUpdate=21600\", \"Intervals fields\", \"CLI flag + validCollectorNames\", \"manager registers default 21600\", \"cap raised to 86400\"]}\n```"
+    },
+    {
+      "id": 4,
+      "subject": "Task 4: Cache binding + read-time merge in GetDockerCache",
+      "status": "pending",
+      "blockedBy": [1],
+      "description": "**Goal:** Cache update result and merge update status into GetDockerCache() returns (copy), keeping raw cache pure.\n\n**Files:** daemon/services/api/cache_store.go, daemon/services/api/event_bindings.go, daemon/services/api/cache_store_test.go\n\n**Verify:** go test ./daemon/services/api/ -run TestGetDockerCacheMerge -v\n\n```json:metadata\n{\"files\": [\"daemon/services/api/cache_store.go\", \"daemon/services/api/event_bindings.go\", \"daemon/services/api/cache_store_test.go\"], \"verifyCommand\": \"go test ./daemon/services/api/ -run TestGetDockerCacheMerge -v\", \"acceptanceCriteria\": [\"dockerUpdatesCache field\", \"binding stores result\", \"merge by ID, absent=unknown\", \"raw slice not mutated\", \"GetContainerUpdatesCache getter\"]}\n```"
+    },
+    {
+      "id": 5,
+      "subject": "Task 5: REST endpoints — cached /docker/updates + refresh",
+      "status": "pending",
+      "blockedBy": [4],
+      "description": "**Goal:** Serve /docker/updates from cache; add POST /docker/updates/refresh that runs+publishes a check.\n\n**Files:** daemon/services/api/handlers.go, daemon/services/api/server.go, daemon/services/api/handlers_test.go\n\n**Verify:** go test ./daemon/services/api/ -run TestDockerUpdates -v\n\n```json:metadata\n{\"files\": [\"daemon/services/api/handlers.go\", \"daemon/services/api/server.go\", \"daemon/services/api/handlers_test.go\"], \"verifyCommand\": \"go test ./daemon/services/api/ -run TestDockerUpdates -v\", \"acceptanceCriteria\": [\"GET /docker/updates from cache, empty when uncached\", \"POST refresh runs+publishes+returns\", \"route registered\"]}\n```"
+    },
+    {
+      "id": 6,
+      "subject": "Task 6: Alerting metric — ContainerUpdatesAvailable",
+      "status": "pending",
+      "blockedBy": [4],
+      "description": "**Goal:** Add ContainerUpdatesAvailable expr metric and populate from merged docker cache.\n\n**Files:** daemon/dto/alert.go, daemon/services/alerting/engine.go, daemon/services/alerting/engine_test.go\n\n**Verify:** go test ./daemon/services/alerting/ -run TestContainerUpdatesAvailableMetric -v\n\n```json:metadata\n{\"files\": [\"daemon/dto/alert.go\", \"daemon/services/alerting/engine.go\", \"daemon/services/alerting/engine_test.go\"], \"verifyCommand\": \"go test ./daemon/services/alerting/ -run TestContainerUpdatesAvailableMetric -v\", \"acceptanceCriteria\": [\"AlertEnv expr field\", \"engine counts UpdateAvailable\", \"count=1 for one update\"]}\n```"
+    },
+    {
+      "id": 7,
+      "subject": "Task 7: MCP — refresh tool + docs",
+      "status": "pending",
+      "blockedBy": [5],
+      "description": "**Goal:** Add refresh_container_updates MCP tool; document update_status on container listings.\n\n**Files:** daemon/services/mcp/server.go, docs/integrations/mcp.md, daemon/services/mcp/server_test.go\n\n**Verify:** go test ./daemon/services/mcp/ -run TestRefreshContainerUpdates -v\n\n```json:metadata\n{\"files\": [\"daemon/services/mcp/server.go\", \"docs/integrations/mcp.md\", \"daemon/services/mcp/server_test.go\"], \"verifyCommand\": \"go test ./daemon/services/mcp/ -run TestRefreshContainerUpdates -v\", \"acceptanceCriteria\": [\"tool registered+publishes\", \"mcp.md documents tool+update_status\", \"registration test updated\"]}\n```"
+    },
+    {
+      "id": 8,
+      "subject": "Task 8: Opt-in notification on new updates",
+      "status": "pending",
+      "blockedBy": [2, 3],
+      "description": "**Goal:** Opt-in Unraid notification when a container newly has an update (transition set only).\n\n**Files:** daemon/domain/context.go, main.go, daemon/services/collectors/docker_update.go, daemon/services/collectors/docker_update_test.go\n\n**Verify:** go test ./daemon/services/collectors/... -run TestDockerUpdateNotify -v\n\n```json:metadata\n{\"files\": [\"daemon/domain/context.go\", \"main.go\", \"daemon/services/collectors/docker_update.go\", \"daemon/services/collectors/docker_update_test.go\"], \"verifyCommand\": \"go test ./daemon/services/collectors/... -run TestDockerUpdateNotify -v\", \"acceptanceCriteria\": [\"DockerUpdateNotify field + CLI flag\", \"notify transition set only\", \"notifyFn injectable\", \"silent first run/disabled\"]}\n```"
+    },
+    {
+      "id": 9,
+      "subject": "Task 9: Docs, swagger, CHANGELOG, full verification",
+      "status": "pending",
+      "blockedBy": [5, 6, 7, 8],
+      "description": "**Goal:** CHANGELOG entry, regenerate swagger, full make test + pre-commit-run.\n\n**Files:** CHANGELOG.md, daemon/docs/swagger.json, daemon/docs/swagger.yaml\n\n**Verify:** make test && make pre-commit-run\n\n```json:metadata\n{\"files\": [\"CHANGELOG.md\", \"daemon/docs/swagger.json\", \"daemon/docs/swagger.yaml\"], \"verifyCommand\": \"make test && make pre-commit-run\", \"acceptanceCriteria\": [\"CHANGELOG entry\", \"swagger regenerated with refresh endpoint\", \"make test passes\", \"make pre-commit-run passes\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-05-30T00:00:00Z"
+}
