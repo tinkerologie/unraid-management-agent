@@ -44,9 +44,10 @@ func TestMetricsHistory_BoundedByAge(t *testing.T) {
 	for i := 0; i < 30; i++ {
 		h.recordAt("cpu_temp", "", float64(i), ts(base, i))
 	}
-	got := len(h.globalSeries["cpu_temp"])
-	if got < 10 || got > 12 {
-		t.Errorf("len = %d, want ~11 (age cap)", got)
+	// cutoff = newest(t=29s) - 10s = t=19s; samples dropped where t.Before(cutoff)
+	// i.e. t < 19 → keeps t in [19,29] = 11 samples.
+	if got := len(h.globalSeries["cpu_temp"]); got != 11 {
+		t.Errorf("len = %d, want 11 (age cap keeps t in [19,29])", got)
 	}
 }
 

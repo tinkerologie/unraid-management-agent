@@ -1,6 +1,7 @@
 package alerting
 
 import (
+	"math"
 	"sync"
 	"time"
 )
@@ -54,15 +55,19 @@ func (h *MetricsHistory) Record(metric, entity string, v float64, now time.Time)
 func (h *MetricsHistory) appendBounded(s []sample, x sample) []sample {
 	s = append(s, x)
 	cutoff := x.t.Add(-h.maxAge)
-	i := 0
-	for i < len(s) && s[i].t.Before(cutoff) {
-		i++
+	start := 0
+	for start < len(s) && s[start].t.Before(cutoff) {
+		start++
 	}
-	s = s[i:]
-	if len(s) > h.maxCount {
-		s = s[len(s)-h.maxCount:]
+	if len(s)-start > h.maxCount {
+		start = len(s) - h.maxCount
 	}
-	return s
+	if start == 0 {
+		return s
+	}
+	trimmed := make([]sample, len(s)-start)
+	copy(trimmed, s[start:])
+	return trimmed
 }
 
 // pruneEntities drops per-entity series for a metric whose entity is not in keep.
@@ -113,7 +118,7 @@ func (h *MetricsHistory) etaToThreshold(s []sample, threshold float64) float64 {
 		return -1
 	}
 	seconds := diff / sl
-	if seconds <= 0 {
+	if seconds <= 0 || math.IsInf(seconds, 0) || math.IsNaN(seconds) {
 		return -1
 	}
 	return seconds / 3600.0
