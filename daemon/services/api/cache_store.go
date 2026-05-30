@@ -136,6 +136,7 @@ func (c *CacheStore) GetDockerCache() []dto.ContainerInfo {
 		}
 		if !u.Timestamp.IsZero() {
 			t := u.Timestamp
+			// checkedAt is a single immutable copy; sharing the pointer across containers is safe.
 			checkedAt = &t
 		}
 	}
@@ -152,6 +153,8 @@ func (c *CacheStore) GetDockerCache() []dto.ContainerInfo {
 			ci.UpdateChecked = checkedAt
 		} else {
 			ci.UpdateStatus = dto.UpdateStatusUnknown
+			ci.UpdateAvailable = nil
+			ci.UpdateChecked = nil
 		}
 		out[i] = ci
 	}
