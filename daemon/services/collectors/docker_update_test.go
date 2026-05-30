@@ -1,6 +1,7 @@
 package collectors
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -93,5 +94,19 @@ func TestDockerUpdateCollector_RepublishesOnChange(t *testing.T) {
 	case <-sub: // success: changed signature triggered republish
 	case <-time.After(time.Second):
 		t.Fatal("expected republish after signature change, got none")
+	}
+}
+
+func TestDockerUpdateCollector_CheckErrorNoPublish(t *testing.T) {
+	hub := domain.NewEventBus(16)
+	sub := hub.Sub(constants.TopicDockerUpdatesUpdate.Name)
+	defer hub.Unsub(sub)
+	c := NewDockerUpdateCollector(&domain.Context{Hub: hub})
+	c.CheckFn = func() (*dto.ContainerUpdatesResult, error) { return nil, fmt.Errorf("boom") }
+	c.Collect()
+	select {
+	case <-sub:
+		t.Fatal("expected no publish on check error")
+	case <-time.After(150 * time.Millisecond):
 	}
 }

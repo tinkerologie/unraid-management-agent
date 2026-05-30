@@ -379,7 +379,7 @@ func (cm *CollectorManager) getDefaultInterval(name string) int {
 		"unassigned":    60,
 		"fancontrol":    30,
 		"tuning":        120,
-		"docker_update": 21600,
+		"docker_update": constants.IntervalDockerUpdate,
 	}
 
 	if interval, ok := defaults[name]; ok {
@@ -489,7 +489,9 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 	cm.Register("docker_update", func(ctx *domain.Context) Collector {
 		c := collectors.NewDockerUpdateCollector(ctx)
 		c.CheckFn = func() (*dto.ContainerUpdatesResult, error) {
-			return controllers.NewDockerController().CheckAllContainerUpdates()
+			dc := controllers.NewDockerController()
+			defer func() { _ = dc.Close() }()
+			return dc.CheckAllContainerUpdates()
 		}
 		return c
 	}, intervals.DockerUpdate, false)
