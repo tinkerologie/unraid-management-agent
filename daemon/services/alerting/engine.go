@@ -373,6 +373,33 @@ func (e *Engine) overlayTrends(env *dto.AlertEnv) {
 	env.MaxContainerRestartsPerHour = maxRestartSlope
 }
 
+// QueryHistory returns the samples and summary statistics for a metric series.
+// Pass entity="" for global (non-entity) metrics such as cpu_temp or array_used_pct.
+func (e *Engine) QueryHistory(metric, entity string) dto.MetricHistoryResult {
+	s := e.history.SeriesSnapshot(metric, entity)
+	res := dto.MetricHistoryResult{Metric: metric, Entity: entity, Count: len(s)}
+	if len(s) == 0 {
+		return res
+	}
+	res.Slope = e.history.slope(s)
+	res.Min = s[0].v
+	res.Max = s[0].v
+	var sum float64
+	for _, p := range s {
+		res.Samples = append(res.Samples, dto.MetricSample{TimeUnix: p.t.Unix(), Value: p.v})
+		if p.v < res.Min {
+			res.Min = p.v
+		}
+		if p.v > res.Max {
+			res.Max = p.v
+		}
+		sum += p.v
+	}
+	res.Avg = sum / float64(len(s))
+	res.Last = s[len(s)-1].v
+	return res
+}
+
 // buildEnv constructs an AlertEnv from the current cached collector data.
 func (e *Engine) buildEnv() dto.AlertEnv {
 	env := dto.AlertEnv{}

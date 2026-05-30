@@ -309,3 +309,9 @@ type MCPHealthReportArgs struct {
 	Confirm bool        `json:"confirm,omitempty" jsonschema:"Set to true together with a non-empty actions list to execute remediation actions"`
 	Actions []ActionRef `json:"actions,omitempty" jsonschema:"List of recommended actions to execute (from a previous report). Leave empty to receive a report only."`
 }
+
+// MCPMetricHistoryArgs represents arguments for the query_metric_history tool.
+type MCPMetricHistoryArgs struct {
+	Metric string `json:"metric" jsonschema:"required,metric name e.g. cpu_temp,array_used_pct,disk_temp"`
+	Entity string `json:"entity,omitempty" jsonschema:"optional entity id e.g. a disk or container id"`
+}

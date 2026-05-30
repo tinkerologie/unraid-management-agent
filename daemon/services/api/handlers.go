@@ -3752,6 +3752,32 @@ func (s *Server) handleAlertTemplates(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, alerting.AlertRuleTemplates())
 }
 
+// handleMetricHistory godoc
+//
+//	@Summary		Query metric history
+//	@Description	Return in-memory ring-buffer samples and summary stats (slope, min, max, avg, last) for a named metric series. Pass entity for per-disk or per-container metrics.
+//	@Tags			Alerts
+//	@Produce		json
+//	@Param			metric	query		string					true	"Metric name (e.g. cpu_temp, array_used_pct, disk_temp)"
+//	@Param			entity	query		string					false	"Entity ID for per-entity metrics (e.g. disk ID, container ID)"
+//	@Success		200		{object}	dto.MetricHistoryResult	"Metric history"
+//	@Failure		400		{object}	dto.Response			"metric query parameter is required"
+//	@Failure		503		{object}	dto.Response			"Alerting engine not initialized"
+//	@Router			/metrics/history [get]
+func (s *Server) handleMetricHistory(w http.ResponseWriter, r *http.Request) {
+	if s.alertEngine == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Alerting engine not initialized")
+		return
+	}
+	metric := r.URL.Query().Get("metric")
+	if metric == "" {
+		respondWithError(w, http.StatusBadRequest, "metric query parameter is required")
+		return
+	}
+	entity := r.URL.Query().Get("entity")
+	respondJSON(w, http.StatusOK, s.alertEngine.QueryHistory(metric, entity))
+}
+
 // ============================================================================
 // Health Check / Watchdog Handlers
 // ============================================================================

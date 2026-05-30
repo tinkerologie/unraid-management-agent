@@ -2019,7 +2019,22 @@ func (s *Server) registerAlertingTools() {
 		return jsonResult(alerting.AlertRuleTemplates())
 	})
 
-	logger.Debug("MCP alerting tools registered (8 tools)")
+	// Query metric history
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "query_metric_history",
+		Description: "Query the in-memory ring-buffer history for a named metric series. Returns all buffered samples plus summary statistics (slope per second, min, max, average, last value). Global metrics (no entity): cpu_temp, array_used_pct. Per-entity metrics (provide entity id): disk_temp, disk_used_pct, disk_errors, reallocated, pending, restart_count.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPMetricHistoryArgs) (*mcp.CallToolResult, any, error) {
+		if s.alertEngine == nil {
+			return textResult("Alerting engine not initialized"), nil, nil
+		}
+		if args.Metric == "" {
+			return textResult("metric is required"), nil, nil
+		}
+		return jsonResult(s.alertEngine.QueryHistory(args.Metric, args.Entity))
+	})
+
+	logger.Debug("MCP alerting tools registered (9 tools)")
 }
 
 // registerWatchdogTools registers MCP tools for health check management and monitoring.

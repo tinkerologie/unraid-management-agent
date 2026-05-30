@@ -281,6 +281,9 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/healthchecks/{id}", s.handleDeleteHealthCheck).Methods("DELETE")
 	api.HandleFunc("/healthchecks/{id}/run", s.handleRunHealthCheck).Methods("POST")
 
+	// Metrics history endpoint
+	api.HandleFunc("/metrics/history", s.handleMetricHistory).Methods("GET")
+
 	// Alerting endpoints
 	api.HandleFunc("/alerts/templates", s.handleAlertTemplates).Methods("GET")
 	api.HandleFunc("/alerts/rules", s.handleListAlertRules).Methods("GET")
