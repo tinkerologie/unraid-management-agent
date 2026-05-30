@@ -5377,9 +5377,8 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "update_available": {
-                    "description": "nil = not yet checked / registry unreachable",
-                    "type": "boolean",
-                    "x-nullable": "true"
+                    "description": "null when not yet checked / registry unreachable (field omitted in JSON)",
+                    "type": "boolean"
                 },
                 "update_checked": {
                     "type": "string"

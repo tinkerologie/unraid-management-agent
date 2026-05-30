@@ -927,7 +927,8 @@ func (s *Server) registerNewMonitoringTools() {
 		Name:        "refresh_container_updates",
 		Description: "Force an immediate registry digest re-check for all containers and publish the result (updates cache, WebSocket, and alerts).",
 		Annotations: &mcp.ToolAnnotations{
-			IdempotentHint: true,
+			IdempotentHint:  true,
+			DestructiveHint: ptr(false),
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
 		logger.Info("MCP: Refreshing container updates")

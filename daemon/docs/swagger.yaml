@@ -475,9 +475,9 @@ definitions:
       timestamp:
         type: string
       update_available:
-        description: nil = not yet checked / registry unreachable
+        description: null when not yet checked / registry unreachable (field omitted
+          in JSON)
         type: boolean
-        x-nullable: "true"
       update_checked:
         type: string
       update_status:
