@@ -33,7 +33,7 @@ The MCP server supports two transports — use the one that fits your deployment
 > - Use **Streamable HTTP** if the AI client (Cursor, VS Code, etc.) runs on a different machine than the Unraid server.
 > - Use **STDIO** if the AI client (Claude Desktop, Cursor) runs locally on the Unraid server itself — it has zero network overhead and requires no authentication.
 
-## Available Tools (84 total)
+## Available Tools (85 total)
 
 ### System Monitoring Tools
 
@@ -163,7 +163,17 @@ The MCP server supports two transports — use the one that fits your deployment
 | Tool                    | Description                                                                                                                                                                                          |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `list_alert_templates`  | List curated, disabled-by-default alert rule templates that use trend/predictive metrics — array fill ETA, disk temp slope, container restart rate, reallocated sectors, disk errors (read-only)     |
+| `enable_alert_template` | Instantiate and enable an alert rule from a template in one call. Pass `template_id` (e.g. `tmpl-array-fill`) and optional `channels` list (defaults to `["unraid"]`). Idempotent — re-enabling updates the existing rule without duplication |
 | `query_metric_history`  | Query the in-memory ring-buffer history for a named metric. Returns all buffered samples plus summary statistics (slope/sec, min, max, avg, last). See below for valid metric names (read-only)      |
+
+**`enable_alert_template` — arguments:**
+
+| Argument      | Type            | Required | Description                                                                                           |
+| ------------- | --------------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `template_id` | string          | Yes      | Template ID to enable (e.g. `tmpl-array-fill`, `tmpl-disk-temp-climb`, `tmpl-container-flapping`)    |
+| `channels`    | array of strings| No       | Notification channels (e.g. `["unraid", "email"]`). Defaults to `["unraid"]` when omitted             |
+
+The created rule's `id` matches the `template_id`, so repeated calls are idempotent — the rule is updated in-place rather than duplicated. Returns `503` if the alerting subsystem is not initialised, `404` for an unknown template, `400` for an invalid request body.
 
 **Valid metric names for `query_metric_history`:**
 
@@ -252,7 +262,7 @@ Supported actions: `start_container`, `stop_container`, `restart_container`, `st
 
 ## Tool Safety Annotations
 
-All 84 tools include MCP safety annotations to help AI agents make safe decisions automatically:
+All 85 tools include MCP safety annotations to help AI agents make safe decisions automatically:
 
 ### Read-Only Tools (56 tools)
 
@@ -300,7 +310,7 @@ These tools make changes that may be difficult or impossible to reverse:
 | `system_health_report`  | —                      | Yes (`confirm: true` + `actions` list) |
 | `run_runbook`           | `idempotentHint: true` | Yes (`confirm: true`) |
 
-### Non-Destructive Control Tools (9 tools) — `destructiveHint: false`
+### Non-Destructive Control Tools (10 tools) — `destructiveHint: false`
 
 These tools make changes that are safe and easily reversible:
 
@@ -315,6 +325,7 @@ These tools make changes that are safe and easily reversible:
 | `collector_action`          | `idempotentHint: true` |
 | `update_collector_interval` | `idempotentHint: true` |
 | `refresh_plugin_updates`    | `idempotentHint: true` |
+| `enable_alert_template`     | `idempotentHint: true` |
 
 > **How AI agents use annotations:** When an AI agent receives these annotations,
 > it can automatically decide whether to ask for user confirmation before calling

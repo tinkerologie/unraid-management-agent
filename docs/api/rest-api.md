@@ -4,7 +4,7 @@ Complete reference for all Unraid Management Agent API endpoints.
 
 **Base URL**: `http://YOUR_UNRAID_IP:8043/api/v1`  
 **Version**: 1.0.0  
-**Total Endpoints**: 65
+**Total Endpoints**: 66
 
 ---
 
@@ -3341,6 +3341,68 @@ to their alert rules configuration file.
 
 ```bash
 curl http://192.168.20.21:8043/api/v1/alerts/templates
+```
+
+---
+
+### POST /alerts/templates/{id}/enable
+
+Instantiate and enable an alert rule from a template in a single request. Idempotent —
+calling this endpoint again for the same template ID updates the existing rule in-place
+rather than creating a duplicate.
+
+**Path Parameters**:
+
+| Parameter | Type   | Required | Description                                                             |
+| --------- | ------ | -------- | ----------------------------------------------------------------------- |
+| `id`      | string | Yes      | Template ID (e.g. `tmpl-array-fill`, `tmpl-disk-temp-climb`)            |
+
+**Request Body** (optional, `application/json`):
+
+| Field      | Type            | Required | Description                                                                          |
+| ---------- | --------------- | -------- | ------------------------------------------------------------------------------------ |
+| `channels` | array of strings| No       | Notification channels (e.g. `["unraid", "email"]`). Defaults to `["unraid"]` if omitted |
+
+**Response** — the created or updated `AlertRule` object:
+
+```json
+{
+  "id": "tmpl-array-fill",
+  "name": "Array filling soon (< 72h)",
+  "expression": "ArrayFillETAHours > 0 && ArrayFillETAHours < 72",
+  "severity": "warning",
+  "enabled": true,
+  "cooldown_minutes": 360,
+  "channels": ["unraid"]
+}
+```
+
+**Error Responses**:
+
+| Status | Condition                                              |
+| ------ | ------------------------------------------------------ |
+| `400`  | Invalid request body                                   |
+| `404`  | Unknown template ID                                    |
+| `503`  | Alerting subsystem not initialised                     |
+
+**How to enable a template** — example workflow:
+
+1. Call `GET /alerts/templates` to list available templates and copy the `id` you want.
+2. Call `POST /alerts/templates/{id}/enable` to activate it immediately (no config-file
+   editing required). Optionally include a `channels` array to route notifications.
+
+**Example** — enable the array fill template with default channel:
+
+```bash
+curl -X POST http://192.168.20.21:8043/api/v1/alerts/templates/tmpl-array-fill/enable
+```
+
+**Example** — enable and route to a custom channel:
+
+```bash
+curl -X POST http://192.168.20.21:8043/api/v1/alerts/templates/tmpl-array-fill/enable \
+  -H "Content-Type: application/json" \
+  -d '{"channels": ["unraid", "email"]}'
 ```
 
 ---

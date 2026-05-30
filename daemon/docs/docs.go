@@ -312,6 +312,64 @@ const docTemplate = `{
                 }
             }
         },
+        "/alerts/templates/{id}/enable": {
+            "post": {
+                "description": "Enable a template by ID, creating or updating the corresponding alert rule. Idempotent: calling multiple times updates the same rule. Optional JSON body may specify channels; defaults to [\"unraid\"].",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Alerts"
+                ],
+                "summary": "Enable an alert rule template",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Template ID (e.g. tmpl-array-fill)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Optional channels",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Enabled alert rule",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AlertRule"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown template",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "503": {
+                        "description": "Alerting engine not initialized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/array": {
             "get": {
                 "description": "Retrieve Unraid array status including parity information",

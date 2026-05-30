@@ -82,6 +82,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Alert rule templates** — `GET /api/v1/alerts/templates` and MCP tool
   `list_alert_templates` return five curated, disabled-by-default rule templates using
   trend/predictive metrics. Users can review, copy, and enable them in their rule config.
+- **One-click alert template enable** — `POST /api/v1/alerts/templates/{id}/enable` and
+  MCP tool `enable_alert_template` instantiate and enable an alert rule directly from a
+  template ID (e.g. `tmpl-array-fill`) in a single call. Idempotent — re-posting updates
+  the existing rule without duplication. Defaults notification channels to `["unraid"]`
+  (Unraid built-in notifications) when no `channels` body is provided.
 - **Container network I/O** — `network_rx_bytes`, `network_tx_bytes`,
   `network_rx_bytes_per_sec`, and `network_tx_bytes_per_sec` fields now populated on
   every container in `GET /api/v1/docker` and `GET /api/v1/docker/{id}` via sampling
