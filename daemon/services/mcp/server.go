@@ -17,6 +17,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
@@ -921,6 +922,26 @@ func (s *Server) registerNewMonitoringTools() {
 		return jsonResult(result)
 	})
 
+	// Force refresh of all container update checks and publish results
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "refresh_container_updates",
+		Description: "Force an immediate registry digest re-check for all containers and publish the result (updates cache, WebSocket, and alerts).",
+		Annotations: &mcp.ToolAnnotations{
+			IdempotentHint:  true,
+			DestructiveHint: ptr(false),
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		logger.Info("MCP: Refreshing container updates")
+		dockerCtrl := controllers.NewDockerController()
+		defer dockerCtrl.Close() //nolint:errcheck
+		result, err := dockerCtrl.CheckAllContainerUpdates()
+		if err != nil {
+			return textResult(fmt.Sprintf("Failed to refresh container updates: %v", err)), nil, nil
+		}
+		domain.Publish(s.ctx.Hub, constants.TopicDockerUpdatesUpdate, result)
+		return jsonResult(result)
+	})
+
 	// Get container size
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "get_container_size",
@@ -1459,7 +1480,7 @@ func (s *Server) registerControlTools() {
 	// Update collector interval tool
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "update_collector_interval",
-		Description: "Update the collection interval for a specific collector. Interval must be between 5 and 3600 seconds.",
+		Description: "Update the collection interval for a specific collector. Interval must be between 5 and 86400 seconds.",
 		Annotations: &mcp.ToolAnnotations{
 			DestructiveHint: ptr(false),
 			IdempotentHint:  true,
@@ -1469,8 +1490,8 @@ func (s *Server) registerControlTools() {
 			return textResult("collector_name is required"), nil, nil
 		}
 
-		if args.Interval < 5 || args.Interval > 3600 {
-			return textResult("interval must be between 5 and 3600 seconds"), nil, nil
+		if args.Interval < 5 || args.Interval > 86400 {
+			return textResult("interval must be between 5 and 86400 seconds"), nil, nil
 		}
 
 		logger.Info("MCP: Updating collector '%s' interval to %d seconds", args.CollectorName, args.Interval)

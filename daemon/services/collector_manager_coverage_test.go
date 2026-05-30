@@ -123,7 +123,7 @@ func TestCollectorManager_RegisterAllCollectors(t *testing.T) {
 	expectedNames := []string{
 		"system", "array", "disk", "docker", "vm", "ups", "nut",
 		"gpu", "shares", "network", "hardware", "zfs", "notification",
-		"registration", "unassigned", "fancontrol", "tuning",
+		"registration", "unassigned", "fancontrol", "tuning", "docker_update",
 	}
 
 	if len(names) != len(expectedNames) {
@@ -139,6 +139,25 @@ func TestCollectorManager_RegisterAllCollectors(t *testing.T) {
 		if !nameSet[expected] {
 			t.Errorf("Missing collector: %q", expected)
 		}
+	}
+}
+
+func TestRegisterAllCollectors_IncludesDockerUpdate(t *testing.T) {
+	cm := NewCollectorManager(&domain.Context{
+		Hub:       domain.NewEventBus(16),
+		Intervals: domain.Intervals{System: 15, DockerUpdate: 21600},
+	}, &sync.WaitGroup{})
+	cm.RegisterAllCollectors()
+
+	st, err := cm.GetStatus("docker_update")
+	if err != nil {
+		t.Fatalf("docker_update not registered: %v", err)
+	}
+	if st.Interval != 21600 {
+		t.Errorf("default interval = %d, want 21600", st.Interval)
+	}
+	if err := cm.UpdateInterval("docker_update", 43200); err != nil {
+		t.Errorf("UpdateInterval(43200) rejected: %v", err)
 	}
 }
 

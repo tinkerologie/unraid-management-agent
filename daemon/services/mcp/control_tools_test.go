@@ -710,7 +710,7 @@ func TestToolUpdateCollectorInterval_OutOfRange(t *testing.T) {
 		interval int
 	}{
 		{"too_low", 2},
-		{"too_high", 4000},
+		{"too_high", 90000},
 	}
 
 	for _, tt := range tests {

@@ -261,6 +261,25 @@ func TestEngineStartStop(t *testing.T) {
 	}
 }
 
+func TestContainerUpdatesAvailableMetric(t *testing.T) {
+	avail := true
+	notAvail := false
+	provider := &mockDataProvider{
+		containers: []dto.ContainerInfo{
+			{Name: "plex", State: "running", UpdateAvailable: &avail, UpdateStatus: dto.UpdateStatusAvailable},
+			{Name: "sonarr", State: "running", UpdateAvailable: &notAvail, UpdateStatus: dto.UpdateStatusUpToDate},
+			{Name: "radarr", State: "running", UpdateStatus: dto.UpdateStatusUnknown},
+		},
+	}
+	dir := t.TempDir()
+	store := NewStore(dir)
+	e := NewEngine(store, provider)
+	env := e.buildEnv()
+	if env.ContainerUpdatesAvailable != 1 {
+		t.Errorf("ContainerUpdatesAvailable = %d, want 1", env.ContainerUpdatesAvailable)
+	}
+}
+
 func TestEngineEvaluateIntegration(t *testing.T) {
 	dir := t.TempDir()
 	store := NewStore(dir)

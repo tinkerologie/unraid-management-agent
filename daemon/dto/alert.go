@@ -65,18 +65,19 @@ type AlertEnv struct {
 	NumParityDisks      int     `expr:"NumParityDisks"`
 
 	// Aggregated
-	ContainerCount    int     `expr:"ContainerCount"`
-	RunningContainers int     `expr:"RunningContainers"`
-	StoppedContainers int     `expr:"StoppedContainers"`
-	VMCount           int     `expr:"VMCount"`
-	RunningVMs        int     `expr:"RunningVMs"`
-	MaxDiskTemp       float64 `expr:"MaxDiskTemp"`
-	MaxDiskUsedPct    float64 `expr:"MaxDiskUsedPct"`
-	TotalDiskErrors   int     `expr:"TotalDiskErrors"`
-	UPSStatus         string  `expr:"UPSStatus"`
-	UPSBatteryCharge  float64 `expr:"UPSBatteryCharge"`
-	UPSLoadPercent    float64 `expr:"UPSLoadPercent"`
-	UPSRuntimeLeft    float64 `expr:"UPSRuntimeLeft"`
+	ContainerCount            int     `expr:"ContainerCount"`
+	RunningContainers         int     `expr:"RunningContainers"`
+	StoppedContainers         int     `expr:"StoppedContainers"`
+	ContainerUpdatesAvailable int     `expr:"ContainerUpdatesAvailable"`
+	VMCount                   int     `expr:"VMCount"`
+	RunningVMs                int     `expr:"RunningVMs"`
+	MaxDiskTemp               float64 `expr:"MaxDiskTemp"`
+	MaxDiskUsedPct            float64 `expr:"MaxDiskUsedPct"`
+	TotalDiskErrors           int     `expr:"TotalDiskErrors"`
+	UPSStatus                 string  `expr:"UPSStatus"`
+	UPSBatteryCharge          float64 `expr:"UPSBatteryCharge"`
+	UPSLoadPercent            float64 `expr:"UPSLoadPercent"`
+	UPSRuntimeLeft            float64 `expr:"UPSRuntimeLeft"`
 
 	// GPU
 	GPUCount      int     `expr:"GPUCount"`

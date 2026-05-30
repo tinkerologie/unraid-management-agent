@@ -920,23 +920,43 @@ const docTemplate = `{
         },
         "/docker/updates": {
             "get": {
-                "description": "Pull latest images and check if any containers have updates available",
+                "description": "Serves the cached container update result. Returns an empty result when no cache is available yet.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Docker"
                 ],
-                "summary": "Check all containers for updates",
+                "summary": "Get cached container update status",
                 "responses": {
                     "200": {
                         "description": "Container update status",
                         "schema": {
                             "$ref": "#/definitions/dto.ContainerUpdatesResult"
                         }
+                    }
+                }
+            }
+        },
+        "/docker/updates/refresh": {
+            "post": {
+                "description": "Runs an immediate registry digest comparison for all containers and publishes the result.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Docker"
+                ],
+                "summary": "Force a container update re-check",
+                "responses": {
+                    "200": {
+                        "description": "Refreshed update status",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ContainerUpdatesResult"
+                        }
                     },
                     "500": {
-                        "description": "Failed to check updates",
+                        "description": "Check failed",
                         "schema": {
                             "$ref": "#/definitions/dto.Response"
                         }
@@ -5355,6 +5375,18 @@ const docTemplate = `{
                 },
                 "timestamp": {
                     "type": "string"
+                },
+                "update_available": {
+                    "description": "null when not yet checked / registry unreachable (field omitted in JSON)",
+                    "type": "boolean"
+                },
+                "update_checked": {
+                    "type": "string"
+                },
+                "update_status": {
+                    "description": "Update status — populated by merging the DockerUpdate collector's cache at read time.",
+                    "type": "string",
+                    "example": "up_to_date"
                 },
                 "uptime": {
                     "type": "string",

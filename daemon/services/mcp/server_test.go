@@ -698,3 +698,22 @@ func TestGetHTTPHandler_NilBeforeInit(t *testing.T) {
 		t.Errorf("expected status 500 from uninitialized handler, got %d", rr.Code)
 	}
 }
+
+func TestRefreshContainerUpdatesToolRegistered(t *testing.T) {
+	server, _ := setupInitializedServer(t)
+	cs, cleanup := connectClientToServer(t, server)
+	defer cleanup()
+
+	ctx := context.Background()
+	result, err := cs.ListTools(ctx, nil)
+	if err != nil {
+		t.Fatalf("ListTools error: %v", err)
+	}
+
+	for _, tool := range result.Tools {
+		if tool.Name == "refresh_container_updates" {
+			return // found — pass
+		}
+	}
+	t.Error("expected tool \"refresh_container_updates\" to be registered")
+}

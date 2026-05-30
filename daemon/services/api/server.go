@@ -121,6 +121,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/shares", s.handleShares).Methods("GET")
 	api.HandleFunc("/docker", s.handleDockerList).Methods("GET")
 	api.HandleFunc("/docker/updates", s.handleDockerCheckUpdates).Methods("GET")
+	api.HandleFunc("/docker/updates/refresh", s.handleDockerUpdatesRefresh).Methods("POST")
 	api.HandleFunc("/docker/update-all", s.handleDockerUpdateAll).Methods("POST")
 	api.HandleFunc("/docker/{id}", s.handleDockerInfo).Methods("GET")
 	api.HandleFunc("/docker/{id}/check-update", s.handleDockerCheckUpdate).Methods("GET")

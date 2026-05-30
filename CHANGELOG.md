@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2026.06.00] - 2026-05-29
+## [2026.06.00] - 2026-05-30
 
 ### Added
 
@@ -50,6 +50,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   notification, exposing the full notification details (id, title, subject,
   description, importance, type, link, timestamp) as event attributes. The existing
   backlog is seeded silently on startup so a restart does not replay old notifications.
+- **Continuous Docker container update detection** — a new background `docker_update`
+  collector (default 6 h interval, staggered start, registry-rate-limit-safe) performs
+  periodic digest comparisons for all running containers without blocking normal Docker
+  polling.
+  - `update_status`, `update_available`, and `update_checked` fields exposed on every
+    container in `GET /api/v1/docker`, `GET /api/v1/docker/{id}`, MCP
+    `list_containers`, and MCP `get_container_info`.
+  - `GET /api/v1/docker/updates` now serves the cached result instantly (no
+    live check on request; populated by the background collector).
+  - `POST /api/v1/docker/updates/refresh` triggers an immediate re-check outside the
+    normal schedule and publishes the result via the event hub.
+  - MCP tool `refresh_container_updates` exposes the same on-demand refresh to AI
+    agents.
+  - `ContainerUpdatesAvailable` alerting metric — counts containers with an update
+    ready; usable in alert rule expressions.
+  - Opt-in startup notification when new container updates are detected:
+    `--docker-update-notify` flag / `DOCKER_UPDATE_NOTIFY=true` env variable.
 
 ### Security
 
@@ -68,6 +85,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   passthrough string; system memory comes from `/proc/meminfo`), and confirmed disk
   SMART polling already uses `smartctl -n standby` so routine collection never wakes
   spun-down drives (aligns with 7.3's "don't spin up the array on reads" fix).
+- **`GET /api/v1/docker/updates`** now returns the cached result immediately instead
+  of performing a live registry check on each request; use the new `POST
+/api/v1/docker/updates/refresh` to force an on-demand re-check.
+- **Runtime collector interval cap** raised from 3 600 s to 86 400 s (24 h) to
+  accommodate the new `docker_update` collector's default 6 h schedule.
 
 ## [2026.05.00] - 2026-05-16
 

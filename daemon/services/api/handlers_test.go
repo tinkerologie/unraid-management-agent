@@ -2002,3 +2002,43 @@ func TestSystemRebootEndpoint(t *testing.T) {
 		t.Errorf("handler returned unexpected status code: got %v", status)
 	}
 }
+
+func TestDockerUpdatesServedFromCache(t *testing.T) {
+	s := &Server{CacheStore: &CacheStore{}}
+	s.dockerUpdatesCache.Store(&dto.ContainerUpdatesResult{TotalCount: 2, UpdatesAvailable: 1})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/docker/updates", nil)
+	rr := httptest.NewRecorder()
+	s.handleDockerCheckUpdates(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rr.Code)
+	}
+	var got dto.ContainerUpdatesResult
+	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.UpdatesAvailable != 1 || got.TotalCount != 2 {
+		t.Errorf("got %+v, want cached result", got)
+	}
+}
+
+func TestDockerUpdatesEmptyWhenUncached(t *testing.T) {
+	s := &Server{CacheStore: &CacheStore{}}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/docker/updates", nil)
+	rr := httptest.NewRecorder()
+	s.handleDockerCheckUpdates(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rr.Code)
+	}
+	var got dto.ContainerUpdatesResult
+	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.TotalCount != 0 {
+		t.Errorf("TotalCount = %d, want 0", got.TotalCount)
+	}
+	if got.UpdatesAvailable != 0 {
+		t.Errorf("UpdatesAvailable = %d, want 0", got.UpdatesAvailable)
+	}
+}

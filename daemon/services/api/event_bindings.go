@@ -99,6 +99,9 @@ func cacheBindings() []eventBinding {
 		bind(constants.TopicTuningUpdate, func(c *CacheStore, v *dto.TuningInfo) {
 			c.tuningCache.Store(v)
 		}),
+		bind(constants.TopicDockerUpdatesUpdate, func(c *CacheStore, v *dto.ContainerUpdatesResult) {
+			c.dockerUpdatesCache.Store(v)
+		}),
 	}
 }
 

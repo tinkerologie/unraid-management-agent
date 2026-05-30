@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
@@ -2629,30 +2631,41 @@ func (s *Server) handleMQTTPublish(w http.ResponseWriter, r *http.Request) {
 
 // handleDockerCheckUpdates godoc
 //
-//	@Summary		Check all containers for updates
-//	@Description	Pull latest images and check if any containers have updates available
+//	@Summary		Get cached container update status
+//	@Description	Serves the cached container update result. Returns an empty result when no cache is available yet.
 //	@Tags			Docker
 //	@Produce		json
 //	@Success		200	{object}	dto.ContainerUpdatesResult	"Container update status"
-//	@Failure		500	{object}	dto.Response				"Failed to check updates"
 //	@Router			/docker/updates [get]
 func (s *Server) handleDockerCheckUpdates(w http.ResponseWriter, _ *http.Request) {
-	logger.Info("API: Checking all containers for updates")
+	if cached := s.GetContainerUpdatesCache(); cached != nil {
+		respondJSON(w, http.StatusOK, cached)
+		return
+	}
+	respondJSON(w, http.StatusOK, dto.ContainerUpdatesResult{})
+}
 
-	controller := controllers.NewDockerController()
-	defer controller.Close() //nolint:errcheck
-
-	result, err := controller.CheckAllContainerUpdates()
+// handleDockerUpdatesRefresh godoc
+//
+//	@Summary		Force a container update re-check
+//	@Description	Runs an immediate registry digest comparison for all containers and publishes the result.
+//	@Tags			Docker
+//	@Produce		json
+//	@Success		200	{object}	dto.ContainerUpdatesResult	"Refreshed update status"
+//	@Failure		500	{object}	dto.Response				"Check failed"
+//	@Router			/docker/updates/refresh [post]
+func (s *Server) handleDockerUpdatesRefresh(w http.ResponseWriter, _ *http.Request) {
+	dc := controllers.NewDockerController()
+	defer func() { _ = dc.Close() }()
+	result, err := dc.CheckAllContainerUpdates()
 	if err != nil {
-		logger.Error("API: Failed to check container updates: %v", err)
+		logger.Error("API: container update refresh failed: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
-			Success:   false,
-			Message:   "Failed to check for updates",
-			Timestamp: time.Now(),
+			Success: false, Message: "update check failed", Timestamp: time.Now(),
 		})
 		return
 	}
-
+	domain.Publish(s.ctx.Hub, constants.TopicDockerUpdatesUpdate, result)
 	respondJSON(w, http.StatusOK, result)
 }
 

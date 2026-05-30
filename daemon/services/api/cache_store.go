@@ -41,6 +41,7 @@ type CacheStore struct {
 	networkServicesCache atomic.Pointer[dto.NetworkServicesStatus]
 	fanControlCache      atomic.Pointer[dto.FanControlStatus]
 	tuningCache          atomic.Pointer[dto.TuningInfo]
+	dockerUpdatesCache   atomic.Pointer[dto.ContainerUpdatesResult]
 }
 
 // ---------- Pointer-type getters (direct Load) ----------
@@ -118,12 +119,53 @@ func (c *CacheStore) GetSharesCache() []dto.ShareInfo {
 	return nil
 }
 
-// GetDockerCache returns cached Docker container information.
+// GetDockerCache returns cached Docker container information with update status
+// merged in from the docker_update collector's cache. The raw stored slice is
+// never mutated — a shallow copy is returned with update fields overlaid.
 func (c *CacheStore) GetDockerCache() []dto.ContainerInfo {
-	if v := c.dockerCache.Load(); v != nil {
-		return *v
+	v := c.dockerCache.Load()
+	if v == nil {
+		return nil
 	}
-	return nil
+
+	updates := map[string]dto.ContainerUpdateInfo{}
+	var checkedAt *time.Time
+	if u := c.dockerUpdatesCache.Load(); u != nil {
+		for i := range u.Containers {
+			updates[u.Containers[i].ContainerID] = u.Containers[i]
+		}
+		if !u.Timestamp.IsZero() {
+			t := u.Timestamp
+			// checkedAt is a single immutable copy; sharing the pointer across containers is safe.
+			checkedAt = &t
+		}
+	}
+
+	out := make([]dto.ContainerInfo, len(*v))
+	for i, ci := range *v {
+		if info, ok := updates[ci.ID]; ok {
+			status := info.Status()
+			ci.UpdateStatus = status
+			if status != dto.UpdateStatusUnknown {
+				avail := info.UpdateAvailable
+				ci.UpdateAvailable = &avail
+			} else {
+				ci.UpdateAvailable = nil
+			}
+			ci.UpdateChecked = checkedAt
+		} else {
+			ci.UpdateStatus = dto.UpdateStatusUnknown
+			ci.UpdateAvailable = nil
+			ci.UpdateChecked = nil
+		}
+		out[i] = ci
+	}
+	return out
+}
+
+// GetContainerUpdatesCache returns the cached container update result, or nil.
+func (c *CacheStore) GetContainerUpdatesCache() *dto.ContainerUpdatesResult {
+	return c.dockerUpdatesCache.Load()
 }
 
 // GetVMsCache returns cached VM information.
