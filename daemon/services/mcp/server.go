@@ -1860,7 +1860,146 @@ func (s *Server) registerRemediationTools() {
 		})
 	})
 
-	logger.Debug("MCP remediation tools registered (1 tool)")
+	// list_runbooks — read-only; returns the static catalogue of reviewed runbooks.
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "list_runbooks",
+		Description: "List all reviewed remediation runbooks with their names, descriptions, and default step shapes.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		return jsonResult(remediation.Runbooks())
+	})
+
+	// run_runbook — executes a named runbook with optional confirm gating.
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name: "run_runbook",
+		Description: "Run a named remediation runbook. " +
+			"Without confirm=true the tool is a dry-run: it returns the planned steps without executing anything. " +
+			"With confirm=true, supported-action steps are executed via the executor. " +
+			"For restart_unhealthy_containers supply target container IDs; if Targets is empty the tool resolves " +
+			"stopped/exited containers from the cache automatically.",
+		Annotations: &mcp.ToolAnnotations{
+			IdempotentHint:  true,
+			DestructiveHint: ptr(true),
+		},
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, args dto.MCPRunRunbookArgs) (*mcp.CallToolResult, any, error) {
+		targets := args.Targets
+
+		// Auto-resolve targets for restart_unhealthy_containers when none supplied.
+		if args.Name == "restart_unhealthy_containers" && len(targets) == 0 {
+			containers := s.cacheProvider.GetDockerCache()
+			for _, c := range containers {
+				if c.State != "running" {
+					targets = append(targets, c.ID)
+				}
+			}
+		}
+
+		exec := remediation.NewExecutor(controllers.NewDockerController(), controllers.NewVMController())
+		results, steps, err := remediation.RunRunbook(ctx, exec, args.Name, args.Confirm, targets)
+		if err != nil {
+			return textResult(fmt.Sprintf("run_runbook error: %v", err)), nil, nil
+		}
+
+		if !args.Confirm {
+			return jsonResult(map[string]any{
+				"runbook":  args.Name,
+				"executed": false,
+				"steps":    steps,
+			})
+		}
+
+		logger.Info("MCP run_runbook: name=%s targets=%v confirm=%v", args.Name, targets, args.Confirm)
+		return jsonResult(map[string]any{
+			"runbook":  args.Name,
+			"executed": true,
+			"steps":    steps,
+			"results":  results,
+		})
+	})
+
+	// find_root_cause — read-only correlation of system signals.
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name: "find_root_cause",
+		Description: "Correlate cached system signals (CPU, array state, parity, disk temperatures, containers) " +
+			"to surface the most likely root causes of degraded performance or health. " +
+			"Read-only — never executes any actions.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		type rootCauseEntry struct {
+			Signal  string `json:"signal"`
+			Detail  string `json:"detail"`
+			Suspect string `json:"suspect,omitempty"`
+		}
+
+		var causes []rootCauseEntry
+
+		// CPU pressure: flag if system CPU > 80 %.
+		if sysInfo := s.cacheProvider.GetSystemCache(); sysInfo != nil {
+			if sysInfo.CPUUsage > 80 {
+				entry := rootCauseEntry{
+					Signal: "high_cpu",
+					Detail: fmt.Sprintf("system CPU usage is %.1f%%", sysInfo.CPUUsage),
+				}
+				// Find the container using the most CPU.
+				containers := s.cacheProvider.GetDockerCache()
+				var topName string
+				var topCPU float64
+				for _, c := range containers {
+					if c.CPUPercent > topCPU {
+						topCPU = c.CPUPercent
+						topName = c.Name
+					}
+				}
+				if topName != "" {
+					entry.Suspect = fmt.Sprintf("container %q at %.1f%% CPU", topName, topCPU)
+				}
+				causes = append(causes, entry)
+			}
+		}
+
+		// Array health: flag if not Started or parity check running.
+		if arrayStatus := s.cacheProvider.GetArrayCache(); arrayStatus != nil {
+			if arrayStatus.State != "Started" {
+				causes = append(causes, rootCauseEntry{
+					Signal: "array_not_started",
+					Detail: fmt.Sprintf("array state is %q (expected Started)", arrayStatus.State),
+				})
+			}
+			if arrayStatus.ParityCheckStatus != "" && arrayStatus.ParityCheckStatus != "idle" {
+				causes = append(causes, rootCauseEntry{
+					Signal:  "parity_check_running",
+					Detail:  fmt.Sprintf("parity check is %q at %.1f%%", arrayStatus.ParityCheckStatus, arrayStatus.ParityCheckProgress),
+					Suspect: "parity check may increase disk I/O and reduce throughput",
+				})
+			}
+		}
+
+		// Disk temperatures: flag any disk >= 50 °C.
+		const warnTempC = 50.0
+		for _, d := range s.cacheProvider.GetDisksCache() {
+			if d.Temperature >= warnTempC {
+				causes = append(causes, rootCauseEntry{
+					Signal:  "high_disk_temp",
+					Detail:  fmt.Sprintf("disk %q temperature is %.1f°C", d.Name, d.Temperature),
+					Suspect: d.Name,
+				})
+			}
+		}
+
+		if len(causes) == 0 {
+			return jsonResult(map[string]any{
+				"status": "no_issues_detected",
+				"causes": []rootCauseEntry{},
+			})
+		}
+
+		return jsonResult(map[string]any{
+			"status": "issues_detected",
+			"causes": causes,
+		})
+	})
+
+	logger.Debug("MCP remediation tools registered (4 tools)")
 }
 
 // registerAlertingTools registers MCP tools for alert rule management and monitoring.

@@ -315,3 +315,12 @@ type MCPMetricHistoryArgs struct {
 	Metric string `json:"metric" jsonschema:"required,metric name e.g. cpu_temp,array_used_pct,disk_temp"`
 	Entity string `json:"entity,omitempty" jsonschema:"optional entity id e.g. a disk or container id"`
 }
+
+// MCPRunRunbookArgs represents arguments for the run_runbook tool.
+// When Confirm is false the tool is a dry-run: it returns planned steps without executing anything.
+// When Confirm is true supported-action steps are executed via the executor.
+type MCPRunRunbookArgs struct {
+	Name    string   `json:"name" jsonschema:"required,runbook name e.g. restart_unhealthy_containers"`
+	Confirm bool     `json:"confirm,omitempty" jsonschema:"Set to true to execute the runbook steps; false (default) returns a dry-run plan only"`
+	Targets []string `json:"targets,omitempty" jsonschema:"container IDs for restart_unhealthy_containers; leave empty to auto-resolve from cache"`
+}
