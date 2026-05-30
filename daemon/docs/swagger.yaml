@@ -12,6 +12,17 @@ definitions:
         description: '"lan", "wan", "wireguard", "mdns", "ipv6", "other"'
         type: string
     type: object
+  dto.ActionRef:
+    properties:
+      action:
+        example: restart_container
+        type: string
+      reason:
+        type: string
+      target:
+        example: abc123def456
+        type: string
+    type: object
   dto.AlertEvent:
     properties:
       fired_at:
@@ -452,9 +463,15 @@ definitions:
       network_rx_bytes:
         example: 104857600
         type: integer
+      network_rx_bytes_per_sec:
+        example: 1024
+        type: number
       network_tx_bytes:
         example: 52428800
         type: integer
+      network_tx_bytes_per_sec:
+        example: 512
+        type: number
       port_mappings:
         items:
           type: string
@@ -463,6 +480,9 @@ definitions:
         items:
           $ref: '#/definitions/dto.PortMapping'
         type: array
+      restart_count:
+        example: 0
+        type: integer
       restart_policy:
         example: unless-stopped
         type: string
@@ -830,6 +850,53 @@ definitions:
       total_memory_usage_mb:
         example: 8192
         type: number
+    type: object
+  dto.DockerNetworkInfo:
+    properties:
+      attachable:
+        type: boolean
+      container_names:
+        items:
+          type: string
+        type: array
+      created:
+        type: string
+      driver:
+        example: bridge
+        type: string
+      gateway:
+        example: 172.17.0.1
+        type: string
+      id:
+        type: string
+      internal:
+        type: boolean
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      name:
+        example: bridge
+        type: string
+      scope:
+        example: local
+        type: string
+      subnet:
+        example: 172.17.0.0/16
+        type: string
+      timestamp:
+        type: string
+    type: object
+  dto.DockerNetworkList:
+    properties:
+      count:
+        type: integer
+      networks:
+        items:
+          $ref: '#/definitions/dto.DockerNetworkInfo'
+        type: array
+      timestamp:
+        type: string
     type: object
   dto.DockerSettings:
     properties:
@@ -1294,6 +1361,36 @@ definitions:
           $ref: '#/definitions/dto.HealthCheckStatus'
         type: array
     type: object
+  dto.HealthFinding:
+    properties:
+      detail:
+        type: string
+      recommended_actions:
+        items:
+          $ref: '#/definitions/dto.ActionRef'
+        type: array
+      severity:
+        description: info|warning|critical
+        example: warning
+        type: string
+      title:
+        type: string
+    type: object
+  dto.HealthReport:
+    properties:
+      critical_count:
+        type: integer
+      findings:
+        items:
+          $ref: '#/definitions/dto.HealthFinding'
+        type: array
+      generated_at:
+        type: string
+      info_count:
+        type: integer
+      warning_count:
+        type: integer
+    type: object
   dto.InotifyInfo:
     properties:
       max_queued_events:
@@ -1464,6 +1561,36 @@ definitions:
       type_detail:
         type: string
     type: object
+  dto.MetricHistoryResult:
+    properties:
+      avg:
+        type: number
+      count:
+        type: integer
+      entity:
+        type: string
+      last:
+        type: number
+      max:
+        type: number
+      metric:
+        type: string
+      min:
+        type: number
+      samples:
+        items:
+          $ref: '#/definitions/dto.MetricSample'
+        type: array
+      slope_per_sec:
+        type: number
+    type: object
+  dto.MetricSample:
+    properties:
+      time_unix:
+        type: integer
+      value:
+        type: number
+    type: object
   dto.MoverSettings:
     description: Mover configuration, schedule, and current status
     properties:
@@ -1484,6 +1611,53 @@ definitions:
         example: 0 12 * * *
         type: string
       timestamp:
+        type: string
+    type: object
+  dto.MoverStatus:
+    description: Mover state, schedule, last-run timing, and file/byte transfer statistics.
+    properties:
+      active:
+        description: Active indicates whether the mover is currently running (from
+          var.ini shareMoverActive).
+        example: false
+        type: boolean
+      current_throughput_mbs:
+        description: |-
+          CurrentThroughputMBs is the live throughput in MB/s. Always 0 in the conservative
+          implementation (live throughput tracking is out of scope).
+        example: 0
+        type: number
+      last_run_bytes_moved:
+        description: LastRunBytesMoved is the total bytes moved during the last run.
+        example: 5368709120
+        type: integer
+      last_run_duration_seconds:
+        description: LastRunDurationSeconds is the duration of the last run in seconds
+          (finish - start).
+        example: 720
+        type: integer
+      last_run_files_moved:
+        description: LastRunFilesMoved is the number of files moved during the last
+          run.
+        example: 1024
+        type: integer
+      last_run_finish:
+        description: LastRunFinish is the ISO-8601 timestamp when the last mover run
+          ended.
+        example: "2026-05-30T03:52:00Z"
+        type: string
+      last_run_start:
+        description: LastRunStart is the ISO-8601 timestamp when the last mover run
+          began.
+        example: "2026-05-30T03:40:00Z"
+        type: string
+      schedule:
+        description: Schedule is the cron schedule expression for the mover (from
+          var.ini shareMoverSchedule).
+        example: 40 3 * * *
+        type: string
+      timestamp:
+        description: Timestamp is when this status was collected.
         type: string
     type: object
   dto.NICOffloadInfo:
@@ -2035,6 +2209,30 @@ definitions:
         $ref: '#/definitions/dto.NotificationCounts'
       unread:
         $ref: '#/definitions/dto.NotificationCounts'
+    type: object
+  dto.OSUpdateStatus:
+    properties:
+      current_version:
+        description: CurrentVersion is the running Unraid OS version (e.g. "7.2.0").
+        example: 7.2.0
+        type: string
+      latest_version:
+        description: LatestVersion is the newest version found in a local candidate
+          file, if any.
+        example: 7.2.1
+        type: string
+      status:
+        description: 'Status is one of: "up_to_date", "update_available", "unknown".'
+        example: unknown
+        type: string
+      timestamp:
+        description: Timestamp records when the check was performed.
+        type: string
+      update_available:
+        description: UpdateAvailable is true when LatestVersion != "" and LatestVersion
+          != CurrentVersion.
+        example: false
+        type: boolean
     type: object
   dto.ParityCheckHistory:
     properties:
@@ -3549,6 +3747,22 @@ paths:
       summary: Get alert status
       tags:
       - Alerts
+  /alerts/templates:
+    get:
+      description: Retrieve curated, disabled-by-default alert rule templates using
+        trend/predictive metrics
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of alert rule templates
+          schema:
+            items:
+              $ref: '#/definitions/dto.AlertRule'
+            type: array
+      summary: List alert rule templates
+      tags:
+      - Alerts
   /array:
     get:
       description: Retrieve Unraid array status including parity information
@@ -4210,6 +4424,20 @@ paths:
       summary: Update a specific container
       tags:
       - Docker
+  /docker/networks:
+    get:
+      description: Serves the cached Docker network list. Returns an empty list when
+        no cache is available yet.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Docker network list
+          schema:
+            $ref: '#/definitions/dto.DockerNetworkList'
+      summary: Get Docker networks
+      tags:
+      - Docker
   /docker/stats:
     get:
       description: Returns aggregate CPU and memory statistics across all running
@@ -4622,6 +4850,20 @@ paths:
       summary: Health check
       tags:
       - System
+  /health/report:
+    get:
+      description: Aggregate health signals from array, disks, containers, and firing
+        alerts into a prioritized list of findings with recommended actions
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Health report
+          schema:
+            $ref: '#/definitions/dto.HealthReport'
+      summary: Get system health report
+      tags:
+      - System
   /healthchecks:
     get:
       description: Get all configured health checks
@@ -4874,6 +5116,54 @@ paths:
       summary: Prometheus metrics endpoint
       tags:
       - Monitoring
+  /metrics/history:
+    get:
+      description: Return in-memory ring-buffer samples and summary stats (slope,
+        min, max, avg, last) for a named metric series. Pass entity for per-disk or
+        per-container metrics.
+      parameters:
+      - description: Metric name (e.g. cpu_temp, array_used_pct, disk_temp)
+        in: query
+        name: metric
+        required: true
+        type: string
+      - description: Entity ID for per-entity metrics (e.g. disk ID, container ID)
+        in: query
+        name: entity
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Metric history
+          schema:
+            $ref: '#/definitions/dto.MetricHistoryResult'
+        "400":
+          description: metric query parameter is required
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Alerting engine not initialized
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Query metric history
+      tags:
+      - Alerts
+  /mover:
+    get:
+      description: Returns the cached mover status including active state, schedule,
+        and last-run statistics. Returns a zero-value sentinel when no data is available
+        yet.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Mover status
+          schema:
+            $ref: '#/definitions/dto.MoverStatus'
+      summary: Get mover status
+      tags:
+      - Mover
   /mqtt/publish:
     post:
       consumes:
@@ -5235,6 +5525,21 @@ paths:
       summary: Get NUT status
       tags:
       - UPS
+  /os/update:
+    get:
+      description: Returns the cached OS update status. No outbound network calls
+        are made; the result is based on local files only. Returns an "unknown" sentinel
+        when no local latest-version data is available.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OS update status
+          schema:
+            $ref: '#/definitions/dto.OSUpdateStatus'
+      summary: Get OS update availability
+      tags:
+      - OS
   /plugins:
     get:
       description: Retrieve list of installed plugins with their versions and update
@@ -5282,21 +5587,16 @@ paths:
       - Plugins
   /plugins/check-updates:
     get:
-      description: Check all installed plugins for available updates
+      description: Serves the cached plugin update result. Returns an empty result
+        when no cache is available yet.
       produces:
       - application/json
       responses:
         "200":
-          description: Plugins with available updates
+          description: Plugin update status
           schema:
-            items:
-              $ref: '#/definitions/dto.PluginInfo'
-            type: array
-        "500":
-          description: Failed to check updates
-          schema:
-            $ref: '#/definitions/dto.Response'
-      summary: Check for plugin updates
+            $ref: '#/definitions/dto.PluginList'
+      summary: Get cached plugin update status
       tags:
       - Plugins
   /plugins/update-all:
@@ -5314,6 +5614,23 @@ paths:
           schema:
             $ref: '#/definitions/dto.Response'
       summary: Update all plugins
+      tags:
+      - Plugins
+  /plugins/updates/refresh:
+    post:
+      description: Runs an immediate plugin update check and publishes the result.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Refreshed plugin update status
+          schema:
+            $ref: '#/definitions/dto.PluginList'
+        "500":
+          description: Check failed
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Force a plugin update re-check
       tags:
       - Plugins
   /processes:

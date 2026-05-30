@@ -4,12 +4,19 @@ Complete reference for all Unraid Management Agent API endpoints.
 
 **Base URL**: `http://YOUR_UNRAID_IP:8043/api/v1`  
 **Version**: 1.0.0  
-**Total Endpoints**: 58
+**Total Endpoints**: 65
 
 ---
 
 ## Table of Contents
 
+- [Authentication](#authentication)
+- [Response Format](#response-format)
+- [Error Handling](#error-handling)
+- [Code Examples](#code-examples)
+  - [Python Examples](#python-examples)
+  - [JavaScript Examples](#javascript-examples)
+  - [TypeScript Examples](#typescript-examples)
 - [Authentication](#authentication)
 - [Response Format](#response-format)
 - [Error Handling](#error-handling)
@@ -26,6 +33,9 @@ Complete reference for all Unraid Management Agent API endpoints.
 - [Hardware](#hardware)
 - [Log Files](#log-files)
 - [Configuration](#configuration)
+- [OS & Mover](#os--mover)
+- [Alerting & Trend Analysis](#alerting--trend-analysis)
+- [AI Remediation Toolkit](#ai-remediation-toolkit)
 - [WebSocket](#websocket)
 - [Prometheus Metrics](#prometheus-metrics)
 - [Security Best Practices](#security-best-practices)
@@ -1552,12 +1562,31 @@ List all Docker containers.
     "memory_usage_bytes": 104857600,
     "network_rx_bytes": 1000000,
     "network_tx_bytes": 500000,
+    "network_rx_bytes_per_sec": 1024,
+    "network_tx_bytes_per_sec": 512,
+    "restart_count": 0,
+    "update_status": "up_to_date",
+    "update_available": false,
+    "update_checked": "2026-05-30T06:00:00Z",
     "timestamp": "2025-10-03T13:41:13+10:00"
   }
 ]
 ```
 
 > `mac_address` is populated from `docker inspect` (Docker 29 / Unraid 7.3 fixed-MAC support).
+
+**New container fields (this branch):**
+
+| Field                      | Type      | Description                                                        |
+| -------------------------- | --------- | ------------------------------------------------------------------ |
+| `network_rx_bytes`         | int       | Total bytes received since container start                        |
+| `network_tx_bytes`         | int       | Total bytes transmitted since container start                     |
+| `network_rx_bytes_per_sec` | float     | Receive throughput, sampled from `/proc/<pid>/net/dev`            |
+| `network_tx_bytes_per_sec` | float     | Transmit throughput, sampled from `/proc/<pid>/net/dev`           |
+| `restart_count`            | int       | Number of times the container has restarted                       |
+| `update_status`            | string    | `up_to_date`, `update_available`, or `unknown`                    |
+| `update_available`         | bool      | Whether a newer image digest is available                         |
+| `update_checked`           | timestamp | When the last update check was performed (omitted if never checked)|
 
 ---
 
@@ -1775,6 +1804,44 @@ Unpause a Docker container.
 
 ```bash
 curl -X POST http://192.168.20.21:8043/api/v1/docker/jackett/unpause
+```
+
+---
+
+### GET /docker/networks
+
+List all Docker networks with driver, scope, IPAM settings, and connected containers.
+Returns the cached result from the `docker_networks` collector (refreshed on its interval;
+default 15 min). Returns an empty list if no cache is available yet.
+
+**Response**:
+
+```json
+{
+  "networks": [
+    {
+      "id": "7fca4eb53c",
+      "name": "bridge",
+      "driver": "bridge",
+      "scope": "local",
+      "internal": false,
+      "attachable": false,
+      "subnet": "172.17.0.0/16",
+      "gateway": "172.17.0.1",
+      "container_names": ["jackett", "plex"],
+      "created": "2025-01-01T00:00:00Z",
+      "timestamp": "2026-05-30T12:00:00Z"
+    }
+  ],
+  "count": 1,
+  "timestamp": "2026-05-30T12:00:00Z"
+}
+```
+
+**Example**:
+
+```bash
+curl http://192.168.20.21:8043/api/v1/docker/networks
 ```
 
 ---
@@ -2972,6 +3039,39 @@ Get list of installed plugins with version and update information.
 
 ---
 
+### POST /plugins/updates/refresh
+
+Force an immediate plugin update check for all installed plugins and publish the result
+to the event hub and WebSocket subscribers. Returns the refreshed plugin list including
+all plugins that have updates available. Use this to get a fresh result without waiting
+for the next scheduled `plugin_update` collector run.
+
+**Response** (same shape as `GET /plugins`):
+
+```json
+{
+  "plugins": [
+    {
+      "name": "unassigned.devices",
+      "version": "2024.08.09",
+      "update_available": true,
+      "update_version": "2024.10.15"
+    }
+  ],
+  "total_count": 12,
+  "updates_available": 3,
+  "timestamp": "2026-05-30T12:00:00Z"
+}
+```
+
+**Example**:
+
+```bash
+curl -X POST http://192.168.20.21:8043/api/v1/plugins/updates/refresh
+```
+
+---
+
 ### GET /updates
 
 Get OS and plugin update availability.
@@ -3054,6 +3154,298 @@ Get network interface configuration.
 
 ```bash
 curl http://192.168.20.21:8043/api/v1/network/eth0/config
+```
+
+---
+
+## OS & Mover
+
+### GET /os/update
+
+Return the cached Unraid OS update availability. All data is sourced from local files
+only — no outbound network calls are made. The `os_update` background collector
+refreshes this cache on its configured interval (`INTERVAL_OS_UPDATE`, default 24 h).
+
+**Response**:
+
+```json
+{
+  "current_version": "7.2.0",
+  "latest_version": "7.2.1",
+  "update_available": true,
+  "status": "update_available",
+  "timestamp": "2026-05-30T06:00:00Z"
+}
+```
+
+**Status values**:
+
+| Value              | Meaning                                               |
+| ------------------ | ----------------------------------------------------- |
+| `up_to_date`       | Running version matches the latest local candidate    |
+| `update_available` | A newer version was found in the local candidate file |
+| `unknown`          | No local latest-version data available yet            |
+
+**Example**:
+
+```bash
+curl http://192.168.20.21:8043/api/v1/os/update
+```
+
+---
+
+### GET /mover
+
+Return the cached mover status, including whether it is currently active, its configured
+cron schedule, and last-run statistics parsed from `/var/log/mover.log`.
+Refreshed by the `mover` background collector (`INTERVAL_MOVER`, default 5 min).
+
+**Response**:
+
+```json
+{
+  "active": false,
+  "schedule": "40 3 * * *",
+  "last_run_start": "2026-05-30T03:40:00Z",
+  "last_run_finish": "2026-05-30T03:52:00Z",
+  "last_run_duration_seconds": 720,
+  "last_run_files_moved": 1024,
+  "last_run_bytes_moved": 5368709120,
+  "current_throughput_mbs": 0,
+  "timestamp": "2026-05-30T12:00:00Z"
+}
+```
+
+**Fields**:
+
+| Field                       | Type   | Description                                         |
+| --------------------------- | ------ | --------------------------------------------------- |
+| `active`                    | bool   | Whether the mover is currently running              |
+| `schedule`                  | string | Cron expression from `var.ini` (`shareMoverSchedule`) |
+| `last_run_start`            | string | ISO-8601 timestamp when the last run began          |
+| `last_run_finish`           | string | ISO-8601 timestamp when the last run ended          |
+| `last_run_duration_seconds` | int    | Duration of the last run in seconds                 |
+| `last_run_files_moved`      | int    | Files moved during the last run                     |
+| `last_run_bytes_moved`      | int    | Bytes moved during the last run                     |
+| `current_throughput_mbs`    | float  | Live throughput MB/s (always 0 in this release)     |
+
+**Example**:
+
+```bash
+curl http://192.168.20.21:8043/api/v1/mover
+```
+
+---
+
+## Alerting & Trend Analysis
+
+### GET /alerts/templates
+
+Return curated, disabled-by-default alert rule templates that use trend/predictive
+metrics. Users can review these templates and enable them by adding the desired rules
+to their alert rules configuration file.
+
+**Response** (array of `AlertRule` objects):
+
+```json
+[
+  {
+    "id": "tmpl-array-fill",
+    "name": "Array filling soon (< 72h)",
+    "expression": "ArrayFillETAHours > 0 && ArrayFillETAHours < 72",
+    "severity": "warning",
+    "enabled": false,
+    "cooldown_minutes": 360
+  },
+  {
+    "id": "tmpl-disk-temp-climb",
+    "name": "Disk temperature climbing",
+    "expression": "MaxDiskTempSlopePerMin > 1",
+    "severity": "warning",
+    "enabled": false,
+    "cooldown_minutes": 30
+  },
+  {
+    "id": "tmpl-container-flapping",
+    "name": "Container flapping",
+    "expression": "MaxContainerRestartsPerHour >= 5",
+    "severity": "warning",
+    "enabled": false,
+    "cooldown_minutes": 30
+  },
+  {
+    "id": "tmpl-smart-reallocated",
+    "name": "Disk reallocated sectors detected",
+    "expression": "MaxReallocatedSectors > 0",
+    "severity": "critical",
+    "enabled": false,
+    "cooldown_minutes": 1440
+  },
+  {
+    "id": "tmpl-disk-errors-rising",
+    "name": "Disk errors increasing",
+    "expression": "DiskErrorsIncreasing",
+    "severity": "critical",
+    "enabled": false,
+    "cooldown_minutes": 720
+  }
+]
+```
+
+**Trend / predictive alerting fields available in expressions**:
+
+| Field                        | Type  | Description                                                                  |
+| ---------------------------- | ----- | ---------------------------------------------------------------------------- |
+| `ArrayFillETAHours`          | float | Hours until the array is full at current fill rate (0 = no fill trend)       |
+| `MaxDiskFillETAHours`        | float | Hours until the fastest-filling disk is full                                 |
+| `CPUTempSlopePerMin`         | float | CPU temperature trend in °C/min                                              |
+| `MaxDiskTempSlopePerMin`     | float | Steepest disk temperature rise across all disks in °C/min                   |
+| `MaxContainerRestartsPerHour`| float | Highest container restart rate over the sampled window (restarts/hour)       |
+| `MaxReallocatedSectors`      | int   | Maximum reallocated sector count across all array disks                      |
+| `MaxPendingSectors`          | int   | Maximum pending (uncorrectable) sector count across all array disks          |
+| `DiskErrorsIncreasing`       | bool  | `true` when any disk's error count has a positive slope                      |
+
+**How to write a trend alert rule:**
+
+1. Call `GET /alerts/templates` to review the available templates.
+2. Copy the desired rule body (e.g. `tmpl-array-fill`) into your alert rules config.
+3. Set `enabled: true` and adjust thresholds as desired.
+
+**Example** — alert when array fill ETA falls below 48 hours:
+
+```json
+{
+  "id": "my-array-fill-alert",
+  "name": "Array nearly full (< 48h)",
+  "expression": "ArrayFillETAHours > 0 && ArrayFillETAHours < 48",
+  "severity": "critical",
+  "enabled": true,
+  "cooldown_minutes": 240
+}
+```
+
+**Example** — alert when disk temperatures are rising more than 2 °C/min:
+
+```json
+{
+  "id": "my-disk-temp-alert",
+  "name": "Disk temperature rising fast",
+  "expression": "MaxDiskTempSlopePerMin > 2",
+  "severity": "warning",
+  "enabled": true,
+  "cooldown_minutes": 15
+}
+```
+
+**Example**:
+
+```bash
+curl http://192.168.20.21:8043/api/v1/alerts/templates
+```
+
+---
+
+### GET /metrics/history
+
+Query the in-memory ring-buffer history for a named metric series. Returns all buffered
+samples plus summary statistics (slope per second, min, max, average, last value).
+
+**Query Parameters**:
+
+| Parameter | Type   | Required | Description                                                |
+| --------- | ------ | -------- | ---------------------------------------------------------- |
+| `metric`  | string | Yes      | Metric name (see table below)                              |
+| `entity`  | string | No       | Entity ID for per-entity metrics (disk ID or container ID) |
+
+**Valid metric names**:
+
+| Metric name      | Scope      | Description                                    |
+| ---------------- | ---------- | ---------------------------------------------- |
+| `cpu_temp`       | global     | CPU temperature in °C                          |
+| `array_used_pct` | global     | Array used percentage                          |
+| `disk_temp`      | per-entity | Temperature of a specific disk                |
+| `disk_used_pct`  | per-entity | Used percentage of a specific disk            |
+| `disk_errors`    | per-entity | Read/write error count for a specific disk    |
+| `reallocated`    | per-entity | Reallocated sector count for a specific disk  |
+| `pending`        | per-entity | Pending sector count for a specific disk      |
+| `restart_count`  | per-entity | Restart count for a specific container        |
+
+**Response**:
+
+```json
+{
+  "metric": "array_used_pct",
+  "entity": "",
+  "samples": [
+    { "time_unix": 1748563200, "value": 72.1 },
+    { "time_unix": 1748566800, "value": 72.3 }
+  ],
+  "count": 2,
+  "slope_per_sec": 0.0000000555,
+  "min": 72.1,
+  "max": 72.3,
+  "avg": 72.2,
+  "last": 72.3
+}
+```
+
+**Examples**:
+
+```bash
+# Global metric — array fill percentage
+curl "http://192.168.20.21:8043/api/v1/metrics/history?metric=array_used_pct"
+
+# Per-entity metric — temperature for a specific disk
+curl "http://192.168.20.21:8043/api/v1/metrics/history?metric=disk_temp&entity=disk1"
+
+# Per-entity metric — restart count for a specific container
+curl "http://192.168.20.21:8043/api/v1/metrics/history?metric=restart_count&entity=fedcb3e1ba1f"
+```
+
+---
+
+## AI Remediation Toolkit
+
+### GET /health/report
+
+Aggregate health signals from the array, disks, containers, and firing alerts into a
+prioritised list of findings with recommended remediation actions. Read-only — does not
+execute any actions.
+
+**Response**:
+
+```json
+{
+  "findings": [
+    {
+      "severity": "warning",
+      "title": "Container stopped",
+      "detail": "Container 'jackett' is not running (state: exited)",
+      "recommended_actions": [
+        {
+          "action": "restart_container",
+          "target": "fedcb3e1ba1f",
+          "reason": "Container is stopped"
+        }
+      ]
+    }
+  ],
+  "critical_count": 0,
+  "warning_count": 1,
+  "info_count": 0,
+  "generated_at": "2026-05-30T12:00:00Z"
+}
+```
+
+**Severity levels**: `critical`, `warning`, `info`.
+
+To execute actions from a report, use the MCP tool `system_health_report` with
+`confirm: true` and pass the `recommended_actions` list as the `actions` argument.
+
+**Example**:
+
+```bash
+curl http://192.168.20.21:8043/api/v1/health/report
 ```
 
 ---

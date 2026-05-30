@@ -67,6 +67,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     ready; usable in alert rule expressions.
   - Opt-in startup notification when new container updates are detected:
     `--docker-update-notify` flag / `DOCKER_UPDATE_NOTIFY=true` env variable.
+- **Trend / predictive alerting** — in-memory ring-buffer `MetricsHistory` samples
+  key metrics continuously. New alerting-expression fields:
+  - `ArrayFillETAHours` — hours until the array is full at current fill rate
+  - `MaxDiskFillETAHours` — hours until the fastest-filling individual disk is full
+  - `CPUTempSlopePerMin` — CPU temperature trend (°C / min)
+  - `MaxDiskTempSlopePerMin` — steepest disk temperature rise across all disks (°C / min)
+  - `MaxContainerRestartsPerHour` — highest container restart rate over the sampled window
+  - `MaxReallocatedSectors` — maximum reallocated sector count across all array disks
+  - `MaxPendingSectors` — maximum pending sector count across all array disks
+  - `DiskErrorsIncreasing` — `true` when any disk's error count is trending upward
+  - Disk SMART attributes (`Reallocated_Sector_Ct`, `Current_Pending_Sector`) now
+    collected via `smartctl -A` and surfaced in the alerting environment.
+- **Alert rule templates** — `GET /api/v1/alerts/templates` and MCP tool
+  `list_alert_templates` return five curated, disabled-by-default rule templates using
+  trend/predictive metrics. Users can review, copy, and enable them in their rule config.
+- **Container network I/O** — `network_rx_bytes`, `network_tx_bytes`,
+  `network_rx_bytes_per_sec`, and `network_tx_bytes_per_sec` fields now populated on
+  every container in `GET /api/v1/docker` and `GET /api/v1/docker/{id}` via sampling
+  from `/proc/<pid>/net/dev`. `restart_count` field also added to each container.
+- **Docker networks** — new `GET /api/v1/docker/networks` endpoint and MCP tool
+  `list_docker_networks` expose all Docker networks with driver, scope, IPAM subnet /
+  gateway, and the list of connected container names.
+- **Continuous plugin update detection** — a new background `plugin_update` collector
+  (configurable via `INTERVAL_PLUGIN_UPDATE`, default 6 h) checks all installed plugins
+  for updates and caches the result. `POST /api/v1/plugins/updates/refresh` and MCP
+  tool `refresh_plugin_updates` trigger an immediate re-check and publish the result
+  via the event hub. `PluginUpdatesAvailable` alert metric counts plugins with a pending
+  update.
+- **OS update availability (local-only)** — new `GET /api/v1/os/update` endpoint and
+  MCP tool `get_os_update` return the cached OS update status sourced entirely from
+  local files (`/etc/unraid-version`, `/tmp/plugins/update/`). No outbound network
+  calls are made. A background `os_update` collector refreshes this on a configurable
+  interval (`INTERVAL_OS_UPDATE`, default 24 h). Status values: `up_to_date`,
+  `update_available`, `unknown`.
+- **Mover status** — new `GET /api/v1/mover` endpoint and MCP tool `get_mover_status`
+  expose the cached mover state: whether it is currently active, the cron schedule
+  from `var.ini`, and last-run statistics (start/finish timestamps, duration, files
+  moved, bytes moved) parsed from `/var/log/mover.log`. Refreshed by the new `mover`
+  collector (`INTERVAL_MOVER`, default 5 min).
+- **AI remediation toolkit:**
+  - **System health report** — `GET /api/v1/health/report` and MCP tool
+    `system_health_report` aggregate health signals from the array, disks, containers,
+    and firing alerts into a prioritised findings list with recommended actions.
+    The MCP tool is read-only by default; passing `confirm: true` together with an
+    `actions` list (from a previous report) executes supported actions
+    (`start/stop/restart_container`, `start/stop/restart/force_stop_vm`) via the
+    remediation executor.
+  - **Metric history query** — `GET /api/v1/metrics/history?metric=&entity=` and MCP
+    tool `query_metric_history` return all buffered ring-buffer samples plus summary
+    statistics (slope per second, min, max, average, last value) for any tracked metric.
+    Global metrics: `cpu_temp`, `array_used_pct`. Per-entity metrics: `disk_temp`,
+    `disk_used_pct`, `disk_errors`, `reallocated`, `pending`, `restart_count`.
+  - **Runbook catalogue** — MCP tool `list_runbooks` lists reviewed remediation
+    runbooks. `run_runbook` dry-runs or executes a named runbook (requires
+    `confirm: true` to execute). `find_root_cause` correlates cached system signals
+    (CPU, array, parity, disk temperatures, containers) to surface the most likely
+    root causes of degraded performance or health.
+- **New collectors:** `docker_networks`, `plugin_update`, `os_update`, `mover` —
+  each follows the standard collector pattern with panic recovery, configurable
+  polling interval, and WebSocket / event-hub publishing on each update.
+- **New environment variables / CLI flags for collector intervals:**
+  `INTERVAL_DOCKER_NETWORKS`, `INTERVAL_PLUGIN_UPDATE`, `INTERVAL_OS_UPDATE`,
+  `INTERVAL_MOVER`.
 
 ### Security
 

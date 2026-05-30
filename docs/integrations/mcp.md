@@ -33,7 +33,7 @@ The MCP server supports two transports — use the one that fits your deployment
 > - Use **Streamable HTTP** if the AI client (Cursor, VS Code, etc.) runs on a different machine than the Unraid server.
 > - Use **STDIO** if the AI client (Claude Desktop, Cursor) runs locally on the Unraid server itself — it has zero network overhead and requires no authentication.
 
-## Available Tools (73 total)
+## Available Tools (84 total)
 
 ### System Monitoring Tools
 
@@ -80,6 +80,7 @@ The MCP server supports two transports — use the one that fits your deployment
 | `check_container_update`    | Synchronous on-demand check of a specific container for an image update                                                      |
 | `refresh_container_updates` | Force an immediate registry digest re-check for all containers and publish the result (updates cache, WebSocket, and alerts) |
 | `get_container_size`        | Get disk usage (image size + rw layer) of a container                                                                        |
+| `list_docker_networks`      | List all Docker networks with driver, scope, IPAM subnet/gateway, and connected container names (read-only)                  |
 
 > **Update status fields:** `list_containers` and `get_container_info` now include the following fields populated from the cached update check results:
 >
@@ -130,9 +131,10 @@ The MCP server supports two transports — use the one that fits your deployment
 
 ### Plugin Tools
 
-| Tool                   | Description                                       |
-| ---------------------- | ------------------------------------------------- |
-| `check_plugin_updates` | Check all installed plugins for available updates |
+| Tool                    | Description                                                                                             |
+| ----------------------- | ------------------------------------------------------------------------------------------------------- |
+| `check_plugin_updates`  | Return the cached plugin update status (read-only)                                                      |
+| `refresh_plugin_updates`| Force an immediate plugin update check for all installed plugins and publish the result (non-destructive)|
 
 ### Service & Process Tools
 
@@ -148,6 +150,65 @@ The MCP server supports two transports — use the one that fits your deployment
 | -------------------- | ---------------------------------------------------- |
 | `get_parity_history` | Parity check history with dates, durations, errors   |
 | `list_user_scripts`  | List available user scripts from User Scripts plugin |
+
+### OS & Mover Tools
+
+| Tool              | Description                                                                                                                       |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `get_os_update`   | Return the cached Unraid OS update availability. Sources local files only — no outbound network calls. Status: `up_to_date`, `update_available`, or `unknown` (read-only) |
+| `get_mover_status`| Return the cached mover state (active flag, cron schedule, last-run start/finish timestamps, duration, files moved, bytes moved) (read-only) |
+
+### Alerting & Trend Analysis Tools
+
+| Tool                    | Description                                                                                                                                                                                          |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_alert_templates`  | List curated, disabled-by-default alert rule templates that use trend/predictive metrics — array fill ETA, disk temp slope, container restart rate, reallocated sectors, disk errors (read-only)     |
+| `query_metric_history`  | Query the in-memory ring-buffer history for a named metric. Returns all buffered samples plus summary statistics (slope/sec, min, max, avg, last). See below for valid metric names (read-only)      |
+
+**Valid metric names for `query_metric_history`:**
+
+| Metric name      | Scope         | Description                                                    |
+| ---------------- | ------------- | -------------------------------------------------------------- |
+| `cpu_temp`       | global        | CPU temperature in °C                                          |
+| `array_used_pct` | global        | Array used percentage                                          |
+| `disk_temp`      | per-entity    | Temperature of a specific disk (pass `entity` = disk ID/name) |
+| `disk_used_pct`  | per-entity    | Used percentage of a specific disk                            |
+| `disk_errors`    | per-entity    | Read/write error count for a specific disk                    |
+| `reallocated`    | per-entity    | Reallocated sector count for a specific disk                  |
+| `pending`        | per-entity    | Pending (uncorrectable) sector count for a specific disk      |
+| `restart_count`  | per-entity    | Restart count for a specific container (pass `entity` = container ID) |
+
+**Example** — query the last hour of array fill percentage:
+
+```bash
+curl "http://192.168.20.21:8043/api/v1/metrics/history?metric=array_used_pct"
+```
+
+### AI Remediation Toolkit Tools
+
+| Tool                  | Annotation          | Description                                                                                                                                         |
+| --------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `system_health_report`| destructive (gated) | Aggregate health signals into prioritised findings with recommended actions. Read-only unless `confirm: true` AND `actions` list are both provided.  |
+| `list_runbooks`       | read-only           | List all reviewed remediation runbooks with their names, descriptions, and default step shapes.                                                     |
+| `run_runbook`         | destructive (gated) | Run a named runbook. Without `confirm: true` it is a dry-run returning planned steps. With `confirm: true` it executes supported-action steps.       |
+| `find_root_cause`     | read-only           | Correlate cached system signals (CPU, array, parity, disk temperatures, containers) to surface the most likely root causes of a degraded system.    |
+
+**`system_health_report` — arguments:**
+
+| Argument  | Type            | Description                                                                                             |
+| --------- | --------------- | ------------------------------------------------------------------------------------------------------- |
+| `confirm` | bool            | Must be `true` to execute actions. Without it the tool returns the report only.                        |
+| `actions` | array of objects| List of `{action, target}` pairs from a previous report's `recommended_actions`. Executed only when `confirm: true`. |
+
+Supported actions: `start_container`, `stop_container`, `restart_container`, `start_vm`, `stop_vm`, `restart_vm`, `force_stop_vm`.
+
+**`run_runbook` — arguments:**
+
+| Argument  | Type            | Description                                                                                |
+| --------- | --------------- | ------------------------------------------------------------------------------------------ |
+| `name`    | string          | Runbook name (from `list_runbooks`)                                                        |
+| `confirm` | bool            | Must be `true` to execute. Without it returns the planned steps (dry-run).                |
+| `targets` | array of strings| Optional list of container or VM IDs. For `restart_unhealthy_containers`, omit to auto-resolve stopped/exited containers. |
 
 ### Settings Tools
 
@@ -191,9 +252,9 @@ The MCP server supports two transports — use the one that fits your deployment
 
 ## Tool Safety Annotations
 
-All 73 tools include MCP safety annotations to help AI agents make safe decisions automatically:
+All 84 tools include MCP safety annotations to help AI agents make safe decisions automatically:
 
-### Read-Only Tools (49 tools)
+### Read-Only Tools (56 tools)
 
 All monitoring and query tools are annotated with `readOnlyHint: true`, signaling to AI agents that these tools are safe to call without side effects:
 
@@ -205,15 +266,17 @@ get_disk_settings, list_shares, get_share_config, get_unassigned_devices,
 get_zfs_pools, get_zfs_datasets, get_zfs_snapshots, get_zfs_arc_stats,
 list_containers, get_container_info, search_containers, get_docker_settings,
 check_container_updates, check_container_update,
-get_container_logs, get_container_size,
+get_container_logs, get_container_size, list_docker_networks,
 list_vms, get_vm_info, search_vms, get_vm_settings, list_vm_snapshots,
 check_plugin_updates, get_service_status, list_services, list_processes,
 get_notifications, get_notifications_overview, list_log_files, get_log_content,
 get_syslog, get_docker_log, get_parity_history, list_user_scripts,
-list_collectors, get_collector_status, get_system_settings
+list_collectors, get_collector_status, get_system_settings,
+get_os_update, get_mover_status,
+list_alert_templates, query_metric_history, list_runbooks, find_root_cause
 ```
 
-### Destructive Tools (15 tools) — `destructiveHint: true`
+### Destructive Tools (17 tools) — `destructiveHint: true`
 
 These tools make changes that may be difficult or impossible to reverse:
 
@@ -234,8 +297,10 @@ These tools make changes that may be difficult or impossible to reverse:
 | `execute_user_script`   | —                      | Yes (`confirm: true`) |
 | `system_reboot`         | —                      | Yes (`confirm: true`) |
 | `system_shutdown`       | —                      | Yes (`confirm: true`) |
+| `system_health_report`  | —                      | Yes (`confirm: true` + `actions` list) |
+| `run_runbook`           | `idempotentHint: true` | Yes (`confirm: true`) |
 
-### Non-Destructive Control Tools (8 tools) — `destructiveHint: false`
+### Non-Destructive Control Tools (9 tools) — `destructiveHint: false`
 
 These tools make changes that are safe and easily reversible:
 
@@ -249,6 +314,7 @@ These tools make changes that are safe and easily reversible:
 | `disk_spin_up`              | `idempotentHint: true` |
 | `collector_action`          | `idempotentHint: true` |
 | `update_collector_interval` | `idempotentHint: true` |
+| `refresh_plugin_updates`    | `idempotentHint: true` |
 
 > **How AI agents use annotations:** When an AI agent receives these annotations,
 > it can automatically decide whether to ask for user confirmation before calling
