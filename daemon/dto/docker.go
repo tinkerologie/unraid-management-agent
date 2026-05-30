@@ -34,10 +34,10 @@ type ContainerInfo struct {
 	RestartPolicy  string          `json:"restart_policy" example:"unless-stopped"`
 	Uptime         string          `json:"uptime" example:"2 days"`
 	// Update status — populated by merging the DockerUpdate collector's cache at read time.
-	UpdateStatus    string     `json:"update_status" example:"up_to_date"` // up_to_date | update_available | unknown
-	UpdateAvailable *bool      `json:"update_available,omitempty"`          // nil = not yet checked / registry unreachable
+	UpdateStatus    string     `json:"update_status" example:"up_to_date"` // see UpdateStatus* constants
+	UpdateAvailable *bool      `json:"update_available,omitempty"`         // nil = not yet checked / registry unreachable
 	UpdateChecked   *time.Time `json:"update_checked,omitempty"`
-	Timestamp      time.Time       `json:"timestamp"`
+	Timestamp       time.Time  `json:"timestamp"`
 }
 
 // PortMapping represents a port mapping
