@@ -674,9 +674,9 @@ func TestResolveZFSPoolName(t *testing.T) {
 			wantOK:   true,
 		},
 		{
-			name:  "mount point can resolve pool",
-			disk:  dto.DiskInfo{Name: "member1", MountPoint: "/mnt/cache/appdata"},
-			pools: poolUsages,
+			name:     "mount point can resolve pool",
+			disk:     dto.DiskInfo{Name: "member1", MountPoint: "/mnt/cache/appdata"},
+			pools:    poolUsages,
 			wantPool: "cache",
 			wantOK:   true,
 		},
@@ -697,15 +697,15 @@ func TestResolveZFSPoolName(t *testing.T) {
 
 func TestParseZFSPoolUsageLine(t *testing.T) {
 	tests := []struct {
-		name    string
-		output  string
+		name     string
+		output   string
 		wantPool string
-		want    zfsPoolUsage
-		wantOK  bool
+		want     zfsPoolUsage
+		wantOK   bool
 	}{
 		{
-			name:   "plain capacity number",
-			output: "cache\t965845127168\t180000000000\t785845127168\t18",
+			name:     "plain capacity number",
+			output:   "cache\t965845127168\t180000000000\t785845127168\t18",
 			wantPool: "cache",
 			want: zfsPoolUsage{
 				Size:         965845127168,
@@ -716,8 +716,8 @@ func TestParseZFSPoolUsageLine(t *testing.T) {
 			wantOK: true,
 		},
 		{
-			name:   "capacity with percent suffix",
-			output: "cache\t965845127168\t180000000000\t785845127168\t18%",
+			name:     "capacity with percent suffix",
+			output:   "cache\t965845127168\t180000000000\t785845127168\t18%",
 			wantPool: "cache",
 			want: zfsPoolUsage{
 				Size:         965845127168,
@@ -767,13 +767,13 @@ func TestEnrichWithZFSPoolUsage(t *testing.T) {
 
 	t.Run("zfs cache disk gets pool usage", func(t *testing.T) {
 		disk := &dto.DiskInfo{
-			Name:          "cache2",
-			Role:          "cache",
-			FileSystem:    "zfs",
-			Size:          1,
-			Used:          2,
-			Free:          3,
-			UsagePercent:  4,
+			Name:         "cache2",
+			Role:         "cache",
+			FileSystem:   "zfs",
+			Size:         1,
+			Used:         2,
+			Free:         3,
+			UsagePercent: 4,
 		}
 
 		applied := collector.enrichWithZFSPoolUsage(disk, poolUsages)
@@ -815,6 +815,98 @@ func TestEnrichWithZFSPoolUsage(t *testing.T) {
 			t.Errorf("disk was modified unexpectedly: %+v", disk)
 		}
 	})
+}
+
+// TestParseSMARTAttributes tests parsing of the ATA SMART attribute table
+// produced by smartctl -A.
+func TestParseSMARTAttributes(t *testing.T) {
+	// Sample output lines as returned by smartctl -A (trimmed).
+	sampleLines := []string{
+		"=== START OF READ SMART DATA SECTION ===",
+		"SMART Attributes Data Structure revision number: 16",
+		"Vendor Specific SMART Attributes with Thresholds:",
+		"ID# ATTRIBUTE_NAME          FLAG     VALUE WORST THRESH TYPE      UPDATED  WHEN_FAILED RAW_VALUE",
+		"  1 Raw_Read_Error_Rate     0x000f   200   200   051    Pre-fail  Always       -       0",
+		"  5 Reallocated_Sector_Ct   0x0033   100   100   010    Pre-fail  Always       -       3",
+		"  9 Power_On_Hours          0x0032   095   095   000    Old_age   Always       -       25123",
+		" 12 Power_Cycle_Count       0x0032   100   100   000    Old_age   Always       -       47",
+		"197 Current_Pending_Sector  0x0012   100   100   000    Old_age   Always       -       2",
+		"198 Offline_Uncorrectable   0x0010   100   100   000    Old_age   Offline      -       0",
+		"",
+	}
+
+	tests := []struct {
+		name    string
+		lines   []string
+		wantLen int
+		checks  map[string]struct { // key → expected field values
+			id       int
+			attrName string
+			rawValue string
+		}
+	}{
+		{
+			name:    "parses full attribute table",
+			lines:   sampleLines,
+			wantLen: 6,
+			checks: map[string]struct {
+				id       int
+				attrName string
+				rawValue string
+			}{
+				"5": {
+					id:       5,
+					attrName: "Reallocated_Sector_Ct",
+					rawValue: "3",
+				},
+				"197": {
+					id:       197,
+					attrName: "Current_Pending_Sector",
+					rawValue: "2",
+				},
+				"9": {
+					id:       9,
+					attrName: "Power_On_Hours",
+					rawValue: "25123",
+				},
+			},
+		},
+		{
+			name:    "returns empty map when no table present",
+			lines:   []string{"SMART overall-health self-assessment test result: PASSED"},
+			wantLen: 0,
+		},
+		{
+			name:    "handles nil / empty input",
+			lines:   nil,
+			wantLen: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseSMARTAttributes(tt.lines)
+			if len(got) != tt.wantLen {
+				t.Fatalf("parseSMARTAttributes() len = %d, want %d (got: %v)", len(got), tt.wantLen, got)
+			}
+			for key, want := range tt.checks {
+				attr, ok := got[key]
+				if !ok {
+					t.Errorf("parseSMARTAttributes(): missing key %q", key)
+					continue
+				}
+				if attr.ID != want.id {
+					t.Errorf("attr[%q].ID = %d, want %d", key, attr.ID, want.id)
+				}
+				if attr.Name != want.attrName {
+					t.Errorf("attr[%q].Name = %q, want %q", key, attr.Name, want.attrName)
+				}
+				if attr.RawValue != want.rawValue {
+					t.Errorf("attr[%q].RawValue = %q, want %q", key, attr.RawValue, want.rawValue)
+				}
+			}
+		})
+	}
 }
 
 // TestEnrichWithModelAndSerialEmptyID tests enrichment when ID is empty

@@ -303,8 +303,7 @@ func (e *Engine) overlayTrends(env *dto.AlertEnv) {
 	// Per-disk series
 	var maxDiskTempSlope float64
 	var minDiskFillETA float64 // soonest (smallest positive) = worst-case
-	for id, s := range e.history.entitySeries["disk_temp"] {
-		_ = id
+	for _, s := range e.history.entitySeries["disk_temp"] {
 		if len(s) < 2 {
 			continue
 		}
@@ -315,8 +314,7 @@ func (e *Engine) overlayTrends(env *dto.AlertEnv) {
 	}
 	env.MaxDiskTempSlopePerMin = maxDiskTempSlope
 
-	for id, s := range e.history.entitySeries["disk_used_pct"] {
-		_ = id
+	for _, s := range e.history.entitySeries["disk_used_pct"] {
 		if len(s) < 2 {
 			continue
 		}

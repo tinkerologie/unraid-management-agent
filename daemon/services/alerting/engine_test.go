@@ -282,7 +282,7 @@ func TestContainerUpdatesAvailableMetric(t *testing.T) {
 
 func TestEngineTrendFields(t *testing.T) {
 	provider := &mockDataProvider{}
-	e := NewEngine(NewStore(t.TempDir()+"/r.json"), provider)
+	e := NewEngine(NewStore(t.TempDir()), provider)
 	base := time.Unix(1_700_000_000, 0)
 	for i := 0; i < 30; i++ {
 		e.history.Record("cpu_temp", "", 40+0.5*float64(i), base.Add(time.Duration(i)*15*time.Second))
