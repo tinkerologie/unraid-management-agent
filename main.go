@@ -43,6 +43,7 @@ var validCollectorNames = map[string]bool{
 	"tuning":          true,
 	"docker_update":   true,
 	"docker_networks": true,
+	"plugin_update":   true,
 }
 
 var cli struct {
@@ -97,6 +98,7 @@ var cli struct {
 	IntervalTuning         int  `default:"120" env:"INTERVAL_TUNING" help:"tuning parameters interval (seconds, 0=disabled, max 86400)"`
 	IntervalDockerUpdate   int  `default:"21600" env:"INTERVAL_DOCKER_UPDATE" help:"container update check interval (seconds, 0=disabled, max 86400)"`
 	IntervalDockerNetworks int  `default:"60" env:"INTERVAL_DOCKER_NETWORKS" help:"docker networks listing interval (seconds, 0=disabled, max 86400)"`
+	IntervalPluginUpdate   int  `default:"3600" env:"INTERVAL_PLUGIN_UPDATE" help:"plugin update check interval (seconds, 0=disabled, max 86400)"`
 	DockerUpdateNotify     bool `default:"false" env:"DOCKER_UPDATE_NOTIFY" help:"raise an Unraid notification when new container updates become available"`
 
 	Boot        cmd.Boot        `cmd:"" default:"1" help:"start the management agent"`
@@ -276,6 +278,7 @@ func main() {
 			Tuning:         getInterval("tuning", cli.IntervalTuning),
 			DockerUpdate:   getInterval("docker_update", cli.IntervalDockerUpdate),
 			DockerNetworks: getInterval("docker_networks", cli.IntervalDockerNetworks),
+			PluginUpdate:   getInterval("plugin_update", cli.IntervalPluginUpdate),
 		},
 	}
 
@@ -363,5 +366,6 @@ func applyFileConfig(cfg *domain.FileConfig) {
 		setInt(&cli.IntervalTuning, iv.Tuning)
 		setInt(&cli.IntervalDockerUpdate, iv.DockerUpdate)
 		setInt(&cli.IntervalDockerNetworks, iv.DockerNetworks)
+		setInt(&cli.IntervalPluginUpdate, iv.PluginUpdate)
 	}
 }

@@ -34,6 +34,7 @@ type DataProvider interface {
 	GetNetworkCache() []dto.NetworkInfo
 	GetNUTCache() *dto.NUTResponse
 	GetNotificationsCache() *dto.NotificationList
+	GetPluginUpdatesCache() *dto.PluginList
 }
 
 // Engine orchestrates alert rule evaluation and notification dispatch.
@@ -513,6 +514,15 @@ func (e *Engine) buildEnv() dto.AlertEnv {
 		env.UnreadNotifications = notifs.Overview.Unread.Total
 		env.WarningNotifications = notifs.Overview.Unread.Warning
 		env.AlertNotifications = notifs.Overview.Unread.Alert
+	}
+
+	// Plugin updates
+	if plugins := e.provider.GetPluginUpdatesCache(); plugins != nil {
+		for _, p := range plugins.Plugins {
+			if p.UpdateAvailable {
+				env.PluginUpdatesAvailable++
+			}
+		}
 	}
 
 	return env

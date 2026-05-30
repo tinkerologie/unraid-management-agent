@@ -62,7 +62,8 @@ func (m *MockCacheProvider) GetNUTCache() *dto.NUTResponse                  { re
 func (m *MockCacheProvider) GetParityHistoryCache() *dto.ParityCheckHistory { return m.parityHistory }
 func (m *MockCacheProvider) GetFanControlCache() *dto.FanControlStatus          { return nil }
 func (m *MockCacheProvider) GetTuningCache() *dto.TuningInfo                    { return nil }
-func (m *MockCacheProvider) GetDockerNetworksCache() *dto.DockerNetworkList     { return nil }
+func (m *MockCacheProvider) GetDockerNetworksCache() *dto.DockerNetworkList { return nil }
+func (m *MockCacheProvider) GetPluginUpdatesCache() *dto.PluginList         { return nil }
 
 // Log methods
 func (m *MockCacheProvider) ListLogFiles() []dto.LogFile { return m.logFiles }

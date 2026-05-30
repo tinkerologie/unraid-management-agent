@@ -2849,33 +2849,47 @@ func (s *Server) handleDockerUpdateAll(w http.ResponseWriter, _ *http.Request) {
 
 // handlePluginCheckUpdates godoc
 //
-//	@Summary		Check for plugin updates
-//	@Description	Check all installed plugins for available updates
+//	@Summary		Get cached plugin update status
+//	@Description	Serves the cached plugin update result. Returns an empty result when no cache is available yet.
 //	@Tags			Plugins
 //	@Produce		json
-//	@Success		200	{array}		dto.PluginInfo	"Plugins with available updates"
-//	@Failure		500	{object}	dto.Response	"Failed to check updates"
+//	@Success		200	{object}	dto.PluginList	"Plugin update status"
 //	@Router			/plugins/check-updates [get]
 func (s *Server) handlePluginCheckUpdates(w http.ResponseWriter, _ *http.Request) {
-	logger.Info("API: Checking for plugin updates")
+	if cached := s.GetPluginUpdatesCache(); cached != nil {
+		respondJSON(w, http.StatusOK, cached)
+		return
+	}
+	respondJSON(w, http.StatusOK, dto.PluginList{})
+}
 
+// handlePluginUpdatesRefresh godoc
+//
+//	@Summary		Force a plugin update re-check
+//	@Description	Runs an immediate plugin update check and publishes the result.
+//	@Tags			Plugins
+//	@Produce		json
+//	@Success		200	{object}	dto.PluginList	"Refreshed plugin update status"
+//	@Failure		500	{object}	dto.Response	"Check failed"
+//	@Router			/plugins/updates/refresh [post]
+func (s *Server) handlePluginUpdatesRefresh(w http.ResponseWriter, _ *http.Request) {
 	controller := controllers.NewPluginController()
 	updates, err := controller.CheckPluginUpdates()
 	if err != nil {
-		logger.Error("API: Failed to check plugin updates: %v", err)
+		logger.Error("API: plugin update refresh failed: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
-			Success:   false,
-			Message:   "Failed to check for plugin updates",
-			Timestamp: time.Now(),
+			Success: false, Message: "plugin update check failed", Timestamp: time.Now(),
 		})
 		return
 	}
-
-	respondJSON(w, http.StatusOK, map[string]any{
-		"plugins_with_updates": updates,
-		"count":                len(updates),
-		"timestamp":            time.Now(),
-	})
+	result := &dto.PluginList{
+		Plugins:          updates,
+		TotalCount:       len(updates),
+		UpdatesAvailable: len(updates),
+		Timestamp:        time.Now(),
+	}
+	domain.Publish(s.ctx.Hub, constants.TopicPluginUpdatesUpdate, result)
+	respondJSON(w, http.StatusOK, result)
 }
 
 // handlePluginUpdate godoc

@@ -69,6 +69,7 @@ type AlertEnv struct {
 	RunningContainers         int     `expr:"RunningContainers"`
 	StoppedContainers         int     `expr:"StoppedContainers"`
 	ContainerUpdatesAvailable int     `expr:"ContainerUpdatesAvailable"`
+	PluginUpdatesAvailable    int     `expr:"PluginUpdatesAvailable"`
 	VMCount                   int     `expr:"VMCount"`
 	RunningVMs                int     `expr:"RunningVMs"`
 	MaxDiskTemp               float64 `expr:"MaxDiskTemp"`

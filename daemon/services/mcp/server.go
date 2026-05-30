@@ -50,6 +50,7 @@ type CacheProvider interface {
 	GetFanControlCache() *dto.FanControlStatus
 	GetTuningCache() *dto.TuningInfo
 	GetDockerNetworksCache() *dto.DockerNetworkList
+	GetPluginUpdatesCache() *dto.PluginList
 	// Logs
 	ListLogFiles() []dto.LogFile
 	GetLogContent(path, lines, start string) (*dto.LogFileContent, error)
@@ -972,22 +973,42 @@ func (s *Server) registerNewMonitoringTools() {
 		return jsonResult(result)
 	})
 
-	// Check plugin updates
+	// Check plugin updates (returns cached result)
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "check_plugin_updates",
-		Description: "Check all installed Unraid plugins for available updates.",
+		Description: "Return the cached plugin update status. Use refresh_plugin_updates to force a fresh check.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
-		logger.Info("MCP: Checking all plugins for updates")
+		logger.Info("MCP: Getting cached plugin update status")
+		if cached := s.cacheProvider.GetPluginUpdatesCache(); cached != nil {
+			return jsonResult(cached)
+		}
+		return jsonResult(dto.PluginList{})
+	})
+
+	// Force refresh of all plugin update checks and publish results
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "refresh_plugin_updates",
+		Description: "Force an immediate plugin update check for all installed plugins and publish the result (updates cache, WebSocket, and alerts).",
+		Annotations: &mcp.ToolAnnotations{
+			IdempotentHint:  true,
+			DestructiveHint: ptr(false),
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		logger.Info("MCP: Refreshing plugin updates")
 		pluginCtrl := controllers.NewPluginController()
 		updates, err := pluginCtrl.CheckPluginUpdates()
 		if err != nil {
-			return textResult(fmt.Sprintf("Failed to check plugin updates: %v", err)), nil, nil
+			return textResult(fmt.Sprintf("Failed to refresh plugin updates: %v", err)), nil, nil
 		}
-		return jsonResult(map[string]any{
-			"plugins_with_updates": updates,
-			"count":                len(updates),
-		})
+		result := &dto.PluginList{
+			Plugins:          updates,
+			TotalCount:       len(updates),
+			UpdatesAvailable: len(updates),
+			Timestamp:        time.Now(),
+		}
+		domain.Publish(s.ctx.Hub, constants.TopicPluginUpdatesUpdate, result)
+		return jsonResult(result)
 	})
 
 	// List VM snapshots

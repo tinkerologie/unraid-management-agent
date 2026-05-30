@@ -55,4 +55,6 @@ var (
 	TopicDockerUpdatesUpdate = domain.NewTopic[*dto.ContainerUpdatesResult]("docker_updates_update")
 	// TopicDockerNetworksUpdate is published by the docker_networks collector with *dto.DockerNetworkList.
 	TopicDockerNetworksUpdate = domain.NewTopic[*dto.DockerNetworkList]("docker_networks_update")
+	// TopicPluginUpdatesUpdate is published by the plugin_update collector with *dto.PluginList.
+	TopicPluginUpdatesUpdate = domain.NewTopic[*dto.PluginList]("plugin_updates_update")
 )

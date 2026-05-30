@@ -288,7 +288,7 @@ func (cm *CollectorManager) GetAllStatus() dto.CollectorsStatusResponse {
 		"system", "array", "disk", "docker", "vm",
 		"ups", "nut", "gpu", "shares", "network",
 		"hardware", "zfs", "notification", "registration", "unassigned",
-		"fancontrol", "tuning", "docker_update", "docker_networks",
+		"fancontrol", "tuning", "docker_update", "docker_networks", "plugin_update",
 	}
 
 	for _, name := range collectorOrder {
@@ -383,6 +383,7 @@ func (cm *CollectorManager) getDefaultInterval(name string) int {
 		"tuning":          120,
 		"docker_update":   constants.IntervalDockerUpdate,
 		"docker_networks": constants.IntervalDockerNetworks,
+		"plugin_update":   constants.IntervalPluginUpdate,
 	}
 
 	if interval, ok := defaults[name]; ok {
@@ -522,4 +523,35 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 		}
 		return c
 	}, intervals.DockerNetworks, false)
+
+	// PluginUpdate collector — checks installed plugins for available updates.
+	// CheckFn and NotifyFn are injected here (not in the collector) to avoid a
+	// collectors→controllers import cycle.
+	cm.Register("plugin_update", func(ctx *domain.Context) Collector {
+		c := collectors.NewPluginUpdateCollector(ctx)
+		c.CheckFn = func() (*dto.PluginList, error) {
+			pc := controllers.NewPluginController()
+			updates, err := pc.CheckPluginUpdates()
+			if err != nil {
+				return nil, err
+			}
+			return &dto.PluginList{
+				Plugins:          updates,
+				TotalCount:       len(updates),
+				UpdatesAvailable: len(updates),
+			}, nil
+		}
+		c.NotifyFn = func(names []string) {
+			if err := controllers.CreateNotification(
+				"Plugin updates available",
+				"Plugins",
+				fmt.Sprintf("Updates available for: %s", strings.Join(names, ", ")),
+				"info",
+				"",
+			); err != nil {
+				logger.Warning("plugin_update: failed to create notification: %v", err)
+			}
+		}
+		return c
+	}, intervals.PluginUpdate, false)
 }

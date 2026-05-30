@@ -144,6 +144,10 @@ const (
 	// IntervalDockerNetworks is the collection interval for Docker network listing in seconds.
 	// Networks change rarely; 60s is a reasonable default.
 	IntervalDockerNetworks = 60
+	// IntervalPluginUpdate is the interval for checking plugin updates in seconds.
+	// Long by design: plugin check runs a network request and parses temp files.
+	// Default 1 hour.
+	IntervalPluginUpdate = 3600
 
 	// WSPingInterval is the WebSocket ping interval in seconds.
 	WSPingInterval = 30

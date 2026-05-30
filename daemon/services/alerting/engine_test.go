@@ -29,6 +29,7 @@ func (m *mockDataProvider) GetZFSPoolsCache() []dto.ZFSPool              { retur
 func (m *mockDataProvider) GetNetworkCache() []dto.NetworkInfo           { return nil }
 func (m *mockDataProvider) GetNUTCache() *dto.NUTResponse                { return nil }
 func (m *mockDataProvider) GetNotificationsCache() *dto.NotificationList { return nil }
+func (m *mockDataProvider) GetPluginUpdatesCache() *dto.PluginList       { return nil }
 
 func newMockProvider() *mockDataProvider {
 	return &mockDataProvider{
