@@ -273,6 +273,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/healthchecks/{id}/run", s.handleRunHealthCheck).Methods("POST")
 
 	// Alerting endpoints
+	api.HandleFunc("/alerts/templates", s.handleAlertTemplates).Methods("GET")
 	api.HandleFunc("/alerts/rules", s.handleListAlertRules).Methods("GET")
 	api.HandleFunc("/alerts/rules", s.handleCreateAlertRule).Methods("POST")
 	api.HandleFunc("/alerts/rules/{id}", s.handleGetAlertRule).Methods("GET")

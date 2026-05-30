@@ -1871,7 +1871,16 @@ func (s *Server) registerAlertingTools() {
 		return jsonResult(dto.AlertHistoryResponse{Events: events, Total: len(events)})
 	})
 
-	logger.Debug("MCP alerting tools registered (7 tools)")
+	// List alert rule templates
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "list_alert_templates",
+		Description: "List curated, disabled-by-default alert rule templates that use trend/predictive metrics (array fill ETA, disk temp slope, container restarts, reallocated sectors, disk errors). Users can review and enable these rules.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		return jsonResult(alerting.AlertRuleTemplates())
+	})
+
+	logger.Debug("MCP alerting tools registered (8 tools)")
 }
 
 // registerWatchdogTools registers MCP tools for health check management and monitoring.

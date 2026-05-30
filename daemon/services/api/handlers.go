@@ -15,6 +15,7 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/alerting"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/collectors"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/controllers"
 )
@@ -3703,6 +3704,18 @@ func (s *Server) handleFiringAlerts(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	respondJSON(w, http.StatusOK, s.alertEngine.GetFiringAlerts())
+}
+
+// handleAlertTemplates godoc
+//
+//	@Summary		List alert rule templates
+//	@Description	Retrieve curated, disabled-by-default alert rule templates using trend/predictive metrics
+//	@Tags			Alerts
+//	@Produce		json
+//	@Success		200	{array}	dto.AlertRule	"List of alert rule templates"
+//	@Router			/alerts/templates [get]
+func (s *Server) handleAlertTemplates(w http.ResponseWriter, _ *http.Request) {
+	respondJSON(w, http.StatusOK, alerting.AlertRuleTemplates())
 }
 
 // ============================================================================
