@@ -30,11 +30,9 @@ type DockerUpdateCollector struct {
 	lastSig string
 }
 
-// NewDockerUpdateCollector creates a new DockerUpdate collector.
-// checkFn is the function used to fetch update status; callers (e.g. the
-// orchestrator) must inject a real implementation before calling Start or
-// Collect, as this package must not import the controllers package to avoid
-// an import cycle.
+// NewDockerUpdateCollector creates a new DockerUpdate collector. CheckFn must be
+// set by the caller (the collector factory in package services) before Start or
+// Collect is invoked — this avoids a collectors→controllers import cycle.
 func NewDockerUpdateCollector(ctx *domain.Context) *DockerUpdateCollector {
 	return &DockerUpdateCollector{
 		appCtx: ctx,
