@@ -1,10 +1,13 @@
 package collectors
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -24,14 +27,22 @@ type cpuSnapshot struct {
 	readAt    time.Time
 }
 
+// netSnapshot holds a point-in-time /proc/<pid>/net/dev reading for rate calculation.
+type netSnapshot struct {
+	rx     uint64
+	tx     uint64
+	readAt time.Time
+}
+
 // DockerCollector collects Docker container information using the Docker SDK.
 // This is significantly faster than CLI commands as it avoids process spawning.
 type DockerCollector struct {
 	appCtx       *domain.Context
 	dockerClient *client.Client
 	initialized  bool
-	mu           sync.Mutex             // protects prevCPU
+	mu           sync.Mutex             // protects prevCPU and prevNet
 	prevCPU      map[string]cpuSnapshot // keyed by full container ID
+	prevNet      map[string]netSnapshot // keyed by full container ID
 }
 
 // NewDockerCollector creates a new Docker SDK-based collector
@@ -40,6 +51,7 @@ func NewDockerCollector(ctx *domain.Context) *DockerCollector {
 		appCtx:      ctx,
 		initialized: false,
 		prevCPU:     make(map[string]cpuSnapshot),
+		prevNet:     make(map[string]netSnapshot),
 	}
 }
 
@@ -256,6 +268,11 @@ func (c *DockerCollector) Collect() {
 
 				// CPU stats from cgroups (delta between collections)
 				c.getCPUFromCgroups(apiContainer.ID, cont)
+
+				// Network I/O from /proc/<pid>/net/dev
+				if inspectData.State != nil {
+					c.getNetworkFromProc(inspectData.State.Pid, apiContainer.ID, cont)
+				}
 			}
 		}
 		logger.Debug("Docker SDK: Inspect + cgroup stats took %v for %d containers", time.Since(startInspect), len(runningContainers))
@@ -425,7 +442,7 @@ func (c *DockerCollector) getCPUFromCgroups(fullID string, cont *dto.ContainerIn
 	cont.CPUPercent = (float64(deltaUsec) / float64(elapsedUsec)) / numCPU * 100
 }
 
-// pruneStaleSnapshots removes CPU snapshots for containers that are no longer running.
+// pruneStaleSnapshots removes CPU and network snapshots for containers that are no longer running.
 func (c *DockerCollector) pruneStaleSnapshots(running []container.Summary) {
 	active := make(map[string]struct{}, len(running))
 	for _, rc := range running {
@@ -437,5 +454,72 @@ func (c *DockerCollector) pruneStaleSnapshots(running []container.Summary) {
 			delete(c.prevCPU, id)
 		}
 	}
+	for id := range c.prevNet {
+		if _, ok := active[id]; !ok {
+			delete(c.prevNet, id)
+		}
+	}
 	c.mu.Unlock()
+}
+
+// parseProcNetDev sums RX and TX bytes across all non-loopback interfaces
+// from /proc/<pid>/net/dev content. Returns (0,0) on malformed input.
+func parseProcNetDev(r io.Reader) (rx, tx uint64) {
+	sc := bufio.NewScanner(r)
+	for sc.Scan() {
+		line := sc.Text()
+		colon := strings.IndexByte(line, ':')
+		if colon < 0 {
+			continue // header lines have no colon in the iface position
+		}
+		iface := strings.TrimSpace(line[:colon])
+		if iface == "" || iface == "lo" {
+			continue
+		}
+		fields := strings.Fields(line[colon+1:])
+		if len(fields) < 9 {
+			continue
+		}
+		if v, err := strconv.ParseUint(fields[0], 10, 64); err == nil {
+			rx += v
+		}
+		if v, err := strconv.ParseUint(fields[8], 10, 64); err == nil {
+			tx += v
+		}
+	}
+	return rx, tx
+}
+
+// getNetworkFromProc reads /proc/<pid>/net/dev for the container's network namespace,
+// sets NetworkRX/NetworkTX on the DTO, and computes per-second rates using prevNet.
+func (c *DockerCollector) getNetworkFromProc(pid int, fullID string, cont *dto.ContainerInfo) {
+	if pid <= 0 {
+		return
+	}
+	// #nosec G304 -- path is constructed from a trusted kernel pid under /proc.
+	f, err := os.Open(fmt.Sprintf("/proc/%d/net/dev", pid))
+	if err != nil {
+		logger.Debug("Docker: cannot read net/dev for %s: %v", cont.Name, err)
+		return
+	}
+	defer func() { _ = f.Close() }()
+	rx, tx := parseProcNetDev(f)
+	cont.NetworkRX = rx
+	cont.NetworkTX = tx
+	now := time.Now()
+	c.mu.Lock()
+	prev, ok := c.prevNet[fullID]
+	c.prevNet[fullID] = netSnapshot{rx: rx, tx: tx, readAt: now}
+	c.mu.Unlock()
+	if ok {
+		dt := now.Sub(prev.readAt).Seconds()
+		if dt > 0 {
+			if rx >= prev.rx {
+				cont.NetworkRXBytesPerSec = float64(rx-prev.rx) / dt
+			}
+			if tx >= prev.tx {
+				cont.NetworkTXBytesPerSec = float64(tx-prev.tx) / dt
+			}
+		}
+	}
 }
