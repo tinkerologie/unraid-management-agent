@@ -36,6 +36,7 @@ database — update status lives in memory and is re-checked after restart (Tier
 persistence model).
 
 Rejected alternatives:
+
 - **Sub-cadence inside the Docker collector** — couples a network/rate-limit-bound
   operation into the CPU-bound stats loop; harder to configure independently.
 - **On-demand + cache only** — does not deliver continuous detection; defeats the goal.
@@ -60,6 +61,7 @@ DockerUpdate collector (every 6h, staggered start)
 ## Components
 
 ### 1. `DockerUpdate` collector — `daemon/services/collectors/docker_update.go`
+
 - Standard collector pattern: goroutine, `defer/recover` panic wrappers, `ctx.Done()`.
 - **Startup stagger:** wait 30–60s after boot before first `Collect()` to avoid
   piling onto startup, then tick on `IntervalDockerUpdate`.
@@ -70,23 +72,28 @@ DockerUpdate collector (every 6h, staggered start)
 - Registered in `collector_manager.go` `RegisterAllCollectors()`.
 
 ### 2. Constants — `daemon/constants/const.go`
+
 - `IntervalDockerUpdate = 21600` (6 hours). Adjustable at runtime via the existing
   `PATCH /collectors/{name}/interval` mechanism for users on metered/rate-limited links.
 - Event topic constant `docker_updates_update`.
 
 ### 3. Data model — `daemon/dto/docker.go`
+
 Extend `ContainerInfo`:
+
 ```go
 UpdateStatus    string     `json:"update_status" example:"up_to_date"` // up_to_date | update_available | unknown
 UpdateAvailable *bool      `json:"update_available,omitempty"`          // nil = not yet checked / registry unreachable
 UpdateChecked   *time.Time `json:"update_checked,omitempty"`
 ```
+
 The tri-state (`*bool` + `"unknown"`) lets us honestly distinguish "no update" from
 "haven't checked yet / registry unreachable". `DistributionInspect` legitimately
 fails for private registries and rate-limits; we must never show "up to date" when
 we do not know.
 
 ### 4. API server — `daemon/services/api/server.go`, `handlers.go`
+
 - New `dockerUpdatesCache map[string]dto.ContainerUpdateInfo` guarded by the existing
   `cacheMutex`, populated from the `docker_updates_update` subscription (added to both
   `Hub.Sub()` and the `subscribeToEvents()` switch).
@@ -96,6 +103,7 @@ we do not know.
   `containerListCache` is never mutated — the merge is a pure read-side join.
 
 ### 5. REST endpoints
+
 - `GET /api/v1/docker`, `/docker/{id}` — now include update fields via merge.
 - `GET /api/v1/docker/updates` — **repointed to serve the cached result** (instant,
   no registry traffic) instead of triggering a live check.
@@ -104,20 +112,23 @@ we do not know.
   `refreshDockerDigests`.
 
 ### 6. WebSocket — `daemon/services/api/websocket.go`
+
 - Subscribe hub to `docker_updates_update`; broadcast as event `docker_updates` with
   the `ContainerUpdatesResult`.
 - **Change-detection:** only broadcast when the result differs from the last published
   one, to avoid a 6-hourly no-op event.
 
 ### 7. Alerting + notifications
+
 - Expose aggregate metric `docker.updates_available` (count) to the existing alert
   engine so users can create a rule "alert when `updates_available > 0`".
 - On a **transition** (container goes up-to-date → update-available), optionally raise
   an Unraid notification via `NotificationController`
-  (e.g. *"3 container updates available: plex, sonarr, radarr"*).
+  (e.g. _"3 container updates available: plex, sonarr, radarr"_).
   **Opt-in** via a settings toggle to avoid notification spam.
 
 ### 8. MCP — `daemon/services/mcp/server.go`
+
 - `check_container_update` / `check_container_updates` remain (live, on-demand).
 - `list_containers` / `get_container_info` output gains the cached update fields.
 - New `refresh_container_updates` tool mapping to `POST /docker/updates/refresh`.
@@ -153,6 +164,7 @@ the Tier-0 low-overhead approach — no USB-flash writes, no DB dependency.
 ## Testing
 
 Table-driven tests (mock the controller — no real registry calls):
+
 - Merge logic: cached / uncached / unknown cases.
 - Tri-state correctness when `DistributionInspect` fails.
 - WebSocket change-detection (no broadcast on identical result).

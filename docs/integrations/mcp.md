@@ -69,25 +69,25 @@ The MCP server supports two transports — use the one that fits your deployment
 
 ### Docker Tools
 
-| Tool                          | Description                                                                   |
-| ----------------------------- | ----------------------------------------------------------------------------- |
-| `list_containers`             | Docker containers, optionally filtered by state (includes update status)      |
-| `get_container_info`          | Detailed information about a specific container (includes update status)      |
-| `get_container_logs`          | Container stdout/stderr logs with tail/since opts                             |
-| `search_containers`           | Search containers by name or state                                            |
-| `get_docker_settings`         | Docker daemon configuration settings                                          |
-| `check_container_updates`     | Synchronous on-demand check of all containers for available image updates     |
-| `check_container_update`      | Synchronous on-demand check of a specific container for an image update       |
-| `refresh_container_updates`   | Force an immediate registry digest re-check for all containers and publish the result (updates cache, WebSocket, and alerts) |
-| `get_container_size`          | Get disk usage (image size + rw layer) of a container                        |
+| Tool                        | Description                                                                                                                  |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `list_containers`           | Docker containers, optionally filtered by state (includes update status)                                                     |
+| `get_container_info`        | Detailed information about a specific container (includes update status)                                                     |
+| `get_container_logs`        | Container stdout/stderr logs with tail/since opts                                                                            |
+| `search_containers`         | Search containers by name or state                                                                                           |
+| `get_docker_settings`       | Docker daemon configuration settings                                                                                         |
+| `check_container_updates`   | Synchronous on-demand check of all containers for available image updates                                                    |
+| `check_container_update`    | Synchronous on-demand check of a specific container for an image update                                                      |
+| `refresh_container_updates` | Force an immediate registry digest re-check for all containers and publish the result (updates cache, WebSocket, and alerts) |
+| `get_container_size`        | Get disk usage (image size + rw layer) of a container                                                                        |
 
 > **Update status fields:** `list_containers` and `get_container_info` now include the following fields populated from the cached update check results:
 >
-> | Field            | Values                                      | Description                                   |
-> | ---------------- | ------------------------------------------- | --------------------------------------------- |
-> | `update_status`  | `up_to_date`, `update_available`, `unknown` | Human-readable update state for the container |
-> | `update_available` | `true` / `false`                          | Whether a newer image digest is available     |
-> | `update_checked` | RFC 3339 timestamp or empty string          | When the update check was last performed      |
+> | Field              | Values                                      | Description                                   |
+> | ------------------ | ------------------------------------------- | --------------------------------------------- |
+> | `update_status`    | `up_to_date`, `update_available`, `unknown` | Human-readable update state for the container |
+> | `update_available` | `true` / `false`                            | Whether a newer image digest is available     |
+> | `update_checked`   | RFC 3339 timestamp or empty string          | When the update check was last performed      |
 >
 > Use `refresh_container_updates` to force a fresh registry check and push results to the cache, WebSocket hub, and alerting engine. Use `check_container_updates` / `check_container_update` for synchronous on-demand checks that return results directly without publishing.
 

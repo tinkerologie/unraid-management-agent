@@ -268,9 +268,9 @@ func TestCollectorManager_UpdateIntervalBounds(t *testing.T) {
 	}
 
 	// Try too large interval
-	err = cm.UpdateInterval("test", 4000)
+	err = cm.UpdateInterval("test", 90000)
 	if err == nil {
-		t.Error("expected error for interval > 3600")
+		t.Error("expected error for interval > 86400")
 	}
 
 	// Valid interval bounds

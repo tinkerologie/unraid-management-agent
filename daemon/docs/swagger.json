@@ -918,7 +918,7 @@
         },
         "/docker/updates": {
             "get": {
-                "description": "Pull latest images and check if any containers have updates available",
+                "description": "Serves the cached container update result. Returns an empty result when no cache is available yet.",
                 "produces": [
                     "application/json"
                 ],
@@ -932,9 +932,29 @@
                         "schema": {
                             "$ref": "#/definitions/dto.ContainerUpdatesResult"
                         }
+                    }
+                }
+            }
+        },
+        "/docker/updates/refresh": {
+            "post": {
+                "description": "Runs an immediate registry digest comparison for all containers and publishes the result.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Docker"
+                ],
+                "summary": "Force a container update re-check",
+                "responses": {
+                    "200": {
+                        "description": "Refreshed update status",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ContainerUpdatesResult"
+                        }
                     },
                     "500": {
-                        "description": "Failed to check updates",
+                        "description": "Check failed",
                         "schema": {
                             "$ref": "#/definitions/dto.Response"
                         }
@@ -5353,6 +5373,18 @@
                 },
                 "timestamp": {
                     "type": "string"
+                },
+                "update_available": {
+                    "description": "nil = not yet checked / registry unreachable",
+                    "type": "boolean"
+                },
+                "update_checked": {
+                    "type": "string"
+                },
+                "update_status": {
+                    "description": "Update status — populated by merging the DockerUpdate collector's cache at read time.",
+                    "type": "string",
+                    "example": "up_to_date"
                 },
                 "uptime": {
                     "type": "string",
