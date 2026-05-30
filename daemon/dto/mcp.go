@@ -218,6 +218,12 @@ type MCPDeleteAlertRuleArgs struct {
 	Confirm bool   `json:"confirm" jsonschema:"Must be set to true to confirm deletion"`
 }
 
+// MCPEnableAlertTemplateArgs represents arguments for the enable_alert_template tool.
+type MCPEnableAlertTemplateArgs struct {
+	TemplateID string   `json:"template_id" jsonschema:"required,template id e.g. tmpl-array-fill"`
+	Channels   []string `json:"channels,omitempty" jsonschema:"optional notification channels; defaults to unraid notification"`
+}
+
 // MCPHealthCheckIDArgs represents arguments for operations on a specific health check.
 type MCPHealthCheckIDArgs struct {
 	CheckID string `json:"check_id" jsonschema:"The unique identifier of the health check"`
@@ -300,4 +306,27 @@ type MCPSetInotifyLimitsArgs struct {
 	MaxUserInstances int  `json:"max_user_instances" jsonschema:"Maximum number of inotify instances per user (e.g. 512)"`
 	MaxQueuedEvents  int  `json:"max_queued_events" jsonschema:"Maximum number of queued inotify events (e.g. 16384)"`
 	Confirm          bool `json:"confirm" jsonschema:"Must be set to true to confirm the inotify limits change"`
+}
+
+// MCPHealthReportArgs represents arguments for the system_health_report tool.
+// When Confirm is false (or Actions is empty) the tool returns a recommend-only report.
+// When Confirm is true AND Actions is non-empty the executor runs each listed action.
+type MCPHealthReportArgs struct {
+	Confirm bool        `json:"confirm,omitempty" jsonschema:"Set to true together with a non-empty actions list to execute remediation actions"`
+	Actions []ActionRef `json:"actions,omitempty" jsonschema:"List of recommended actions to execute (from a previous report). Leave empty to receive a report only."`
+}
+
+// MCPMetricHistoryArgs represents arguments for the query_metric_history tool.
+type MCPMetricHistoryArgs struct {
+	Metric string `json:"metric" jsonschema:"required,metric name e.g. cpu_temp,array_used_pct,disk_temp"`
+	Entity string `json:"entity,omitempty" jsonschema:"optional entity id e.g. a disk or container id"`
+}
+
+// MCPRunRunbookArgs represents arguments for the run_runbook tool.
+// When Confirm is false the tool is a dry-run: it returns planned steps without executing anything.
+// When Confirm is true supported-action steps are executed via the executor.
+type MCPRunRunbookArgs struct {
+	Name    string   `json:"name" jsonschema:"required,runbook name e.g. restart_unhealthy_containers"`
+	Confirm bool     `json:"confirm,omitempty" jsonschema:"Set to true to execute the runbook steps; false (default) returns a dry-run plan only"`
+	Targets []string `json:"targets,omitempty" jsonschema:"container IDs for restart_unhealthy_containers; leave empty to auto-resolve from cache"`
 }

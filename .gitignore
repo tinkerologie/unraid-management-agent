@@ -93,3 +93,4 @@ PHASE_2_COMPLETION_SUMMARY.md
 .ai-scratch/*
 !.ai-scratch/.gitkeep
 .claude/settings.json
+.claude/settings.local.json

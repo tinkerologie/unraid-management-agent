@@ -69,6 +69,7 @@ type AlertEnv struct {
 	RunningContainers         int     `expr:"RunningContainers"`
 	StoppedContainers         int     `expr:"StoppedContainers"`
 	ContainerUpdatesAvailable int     `expr:"ContainerUpdatesAvailable"`
+	PluginUpdatesAvailable    int     `expr:"PluginUpdatesAvailable"`
 	VMCount                   int     `expr:"VMCount"`
 	RunningVMs                int     `expr:"RunningVMs"`
 	MaxDiskTemp               float64 `expr:"MaxDiskTemp"`
@@ -108,6 +109,16 @@ type AlertEnv struct {
 	UnreadNotifications  int `expr:"UnreadNotifications"`
 	WarningNotifications int `expr:"WarningNotifications"`
 	AlertNotifications   int `expr:"AlertNotifications"`
+
+	// Trends (derived from MetricsHistory)
+	ArrayFillETAHours           float64 `expr:"ArrayFillETAHours"`
+	MaxDiskFillETAHours         float64 `expr:"MaxDiskFillETAHours"`
+	CPUTempSlopePerMin          float64 `expr:"CPUTempSlopePerMin"`
+	MaxDiskTempSlopePerMin      float64 `expr:"MaxDiskTempSlopePerMin"`
+	MaxContainerRestartsPerHour float64 `expr:"MaxContainerRestartsPerHour"`
+	MaxReallocatedSectors       int     `expr:"MaxReallocatedSectors"`
+	MaxPendingSectors           int     `expr:"MaxPendingSectors"`
+	DiskErrorsIncreasing        bool    `expr:"DiskErrorsIncreasing"`
 }
 
 // AlertRulesConfig is the top-level structure persisted to the JSON config file.

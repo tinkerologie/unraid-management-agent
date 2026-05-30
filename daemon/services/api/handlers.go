@@ -15,6 +15,7 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/alerting"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/collectors"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/controllers"
 )
@@ -2669,6 +2670,26 @@ func (s *Server) handleDockerUpdatesRefresh(w http.ResponseWriter, _ *http.Reque
 	respondJSON(w, http.StatusOK, result)
 }
 
+// handleDockerNetworks godoc
+//
+//	@Summary		Get Docker networks
+//	@Description	Serves the cached Docker network list. Returns an empty list when no cache is available yet.
+//	@Tags			Docker
+//	@Produce		json
+//	@Success		200	{object}	dto.DockerNetworkList	"Docker network list"
+//	@Router			/docker/networks [get]
+func (s *Server) handleDockerNetworks(w http.ResponseWriter, _ *http.Request) {
+	if cached := s.GetDockerNetworksCache(); cached != nil {
+		respondJSON(w, http.StatusOK, cached)
+		return
+	}
+	respondJSON(w, http.StatusOK, dto.DockerNetworkList{
+		Networks:  []dto.DockerNetworkInfo{},
+		Count:     0,
+		Timestamp: time.Now(),
+	})
+}
+
 // handleDockerCheckUpdate godoc
 //
 //	@Summary		Check a specific container for updates
@@ -2828,33 +2849,47 @@ func (s *Server) handleDockerUpdateAll(w http.ResponseWriter, _ *http.Request) {
 
 // handlePluginCheckUpdates godoc
 //
-//	@Summary		Check for plugin updates
-//	@Description	Check all installed plugins for available updates
+//	@Summary		Get cached plugin update status
+//	@Description	Serves the cached plugin update result. Returns an empty result when no cache is available yet.
 //	@Tags			Plugins
 //	@Produce		json
-//	@Success		200	{array}		dto.PluginInfo	"Plugins with available updates"
-//	@Failure		500	{object}	dto.Response	"Failed to check updates"
+//	@Success		200	{object}	dto.PluginList	"Plugin update status"
 //	@Router			/plugins/check-updates [get]
 func (s *Server) handlePluginCheckUpdates(w http.ResponseWriter, _ *http.Request) {
-	logger.Info("API: Checking for plugin updates")
+	if cached := s.GetPluginUpdatesCache(); cached != nil {
+		respondJSON(w, http.StatusOK, cached)
+		return
+	}
+	respondJSON(w, http.StatusOK, dto.PluginList{})
+}
 
+// handlePluginUpdatesRefresh godoc
+//
+//	@Summary		Force a plugin update re-check
+//	@Description	Runs an immediate plugin update check and publishes the result.
+//	@Tags			Plugins
+//	@Produce		json
+//	@Success		200	{object}	dto.PluginList	"Refreshed plugin update status"
+//	@Failure		500	{object}	dto.Response	"Check failed"
+//	@Router			/plugins/updates/refresh [post]
+func (s *Server) handlePluginUpdatesRefresh(w http.ResponseWriter, _ *http.Request) {
 	controller := controllers.NewPluginController()
 	updates, err := controller.CheckPluginUpdates()
 	if err != nil {
-		logger.Error("API: Failed to check plugin updates: %v", err)
+		logger.Error("API: plugin update refresh failed: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
-			Success:   false,
-			Message:   "Failed to check for plugin updates",
-			Timestamp: time.Now(),
+			Success: false, Message: "plugin update check failed", Timestamp: time.Now(),
 		})
 		return
 	}
-
-	respondJSON(w, http.StatusOK, map[string]any{
-		"plugins_with_updates": updates,
-		"count":                len(updates),
-		"timestamp":            time.Now(),
-	})
+	result := &dto.PluginList{
+		Plugins:          updates,
+		TotalCount:       len(updates),
+		UpdatesAvailable: len(updates),
+		Timestamp:        time.Now(),
+	}
+	domain.Publish(s.ctx.Hub, constants.TopicPluginUpdatesUpdate, result)
+	respondJSON(w, http.StatusOK, result)
 }
 
 // handlePluginUpdate godoc
@@ -3705,6 +3740,105 @@ func (s *Server) handleFiringAlerts(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, s.alertEngine.GetFiringAlerts())
 }
 
+// handleAlertTemplates godoc
+//
+//	@Summary		List alert rule templates
+//	@Description	Retrieve curated, disabled-by-default alert rule templates using trend/predictive metrics
+//	@Tags			Alerts
+//	@Produce		json
+//	@Success		200	{array}	dto.AlertRule	"List of alert rule templates"
+//	@Router			/alerts/templates [get]
+func (s *Server) handleAlertTemplates(w http.ResponseWriter, _ *http.Request) {
+	respondJSON(w, http.StatusOK, alerting.AlertRuleTemplates())
+}
+
+// handleEnableAlertTemplate godoc
+//
+//	@Summary		Enable an alert rule template
+//	@Description	Enable a template by ID, creating or updating the corresponding alert rule. Idempotent: calling multiple times updates the same rule. Optional JSON body may specify channels; defaults to ["unraid"].
+//	@Tags			Alerts
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		string				true	"Template ID (e.g. tmpl-array-fill)"
+//	@Param			body	body		object				false	"Optional channels"
+//	@Success		200		{object}	dto.AlertRule		"Enabled alert rule"
+//	@Failure		400		{object}	dto.Response		"Invalid request body"
+//	@Failure		404		{object}	dto.Response		"Unknown template"
+//	@Failure		503		{object}	dto.Response		"Alerting engine not initialized"
+//	@Router			/alerts/templates/{id}/enable [post]
+func (s *Server) handleEnableAlertTemplate(w http.ResponseWriter, r *http.Request) {
+	if s.alertStore == nil || s.alertEngine == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Alerting engine not initialized")
+		return
+	}
+
+	id := mux.Vars(r)["id"]
+
+	var body struct {
+		Channels []string `json:"channels"`
+	}
+	if r.ContentLength > 0 {
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			respondWithError(w, http.StatusBadRequest, "Invalid request body")
+			return
+		}
+	}
+
+	rule, ok := alerting.RuleFromTemplate(id, body.Channels)
+	if !ok {
+		respondJSON(w, http.StatusNotFound, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("unknown template: %s", id),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	// Idempotent upsert: update if rule already exists, otherwise create.
+	if _, err := s.alertStore.GetRule(rule.ID); err == nil {
+		if err := s.alertStore.UpdateRule(rule); err != nil {
+			logger.Error("API: Failed to update alert rule from template %s: %v", id, err)
+			respondWithError(w, http.StatusInternalServerError, "Failed to update alert rule")
+			return
+		}
+	} else {
+		if err := s.alertStore.CreateRule(rule); err != nil {
+			logger.Error("API: Failed to create alert rule from template %s: %v", id, err)
+			respondWithError(w, http.StatusInternalServerError, "Failed to create alert rule")
+			return
+		}
+	}
+
+	s.alertEngine.RecompileRules()
+	respondJSON(w, http.StatusOK, rule)
+}
+
+// handleMetricHistory godoc
+//
+//	@Summary		Query metric history
+//	@Description	Return in-memory ring-buffer samples and summary stats (slope, min, max, avg, last) for a named metric series. Pass entity for per-disk or per-container metrics.
+//	@Tags			Alerts
+//	@Produce		json
+//	@Param			metric	query		string					true	"Metric name (e.g. cpu_temp, array_used_pct, disk_temp)"
+//	@Param			entity	query		string					false	"Entity ID for per-entity metrics (e.g. disk ID, container ID)"
+//	@Success		200		{object}	dto.MetricHistoryResult	"Metric history"
+//	@Failure		400		{object}	dto.Response			"metric query parameter is required"
+//	@Failure		503		{object}	dto.Response			"Alerting engine not initialized"
+//	@Router			/metrics/history [get]
+func (s *Server) handleMetricHistory(w http.ResponseWriter, r *http.Request) {
+	if s.alertEngine == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Alerting engine not initialized")
+		return
+	}
+	metric := r.URL.Query().Get("metric")
+	if metric == "" {
+		respondWithError(w, http.StatusBadRequest, "metric query parameter is required")
+		return
+	}
+	entity := r.URL.Query().Get("entity")
+	respondJSON(w, http.StatusOK, s.alertEngine.QueryHistory(metric, entity))
+}
+
 // ============================================================================
 // Health Check / Watchdog Handlers
 // ============================================================================
@@ -4441,6 +4575,43 @@ func (s *Server) handleSetInotifyLimits(w http.ResponseWriter, r *http.Request) 
 	respondJSON(w, http.StatusOK, dto.Response{
 		Success:   true,
 		Message:   "Inotify limits updated",
+		Timestamp: time.Now(),
+	})
+}
+
+// handleOSUpdate godoc
+//
+//	@Summary		Get OS update availability
+//	@Description	Returns the cached OS update status. No outbound network calls are made; the result is based on local files only. Returns an "unknown" sentinel when no local latest-version data is available.
+//	@Tags			OS
+//	@Produce		json
+//	@Success		200	{object}	dto.OSUpdateStatus	"OS update status"
+//	@Router			/os/update [get]
+func (s *Server) handleOSUpdate(w http.ResponseWriter, _ *http.Request) {
+	if cached := s.GetOSUpdateCache(); cached != nil {
+		respondJSON(w, http.StatusOK, cached)
+		return
+	}
+	respondJSON(w, http.StatusOK, &dto.OSUpdateStatus{
+		Status:    dto.OSUpdateStatusUnknown,
+		Timestamp: time.Now(),
+	})
+}
+
+// handleMover godoc
+//
+//	@Summary		Get mover status
+//	@Description	Returns the cached mover status including active state, schedule, and last-run statistics. Returns a zero-value sentinel when no data is available yet.
+//	@Tags			Mover
+//	@Produce		json
+//	@Success		200	{object}	dto.MoverStatus	"Mover status"
+//	@Router			/mover [get]
+func (s *Server) handleMover(w http.ResponseWriter, _ *http.Request) {
+	if cached := s.GetMoverCache(); cached != nil {
+		respondJSON(w, http.StatusOK, cached)
+		return
+	}
+	respondJSON(w, http.StatusOK, &dto.MoverStatus{
 		Timestamp: time.Now(),
 	})
 }

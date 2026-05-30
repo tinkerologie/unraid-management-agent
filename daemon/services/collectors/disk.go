@@ -521,7 +521,11 @@ func (c *DiskCollector) isNVMeDevice(device string) bool {
 	return isNVMe
 }
 
-// enrichWithSMARTData adds SMART attributes using smartctl
+// enrichWithSMARTData adds SMART health status and attributes using smartctl.
+// For SATA/SAS drives it combines -H and -A in a single invocation with -n standby
+// so spun-down disks are never woken up. The attribute table is parsed into
+// SMARTAttributes and the PowerOnHours / PowerCycleCount convenience fields are
+// populated from their well-known attribute IDs.
 func (c *DiskCollector) enrichWithSMARTData(disk *dto.DiskInfo) {
 	devicePath := "/dev/" + disk.Device
 
@@ -552,27 +556,26 @@ func (c *DiskCollector) enrichWithSMARTData(disk *dto.DiskInfo) {
 	var err error
 
 	if isNVMe {
-		// NVMe drives don't support standby mode, so we skip the -n standby flag
-		// Use smartctl -H directly for NVMe drives
+		// NVMe drives don't support standby mode, so we skip the -n standby flag.
+		// -H only — NVMe attribute format differs from ATA; we parse health status only.
 		logger.Debug("Disk: Collecting SMART data for NVMe device %s (no standby check)", disk.Device)
 		lines, err = lib.ExecCommand("smartctl", "-H", devicePath)
 	} else {
-		// SATA/SAS drives support standby mode
-		// Run smartctl with -n standby to avoid waking up spun-down disks
-		// The -n standby flag tells smartctl to skip the check if the disk is in standby mode
-		// This preserves Unraid's disk spin-down functionality
+		// SATA/SAS drives: combine health check (-H) and attribute table (-A) in one
+		// call while respecting standby mode (-n standby). Adding -A does not change
+		// the exit-code semantics: exit 2 still means "disk in standby, skipped".
+		//
 		// Exit codes:
 		//   0 = Success, disk is active, SMART data retrieved
 		//   2 = Disk is in standby/sleep mode, check skipped (disk NOT woken up)
 		//   Other = Error accessing disk
 		logger.Debug("Disk: Collecting SMART data for SATA/SAS device %s (with standby check)", disk.Device)
-		lines, err = lib.ExecCommand("smartctl", "-n", "standby", "-H", devicePath)
+		lines, err = lib.ExecCommand("smartctl", "-n", "standby", "-H", "-A", devicePath)
 	}
 
 	if err != nil {
-		// Check if this is a "disk in standby" error (exit code 2)
-		// In this case, we preserve the disk's spun-down state and skip SMART check
-		// The SMART status will remain as the last known value or UNKNOWN
+		// Disk may be in standby mode (exit code 2) or otherwise inaccessible.
+		// The SMART status will remain as the last known value or UNKNOWN.
 		logger.Debug("Disk: Skipping SMART check for %s (disk may be in standby mode): %v", disk.Device, err)
 		return
 	}
@@ -608,6 +611,95 @@ func (c *DiskCollector) enrichWithSMARTData(disk *dto.DiskInfo) {
 			}
 		}
 	}
+
+	// Parse the ATA attribute table (only present for SATA/SAS with -A).
+	if !isNVMe {
+		attrs := parseSMARTAttributes(lines)
+		if len(attrs) > 0 {
+			disk.SMARTAttributes = attrs
+			// Populate convenience fields from well-known attribute IDs.
+			if a, ok := attrs["9"]; ok {
+				if v, parseErr := strconv.ParseUint(strings.Fields(a.RawValue)[0], 10, 64); parseErr == nil {
+					disk.PowerOnHours = v
+				}
+			}
+			if a, ok := attrs["12"]; ok {
+				if v, parseErr := strconv.ParseUint(strings.Fields(a.RawValue)[0], 10, 64); parseErr == nil {
+					disk.PowerCycleCount = v
+				}
+			}
+		}
+	}
+}
+
+// parseSMARTAttributes parses the ATA SMART attribute table from smartctl -A output.
+// Each data row looks like (columns separated by whitespace):
+//
+//	ID# ATTRIBUTE_NAME FLAG VALUE WORST THRESH TYPE UPDATED WHEN_FAILED RAW_VALUE
+//	  5 Reallocated_Sector_Ct   0x0033   100   100   010    Pre-fail  Always       -       0
+//
+// The map key is the decimal attribute ID as a string (e.g. "5", "197").
+// Parsing is defensive: malformed lines are silently skipped.
+func parseSMARTAttributes(lines []string) map[string]dto.SMARTAttribute {
+	// Guard against panics from unexpected input.
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Debug("Disk: recovered panic in parseSMARTAttributes: %v", r)
+		}
+	}()
+
+	attrs := make(map[string]dto.SMARTAttribute)
+	inTable := false
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// The table starts after the header line that begins with "ID#".
+		if strings.HasPrefix(line, "ID#") {
+			inTable = true
+			continue
+		}
+		if !inTable || line == "" {
+			continue
+		}
+
+		fields := strings.Fields(line)
+		// Minimum required: ID, NAME, FLAG, VALUE, WORST, THRESH, TYPE, UPDATED, WHEN_FAILED, RAW_VALUE
+		if len(fields) < 10 {
+			continue
+		}
+
+		idVal, err := strconv.Atoi(fields[0])
+		if err != nil {
+			// Not a numeric ID row (e.g. footer text); stop scanning.
+			break
+		}
+
+		value, _ := strconv.Atoi(fields[3])
+		worst, _ := strconv.Atoi(fields[4])
+		threshold, _ := strconv.Atoi(fields[5])
+
+		// RAW_VALUE is the last field; there may be extra whitespace but Fields()
+		// handles that. The raw value can include a trailing space-separated note
+		// (e.g. "4294967295" or "0 (0 200 0 0 0)") — capture everything from
+		// field 9 onward to preserve the full raw string.
+		rawValue := strings.Join(fields[9:], " ")
+
+		attr := dto.SMARTAttribute{
+			ID:         idVal,
+			Name:       fields[1],
+			Value:      value,
+			Worst:      worst,
+			Threshold:  threshold,
+			WhenFailed: fields[8],
+			RawValue:   rawValue,
+		}
+
+		key := strconv.Itoa(idVal)
+		attrs[key] = attr
+	}
+
+	return attrs
 }
 
 // enrichWithMountInfo adds mount point and usage information

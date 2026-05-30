@@ -53,24 +53,28 @@ type FileConfigMQTT struct {
 
 // FileConfigIntervals holds collection interval overrides from the config file.
 type FileConfigIntervals struct {
-	System       *int `yaml:"system,omitempty"`
-	Array        *int `yaml:"array,omitempty"`
-	Disk         *int `yaml:"disk,omitempty"`
-	Docker       *int `yaml:"docker,omitempty"`
-	VM           *int `yaml:"vm,omitempty"`
-	UPS          *int `yaml:"ups,omitempty"`
-	NUT          *int `yaml:"nut,omitempty"`
-	GPU          *int `yaml:"gpu,omitempty"`
-	Shares       *int `yaml:"shares,omitempty"`
-	Network      *int `yaml:"network,omitempty"`
-	Hardware     *int `yaml:"hardware,omitempty"`
-	ZFS          *int `yaml:"zfs,omitempty"`
-	Notification *int `yaml:"notification,omitempty"`
-	Registration *int `yaml:"registration,omitempty"`
-	Unassigned   *int `yaml:"unassigned,omitempty"`
-	FanControl   *int `yaml:"fancontrol,omitempty"`
-	Tuning       *int `yaml:"tuning,omitempty"`
-	DockerUpdate *int `yaml:"docker_update,omitempty"`
+	System         *int `yaml:"system,omitempty"`
+	Array          *int `yaml:"array,omitempty"`
+	Disk           *int `yaml:"disk,omitempty"`
+	Docker         *int `yaml:"docker,omitempty"`
+	VM             *int `yaml:"vm,omitempty"`
+	UPS            *int `yaml:"ups,omitempty"`
+	NUT            *int `yaml:"nut,omitempty"`
+	GPU            *int `yaml:"gpu,omitempty"`
+	Shares         *int `yaml:"shares,omitempty"`
+	Network        *int `yaml:"network,omitempty"`
+	Hardware       *int `yaml:"hardware,omitempty"`
+	ZFS            *int `yaml:"zfs,omitempty"`
+	Notification   *int `yaml:"notification,omitempty"`
+	Registration   *int `yaml:"registration,omitempty"`
+	Unassigned     *int `yaml:"unassigned,omitempty"`
+	FanControl     *int `yaml:"fancontrol,omitempty"`
+	Tuning         *int `yaml:"tuning,omitempty"`
+	DockerUpdate   *int `yaml:"docker_update,omitempty"`
+	DockerNetworks *int `yaml:"docker_networks,omitempty"`
+	PluginUpdate   *int `yaml:"plugin_update,omitempty"`
+	OSUpdate       *int `yaml:"os_update,omitempty"`
+	Mover          *int `yaml:"mover,omitempty"`
 }
 
 // LoadConfigFile reads and parses a YAML config file.

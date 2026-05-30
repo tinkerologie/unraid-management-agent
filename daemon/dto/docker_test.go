@@ -26,6 +26,17 @@ func TestContainerUpdateInfo_Status(t *testing.T) {
 	}
 }
 
+func TestContainerInfo_RestartCountMarshals(t *testing.T) {
+	c := ContainerInfo{Name: "plex", RestartCount: 3}
+	b, err := json.Marshal(c)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if !strings.Contains(string(b), `"restart_count":3`) {
+		t.Errorf("expected restart_count:3, got %s", b)
+	}
+}
+
 func TestContainerInfo_UpdateMarshalOmitsNilBool(t *testing.T) {
 	c := ContainerInfo{Name: "plex", UpdateStatus: UpdateStatusUnknown}
 	b, err := json.Marshal(c)

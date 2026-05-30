@@ -29,6 +29,7 @@ func (m *mockDataProvider) GetZFSPoolsCache() []dto.ZFSPool              { retur
 func (m *mockDataProvider) GetNetworkCache() []dto.NetworkInfo           { return nil }
 func (m *mockDataProvider) GetNUTCache() *dto.NUTResponse                { return nil }
 func (m *mockDataProvider) GetNotificationsCache() *dto.NotificationList { return nil }
+func (m *mockDataProvider) GetPluginUpdatesCache() *dto.PluginList       { return nil }
 
 func newMockProvider() *mockDataProvider {
 	return &mockDataProvider{
@@ -277,6 +278,24 @@ func TestContainerUpdatesAvailableMetric(t *testing.T) {
 	env := e.buildEnv()
 	if env.ContainerUpdatesAvailable != 1 {
 		t.Errorf("ContainerUpdatesAvailable = %d, want 1", env.ContainerUpdatesAvailable)
+	}
+}
+
+func TestEngineTrendFields(t *testing.T) {
+	provider := &mockDataProvider{}
+	e := NewEngine(NewStore(t.TempDir()), provider)
+	base := time.Unix(1_700_000_000, 0)
+	for i := 0; i < 30; i++ {
+		e.history.Record("cpu_temp", "", 40+0.5*float64(i), base.Add(time.Duration(i)*15*time.Second))
+		e.history.Record("array_used_pct", "", 80+0.03*float64(i), base.Add(time.Duration(i)*15*time.Second))
+	}
+	var env dto.AlertEnv
+	e.overlayTrends(&env)
+	if env.CPUTempSlopePerMin <= 0 {
+		t.Errorf("CPUTempSlopePerMin = %v, want > 0", env.CPUTempSlopePerMin)
+	}
+	if env.ArrayFillETAHours <= 0 {
+		t.Errorf("ArrayFillETAHours = %v, want > 0", env.ArrayFillETAHours)
 	}
 }
 

@@ -289,6 +289,87 @@ const docTemplate = `{
                 }
             }
         },
+        "/alerts/templates": {
+            "get": {
+                "description": "Retrieve curated, disabled-by-default alert rule templates using trend/predictive metrics",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Alerts"
+                ],
+                "summary": "List alert rule templates",
+                "responses": {
+                    "200": {
+                        "description": "List of alert rule templates",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.AlertRule"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/alerts/templates/{id}/enable": {
+            "post": {
+                "description": "Enable a template by ID, creating or updating the corresponding alert rule. Idempotent: calling multiple times updates the same rule. Optional JSON body may specify channels; defaults to [\"unraid\"].",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Alerts"
+                ],
+                "summary": "Enable an alert rule template",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Template ID (e.g. tmpl-array-fill)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Optional channels",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Enabled alert rule",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AlertRule"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown template",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "503": {
+                        "description": "Alerting engine not initialized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/array": {
             "get": {
                 "description": "Retrieve Unraid array status including parity information",
@@ -861,6 +942,26 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/dto.ContainerInfo"
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/docker/networks": {
+            "get": {
+                "description": "Serves the cached Docker network list. Returns an empty list when no cache is available yet.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Docker"
+                ],
+                "summary": "Get Docker networks",
+                "responses": {
+                    "200": {
+                        "description": "Docker network list",
+                        "schema": {
+                            "$ref": "#/definitions/dto.DockerNetworkList"
                         }
                     }
                 }
@@ -1908,6 +2009,26 @@ const docTemplate = `{
                 }
             }
         },
+        "/health/report": {
+            "get": {
+                "description": "Aggregate health signals from array, disks, containers, and firing alerts into a prioritized list of findings with recommended actions",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System"
+                ],
+                "summary": "Get system health report",
+                "responses": {
+                    "200": {
+                        "description": "Health report",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HealthReport"
+                        }
+                    }
+                }
+            }
+        },
         "/healthchecks": {
             "get": {
                 "description": "Get all configured health checks",
@@ -2286,6 +2407,73 @@ const docTemplate = `{
                         "description": "Prometheus metrics",
                         "schema": {
                             "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/metrics/history": {
+            "get": {
+                "description": "Return in-memory ring-buffer samples and summary stats (slope, min, max, avg, last) for a named metric series. Pass entity for per-disk or per-container metrics.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Alerts"
+                ],
+                "summary": "Query metric history",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Metric name (e.g. cpu_temp, array_used_pct, disk_temp)",
+                        "name": "metric",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Entity ID for per-entity metrics (e.g. disk ID, container ID)",
+                        "name": "entity",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Metric history",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MetricHistoryResult"
+                        }
+                    },
+                    "400": {
+                        "description": "metric query parameter is required",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "503": {
+                        "description": "Alerting engine not initialized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/mover": {
+            "get": {
+                "description": "Returns the cached mover status including active state, schedule, and last-run statistics. Returns a zero-value sentinel when no data is available yet.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Mover"
+                ],
+                "summary": "Get mover status",
+                "responses": {
+                    "200": {
+                        "description": "Mover status",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MoverStatus"
                         }
                     }
                 }
@@ -2838,6 +3026,26 @@ const docTemplate = `{
                 }
             }
         },
+        "/os/update": {
+            "get": {
+                "description": "Returns the cached OS update status. No outbound network calls are made; the result is based on local files only. Returns an \"unknown\" sentinel when no local latest-version data is available.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OS"
+                ],
+                "summary": "Get OS update availability",
+                "responses": {
+                    "200": {
+                        "description": "OS update status",
+                        "schema": {
+                            "$ref": "#/definitions/dto.OSUpdateStatus"
+                        }
+                    }
+                }
+            }
+        },
         "/plugins": {
             "get": {
                 "description": "Retrieve list of installed plugins with their versions and update status",
@@ -2866,28 +3074,19 @@ const docTemplate = `{
         },
         "/plugins/check-updates": {
             "get": {
-                "description": "Check all installed plugins for available updates",
+                "description": "Serves the cached plugin update result. Returns an empty result when no cache is available yet.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Plugins"
                 ],
-                "summary": "Check for plugin updates",
+                "summary": "Get cached plugin update status",
                 "responses": {
                     "200": {
-                        "description": "Plugins with available updates",
+                        "description": "Plugin update status",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/dto.PluginInfo"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Failed to check updates",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
+                            "$ref": "#/definitions/dto.PluginList"
                         }
                     }
                 }
@@ -2912,6 +3111,32 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Failed to update plugins",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/plugins/updates/refresh": {
+            "post": {
+                "description": "Runs an immediate plugin update check and publishes the result.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Plugins"
+                ],
+                "summary": "Force a plugin update re-check",
+                "responses": {
+                    "200": {
+                        "description": "Refreshed plugin update status",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PluginList"
+                        }
+                    },
+                    "500": {
+                        "description": "Check failed",
                         "schema": {
                             "$ref": "#/definitions/dto.Response"
                         }
@@ -4720,6 +4945,22 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.ActionRef": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "example": "restart_container"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "target": {
+                    "type": "string",
+                    "example": "abc123def456"
+                }
+            }
+        },
         "dto.AlertEvent": {
             "type": "object",
             "properties": {
@@ -5345,9 +5586,17 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 104857600
                 },
+                "network_rx_bytes_per_sec": {
+                    "type": "number",
+                    "example": 1024
+                },
                 "network_tx_bytes": {
                     "type": "integer",
                     "example": 52428800
+                },
+                "network_tx_bytes_per_sec": {
+                    "type": "number",
+                    "example": 512
                 },
                 "port_mappings": {
                     "type": "array",
@@ -5360,6 +5609,10 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/dto.PortMapping"
                     }
+                },
+                "restart_count": {
+                    "type": "integer",
+                    "example": 0
                 },
                 "restart_policy": {
                     "type": "string",
@@ -5855,6 +6108,75 @@ const docTemplate = `{
                 "total_memory_usage_mb": {
                     "type": "number",
                     "example": 8192
+                }
+            }
+        },
+        "dto.DockerNetworkInfo": {
+            "type": "object",
+            "properties": {
+                "attachable": {
+                    "type": "boolean"
+                },
+                "container_names": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "created": {
+                    "type": "string"
+                },
+                "driver": {
+                    "type": "string",
+                    "example": "bridge"
+                },
+                "gateway": {
+                    "type": "string",
+                    "example": "172.17.0.1"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "internal": {
+                    "type": "boolean"
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "name": {
+                    "type": "string",
+                    "example": "bridge"
+                },
+                "scope": {
+                    "type": "string",
+                    "example": "local"
+                },
+                "subnet": {
+                    "type": "string",
+                    "example": "172.17.0.0/16"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.DockerNetworkList": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "networks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.DockerNetworkInfo"
+                    }
+                },
+                "timestamp": {
+                    "type": "string"
                 }
             }
         },
@@ -6503,6 +6825,51 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.HealthFinding": {
+            "type": "object",
+            "properties": {
+                "detail": {
+                    "type": "string"
+                },
+                "recommended_actions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.ActionRef"
+                    }
+                },
+                "severity": {
+                    "description": "info|warning|critical",
+                    "type": "string",
+                    "example": "warning"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.HealthReport": {
+            "type": "object",
+            "properties": {
+                "critical_count": {
+                    "type": "integer"
+                },
+                "findings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.HealthFinding"
+                    }
+                },
+                "generated_at": {
+                    "type": "string"
+                },
+                "info_count": {
+                    "type": "integer"
+                },
+                "warning_count": {
+                    "type": "integer"
+                }
+            }
+        },
         "dto.InotifyInfo": {
             "type": "object",
             "properties": {
@@ -6749,6 +7116,52 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.MetricHistoryResult": {
+            "type": "object",
+            "properties": {
+                "avg": {
+                    "type": "number"
+                },
+                "count": {
+                    "type": "integer"
+                },
+                "entity": {
+                    "type": "string"
+                },
+                "last": {
+                    "type": "number"
+                },
+                "max": {
+                    "type": "number"
+                },
+                "metric": {
+                    "type": "string"
+                },
+                "min": {
+                    "type": "number"
+                },
+                "samples": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.MetricSample"
+                    }
+                },
+                "slope_per_sec": {
+                    "type": "number"
+                }
+            }
+        },
+        "dto.MetricSample": {
+            "type": "object",
+            "properties": {
+                "time_unix": {
+                    "type": "integer"
+                },
+                "value": {
+                    "type": "number"
+                }
+            }
+        },
         "dto.MoverSettings": {
             "description": "Mover configuration, schedule, and current status",
             "type": "object",
@@ -6774,6 +7187,56 @@ const docTemplate = `{
                     "example": "0 12 * * *"
                 },
                 "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.MoverStatus": {
+            "description": "Mover state, schedule, last-run timing, and file/byte transfer statistics.",
+            "type": "object",
+            "properties": {
+                "active": {
+                    "description": "Active indicates whether the mover is currently running (from var.ini shareMoverActive).",
+                    "type": "boolean",
+                    "example": false
+                },
+                "current_throughput_mbs": {
+                    "description": "CurrentThroughputMBs is the live throughput in MB/s. Always 0 in the conservative\nimplementation (live throughput tracking is out of scope).",
+                    "type": "number",
+                    "example": 0
+                },
+                "last_run_bytes_moved": {
+                    "description": "LastRunBytesMoved is the total bytes moved during the last run.",
+                    "type": "integer",
+                    "example": 5368709120
+                },
+                "last_run_duration_seconds": {
+                    "description": "LastRunDurationSeconds is the duration of the last run in seconds (finish - start).",
+                    "type": "integer",
+                    "example": 720
+                },
+                "last_run_files_moved": {
+                    "description": "LastRunFilesMoved is the number of files moved during the last run.",
+                    "type": "integer",
+                    "example": 1024
+                },
+                "last_run_finish": {
+                    "description": "LastRunFinish is the ISO-8601 timestamp when the last mover run ended.",
+                    "type": "string",
+                    "example": "2026-05-30T03:52:00Z"
+                },
+                "last_run_start": {
+                    "description": "LastRunStart is the ISO-8601 timestamp when the last mover run began.",
+                    "type": "string",
+                    "example": "2026-05-30T03:40:00Z"
+                },
+                "schedule": {
+                    "description": "Schedule is the cron schedule expression for the mover (from var.ini shareMoverSchedule).",
+                    "type": "string",
+                    "example": "40 3 * * *"
+                },
+                "timestamp": {
+                    "description": "Timestamp is when this status was collected.",
                     "type": "string"
                 }
             }
@@ -7574,6 +8037,35 @@ const docTemplate = `{
                 },
                 "unread": {
                     "$ref": "#/definitions/dto.NotificationCounts"
+                }
+            }
+        },
+        "dto.OSUpdateStatus": {
+            "type": "object",
+            "properties": {
+                "current_version": {
+                    "description": "CurrentVersion is the running Unraid OS version (e.g. \"7.2.0\").",
+                    "type": "string",
+                    "example": "7.2.0"
+                },
+                "latest_version": {
+                    "description": "LatestVersion is the newest version found in a local candidate file, if any.",
+                    "type": "string",
+                    "example": "7.2.1"
+                },
+                "status": {
+                    "description": "Status is one of: \"up_to_date\", \"update_available\", \"unknown\".",
+                    "type": "string",
+                    "example": "unknown"
+                },
+                "timestamp": {
+                    "description": "Timestamp records when the check was performed.",
+                    "type": "string"
+                },
+                "update_available": {
+                    "description": "UpdateAvailable is true when LatestVersion != \"\" and LatestVersion != CurrentVersion.",
+                    "type": "boolean",
+                    "example": false
                 }
             }
         },

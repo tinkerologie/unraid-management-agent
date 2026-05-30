@@ -112,6 +112,7 @@ func (s *Server) setupRoutes() {
 
 	// Health check
 	api.HandleFunc("/health", s.handleHealth).Methods("GET")
+	api.HandleFunc("/health/report", s.handleHealthReport).Methods("GET")
 
 	// Monitoring endpoints
 	api.HandleFunc("/system", s.handleSystem).Methods("GET")
@@ -120,6 +121,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/disks/{id}", s.handleDisk).Methods("GET")
 	api.HandleFunc("/shares", s.handleShares).Methods("GET")
 	api.HandleFunc("/docker", s.handleDockerList).Methods("GET")
+	api.HandleFunc("/docker/networks", s.handleDockerNetworks).Methods("GET")
 	api.HandleFunc("/docker/updates", s.handleDockerCheckUpdates).Methods("GET")
 	api.HandleFunc("/docker/updates/refresh", s.handleDockerUpdatesRefresh).Methods("POST")
 	api.HandleFunc("/docker/update-all", s.handleDockerUpdateAll).Methods("POST")
@@ -202,11 +204,18 @@ func (s *Server) setupRoutes() {
 	// Plugin endpoints (Issue #52)
 	api.HandleFunc("/plugins", s.handlePluginList).Methods("GET")
 	api.HandleFunc("/plugins/check-updates", s.handlePluginCheckUpdates).Methods("GET")
+	api.HandleFunc("/plugins/updates/refresh", s.handlePluginUpdatesRefresh).Methods("POST")
 	api.HandleFunc("/plugins/update-all", s.handlePluginUpdateAll).Methods("POST")
 	api.HandleFunc("/plugins/{name}/update", s.handlePluginUpdate).Methods("POST")
 
 	// Update status endpoint (Issue #50)
 	api.HandleFunc("/updates", s.handleUpdateStatus).Methods("GET")
+
+	// OS update availability (local-file only, no network calls)
+	api.HandleFunc("/os/update", s.handleOSUpdate).Methods("GET")
+
+	// Mover status (state + schedule + last-run stats from /var/log/mover.log)
+	api.HandleFunc("/mover", s.handleMover).Methods("GET")
 
 	// Configuration endpoints (write)
 	api.HandleFunc("/shares/{name}/config", s.handleUpdateShareConfig).Methods("POST")
@@ -272,7 +281,12 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/healthchecks/{id}", s.handleDeleteHealthCheck).Methods("DELETE")
 	api.HandleFunc("/healthchecks/{id}/run", s.handleRunHealthCheck).Methods("POST")
 
+	// Metrics history endpoint
+	api.HandleFunc("/metrics/history", s.handleMetricHistory).Methods("GET")
+
 	// Alerting endpoints
+	api.HandleFunc("/alerts/templates", s.handleAlertTemplates).Methods("GET")
+	api.HandleFunc("/alerts/templates/{id}/enable", s.handleEnableAlertTemplate).Methods("POST")
 	api.HandleFunc("/alerts/rules", s.handleListAlertRules).Methods("GET")
 	api.HandleFunc("/alerts/rules", s.handleCreateAlertRule).Methods("POST")
 	api.HandleFunc("/alerts/rules/{id}", s.handleGetAlertRule).Methods("GET")
