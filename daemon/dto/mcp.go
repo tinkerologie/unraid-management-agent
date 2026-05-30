@@ -218,6 +218,12 @@ type MCPDeleteAlertRuleArgs struct {
 	Confirm bool   `json:"confirm" jsonschema:"Must be set to true to confirm deletion"`
 }
 
+// MCPEnableAlertTemplateArgs represents arguments for the enable_alert_template tool.
+type MCPEnableAlertTemplateArgs struct {
+	TemplateID string   `json:"template_id" jsonschema:"required,template id e.g. tmpl-array-fill"`
+	Channels   []string `json:"channels,omitempty" jsonschema:"optional notification channels; defaults to unraid notification"`
+}
+
 // MCPHealthCheckIDArgs represents arguments for operations on a specific health check.
 type MCPHealthCheckIDArgs struct {
 	CheckID string `json:"check_id" jsonschema:"The unique identifier of the health check"`

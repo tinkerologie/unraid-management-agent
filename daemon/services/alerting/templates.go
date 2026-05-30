@@ -13,3 +13,25 @@ func AlertRuleTemplates() []dto.AlertRule {
 		{ID: "tmpl-disk-errors-rising", Name: "Disk errors increasing", Expression: "DiskErrorsIncreasing", Severity: "critical", Enabled: false, CooldownMinutes: 720},
 	}
 }
+
+// RuleFromTemplate returns an enabled AlertRule built from the template with the
+// given id. channels are the notification targets; if empty it defaults to
+// ["unraid"] (an Unraid system notification) so the rule notifies somewhere.
+// The returned rule's ID equals the template id, making enable idempotent
+// (re-enabling updates the same rule rather than creating duplicates).
+// ok is false if no template has that id.
+func RuleFromTemplate(id string, channels []string) (rule dto.AlertRule, ok bool) {
+	for _, t := range AlertRuleTemplates() {
+		if t.ID == id {
+			r := t
+			r.Enabled = true
+			if len(channels) == 0 {
+				r.Channels = []string{"unraid"}
+			} else {
+				r.Channels = channels
+			}
+			return r, true
+		}
+	}
+	return dto.AlertRule{}, false
+}

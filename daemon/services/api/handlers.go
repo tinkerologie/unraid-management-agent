@@ -3752,6 +3752,67 @@ func (s *Server) handleAlertTemplates(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, alerting.AlertRuleTemplates())
 }
 
+// handleEnableAlertTemplate godoc
+//
+//	@Summary		Enable an alert rule template
+//	@Description	Enable a template by ID, creating or updating the corresponding alert rule. Idempotent: calling multiple times updates the same rule. Optional JSON body may specify channels; defaults to ["unraid"].
+//	@Tags			Alerts
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		string				true	"Template ID (e.g. tmpl-array-fill)"
+//	@Param			body	body		object				false	"Optional channels"
+//	@Success		200		{object}	dto.AlertRule		"Enabled alert rule"
+//	@Failure		400		{object}	dto.Response		"Invalid request body"
+//	@Failure		404		{object}	dto.Response		"Unknown template"
+//	@Failure		503		{object}	dto.Response		"Alerting engine not initialized"
+//	@Router			/alerts/templates/{id}/enable [post]
+func (s *Server) handleEnableAlertTemplate(w http.ResponseWriter, r *http.Request) {
+	if s.alertStore == nil || s.alertEngine == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Alerting engine not initialized")
+		return
+	}
+
+	id := mux.Vars(r)["id"]
+
+	var body struct {
+		Channels []string `json:"channels"`
+	}
+	if r.ContentLength > 0 {
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			respondWithError(w, http.StatusBadRequest, "Invalid request body")
+			return
+		}
+	}
+
+	rule, ok := alerting.RuleFromTemplate(id, body.Channels)
+	if !ok {
+		respondJSON(w, http.StatusNotFound, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("unknown template: %s", id),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	// Idempotent upsert: update if rule already exists, otherwise create.
+	if _, err := s.alertStore.GetRule(rule.ID); err == nil {
+		if err := s.alertStore.UpdateRule(rule); err != nil {
+			logger.Error("API: Failed to update alert rule from template %s: %v", id, err)
+			respondWithError(w, http.StatusInternalServerError, "Failed to update alert rule")
+			return
+		}
+	} else {
+		if err := s.alertStore.CreateRule(rule); err != nil {
+			logger.Error("API: Failed to create alert rule from template %s: %v", id, err)
+			respondWithError(w, http.StatusInternalServerError, "Failed to create alert rule")
+			return
+		}
+	}
+
+	s.alertEngine.RecompileRules()
+	respondJSON(w, http.StatusOK, rule)
+}
+
 // handleMetricHistory godoc
 //
 //	@Summary		Query metric history

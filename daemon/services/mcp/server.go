@@ -2164,6 +2164,39 @@ func (s *Server) registerAlertingTools() {
 		return jsonResult(alerting.AlertRuleTemplates())
 	})
 
+	// Enable alert rule template (idempotent upsert)
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "enable_alert_template",
+		Description: "Enable a curated alert rule template by ID. Creates the alert rule if it does not exist, or updates it if it does (idempotent). Optional channels override the default 'unraid' system notification. Template IDs: tmpl-array-fill, tmpl-disk-temp-climb, tmpl-container-flapping, tmpl-smart-reallocated, tmpl-disk-errors-rising.",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(false),
+			IdempotentHint:  true,
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPEnableAlertTemplateArgs) (*mcp.CallToolResult, any, error) {
+		if s.alertStore == nil || s.alertEngine == nil {
+			return textResult("Alerting engine not initialized"), nil, nil
+		}
+
+		rule, ok := alerting.RuleFromTemplate(args.TemplateID, args.Channels)
+		if !ok {
+			return textResult(fmt.Sprintf("unknown template: %s", args.TemplateID)), nil, nil
+		}
+
+		// Idempotent upsert: update if rule already exists, otherwise create.
+		if _, err := s.alertStore.GetRule(rule.ID); err == nil {
+			if err := s.alertStore.UpdateRule(rule); err != nil {
+				return textResult(fmt.Sprintf("Failed to update alert rule: %v", err)), nil, nil
+			}
+		} else {
+			if err := s.alertStore.CreateRule(rule); err != nil {
+				return textResult(fmt.Sprintf("Failed to create alert rule: %v", err)), nil, nil
+			}
+		}
+
+		s.alertEngine.RecompileRules()
+		return jsonResult(rule)
+	})
+
 	// Query metric history
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "query_metric_history",
@@ -2179,7 +2212,7 @@ func (s *Server) registerAlertingTools() {
 		return jsonResult(s.alertEngine.QueryHistory(args.Metric, args.Entity))
 	})
 
-	logger.Debug("MCP alerting tools registered (9 tools)")
+	logger.Debug("MCP alerting tools registered (10 tools)")
 }
 
 // registerWatchdogTools registers MCP tools for health check management and monitoring.
