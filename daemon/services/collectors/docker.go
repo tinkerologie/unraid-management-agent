@@ -61,11 +61,7 @@ func (c *DockerCollector) initClient() error {
 		return nil
 	}
 
-	//nolint:staticcheck // SA1019: Updating to new API in future version
-	dockerClient, err := client.NewClientWithOpts(
-		client.FromEnv,
-		client.WithAPIVersionNegotiation(), //nolint:staticcheck // SA1019
-	)
+	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation()) //nolint:staticcheck,govet // SA1019: Updating to new API in future version
 	if err != nil {
 		return err
 	}
