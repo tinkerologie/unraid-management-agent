@@ -27,6 +27,7 @@
 │   ├── logger/                 # Logging wrapper (lumberjack)
 │   └── services/
 │       ├── api/                # HTTP server, REST handlers, WebSocket hub
+│       ├── agent/              # Embedded autonomous agent (LLM loop, tools, sessions)
 │       ├── alerting/           # Alert engine, evaluation, dispatch
 │       ├── collectors/         # Data collection goroutines
 │       ├── controllers/        # Control operations (Docker, VM, Array, etc.)
@@ -509,5 +510,6 @@ See `docs/api/` for complete endpoint documentation.
 - **API Reference:** `docs/api/`
 - **WebSocket Events:** `docs/api/websocket-events.md`
 - **MCP Integration:** `docs/integrations/mcp.md`
+- **Agent Core:** `docs/integrations/agent.md`
 - **System Requirements:** `docs/guides/system-requirements.md`
 - **Configuration:** `docs/guides/configuration.md`
