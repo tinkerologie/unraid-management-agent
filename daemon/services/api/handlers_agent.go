@@ -104,6 +104,65 @@ func (s *Server) handleAgentGetSession(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, sess)
 }
 
+// handleAgentApprove resolves a pending approval and resumes the session.
+//
+//	@Summary		Approve or reject a pending agent action
+//	@Description	Approve or reject a pending high-risk tool call, resuming the session
+//	@Tags			Agent
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		string								true	"Session ID"
+//	@Param			request	body		object{action_id=string,approve=bool}	true	"Approval decision"
+//	@Success		200		{object}	dto.AgentSession					"Updated session"
+//	@Failure		400		{object}	dto.Response						"Invalid request or service error"
+//	@Failure		503		{object}	dto.Response						"Agent disabled"
+//	@Router			/agent/sessions/{id}/approve [post]
+func (s *Server) handleAgentApprove(w http.ResponseWriter, r *http.Request) {
+	if s.agentSvc == nil || !s.agentSvc.Enabled() {
+		respondJSON(w, http.StatusServiceUnavailable, dto.Response{Success: false, Message: "agent is disabled", Timestamp: time.Now()})
+		return
+	}
+	id := mux.Vars(r)["id"]
+	var body struct {
+		ActionID string `json:"action_id"`
+		Approve  bool   `json:"approve"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.ActionID == "" {
+		respondWithError(w, http.StatusBadRequest, "request body must include 'action_id' and 'approve'")
+		return
+	}
+	sess, err := s.agentSvc.ApproveAction(r.Context(), id, body.ActionID, body.Approve)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	respondJSON(w, http.StatusOK, sess)
+}
+
+// handleAgentCancel cancels a session.
+//
+//	@Summary		Cancel an agent session
+//	@Description	Cancel a running or awaiting-approval agent session
+//	@Tags			Agent
+//	@Produce		json
+//	@Param			id	path		string				true	"Session ID"
+//	@Success		200	{object}	dto.AgentSession	"Cancelled session"
+//	@Failure		400	{object}	dto.Response		"Service error"
+//	@Failure		503	{object}	dto.Response		"Agent disabled"
+//	@Router			/agent/sessions/{id}/cancel [post]
+func (s *Server) handleAgentCancel(w http.ResponseWriter, r *http.Request) {
+	if s.agentSvc == nil || !s.agentSvc.Enabled() {
+		respondJSON(w, http.StatusServiceUnavailable, dto.Response{Success: false, Message: "agent is disabled", Timestamp: time.Now()})
+		return
+	}
+	sess, err := s.agentSvc.CancelSession(mux.Vars(r)["id"])
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	respondJSON(w, http.StatusOK, sess)
+}
+
 // SystemJSON exposes the cached system info for the agent's read-only tools.
 func (s *Server) SystemJSON() (any, bool) { v := s.GetSystemCache(); return v, v != nil }
 

@@ -1,6 +1,8 @@
 package api
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -163,5 +165,66 @@ func TestAgentDisabledReturns503(t *testing.T) {
 	}
 	if !strings.Contains(rr.Body.String(), "\"success\":false") {
 		t.Fatalf("expected Success=false in body, got %s", rr.Body.String())
+	}
+}
+
+func TestAgentApproveEndpoint(t *testing.T) {
+	s := NewServer(&domain.Context{Hub: domain.NewEventBus(10)})
+	cfg := dto.DefaultAgentConfig()
+	cfg.Enabled = true
+	p := llm.NewMockProvider(
+		&llm.ChatResponse{ToolCalls: []llm.ToolCall{{ID: "tu1", Name: "stop_array", Args: "{}"}}, OutputTokens: 2},
+		&llm.ChatResponse{Text: "done", OutputTokens: 1},
+	)
+	reg := tools.NewRegistry()
+	reg.Register(tools.Tool{Name: "stop_array", RiskTier: dto.RiskHigh,
+		Invoke: func(_ context.Context, _ string) (string, error) { return "stopped", nil }})
+	svc := agent.NewService(cfg, p, reg, agent.NewStore(t.TempDir()), s)
+	s.SetAgent(svc)
+
+	start := httptest.NewRequest(http.MethodPost, "/api/v1/agent/sessions", strings.NewReader(`{"goal":"stop array"}`))
+	sr := httptest.NewRecorder()
+	s.GetRouter().ServeHTTP(sr, start)
+	var started dto.AgentSession
+	if err := json.Unmarshal(sr.Body.Bytes(), &started); err != nil {
+		t.Fatalf("unmarshal start: %v body=%s", err, sr.Body.String())
+	}
+	if started.Status != dto.SessionAwaitingApproval {
+		t.Fatalf("expected awaiting_approval, got %q (body=%s)", started.Status, sr.Body.String())
+	}
+
+	body := `{"action_id":"` + started.PendingApproval.ActionID + `","approve":true}`
+	ar := httptest.NewRequest(http.MethodPost, "/api/v1/agent/sessions/"+started.ID+"/approve", strings.NewReader(body))
+	rr := httptest.NewRecorder()
+	s.GetRouter().ServeHTTP(rr, ar)
+	if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), `"completed"`) {
+		t.Fatalf("approve failed: code=%d body=%s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestAgentCancelEndpoint(t *testing.T) {
+	s := NewServer(&domain.Context{Hub: domain.NewEventBus(10)})
+	cfg := dto.DefaultAgentConfig()
+	cfg.Enabled = true
+	p := llm.NewMockProvider(
+		&llm.ChatResponse{ToolCalls: []llm.ToolCall{{ID: "tu1", Name: "stop_array", Args: "{}"}}, OutputTokens: 2},
+	)
+	reg := tools.NewRegistry()
+	reg.Register(tools.Tool{Name: "stop_array", RiskTier: dto.RiskHigh,
+		Invoke: func(_ context.Context, _ string) (string, error) { return "stopped", nil }})
+	svc := agent.NewService(cfg, p, reg, agent.NewStore(t.TempDir()), s)
+	s.SetAgent(svc)
+
+	start := httptest.NewRequest(http.MethodPost, "/api/v1/agent/sessions", strings.NewReader(`{"goal":"stop array"}`))
+	sr := httptest.NewRecorder()
+	s.GetRouter().ServeHTTP(sr, start)
+	var started dto.AgentSession
+	_ = json.Unmarshal(sr.Body.Bytes(), &started)
+
+	cr := httptest.NewRequest(http.MethodPost, "/api/v1/agent/sessions/"+started.ID+"/cancel", nil)
+	rr := httptest.NewRecorder()
+	s.GetRouter().ServeHTTP(rr, cr)
+	if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), `"cancelled"`) {
+		t.Fatalf("cancel failed: code=%d body=%s", rr.Code, rr.Body.String())
 	}
 }

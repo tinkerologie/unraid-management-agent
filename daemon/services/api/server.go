@@ -298,10 +298,12 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/alerts/history", s.handleAlertHistory).Methods("GET")
 	api.HandleFunc("/alerts/firing", s.handleFiringAlerts).Methods("GET")
 
-	// Agent (Phase 1: on-demand sessions)
+	// Agent (Phase 1: on-demand sessions; Phase 2: approve/cancel)
 	api.HandleFunc("/agent/sessions", s.handleAgentStartSession).Methods("POST")
 	api.HandleFunc("/agent/sessions", s.handleAgentListSessions).Methods("GET")
 	api.HandleFunc("/agent/sessions/{id}", s.handleAgentGetSession).Methods("GET")
+	api.HandleFunc("/agent/sessions/{id}/approve", s.handleAgentApprove).Methods("POST")
+	api.HandleFunc("/agent/sessions/{id}/cancel", s.handleAgentCancel).Methods("POST")
 
 	// Fan control endpoints (monitoring)
 	api.HandleFunc("/fans", s.handleFanControl).Methods("GET")
