@@ -16,21 +16,36 @@ import (
 const parityLogPath = "/boot/config/parity-checks.log"
 
 // ParityCollector collects parity check history
-type ParityCollector struct{}
+type ParityCollector struct {
+	// logPath is the path to the parity-checks.log file. Defaults to parityLogPath
+	// but can be overridden (primarily for testing).
+	logPath string
+}
 
-// NewParityCollector creates a new parity collector
+// NewParityCollector creates a new parity collector using the default log path.
 func NewParityCollector() *ParityCollector {
-	return &ParityCollector{}
+	return &ParityCollector{logPath: parityLogPath}
+}
+
+// NewParityCollectorWithPath creates a parity collector that reads from a custom
+// log path. Primarily intended for tests.
+func NewParityCollectorWithPath(path string) *ParityCollector {
+	return &ParityCollector{logPath: path}
 }
 
 // GetParityHistory reads and parses the parity-checks.log file
 func (c *ParityCollector) GetParityHistory() (*dto.ParityCheckHistory, error) {
-	logger.Debug("Parity: Reading parity check history from %s", parityLogPath)
+	logPath := c.logPath
+	if logPath == "" {
+		logPath = parityLogPath
+	}
+	logger.Debug("Parity: Reading parity check history from %s", logPath)
 
-	file, err := os.Open(parityLogPath)
+	// #nosec G304 -- logPath is the fixed parity-checks.log constant (or a test-only override), not user input.
+	file, err := os.Open(logPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			logger.Debug("Parity: Parity log file does not exist: %s", parityLogPath)
+			logger.Debug("Parity: Parity log file does not exist: %s", logPath)
 			return &dto.ParityCheckHistory{
 				Records:   []dto.ParityCheckRecord{},
 				Timestamp: time.Now(),
@@ -72,6 +87,30 @@ func (c *ParityCollector) GetParityHistory() (*dto.ParityCheckHistory, error) {
 		Records:   records,
 		Timestamp: time.Now(),
 	}, nil
+}
+
+// LastCheckValid reports whether the most recent parity operation in the log
+// completed successfully (exit code 0 with zero errors). A successful parity
+// check or sync is concrete evidence that parity is valid — independent of the
+// var.ini sbSynced field, which some Unraid versions omit or zero out (issue #114).
+// Returns false when the log is missing, empty, or the latest run was canceled
+// or reported errors.
+func (c *ParityCollector) LastCheckValid() bool {
+	history, err := c.GetParityHistory()
+	if err != nil || history == nil || len(history.Records) == 0 {
+		return false
+	}
+
+	// Find the most recent record by date (do not assume file ordering).
+	latest := history.Records[0]
+	for _, r := range history.Records[1:] {
+		if r.Date.After(latest.Date) {
+			latest = r
+		}
+	}
+
+	// parseLine sets Status to "OK" only for exit code 0 with zero errors.
+	return latest.Status == "OK"
 }
 
 // parseLine parses a single line from parity-checks.log

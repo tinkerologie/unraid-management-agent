@@ -196,11 +196,26 @@ func (c *ArrayCollector) collectArrayStatus() (status *dto.ArrayStatus, err erro
 	}
 
 	// Parity errors override: any sync errors invalidate parity
+	hasSyncErrors := false
 	if section.HasKey("sbSyncErrs") {
 		sbSyncErrs := strings.Trim(section.Key("sbSyncErrs").String(), `"`)
 		if n, err := strconv.Atoi(sbSyncErrs); err == nil && n > 0 {
 			logger.Debug("Array: sbSyncErrs=%d, marking parity as invalid", n)
+			hasSyncErrors = true
 			parityValid = false
+		}
+	}
+
+	// Corroboration via parity-checks.log (issue #114): some Unraid versions omit
+	// or zero out sbSynced in var.ini even when parity is valid. If the var.ini
+	// signals didn't confirm validity but the array is started with parity disks
+	// and the most recent parity check/sync completed successfully (exit 0, zero
+	// errors), treat parity as valid. Skipped when the superblock reports sync
+	// errors so this can never mask a real problem.
+	if !parityValid && !hasSyncErrors && status.State == "STARTED" && status.NumParityDisks > 0 {
+		if NewParityCollector().LastCheckValid() {
+			logger.Debug("Array: parity marked valid via most recent successful parity-check log entry (sbSynced absent/zero)")
+			parityValid = true
 		}
 	}
 
@@ -210,7 +225,15 @@ func (c *ArrayCollector) collectArrayStatus() (status *dto.ArrayStatus, err erro
 	} else {
 		status.ParityValid = false
 	}
-	logger.Debug("Array: parityValid=%v (numParityDisks=%d)", status.ParityValid, status.NumParityDisks)
+
+	// Comprehensive diagnostic logging — captures every signal that feeds the
+	// parity validity decision so future false-positive/negative reports
+	// (issues #98, #114) have the raw data needed to reproduce.
+	logger.Debug("Array: parity decision: parityValid=%v state=%q numParityDisks=%d sbSynced=%q sbSynced2=%q sbSyncErrs=%q sbSyncExit=%q mdNumInvalid=%q mdResync=%q",
+		status.ParityValid, status.State, status.NumParityDisks,
+		section.Key("sbSynced").String(), section.Key("sbSynced2").String(),
+		section.Key("sbSyncErrs").String(), section.Key("sbSyncExit").String(),
+		section.Key("mdNumInvalid").String(), section.Key("mdResync").String())
 
 	// Parity check status - need to check multiple fields to detect state properly
 	// Key fields:

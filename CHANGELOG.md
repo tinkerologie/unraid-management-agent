@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **MCP `get_parity_history` always returned "No parity check history available"**
+  (issue #114) — the cache layer's `GetParityHistoryCache()` was a stub that
+  unconditionally returned an empty result, so the MCP tool (and the parity section of
+  `system_health_report` / `get_diagnostic_summary`) never reported any history even
+  when `/boot/config/parity-checks.log` was populated. It now loads and caches the real
+  parity-checks log (60 s TTL), matching the `GET /api/v1/array/parity-check/history`
+  REST endpoint. Verified live: REST, MCP, and the on-disk log all report identical
+  record counts.
+
+### Changed
+
+- **More robust `parity_valid` determination** (issues #98, #114) — array parity
+  validity now corroborates the `var.ini` `sbSynced` signal against the parity-checks
+  log: when the array is started with parity disks and the most recent parity check/sync
+  completed successfully (exit 0, zero errors), parity is reported valid even on Unraid
+  versions that omit or zero out `sbSynced`. This corroboration is additive (it can only
+  confirm validity, never mask sync errors). Added comprehensive debug logging of every
+  signal feeding the decision (`sbSynced`, `sbSynced2`, `sbSyncErrs`, `sbSyncExit`,
+  `mdNumInvalid`, `mdResync`, `numParityDisks`, state) to aid future diagnosis.
+
 ## [2026.06.01] - 2026-06-01
 
 ### Added

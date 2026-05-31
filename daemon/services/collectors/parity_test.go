@@ -358,3 +358,84 @@ func TestParityParseLine_NaNSpeedProducesValidJSON(t *testing.T) {
 		})
 	}
 }
+
+// writeParityLog writes the given lines to a temp parity-checks.log and returns
+// a collector pointed at it.
+func writeParityLog(t *testing.T, content string) *ParityCollector {
+	t.Helper()
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "parity-checks.log")
+	if err := os.WriteFile(tmpFile, []byte(content), 0600); err != nil {
+		t.Fatalf("Failed to write temp parity log: %v", err)
+	}
+	return NewParityCollectorWithPath(tmpFile)
+}
+
+// TestGetParityHistory_ReadsRealLog verifies the collector parses a realistic
+// multi-record log when given a custom path. This guards the cache path that
+// previously returned an empty stub (issue #114).
+func TestGetParityHistory_ReadsRealLog(t *testing.T) {
+	content := `2025 Jun 30 10:29:12|129631|123434214|0|0|check P|15625879500
+2026 Jan  7 00:35:25|102925|155461750|0|0|check P|15625879500
+2026 Jan 13 15:16:43|27|0|-4|0|check P|15625879500
+`
+	c := writeParityLog(t, content)
+	history, err := c.GetParityHistory()
+	if err != nil {
+		t.Fatalf("GetParityHistory() error: %v", err)
+	}
+	if len(history.Records) != 3 {
+		t.Fatalf("got %d records, want 3", len(history.Records))
+	}
+	if history.Records[0].Action != "Parity-Check" {
+		t.Errorf("Records[0].Action = %q, want Parity-Check", history.Records[0].Action)
+	}
+}
+
+func TestLastCheckValid(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		want    bool
+	}{
+		{
+			name:    "empty log",
+			content: "",
+			want:    false,
+		},
+		{
+			name:    "most recent completed successfully",
+			content: "2026 Jan  9 14:09:24|10|0|-4|0|check P|15625879500\n2026 Jan 13 15:16:43|102925|155461750|0|0|check P|15625879500\n",
+			want:    true,
+		},
+		{
+			name:    "most recent canceled",
+			content: "2026 Jan  7 00:35:25|102925|155461750|0|0|check P|15625879500\n2026 Jan 13 15:16:43|27|0|-4|0|check P|15625879500\n",
+			want:    false,
+		},
+		{
+			name:    "most recent had errors",
+			content: "2024 Nov 30 00:30:26|100888|99128056|0|1348756140|check P|9766436812\n",
+			want:    false,
+		},
+		{
+			name:    "successful sync (recon) most recent",
+			content: "2026 Jan 13 15:16:43|102925|155461750|0|0|recon P|15625879500\n",
+			want:    true,
+		},
+		{
+			name:    "out-of-order lines: latest by date wins",
+			content: "2026 Jan 13 15:16:43|102925|155461750|0|0|check P|15625879500\n2025 Jan  2 06:25:17|27|0|-4|0|check P|15625879500\n",
+			want:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := writeParityLog(t, tt.content)
+			if got := c.LastCheckValid(); got != tt.want {
+				t.Errorf("LastCheckValid() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

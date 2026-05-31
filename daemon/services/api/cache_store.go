@@ -13,6 +13,10 @@ import (
 // networkServicesCacheTTL controls how often network services status is refreshed.
 const networkServicesCacheTTL = 30 * time.Second
 
+// parityHistoryCacheTTL controls how often parity check history is refreshed from
+// disk. Parity checks complete infrequently, so a longer TTL is appropriate.
+const parityHistoryCacheTTL = 60 * time.Second
+
 // Compile-time assertion: CacheStore satisfies alerting.DataProvider.
 var _ alerting.DataProvider = (*CacheStore)(nil)
 
@@ -46,6 +50,7 @@ type CacheStore struct {
 	pluginUpdatesCache   atomic.Pointer[dto.PluginList]
 	osUpdateCache        atomic.Pointer[dto.OSUpdateStatus]
 	moverCache           atomic.Pointer[dto.MoverStatus]
+	parityHistoryCache   atomic.Pointer[dto.ParityCheckHistory]
 }
 
 // ---------- Pointer-type getters (direct Load) ----------
@@ -242,11 +247,33 @@ func (c *CacheStore) GetZFSSnapshotsCache() []dto.ZFSSnapshot {
 
 // ---------- Non-collector caches ----------
 
-// GetParityHistoryCache returns cached parity check history.
-// Note: This is dynamically loaded, not cached by a collector.
-// Returns an empty sentinel so callers never receive nil.
+// GetParityHistoryCache returns parity check history, refreshing from disk when
+// the cache is stale (older than parityHistoryCacheTTL).
+//
+// Parity history is loaded on demand rather than by a periodic collector. The
+// previous implementation returned an empty sentinel unconditionally, which made
+// the get_parity_history MCP tool always report "no parity check history
+// available" even when the log was populated (issue #114). It now reads the real
+// parity-checks.log via the parity collector.
 func (c *CacheStore) GetParityHistoryCache() *dto.ParityCheckHistory {
-	return &dto.ParityCheckHistory{}
+	if cached := c.parityHistoryCache.Load(); cached != nil {
+		if time.Since(cached.Timestamp) < parityHistoryCacheTTL {
+			return cached
+		}
+	}
+
+	pc := collectors.NewParityCollector()
+	history, err := pc.GetParityHistory()
+	if err != nil {
+		logger.Warning("CacheStore: failed to refresh parity history: %v", err)
+		if stale := c.parityHistoryCache.Load(); stale != nil {
+			return stale // return stale data if available
+		}
+		return &dto.ParityCheckHistory{Records: []dto.ParityCheckRecord{}}
+	}
+
+	c.parityHistoryCache.Store(history)
+	return history
 }
 
 // GetNetworkServicesCache returns cached network services status,
