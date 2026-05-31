@@ -43,20 +43,20 @@ failures (event-driven) and on operator request (on-demand), with zero idle toke
 
 ## Approved Decisions
 
-| Decision | Choice |
-| --- | --- |
-| Architecture | **A — embedded Agent Core service**, reusing pubsub, controllers, and the MCP tool catalog. |
-| Brain location | **Pluggable provider** behind one interface (cloud BYO + local). |
-| Autonomy model | **Tiered by risk** (ReadOnly auto / LowRisk auto / HighRisk approval). |
-| Triggers | **Event-driven** (alerting + watchdog wake the agent) **+ on-demand**. |
-| Surface | **New REST + WebSocket** and **agent exposed as MCP tools**. |
-| Reasoning | **Hand-rolled bounded ReAct loop** in Go (no heavy framework). |
-| Tools | **Registry wraps existing MCP/controller calls** (single source of truth). |
-| Runbooks | **Reuse `remediation/runbooks.go`** as the runbook source of truth. |
-| Learning | **Suggest-not-mutate** — agent proposes preference/runbook changes; user confirms. |
-| Array stop | **HighRisk (approval-required, reversible)**, not forbidden. |
-| Forbid-list | Non-overridable circuit breaker for irreversible ops (disk format, parity clear/disable, partition changes) — agent may _describe_ but the gate _never_ executes, even with approval. |
-| Default state | **Disabled by default** — daemon behaves exactly as today until opted in. |
+| Decision       | Choice                                                                                                                                                                                |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Architecture   | **A — embedded Agent Core service**, reusing pubsub, controllers, and the MCP tool catalog.                                                                                           |
+| Brain location | **Pluggable provider** behind one interface (cloud BYO + local).                                                                                                                      |
+| Autonomy model | **Tiered by risk** (ReadOnly auto / LowRisk auto / HighRisk approval).                                                                                                                |
+| Triggers       | **Event-driven** (alerting + watchdog wake the agent) **+ on-demand**.                                                                                                                |
+| Surface        | **New REST + WebSocket** and **agent exposed as MCP tools**.                                                                                                                          |
+| Reasoning      | **Hand-rolled bounded ReAct loop** in Go (no heavy framework).                                                                                                                        |
+| Tools          | **Registry wraps existing MCP/controller calls** (single source of truth).                                                                                                            |
+| Runbooks       | **Reuse `remediation/runbooks.go`** as the runbook source of truth.                                                                                                                   |
+| Learning       | **Suggest-not-mutate** — agent proposes preference/runbook changes; user confirms.                                                                                                    |
+| Array stop     | **HighRisk (approval-required, reversible)**, not forbidden.                                                                                                                          |
+| Forbid-list    | Non-overridable circuit breaker for irreversible ops (disk format, parity clear/disable, partition changes) — agent may _describe_ but the gate _never_ executes, even with approval. |
+| Default state  | **Disabled by default** — daemon behaves exactly as today until opted in.                                                                                                             |
 
 ## Architecture
 
@@ -133,12 +133,12 @@ type Tool struct {
 
 Tier assignment lives in **one auditable file**. Examples:
 
-| Tier | Examples |
-| --- | --- |
-| ReadOnly (always auto) | `get_system`, `query_metric_history`, `system_health_report` |
-| LowRisk (auto by default) | `restart_container`, `start_vm` |
-| HighRisk (approval) | `stop_array`, `force_stop_vm`, delete/destroy operations |
-| Forbidden (never, even w/ approval) | disk format, parity clear/disable, partition changes |
+| Tier                                | Examples                                                     |
+| ----------------------------------- | ------------------------------------------------------------ |
+| ReadOnly (always auto)              | `get_system`, `query_metric_history`, `system_health_report` |
+| LowRisk (auto by default)           | `restart_container`, `start_vm`                              |
+| HighRisk (approval)                 | `stop_array`, `force_stop_vm`, delete/destroy operations     |
+| Forbidden (never, even w/ approval) | disk format, parity clear/disable, partition changes         |
 
 ### Agent Loop (`loop.go`)
 
@@ -232,16 +232,16 @@ tool requested ──▶ resolve RiskTier ──▶ consult policy + learned pre
 
 ### REST (`api/handlers.go` + `setupRoutes()`), under `/api/v1/agent`
 
-| Method & path | Purpose |
-| --- | --- |
-| `POST /agent/sessions` | Start a session (`{goal}` or `{question}`). Returns session ID. |
-| `GET  /agent/sessions` | List sessions (status, trigger, started). |
-| `GET  /agent/sessions/{id}` | Full session: plan, transcript, actions, pending approval. |
-| `POST /agent/sessions/{id}/messages` | Continue the conversation (operator chat). |
-| `POST /agent/sessions/{id}/approve` | Approve/deny a pending action (`{action_id, decision, remember?}`). |
-| `POST /agent/sessions/{id}/cancel` | Stop a running/paused session. |
-| `GET  /agent/config` / `PUT /agent/config` | Provider, tier policy, limits (secrets write-only). |
-| `GET  /agent/memory` | Browse episodic incidents + learned prefs/runbooks. |
+| Method & path                              | Purpose                                                             |
+| ------------------------------------------ | ------------------------------------------------------------------- |
+| `POST /agent/sessions`                     | Start a session (`{goal}` or `{question}`). Returns session ID.     |
+| `GET  /agent/sessions`                     | List sessions (status, trigger, started).                           |
+| `GET  /agent/sessions/{id}`                | Full session: plan, transcript, actions, pending approval.          |
+| `POST /agent/sessions/{id}/messages`       | Continue the conversation (operator chat).                          |
+| `POST /agent/sessions/{id}/approve`        | Approve/deny a pending action (`{action_id, decision, remember?}`). |
+| `POST /agent/sessions/{id}/cancel`         | Stop a running/paused session.                                      |
+| `GET  /agent/config` / `PUT /agent/config` | Provider, tier policy, limits (secrets write-only).                 |
+| `GET  /agent/memory`                       | Browse episodic incidents + learned prefs/runbooks.                 |
 
 - Reads use `RLock/RUnlock` on the agent cache; control endpoints return `dto.Response`.
 - New DTOs (`daemon/dto/`): `AgentSession`, `AgentStep`, `AgentAction`, `ApprovalRequest`,

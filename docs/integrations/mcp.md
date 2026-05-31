@@ -84,10 +84,10 @@ The MCP server supports two transports — use the one that fits your deployment
 
 > **Update status fields:** `list_containers` and `get_container_info` now include the following fields populated from the cached update check results:
 >
-> | Field              | Values                                      | Description                                   |
-> | ------------------ | ------------------------------------------- | --------------------------------------------- |
-> | `update_status`    | `up_to_date`, `update_available`, `unknown` | Human-readable update state for the container |
-> | `update_available` | `true` / `false`                            | Whether a newer image digest is available     |
+> | Field              | Values                                        | Description                                   |
+> | ------------------ | --------------------------------------------- | --------------------------------------------- |
+> | `update_status`    | `up_to_date`, `update_available`, `unknown`   | Human-readable update state for the container |
+> | `update_available` | `true` / `false`                              | Whether a newer image digest is available     |
 > | `update_checked`   | RFC 3339 timestamp (omitted if never checked) | When the update check was last performed      |
 >
 > Use `refresh_container_updates` to force a fresh registry check and push results to the cache, WebSocket hub, and alerting engine. Use `check_container_updates` / `check_container_update` for synchronous on-demand checks that return results directly without publishing.
@@ -131,10 +131,10 @@ The MCP server supports two transports — use the one that fits your deployment
 
 ### Plugin Tools
 
-| Tool                    | Description                                                                                             |
-| ----------------------- | ------------------------------------------------------------------------------------------------------- |
-| `check_plugin_updates`  | Return the cached plugin update status (read-only)                                                      |
-| `refresh_plugin_updates`| Force an immediate plugin update check for all installed plugins and publish the result (non-destructive)|
+| Tool                     | Description                                                                                               |
+| ------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `check_plugin_updates`   | Return the cached plugin update status (read-only)                                                        |
+| `refresh_plugin_updates` | Force an immediate plugin update check for all installed plugins and publish the result (non-destructive) |
 
 ### Service & Process Tools
 
@@ -153,40 +153,40 @@ The MCP server supports two transports — use the one that fits your deployment
 
 ### OS & Mover Tools
 
-| Tool              | Description                                                                                                                       |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `get_os_update`   | Return the cached Unraid OS update availability. Sources local files only — no outbound network calls. Status: `up_to_date`, `update_available`, or `unknown` (read-only) |
-| `get_mover_status`| Return the cached mover state (active flag, cron schedule, last-run start/finish timestamps, duration, files moved, bytes moved) (read-only) |
+| Tool               | Description                                                                                                                                                               |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_os_update`    | Return the cached Unraid OS update availability. Sources local files only — no outbound network calls. Status: `up_to_date`, `update_available`, or `unknown` (read-only) |
+| `get_mover_status` | Return the cached mover state (active flag, cron schedule, last-run start/finish timestamps, duration, files moved, bytes moved) (read-only)                              |
 
 ### Alerting & Trend Analysis Tools
 
-| Tool                    | Description                                                                                                                                                                                          |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `list_alert_templates`  | List curated, disabled-by-default alert rule templates that use trend/predictive metrics — array fill ETA, disk temp slope, container restart rate, reallocated sectors, disk errors (read-only)     |
+| Tool                    | Description                                                                                                                                                                                                                                   |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_alert_templates`  | List curated, disabled-by-default alert rule templates that use trend/predictive metrics — array fill ETA, disk temp slope, container restart rate, reallocated sectors, disk errors (read-only)                                              |
 | `enable_alert_template` | Instantiate and enable an alert rule from a template in one call. Pass `template_id` (e.g. `tmpl-array-fill`) and optional `channels` list (defaults to `["unraid"]`). Idempotent — re-enabling updates the existing rule without duplication |
-| `query_metric_history`  | Query the in-memory ring-buffer history for a named metric. Returns all buffered samples plus summary statistics (slope/sec, min, max, avg, last). See below for valid metric names (read-only)      |
+| `query_metric_history`  | Query the in-memory ring-buffer history for a named metric. Returns all buffered samples plus summary statistics (slope/sec, min, max, avg, last). See below for valid metric names (read-only)                                               |
 
 **`enable_alert_template` — arguments:**
 
-| Argument      | Type            | Required | Description                                                                                           |
-| ------------- | --------------- | -------- | ----------------------------------------------------------------------------------------------------- |
-| `template_id` | string          | Yes      | Template ID to enable (e.g. `tmpl-array-fill`, `tmpl-disk-temp-climb`, `tmpl-container-flapping`)    |
-| `channels`    | array of strings| No       | Notification channels (e.g. `["unraid", "email"]`). Defaults to `["unraid"]` when omitted             |
+| Argument      | Type             | Required | Description                                                                                       |
+| ------------- | ---------------- | -------- | ------------------------------------------------------------------------------------------------- |
+| `template_id` | string           | Yes      | Template ID to enable (e.g. `tmpl-array-fill`, `tmpl-disk-temp-climb`, `tmpl-container-flapping`) |
+| `channels`    | array of strings | No       | Notification channels (e.g. `["unraid", "email"]`). Defaults to `["unraid"]` when omitted         |
 
 The created rule's `id` matches the `template_id`, so repeated calls are idempotent — the rule is updated in-place rather than duplicated. Returns `503` if the alerting subsystem is not initialised, `404` for an unknown template, `400` for an invalid request body.
 
 **Valid metric names for `query_metric_history`:**
 
-| Metric name      | Scope         | Description                                                    |
-| ---------------- | ------------- | -------------------------------------------------------------- |
-| `cpu_temp`       | global        | CPU temperature in °C                                          |
-| `array_used_pct` | global        | Array used percentage                                          |
-| `disk_temp`      | per-entity    | Temperature of a specific disk (pass `entity` = disk ID/name) |
-| `disk_used_pct`  | per-entity    | Used percentage of a specific disk                            |
-| `disk_errors`    | per-entity    | Read/write error count for a specific disk                    |
-| `reallocated`    | per-entity    | Reallocated sector count for a specific disk                  |
-| `pending`        | per-entity    | Pending (uncorrectable) sector count for a specific disk      |
-| `restart_count`  | per-entity    | Restart count for a specific container (pass `entity` = container ID) |
+| Metric name      | Scope      | Description                                                           |
+| ---------------- | ---------- | --------------------------------------------------------------------- |
+| `cpu_temp`       | global     | CPU temperature in °C                                                 |
+| `array_used_pct` | global     | Array used percentage                                                 |
+| `disk_temp`      | per-entity | Temperature of a specific disk (pass `entity` = disk ID/name)         |
+| `disk_used_pct`  | per-entity | Used percentage of a specific disk                                    |
+| `disk_errors`    | per-entity | Read/write error count for a specific disk                            |
+| `reallocated`    | per-entity | Reallocated sector count for a specific disk                          |
+| `pending`        | per-entity | Pending (uncorrectable) sector count for a specific disk              |
+| `restart_count`  | per-entity | Restart count for a specific container (pass `entity` = container ID) |
 
 **Example** — query the last hour of array fill percentage:
 
@@ -196,29 +196,29 @@ curl "http://192.168.20.21:8043/api/v1/metrics/history?metric=array_used_pct"
 
 ### AI Remediation Toolkit Tools
 
-| Tool                  | Annotation          | Description                                                                                                                                         |
-| --------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `system_health_report`| destructive (gated) | Aggregate health signals into prioritised findings with recommended actions. Read-only unless `confirm: true` AND `actions` list are both provided.  |
-| `list_runbooks`       | read-only           | List all reviewed remediation runbooks with their names, descriptions, and default step shapes.                                                     |
-| `run_runbook`         | destructive (gated) | Run a named runbook. Without `confirm: true` it is a dry-run returning planned steps. With `confirm: true` it executes supported-action steps.       |
-| `find_root_cause`     | read-only           | Correlate cached system signals (CPU, array, parity, disk temperatures, containers) to surface the most likely root causes of a degraded system.    |
+| Tool                   | Annotation          | Description                                                                                                                                         |
+| ---------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `system_health_report` | destructive (gated) | Aggregate health signals into prioritised findings with recommended actions. Read-only unless `confirm: true` AND `actions` list are both provided. |
+| `list_runbooks`        | read-only           | List all reviewed remediation runbooks with their names, descriptions, and default step shapes.                                                     |
+| `run_runbook`          | destructive (gated) | Run a named runbook. Without `confirm: true` it is a dry-run returning planned steps. With `confirm: true` it executes supported-action steps.      |
+| `find_root_cause`      | read-only           | Correlate cached system signals (CPU, array, parity, disk temperatures, containers) to surface the most likely root causes of a degraded system.    |
 
 **`system_health_report` — arguments:**
 
-| Argument  | Type            | Description                                                                                             |
-| --------- | --------------- | ------------------------------------------------------------------------------------------------------- |
-| `confirm` | bool            | Must be `true` to execute actions. Without it the tool returns the report only.                        |
-| `actions` | array of objects| List of `{action, target}` pairs from a previous report's `recommended_actions`. Executed only when `confirm: true`. |
+| Argument  | Type             | Description                                                                                                          |
+| --------- | ---------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `confirm` | bool             | Must be `true` to execute actions. Without it the tool returns the report only.                                      |
+| `actions` | array of objects | List of `{action, target}` pairs from a previous report's `recommended_actions`. Executed only when `confirm: true`. |
 
 Supported actions: `start_container`, `stop_container`, `restart_container`, `start_vm`, `stop_vm`, `restart_vm`, `force_stop_vm`.
 
 **`run_runbook` — arguments:**
 
-| Argument  | Type            | Description                                                                                |
-| --------- | --------------- | ------------------------------------------------------------------------------------------ |
-| `name`    | string          | Runbook name (from `list_runbooks`)                                                        |
-| `confirm` | bool            | Must be `true` to execute. Without it returns the planned steps (dry-run).                |
-| `targets` | array of strings| Optional list of container or VM IDs. For `restart_unhealthy_containers`, omit to auto-resolve stopped/exited containers. |
+| Argument  | Type             | Description                                                                                                               |
+| --------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `name`    | string           | Runbook name (from `list_runbooks`)                                                                                       |
+| `confirm` | bool             | Must be `true` to execute. Without it returns the planned steps (dry-run).                                                |
+| `targets` | array of strings | Optional list of container or VM IDs. For `restart_unhealthy_containers`, omit to auto-resolve stopped/exited containers. |
 
 ### Settings Tools
 
@@ -290,25 +290,25 @@ list_alert_templates, query_metric_history, list_runbooks, find_root_cause
 
 These tools make changes that may be difficult or impossible to reverse:
 
-| Tool                    | Additional Hints       | Confirmation Required |
-| ----------------------- | ---------------------- | --------------------- |
-| `container_action`      | `idempotentHint: true` | No                    |
-| `update_container`      | —                      | Yes (`confirm: true`) |
-| `update_all_containers` | —                      | Yes (`confirm: true`) |
-| `vm_action`             | `idempotentHint: true` | No                    |
-| `create_vm_snapshot`    | —                      | Yes (`confirm: true`) |
-| `delete_vm_snapshot`    | —                      | Yes (`confirm: true`) |
-| `restore_vm_snapshot`   | —                      | Yes (`confirm: true`) |
-| `clone_vm`              | —                      | Yes (`confirm: true`) |
-| `array_action`          | `idempotentHint: true` | Yes (`confirm: true`) |
-| `update_plugin`         | —                      | Yes (`confirm: true`) |
-| `update_all_plugins`    | —                      | Yes (`confirm: true`) |
-| `service_action`        | `idempotentHint: true` | Yes (`confirm: true`) |
-| `execute_user_script`   | —                      | Yes (`confirm: true`) |
-| `system_reboot`         | —                      | Yes (`confirm: true`) |
-| `system_shutdown`       | —                      | Yes (`confirm: true`) |
+| Tool                    | Additional Hints       | Confirmation Required                  |
+| ----------------------- | ---------------------- | -------------------------------------- |
+| `container_action`      | `idempotentHint: true` | No                                     |
+| `update_container`      | —                      | Yes (`confirm: true`)                  |
+| `update_all_containers` | —                      | Yes (`confirm: true`)                  |
+| `vm_action`             | `idempotentHint: true` | No                                     |
+| `create_vm_snapshot`    | —                      | Yes (`confirm: true`)                  |
+| `delete_vm_snapshot`    | —                      | Yes (`confirm: true`)                  |
+| `restore_vm_snapshot`   | —                      | Yes (`confirm: true`)                  |
+| `clone_vm`              | —                      | Yes (`confirm: true`)                  |
+| `array_action`          | `idempotentHint: true` | Yes (`confirm: true`)                  |
+| `update_plugin`         | —                      | Yes (`confirm: true`)                  |
+| `update_all_plugins`    | —                      | Yes (`confirm: true`)                  |
+| `service_action`        | `idempotentHint: true` | Yes (`confirm: true`)                  |
+| `execute_user_script`   | —                      | Yes (`confirm: true`)                  |
+| `system_reboot`         | —                      | Yes (`confirm: true`)                  |
+| `system_shutdown`       | —                      | Yes (`confirm: true`)                  |
 | `system_health_report`  | —                      | Yes (`confirm: true` + `actions` list) |
-| `run_runbook`           | `idempotentHint: true` | Yes (`confirm: true`) |
+| `run_runbook`           | `idempotentHint: true` | Yes (`confirm: true`)                  |
 
 ### Non-Destructive Control Tools (10 tools) — `destructiveHint: false`
 

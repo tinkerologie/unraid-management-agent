@@ -1577,16 +1577,16 @@ List all Docker containers.
 
 **New container fields (this branch):**
 
-| Field                      | Type      | Description                                                        |
-| -------------------------- | --------- | ------------------------------------------------------------------ |
-| `network_rx_bytes`         | int       | Total bytes received since container start                        |
-| `network_tx_bytes`         | int       | Total bytes transmitted since container start                     |
-| `network_rx_bytes_per_sec` | float     | Receive throughput, sampled from `/proc/<pid>/net/dev`            |
-| `network_tx_bytes_per_sec` | float     | Transmit throughput, sampled from `/proc/<pid>/net/dev`           |
-| `restart_count`            | int       | Number of times the container has restarted                       |
-| `update_status`            | string    | `up_to_date`, `update_available`, or `unknown`                    |
-| `update_available`         | bool      | Whether a newer image digest is available                         |
-| `update_checked`           | timestamp | When the last update check was performed (omitted if never checked)|
+| Field                      | Type      | Description                                                         |
+| -------------------------- | --------- | ------------------------------------------------------------------- |
+| `network_rx_bytes`         | int       | Total bytes received since container start                          |
+| `network_tx_bytes`         | int       | Total bytes transmitted since container start                       |
+| `network_rx_bytes_per_sec` | float     | Receive throughput, sampled from `/proc/<pid>/net/dev`              |
+| `network_tx_bytes_per_sec` | float     | Transmit throughput, sampled from `/proc/<pid>/net/dev`             |
+| `restart_count`            | int       | Number of times the container has restarted                         |
+| `update_status`            | string    | `up_to_date`, `update_available`, or `unknown`                      |
+| `update_available`         | bool      | Whether a newer image digest is available                           |
+| `update_checked`           | timestamp | When the last update check was performed (omitted if never checked) |
 
 ---
 
@@ -3218,16 +3218,16 @@ Refreshed by the `mover` background collector (`INTERVAL_MOVER`, default 5 min).
 
 **Fields**:
 
-| Field                       | Type   | Description                                         |
-| --------------------------- | ------ | --------------------------------------------------- |
-| `active`                    | bool   | Whether the mover is currently running              |
+| Field                       | Type   | Description                                           |
+| --------------------------- | ------ | ----------------------------------------------------- |
+| `active`                    | bool   | Whether the mover is currently running                |
 | `schedule`                  | string | Cron expression from `var.ini` (`shareMoverSchedule`) |
-| `last_run_start`            | string | ISO-8601 timestamp when the last run began          |
-| `last_run_finish`           | string | ISO-8601 timestamp when the last run ended          |
-| `last_run_duration_seconds` | int    | Duration of the last run in seconds                 |
-| `last_run_files_moved`      | int    | Files moved during the last run                     |
-| `last_run_bytes_moved`      | int    | Bytes moved during the last run                     |
-| `current_throughput_mbs`    | float  | Live throughput MB/s (always 0 in this release)     |
+| `last_run_start`            | string | ISO-8601 timestamp when the last run began            |
+| `last_run_finish`           | string | ISO-8601 timestamp when the last run ended            |
+| `last_run_duration_seconds` | int    | Duration of the last run in seconds                   |
+| `last_run_files_moved`      | int    | Files moved during the last run                       |
+| `last_run_bytes_moved`      | int    | Bytes moved during the last run                       |
+| `current_throughput_mbs`    | float  | Live throughput MB/s (always 0 in this release)       |
 
 **Example**:
 
@@ -3294,16 +3294,16 @@ to their alert rules configuration file.
 
 **Trend / predictive alerting fields available in expressions**:
 
-| Field                        | Type  | Description                                                                  |
-| ---------------------------- | ----- | ---------------------------------------------------------------------------- |
-| `ArrayFillETAHours`          | float | Hours until the array is full at current fill rate (0 = no fill trend)       |
-| `MaxDiskFillETAHours`        | float | Hours until the fastest-filling disk is full                                 |
-| `CPUTempSlopePerMin`         | float | CPU temperature trend in °C/min                                              |
-| `MaxDiskTempSlopePerMin`     | float | Steepest disk temperature rise across all disks in °C/min                   |
-| `MaxContainerRestartsPerHour`| float | Highest container restart rate over the sampled window (restarts/hour)       |
-| `MaxReallocatedSectors`      | int   | Maximum reallocated sector count across all array disks                      |
-| `MaxPendingSectors`          | int   | Maximum pending (uncorrectable) sector count across all array disks          |
-| `DiskErrorsIncreasing`       | bool  | `true` when any disk's error count has a positive slope                      |
+| Field                         | Type  | Description                                                            |
+| ----------------------------- | ----- | ---------------------------------------------------------------------- |
+| `ArrayFillETAHours`           | float | Hours until the array is full at current fill rate (0 = no fill trend) |
+| `MaxDiskFillETAHours`         | float | Hours until the fastest-filling disk is full                           |
+| `CPUTempSlopePerMin`          | float | CPU temperature trend in °C/min                                        |
+| `MaxDiskTempSlopePerMin`      | float | Steepest disk temperature rise across all disks in °C/min              |
+| `MaxContainerRestartsPerHour` | float | Highest container restart rate over the sampled window (restarts/hour) |
+| `MaxReallocatedSectors`       | int   | Maximum reallocated sector count across all array disks                |
+| `MaxPendingSectors`           | int   | Maximum pending (uncorrectable) sector count across all array disks    |
+| `DiskErrorsIncreasing`        | bool  | `true` when any disk's error count has a positive slope                |
 
 **How to write a trend alert rule:**
 
@@ -3353,15 +3353,15 @@ rather than creating a duplicate.
 
 **Path Parameters**:
 
-| Parameter | Type   | Required | Description                                                             |
-| --------- | ------ | -------- | ----------------------------------------------------------------------- |
-| `id`      | string | Yes      | Template ID (e.g. `tmpl-array-fill`, `tmpl-disk-temp-climb`)            |
+| Parameter | Type   | Required | Description                                                  |
+| --------- | ------ | -------- | ------------------------------------------------------------ |
+| `id`      | string | Yes      | Template ID (e.g. `tmpl-array-fill`, `tmpl-disk-temp-climb`) |
 
 **Request Body** (optional, `application/json`):
 
-| Field      | Type            | Required | Description                                                                          |
-| ---------- | --------------- | -------- | ------------------------------------------------------------------------------------ |
-| `channels` | array of strings| No       | Notification channels (e.g. `["unraid", "email"]`). Defaults to `["unraid"]` if omitted |
+| Field      | Type             | Required | Description                                                                             |
+| ---------- | ---------------- | -------- | --------------------------------------------------------------------------------------- |
+| `channels` | array of strings | No       | Notification channels (e.g. `["unraid", "email"]`). Defaults to `["unraid"]` if omitted |
 
 **Response** — the created or updated `AlertRule` object:
 
@@ -3379,11 +3379,11 @@ rather than creating a duplicate.
 
 **Error Responses**:
 
-| Status | Condition                                              |
-| ------ | ------------------------------------------------------ |
-| `400`  | Invalid request body                                   |
-| `404`  | Unknown template ID                                    |
-| `503`  | Alerting subsystem not initialised                     |
+| Status | Condition                          |
+| ------ | ---------------------------------- |
+| `400`  | Invalid request body               |
+| `404`  | Unknown template ID                |
+| `503`  | Alerting subsystem not initialised |
 
 **How to enable a template** — example workflow:
 
@@ -3421,16 +3421,16 @@ samples plus summary statistics (slope per second, min, max, average, last value
 
 **Valid metric names**:
 
-| Metric name      | Scope      | Description                                    |
-| ---------------- | ---------- | ---------------------------------------------- |
-| `cpu_temp`       | global     | CPU temperature in °C                          |
-| `array_used_pct` | global     | Array used percentage                          |
-| `disk_temp`      | per-entity | Temperature of a specific disk                |
-| `disk_used_pct`  | per-entity | Used percentage of a specific disk            |
-| `disk_errors`    | per-entity | Read/write error count for a specific disk    |
-| `reallocated`    | per-entity | Reallocated sector count for a specific disk  |
-| `pending`        | per-entity | Pending sector count for a specific disk      |
-| `restart_count`  | per-entity | Restart count for a specific container        |
+| Metric name      | Scope      | Description                                  |
+| ---------------- | ---------- | -------------------------------------------- |
+| `cpu_temp`       | global     | CPU temperature in °C                        |
+| `array_used_pct` | global     | Array used percentage                        |
+| `disk_temp`      | per-entity | Temperature of a specific disk               |
+| `disk_used_pct`  | per-entity | Used percentage of a specific disk           |
+| `disk_errors`    | per-entity | Read/write error count for a specific disk   |
+| `reallocated`    | per-entity | Reallocated sector count for a specific disk |
+| `pending`        | per-entity | Pending sector count for a specific disk     |
+| `restart_count`  | per-entity | Restart count for a specific container       |
 
 **Response**:
 

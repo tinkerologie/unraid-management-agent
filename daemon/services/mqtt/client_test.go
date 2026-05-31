@@ -52,7 +52,7 @@ func TestPublishNewNotificationEventsSeeding(t *testing.T) {
 		{ID: "n1", Importance: "alert", Type: "unread"},
 		{ID: "n3", Importance: "warning", Type: "unread"},
 		{ID: "n4", Importance: "info", Type: "archive"}, // archived -> skipped
-		{ID: "", Importance: "info", Type: "unread"},     // no ID -> skipped
+		{ID: "", Importance: "info", Type: "unread"},    // no ID -> skipped
 	})
 
 	if !client.seenNotifications["n3"] {
