@@ -57,6 +57,22 @@ func BuildService(cfg dto.AgentConfig, configDir string, state tools.StateProvid
 			return nil, fmt.Errorf("agent enabled but %s is not set", APIKeyEnv)
 		}
 		provider = llm.NewAnthropicProvider(cfg.APIKey, cfg.Model, cfg.Endpoint)
+	case "openai", "openrouter", "gemini":
+		if cfg.APIKey == "" {
+			return nil, fmt.Errorf("agent enabled but %s is not set", APIKeyEnv)
+		}
+		endpoint := cfg.Endpoint
+		if endpoint == "" {
+			switch cfg.Provider {
+			case "openrouter":
+				endpoint = "https://openrouter.ai/api/v1/chat/completions"
+			case "gemini":
+				endpoint = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+			default:
+				endpoint = "https://api.openai.com/v1/chat/completions"
+			}
+		}
+		provider = llm.NewOpenAIProvider(cfg.APIKey, cfg.Model, endpoint)
 	default:
 		return nil, fmt.Errorf("unsupported agent provider %q", cfg.Provider)
 	}
