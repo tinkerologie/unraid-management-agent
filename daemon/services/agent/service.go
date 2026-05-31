@@ -193,6 +193,9 @@ func (s *Service) CancelSession(sessionID string) (dto.AgentSession, error) {
 	if !ok {
 		return dto.AgentSession{}, fmt.Errorf("session %q not found", sessionID)
 	}
+	if sess.Status == dto.SessionCompleted || sess.Status == dto.SessionFailed || sess.Status == dto.SessionCancelled {
+		return sess, fmt.Errorf("cannot cancel session %q in terminal state %q", sessionID, sess.Status)
+	}
 	now := time.Now()
 	sess.Status = dto.SessionCancelled
 	sess.PendingApproval = nil

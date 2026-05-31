@@ -78,3 +78,15 @@ func TestOpenAIErrorStatus(t *testing.T) {
 		t.Fatal("expected error on 401")
 	}
 }
+
+func TestOpenAIEmptyChoicesErrors(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[],"usage":{}}`))
+	}))
+	defer srv.Close()
+	p := NewOpenAIProvider("k", "m", srv.URL)
+	if _, err := p.Chat(context.Background(), ChatRequest{}); err == nil {
+		t.Fatal("expected error when choices is empty")
+	}
+}

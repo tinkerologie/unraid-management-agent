@@ -98,6 +98,10 @@ func (o *Orchestrator) Run() error {
 	alertEngine := alerting.NewEngine(alertStore, apiServer)
 	apiServer.SetAlertEngine(alertEngine, alertStore)
 	mcpServer.SetAlertEngine(alertEngine, alertStore)
+	// Set the event bus before launching Start so the goroutine's publishWake
+	// reads of the hub field don't race with a later SetEventBus write.
+	// Publishing to agent_wake with no subscriber (agent disabled) is a no-op.
+	alertEngine.SetEventBus(o.ctx.Hub)
 	wg.Go(func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -114,6 +118,9 @@ func (o *Orchestrator) Run() error {
 	watchdog.SetDockerProvider(apiServer)
 	apiServer.SetWatchdog(watchdogRunner, watchdogStore)
 	mcpServer.SetWatchdog(watchdogRunner, watchdogStore)
+	// Set the event bus before launching Start to avoid racing with a later
+	// SetEventBus write. No-op publish if the agent is disabled.
+	watchdogRunner.SetEventBus(o.ctx.Hub)
 	wg.Go(func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -136,8 +143,6 @@ func (o *Orchestrator) Run() error {
 			o.agentDocker = agentDocker
 			apiServer.SetAgent(agentSvc)
 			agentSvc.SetEventBus(o.ctx.Hub)
-			alertEngine.SetEventBus(o.ctx.Hub)
-			watchdogRunner.SetEventBus(o.ctx.Hub)
 			mcpServer.SetAgent(agentSvc)
 			wg.Go(func() {
 				defer func() {

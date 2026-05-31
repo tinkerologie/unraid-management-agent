@@ -179,6 +179,9 @@ func (o *OpenAIProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRespon
 	if err := json.Unmarshal(raw, &parsed); err != nil {
 		return nil, fmt.Errorf("decode openai response: %w", err)
 	}
+	if len(parsed.Choices) == 0 {
+		return nil, fmt.Errorf("openai response contained no choices: %s", string(raw))
+	}
 
 	out := &ChatResponse{InputTokens: parsed.Usage.PromptTokens, OutputTokens: parsed.Usage.CompletionTokens}
 	if len(parsed.Choices) > 0 {

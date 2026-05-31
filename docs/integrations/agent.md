@@ -220,12 +220,12 @@ where it left off.
 
 ```bash
 # Approve
-curl -s -X POST http://192.168.20.21:8043/api/v1/agent/sessions/01J3XKZP2V8N4DRHMGT5W6QA00/approve \
+curl -s -X POST http://<unraid-ip>:8043/api/v1/agent/sessions/01J3XKZP2V8N4DRHMGT5W6QA00/approve \
   -H "Content-Type: application/json" \
   -d '{"action_id": "act_01J3XKZP2V8N4DRHMGT5W6QA01", "approve": true}'
 
 # Deny
-curl -s -X POST http://192.168.20.21:8043/api/v1/agent/sessions/01J3XKZP2V8N4DRHMGT5W6QA00/approve \
+curl -s -X POST http://<unraid-ip>:8043/api/v1/agent/sessions/01J3XKZP2V8N4DRHMGT5W6QA00/approve \
   -H "Content-Type: application/json" \
   -d '{"action_id": "act_01J3XKZP2V8N4DRHMGT5W6QA01", "approve": false}'
 ```
@@ -260,7 +260,7 @@ a denial and winds down gracefully.
 To abandon a session entirely (whether running or awaiting approval):
 
 ```bash
-curl -s -X POST http://192.168.20.21:8043/api/v1/agent/sessions/01J3XKZP2V8N4DRHMGT5W6QA00/cancel
+curl -s -X POST http://<unraid-ip>:8043/api/v1/agent/sessions/01J3XKZP2V8N4DRHMGT5W6QA00/cancel
 ```
 
 The session transitions to status `cancelled` and any pending approvals are cleared.
@@ -348,7 +348,7 @@ completes (goal reached, iteration cap, token budget, or deadline).
 **Example:**
 
 ```bash
-curl -s -X POST http://192.168.20.21:8043/api/v1/agent/sessions \
+curl -s -X POST http://<unraid-ip>:8043/api/v1/agent/sessions \
   -H "Content-Type: application/json" \
   -d '{"goal": "Check whether any containers have exited and restart them."}'
 ```
@@ -396,7 +396,7 @@ List all persisted sessions, newest first.
 **Example:**
 
 ```bash
-curl -s http://192.168.20.21:8043/api/v1/agent/sessions
+curl -s http://<unraid-ip>:8043/api/v1/agent/sessions
 ```
 
 **Example response (200 OK):**
@@ -425,7 +425,7 @@ Retrieve a single session by its ULID. Returns **404** if not found.
 **Example:**
 
 ```bash
-curl -s http://192.168.20.21:8043/api/v1/agent/sessions/01J3XKZP2V8N4DRHMGT5W6QA00
+curl -s http://<unraid-ip>:8043/api/v1/agent/sessions/01J3XKZP2V8N4DRHMGT5W6QA00
 ```
 
 ---
@@ -445,7 +445,7 @@ request or wrong state, **503** when the agent is disabled.
 **Example (approve):**
 
 ```bash
-curl -s -X POST http://192.168.20.21:8043/api/v1/agent/sessions/01J3XKZP2V8N4DRHMGT5W6QA00/approve \
+curl -s -X POST http://<unraid-ip>:8043/api/v1/agent/sessions/01J3XKZP2V8N4DRHMGT5W6QA00/approve \
   -H "Content-Type: application/json" \
   -d '{"action_id": "act_01J3XKZP2V8N4DRHMGT5W6QA01", "approve": true}'
 ```
@@ -460,7 +460,7 @@ completed session returns **400**. Returns the updated session on success.
 **Example:**
 
 ```bash
-curl -s -X POST http://192.168.20.21:8043/api/v1/agent/sessions/01J3XKZP2V8N4DRHMGT5W6QA00/cancel
+curl -s -X POST http://<unraid-ip>:8043/api/v1/agent/sessions/01J3XKZP2V8N4DRHMGT5W6QA00/cancel
 ```
 
 ---
@@ -507,7 +507,7 @@ live agent reasoning to a UI or monitoring tool:
 
 ```bash
 # Using websocat (https://github.com/vi/websocat)
-websocat ws://192.168.20.21:8043/ws | grep '"agent_'
+websocat ws://<unraid-ip>:8043/ws | grep '"agent_'
 ```
 
 ---

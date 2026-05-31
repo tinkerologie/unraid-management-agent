@@ -123,6 +123,20 @@ func TestCancelSession(t *testing.T) {
 	}
 }
 
+func TestCancelTerminalSessionErrors(t *testing.T) {
+	called := false
+	svc := pausedSvc(t, &called)
+	sess, _ := svc.StartSession(context.Background(), "stop array")
+	// First cancel succeeds (session was awaiting_approval).
+	if _, err := svc.CancelSession(sess.ID); err != nil {
+		t.Fatalf("first cancel: %v", err)
+	}
+	// Second cancel must error (already cancelled) and not re-mutate.
+	if _, err := svc.CancelSession(sess.ID); err == nil {
+		t.Fatal("expected error cancelling an already-terminal session")
+	}
+}
+
 func TestSweepExpiredApprovals(t *testing.T) {
 	called := false
 	svc := pausedSvc(t, &called)
