@@ -127,6 +127,9 @@ func (s *Service) runLoop(ctx context.Context, sess *dto.AgentSession) {
 
 			mode := s.cfg.Autonomy[tier]
 			if mode != dto.ModeAuto {
+				// NOTE: the pending call's tool_use is in the assistant turn but has NO
+				// matching tool result yet. ApproveAction (Task 3) MUST append the tool
+				// result for this call.ID before calling runLoop again.
 				sess.Steps = append(sess.Steps, step)
 				sess.PendingApproval = &dto.ApprovalRequest{
 					ActionID:    call.ID,

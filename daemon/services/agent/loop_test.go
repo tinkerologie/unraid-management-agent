@@ -196,18 +196,61 @@ func TestLoopForbidListRefusesEvenIfAuto(t *testing.T) {
 	cfg := dto.DefaultAgentConfig()
 	cfg.Enabled = true
 	cfg.Autonomy[dto.RiskHigh] = dto.ModeAuto // even if mis-set to auto...
+	cfg.ForbidList = []string{"format_disk"}  // ...the forbid-list still wins (set explicitly, not via defaults)
 	reg := tools.NewRegistry()
 	called := false
 	reg.Register(tools.Tool{Name: "format_disk", RiskTier: dto.RiskHigh,
 		Invoke: func(_ context.Context, _ string) (string, error) { called = true; return "", nil }})
 	svc := NewService(cfg, p, reg, NewStore(t.TempDir()), &capturingBroadcaster{})
 
-	sess, _ := svc.StartSession(context.Background(), "format disk1")
+	sess, err := svc.StartSession(context.Background(), "format disk1")
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
 	if called {
 		t.Fatal("forbid-list tool must never execute")
 	}
 	if sess.Status != dto.SessionCompleted {
 		t.Fatalf("status=%q want completed (loop continues after refusal)", sess.Status)
+	}
+}
+
+func TestLoopAutoThenApprovalPreservesFirstResult(t *testing.T) {
+	p := llm.NewMockProvider(
+		&llm.ChatResponse{ToolCalls: []llm.ToolCall{
+			{ID: "a1", Name: "get_system_info", Args: "{}"},
+			{ID: "a2", Name: "stop_array", Args: "{}"},
+		}, OutputTokens: 3},
+	)
+	cfg := dto.DefaultAgentConfig()
+	cfg.Enabled = true
+	reg := tools.BuildDefault(fakeState{}, fakeDocker{}) // provides get_system_info (read-only)
+	stopped := false
+	reg.Register(tools.Tool{Name: "stop_array", RiskTier: dto.RiskHigh,
+		Invoke: func(_ context.Context, _ string) (string, error) { stopped = true; return "stopped", nil }})
+	svc := NewService(cfg, p, reg, NewStore(t.TempDir()), &capturingBroadcaster{})
+
+	sess, err := svc.StartSession(context.Background(), "check then stop")
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if sess.Status != dto.SessionAwaitingApproval {
+		t.Fatalf("want awaiting_approval, got %q", sess.Status)
+	}
+	if stopped {
+		t.Fatal("stop_array must not execute before approval")
+	}
+	if sess.PendingApproval == nil || sess.PendingApproval.ActionID != "a2" {
+		t.Fatalf("pending approval should target call a2: %+v", sess.PendingApproval)
+	}
+	foundA1 := false
+	for _, m := range sess.Transcript {
+		if m.Role == "tool" && m.ToolCallID == "a1" {
+			foundA1 = true
+		}
+	}
+	if !foundA1 {
+		t.Fatal("first (auto) tool result must be preserved in transcript before pause")
 	}
 }
 
