@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -14,9 +15,17 @@ const systemPrompt = `You are the Unraid Management Agent's autonomous operator.
 	`Investigate the user's goal using the provided tools, then give a concise answer. ` +
 	`Only call tools that exist. When you have enough information, reply with a final text answer and no tool calls.`
 
+const defaultLLMMaxOutputTokens = 4096 // minimum safe for the Anthropic Claude family
+
 // runLoop executes the bounded ReAct cycle and returns the finished session.
-func (s *Service) runLoop(ctx context.Context, id, goal string) dto.AgentSession {
-	sess := dto.AgentSession{ID: id, Goal: goal, Status: dto.SessionRunning, StartedAt: time.Now()}
+func (s *Service) runLoop(ctx context.Context, id, goal string) (sess dto.AgentSession) {
+	sess = dto.AgentSession{ID: id, Goal: goal, Status: dto.SessionRunning, StartedAt: time.Now()}
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error("Agent: panic in session %s: %v", id, r)
+			s.fail(&sess, fmt.Sprintf("internal panic: %v", r))
+		}
+	}()
 	s.emit(&sess, "session_started", nil)
 
 	deadline := time.Duration(s.cfg.SessionDeadlineSecs) * time.Second
@@ -31,17 +40,21 @@ func (s *Service) runLoop(ctx context.Context, id, goal string) dto.AgentSession
 	schemas := s.tools.Schemas()
 
 	for i := 0; i < s.cfg.MaxIterations; i++ {
-		if sess.TokensUsed >= s.cfg.MaxTokensPerSession {
+		if s.cfg.MaxTokensPerSession > 0 && sess.TokensUsed >= s.cfg.MaxTokensPerSession {
 			s.finish(&sess, dto.SessionCompleted, "Stopped: token budget reached.")
 			return sess
 		}
 
 		resp, err := s.provider.Chat(loopCtx, llm.ChatRequest{
 			System: systemPrompt, Messages: messages, Tools: schemas,
-			MaxTokens: 4096,
+			MaxTokens: defaultLLMMaxOutputTokens,
 		})
 		if err != nil {
-			s.fail(&sess, fmt.Sprintf("provider error: %v", err))
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				s.fail(&sess, fmt.Sprintf("session cancelled: %v", err))
+			} else {
+				s.fail(&sess, fmt.Sprintf("provider error: %v", err))
+			}
 			return sess
 		}
 		sess.TokensUsed += resp.InputTokens + resp.OutputTokens

@@ -75,8 +75,8 @@ func TestLoopHitsIterationCap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("start: %v", err)
 	}
-	if len(sess.Steps) > 3 {
-		t.Fatalf("expected <=3 steps, got %d", len(sess.Steps))
+	if len(sess.Steps) != 3 {
+		t.Fatalf("expected 3 steps, got %d", len(sess.Steps))
 	}
 	if sess.Status != dto.SessionCompleted {
 		t.Fatalf("expected completed (truncated), got %q", sess.Status)
@@ -169,5 +169,22 @@ func TestLoopTokenBudgetStops(t *testing.T) {
 	}
 	if len(sess.Steps) >= cfg.MaxIterations {
 		t.Fatalf("expected to stop before MaxIterations, got %d steps", len(sess.Steps))
+	}
+}
+
+func TestLoopProviderErrorFails(t *testing.T) {
+	p := llm.NewMockProvider() // empty script → errors on first call
+	cfg := dto.DefaultAgentConfig()
+	cfg.Enabled = true
+	svc := NewService(cfg, p, tools.BuildDefault(fakeState{}, fakeDocker{}), NewStore(t.TempDir()), &capturingBroadcaster{})
+	sess, err := svc.StartSession(context.Background(), "anything")
+	if err != nil {
+		t.Fatalf("StartSession itself should not error: %v", err)
+	}
+	if sess.Status != dto.SessionFailed {
+		t.Fatalf("expected failed, got %q", sess.Status)
+	}
+	if sess.Error == "" {
+		t.Fatal("expected non-empty Error field")
 	}
 }

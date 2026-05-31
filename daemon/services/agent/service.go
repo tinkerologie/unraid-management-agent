@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -53,7 +54,7 @@ func (s *Service) ListSessions() []dto.AgentSession { return s.store.List() }
 // StartSession runs a new agent session to completion (synchronous in Phase 1).
 func (s *Service) StartSession(ctx context.Context, goal string) (dto.AgentSession, error) {
 	if !s.Enabled() {
-		return dto.AgentSession{}, fmt.Errorf("agent is disabled")
+		return dto.AgentSession{}, errors.New("agent is disabled")
 	}
 	sess := s.runLoop(ctx, s.nextID(), goal)
 	s.store.Put(sess)
