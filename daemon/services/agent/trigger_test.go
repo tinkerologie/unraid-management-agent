@@ -7,6 +7,7 @@ import (
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/llm"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/memory"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/tools"
 )
 
@@ -16,7 +17,7 @@ func wakeSvc(t *testing.T) *Service {
 	cfg := dto.DefaultAgentConfig()
 	cfg.Enabled = true
 	reg := tools.BuildDefault(fakeState{}, fakeDocker{})
-	return NewService(cfg, p, reg, NewStore(t.TempDir()), &capturingBroadcaster{})
+	return NewService(cfg, p, reg, NewStore(t.TempDir()), memory.NewStore(t.TempDir(), 0), &capturingBroadcaster{})
 }
 
 func TestHandleWakeDedupsBySubsystem(t *testing.T) {

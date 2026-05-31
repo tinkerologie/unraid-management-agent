@@ -13,6 +13,7 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/llm"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/memory"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/tools"
 )
 
@@ -715,7 +716,7 @@ func newTestAgentService(t *testing.T) *agent.Service {
 	cfg.Enabled = true
 	p := llm.NewMockProvider(&llm.ChatResponse{Text: "all good", OutputTokens: 1})
 	reg := tools.BuildDefault(nil, nil)
-	return agent.NewService(cfg, p, reg, agent.NewStore(t.TempDir()), nil)
+	return agent.NewService(cfg, p, reg, agent.NewStore(t.TempDir()), memory.NewStore(t.TempDir(), 0), nil)
 }
 
 func TestRegisterAgentToolsInitializes(t *testing.T) {

@@ -10,6 +10,7 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/llm"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/memory"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/tools"
 )
 
@@ -81,6 +82,10 @@ func BuildService(cfg dto.AgentConfig, configDir string, state tools.StateProvid
 	if err := store.Load(); err != nil {
 		logger.Warning("Agent: failed to load sessions: %v", err)
 	}
+	mem := memory.NewStore(configDir, cfg.MaxIncidents)
+	if err := mem.Load(); err != nil {
+		logger.Warning("Agent: failed to load memory: %v", err)
+	}
 	reg := tools.BuildDefault(state, docker)
-	return NewService(cfg, provider, reg, store, bc), nil
+	return NewService(cfg, provider, reg, store, mem, bc), nil
 }

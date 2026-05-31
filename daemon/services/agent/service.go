@@ -13,6 +13,7 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/llm"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/memory"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/tools"
 )
 
@@ -27,6 +28,7 @@ type Service struct {
 	provider llm.Provider
 	tools    *tools.Registry
 	store    *Store
+	memory   *memory.Store
 	bc       Broadcaster
 
 	mu  sync.Mutex
@@ -39,8 +41,8 @@ type Service struct {
 }
 
 // NewService constructs the agent service.
-func NewService(cfg dto.AgentConfig, provider llm.Provider, reg *tools.Registry, store *Store, bc Broadcaster) *Service {
-	s := &Service{cfg: cfg, provider: provider, tools: reg, store: store, bc: bc, lastWake: map[string]time.Time{}}
+func NewService(cfg dto.AgentConfig, provider llm.Provider, reg *tools.Registry, store *Store, mem *memory.Store, bc Broadcaster) *Service {
+	s := &Service{cfg: cfg, provider: provider, tools: reg, store: store, memory: mem, bc: bc, lastWake: map[string]time.Time{}}
 	// Resume the session counter past any persisted IDs so a restart does not
 	// reuse "sess-1" and overwrite an existing session.
 	for _, sess := range store.List() {
@@ -89,8 +91,10 @@ func (s *Service) StartSession(ctx context.Context, goal string) (dto.AgentSessi
 	}
 	sess := dto.AgentSession{ID: s.nextID(), Goal: goal, Status: dto.SessionRunning, StartedAt: time.Now()}
 	sess.Transcript = []dto.AgentMessage{{Role: "user", Content: goal}}
+	s.injectRecall(&sess)
 	s.emit(&sess, "session_started", nil)
 	s.runLoop(ctx, &sess)
+	s.finalize(&sess)
 	s.store.Put(sess)
 	if err := s.store.Save(); err != nil {
 		logger.Warning("Agent: failed to persist session %s: %v", sess.ID, err)
@@ -133,6 +137,7 @@ func (s *Service) ApproveAction(ctx context.Context, sessionID, actionID string,
 	}
 	appendTranscript(&sess, llm.Message{Role: "tool", ToolCallID: pending.ActionID, Content: result})
 	s.runLoop(ctx, &sess)
+	s.finalize(&sess)
 
 	s.store.Put(sess)
 	if err := s.store.Save(); err != nil {
@@ -176,8 +181,10 @@ func (s *Service) startAutonomousSession(ctx context.Context, ev dto.AgentWakeEv
 		ev.Source, ev.Severity, ev.Title, ev.Detail)
 	sess := dto.AgentSession{ID: s.nextID(), Goal: goal, Status: dto.SessionRunning, StartedAt: time.Now()}
 	sess.Transcript = []dto.AgentMessage{{Role: "user", Content: goal}}
+	s.injectRecall(&sess)
 	s.emit(&sess, "session_started", nil)
 	s.runLoop(ctx, &sess)
+	s.finalize(&sess)
 	s.store.Put(sess)
 	if err := s.store.Save(); err != nil {
 		logger.Warning("Agent: failed to persist autonomous session %s: %v", sess.ID, err)

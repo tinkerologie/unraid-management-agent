@@ -7,6 +7,7 @@ import (
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/llm"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/memory"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/tools"
 )
 
@@ -21,7 +22,7 @@ func TestNextIDResumesAfterRestart(t *testing.T) {
 	provider := llm.NewMockProvider(&llm.ChatResponse{Text: "done", OutputTokens: 1})
 	reg := tools.BuildDefault(nil, nil)
 
-	svc := NewService(cfg, provider, reg, store, nil)
+	svc := NewService(cfg, provider, reg, store, memory.NewStore(t.TempDir(), 0), nil)
 	sess, err := svc.StartSession(context.Background(), "check status")
 	if err != nil {
 		t.Fatalf("StartSession: %v", err)
@@ -42,7 +43,7 @@ func pausedSvc(t *testing.T, toolCalled *bool) *Service {
 	reg := tools.NewRegistry()
 	reg.Register(tools.Tool{Name: "stop_array", RiskTier: dto.RiskHigh,
 		Invoke: func(_ context.Context, _ string) (string, error) { *toolCalled = true; return "stopped", nil }})
-	return NewService(cfg, p, reg, NewStore(t.TempDir()), &capturingBroadcaster{})
+	return NewService(cfg, p, reg, NewStore(t.TempDir()), memory.NewStore(t.TempDir(), 0), &capturingBroadcaster{})
 }
 
 func TestApproveExecutesAndCompletes(t *testing.T) {
@@ -102,7 +103,7 @@ func TestApproveForbiddenStillRefused(t *testing.T) {
 	reg := tools.NewRegistry()
 	reg.Register(tools.Tool{Name: "format_disk", RiskTier: dto.RiskHigh,
 		Invoke: func(_ context.Context, _ string) (string, error) { called = true; return "", nil }})
-	svc := NewService(cfg, p, reg, NewStore(t.TempDir()), &capturingBroadcaster{})
+	svc := NewService(cfg, p, reg, NewStore(t.TempDir()), memory.NewStore(t.TempDir(), 0), &capturingBroadcaster{})
 	// format_disk is forbidden, so the loop refuses it inline and never pauses; session completes.
 	sess, _ := svc.StartSession(context.Background(), "format disk1")
 	if called {
