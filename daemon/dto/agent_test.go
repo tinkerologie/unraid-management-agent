@@ -68,3 +68,33 @@ func TestAgentSessionPendingApprovalRoundTrips(t *testing.T) {
 		t.Fatalf("transcript lost: %+v", back.Transcript)
 	}
 }
+
+func TestDefaultAgentConfigPhase3Defaults(t *testing.T) {
+	cfg := DefaultAgentConfig()
+	if !cfg.MemoryEnabled {
+		t.Error("memory should be enabled by default")
+	}
+	if cfg.MaxIncidents <= 0 || cfg.RecallTopK <= 0 {
+		t.Error("MaxIncidents and RecallTopK must be positive")
+	}
+}
+
+func TestAgentIncidentAndPreferenceRoundTrip(t *testing.T) {
+	inc := AgentIncident{ID: "inc-1", Signature: "watchdog:Plex HTTP", Goal: "fix plex", Outcome: "completed", Summary: "restarted plex", Actions: []string{"restart_container"}}
+	pref := AgentPreference{ID: "pref-1", Kind: "auto_approve_tool", Subject: "restart_container", Status: PreferencePending}
+	for _, v := range []any{inc, pref} {
+		b, err := json.Marshal(v)
+		if err != nil {
+			t.Fatalf("marshal: %v", err)
+		}
+		if len(b) == 0 {
+			t.Fatal("empty marshal")
+		}
+	}
+	sess := AgentSession{ID: "s1", Plan: []PlanStep{{Intent: "check disk", Tool: "get_system_info"}}}
+	b, _ := json.Marshal(sess)
+	var back AgentSession
+	if err := json.Unmarshal(b, &back); err != nil || len(back.Plan) != 1 || back.Plan[0].Intent != "check disk" {
+		t.Fatalf("plan round-trip failed: %+v err=%v", back.Plan, err)
+	}
+}

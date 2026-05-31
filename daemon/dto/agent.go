@@ -48,6 +48,9 @@ type AgentConfig struct {
 	MaxConcurrentSessions int                       `json:"max_concurrent_sessions"`
 	ApprovalTTLSecs       int                       `json:"approval_ttl_secs"`
 	ForbidList            []string                  `json:"forbid_list"`
+	MemoryEnabled         bool                      `json:"memory_enabled"`
+	MaxIncidents          int                       `json:"max_incidents"`
+	RecallTopK            int                       `json:"recall_top_k"`
 }
 
 // DefaultAgentConfig returns safe defaults: disabled, conservative caps, tiered autonomy.
@@ -65,6 +68,9 @@ func DefaultAgentConfig() AgentConfig {
 		MaxConcurrentSessions: 2,
 		ApprovalTTLSecs:       3600,
 		ForbidList:            []string{"format_disk", "clear_parity", "disable_parity", "partition_disk", "delete_array_disk"},
+		MemoryEnabled:         true,
+		MaxIncidents:          200,
+		RecallTopK:            3,
 	}
 }
 
@@ -122,6 +128,42 @@ type AgentStep struct {
 	At        time.Time       `json:"at"`
 }
 
+// PlanStep is one step of a goal decomposition produced by the planner.
+type PlanStep struct {
+	Intent string `json:"intent"`
+	Tool   string `json:"tool,omitempty"`
+	Done   bool   `json:"done"`
+}
+
+// AgentIncident is an episodic memory record of a finished session.
+type AgentIncident struct {
+	ID        string    `json:"id"`
+	Signature string    `json:"signature"`
+	Goal      string    `json:"goal"`
+	Outcome   string    `json:"outcome"`
+	Summary   string    `json:"summary"`
+	Actions   []string  `json:"actions,omitempty"`
+	At        time.Time `json:"at"`
+}
+
+// PreferenceStatus is the lifecycle of a learned preference.
+type PreferenceStatus string
+
+const (
+	PreferencePending PreferenceStatus = "pending"
+	PreferenceActive  PreferenceStatus = "active"
+)
+
+// AgentPreference is a learned, suggest-not-mutate operator preference.
+type AgentPreference struct {
+	ID      string           `json:"id"`
+	Kind    string           `json:"kind"`
+	Subject string           `json:"subject"`
+	Note    string           `json:"note,omitempty"`
+	Status  PreferenceStatus `json:"status"`
+	At      time.Time        `json:"at"`
+}
+
 // AgentSession is a full agent run (on-demand in Phase 1).
 type AgentSession struct {
 	ID              string             `json:"id"`
@@ -135,4 +177,5 @@ type AgentSession struct {
 	EndedAt         *time.Time         `json:"ended_at,omitempty"`
 	PendingApproval *ApprovalRequest   `json:"pending_approval,omitempty"`
 	Transcript      []AgentMessage     `json:"transcript,omitempty"`
+	Plan            []PlanStep         `json:"plan,omitempty"`
 }
