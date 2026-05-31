@@ -22,6 +22,87 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/agent/memory": {
+            "get": {
+                "description": "Retrieve the agent's recorded incidents and learned preferences",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Get agent memory",
+                "responses": {
+                    "200": {
+                        "description": "Agent memory",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "incidents": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/definitions/dto.AgentIncident"
+                                    }
+                                },
+                                "preferences": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/definitions/dto.AgentPreference"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Agent disabled",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/preferences/{id}/confirm": {
+            "post": {
+                "description": "Confirm (activate) a pending learned preference by ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Confirm an agent preference",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Preference ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Preference confirmed",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Service error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "503": {
+                        "description": "Agent disabled",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/agent/sessions": {
             "get": {
                 "description": "Retrieve all agent sessions, newest first",
@@ -236,6 +317,64 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Service error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "503": {
+                        "description": "Agent disabled",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/sessions/{id}/messages": {
+            "post": {
+                "description": "Continue a completed or failed agent session with a new operator message and run it",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Send a follow-up message to an agent session",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Session ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Follow-up message",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Updated session",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AgentSession"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or service error",
                         "schema": {
                             "$ref": "#/definitions/dto.Response"
                         }
@@ -5188,6 +5327,35 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.AgentIncident": {
+            "type": "object",
+            "properties": {
+                "actions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "at": {
+                    "type": "string"
+                },
+                "goal": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "outcome": {
+                    "type": "string"
+                },
+                "signature": {
+                    "type": "string"
+                },
+                "summary": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.AgentMessage": {
             "type": "object",
             "properties": {
@@ -5222,6 +5390,29 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.AgentPreference": {
+            "type": "object",
+            "properties": {
+                "at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/dto.PreferenceStatus"
+                },
+                "subject": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.AgentSession": {
             "type": "object",
             "properties": {
@@ -5242,6 +5433,12 @@ const docTemplate = `{
                 },
                 "pending_approval": {
                     "$ref": "#/definitions/dto.ApprovalRequest"
+                },
+                "plan": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.PlanStep"
+                    }
                 },
                 "started_at": {
                     "type": "string"
@@ -8564,6 +8761,20 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.PlanStep": {
+            "type": "object",
+            "properties": {
+                "done": {
+                    "type": "boolean"
+                },
+                "intent": {
+                    "type": "string"
+                },
+                "tool": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.PluginBulkUpdateResult": {
             "type": "object",
             "properties": {
@@ -8703,6 +8914,17 @@ const docTemplate = `{
                     "example": "tcp"
                 }
             }
+        },
+        "dto.PreferenceStatus": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "active"
+            ],
+            "x-enum-varnames": [
+                "PreferencePending",
+                "PreferenceActive"
+            ]
         },
         "dto.ProcessInfo": {
             "type": "object",

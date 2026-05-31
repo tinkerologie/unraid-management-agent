@@ -1,9 +1,9 @@
 # Embedded Agent Core
 
-> **Status: Beta (Phase 2)** — Disabled by default. Opt-in required.
-> Phase 2 adds event-driven autonomy (alert/health-check triggers), a full
-> approval gate with pause/resume surviving restarts, a non-overridable forbid-list,
-> and OpenAI-compatible LLM providers (OpenRouter, Gemini).
+> **Status: Beta (Phase 3)** — Disabled by default. Opt-in required.
+> Phase 3 adds episodic memory with semantic recall, a goal-decomposition planner,
+> suggest-not-mutate learning (preference + runbook proposals), multi-turn chat
+> (`SendMessage`), and new REST / MCP surfaces for memory and preferences.
 
 The Unraid Management Agent includes an embedded autonomous operator ("Agent Core")
 that can reason about your Unraid server and take actions on your behalf using a
@@ -25,7 +25,7 @@ The Agent Core implements a bounded **ReAct** (Reason + Act) loop:
 Sessions can also start **automatically** when an alert fires or a health check fails
 (see [Autonomy / triggers](#autonomy--triggers) below).
 
-### Phase 2 scope
+### Phase 3 scope (current)
 
 | Capability                      | Status    |
 | ------------------------------- | --------- |
@@ -36,9 +36,10 @@ Sessions can also start **automatically** when an alert fires or a health check 
 | Event-driven triggers (alerts)  | Supported |
 | Forbid-list (irreversible ops)  | Supported |
 | MCP agent tools                 | Supported |
-| Memory / cross-session learning | Phase 3   |
-| Planner / runbook reuse         | Phase 3   |
-| Multi-turn chat                 | Phase 3   |
+| Episodic memory + recall        | Supported |
+| Goal-decomposition planner      | Supported |
+| Suggest-not-mutate learning     | Supported |
+| Multi-turn chat (SendMessage)   | Supported |
 
 ### Safety model
 
@@ -90,7 +91,10 @@ Create `/boot/config/plugins/unraid-management-agent/agent_config.json`:
   "wake_debounce_secs": 30,
   "wake_cooldown_secs": 300,
   "max_concurrent_sessions": 2,
-  "approval_ttl_secs": 3600
+  "approval_ttl_secs": 3600,
+  "memory_enabled": true,
+  "max_incidents": 200,
+  "recall_top_k": 3
 }
 ```
 
@@ -136,7 +140,10 @@ disabled or misconfigured).
   "wake_cooldown_secs": 300,
   "max_concurrent_sessions": 2,
   "approval_ttl_secs": 3600,
-  "forbid_list": []
+  "forbid_list": [],
+  "memory_enabled": true,
+  "max_incidents": 200,
+  "recall_top_k": 3
 }
 ```
 
@@ -155,9 +162,183 @@ disabled or misconfigured).
 | `max_concurrent_sessions` | int               | `2`       | Maximum number of autonomous sessions that may run simultaneously                      |
 | `approval_ttl_secs`       | int               | `3600`    | Seconds before an unresolved pending approval is automatically denied                  |
 | `forbid_list`             | []string          | `[]`      | Additional tool names to block unconditionally (merged with the built-in forbid-list)  |
+| `memory_enabled`          | bool              | `true`    | Enable episodic memory recording and recall across sessions                            |
+| `max_incidents`           | int               | `200`     | Maximum number of incident records retained in `agent_memory.json`                     |
+| `recall_top_k`            | int               | `3`       | Number of past incidents injected as context at the start of each session              |
 
 The API key is **never stored in the config file**. It must be provided via the
 `UMA_AGENT_API_KEY` environment variable.
+
+---
+
+## Memory and recall
+
+When `memory_enabled` is `true` (the default), the agent records a structured
+incident for every finished session into
+`/boot/config/plugins/unraid-management-agent/agent_memory.json`.
+
+### What gets recorded
+
+Each incident stores:
+
+| Field       | Description                                         |
+| ----------- | --------------------------------------------------- |
+| `id`        | Unique incident ULID                                |
+| `signature` | Short stable fingerprint of the goal (for dedup)    |
+| `goal`      | Original operator goal text                         |
+| `outcome`   | `completed`, `failed`, `cancelled`, etc.            |
+| `summary`   | One-sentence LLM-generated summary of what happened |
+| `tags`      | Keywords extracted from the goal and actions taken  |
+| `actions`   | List of tool names called during the session        |
+| `timestamp` | When the session finished                           |
+
+### How recall works
+
+At the start of each new session the recall engine:
+
+1. Scores every stored incident against the new goal using keyword / tag overlap.
+2. Selects the top-K incidents (controlled by `recall_top_k`, default `3`).
+3. Injects the matching incidents plus all active operator preferences into a
+   "memory context" block that is prepended to the first LLM system message.
+
+This allows the agent to reference past remediations — for example, if a container
+restart repeatedly fails the agent can note that it tried before and skip to a
+deeper investigation step.
+
+### Where memory is stored
+
+| File                | Purpose                                            |
+| ------------------- | -------------------------------------------------- |
+| `agent_memory.json` | Episodic incidents (up to `max_incidents` entries) |
+
+Inspect and clear via:
+
+```bash
+# View current memory via REST
+curl -s http://<unraid-ip>:8043/api/v1/agent/memory | jq .
+
+# Clear manually (daemon re-creates the file on next session)
+rm /boot/config/plugins/unraid-management-agent/agent_memory.json
+```
+
+---
+
+## Planner
+
+For operator-initiated sessions (not event-driven wakes), the agent runs one
+additional LLM call before the ReAct loop to decompose the goal into a short
+ordered plan.
+
+The plan is stored on the session as `sess.Plan` — a list of `{intent, tool}`
+steps — and a plain-English summary is injected into the transcript as the first
+assistant turn so subsequent reasoning steps can reference it.
+
+The planner call is **best-effort**: if it fails (LLM error, timeout) the session
+continues as normal without a plan. The extra LLM call consumes tokens from the
+session budget.
+
+---
+
+## Learning (suggest-not-mutate)
+
+The agent can propose new preferences and runbooks during a session, but it can
+never activate them by itself. All proposals are `PENDING` until an operator
+explicitly confirms them.
+
+### How proposals work
+
+During a session the agent may call:
+
+| Tool                 | What it does                                                            |
+| -------------------- | ----------------------------------------------------------------------- |
+| `propose_preference` | Records a pending preference (e.g. `auto_approve_tool` for a tool name) |
+| `propose_runbook`    | Records a proposed remediation runbook in `agent_runbooks.json`         |
+
+Both tools are read-only from the system perspective — they only write to the
+proposal store; they never change any configuration or execute any action.
+
+### Confirming a preference
+
+Pending preferences are confirmed via REST or MCP:
+
+```bash
+# List pending preferences
+curl -s http://<unraid-ip>:8043/api/v1/agent/memory | jq '.preferences[] | select(.status=="pending")'
+
+# Confirm a preference by ID
+curl -s -X POST http://<unraid-ip>:8043/api/v1/agent/preferences/01J3XK.../confirm
+```
+
+Or via MCP tool `agent_confirm_preference`:
+
+```json
+{
+  "name": "agent_confirm_preference",
+  "arguments": { "preference_id": "01J3XK..." }
+}
+```
+
+### Effect of a confirmed `auto_approve_tool` preference
+
+When a preference with `subject_type = "auto_approve_tool"` is confirmed, the
+policy gate treats calls to that tool (identified by `subject`) as if the tier
+were `auto`, bypassing the pause-for-approval step.
+
+> **Important:** the forbid-list always wins. A confirmed `auto_approve_tool`
+> preference for a forbidden tool has no effect.
+
+### Runbook proposals
+
+Proposed runbooks are persisted to
+`/boot/config/plugins/unraid-management-agent/agent_runbooks.json` alongside the
+built-in static runbook catalogue. They can be inspected, edited, or deleted
+manually. The `list_runbooks` MCP tool includes proposed runbooks in its output.
+
+---
+
+## Multi-turn chat
+
+After a session finishes (status `completed` or `failed`), the operator can
+continue the conversation by sending a follow-up message. The agent appends the
+message to the existing transcript and re-runs the ReAct loop.
+
+### Continuing a session via REST
+
+```bash
+curl -s -X POST http://<unraid-ip>:8043/api/v1/agent/sessions/01J3XKZP2V8N4DRHMGT5W6QA00/messages \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Can you also check whether the disk temperatures are normal?"}'
+```
+
+**Example response (200 OK):**
+
+```json
+{
+  "id": "01J3XKZP2V8N4DRHMGT5W6QA00",
+  "goal": "Check whether any containers have exited and restart them.",
+  "status": "completed",
+  "iterations": 7,
+  "total_tokens": 5840,
+  "final_answer": "All containers are running. Disk temperatures are within normal range (max 38 °C).",
+  "steps": ["..."]
+}
+```
+
+The session `id` is unchanged — each `SendMessage` call adds turns to the same
+session object. You can retrieve the full transcript at any time with
+`GET /api/v1/agent/sessions/{id}`.
+
+### Continuing a session via MCP
+
+```json
+{
+  "name": "agent_send_message",
+  "arguments": {
+    "session_id": "01J3XKZP2V8N4DRHMGT5W6QA00",
+    "message": "Can you also check disk temperatures?"
+  }
+}
+```
 
 ---
 
@@ -465,17 +646,124 @@ curl -s -X POST http://<unraid-ip>:8043/api/v1/agent/sessions/01J3XKZP2V8N4DRHMG
 
 ---
 
+### POST /api/v1/agent/sessions/{id}/messages
+
+Continue a completed or failed session with a follow-up operator message. The
+agent appends the message to the existing conversation history and re-runs the
+ReAct loop. Returns the updated session on success, **400** on invalid request
+or wrong session state, **503** when the agent is disabled.
+
+**Request body:**
+
+```json
+{ "message": "Also check disk temperatures." }
+```
+
+**Example:**
+
+```bash
+curl -s -X POST http://<unraid-ip>:8043/api/v1/agent/sessions/01J3XKZP2V8N4DRHMGT5W6QA00/messages \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Also check disk temperatures."}'
+```
+
+**Example response (200 OK):**
+
+```json
+{
+  "id": "01J3XKZP2V8N4DRHMGT5W6QA00",
+  "goal": "Check whether any containers have exited and restart them.",
+  "status": "completed",
+  "iterations": 7,
+  "total_tokens": 5840,
+  "final_answer": "All containers are running. Disk temperatures are within normal range.",
+  "steps": ["..."]
+}
+```
+
+---
+
+### GET /api/v1/agent/memory
+
+Return the agent's in-memory store: episodic incidents and learned preferences.
+Always returns **200** (even when the memory store is empty). Returns **503**
+when the agent is disabled.
+
+**Example:**
+
+```bash
+curl -s http://<unraid-ip>:8043/api/v1/agent/memory | jq .
+```
+
+**Example response (200 OK):**
+
+```json
+{
+  "incidents": [
+    {
+      "id": "01J3XM...",
+      "signature": "check-containers-restart",
+      "goal": "Check whether any containers have exited and restart them.",
+      "outcome": "completed",
+      "summary": "Found plex container stopped; restarted successfully.",
+      "tags": ["docker", "restart", "container"],
+      "actions": ["list_docker_containers", "restart_container"],
+      "timestamp": "2026-06-01T14:22:18Z"
+    }
+  ],
+  "preferences": [
+    {
+      "id": "01J3XN...",
+      "subject_type": "auto_approve_tool",
+      "subject": "restart_container",
+      "status": "confirmed",
+      "proposed_at": "2026-06-01T14:22:18Z",
+      "confirmed_at": "2026-06-01T15:00:00Z"
+    }
+  ]
+}
+```
+
+---
+
+### POST /api/v1/agent/preferences/{id}/confirm
+
+Activate a pending learned preference by its ID. Idempotent — confirming an
+already-confirmed preference is a no-op. Returns **400** if the preference is
+not found or already in a terminal state, **503** when the agent is disabled.
+
+**Example:**
+
+```bash
+curl -s -X POST http://<unraid-ip>:8043/api/v1/agent/preferences/01J3XN.../confirm
+```
+
+**Example response (200 OK):**
+
+```json
+{
+  "success": true,
+  "message": "preference confirmed",
+  "timestamp": "2026-06-01T15:00:00Z"
+}
+```
+
+---
+
 ## MCP tools
 
 The following MCP tools are exposed under the `agent_*` namespace for external AI
 agents and MCP clients:
 
-| Tool                   | Description                                                       |
-| ---------------------- | ----------------------------------------------------------------- |
-| `agent_start_session`  | Start a new agent session with a natural-language goal            |
-| `agent_get_session`    | Retrieve a session by ID (includes full step transcript)          |
-| `agent_list_sessions`  | List all persisted sessions, newest first                         |
-| `agent_approve_action` | Approve or deny a pending high-risk action in an awaiting session |
+| Tool                       | Description                                                       |
+| -------------------------- | ----------------------------------------------------------------- |
+| `agent_start_session`      | Start a new agent session with a natural-language goal            |
+| `agent_get_session`        | Retrieve a session by ID (includes full step transcript)          |
+| `agent_list_sessions`      | List all persisted sessions, newest first                         |
+| `agent_approve_action`     | Approve or deny a pending high-risk action in an awaiting session |
+| `agent_send_message`       | Continue a finished session with a follow-up operator message     |
+| `agent_get_memory`         | Retrieve the agent's episodic incidents and learned preferences   |
+| `agent_confirm_preference` | Activate a pending learned preference by ID                       |
 
 ---
 
@@ -521,16 +809,17 @@ pruning — remove or truncate the file manually if it grows too large.
 
 ---
 
-## Coming in later phases
+## Future work
 
-- **Phase 3 — Memory and learning:** The agent retains facts across sessions so it
-  can learn server-specific context over time (e.g. "disk 3 runs hot after array
-  starts").
-- **Phase 3 — Planner and runbook reuse:** Higher-level planning step that selects
-  and parameterises a runbook before entering the ReAct loop, reducing token usage
-  for known remediation patterns.
-- **Phase 3 — Multi-turn chat:** Interactive back-and-forth with the agent within a
-  long-lived session, beyond single-goal execution.
+The planned three-phase roadmap for the Agent Core is now complete. Potential future
+enhancements include:
+
+- **Embedding-based recall:** replace keyword / tag matching with vector similarity
+  search for more accurate incident retrieval on large memory stores.
+- **GUI page:** a dedicated Unraid UI page for viewing sessions, memory, and
+  confirming proposals without using the REST API or a terminal.
+- **Native notification approvals:** allow high-risk approval requests to be resolved
+  directly from an Unraid notification toast or mobile push notification.
 
 ---
 

@@ -23,6 +23,25 @@ definitions:
         example: abc123def456
         type: string
     type: object
+  dto.AgentIncident:
+    properties:
+      actions:
+        items:
+          type: string
+        type: array
+      at:
+        type: string
+      goal:
+        type: string
+      id:
+        type: string
+      outcome:
+        type: string
+      signature:
+        type: string
+      summary:
+        type: string
+    type: object
   dto.AgentMessage:
     properties:
       content:
@@ -45,6 +64,21 @@ definitions:
       name:
         type: string
     type: object
+  dto.AgentPreference:
+    properties:
+      at:
+        type: string
+      id:
+        type: string
+      kind:
+        type: string
+      note:
+        type: string
+      status:
+        $ref: '#/definitions/dto.PreferenceStatus'
+      subject:
+        type: string
+    type: object
   dto.AgentSession:
     properties:
       answer:
@@ -59,6 +93,10 @@ definitions:
         type: string
       pending_approval:
         $ref: '#/definitions/dto.ApprovalRequest'
+      plan:
+        items:
+          $ref: '#/definitions/dto.PlanStep'
+        type: array
       started_at:
         type: string
       status:
@@ -2422,6 +2460,15 @@ definitions:
       timestamp:
         type: string
     type: object
+  dto.PlanStep:
+    properties:
+      done:
+        type: boolean
+      intent:
+        type: string
+      tool:
+        type: string
+    type: object
   dto.PluginBulkUpdateResult:
     properties:
       failed:
@@ -2524,6 +2571,14 @@ definitions:
         example: tcp
         type: string
     type: object
+  dto.PreferenceStatus:
+    enum:
+    - pending
+    - active
+    type: string
+    x-enum-varnames:
+    - PreferencePending
+    - PreferenceActive
   dto.ProcessInfo:
     properties:
       command:
@@ -3698,6 +3753,59 @@ info:
   title: Unraid Management Agent API
   version: 2025.12.1
 paths:
+  /agent/memory:
+    get:
+      description: Retrieve the agent's recorded incidents and learned preferences
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Agent memory
+          schema:
+            properties:
+              incidents:
+                items:
+                  $ref: '#/definitions/dto.AgentIncident'
+                type: array
+              preferences:
+                items:
+                  $ref: '#/definitions/dto.AgentPreference'
+                type: array
+            type: object
+        "503":
+          description: Agent disabled
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get agent memory
+      tags:
+      - Agent
+  /agent/preferences/{id}/confirm:
+    post:
+      description: Confirm (activate) a pending learned preference by ID
+      parameters:
+      - description: Preference ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Preference confirmed
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Service error
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Agent disabled
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Confirm an agent preference
+      tags:
+      - Agent
   /agent/sessions:
     get:
       description: Retrieve all agent sessions, newest first
@@ -3846,6 +3954,45 @@ paths:
           schema:
             $ref: '#/definitions/dto.Response'
       summary: Cancel an agent session
+      tags:
+      - Agent
+  /agent/sessions/{id}/messages:
+    post:
+      consumes:
+      - application/json
+      description: Continue a completed or failed agent session with a new operator
+        message and run it
+      parameters:
+      - description: Session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Follow-up message
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            message:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Updated session
+          schema:
+            $ref: '#/definitions/dto.AgentSession'
+        "400":
+          description: Invalid request or service error
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Agent disabled
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Send a follow-up message to an agent session
       tags:
       - Agent
   /alerts/firing:

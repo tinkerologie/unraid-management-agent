@@ -35,6 +35,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Agent Core (Phase 3 — Memory, Planner, Learning, Multi-turn Chat):**
+
+  - **Episodic memory with semantic recall:** when a session finishes the agent
+    writes an incident record (signature, goal, outcome, summary, action tags) to
+    `agent_memory.json`. At the start of each new session the agent recalls the
+    most relevant past incidents via keyword / tag matching (top-K, default 3) and
+    injects them as context before the first LLM call. Active operator preferences
+    are included in the same context injection. Controlled by new config fields
+    `memory_enabled` (default `true`), `max_incidents` (default `200`), and
+    `recall_top_k` (default `3`).
+  - **Goal-decomposition planner:** operator-initiated sessions run one extra LLM
+    call before the ReAct loop that decomposes the goal into a short ordered plan
+    (`sess.Plan`, list of `{intent, tool}` steps) and injects a plan summary into
+    the transcript. The call is best-effort — a planner failure never aborts the
+    session.
+  - **Suggest-not-mutate learning:** the agent can call two new read-only tools
+    during a session: `propose_preference` (stores a `PENDING` autonomy / runbook
+    preference) and `propose_runbook` (stores a proposed runbook in
+    `agent_runbooks.json` alongside the static reviewed catalogue). Proposals never
+    take effect until an operator confirms them. A confirmed preference of subject
+    type `auto_approve_tool` (where `subject` is a tool name) causes the policy
+    gate to auto-approve calls to that tool (the forbid-list still wins).
+  - **Multi-turn chat (SendMessage):** `POST /api/v1/agent/sessions/{id}/messages`
+    with body `{"message":"…"}` continues a completed or failed session with a new
+    operator message and re-runs the ReAct loop. The conversation history is
+    preserved across turns.
+  - **New REST endpoints:**
+    - `POST /api/v1/agent/sessions/{id}/messages` — send a follow-up message to a
+      finished session.
+    - `GET /api/v1/agent/memory` — returns `{incidents, preferences}` from the
+      in-memory store.
+    - `POST /api/v1/agent/preferences/{id}/confirm` — confirm (activate) a pending
+      learned preference by ID.
+  - **New MCP tools:** `agent_send_message`, `agent_get_memory`,
+    `agent_confirm_preference` — exposing multi-turn chat, memory inspection, and
+    preference confirmation to external MCP clients.
+  - **New `agent_config.json` fields:** `memory_enabled` (bool, default `true`),
+    `max_incidents` (int, default `200`), `recall_top_k` (int, default `3`).
+
 - **Agent Core (Phase 2 — Autonomy & Approval):**
 
   - **Event-driven triggers:** the alerting Engine and watchdog Runner publish a
