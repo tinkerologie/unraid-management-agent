@@ -147,6 +147,108 @@ const docTemplate = `{
                 }
             }
         },
+        "/agent/sessions/{id}/approve": {
+            "post": {
+                "description": "Approve or reject a pending high-risk tool call, resuming the session",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Approve or reject a pending agent action",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Session ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Approval decision",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "action_id": {
+                                    "type": "string"
+                                },
+                                "approve": {
+                                    "type": "boolean"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Updated session",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AgentSession"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or service error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "503": {
+                        "description": "Agent disabled",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/sessions/{id}/cancel": {
+            "post": {
+                "description": "Cancel a running or awaiting-approval agent session",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Cancel an agent session",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Session ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Cancelled session",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AgentSession"
+                        }
+                    },
+                    "400": {
+                        "description": "Service error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "503": {
+                        "description": "Agent disabled",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/alerts/firing": {
             "get": {
                 "description": "Get only alert rules currently in the firing state",
@@ -5086,6 +5188,40 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.AgentMessage": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "tool_call_id": {
+                    "type": "string"
+                },
+                "tool_calls": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.AgentMsgToolCall"
+                    }
+                }
+            }
+        },
+        "dto.AgentMsgToolCall": {
+            "type": "object",
+            "properties": {
+                "args": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.AgentSession": {
             "type": "object",
             "properties": {
@@ -5104,6 +5240,9 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
+                "pending_approval": {
+                    "$ref": "#/definitions/dto.ApprovalRequest"
+                },
                 "started_at": {
                     "type": "string"
                 },
@@ -5118,6 +5257,12 @@ const docTemplate = `{
                 },
                 "tokens_used": {
                     "type": "integer"
+                },
+                "transcript": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.AgentMessage"
+                    }
                 }
             }
         },
@@ -5127,13 +5272,15 @@ const docTemplate = `{
                 "running",
                 "completed",
                 "failed",
-                "cancelled"
+                "cancelled",
+                "awaiting_approval"
             ],
             "x-enum-varnames": [
                 "SessionRunning",
                 "SessionCompleted",
                 "SessionFailed",
-                "SessionCancelled"
+                "SessionCancelled",
+                "SessionAwaitingApproval"
             ]
         },
         "dto.AgentStep": {
@@ -5293,6 +5440,29 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/dto.AlertStatus"
                     }
+                }
+            }
+        },
+        "dto.ApprovalRequest": {
+            "type": "object",
+            "properties": {
+                "action_id": {
+                    "type": "string"
+                },
+                "args": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "requested_at": {
+                    "type": "string"
+                },
+                "risk_tier": {
+                    "$ref": "#/definitions/dto.RiskTier"
+                },
+                "tool_name": {
+                    "type": "string"
                 }
             }
         },

@@ -23,6 +23,28 @@ definitions:
         example: abc123def456
         type: string
     type: object
+  dto.AgentMessage:
+    properties:
+      content:
+        type: string
+      role:
+        type: string
+      tool_call_id:
+        type: string
+      tool_calls:
+        items:
+          $ref: '#/definitions/dto.AgentMsgToolCall'
+        type: array
+    type: object
+  dto.AgentMsgToolCall:
+    properties:
+      args:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+    type: object
   dto.AgentSession:
     properties:
       answer:
@@ -35,6 +57,8 @@ definitions:
         type: string
       id:
         type: string
+      pending_approval:
+        $ref: '#/definitions/dto.ApprovalRequest'
       started_at:
         type: string
       status:
@@ -45,6 +69,10 @@ definitions:
         type: array
       tokens_used:
         type: integer
+      transcript:
+        items:
+          $ref: '#/definitions/dto.AgentMessage'
+        type: array
     type: object
   dto.AgentSessionStatus:
     enum:
@@ -52,12 +80,14 @@ definitions:
     - completed
     - failed
     - cancelled
+    - awaiting_approval
     type: string
     x-enum-varnames:
     - SessionRunning
     - SessionCompleted
     - SessionFailed
     - SessionCancelled
+    - SessionAwaitingApproval
   dto.AgentStep:
     properties:
       at:
@@ -164,6 +194,21 @@ definitions:
         items:
           $ref: '#/definitions/dto.AlertStatus'
         type: array
+    type: object
+  dto.ApprovalRequest:
+    properties:
+      action_id:
+        type: string
+      args:
+        type: string
+      reason:
+        type: string
+      requested_at:
+        type: string
+      risk_tier:
+        $ref: '#/definitions/dto.RiskTier'
+      tool_name:
+        type: string
     type: object
   dto.ArrayStatus:
     properties:
@@ -3734,6 +3779,73 @@ paths:
           schema:
             $ref: '#/definitions/dto.Response'
       summary: Get agent session
+      tags:
+      - Agent
+  /agent/sessions/{id}/approve:
+    post:
+      consumes:
+      - application/json
+      description: Approve or reject a pending high-risk tool call, resuming the session
+      parameters:
+      - description: Session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Approval decision
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            action_id:
+              type: string
+            approve:
+              type: boolean
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Updated session
+          schema:
+            $ref: '#/definitions/dto.AgentSession'
+        "400":
+          description: Invalid request or service error
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Agent disabled
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Approve or reject a pending agent action
+      tags:
+      - Agent
+  /agent/sessions/{id}/cancel:
+    post:
+      description: Cancel a running or awaiting-approval agent session
+      parameters:
+      - description: Session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Cancelled session
+          schema:
+            $ref: '#/definitions/dto.AgentSession'
+        "400":
+          description: Service error
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Agent disabled
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Cancel an agent session
       tags:
       - Agent
   /alerts/firing:

@@ -35,6 +35,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Agent Core (Phase 2 — Autonomy & Approval):**
+
+  - **Event-driven triggers:** the alerting Engine and watchdog Runner publish a
+    `dto.AgentWakeEvent` to the `agent_wake` typed pub-sub topic whenever an alert
+    fires or a health check fails. The agent subscribes at daemon startup (before
+    collectors start) and spawns autonomous investigation sessions automatically.
+    Wake events are debounced (default 30 s), deduplicated by subsystem, and rate-limited
+    by a per-subsystem cooldown (default 300 s). A concurrency cap (default 2) prevents
+    more than a configurable number of parallel autonomous sessions.
+  - **Approval gate (pause / resume):** when the agent proposes a tool whose risk tier
+    maps to `approve`, the session pauses with status `awaiting_approval` and a
+    `pending_approval` object (`action_id`, `tool`, `args`, `risk_tier`, `reason`).
+    The full conversation transcript is persisted to disk so the session survives a
+    daemon restart. Approving or denying the action resumes the loop from where it
+    left off. An automatic TTL sweeper (default 3 600 s / 1 hour) denies any approval
+    that has not been resolved within the configured window.
+  - **Non-overridable forbid-list:** a hard-coded list of irreversible disk operations
+    (`format_disk`, `clear_parity`, `disable_parity`, `partition_disk`,
+    `delete_array_disk`) that the agent will describe but the gate **never** executes,
+    even with explicit operator approval. The list is also configurable via the
+    `forbid_list` field in `agent_config.json`.
+  - **REST endpoints:** `POST /api/v1/agent/sessions/{id}/approve` (body
+    `{"action_id":"…","approve":true|false}`) approves or denies a pending action and
+    resumes the session; `POST /api/v1/agent/sessions/{id}/cancel` cancels a running
+    or awaiting-approval session.
+  - **MCP agent tools:** `agent_start_session`, `agent_get_session`,
+    `agent_list_sessions`, `agent_approve_action` — exposing the full agent lifecycle
+    to external MCP clients.
+  - **New WebSocket events** on the `agent_stream` topic: `agent_approval_required`
+    (session paused, pending action details in payload) and `agent_session_cancelled`.
+  - **OpenAI-compatible LLM providers:** in addition to `"anthropic"`, the `provider`
+    field now accepts `"openai"`, `"openrouter"`, and `"gemini"`. OpenRouter uses
+    `https://openrouter.ai/api/v1/chat/completions` by default; Gemini uses
+    `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`. All
+    providers read the API key from `UMA_AGENT_API_KEY`. Example free model via
+    OpenRouter: `openai/gpt-oss-20b:free`.
+  - **New `agent_config.json` fields:** `wake_debounce_secs` (default `30`),
+    `wake_cooldown_secs` (default `300`), `max_concurrent_sessions` (default `2`),
+    `approval_ttl_secs` (default `3600`), `forbid_list` (`[]string`).
+
 - **Agent Core (Phase 1):** embedded autonomous operator with a pluggable LLM provider
   (Anthropic), a risk-tiered tool registry (read-only + low-risk auto-execute; high-risk
   reserved for approval), a bounded ReAct reasoning loop with iteration/token/deadline
