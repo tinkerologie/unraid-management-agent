@@ -135,6 +135,31 @@ func (s *Service) ApproveAction(ctx context.Context, sessionID, actionID string,
 	return sess, nil
 }
 
+// SweepExpiredApprovals auto-denies awaiting-approval sessions older than the TTL.
+// Returns the number of sessions swept. A non-positive ApprovalTTLSecs disables it.
+func (s *Service) SweepExpiredApprovals(ctx context.Context, now time.Time) int {
+	if s.cfg.ApprovalTTLSecs <= 0 {
+		return 0
+	}
+	ttl := time.Duration(s.cfg.ApprovalTTLSecs) * time.Second
+	swept := 0
+	for _, sess := range s.store.List() {
+		if sess.Status != dto.SessionAwaitingApproval || sess.PendingApproval == nil {
+			continue
+		}
+		if now.Sub(sess.PendingApproval.RequestedAt) < ttl {
+			continue
+		}
+		logger.Warning("Agent: approval for session %s timed out after %s; auto-denying", sess.ID, ttl)
+		if _, err := s.ApproveAction(ctx, sess.ID, sess.PendingApproval.ActionID, false); err != nil {
+			logger.Error("Agent: failed to auto-deny session %s: %v", sess.ID, err)
+			continue
+		}
+		swept++
+	}
+	return swept
+}
+
 // CancelSession marks a session cancelled and clears any pending approval.
 func (s *Service) CancelSession(sessionID string) (dto.AgentSession, error) {
 	sess, ok := s.store.Get(sessionID)

@@ -122,3 +122,42 @@ func TestCancelSession(t *testing.T) {
 		t.Fatalf("cancel: status=%q err=%v", out.Status, err)
 	}
 }
+
+func TestSweepExpiredApprovals(t *testing.T) {
+	called := false
+	svc := pausedSvc(t, &called)
+	svc.cfg.ApprovalTTLSecs = 60
+	sess, _ := svc.StartSession(context.Background(), "stop array")
+	if sess.Status != dto.SessionAwaitingApproval {
+		t.Fatalf("precondition: want awaiting_approval, got %q", sess.Status)
+	}
+	// Backdate the pending approval beyond TTL and persist.
+	sess.PendingApproval.RequestedAt = time.Now().Add(-2 * time.Hour)
+	svc.store.Put(sess)
+
+	n := svc.SweepExpiredApprovals(context.Background(), time.Now())
+	if n != 1 {
+		t.Fatalf("expected 1 swept, got %d", n)
+	}
+	if called {
+		t.Fatal("expired approval must NOT execute the tool")
+	}
+	out, _ := svc.GetSession(sess.ID)
+	if out.PendingApproval != nil || out.Status == dto.SessionAwaitingApproval {
+		t.Fatalf("expired session should no longer await approval: %+v", out)
+	}
+}
+
+func TestSweepWithinTTLUntouched(t *testing.T) {
+	called := false
+	svc := pausedSvc(t, &called)
+	svc.cfg.ApprovalTTLSecs = 3600
+	sess, _ := svc.StartSession(context.Background(), "stop array")
+	if n := svc.SweepExpiredApprovals(context.Background(), time.Now()); n != 0 {
+		t.Fatalf("expected 0 swept within TTL, got %d", n)
+	}
+	out, _ := svc.GetSession(sess.ID)
+	if out.Status != dto.SessionAwaitingApproval {
+		t.Fatalf("within-TTL session should remain awaiting, got %q", out.Status)
+	}
+}
