@@ -181,3 +181,51 @@ func TestSweepWithinTTLUntouched(t *testing.T) {
 		t.Fatalf("within-TTL session should remain awaiting, got %q", out.Status)
 	}
 }
+
+func TestSendMessageContinuesSession(t *testing.T) {
+	p := llm.NewMockProvider(
+		&llm.ChatResponse{Text: "[]"},                                         // planner (StartSession)
+		&llm.ChatResponse{Text: "Plex is healthy.", OutputTokens: 2},          // first answer
+		&llm.ChatResponse{Text: "Yes, it restarted 2h ago.", OutputTokens: 2}, // follow-up answer
+	)
+	cfg := dto.DefaultAgentConfig()
+	cfg.Enabled = true
+	svc := NewService(cfg, p, tools.BuildDefault(fakeState{}, fakeDocker{}), NewStore(t.TempDir()), memory.NewStore(t.TempDir(), 0), &capturingBroadcaster{})
+	sess, _ := svc.StartSession(context.Background(), "is plex healthy?")
+	if sess.Status != dto.SessionCompleted {
+		t.Fatalf("precondition: %q", sess.Status)
+	}
+	out, err := svc.SendMessage(context.Background(), sess.ID, "did it restart recently?")
+	if err != nil {
+		t.Fatalf("send: %v", err)
+	}
+	if out.Status != dto.SessionCompleted || out.Answer != "Yes, it restarted 2h ago." {
+		t.Fatalf("follow-up not handled: %q / %q", out.Status, out.Answer)
+	}
+}
+
+func TestSendMessageRejectsAwaitingOrEmpty(t *testing.T) {
+	p := llm.NewMockProvider(&llm.ChatResponse{Text: "[]"}, &llm.ChatResponse{ToolCalls: []llm.ToolCall{{ID: "t1", Name: "stop_array", Args: "{}"}}})
+	cfg := dto.DefaultAgentConfig()
+	cfg.Enabled = true
+	reg := tools.NewRegistry()
+	reg.Register(tools.Tool{Name: "stop_array", RiskTier: dto.RiskHigh, Invoke: func(_ context.Context, _ string) (string, error) { return "", nil }})
+	svc := NewService(cfg, p, reg, NewStore(t.TempDir()), memory.NewStore(t.TempDir(), 0), &capturingBroadcaster{})
+	sess, _ := svc.StartSession(context.Background(), "stop array")
+	if sess.Status != dto.SessionAwaitingApproval {
+		t.Fatalf("precondition: %q", sess.Status)
+	}
+	if _, err := svc.SendMessage(context.Background(), sess.ID, "hi"); err == nil {
+		t.Fatal("expected error continuing an awaiting_approval session")
+	}
+
+	p2 := llm.NewMockProvider(&llm.ChatResponse{Text: "[]"}, &llm.ChatResponse{Text: "done"})
+	svc2 := NewService(cfg, p2, tools.BuildDefault(fakeState{}, fakeDocker{}), NewStore(t.TempDir()), memory.NewStore(t.TempDir(), 0), &capturingBroadcaster{})
+	s2, _ := svc2.StartSession(context.Background(), "x")
+	if _, err := svc2.SendMessage(context.Background(), s2.ID, "  "); err == nil {
+		t.Fatal("expected error on empty message")
+	}
+	if _, err := svc2.SendMessage(context.Background(), "no-such-session", "hi"); err == nil {
+		t.Fatal("expected error for unknown session")
+	}
+}

@@ -237,6 +237,33 @@ func (s *Service) startAutonomousSession(ctx context.Context, ev dto.AgentWakeEv
 	s.wakeMu.Unlock()
 }
 
+// SendMessage continues a finished session with a follow-up operator message.
+func (s *Service) SendMessage(ctx context.Context, sessionID, message string) (dto.AgentSession, error) {
+	if strings.TrimSpace(message) == "" {
+		return dto.AgentSession{}, errors.New("message must not be empty")
+	}
+	sess, ok := s.store.Get(sessionID)
+	if !ok {
+		return dto.AgentSession{}, fmt.Errorf("session %q not found", sessionID)
+	}
+	if sess.Status != dto.SessionCompleted && sess.Status != dto.SessionFailed {
+		return dto.AgentSession{}, fmt.Errorf("session %q cannot be continued in state %q", sessionID, sess.Status)
+	}
+	sess.Status = dto.SessionRunning
+	sess.Answer = ""
+	sess.Error = ""
+	sess.EndedAt = nil
+	appendTranscript(&sess, llm.Message{Role: "user", Content: message})
+	s.emit(&sess, "message_received", nil)
+	s.runLoop(ctx, &sess)
+	s.finalize(&sess)
+	s.store.Put(sess)
+	if err := s.store.Save(); err != nil {
+		logger.Warning("Agent: failed to persist session %s: %v", sess.ID, err)
+	}
+	return sess, nil
+}
+
 // CancelSession marks a session cancelled and clears any pending approval.
 func (s *Service) CancelSession(sessionID string) (dto.AgentSession, error) {
 	sess, ok := s.store.Get(sessionID)
