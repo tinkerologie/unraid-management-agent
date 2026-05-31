@@ -2,6 +2,7 @@ package remediation
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -72,7 +73,7 @@ func (s *RunbookStore) Save() error {
 func (s *RunbookStore) Load() error {
 	data, err := os.ReadFile(s.filePath) //nolint:gosec // G304: Plugin config file
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			logger.Info("Runbooks: no proposal file yet, starting empty")
 			return nil
 		}

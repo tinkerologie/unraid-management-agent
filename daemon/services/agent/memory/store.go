@@ -4,6 +4,7 @@ package memory
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -82,6 +83,9 @@ func tokenize(s string) map[string]bool {
 // Recall returns up to k incidents whose signature shares tokens with query,
 // scored by token overlap (positive scores only), highest first.
 func (s *Store) Recall(query string, k int) []dto.AgentIncident {
+	if k <= 0 {
+		return nil
+	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	q := tokenize(query)
@@ -154,8 +158,12 @@ func (s *Store) ActivePreferences() []dto.AgentPreference {
 // Save writes the store to disk.
 func (s *Store) Save() error {
 	s.mu.RLock()
-	data := persisted{Incidents: s.incidents, Preferences: s.preferences}
+	incidents := make([]dto.AgentIncident, len(s.incidents))
+	copy(incidents, s.incidents)
+	preferences := make([]dto.AgentPreference, len(s.preferences))
+	copy(preferences, s.preferences)
 	s.mu.RUnlock()
+	data := persisted{Incidents: incidents, Preferences: preferences}
 	if err := os.MkdirAll(filepath.Dir(s.filePath), 0o755); err != nil { // #nosec G301 -- plugin config dir
 		return fmt.Errorf("creating agent config dir: %w", err)
 	}
@@ -173,7 +181,7 @@ func (s *Store) Save() error {
 func (s *Store) Load() error {
 	b, err := os.ReadFile(s.filePath) // #nosec G304 -- path is operator-controlled, under the plugin config dir
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			logger.Info("Agent: no memory file yet, starting empty")
 			return nil
 		}
@@ -186,6 +194,10 @@ func (s *Store) Load() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.incidents = data.Incidents
+	sort.Slice(s.incidents, func(i, j int) bool { return s.incidents[i].At.After(s.incidents[j].At) })
+	if len(s.incidents) > s.maxIncidents {
+		s.incidents = s.incidents[:s.maxIncidents]
+	}
 	s.preferences = data.Preferences
 	return nil
 }

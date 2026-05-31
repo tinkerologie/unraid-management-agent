@@ -94,7 +94,7 @@ func (s *Service) nextPrefSeq() int {
 // ConfirmPreference activates a pending learned preference.
 func (s *Service) ConfirmPreference(id string) error {
 	if s.memory == nil {
-		return fmt.Errorf("memory disabled")
+		return errors.New("memory disabled")
 	}
 	if err := s.memory.ConfirmPreference(id); err != nil {
 		return err

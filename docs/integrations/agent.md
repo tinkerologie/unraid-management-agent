@@ -280,7 +280,7 @@ Or via MCP tool `agent_confirm_preference`:
 
 ### Effect of a confirmed `auto_approve_tool` preference
 
-When a preference with `subject_type = "auto_approve_tool"` is confirmed, the
+When a preference with `kind = "auto_approve_tool"` is confirmed, the
 policy gate treats calls to that tool (identified by `subject`) as if the tier
 were `auto`, bypassing the pause-for-approval step.
 
@@ -714,7 +714,7 @@ curl -s http://<unraid-ip>:8043/api/v1/agent/memory | jq .
   "preferences": [
     {
       "id": "01J3XN...",
-      "subject_type": "auto_approve_tool",
+      "kind": "auto_approve_tool",
       "subject": "restart_container",
       "status": "confirmed",
       "proposed_at": "2026-06-01T14:22:18Z",
