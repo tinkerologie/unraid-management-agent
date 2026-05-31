@@ -83,7 +83,7 @@ func TestLoopHitsIterationCap(t *testing.T) {
 	}
 }
 
-func TestLoopHighRiskToolRefused(t *testing.T) {
+func TestLoopHighRiskToolPauses(t *testing.T) {
 	called := false
 	reg := tools.NewRegistry()
 	reg.Register(tools.Tool{
@@ -110,25 +110,11 @@ func TestLoopHighRiskToolRefused(t *testing.T) {
 	if called {
 		t.Fatal("high-risk tool must NOT be executed under ModeApprove")
 	}
-	if sess.Status != dto.SessionCompleted {
-		t.Fatalf("expected completed, got %q err=%q", sess.Status, sess.Error)
+	if sess.Status != dto.SessionAwaitingApproval {
+		t.Fatalf("expected awaiting_approval, got %q err=%q", sess.Status, sess.Error)
 	}
-	var rec *dto.AgentToolCall
-	for i := range sess.Steps {
-		for j := range sess.Steps[i].ToolCalls {
-			if sess.Steps[i].ToolCalls[j].Name == "stop_array" {
-				rec = &sess.Steps[i].ToolCalls[j]
-			}
-		}
-	}
-	if rec == nil {
-		t.Fatal("expected a recorded stop_array tool call")
-	}
-	if rec.Error == "" {
-		t.Fatal("expected a non-empty Error indicating approval required")
-	}
-	if rec.Result == "" {
-		t.Fatal("expected a non-empty Result indicating approval required")
+	if sess.PendingApproval == nil || sess.PendingApproval.ToolName != "stop_array" {
+		t.Fatalf("expected pending approval for stop_array, got %+v", sess.PendingApproval)
 	}
 }
 
@@ -169,6 +155,59 @@ func TestLoopTokenBudgetStops(t *testing.T) {
 	}
 	if len(sess.Steps) >= cfg.MaxIterations {
 		t.Fatalf("expected to stop before MaxIterations, got %d steps", len(sess.Steps))
+	}
+}
+
+func TestLoopPausesForApproval(t *testing.T) {
+	p := llm.NewMockProvider(
+		&llm.ChatResponse{ToolCalls: []llm.ToolCall{{ID: "tu1", Name: "stop_array", Args: "{}"}}, OutputTokens: 3},
+	)
+	cfg := dto.DefaultAgentConfig()
+	cfg.Enabled = true
+	reg := tools.NewRegistry()
+	called := false
+	reg.Register(tools.Tool{Name: "stop_array", RiskTier: dto.RiskHigh,
+		Invoke: func(_ context.Context, _ string) (string, error) { called = true; return "stopped", nil }})
+	svc := NewService(cfg, p, reg, NewStore(t.TempDir()), &capturingBroadcaster{})
+
+	sess, err := svc.StartSession(context.Background(), "stop the array")
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if sess.Status != dto.SessionAwaitingApproval {
+		t.Fatalf("status=%q want awaiting_approval", sess.Status)
+	}
+	if sess.PendingApproval == nil || sess.PendingApproval.ToolName != "stop_array" {
+		t.Fatalf("pending approval missing: %+v", sess.PendingApproval)
+	}
+	if called {
+		t.Fatal("high-risk tool must NOT execute before approval")
+	}
+	if len(sess.Transcript) == 0 {
+		t.Fatal("transcript must be persisted for resume")
+	}
+}
+
+func TestLoopForbidListRefusesEvenIfAuto(t *testing.T) {
+	p := llm.NewMockProvider(
+		&llm.ChatResponse{ToolCalls: []llm.ToolCall{{ID: "f1", Name: "format_disk", Args: "{}"}}, OutputTokens: 2},
+		&llm.ChatResponse{Text: "I won't do that.", OutputTokens: 2},
+	)
+	cfg := dto.DefaultAgentConfig()
+	cfg.Enabled = true
+	cfg.Autonomy[dto.RiskHigh] = dto.ModeAuto // even if mis-set to auto...
+	reg := tools.NewRegistry()
+	called := false
+	reg.Register(tools.Tool{Name: "format_disk", RiskTier: dto.RiskHigh,
+		Invoke: func(_ context.Context, _ string) (string, error) { called = true; return "", nil }})
+	svc := NewService(cfg, p, reg, NewStore(t.TempDir()), &capturingBroadcaster{})
+
+	sess, _ := svc.StartSession(context.Background(), "format disk1")
+	if called {
+		t.Fatal("forbid-list tool must never execute")
+	}
+	if sess.Status != dto.SessionCompleted {
+		t.Fatalf("status=%q want completed (loop continues after refusal)", sess.Status)
 	}
 }
 

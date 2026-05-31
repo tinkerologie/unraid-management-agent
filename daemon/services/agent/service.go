@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
@@ -74,12 +75,16 @@ func (s *Service) GetSession(id string) (dto.AgentSession, bool) { return s.stor
 // ListSessions returns all sessions newest-first.
 func (s *Service) ListSessions() []dto.AgentSession { return s.store.List() }
 
-// StartSession runs a new agent session to completion (synchronous in Phase 1).
+// StartSession runs a new agent session until it completes, fails, or pauses
+// awaiting approval.
 func (s *Service) StartSession(ctx context.Context, goal string) (dto.AgentSession, error) {
 	if !s.Enabled() {
 		return dto.AgentSession{}, errors.New("agent is disabled")
 	}
-	sess := s.runLoop(ctx, s.nextID(), goal)
+	sess := dto.AgentSession{ID: s.nextID(), Goal: goal, Status: dto.SessionRunning, StartedAt: time.Now()}
+	sess.Transcript = []dto.AgentMessage{{Role: "user", Content: goal}}
+	s.emit(&sess, "session_started", nil)
+	s.runLoop(ctx, &sess)
 	s.store.Put(sess)
 	if err := s.store.Save(); err != nil {
 		logger.Warning("Agent: failed to persist session %s: %v", sess.ID, err)
