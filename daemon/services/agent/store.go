@@ -72,6 +72,20 @@ func (s *Store) Save() error {
 	if len(list) > MaxStoredSessions {
 		list = list[:MaxStoredSessions]
 	}
+	// Prune the in-memory map to the same bounded set so it does not grow
+	// unbounded. List() released its RLock above, so taking the write lock here
+	// cannot deadlock.
+	keep := make(map[string]struct{}, len(list))
+	for _, sess := range list {
+		keep[sess.ID] = struct{}{}
+	}
+	s.mu.Lock()
+	for id := range s.sessions {
+		if _, ok := keep[id]; !ok {
+			delete(s.sessions, id)
+		}
+	}
+	s.mu.Unlock()
 	if err := os.MkdirAll(filepath.Dir(s.filePath), 0o750); err != nil { //nolint:gosec // G301: Plugin config directory
 		return fmt.Errorf("creating agent config dir: %w", err)
 	}

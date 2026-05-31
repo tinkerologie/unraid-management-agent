@@ -125,13 +125,15 @@ func (o *Orchestrator) Run() error {
 
 	// Initialize agent (disabled by default; opt-in via agent_config.json + UMA_AGENT_API_KEY)
 	agentCfg := agent.LoadConfig("")
-	agentDocker := controllers.NewDockerController()
-	agentSvc, agentErr := agent.BuildService(agentCfg, "", apiServer, agentDocker, apiServer)
-	if agentErr != nil {
-		logger.Warning("Agent disabled: %v", agentErr)
-	} else if agentSvc != nil {
-		apiServer.SetAgent(agentSvc)
-		logger.Success("Agent service started (provider=%s, model=%s)", agentCfg.Provider, agentCfg.Model)
+	if agentCfg.Enabled {
+		agentDocker := controllers.NewDockerController()
+		agentSvc, agentErr := agent.BuildService(agentCfg, "", apiServer, agentDocker, apiServer)
+		if agentErr != nil {
+			logger.Warning("Agent disabled: %v", agentErr)
+		} else if agentSvc != nil {
+			apiServer.SetAgent(agentSvc)
+			logger.Success("Agent service started (provider=%s, model=%s)", agentCfg.Provider, agentCfg.Model)
+		}
 	}
 
 	// Initialize fan controller (disabled by default, enabled via config)

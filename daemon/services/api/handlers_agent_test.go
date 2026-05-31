@@ -109,6 +109,49 @@ func TestAgentGetSessionNotFound(t *testing.T) {
 	}
 }
 
+func TestAgentStartSessionRejectsBadInput(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+	}{
+		{name: "empty goal", body: `{"goal":""}`},
+		{name: "whitespace goal", body: `{"goal":"   "}`},
+		{name: "over-length goal", body: `{"goal":"` + strings.Repeat("a", 5000) + `"}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := newAgentServer(t)
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/agent/sessions", strings.NewReader(tc.body))
+			rr := httptest.NewRecorder()
+			s.GetRouter().ServeHTTP(rr, req)
+			if rr.Code != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d body=%s", rr.Code, rr.Body.String())
+			}
+		})
+	}
+}
+
+func TestAgentGetSessionInjectionID(t *testing.T) {
+	// A path-traversal/injection-flavored ID must be treated as an unknown
+	// session: the handler looks it up by exact key and never touches the
+	// filesystem, so the response is 404 with no leak.
+	cases := []string{
+		"..etc-passwd",        // dotted, single segment (reaches the handler)
+		"sess-1%3Bcat%20/etc", // injection-flavored, single segment
+	}
+	for _, id := range cases {
+		t.Run(id, func(t *testing.T) {
+			s := newAgentServer(t)
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/agent/sessions/"+id, nil)
+			rr := httptest.NewRecorder()
+			s.GetRouter().ServeHTTP(rr, req)
+			if rr.Code != http.StatusNotFound {
+				t.Fatalf("expected 404 for injection-ish id %q, got %d body=%s", id, rr.Code, rr.Body.String())
+			}
+		})
+	}
+}
+
 func TestAgentDisabledReturns503(t *testing.T) {
 	hub := domain.NewEventBus(10)
 	s := NewServer(&domain.Context{Hub: hub}) // agent NOT set

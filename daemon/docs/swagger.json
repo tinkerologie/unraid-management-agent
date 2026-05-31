@@ -20,6 +20,131 @@
     "host": "localhost:8043",
     "basePath": "/api/v1",
     "paths": {
+        "/agent/sessions": {
+            "get": {
+                "description": "Retrieve all agent sessions, newest first",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "List agent sessions",
+                "responses": {
+                    "200": {
+                        "description": "List of sessions",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.AgentSession"
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Agent disabled",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Start a new on-demand agent session for the given goal and run it to completion",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Start agent session",
+                "parameters": [
+                    {
+                        "description": "Session goal",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "goal": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Completed session",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AgentSession"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to run session",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "503": {
+                        "description": "Agent disabled",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/sessions/{id}": {
+            "get": {
+                "description": "Retrieve a single agent session by ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Get agent session",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Session ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Session",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AgentSession"
+                        }
+                    },
+                    "404": {
+                        "description": "Session not found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "503": {
+                        "description": "Agent disabled",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/alerts/firing": {
             "get": {
                 "description": "Get only alert rules currently in the firing state",
@@ -4959,6 +5084,100 @@
                 }
             }
         },
+        "dto.AgentSession": {
+            "type": "object",
+            "properties": {
+                "answer": {
+                    "type": "string"
+                },
+                "ended_at": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "goal": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/dto.AgentSessionStatus"
+                },
+                "steps": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.AgentStep"
+                    }
+                },
+                "tokens_used": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.AgentSessionStatus": {
+            "type": "string",
+            "enum": [
+                "running",
+                "completed",
+                "failed",
+                "cancelled"
+            ],
+            "x-enum-varnames": [
+                "SessionRunning",
+                "SessionCompleted",
+                "SessionFailed",
+                "SessionCancelled"
+            ]
+        },
+        "dto.AgentStep": {
+            "type": "object",
+            "properties": {
+                "at": {
+                    "type": "string"
+                },
+                "index": {
+                    "type": "integer"
+                },
+                "thought": {
+                    "type": "string"
+                },
+                "tool_calls": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.AgentToolCall"
+                    }
+                }
+            }
+        },
+        "dto.AgentToolCall": {
+            "type": "object",
+            "properties": {
+                "args": {
+                    "description": "raw JSON arguments",
+                    "type": "string"
+                },
+                "at": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "result": {
+                    "type": "string"
+                },
+                "risk_tier": {
+                    "$ref": "#/definitions/dto.RiskTier"
+                }
+            }
+        },
         "dto.AlertEvent": {
             "type": "object",
             "properties": {
@@ -8443,6 +8662,29 @@
                     "type": "string"
                 }
             }
+        },
+        "dto.RiskTier": {
+            "type": "string",
+            "enum": [
+                "read_only",
+                "low",
+                "high"
+            ],
+            "x-enum-comments": {
+                "RiskHigh": "requires approval (e.g. stop array) — Phase 2",
+                "RiskLow": "reversible, low blast radius (e.g. restart container)",
+                "RiskReadOnly": "never changes state"
+            },
+            "x-enum-descriptions": [
+                "never changes state",
+                "reversible, low blast radius (e.g. restart container)",
+                "requires approval (e.g. stop array) — Phase 2"
+            ],
+            "x-enum-varnames": [
+                "RiskReadOnly",
+                "RiskLow",
+                "RiskHigh"
+            ]
         },
         "dto.SMARTAttribute": {
             "type": "object",

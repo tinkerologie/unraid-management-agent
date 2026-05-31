@@ -96,7 +96,7 @@ func (a *AnthropicProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRes
 	for _, t := range req.Tools {
 		schema := t.Schema
 		if len(schema) == 0 {
-			schema = []byte(`{"type":"object","properties":{}}`)
+			schema = []byte(EmptyObjectSchema)
 		}
 		body.Tools = append(body.Tools, anthropicReqTool{
 			Name: t.Name, Description: t.Description, InputSchema: schema,
@@ -122,7 +122,10 @@ func (a *AnthropicProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRes
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	raw, _ := io.ReadAll(resp.Body)
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read anthropic response body: %w", err)
+	}
 	if resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("anthropic API status %d: %s", resp.StatusCode, string(raw))
 	}

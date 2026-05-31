@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
@@ -31,7 +33,28 @@ type Service struct {
 
 // NewService constructs the agent service.
 func NewService(cfg dto.AgentConfig, provider llm.Provider, reg *tools.Registry, store *Store, bc Broadcaster) *Service {
-	return &Service{cfg: cfg, provider: provider, tools: reg, store: store, bc: bc}
+	s := &Service{cfg: cfg, provider: provider, tools: reg, store: store, bc: bc}
+	// Resume the session counter past any persisted IDs so a restart does not
+	// reuse "sess-1" and overwrite an existing session.
+	for _, sess := range store.List() {
+		if n, ok := parseSessionSeq(sess.ID); ok && n > s.seq {
+			s.seq = n
+		}
+	}
+	return s
+}
+
+// parseSessionSeq extracts N from an ID of the form "sess-N".
+func parseSessionSeq(id string) (int, bool) {
+	const prefix = "sess-"
+	if !strings.HasPrefix(id, prefix) {
+		return 0, false
+	}
+	n, err := strconv.Atoi(strings.TrimPrefix(id, prefix))
+	if err != nil {
+		return 0, false
+	}
+	return n, true
 }
 
 // Enabled reports whether the agent is configured to run.

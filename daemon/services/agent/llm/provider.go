@@ -3,6 +3,9 @@ package llm
 
 import "context"
 
+// EmptyObjectSchema is the default JSON Schema for a tool that takes no arguments.
+const EmptyObjectSchema = `{"type":"object","properties":{}}`
+
 // Message is one turn in the conversation. Role is "system" | "user" | "assistant" | "tool".
 type Message struct {
 	Role       string // system|user|assistant|tool

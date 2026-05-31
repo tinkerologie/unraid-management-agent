@@ -2,6 +2,7 @@ package agent
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -27,6 +28,9 @@ func LoadConfig(configDir string) dto.AgentConfig {
 	// #nosec G304 -- config path is operator-controlled, under the plugin config dir
 	data, err := os.ReadFile(filepath.Join(configDir, AgentConfigFile))
 	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			logger.Warning("Agent: failed to read config file, using defaults: %v", err)
+		}
 		return cfg
 	}
 	if err := json.Unmarshal(data, &cfg); err != nil {

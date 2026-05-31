@@ -74,10 +74,10 @@ func BuildDefault(state StateProvider, docker DockerActor) *Registry {
 				return "", fmt.Errorf("parse args: %w", err)
 			}
 			if err := lib.ValidateContainerID(a.ContainerID); err != nil {
-				return "", err
+				return "", fmt.Errorf("validate container_id: %w", err)
 			}
 			if err := docker.Restart(a.ContainerID); err != nil {
-				return "", err
+				return "", fmt.Errorf("restart container %s: %w", a.ContainerID, err)
 			}
 			return fmt.Sprintf("Container %s restarted.", a.ContainerID), nil
 		},

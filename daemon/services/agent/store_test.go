@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -27,5 +28,25 @@ func TestStoreRoundTrip(t *testing.T) {
 	list := s2.List()
 	if len(list) != 2 || list[0].ID != "b" {
 		t.Fatalf("expected newest-first list, got %+v", list)
+	}
+}
+
+func TestStoreSavePrunesInMemory(t *testing.T) {
+	s := NewStore(t.TempDir())
+	base := time.Now()
+	total := MaxStoredSessions + 10
+	for i := 0; i < total; i++ {
+		s.Put(dto.AgentSession{
+			ID:        fmt.Sprintf("sess-%d", i),
+			Goal:      "g",
+			Status:    dto.SessionCompleted,
+			StartedAt: base.Add(time.Duration(i) * time.Second),
+		})
+	}
+	if err := s.Save(); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	if got := len(s.List()); got != MaxStoredSessions {
+		t.Fatalf("expected in-memory map pruned to %d, got %d", MaxStoredSessions, got)
 	}
 }

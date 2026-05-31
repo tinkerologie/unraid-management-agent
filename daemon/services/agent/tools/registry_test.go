@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
@@ -47,5 +46,4 @@ func TestBuildDefaultTiersAndInvoke(t *testing.T) {
 	if len(reg.Schemas()) == 0 {
 		t.Fatal("expected non-empty schemas")
 	}
-	_ = json.RawMessage(nil)
 }
