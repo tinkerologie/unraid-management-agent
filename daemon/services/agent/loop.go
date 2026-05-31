@@ -126,6 +126,9 @@ func (s *Service) runLoop(ctx context.Context, sess *dto.AgentSession) {
 			}
 
 			mode := s.cfg.Autonomy[tier]
+			if mode != dto.ModeAuto && s.autoApprovedByPreference(call.Name) {
+				mode = dto.ModeAuto
+			}
 			if mode != dto.ModeAuto {
 				// NOTE: the pending call's tool_use is in the assistant turn but has NO
 				// matching tool result yet. ApproveAction (Task 3) MUST append the tool

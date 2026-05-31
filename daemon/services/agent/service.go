@@ -15,6 +15,7 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/llm"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/memory"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/tools"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/remediation"
 )
 
 // Broadcaster streams agent events to WebSocket clients. Satisfied by the API server.
@@ -29,10 +30,12 @@ type Service struct {
 	tools    *tools.Registry
 	store    *Store
 	memory   *memory.Store
+	runbooks *remediation.RunbookStore
 	bc       Broadcaster
 
-	mu  sync.Mutex
-	seq int
+	mu      sync.Mutex
+	seq     int
+	prefSeq int
 
 	hub        *domain.EventBus
 	wakeMu     sync.Mutex
@@ -75,6 +78,42 @@ func (s *Service) nextID() string {
 	defer s.mu.Unlock()
 	s.seq++
 	return fmt.Sprintf("sess-%d", s.seq)
+}
+
+// SetRunbookStore wires the persistent runbook store for runbook proposals.
+func (s *Service) SetRunbookStore(rs *remediation.RunbookStore) { s.runbooks = rs }
+
+// nextPrefSeq returns a monotonically increasing preference counter.
+func (s *Service) nextPrefSeq() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.prefSeq++
+	return s.prefSeq
+}
+
+// ConfirmPreference activates a pending learned preference.
+func (s *Service) ConfirmPreference(id string) error {
+	if s.memory == nil {
+		return fmt.Errorf("memory disabled")
+	}
+	if err := s.memory.ConfirmPreference(id); err != nil {
+		return err
+	}
+	return s.memory.Save()
+}
+
+// autoApprovedByPreference reports whether an active auto_approve_tool preference
+// covers the named tool. (Forbidden tools are filtered earlier in the loop.)
+func (s *Service) autoApprovedByPreference(toolName string) bool {
+	if s.memory == nil {
+		return false
+	}
+	for _, p := range s.memory.ActivePreferences() {
+		if p.Kind == "auto_approve_tool" && p.Subject == toolName {
+			return true
+		}
+	}
+	return false
 }
 
 // GetSession returns a stored session by ID.
