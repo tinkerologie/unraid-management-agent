@@ -60,3 +60,12 @@ func (s *Server) handleAgentGetSession(w http.ResponseWriter, r *http.Request) {
 	}
 	respondJSON(w, http.StatusOK, sess)
 }
+
+// SystemJSON exposes the cached system info for the agent's read-only tools.
+func (s *Server) SystemJSON() (any, bool) { v := s.GetSystemCache(); return v, v != nil }
+
+// ArrayJSON exposes the cached array status for the agent's read-only tools.
+func (s *Server) ArrayJSON() (any, bool) { v := s.GetArrayCache(); return v, v != nil }
+
+// DockerJSON exposes the cached container list for the agent's read-only tools.
+func (s *Server) DockerJSON() (any, bool) { v := s.GetDockerCache(); return v, v != nil }

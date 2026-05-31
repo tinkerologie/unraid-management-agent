@@ -14,6 +14,7 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/alerting"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/api"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/controllers"
@@ -121,6 +122,17 @@ func (o *Orchestrator) Run() error {
 		watchdogRunner.Start(ctx)
 	})
 	logger.Success("Watchdog started")
+
+	// Initialize agent (disabled by default; opt-in via agent_config.json + UMA_AGENT_API_KEY)
+	agentCfg := agent.LoadConfig("")
+	agentDocker := controllers.NewDockerController()
+	agentSvc, agentErr := agent.BuildService(agentCfg, "", apiServer, agentDocker, apiServer)
+	if agentErr != nil {
+		logger.Warning("Agent disabled: %v", agentErr)
+	} else if agentSvc != nil {
+		apiServer.SetAgent(agentSvc)
+		logger.Success("Agent service started (provider=%s, model=%s)", agentCfg.Provider, agentCfg.Model)
+	}
 
 	// Initialize fan controller (disabled by default, enabled via config)
 	fanCtrl := controllers.NewFanController()
