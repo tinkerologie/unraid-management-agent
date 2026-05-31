@@ -1,0 +1,63 @@
+{
+  "planPath": "docs/superpowers/plans/2026-05-31-agentic-agent-phase3-memory.md",
+  "spec": "docs/superpowers/specs/2026-05-31-agentic-agent-design.md",
+  "tasks": [
+    {
+      "id": 25,
+      "subject": "P3 Task 1: Plan/memory/preference DTOs + config",
+      "status": "pending",
+      "description": "PlanStep + AgentSession.Plan; AgentIncident; PreferenceStatus + AgentPreference; config MemoryEnabled/MaxIncidents/RecallTopK. Verify: go test ./daemon/dto/ -run TestAgent -v"
+    },
+    {
+      "id": 26,
+      "subject": "P3 Task 2: Memory store (episodic+semantic+recall)",
+      "status": "pending",
+      "blockedBy": [25],
+      "description": "memory.Store JSON: AddIncident/ListIncidents/Recall(token-overlap) + preferences add/list/confirm/active + Save/Load. Verify: go test ./daemon/services/agent/memory/ -v"
+    },
+    {
+      "id": 27,
+      "subject": "P3 Task 3: Recall injection + episodic write",
+      "status": "pending",
+      "blockedBy": [26],
+      "description": "Service.memory field (NewService +mem, update all call sites); recall.go injectRecall/finalize/recallContext/signatureFor; wire into 3 entrypoints; no incident on awaiting_approval. Verify: go test ./daemon/services/agent/ -run 'Recall|Finalize|Memory' -v"
+    },
+    {
+      "id": 28,
+      "subject": "P3 Task 4: Planner (goal -> plan steps)",
+      "status": "pending",
+      "blockedBy": [27],
+      "description": "planner.go plan()/planSummary(); StartSession-only; best-effort nil on parse fail; prepend planner mock response to existing StartSession tests. Verify: go test ./daemon/services/agent/ -run Plan -v"
+    },
+    {
+      "id": 29,
+      "subject": "P3 Task 5: Suggest-not-mutate learning + runbook proposals",
+      "status": "pending",
+      "blockedBy": [27],
+      "description": "remediation.RunbookStore; propose_preference/propose_runbook RiskReadOnly tools (PENDING); ConfirmPreference; policy gate auto-approves on active auto_approve_tool pref (forbid wins). Verify: go test ./daemon/services/remediation/ -run RunbookStore -v && go test ./daemon/services/agent/ -run 'Learning|Pref|AutoApprove' -v"
+    },
+    {
+      "id": 30,
+      "subject": "P3 Task 6: Multi-turn chat (SendMessage)",
+      "status": "pending",
+      "blockedBy": [28],
+      "description": "SendMessage continues Completed/Failed sessions (append user msg, runLoop, finalize, persist); awaiting/not-found/empty error. Verify: go test ./daemon/services/agent/ -run SendMessage -v"
+    },
+    {
+      "id": 31,
+      "subject": "P3 Task 7: REST + MCP surface + orchestrator wiring",
+      "status": "pending",
+      "blockedBy": [29, 30],
+      "description": "bootstrap builds+wires memory+runbook stores+RegisterLearningTools; REST messages/memory/preferences-confirm; MCP send_message/get_memory/confirm_preference; accessors. Verify: go test ./daemon/services/api/ -run Agent -v && go test ./daemon/services/mcp/ -run Agent -v && go build ./..."
+    },
+    {
+      "id": 32,
+      "subject": "P3 Task 8: Docs, CHANGELOG, CodeRabbit, Unraid verify",
+      "status": "pending",
+      "blockedBy": [31],
+      "userGate": true,
+      "description": "USER-ORDERED GATE. CHANGELOG+docs+swagger; pre-commit+test; CodeRabbit CLI; ansible build,deploy,verify; real-provider integration (plan+memory+chat+suggest-not-mutate). Verify: make pre-commit-run && make test && ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --tags build,deploy,verify"
+    }
+  ],
+  "lastUpdated": "2026-05-31"
+}
