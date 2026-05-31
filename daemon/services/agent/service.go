@@ -91,3 +91,64 @@ func (s *Service) StartSession(ctx context.Context, goal string) (dto.AgentSessi
 	}
 	return sess, nil
 }
+
+// ApproveAction resolves a pending approval and resumes the session loop.
+func (s *Service) ApproveAction(ctx context.Context, sessionID, actionID string, approve bool) (dto.AgentSession, error) {
+	sess, ok := s.store.Get(sessionID)
+	if !ok {
+		return dto.AgentSession{}, fmt.Errorf("session %q not found", sessionID)
+	}
+	if sess.Status != dto.SessionAwaitingApproval || sess.PendingApproval == nil {
+		return dto.AgentSession{}, fmt.Errorf("session %q is not awaiting approval", sessionID)
+	}
+	if sess.PendingApproval.ActionID != actionID {
+		return dto.AgentSession{}, fmt.Errorf("action_id %q does not match the pending approval", actionID)
+	}
+
+	pending := sess.PendingApproval
+	sess.PendingApproval = nil
+	sess.Status = dto.SessionRunning
+
+	var result string
+	switch {
+	case !approve:
+		result = "Action denied by operator."
+	case s.isForbidden(pending.ToolName):
+		result = fmt.Sprintf("Action %q is on the forbidden list and cannot be executed even with approval.", pending.ToolName)
+	default:
+		tool, found := s.tools.Get(pending.ToolName)
+		if !found {
+			result = fmt.Sprintf("Error: tool %q no longer exists.", pending.ToolName)
+		} else {
+			rec := s.invokeTool(ctx, tool, llm.ToolCall{ID: pending.ActionID, Name: pending.ToolName, Args: pending.Args})
+			result = rec.Result
+			s.emit(&sess, "tool_called", rec)
+		}
+	}
+	appendTranscript(&sess, llm.Message{Role: "tool", ToolCallID: pending.ActionID, Content: result})
+	s.runLoop(ctx, &sess)
+
+	s.store.Put(sess)
+	if err := s.store.Save(); err != nil {
+		logger.Warning("Agent: failed to persist session %s: %v", sess.ID, err)
+	}
+	return sess, nil
+}
+
+// CancelSession marks a session cancelled and clears any pending approval.
+func (s *Service) CancelSession(sessionID string) (dto.AgentSession, error) {
+	sess, ok := s.store.Get(sessionID)
+	if !ok {
+		return dto.AgentSession{}, fmt.Errorf("session %q not found", sessionID)
+	}
+	now := time.Now()
+	sess.Status = dto.SessionCancelled
+	sess.PendingApproval = nil
+	sess.EndedAt = &now
+	s.emit(&sess, "session_cancelled", nil)
+	s.store.Put(sess)
+	if err := s.store.Save(); err != nil {
+		logger.Warning("Agent: failed to persist session %s: %v", sess.ID, err)
+	}
+	return sess, nil
+}
