@@ -79,8 +79,9 @@ func (a *AnthropicProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRes
 
 	body := anthropicReq{Model: a.model, MaxTokens: maxTokens, System: req.System}
 	for _, m := range req.Messages {
-		// Tool results are sent as a user message with a tool_result content block.
-		if m.Role == "tool" {
+		switch m.Role {
+		case "tool":
+			// Tool results are sent as a user message with a tool_result content block.
 			body.Messages = append(body.Messages, anthropicMessage{
 				Role: "user",
 				Content: []map[string]any{{
@@ -89,9 +90,31 @@ func (a *AnthropicProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRes
 					"content":     m.Content,
 				}},
 			})
-			continue
+		case "assistant":
+			if len(m.ToolCalls) > 0 {
+				blocks := make([]map[string]any, 0, len(m.ToolCalls)+1)
+				if m.Content != "" {
+					blocks = append(blocks, map[string]any{"type": "text", "text": m.Content})
+				}
+				for _, c := range m.ToolCalls {
+					input := json.RawMessage(c.Args)
+					if len(input) == 0 || !json.Valid(input) {
+						input = json.RawMessage(`{}`)
+					}
+					blocks = append(blocks, map[string]any{
+						"type":  "tool_use",
+						"id":    c.ID,
+						"name":  c.Name,
+						"input": input,
+					})
+				}
+				body.Messages = append(body.Messages, anthropicMessage{Role: "assistant", Content: blocks})
+			} else {
+				body.Messages = append(body.Messages, anthropicMessage{Role: "assistant", Content: m.Content})
+			}
+		default: // system, user
+			body.Messages = append(body.Messages, anthropicMessage{Role: m.Role, Content: m.Content})
 		}
-		body.Messages = append(body.Messages, anthropicMessage{Role: m.Role, Content: m.Content})
 	}
 	for _, t := range req.Tools {
 		schema := t.Schema

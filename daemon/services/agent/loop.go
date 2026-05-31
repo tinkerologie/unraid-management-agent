@@ -70,7 +70,7 @@ func (s *Service) runLoop(ctx context.Context, id, goal string) (sess dto.AgentS
 		}
 
 		// Record the assistant's tool-call turn so the provider keeps context.
-		messages = append(messages, llm.Message{Role: "assistant", Content: resp.Text})
+		messages = append(messages, llm.Message{Role: "assistant", Content: resp.Text, ToolCalls: resp.ToolCalls})
 
 		for _, call := range resp.ToolCalls {
 			rec := s.executeCall(loopCtx, call)

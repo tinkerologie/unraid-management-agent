@@ -68,24 +68,29 @@ func (s *Store) List() []dto.AgentSession {
 
 // Save writes the most recent MaxStoredSessions sessions to disk.
 func (s *Store) Save() error {
-	list := s.List()
+	// Snapshot + prune atomically under a single write lock so a concurrent Put
+	// cannot be lost between collecting the list and rebuilding the map. Inline
+	// the collection+sort (rather than calling List(), which takes the RLock and
+	// would deadlock under Lock).
+	s.mu.Lock()
+	list := make([]dto.AgentSession, 0, len(s.sessions))
+	for _, v := range s.sessions {
+		list = append(list, v)
+	}
+	sort.Slice(list, func(i, j int) bool { return list[i].StartedAt.After(list[j].StartedAt) })
 	if len(list) > MaxStoredSessions {
 		list = list[:MaxStoredSessions]
 	}
-	// Prune the in-memory map to the same bounded set so it does not grow
-	// unbounded. List() released its RLock above, so taking the write lock here
-	// cannot deadlock.
-	keep := make(map[string]struct{}, len(list))
+	// Rebuild the in-memory map to exactly the kept entries so it does not grow
+	// unbounded.
+	pruned := make(map[string]dto.AgentSession, len(list))
 	for _, sess := range list {
-		keep[sess.ID] = struct{}{}
+		pruned[sess.ID] = sess
 	}
-	s.mu.Lock()
-	for id := range s.sessions {
-		if _, ok := keep[id]; !ok {
-			delete(s.sessions, id)
-		}
-	}
+	s.sessions = pruned
 	s.mu.Unlock()
+
+	// File I/O is performed outside the lock to avoid holding the mutex during disk access.
 	if err := os.MkdirAll(filepath.Dir(s.filePath), 0o750); err != nil { //nolint:gosec // G301: Plugin config directory
 		return fmt.Errorf("creating agent config dir: %w", err)
 	}

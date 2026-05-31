@@ -10,7 +10,8 @@ const EmptyObjectSchema = `{"type":"object","properties":{}}`
 type Message struct {
 	Role       string // system|user|assistant|tool
 	Content    string
-	ToolCallID string // set when Role == "tool": which call this result answers
+	ToolCallID string     // set when Role == "tool": which call this result answers
+	ToolCalls  []ToolCall // set when Role == "assistant": tool calls the model requested
 }
 
 // ToolSchema describes a tool the model may call.
