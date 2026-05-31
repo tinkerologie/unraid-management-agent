@@ -5,11 +5,15 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/llm"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/tools"
 )
 
 // MockCacheProvider implements CacheProvider interface for testing
@@ -700,6 +704,84 @@ func TestGetHTTPHandler_NilBeforeInit(t *testing.T) {
 
 	if rr.Code != http.StatusInternalServerError {
 		t.Errorf("expected status 500 from uninitialized handler, got %d", rr.Code)
+	}
+}
+
+// newTestAgentService builds an enabled agent service backed by a mock LLM that
+// replies with a single text answer (so StartSession completes immediately).
+func newTestAgentService(t *testing.T) *agent.Service {
+	t.Helper()
+	cfg := dto.DefaultAgentConfig()
+	cfg.Enabled = true
+	p := llm.NewMockProvider(&llm.ChatResponse{Text: "all good", OutputTokens: 1})
+	reg := tools.BuildDefault(nil, nil)
+	return agent.NewService(cfg, p, reg, agent.NewStore(t.TempDir()), nil)
+}
+
+func TestRegisterAgentToolsInitializes(t *testing.T) {
+	server, _ := setupTestMCPServer()
+	server.SetAgent(newTestAgentService(t))
+
+	if err := server.Initialize(); err != nil {
+		t.Fatalf("initialize: %v", err)
+	}
+
+	cs, cleanup := connectClientToServer(t, server)
+	defer cleanup()
+
+	ctx := context.Background()
+	listed, err := cs.ListTools(ctx, nil)
+	if err != nil {
+		t.Fatalf("ListTools error: %v", err)
+	}
+
+	want := map[string]bool{
+		"agent_start_session":  false,
+		"agent_get_session":    false,
+		"agent_list_sessions":  false,
+		"agent_approve_action": false,
+	}
+	for _, tool := range listed.Tools {
+		if _, ok := want[tool.Name]; ok {
+			want[tool.Name] = true
+		}
+	}
+	for name, found := range want {
+		if !found {
+			t.Errorf("expected tool %q to be registered", name)
+		}
+	}
+}
+
+func TestAgentStartSessionReturnsSession(t *testing.T) {
+	server, _ := setupTestMCPServer()
+	server.SetAgent(newTestAgentService(t))
+	if err := server.Initialize(); err != nil {
+		t.Fatalf("initialize: %v", err)
+	}
+
+	cs, cleanup := connectClientToServer(t, server)
+	defer cleanup()
+
+	_, text := callToolJSON(t, cs, "agent_start_session", map[string]any{"goal": "check status"})
+	if !strings.Contains(text, "completed") {
+		t.Errorf("expected completed session in result, got: %s", text)
+	}
+}
+
+func TestAgentToolsDisabledWhenNoService(t *testing.T) {
+	server, _ := setupTestMCPServer()
+	// No SetAgent call — agentSvc is nil.
+	if err := server.Initialize(); err != nil {
+		t.Fatalf("initialize: %v", err)
+	}
+
+	cs, cleanup := connectClientToServer(t, server)
+	defer cleanup()
+
+	_, text := callToolJSON(t, cs, "agent_list_sessions", map[string]any{})
+	if !strings.Contains(text, "disabled") {
+		t.Errorf("expected disabled message, got: %s", text)
 	}
 }
 

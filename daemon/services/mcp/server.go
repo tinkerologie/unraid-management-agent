@@ -21,6 +21,7 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/alerting"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/api"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/controllers"
@@ -91,6 +92,7 @@ type Server struct {
 	fanController    *controllers.FanController
 	cpuController    *controllers.CPUController
 	tuningController *controllers.TuningController
+	agentSvc         *agent.Service
 }
 
 // NewServer creates a new MCP server instance.
@@ -124,6 +126,7 @@ func (s *Server) Initialize() error {
 	s.registerPrompts()
 	s.registerAlertingTools()
 	s.registerWatchdogTools()
+	s.registerAgentTools()
 	s.registerFanControlTools()
 	s.registerCPUControlTools()
 	s.registerTuningTools()
@@ -154,6 +157,9 @@ func (s *Server) SetWatchdog(runner *watchdog.Runner, store *watchdog.Store) {
 func (s *Server) SetFanController(fc *controllers.FanController) {
 	s.fanController = fc
 }
+
+// SetAgent wires the agent service for MCP agent tools.
+func (s *Server) SetAgent(svc *agent.Service) { s.agentSvc = svc }
 
 // SetCPUController sets the CPU controller for MCP CPU control tools.
 func (s *Server) SetCPUController(cc *controllers.CPUController) {
@@ -2368,7 +2374,83 @@ func (s *Server) registerWatchdogTools() {
 	})
 
 	logger.Debug("MCP watchdog tools registered (7 tools)")
-} // registerResources registers MCP resources for real-time data access.
+}
+
+// registerAgentTools registers tools that drive the embedded autonomous agent.
+func (s *Server) registerAgentTools() {
+	type startArgs struct {
+		Goal string `json:"goal" jsonschema:"The goal or question for the agent to investigate or remediate"`
+	}
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name: "agent_start_session",
+		Description: "Start an autonomous agent session to investigate or remediate a goal. " +
+			"May return status 'awaiting_approval' if a high-risk action is proposed.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, args startArgs) (*mcp.CallToolResult, any, error) {
+		if s.agentSvc == nil || !s.agentSvc.Enabled() {
+			return textResult("Agent is disabled."), nil, nil
+		}
+		if args.Goal == "" {
+			return textResult("Error: 'goal' is required."), nil, nil
+		}
+		sess, err := s.agentSvc.StartSession(ctx, args.Goal)
+		if err != nil {
+			return textResult("Error: " + err.Error()), nil, nil
+		}
+		return jsonResult(sess)
+	})
+
+	type idArgs struct {
+		SessionID string `json:"session_id" jsonschema:"The session id"`
+	}
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "agent_get_session",
+		Description: "Get a single agent session (status, steps, pending approval, answer).",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args idArgs) (*mcp.CallToolResult, any, error) {
+		if s.agentSvc == nil {
+			return textResult("Agent is disabled."), nil, nil
+		}
+		sess, ok := s.agentSvc.GetSession(args.SessionID)
+		if !ok {
+			return textResult(fmt.Sprintf("Session %q not found.", args.SessionID)), nil, nil
+		}
+		return jsonResult(sess)
+	})
+
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "agent_list_sessions",
+		Description: "List all agent sessions, newest first.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		if s.agentSvc == nil {
+			return textResult("Agent is disabled."), nil, nil
+		}
+		return jsonResult(s.agentSvc.ListSessions())
+	})
+
+	type approveArgs struct {
+		SessionID string `json:"session_id" jsonschema:"The session id"`
+		ActionID  string `json:"action_id" jsonschema:"The pending approval action id"`
+		Approve   bool   `json:"approve" jsonschema:"True to approve, false to deny"`
+	}
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "agent_approve_action",
+		Description: "Approve or deny a high-risk action a session is awaiting, then resume it.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, args approveArgs) (*mcp.CallToolResult, any, error) {
+		if s.agentSvc == nil || !s.agentSvc.Enabled() {
+			return textResult("Agent is disabled."), nil, nil
+		}
+		sess, err := s.agentSvc.ApproveAction(ctx, args.SessionID, args.ActionID, args.Approve)
+		if err != nil {
+			return textResult("Error: " + err.Error()), nil, nil
+		}
+		return jsonResult(sess)
+	})
+
+	logger.Debug("MCP agent tools registered (4 tools)")
+}
+
+// registerResources registers MCP resources for real-time data access.
 func (s *Server) registerResources() {
 	// System resource
 	s.mcpServer.AddResource(&mcp.Resource{

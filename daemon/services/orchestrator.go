@@ -138,7 +138,7 @@ func (o *Orchestrator) Run() error {
 			agentSvc.SetEventBus(o.ctx.Hub)
 			alertEngine.SetEventBus(o.ctx.Hub)
 			watchdogRunner.SetEventBus(o.ctx.Hub)
-			// TODO(task8): mcpServer.SetAgent(agentSvc)
+			mcpServer.SetAgent(agentSvc)
 			wg.Go(func() {
 				defer func() {
 					if r := recover(); r != nil {
