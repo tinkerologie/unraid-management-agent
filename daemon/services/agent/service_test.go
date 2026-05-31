@@ -19,7 +19,10 @@ func TestNextIDResumesAfterRestart(t *testing.T) {
 
 	cfg := dto.DefaultAgentConfig()
 	cfg.Enabled = true
-	provider := llm.NewMockProvider(&llm.ChatResponse{Text: "done", OutputTokens: 1})
+	provider := llm.NewMockProvider(
+		&llm.ChatResponse{Text: "[]"},
+		&llm.ChatResponse{Text: "done", OutputTokens: 1},
+	)
 	reg := tools.BuildDefault(nil, nil)
 
 	svc := NewService(cfg, provider, reg, store, memory.NewStore(t.TempDir(), 0), nil)
@@ -35,6 +38,7 @@ func TestNextIDResumesAfterRestart(t *testing.T) {
 func pausedSvc(t *testing.T, toolCalled *bool) *Service {
 	t.Helper()
 	p := llm.NewMockProvider(
+		&llm.ChatResponse{Text: "[]"},
 		&llm.ChatResponse{ToolCalls: []llm.ToolCall{{ID: "tu1", Name: "stop_array", Args: "{}"}}, OutputTokens: 2},
 		&llm.ChatResponse{Text: "Array stopped, all done.", OutputTokens: 2}, // returned after resume
 	)
@@ -93,6 +97,7 @@ func TestApproveWrongActionIDErrors(t *testing.T) {
 func TestApproveForbiddenStillRefused(t *testing.T) {
 	called := false
 	p := llm.NewMockProvider(
+		&llm.ChatResponse{Text: "[]"},
 		&llm.ChatResponse{ToolCalls: []llm.ToolCall{{ID: "tu1", Name: "format_disk", Args: "{}"}}, OutputTokens: 2},
 		&llm.ChatResponse{Text: "ok, won't.", OutputTokens: 1},
 	)

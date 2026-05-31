@@ -92,6 +92,10 @@ func (s *Service) StartSession(ctx context.Context, goal string) (dto.AgentSessi
 	sess := dto.AgentSession{ID: s.nextID(), Goal: goal, Status: dto.SessionRunning, StartedAt: time.Now()}
 	sess.Transcript = []dto.AgentMessage{{Role: "user", Content: goal}}
 	s.injectRecall(&sess)
+	if steps := s.plan(ctx, goal); len(steps) > 0 {
+		sess.Plan = steps
+		appendTranscript(&sess, llm.Message{Role: "system", Content: planSummary(steps)})
+	}
 	s.emit(&sess, "session_started", nil)
 	s.runLoop(ctx, &sess)
 	s.finalize(&sess)

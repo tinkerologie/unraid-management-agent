@@ -27,6 +27,7 @@ func (c *capturingBroadcaster) BroadcastAgentEvent(dto.WSEvent) { c.events++ }
 
 func TestLoopToolThenAnswer(t *testing.T) {
 	p := llm.NewMockProvider(
+		&llm.ChatResponse{Text: "[]"},
 		&llm.ChatResponse{ToolCalls: []llm.ToolCall{{ID: "1", Name: "get_system_info", Args: "{}"}}, InputTokens: 10, OutputTokens: 5},
 		&llm.ChatResponse{Text: "Host is tower, all healthy.", InputTokens: 8, OutputTokens: 7},
 	)
@@ -62,7 +63,7 @@ func TestLoopToolThenAnswer(t *testing.T) {
 }
 
 func TestLoopHitsIterationCap(t *testing.T) {
-	loop := []*llm.ChatResponse{}
+	loop := []*llm.ChatResponse{{Text: "[]"}}
 	for i := 0; i < 50; i++ {
 		loop = append(loop, &llm.ChatResponse{ToolCalls: []llm.ToolCall{{ID: "x", Name: "get_system_info", Args: "{}"}}, OutputTokens: 1})
 	}
@@ -97,6 +98,7 @@ func TestLoopHighRiskToolPauses(t *testing.T) {
 	})
 
 	p := llm.NewMockProvider(
+		&llm.ChatResponse{Text: "[]"},
 		&llm.ChatResponse{ToolCalls: []llm.ToolCall{{ID: "1", Name: "stop_array", Args: "{}"}}, OutputTokens: 1},
 		&llm.ChatResponse{Text: "I cannot stop the array without approval.", OutputTokens: 1},
 	)
@@ -135,6 +137,7 @@ func TestLoopDisabledAgentReturnsError(t *testing.T) {
 
 func TestLoopTokenBudgetStops(t *testing.T) {
 	p := llm.NewMockProvider(
+		&llm.ChatResponse{Text: "[]"},
 		// First response alone blows the 5-token budget while still asking for a tool.
 		&llm.ChatResponse{ToolCalls: []llm.ToolCall{{ID: "1", Name: "get_system_info", Args: "{}"}}, InputTokens: 10, OutputTokens: 10},
 	)
@@ -161,6 +164,7 @@ func TestLoopTokenBudgetStops(t *testing.T) {
 
 func TestLoopPausesForApproval(t *testing.T) {
 	p := llm.NewMockProvider(
+		&llm.ChatResponse{Text: "[]"},
 		&llm.ChatResponse{ToolCalls: []llm.ToolCall{{ID: "tu1", Name: "stop_array", Args: "{}"}}, OutputTokens: 3},
 	)
 	cfg := dto.DefaultAgentConfig()
@@ -191,6 +195,7 @@ func TestLoopPausesForApproval(t *testing.T) {
 
 func TestLoopForbidListRefusesEvenIfAuto(t *testing.T) {
 	p := llm.NewMockProvider(
+		&llm.ChatResponse{Text: "[]"},
 		&llm.ChatResponse{ToolCalls: []llm.ToolCall{{ID: "f1", Name: "format_disk", Args: "{}"}}, OutputTokens: 2},
 		&llm.ChatResponse{Text: "I won't do that.", OutputTokens: 2},
 	)
@@ -218,6 +223,7 @@ func TestLoopForbidListRefusesEvenIfAuto(t *testing.T) {
 
 func TestLoopAutoThenApprovalPreservesFirstResult(t *testing.T) {
 	p := llm.NewMockProvider(
+		&llm.ChatResponse{Text: "[]"},
 		&llm.ChatResponse{ToolCalls: []llm.ToolCall{
 			{ID: "a1", Name: "get_system_info", Args: "{}"},
 			{ID: "a2", Name: "stop_array", Args: "{}"},

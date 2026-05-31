@@ -11,7 +11,10 @@ import (
 )
 
 func TestFinalizeWritesIncident(t *testing.T) {
-	p := llm.NewMockProvider(&llm.ChatResponse{Text: "All healthy.", OutputTokens: 2})
+	p := llm.NewMockProvider(
+		&llm.ChatResponse{Text: "[]"},
+		&llm.ChatResponse{Text: "All healthy.", OutputTokens: 2},
+	)
 	cfg := dto.DefaultAgentConfig()
 	cfg.Enabled = true
 	mem := memory.NewStore(t.TempDir(), 100)
@@ -31,26 +34,33 @@ func TestRecallInjectedAtStart(t *testing.T) {
 	cfg.Enabled = true
 	mem := memory.NewStore(t.TempDir(), 100)
 	mem.AddIncident(dto.AgentIncident{ID: "i1", Signature: "plex healthy", Summary: "last time: restarted plex container"})
-	p := llm.NewMockProvider(&llm.ChatResponse{Text: "ok", OutputTokens: 1})
+	p := llm.NewMockProvider(
+		&llm.ChatResponse{Text: "[]"},
+		&llm.ChatResponse{Text: "ok", OutputTokens: 1},
+	)
 	svc := NewService(cfg, p, tools.BuildDefault(fakeState{}, fakeDocker{}), NewStore(t.TempDir()), mem, &capturingBroadcaster{})
 	_, _ = svc.StartSession(context.Background(), "is plex healthy?")
 	reqs := p.Requests()
-	if len(reqs) == 0 {
-		t.Fatal("no provider request")
+	// reqs[0] is the planner call (no recall); reqs[1] is the loop call with recall injected.
+	if len(reqs) < 2 {
+		t.Fatalf("expected at least 2 provider requests, got %d", len(reqs))
 	}
 	found := false
-	for _, m := range reqs[0].Messages {
+	for _, m := range reqs[1].Messages {
 		if m.Role == "system" && len(m.Content) > 0 {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatal("expected a recalled-context system message injected into the first request")
+		t.Fatal("expected a recalled-context system message injected into the loop request")
 	}
 }
 
 func TestNoIncidentOnApprovalPause(t *testing.T) {
-	p := llm.NewMockProvider(&llm.ChatResponse{ToolCalls: []llm.ToolCall{{ID: "t1", Name: "stop_array", Args: "{}"}}, OutputTokens: 2})
+	p := llm.NewMockProvider(
+		&llm.ChatResponse{Text: "[]"},
+		&llm.ChatResponse{ToolCalls: []llm.ToolCall{{ID: "t1", Name: "stop_array", Args: "{}"}}, OutputTokens: 2},
+	)
 	cfg := dto.DefaultAgentConfig()
 	cfg.Enabled = true
 	reg := tools.NewRegistry()

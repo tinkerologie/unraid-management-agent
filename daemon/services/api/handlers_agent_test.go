@@ -32,7 +32,10 @@ func newAgentServer(t *testing.T) *Server {
 	s := NewServer(&domain.Context{Hub: hub})
 	cfg := dto.DefaultAgentConfig()
 	cfg.Enabled = true
-	p := llm.NewMockProvider(&llm.ChatResponse{Text: "Healthy.", OutputTokens: 3})
+	p := llm.NewMockProvider(
+		&llm.ChatResponse{Text: "[]"},
+		&llm.ChatResponse{Text: "Healthy.", OutputTokens: 3},
+	)
 	reg := tools.BuildDefault(agentTestState{}, agentTestDocker{})
 	svc := agent.NewService(cfg, p, reg, agent.NewStore(t.TempDir()), memory.NewStore(t.TempDir(), 0), s)
 	s.SetAgent(svc)
@@ -174,6 +177,7 @@ func TestAgentApproveEndpoint(t *testing.T) {
 	cfg := dto.DefaultAgentConfig()
 	cfg.Enabled = true
 	p := llm.NewMockProvider(
+		&llm.ChatResponse{Text: "[]"},
 		&llm.ChatResponse{ToolCalls: []llm.ToolCall{{ID: "tu1", Name: "stop_array", Args: "{}"}}, OutputTokens: 2},
 		&llm.ChatResponse{Text: "done", OutputTokens: 1},
 	)
@@ -208,6 +212,7 @@ func TestAgentCancelEndpoint(t *testing.T) {
 	cfg := dto.DefaultAgentConfig()
 	cfg.Enabled = true
 	p := llm.NewMockProvider(
+		&llm.ChatResponse{Text: "[]"},
 		&llm.ChatResponse{ToolCalls: []llm.ToolCall{{ID: "tu1", Name: "stop_array", Args: "{}"}}, OutputTokens: 2},
 	)
 	reg := tools.NewRegistry()

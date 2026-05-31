@@ -714,7 +714,10 @@ func newTestAgentService(t *testing.T) *agent.Service {
 	t.Helper()
 	cfg := dto.DefaultAgentConfig()
 	cfg.Enabled = true
-	p := llm.NewMockProvider(&llm.ChatResponse{Text: "all good", OutputTokens: 1})
+	p := llm.NewMockProvider(
+		&llm.ChatResponse{Text: "[]"},
+		&llm.ChatResponse{Text: "all good", OutputTokens: 1},
+	)
 	reg := tools.BuildDefault(nil, nil)
 	return agent.NewService(cfg, p, reg, agent.NewStore(t.TempDir()), memory.NewStore(t.TempDir(), 0), nil)
 }
