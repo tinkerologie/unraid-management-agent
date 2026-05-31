@@ -8,8 +8,27 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 )
+
+func TestRunnerSetEventBusPublishesWake(t *testing.T) {
+	bus := domain.NewEventBus(8)
+	ch := bus.SubTopics(constants.TopicAgentWake)
+	r := NewRunner(NewStore(t.TempDir()))
+	r.SetEventBus(bus)
+	r.publishWake(dto.HealthCheck{Name: "Plex HTTP"}, ProbeResult{Healthy: false, Error: "timeout"})
+	select {
+	case msg := <-ch:
+		ev := msg.(dto.AgentWakeEvent)
+		if ev.Source != "watchdog" || ev.Subsystem != "Plex HTTP" {
+			t.Fatalf("unexpected wake: %+v", ev)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("no wake published")
+	}
+}
 
 func TestRunnerGetStatuses_Empty(t *testing.T) {
 	dir := t.TempDir()

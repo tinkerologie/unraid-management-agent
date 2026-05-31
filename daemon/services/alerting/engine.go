@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
@@ -46,6 +48,7 @@ type Engine struct {
 	dispatcher *Dispatcher
 	provider   DataProvider
 	history    *MetricsHistory
+	hub        *domain.EventBus
 
 	mu           sync.RWMutex
 	alertHistory []dto.AlertEvent
@@ -128,7 +131,26 @@ func (e *Engine) evaluate() {
 
 		e.addHistory(event)
 		e.dispatcher.Dispatch(result.Rule, event)
+		e.publishWake(event)
 	}
+}
+
+// SetEventBus wires the pubsub hub so firing alerts can wake the agent.
+func (e *Engine) SetEventBus(hub *domain.EventBus) { e.hub = hub }
+
+// publishWake emits an AgentWakeEvent for a firing alert (no-op if no hub or not firing).
+func (e *Engine) publishWake(event dto.AlertEvent) {
+	if e.hub == nil || event.State != "firing" {
+		return
+	}
+	domain.Publish(e.hub, constants.TopicAgentWake, dto.AgentWakeEvent{
+		Source:    "alert",
+		Subsystem: event.RuleName,
+		Severity:  event.Severity,
+		Title:     event.RuleName,
+		Detail:    event.Message,
+		At:        time.Now(),
+	})
 }
 
 // resultToEvent converts an EvaluateResult into an AlertEvent for history/dispatch.

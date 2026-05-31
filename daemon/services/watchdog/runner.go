@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
@@ -24,6 +26,7 @@ const (
 type Runner struct {
 	store      *Store
 	remediator *Remediator
+	hub        *domain.EventBus
 
 	mu          sync.RWMutex
 	statuses    map[string]*dto.HealthCheckStatus
@@ -182,6 +185,7 @@ func (r *Runner) runCheck(ctx context.Context, check dto.HealthCheck, now time.T
 		}
 
 		r.addHistory(event)
+		r.publishWake(check, result)
 	} else if transitionedToHealthy {
 		logger.Success("Watchdog: '%s' recovered", check.Name)
 		r.addHistory(dto.HealthCheckEvent{
@@ -192,6 +196,24 @@ func (r *Runner) runCheck(ctx context.Context, check dto.HealthCheck, now time.T
 			Timestamp: now,
 		})
 	}
+}
+
+// SetEventBus wires the pubsub hub so unhealthy transitions can wake the agent.
+func (r *Runner) SetEventBus(hub *domain.EventBus) { r.hub = hub }
+
+// publishWake emits an AgentWakeEvent for an unhealthy check (no-op if no hub).
+func (r *Runner) publishWake(check dto.HealthCheck, result ProbeResult) {
+	if r.hub == nil {
+		return
+	}
+	domain.Publish(r.hub, constants.TopicAgentWake, dto.AgentWakeEvent{
+		Source:    "watchdog",
+		Subsystem: check.Name,
+		Severity:  "warning",
+		Title:     "Health check failed: " + check.Name,
+		Detail:    result.Error,
+		At:        time.Now(),
+	})
 }
 
 // addHistory adds an event to the ring buffer.

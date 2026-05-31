@@ -5,8 +5,41 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 )
+
+func TestEngineSetEventBusPublishesWake(t *testing.T) {
+	bus := domain.NewEventBus(8)
+	ch := bus.SubTopics(constants.TopicAgentWake)
+	e := NewEngine(NewStore(t.TempDir()), nil)
+	e.SetEventBus(bus)
+	e.publishWake(dto.AlertEvent{RuleName: "High CPU", Severity: "warning", Message: "cpu 95%", State: "firing"})
+	select {
+	case msg := <-ch:
+		ev := msg.(dto.AgentWakeEvent)
+		if ev.Source != "alert" || ev.Subsystem != "High CPU" {
+			t.Fatalf("unexpected wake: %+v", ev)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("no wake published")
+	}
+}
+
+func TestEngineNoWakeWhenResolvedOrNoBus(t *testing.T) {
+	e := NewEngine(NewStore(t.TempDir()), nil)
+	e.publishWake(dto.AlertEvent{RuleName: "x", State: "firing"}) // no bus → must not panic
+	bus := domain.NewEventBus(8)
+	ch := bus.SubTopics(constants.TopicAgentWake)
+	e.SetEventBus(bus)
+	e.publishWake(dto.AlertEvent{RuleName: "x", State: "resolved"}) // resolved → no publish
+	select {
+	case <-ch:
+		t.Fatal("resolved alert must not publish a wake")
+	case <-time.After(200 * time.Millisecond):
+	}
+}
 
 // mockDataProvider implements DataProvider for testing.
 type mockDataProvider struct {

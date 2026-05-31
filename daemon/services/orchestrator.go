@@ -135,6 +135,18 @@ func (o *Orchestrator) Run() error {
 		} else if agentSvc != nil {
 			o.agentDocker = agentDocker
 			apiServer.SetAgent(agentSvc)
+			agentSvc.SetEventBus(o.ctx.Hub)
+			alertEngine.SetEventBus(o.ctx.Hub)
+			watchdogRunner.SetEventBus(o.ctx.Hub)
+			// TODO(task8): mcpServer.SetAgent(agentSvc)
+			wg.Go(func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.LogPanicWithStack("Agent trigger goroutine", r)
+					}
+				}()
+				agentSvc.Start(ctx)
+			})
 			logger.Success("Agent service started (provider=%s, model=%s)", agentCfg.Provider, agentCfg.Model)
 		}
 	}
