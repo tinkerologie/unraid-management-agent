@@ -25,16 +25,28 @@ func (s *Service) plan(ctx context.Context, goal string) []dto.PlanStep {
 	if err != nil || resp == nil {
 		return nil
 	}
-	text := strings.TrimSpace(resp.Text)
-	text = strings.TrimPrefix(text, "```json")
-	text = strings.TrimPrefix(text, "```")
-	text = strings.TrimSuffix(text, "```")
-	text = strings.TrimSpace(text)
 	var steps []dto.PlanStep
-	if err := json.Unmarshal([]byte(text), &steps); err != nil {
+	if err := json.Unmarshal([]byte(extractJSONArray(resp.Text)), &steps); err != nil {
 		return nil
 	}
 	return steps
+}
+
+// extractJSONArray pulls a JSON array out of an LLM reply, tolerating ```json
+// fences and surrounding prose by taking the span from the first '[' to the
+// last ']'. Returns the trimmed input unchanged when no array is found.
+func extractJSONArray(text string) string {
+	t := strings.TrimSpace(text)
+	t = strings.TrimPrefix(t, "```json")
+	t = strings.TrimPrefix(t, "```")
+	t = strings.TrimSuffix(t, "```")
+	t = strings.TrimSpace(t)
+	start := strings.IndexByte(t, '[')
+	end := strings.LastIndexByte(t, ']')
+	if start >= 0 && end > start {
+		return t[start : end+1]
+	}
+	return t
 }
 
 // planSummary renders a plan as a compact system message.
