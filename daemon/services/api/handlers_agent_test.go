@@ -207,6 +207,57 @@ func TestAgentApproveEndpoint(t *testing.T) {
 	}
 }
 
+func TestAgentMemoryEndpoint(t *testing.T) {
+	s := newAgentServer(t)
+	// Run a session so there is an incident recorded.
+	start := httptest.NewRequest(http.MethodPost, "/api/v1/agent/sessions", strings.NewReader(`{"goal":"is it healthy?"}`))
+	s.GetRouter().ServeHTTP(httptest.NewRecorder(), start)
+
+	rr := httptest.NewRecorder()
+	s.GetRouter().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/v1/agent/memory", nil))
+	if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), "incidents") {
+		t.Fatalf("memory endpoint: code=%d body=%s", rr.Code, rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "preferences") {
+		t.Fatalf("expected preferences key, got %s", rr.Body.String())
+	}
+}
+
+func TestAgentMemoryDisabledReturns503(t *testing.T) {
+	s := NewServer(&domain.Context{Hub: domain.NewEventBus(10)}) // agent NOT set
+	rr := httptest.NewRecorder()
+	s.GetRouter().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/v1/agent/memory", nil))
+	if rr.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503, got %d body=%s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestAgentSendMessageMissingMessage(t *testing.T) {
+	s := newAgentServer(t)
+	start := httptest.NewRequest(http.MethodPost, "/api/v1/agent/sessions", strings.NewReader(`{"goal":"status?"}`))
+	sr := httptest.NewRecorder()
+	s.GetRouter().ServeHTTP(sr, start)
+	var started dto.AgentSession
+	_ = json.Unmarshal(sr.Body.Bytes(), &started)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/agent/sessions/"+started.ID+"/messages", strings.NewReader(`{"message":""}`))
+	rr := httptest.NewRecorder()
+	s.GetRouter().ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d body=%s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestAgentConfirmPreferenceUnknown(t *testing.T) {
+	s := newAgentServer(t)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/agent/preferences/does-not-exist/confirm", nil)
+	rr := httptest.NewRecorder()
+	s.GetRouter().ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for unknown preference, got %d body=%s", rr.Code, rr.Body.String())
+	}
+}
+
 func TestAgentCancelEndpoint(t *testing.T) {
 	s := NewServer(&domain.Context{Hub: domain.NewEventBus(10)})
 	cfg := dto.DefaultAgentConfig()

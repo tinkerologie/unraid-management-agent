@@ -740,10 +740,13 @@ func TestRegisterAgentToolsInitializes(t *testing.T) {
 	}
 
 	want := map[string]bool{
-		"agent_start_session":  false,
-		"agent_get_session":    false,
-		"agent_list_sessions":  false,
-		"agent_approve_action": false,
+		"agent_start_session":      false,
+		"agent_get_session":        false,
+		"agent_list_sessions":      false,
+		"agent_approve_action":     false,
+		"agent_send_message":       false,
+		"agent_get_memory":         false,
+		"agent_confirm_preference": false,
 	}
 	for _, tool := range listed.Tools {
 		if _, ok := want[tool.Name]; ok {
@@ -770,6 +773,22 @@ func TestAgentStartSessionReturnsSession(t *testing.T) {
 	_, text := callToolJSON(t, cs, "agent_start_session", map[string]any{"goal": "check status"})
 	if !strings.Contains(text, "completed") {
 		t.Errorf("expected completed session in result, got: %s", text)
+	}
+}
+
+func TestAgentGetMemoryReturnsMemory(t *testing.T) {
+	server, _ := setupTestMCPServer()
+	server.SetAgent(newTestAgentService(t))
+	if err := server.Initialize(); err != nil {
+		t.Fatalf("initialize: %v", err)
+	}
+
+	cs, cleanup := connectClientToServer(t, server)
+	defer cleanup()
+
+	_, text := callToolJSON(t, cs, "agent_get_memory", map[string]any{})
+	if !strings.Contains(text, "incidents") || !strings.Contains(text, "preferences") {
+		t.Errorf("expected incidents/preferences in result, got: %s", text)
 	}
 }
 

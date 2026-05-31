@@ -12,6 +12,7 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/llm"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/memory"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/tools"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/remediation"
 )
 
 // AgentConfigFile is the on-disk agent configuration filename.
@@ -87,5 +88,12 @@ func BuildService(cfg dto.AgentConfig, configDir string, state tools.StateProvid
 		logger.Warning("Agent: failed to load memory: %v", err)
 	}
 	reg := tools.BuildDefault(state, docker)
-	return NewService(cfg, provider, reg, store, mem, bc), nil
+	svc := NewService(cfg, provider, reg, store, mem, bc)
+	rbStore := remediation.NewRunbookStore(configDir)
+	if err := rbStore.Load(); err != nil {
+		logger.Warning("Agent: failed to load runbooks: %v", err)
+	}
+	svc.SetRunbookStore(rbStore)
+	svc.RegisterLearningTools(reg)
+	return svc, nil
 }

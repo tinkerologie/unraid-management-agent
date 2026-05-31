@@ -163,6 +163,83 @@ func (s *Server) handleAgentCancel(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, sess)
 }
 
+// handleAgentSendMessage continues a finished session with a follow-up message.
+//
+//	@Summary		Send a follow-up message to an agent session
+//	@Description	Continue a completed or failed agent session with a new operator message and run it
+//	@Tags			Agent
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		string					true	"Session ID"
+//	@Param			request	body		object{message=string}	true	"Follow-up message"
+//	@Success		200		{object}	dto.AgentSession		"Updated session"
+//	@Failure		400		{object}	dto.Response			"Invalid request or service error"
+//	@Failure		503		{object}	dto.Response			"Agent disabled"
+//	@Router			/agent/sessions/{id}/messages [post]
+func (s *Server) handleAgentSendMessage(w http.ResponseWriter, r *http.Request) {
+	if s.agentSvc == nil || !s.agentSvc.Enabled() {
+		respondJSON(w, http.StatusServiceUnavailable, dto.Response{Success: false, Message: "agent is disabled", Timestamp: time.Now()})
+		return
+	}
+	id := mux.Vars(r)["id"]
+	var body struct {
+		Message string `json:"message"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Message) == "" {
+		respondWithError(w, http.StatusBadRequest, "request body must include a non-empty 'message'")
+		return
+	}
+	sess, err := s.agentSvc.SendMessage(r.Context(), id, body.Message)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	respondJSON(w, http.StatusOK, sess)
+}
+
+// handleAgentMemory returns the agent's episodic incidents and learned preferences.
+//
+//	@Summary		Get agent memory
+//	@Description	Retrieve the agent's recorded incidents and learned preferences
+//	@Tags			Agent
+//	@Produce		json
+//	@Success		200	{object}	object{incidents=[]dto.AgentIncident,preferences=[]dto.AgentPreference}	"Agent memory"
+//	@Failure		503	{object}	dto.Response															"Agent disabled"
+//	@Router			/agent/memory [get]
+func (s *Server) handleAgentMemory(w http.ResponseWriter, _ *http.Request) {
+	if s.agentSvc == nil {
+		respondJSON(w, http.StatusServiceUnavailable, dto.Response{Success: false, Message: "agent is disabled", Timestamp: time.Now()})
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]any{
+		"incidents":   s.agentSvc.MemoryIncidents(),
+		"preferences": s.agentSvc.MemoryPreferences(),
+	})
+}
+
+// handleAgentConfirmPreference activates a pending learned preference.
+//
+//	@Summary		Confirm an agent preference
+//	@Description	Confirm (activate) a pending learned preference by ID
+//	@Tags			Agent
+//	@Produce		json
+//	@Param			id	path		string			true	"Preference ID"
+//	@Success		200	{object}	dto.Response	"Preference confirmed"
+//	@Failure		400	{object}	dto.Response	"Service error"
+//	@Failure		503	{object}	dto.Response	"Agent disabled"
+//	@Router			/agent/preferences/{id}/confirm [post]
+func (s *Server) handleAgentConfirmPreference(w http.ResponseWriter, r *http.Request) {
+	if s.agentSvc == nil || !s.agentSvc.Enabled() {
+		respondJSON(w, http.StatusServiceUnavailable, dto.Response{Success: false, Message: "agent is disabled", Timestamp: time.Now()})
+		return
+	}
+	if err := s.agentSvc.ConfirmPreference(mux.Vars(r)["id"]); err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	respondJSON(w, http.StatusOK, dto.Response{Success: true, Message: "preference confirmed", Timestamp: time.Now()})
+}
+
 // SystemJSON exposes the cached system info for the agent's read-only tools.
 func (s *Server) SystemJSON() (any, bool) { v := s.GetSystemCache(); return v, v != nil }
 

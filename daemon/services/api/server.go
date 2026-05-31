@@ -304,6 +304,9 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/agent/sessions/{id}", s.handleAgentGetSession).Methods("GET")
 	api.HandleFunc("/agent/sessions/{id}/approve", s.handleAgentApprove).Methods("POST")
 	api.HandleFunc("/agent/sessions/{id}/cancel", s.handleAgentCancel).Methods("POST")
+	api.HandleFunc("/agent/sessions/{id}/messages", s.handleAgentSendMessage).Methods("POST")
+	api.HandleFunc("/agent/memory", s.handleAgentMemory).Methods("GET")
+	api.HandleFunc("/agent/preferences/{id}/confirm", s.handleAgentConfirmPreference).Methods("POST")
 
 	// Fan control endpoints (monitoring)
 	api.HandleFunc("/fans", s.handleFanControl).Methods("GET")

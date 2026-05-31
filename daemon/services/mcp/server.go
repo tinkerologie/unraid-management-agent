@@ -2447,7 +2447,55 @@ func (s *Server) registerAgentTools() {
 		return jsonResult(sess)
 	})
 
-	logger.Debug("MCP agent tools registered (4 tools)")
+	type sendArgs struct {
+		SessionID string `json:"session_id" jsonschema:"The session id to continue"`
+		Message   string `json:"message" jsonschema:"The follow-up message for the agent"`
+	}
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "agent_send_message",
+		Description: "Continue a finished agent session with a follow-up message, then run it.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, args sendArgs) (*mcp.CallToolResult, any, error) {
+		if s.agentSvc == nil || !s.agentSvc.Enabled() {
+			return textResult("Agent is disabled."), nil, nil
+		}
+		sess, err := s.agentSvc.SendMessage(ctx, args.SessionID, args.Message)
+		if err != nil {
+			return textResult("Error: " + err.Error()), nil, nil
+		}
+		return jsonResult(sess)
+	})
+
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "agent_get_memory",
+		Description: "Get the agent's episodic incidents and learned preferences.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		if s.agentSvc == nil {
+			return textResult("Agent is disabled."), nil, nil
+		}
+		return jsonResult(map[string]any{
+			"incidents":   s.agentSvc.MemoryIncidents(),
+			"preferences": s.agentSvc.MemoryPreferences(),
+		})
+	})
+
+	type confirmArgs struct {
+		PreferenceID string `json:"preference_id" jsonschema:"The preference id to confirm"`
+	}
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "agent_confirm_preference",
+		Description: "Confirm (activate) a pending learned preference.",
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args confirmArgs) (*mcp.CallToolResult, any, error) {
+		if s.agentSvc == nil || !s.agentSvc.Enabled() {
+			return textResult("Agent is disabled."), nil, nil
+		}
+		if err := s.agentSvc.ConfirmPreference(args.PreferenceID); err != nil {
+			return textResult("Error: " + err.Error()), nil, nil
+		}
+		return textResult("Preference confirmed."), nil, nil
+	})
+
+	logger.Debug("MCP agent tools registered (7 tools)")
 }
 
 // registerResources registers MCP resources for real-time data access.

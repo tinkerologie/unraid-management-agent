@@ -116,6 +116,22 @@ func (s *Service) autoApprovedByPreference(toolName string) bool {
 	return false
 }
 
+// MemoryIncidents returns recorded incidents (newest-first); nil when memory disabled.
+func (s *Service) MemoryIncidents() []dto.AgentIncident {
+	if s.memory == nil {
+		return nil
+	}
+	return s.memory.ListIncidents()
+}
+
+// MemoryPreferences returns all learned preferences; nil when memory disabled.
+func (s *Service) MemoryPreferences() []dto.AgentPreference {
+	if s.memory == nil {
+		return nil
+	}
+	return s.memory.ListPreferences()
+}
+
 // GetSession returns a stored session by ID.
 func (s *Service) GetSession(id string) (dto.AgentSession, bool) { return s.store.Get(id) }
 
