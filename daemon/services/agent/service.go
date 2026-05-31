@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/llm"
@@ -30,11 +31,16 @@ type Service struct {
 
 	mu  sync.Mutex
 	seq int
+
+	hub        *domain.EventBus
+	wakeMu     sync.Mutex
+	lastWake   map[string]time.Time
+	activeAuto int
 }
 
 // NewService constructs the agent service.
 func NewService(cfg dto.AgentConfig, provider llm.Provider, reg *tools.Registry, store *Store, bc Broadcaster) *Service {
-	s := &Service{cfg: cfg, provider: provider, tools: reg, store: store, bc: bc}
+	s := &Service{cfg: cfg, provider: provider, tools: reg, store: store, bc: bc, lastWake: map[string]time.Time{}}
 	// Resume the session counter past any persisted IDs so a restart does not
 	// reuse "sess-1" and overwrite an existing session.
 	for _, sess := range store.List() {
@@ -158,6 +164,27 @@ func (s *Service) SweepExpiredApprovals(ctx context.Context, now time.Time) int 
 		swept++
 	}
 	return swept
+}
+
+// SetEventBus wires the pubsub hub so the agent can receive wake events.
+func (s *Service) SetEventBus(hub *domain.EventBus) { s.hub = hub }
+
+// startAutonomousSession runs an investigation triggered by a wake event (synchronous).
+func (s *Service) startAutonomousSession(ctx context.Context, ev dto.AgentWakeEvent) {
+	goal := fmt.Sprintf("An incident was detected (source=%s, severity=%s): %s. %s\n"+
+		"Investigate using read-only tools and, within policy, remediate it.",
+		ev.Source, ev.Severity, ev.Title, ev.Detail)
+	sess := dto.AgentSession{ID: s.nextID(), Goal: goal, Status: dto.SessionRunning, StartedAt: time.Now()}
+	sess.Transcript = []dto.AgentMessage{{Role: "user", Content: goal}}
+	s.emit(&sess, "session_started", nil)
+	s.runLoop(ctx, &sess)
+	s.store.Put(sess)
+	if err := s.store.Save(); err != nil {
+		logger.Warning("Agent: failed to persist autonomous session %s: %v", sess.ID, err)
+	}
+	s.wakeMu.Lock()
+	s.activeAuto--
+	s.wakeMu.Unlock()
 }
 
 // CancelSession marks a session cancelled and clears any pending approval.
