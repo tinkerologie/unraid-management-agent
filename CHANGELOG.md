@@ -35,6 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Agent Core (Phase 1):** embedded autonomous operator with a pluggable LLM provider
+  (Anthropic), a risk-tiered tool registry (read-only + low-risk auto-execute; high-risk
+  reserved for approval), a bounded ReAct reasoning loop with iteration/token/deadline
+  caps, JSON-persisted sessions, REST endpoints under `/api/v1/agent`, and a WebSocket
+  `agent_stream` event feed. Disabled by default; opt-in via `agent_config.json`
+  (`enabled: true`) and the `UMA_AGENT_API_KEY` environment variable.
 - **Continuous Docker container update detection** — a new background `docker_update`
   collector (default 6 h interval, staggered start, registry-rate-limit-safe) performs
   periodic digest comparisons for all running containers without blocking normal Docker

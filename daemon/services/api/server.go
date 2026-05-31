@@ -16,6 +16,7 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/alerting"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/collectors"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/controllers"
@@ -58,6 +59,7 @@ type Server struct {
 	fanController    *controllers.FanController
 	cpuController    *controllers.CPUController
 	tuningController *controllers.TuningController
+	agentSvc         *agent.Service
 
 	// Embedded cache store for lock-free atomic access to collector data
 	*CacheStore
@@ -295,6 +297,11 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/alerts/status", s.handleAlertStatus).Methods("GET")
 	api.HandleFunc("/alerts/history", s.handleAlertHistory).Methods("GET")
 	api.HandleFunc("/alerts/firing", s.handleFiringAlerts).Methods("GET")
+
+	// Agent (Phase 1: on-demand sessions)
+	api.HandleFunc("/agent/sessions", s.handleAgentStartSession).Methods("POST")
+	api.HandleFunc("/agent/sessions", s.handleAgentListSessions).Methods("GET")
+	api.HandleFunc("/agent/sessions/{id}", s.handleAgentGetSession).Methods("GET")
 
 	// Fan control endpoints (monitoring)
 	api.HandleFunc("/fans", s.handleFanControl).Methods("GET")
@@ -682,4 +689,17 @@ func (s *Server) SetCPUController(cc *controllers.CPUController) {
 // SetTuningController injects the tuning controller after initialization.
 func (s *Server) SetTuningController(tc *controllers.TuningController) {
 	s.tuningController = tc
+}
+
+// SetAgent wires the agent service into the API server.
+func (s *Server) SetAgent(svc *agent.Service) {
+	s.agentSvc = svc
+}
+
+// BroadcastAgentEvent implements agent.Broadcaster: streams agent events to WS clients
+// subscribed to the "agent_stream" topic.
+func (s *Server) BroadcastAgentEvent(event dto.WSEvent) {
+	if s.wsHub != nil {
+		s.wsHub.Broadcast("agent_stream", event)
+	}
 }
