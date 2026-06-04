@@ -4450,6 +4450,98 @@
                 }
             }
         },
+        "/unassigned/remote-shares/mount": {
+            "post": {
+                "description": "Mount an Unassigned Devices SMB/NFS remote share that is configured in the plugin. The source must match a value from the remote_shares list: \"//server/share\" for SMB or \"server:/export\" for NFS.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Unassigned Devices"
+                ],
+                "summary": "Mount a remote share",
+                "parameters": [
+                    {
+                        "description": "Remote share source",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.RemoteShareActionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Remote share mounted",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to mount",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/unassigned/remote-shares/unmount": {
+            "post": {
+                "description": "Unmount an Unassigned Devices SMB/NFS remote share that is currently mounted. The source must match a value from the remote_shares list: \"//server/share\" for SMB or \"server:/export\" for NFS.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Unassigned Devices"
+                ],
+                "summary": "Unmount a remote share",
+                "parameters": [
+                    {
+                        "description": "Remote share source",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.RemoteShareActionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Remote share unmounted",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to unmount",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/updates": {
             "get": {
                 "description": "Retrieve Unraid OS and plugin update availability information",
@@ -9031,6 +9123,18 @@
                 "update_expiration": {
                     "description": "Update expiration date",
                     "type": "string"
+                }
+            }
+        },
+        "dto.RemoteShareActionRequest": {
+            "type": "object",
+            "required": [
+                "source"
+            ],
+            "properties": {
+                "source": {
+                    "type": "string",
+                    "example": "//server/share"
                 }
             }
         },

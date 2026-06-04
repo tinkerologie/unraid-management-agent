@@ -21,8 +21,8 @@ coverage.html
 # Go workspace file
 go.work
 
-# Build directory
-build/
+# Build directory (root only — anchored so it does not match ansible/roles/build/)
+/build/
 
 # Binary output from local builds
 unraid-management-agent
@@ -81,9 +81,21 @@ PHASE_2_COMPLETION_SUMMARY.md
 # Pre-commit
 .pre-commit-cache/
 
-# Claude/AI Assistant local settings
+# Claude/AI Assistant local settings and locally-installed skills
+.claude/settings.json
 .claude/settings.local.json
 .claude/*.local.json
+.claude/skills/
+
+# Playwright local runtime artifacts (traces, reports, browser state) — not project code
+.playwright/
+.playwright-cli/
+.playwright-mcp/
+playwright-report/
+test-results/
+
+# Node.js (only used by local tooling/skills, never committed)
+node_modules/
 
 # Specify tool cache/memory (if it generates local state)
 .specify/memory/
@@ -92,5 +104,3 @@ PHASE_2_COMPLETION_SUMMARY.md
 # AI scratch directory (temporary AI working files)
 .ai-scratch/*
 !.ai-scratch/.gitkeep
-.claude/settings.json
-.claude/settings.local.json

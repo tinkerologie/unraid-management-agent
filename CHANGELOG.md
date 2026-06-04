@@ -9,8 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Remote share mount/unmount control** (issue #115; resolves the mount/unmount toggle
+  ask in ha-unraid-management-agent #79) — SMB/NFS remote shares can now be mounted and
+  unmounted by source. Added the REST endpoints
+  `POST /api/v1/unassigned/remote-shares/mount` and `.../unmount`
+  (body `{"source": "//server/share"}`), the MCP `remote_share_action` tool, and an MQTT
+  Home Assistant **switch** per share. Operations are delegated to the plugin's
+  `rc.unassigned` control script so credentials, protocol versions, and mount options
+  match the Unraid web UI. Sources are validated (`ValidateRemoteShareSource`) and passed
+  as discrete exec arguments (never via a shell). Verified live on Unraid: mount via REST
+  and unmount via MCP both toggled a real CIFS mount, with the API reflecting the change.
+- **Configured-but-unmounted remote shares are now reported** (issue #115; resolves
+  ha-unraid-management-agent #79) — the collector parses the plugin's `samba_mount.cfg`
+  and merges it with `/proc/mounts`, so shares that are configured but not currently
+  mounted appear with `status: "unmounted"` (plus their `auto_mount`/`read_only`
+  metadata), enabling mount/unmount toggles in Home Assistant for offline shares.
+- **MCP `get_remote_shares` tool** (issue #115) — a dedicated read-only tool returning
+  SMB/NFS/ISO remote share mount status and space usage.
+- **MQTT Home Assistant discovery for remote shares** (issue #115) — each remote share
+  now publishes a `mounted` binary sensor plus usage / used / free capacity sensors,
+  mirroring the existing unassigned-device entities.
+
 ### Fixed
 
+- **Remote shares (SMB/NFS) never reported** (issue #115; resolves
+  ha-unraid-management-agent issues #83, #79) — the unassigned-devices collector's
+  `parseSMBMounts()` was a stub that always returned an empty list, and NFS mounts were
+  not parsed at all, so `remote_shares` was permanently empty across the REST API
+  (`/api/v1/unassigned`, `/api/v1/unassigned/remote-shares`), MQTT, and MCP. As a result
+  Home Assistant could never create binary sensors for remote shares. The collector now
+  parses `/proc/mounts` for `cifs`/`smb3`/`smbfs` and `nfs`/`nfs4` filesystems mounted
+  under `/mnt/remotes/` and `/mnt/disks/`, populating server/share/export fields,
+  read-only status, and capacity (size/used/free/usage via `statfs`). Octal-escaped
+  mount fields (e.g. spaces) are decoded. ISO loop mounts are still detected.
+- **MCP `get_unassigned_devices` hid remote shares** (issue #115) — the tool returned
+  "No unassigned devices found" whenever the local device list was empty, even when
+  remote shares were present. It now returns data when either `Devices` or
+  `RemoteShares` is non-empty.
 - **MCP `get_parity_history` always returned "No parity check history available"**
   (issue #114) — the cache layer's `GetParityHistoryCache()` was a stub that
   unconditionally returned an empty result, so the MCP tool (and the parity section of

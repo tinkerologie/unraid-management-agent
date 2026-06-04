@@ -88,3 +88,10 @@ type UnassignedDeviceList struct {
 	RemoteShares []UnassignedRemoteShare `json:"remote_shares"`
 	Timestamp    time.Time               `json:"timestamp"`
 }
+
+// RemoteShareActionRequest is the request body for mounting or unmounting a
+// remote share. Source is the share identifier as reported in the remote_shares
+// list ("//server/share" for SMB or "server:/export" for NFS).
+type RemoteShareActionRequest struct {
+	Source string `json:"source" validate:"required" example:"//server/share"`
+}

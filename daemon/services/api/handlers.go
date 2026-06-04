@@ -1901,6 +1901,95 @@ func (s *Server) handleUnassignedRemoteShares(w http.ResponseWriter, _ *http.Req
 	})
 }
 
+// handleMountRemoteShare godoc
+//
+//	@Summary		Mount a remote share
+//	@Description	Mount an Unassigned Devices SMB/NFS remote share that is configured in the plugin. The source must match a value from the remote_shares list: "//server/share" for SMB or "server:/export" for NFS.
+//	@Tags			Unassigned Devices
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		dto.RemoteShareActionRequest	true	"Remote share source"
+//	@Success		200		{object}	dto.Response					"Remote share mounted"
+//	@Failure		400		{object}	dto.Response					"Invalid request"
+//	@Failure		500		{object}	dto.Response					"Failed to mount"
+//	@Router			/unassigned/remote-shares/mount [post]
+func (s *Server) handleMountRemoteShare(w http.ResponseWriter, r *http.Request) {
+	s.handleRemoteShareAction(w, r, "mount")
+}
+
+// handleUnmountRemoteShare godoc
+//
+//	@Summary		Unmount a remote share
+//	@Description	Unmount an Unassigned Devices SMB/NFS remote share that is currently mounted. The source must match a value from the remote_shares list: "//server/share" for SMB or "server:/export" for NFS.
+//	@Tags			Unassigned Devices
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		dto.RemoteShareActionRequest	true	"Remote share source"
+//	@Success		200		{object}	dto.Response					"Remote share unmounted"
+//	@Failure		400		{object}	dto.Response					"Invalid request"
+//	@Failure		500		{object}	dto.Response					"Failed to unmount"
+//	@Router			/unassigned/remote-shares/unmount [post]
+func (s *Server) handleUnmountRemoteShare(w http.ResponseWriter, r *http.Request) {
+	s.handleRemoteShareAction(w, r, "unmount")
+}
+
+// handleRemoteShareAction is the shared implementation for the mount and
+// unmount remote-share endpoints.
+func (s *Server) handleRemoteShareAction(w http.ResponseWriter, r *http.Request, action string) {
+	var req dto.RemoteShareActionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Invalid request body: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	if err := lib.ValidateRemoteShareSource(req.Source); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   err.Error(),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	controller := controllers.NewRemoteShareController()
+	var err error
+	switch action {
+	case "mount":
+		err = controller.Mount(req.Source)
+	case "unmount":
+		err = controller.Unmount(req.Source)
+	default:
+		// Unreachable in normal operation: action is supplied internally by the
+		// mount/unmount wrapper handlers, never by the client. Reaching here
+		// indicates a programming error, hence HTTP 500.
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Unknown remote share action: %s", action),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+	if err != nil {
+		logger.Error("API: Failed to %s remote share %q: %v", action, req.Source, err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to %s remote share", action),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   fmt.Sprintf("Remote share %s initiated for %s", action, req.Source),
+		Timestamp: time.Now(),
+	})
+}
+
 // ============================================================================
 // ZFS Handlers
 // ============================================================================

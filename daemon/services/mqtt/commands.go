@@ -95,6 +95,10 @@ func (c *Client) handleCommand(msg pahomqtt.Message) {
 	case len(parts) == 3 && parts[0] == "service" && parts[2] == "set":
 		err = c.execServiceSwitch(parts[1], payload)
 
+	// Remote share: unassigned/remote/{id}/set (switch → mount/unmount)
+	case len(parts) == 4 && parts[0] == "unassigned" && parts[1] == "remote" && parts[3] == "set":
+		err = c.execRemoteShareSwitch(parts[2], payload)
+
 	// System: system/reboot, system/shutdown (buttons)
 	case len(parts) == 2 && parts[0] == "system":
 		err = c.execSystemButton(parts[1])
@@ -297,6 +301,33 @@ func (c *Client) execServiceSwitch(nameID, payload string) error {
 	}
 
 	return err
+}
+
+// --- Remote shares ---
+
+func (c *Client) execRemoteShareSwitch(shareID, payload string) error {
+	source := c.lookupRemoteShareSource(shareID)
+	if source == "" {
+		return fmt.Errorf("unknown remote share id: %s", shareID)
+	}
+
+	ctrl := controllers.NewRemoteShareController()
+	switch strings.ToUpper(payload) {
+	case "ON":
+		logger.Info("MQTT: Mounting remote share %s", source)
+		if err := ctrl.Mount(source); err != nil {
+			return fmt.Errorf("mounting remote share %s: %w", source, err)
+		}
+		return nil
+	case "OFF":
+		logger.Info("MQTT: Unmounting remote share %s", source)
+		if err := ctrl.Unmount(source); err != nil {
+			return fmt.Errorf("unmounting remote share %s: %w", source, err)
+		}
+		return nil
+	default:
+		return fmt.Errorf("invalid remote share switch payload: %s (expected ON/OFF)", payload)
+	}
 }
 
 // --- System ---

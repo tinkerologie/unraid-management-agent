@@ -422,3 +422,50 @@ func ValidateHostOrIP(host string) error {
 	}
 	return nil
 }
+
+// ValidateRemoteShareSource validates an Unassigned Devices remote-share source
+// identifier as accepted by the rc.unassigned mount/umount commands. Valid forms
+// are SMB ("//server/share") and NFS ("server:/export"). The value is passed to
+// the mount script as a separate argument (never through a shell), so the checks
+// here guard against malformed input and flag injection rather than shell
+// metacharacters.
+func ValidateRemoteShareSource(source string) error {
+	if source == "" {
+		return errors.New("remote share source cannot be empty")
+	}
+	if len(source) > 4096 {
+		return fmt.Errorf("invalid remote share source: exceeds 4096 characters")
+	}
+	if strings.ContainsAny(source, "\x00\n\r") {
+		return errors.New("invalid remote share source: must not contain control characters")
+	}
+	if strings.HasPrefix(source, "-") {
+		return fmt.Errorf("invalid remote share source %q: must not start with a hyphen", source)
+	}
+	// Reject path-traversal segments. Note: shell metacharacters are NOT
+	// rejected here because the source is always passed to the mount script as a
+	// discrete exec argument (never via a shell), and characters such as '$' are
+	// legitimate in SMB share names (e.g. hidden "share$").
+	if strings.Contains(source, "..") {
+		return fmt.Errorf("invalid remote share source %q: must not contain '..'", source)
+	}
+
+	switch {
+	case strings.HasPrefix(source, "//"):
+		// SMB: //server/share — both server and share must be present.
+		rest := strings.TrimPrefix(source, "//")
+		server, share, ok := strings.Cut(rest, "/")
+		if !ok || server == "" || share == "" {
+			return fmt.Errorf("invalid SMB remote share source %q: expected //server/share", source)
+		}
+	case strings.Contains(source, ":/"):
+		// NFS: server:/export — both server and a rooted export must be present.
+		server, export, _ := strings.Cut(source, ":/")
+		if server == "" || export == "" {
+			return fmt.Errorf("invalid NFS remote share source %q: expected server:/export", source)
+		}
+	default:
+		return fmt.Errorf("invalid remote share source %q: must be an SMB (//server/share) or NFS (server:/export) source", source)
+	}
+	return nil
+}

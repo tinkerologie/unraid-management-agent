@@ -252,6 +252,8 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/unassigned", s.handleUnassignedDevices).Methods("GET")
 	api.HandleFunc("/unassigned/devices", s.handleUnassignedDevicesList).Methods("GET")
 	api.HandleFunc("/unassigned/remote-shares", s.handleUnassignedRemoteShares).Methods("GET")
+	api.HandleFunc("/unassigned/remote-shares/mount", s.handleMountRemoteShare).Methods("POST")
+	api.HandleFunc("/unassigned/remote-shares/unmount", s.handleUnmountRemoteShare).Methods("POST")
 
 	// Collectors management endpoints
 	api.HandleFunc("/collectors/status", s.handleCollectorsStatus).Methods("GET")

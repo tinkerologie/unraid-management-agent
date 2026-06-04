@@ -76,6 +76,13 @@ const (
 	PluginBin = "/usr/local/sbin/plugin"
 	// VirtCloneBin is the path to the virt-clone binary.
 	VirtCloneBin = "/usr/bin/virt-clone"
+	// RcUnassignedBin is the Unassigned Devices plugin control script used to
+	// mount and unmount SMB/NFS remote shares by source.
+	RcUnassignedBin = "/usr/local/sbin/rc.unassigned"
+
+	// UnassignedSambaMountCfg is the Unassigned Devices SMB/NFS remote-share
+	// configuration file (INI keyed by share source).
+	UnassignedSambaMountCfg = "/boot/config/plugins/unassigned.devices/samba_mount.cfg"
 
 	// ProcSPLARCStats is the path to the ZFS ARC statistics file.
 	ProcSPLARCStats = "/proc/spl/kstat/zfs/arcstats"

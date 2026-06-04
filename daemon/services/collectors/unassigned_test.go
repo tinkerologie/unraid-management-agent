@@ -2,8 +2,10 @@ package collectors
 
 import (
 	"testing"
+	"time"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 )
 
 func TestNewUnassignedCollector(t *testing.T) {
@@ -351,6 +353,280 @@ func extractPartitionNumber(s string) int {
 		}
 	}
 	return 0
+}
+
+func TestParseSMBSource(t *testing.T) {
+	tests := []struct {
+		name       string
+		source     string
+		wantServer string
+		wantShare  string
+	}{
+		{"standard", "//192.168.1.100/backup", "192.168.1.100", "backup"},
+		{"nested share", "//tower/media/movies", "tower", "media/movies"},
+		{"hostname", "//nas.local/data", "nas.local", "data"},
+		{"no share", "//server", "server", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server, share := parseSMBSource(tt.source)
+			if server != tt.wantServer || share != tt.wantShare {
+				t.Errorf("parseSMBSource(%q) = (%q, %q), want (%q, %q)",
+					tt.source, server, share, tt.wantServer, tt.wantShare)
+			}
+		})
+	}
+}
+
+func TestParseNFSSource(t *testing.T) {
+	tests := []struct {
+		name       string
+		source     string
+		wantServer string
+		wantExport string
+	}{
+		{"standard", "192.168.1.100:/mnt/user/backup", "192.168.1.100", "/mnt/user/backup"},
+		{"hostname", "nas:/export", "nas", "/export"},
+		{"ipv6 host", "[fe80::1]:/export/media", "[fe80::1]", "/export/media"},
+		{"no export", "192.168.1.100", "192.168.1.100", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server, export := parseNFSSource(tt.source)
+			if server != tt.wantServer || export != tt.wantExport {
+				t.Errorf("parseNFSSource(%q) = (%q, %q), want (%q, %q)",
+					tt.source, server, export, tt.wantServer, tt.wantExport)
+			}
+		})
+	}
+}
+
+func TestIsUnassignedRemoteMount(t *testing.T) {
+	tests := []struct {
+		mountPoint string
+		want       bool
+	}{
+		{"/mnt/remotes/NAS_backup", true},
+		{"/mnt/disks/MyISO", true},
+		{"/mnt/user/appdata", false},
+		{"/mnt/cache", false},
+		{"/boot", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.mountPoint, func(t *testing.T) {
+			if got := isUnassignedRemoteMount(tt.mountPoint); got != tt.want {
+				t.Errorf("isUnassignedRemoteMount(%q) = %v, want %v", tt.mountPoint, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMountHasOption(t *testing.T) {
+	tests := []struct {
+		options string
+		want    string
+		found   bool
+	}{
+		{"rw,relatime,vers=3.1.1", "ro", false},
+		{"ro,relatime,vers=3.1.1", "ro", true},
+		{"rw,nosuid,ro", "ro", true},
+		{"rw,relatime", "rw", true},
+		// "ro" must be an exact token, not a substring of "errors=remount-ro".
+		{"rw,errors=remount-ro", "ro", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.options, func(t *testing.T) {
+			if got := mountHasOption(tt.options, tt.want); got != tt.found {
+				t.Errorf("mountHasOption(%q, %q) = %v, want %v", tt.options, tt.want, got, tt.found)
+			}
+		})
+	}
+}
+
+func TestUnescapeMountField(t *testing.T) {
+	tests := []struct {
+		in   string
+		want string
+	}{
+		{"/mnt/remotes/NAS_backup", "/mnt/remotes/NAS_backup"},
+		{`/mnt/remotes/My\040Share`, "/mnt/remotes/My Share"},
+		{`//server/Media\040Library`, "//server/Media Library"},
+		{`/path\134with\134backslash`, `/path\with\backslash`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			if got := unescapeMountField(tt.in); got != tt.want {
+				t.Errorf("unescapeMountField(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseRemoteShareMounts(t *testing.T) {
+	now := time.Now()
+	procMounts := `proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0
+//192.168.1.100/backup /mnt/remotes/192.168.1.100_backup cifs rw,relatime,vers=3.1.1 0 0
+192.168.1.50:/export/media /mnt/remotes/192.168.1.50_media nfs4 ro,relatime 0 0
+//tower/Media\040Library /mnt/remotes/tower_Media_Library cifs rw,relatime 0 0
+/dev/sda1 /mnt/disk1 xfs rw,relatime 0 0
+192.168.1.60:/data /mnt/disks/legacy_nfs nfs rw,relatime 0 0
+tmpfs /run tmpfs rw,nosuid 0 0`
+
+	shares := parseRemoteShareMounts(procMounts, now)
+
+	if len(shares) != 4 {
+		t.Fatalf("expected 4 remote shares, got %d: %+v", len(shares), shares)
+	}
+
+	// SMB share
+	if shares[0].Type != "smb" || shares[0].SMBServer != "192.168.1.100" ||
+		shares[0].SMBShare != "backup" || shares[0].Status != "mounted" || shares[0].ReadOnly {
+		t.Errorf("unexpected first SMB share: %+v", shares[0])
+	}
+
+	// NFS read-only share
+	if shares[1].Type != "nfs" || shares[1].NFSServer != "192.168.1.50" ||
+		shares[1].NFSExport != "/export/media" || !shares[1].ReadOnly {
+		t.Errorf("unexpected NFS share: %+v", shares[1])
+	}
+
+	// SMB share with escaped space in mount point
+	if shares[2].MountPoint != "/mnt/remotes/tower_Media_Library" ||
+		shares[2].SMBShare != "Media Library" {
+		t.Errorf("unexpected escaped SMB share: %+v", shares[2])
+	}
+
+	// Legacy NFS under /mnt/disks/
+	if shares[3].Type != "nfs" || shares[3].MountPoint != "/mnt/disks/legacy_nfs" {
+		t.Errorf("unexpected legacy NFS share: %+v", shares[3])
+	}
+}
+
+func TestParseRemoteShareMountsEmpty(t *testing.T) {
+	now := time.Now()
+	procMounts := `proc /proc proc rw 0 0
+/dev/sda1 /mnt/disk1 xfs rw 0 0
+tmpfs /run tmpfs rw 0 0`
+
+	shares := parseRemoteShareMounts(procMounts, now)
+	if len(shares) != 0 {
+		t.Errorf("expected no remote shares, got %d: %+v", len(shares), shares)
+	}
+}
+
+func TestParseConfiguredRemoteShares(t *testing.T) {
+	now := time.Now()
+	cfg := `["//192.168.1.100/backup"]
+protocol="SMB"
+ip="192.168.1.100"
+path="backup"
+share="backup"
+automount="yes"
+read_only="no"
+
+["192.168.1.50:/export/media"]
+protocol="NFS"
+ip="192.168.1.50"
+path="/export/media"
+automount="no"
+read_only="yes"
+
+["//tower/scratch"]
+protocol="ROOT"
+ip="tower"
+path="scratch"`
+
+	shares := parseConfiguredRemoteShares(cfg, now)
+	if len(shares) != 2 {
+		t.Fatalf("expected 2 configured shares (ROOT skipped), got %d: %+v", len(shares), shares)
+	}
+
+	byType := map[string]dto.UnassignedRemoteShare{}
+	for _, s := range shares {
+		byType[s.Type] = s
+	}
+
+	smb, ok := byType["smb"]
+	if !ok {
+		t.Fatal("expected an smb share")
+	}
+	if smb.Source != "//192.168.1.100/backup" || smb.SMBServer != "192.168.1.100" ||
+		smb.SMBShare != "backup" || !smb.AutoMount || smb.ReadOnly || smb.Status != "unmounted" {
+		t.Errorf("unexpected smb share: %+v", smb)
+	}
+	if smb.MountPoint != "/mnt/remotes/192.168.1.100_backup" {
+		t.Errorf("unexpected smb mountpoint: %q", smb.MountPoint)
+	}
+
+	nfs, ok := byType["nfs"]
+	if !ok {
+		t.Fatal("expected an nfs share")
+	}
+	if nfs.NFSServer != "192.168.1.50" || nfs.NFSExport != "/export/media" ||
+		nfs.AutoMount || !nfs.ReadOnly || nfs.Status != "unmounted" {
+		t.Errorf("unexpected nfs share: %+v", nfs)
+	}
+}
+
+func TestParseConfiguredRemoteSharesEmpty(t *testing.T) {
+	if shares := parseConfiguredRemoteShares("", time.Now()); shares != nil {
+		t.Errorf("expected nil for empty config, got %+v", shares)
+	}
+	// A 1-byte/whitespace config (UD default) yields no shares.
+	if shares := parseConfiguredRemoteShares("\n", time.Now()); len(shares) != 0 {
+		t.Errorf("expected no shares for blank config, got %+v", shares)
+	}
+}
+
+func TestMergeRemoteShares(t *testing.T) {
+	now := time.Now()
+	configured := []dto.UnassignedRemoteShare{
+		{Type: "smb", Source: "//192.168.1.100/backup", MountPoint: "/mnt/remotes/192.168.1.100_backup", Status: "unmounted", AutoMount: true, Timestamp: now},
+		{Type: "nfs", Source: "192.168.1.50:/export/media", MountPoint: "/mnt/remotes/192.168.1.50_export_media", Status: "unmounted", AutoMount: false, Timestamp: now},
+	}
+	mounted := []dto.UnassignedRemoteShare{
+		// Matches the first configured share by source — should become mounted
+		// while keeping automount=true from config.
+		{Type: "smb", Source: "//192.168.1.100/backup", MountPoint: "/mnt/remotes/192.168.1.100_backup", Status: "mounted", Timestamp: now},
+		// A manually-mounted share not present in config — preserved.
+		{Type: "smb", Source: "//other/share", MountPoint: "/mnt/remotes/other_share", Status: "mounted", Timestamp: now},
+	}
+
+	merged := mergeRemoteShares(configured, mounted)
+	if len(merged) != 3 {
+		t.Fatalf("expected 3 merged shares, got %d: %+v", len(merged), merged)
+	}
+
+	bySource := map[string]dto.UnassignedRemoteShare{}
+	for _, s := range merged {
+		bySource[s.Source] = s
+	}
+
+	if got := bySource["//192.168.1.100/backup"]; got.Status != "mounted" || !got.AutoMount {
+		t.Errorf("expected matched share mounted+automount, got %+v", got)
+	}
+	if got := bySource["192.168.1.50:/export/media"]; got.Status != "unmounted" {
+		t.Errorf("expected unmatched config share to stay unmounted, got %+v", got)
+	}
+	if got, ok := bySource["//other/share"]; !ok || got.Status != "mounted" {
+		t.Errorf("expected manually-mounted share preserved, got %+v (ok=%v)", got, ok)
+	}
+}
+
+func TestParseISOMountsFromProc(t *testing.T) {
+	now := time.Now()
+	procMounts := `/dev/loop2 /mnt/disks/ubuntu_iso iso9660 ro,relatime 0 0
+/dev/sda1 /mnt/disk1 xfs rw,relatime 0 0
+/dev/loop3 /var/lib/docker btrfs rw 0 0`
+
+	shares := parseISOMountsFromProc(procMounts, now)
+	if len(shares) != 1 {
+		t.Fatalf("expected 1 ISO share, got %d: %+v", len(shares), shares)
+	}
+	if shares[0].Type != "iso" || shares[0].MountPoint != "/mnt/disks/ubuntu_iso" ||
+		!shares[0].ReadOnly || shares[0].Status != "mounted" {
+		t.Errorf("unexpected ISO share: %+v", shares[0])
+	}
 }
 
 func TestArrayDiskFiltering(t *testing.T) {

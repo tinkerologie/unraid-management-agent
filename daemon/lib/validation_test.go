@@ -63,6 +63,54 @@ func TestValidateHostOrIP(t *testing.T) {
 	}
 }
 
+func TestValidateRemoteShareSource(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+		errMsg  string
+	}{
+		// Valid SMB / NFS sources
+		{name: "smb source", input: "//192.168.1.100/backup", wantErr: false},
+		{name: "smb nested share", input: "//tower/media/movies", wantErr: false},
+		{name: "smb hostname", input: "//nas.local/data", wantErr: false},
+		{name: "nfs source", input: "192.168.1.50:/export/media", wantErr: false},
+		{name: "nfs hostname", input: "nas:/srv/share", wantErr: false},
+		{name: "smb share with space", input: "//server/Media Library", wantErr: false},
+		// SMB hidden/admin shares legitimately contain '$' — must be accepted.
+		{name: "smb hidden share", input: "//server/share$", wantErr: false},
+		// Invalid: structure
+		{name: "empty", input: "", wantErr: true, errMsg: "cannot be empty"},
+		{name: "blank whitespace", input: "   ", wantErr: true, errMsg: "SMB"},
+		{name: "smb missing share", input: "//server", wantErr: true, errMsg: "SMB"},
+		{name: "smb empty share", input: "//server/", wantErr: true, errMsg: "SMB"},
+		{name: "smb only slashes", input: "//", wantErr: true, errMsg: "SMB"},
+		{name: "nfs missing export", input: ":/export", wantErr: true, errMsg: "NFS"},
+		{name: "plain path", input: "/mnt/user/backup", wantErr: true, errMsg: "SMB"},
+		{name: "bare hostname", input: "justahost", wantErr: true, errMsg: "SMB"},
+		// Invalid: injection / traversal / control
+		{name: "leading hyphen", input: "-rf", wantErr: true, errMsg: "must not start with a hyphen"},
+		{name: "null byte", input: "//server/share\x00", wantErr: true, errMsg: "control characters"},
+		{name: "newline", input: "//server/share\nrm", wantErr: true, errMsg: "control characters"},
+		{name: "path traversal smb", input: "//server/../share", wantErr: true, errMsg: ".."},
+		{name: "path traversal nfs", input: "nas:/../export", wantErr: true, errMsg: ".."},
+		{name: "too long", input: "//s/" + strings.Repeat("a", 4096), wantErr: true, errMsg: "exceeds 4096"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateRemoteShareSource(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateRemoteShareSource(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+				return
+			}
+			if tt.wantErr && tt.errMsg != "" && !strings.Contains(err.Error(), tt.errMsg) {
+				t.Errorf("ValidateRemoteShareSource(%q) error = %q, want to contain %q", tt.input, err.Error(), tt.errMsg)
+			}
+		})
+	}
+}
+
 func TestValidateContainerID(t *testing.T) {
 	tests := []struct {
 		name    string

@@ -1706,10 +1706,86 @@ func (c *Client) publishUnassignedDiscovery(list *dto.UnassignedDeviceList) {
 		ids := c.publishUnassignedEntities(devTopic, fmt.Sprintf("unassigned_%s", devID), displayName, dev)
 		currentIDs = append(currentIDs, ids...)
 	}
+	shareSources := make(map[string]string)
+	for _, share := range list.RemoteShares {
+		if share.MountPoint == "" {
+			continue
+		}
+		shareID := sanitizeID(share.MountPoint)
+		// Record the ID→source mapping so MQTT switch commands can be routed
+		// back to the controller. Skip ISO mounts, which cannot be toggled.
+		if share.Source != "" && share.Type != "iso" {
+			shareSources[shareID] = share.Source
+		}
+		shareTopic := c.buildTopic(fmt.Sprintf("unassigned/remote/%s", shareID))
+		if err := c.publishJSON(shareTopic, share); err != nil {
+			logger.Debug("MQTT: Failed to publish remote share %s: %v", shareID, err)
+			continue
+		}
+		ids := c.publishRemoteShareEntities(shareTopic, fmt.Sprintf("remote_share_%s", shareID), remoteShareDisplayName(share), shareID, share.Type)
+		currentIDs = append(currentIDs, ids...)
+	}
+	c.setRemoteShareSources(shareSources)
 	removed := c.tracker.update("unassigned", currentIDs)
 	for _, id := range removed {
 		c.removeHAEntities(id)
 	}
+}
+
+// remoteShareDisplayName builds a human-friendly label for a remote share.
+func remoteShareDisplayName(share dto.UnassignedRemoteShare) string {
+	if share.Source != "" {
+		return share.Source
+	}
+	return share.MountPoint
+}
+
+// publishRemoteShareEntities publishes HA entity discovery for a single remote
+// SMB/NFS/ISO share (mounted status, capacity sensors, and — for toggleable
+// SMB/NFS shares — a mount/unmount switch).
+func (c *Client) publishRemoteShareEntities(topic, prefix, displayName, shareID, shareType string) []string {
+	ids := []string{prefix + "_mounted", prefix + "_usage", prefix + "_used", prefix + "_free"}
+	c.publishHAEntity(haEntityOpts{
+		entityType: "binary_sensor", stateTopic: topic,
+		id: prefix + "_mounted", name: fmt.Sprintf("Remote Share: %s Mounted", displayName),
+		icon:        "mdi:nas",
+		template:    "{{ 'ON' if value_json.status == 'mounted' else 'OFF' }}",
+		deviceClass: "connectivity",
+	})
+	// ISO mounts cannot be toggled by source, so only SMB/NFS get a switch.
+	if shareType != "iso" {
+		ids = append(ids, prefix+"_switch")
+		c.publishHAEntity(haEntityOpts{
+			entityType: "switch", stateTopic: topic,
+			commandTopic: c.buildCommandTopic("unassigned", "remote", shareID, "set"),
+			id:           prefix + "_switch", name: fmt.Sprintf("Remote Share: %s Mount", displayName),
+			icon:     "mdi:nas",
+			template: "{{ value_json.status }}",
+			stateOn:  "mounted", stateOff: "unmounted",
+		})
+	}
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: prefix + "_usage", name: fmt.Sprintf("Remote Share: %s Usage", displayName), unit: "%",
+		icon:       "mdi:nas",
+		template:   "{{ value_json.usage_percent | default(0) | round(1) }}",
+		stateClass: "measurement",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: prefix + "_used", name: fmt.Sprintf("Remote Share: %s Used", displayName), unit: "B",
+		icon:        "mdi:nas",
+		template:    "{{ value_json.used_bytes | default(0) }}",
+		deviceClass: "data_size", stateClass: "measurement",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: prefix + "_free", name: fmt.Sprintf("Remote Share: %s Free", displayName), unit: "B",
+		icon:        "mdi:nas",
+		template:    "{{ value_json.free_bytes | default(0) }}",
+		deviceClass: "data_size", stateClass: "measurement",
+	})
+	return ids
 }
 
 // publishUnassignedEntities publishes HA entity discovery for a single unassigned device.

@@ -2663,6 +2663,14 @@ definitions:
         description: Update expiration date
         type: string
     type: object
+  dto.RemoteShareActionRequest:
+    properties:
+      source:
+        example: //server/share
+        type: string
+    required:
+    - source
+    type: object
   dto.Response:
     properties:
       data: {}
@@ -6693,6 +6701,70 @@ paths:
             additionalProperties: true
             type: object
       summary: Get remote shares only
+      tags:
+      - Unassigned Devices
+  /unassigned/remote-shares/mount:
+    post:
+      consumes:
+      - application/json
+      description: 'Mount an Unassigned Devices SMB/NFS remote share that is configured
+        in the plugin. The source must match a value from the remote_shares list:
+        "//server/share" for SMB or "server:/export" for NFS.'
+      parameters:
+      - description: Remote share source
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RemoteShareActionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Remote share mounted
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to mount
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Mount a remote share
+      tags:
+      - Unassigned Devices
+  /unassigned/remote-shares/unmount:
+    post:
+      consumes:
+      - application/json
+      description: 'Unmount an Unassigned Devices SMB/NFS remote share that is currently
+        mounted. The source must match a value from the remote_shares list: "//server/share"
+        for SMB or "server:/export" for NFS.'
+      parameters:
+      - description: Remote share source
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RemoteShareActionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Remote share unmounted
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Failed to unmount
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Unmount a remote share
       tags:
       - Unassigned Devices
   /updates:

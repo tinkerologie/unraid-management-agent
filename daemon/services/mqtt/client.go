@@ -47,6 +47,28 @@ type Client struct {
 	// connectCancel cancels the context for goroutines spawned by handleConnect.
 	// Protected by mu.
 	connectCancel context.CancelFunc
+
+	// remoteShareSources maps a sanitized remote-share ID (used in MQTT switch
+	// command topics) back to the share's source identifier so incoming
+	// mount/unmount commands can be routed to the controller. Rebuilt on each
+	// unassigned discovery publish.
+	remoteShareMu      sync.RWMutex
+	remoteShareSources map[string]string
+}
+
+// setRemoteShareSources atomically replaces the remote-share ID→source map.
+func (c *Client) setRemoteShareSources(m map[string]string) {
+	c.remoteShareMu.Lock()
+	c.remoteShareSources = m
+	c.remoteShareMu.Unlock()
+}
+
+// lookupRemoteShareSource resolves a sanitized remote-share ID to its source,
+// returning an empty string if unknown.
+func (c *Client) lookupRemoteShareSource(shareID string) string {
+	c.remoteShareMu.RLock()
+	defer c.remoteShareMu.RUnlock()
+	return c.remoteShareSources[shareID]
 }
 
 func normalizeQoS(qos int) byte {

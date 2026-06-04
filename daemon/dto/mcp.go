@@ -322,6 +322,13 @@ type MCPMetricHistoryArgs struct {
 	Entity string `json:"entity,omitempty" jsonschema:"optional entity id e.g. a disk or container id"`
 }
 
+// MCPRemoteShareActionArgs represents arguments for mounting/unmounting an
+// Unassigned Devices SMB/NFS remote share.
+type MCPRemoteShareActionArgs struct {
+	Source string `json:"source" jsonschema:"The remote share source as reported in remote_shares: //server/share for SMB or server:/export for NFS"`
+	Action string `json:"action" jsonschema:"The action to perform: mount or unmount"`
+}
+
 // MCPRunRunbookArgs represents arguments for the run_runbook tool.
 // When Confirm is false the tool is a dry-run: it returns planned steps without executing anything.
 // When Confirm is true supported-action steps are executed via the executor.

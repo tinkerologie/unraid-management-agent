@@ -516,14 +516,27 @@ func (s *Server) registerMonitoringTools() {
 	// Unassigned devices tool
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "get_unassigned_devices",
-		Description: "Get information about unassigned (non-array) devices including USB drives and unassigned disks",
+		Description: "Get information about unassigned (non-array) devices including USB drives, unassigned disks, and remote SMB/NFS/ISO shares",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
 		unassigned := s.cacheProvider.GetUnassignedCache()
-		if unassigned == nil || len(unassigned.Devices) == 0 {
-			return textResult("No unassigned devices found or Unassigned Devices plugin not installed"), nil, nil
+		if unassigned == nil || (len(unassigned.Devices) == 0 && len(unassigned.RemoteShares) == 0) {
+			return textResult("No unassigned devices or remote shares found, or Unassigned Devices plugin not installed"), nil, nil
 		}
 		return jsonResult(unassigned)
+	})
+
+	// Remote shares tool (SMB/NFS/ISO mounts managed by Unassigned Devices)
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "get_remote_shares",
+		Description: "Get SMB/NFS/ISO remote share mount status and space usage from the Unassigned Devices plugin",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		unassigned := s.cacheProvider.GetUnassignedCache()
+		if unassigned == nil || len(unassigned.RemoteShares) == 0 {
+			return textResult("No remote shares found or Unassigned Devices plugin not installed"), nil, nil
+		}
+		return jsonResult(unassigned.RemoteShares)
 	})
 
 	// NUT (Network UPS Tools) status tool
@@ -1291,6 +1304,36 @@ func (s *Server) registerControlTools() {
 		}
 
 		return textResult(fmt.Sprintf("Successfully executed '%s' on array", args.Action)), nil, nil
+	})
+
+	// Remote share mount/unmount tool
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "remote_share_action",
+		Description: "Mount or unmount an Unassigned Devices SMB/NFS remote share by its source (//server/share or server:/export, as reported by get_remote_shares).",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(true),
+			IdempotentHint:  true,
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPRemoteShareActionArgs) (*mcp.CallToolResult, any, error) {
+		logger.Info("MCP: Remote share action '%s' requested for '%s'", args.Action, args.Source)
+
+		ctrl := controllers.NewRemoteShareController()
+		var err error
+		switch strings.ToLower(strings.TrimSpace(args.Action)) {
+		case "mount":
+			err = ctrl.Mount(args.Source)
+		case "unmount":
+			err = ctrl.Unmount(args.Source)
+		default:
+			return textResult(fmt.Sprintf("Unknown action: %s (expected mount or unmount)", args.Action)), nil, nil
+		}
+
+		if err != nil {
+			logger.Error("MCP: Remote share action failed: %v", err)
+			return textResult(fmt.Sprintf("Failed to %s remote share: %v", args.Action, err)), nil, nil
+		}
+
+		return textResult(fmt.Sprintf("Successfully initiated '%s' on remote share '%s'", args.Action, args.Source)), nil, nil
 	})
 
 	// Parity check tool

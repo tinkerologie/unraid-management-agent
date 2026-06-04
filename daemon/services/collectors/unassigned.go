@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -123,22 +124,219 @@ func (c *UnassignedCollector) collectUnassignedDevices() []dto.UnassignedDevice 
 	return unassignedDevices
 }
 
-// collectRemoteShares collects remote SMB/NFS/ISO shares
+// collectRemoteShares collects remote SMB/NFS/ISO shares mounted by the
+// Unassigned Devices plugin under /mnt/remotes/ and /mnt/disks/.
 func (c *UnassignedCollector) collectRemoteShares() []dto.UnassignedRemoteShare {
 	if !c.isPluginInstalled() {
 		return []dto.UnassignedRemoteShare{}
 	}
 
+	// Read /proc/mounts once and parse all remote share types from it.
+	mounts, err := os.ReadFile("/proc/mounts")
+	if err != nil {
+		logger.Debug("Failed to read /proc/mounts: %v", err)
+		return []dto.UnassignedRemoteShare{}
+	}
+	procMounts := string(mounts)
+	now := time.Now()
+
+	// Parse currently-mounted SMB (CIFS) and NFS network shares.
+	mounted := parseRemoteShareMounts(procMounts, now)
+
+	// Enumerate configured shares from the plugin's samba_mount.cfg so that
+	// shares which are configured but not currently mounted are still reported
+	// (status "unmounted"), enabling mount/unmount toggles in consumers.
+	configured := parseConfiguredRemoteShares(readSambaConfig(), now)
+
+	// Merge: configured shares carry automount/read-only metadata and surface
+	// unmounted entries; mounted shares carry live status and capacity.
+	shares := mergeRemoteShares(configured, mounted)
+
+	// Parse ISO mounts (loop devices) only when the plugin's ISO config exists,
+	// preserving the historical gate that avoids false positives.
+	if _, err := os.Stat("/boot/config/plugins/unassigned.devices/iso_mount.cfg"); err == nil {
+		shares = append(shares, parseISOMountsFromProc(procMounts, now)...)
+	}
+
+	// Populate capacity information for mounted shares via statfs.
+	for i := range shares {
+		if shares[i].Status == "mounted" && shares[i].MountPoint != "" {
+			c.getRemoteShareSizeInfo(&shares[i], shares[i].MountPoint)
+		}
+	}
+
+	return shares
+}
+
+// readSambaConfig returns the contents of the Unassigned Devices SMB/NFS remote
+// share configuration file, or an empty string if it is absent/unreadable.
+func readSambaConfig() string {
+	data, err := os.ReadFile(constants.UnassignedSambaMountCfg)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+// mergeRemoteShares combines configured shares (which may be unmounted) with the
+// live set parsed from /proc/mounts. A configured share that is currently
+// mounted adopts the live mount data while retaining its automount metadata;
+// configured-but-unmounted shares are reported as "unmounted". Mounted shares
+// with no matching config entry (e.g. manually mounted) are preserved.
+func mergeRemoteShares(configured, mounted []dto.UnassignedRemoteShare) []dto.UnassignedRemoteShare {
+	matched := make(map[int]bool, len(mounted))
+	result := make([]dto.UnassignedRemoteShare, 0, len(configured)+len(mounted))
+
+	for _, cfg := range configured {
+		live := -1
+		for i := range mounted {
+			if matched[i] {
+				continue
+			}
+			if mounted[i].Source == cfg.Source ||
+				(cfg.MountPoint != "" && mounted[i].MountPoint == cfg.MountPoint) {
+				live = i
+				break
+			}
+		}
+		if live >= 0 {
+			matched[live] = true
+			m := mounted[live]
+			m.AutoMount = cfg.AutoMount
+			result = append(result, m)
+		} else {
+			result = append(result, cfg)
+		}
+	}
+
+	// Preserve any mounted shares that were not present in the config.
+	for i := range mounted {
+		if !matched[i] {
+			result = append(result, mounted[i])
+		}
+	}
+
+	return result
+}
+
+// unassignedRemotePrefixes are the mount-point roots used by the Unassigned
+// Devices plugin for remote (network) shares.
+var unassignedRemotePrefixes = []string{"/mnt/remotes/", "/mnt/disks/"}
+
+// isUnassignedRemoteMount reports whether a mount point belongs to one of the
+// Unassigned Devices remote-share locations.
+func isUnassignedRemoteMount(mountPoint string) bool {
+	for _, prefix := range unassignedRemotePrefixes {
+		if strings.HasPrefix(mountPoint, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// mountHasOption reports whether a comma-separated /proc/mounts options field
+// contains the given option token (exact match, not substring).
+func mountHasOption(options, want string) bool {
+	for opt := range strings.SplitSeq(options, ",") {
+		if opt == want {
+			return true
+		}
+	}
+	return false
+}
+
+// unescapeMountField decodes the octal escapes (\040 space, \011 tab,
+// \012 newline, \134 backslash) that the kernel uses in /proc/mounts fields.
+func unescapeMountField(field string) string {
+	if !strings.Contains(field, `\`) {
+		return field
+	}
+	var b strings.Builder
+	for i := 0; i < len(field); i++ {
+		// A valid single-byte octal escape is \ followed by three octal digits
+		// whose value fits in a byte (0..255), so the leading digit is 0..3.
+		if field[i] == '\\' && i+3 < len(field) &&
+			field[i+1] >= '0' && field[i+1] <= '3' &&
+			field[i+2] >= '0' && field[i+2] <= '7' &&
+			field[i+3] >= '0' && field[i+3] <= '7' {
+			val := (int(field[i+1]-'0') << 6) | (int(field[i+2]-'0') << 3) | int(field[i+3]-'0')
+			b.WriteByte(byte(val & 0xFF))
+			i += 3
+			continue
+		}
+		b.WriteByte(field[i])
+	}
+	return b.String()
+}
+
+// parseSMBSource splits a CIFS source ("//server/share") into server and share.
+func parseSMBSource(source string) (server, share string) {
+	trimmed := strings.TrimPrefix(source, "//")
+	if idx := strings.Index(trimmed, "/"); idx >= 0 {
+		return trimmed[:idx], trimmed[idx+1:]
+	}
+	return trimmed, ""
+}
+
+// parseNFSSource splits an NFS source ("server:/export") into server and export.
+// It splits on the ":/" delimiter so bracketed IPv6 hosts (e.g.
+// "[fe80::1]:/export") are handled correctly rather than splitting inside the
+// address.
+func parseNFSSource(source string) (server, export string) {
+	if idx := strings.Index(source, ":/"); idx >= 0 {
+		return source[:idx], source[idx+1:]
+	}
+	return source, ""
+}
+
+// parseRemoteShareMounts parses /proc/mounts content for CIFS and NFS remote
+// shares mounted under the Unassigned Devices locations. Capacity fields are
+// left zero; callers populate them via getRemoteShareSizeInfo.
+func parseRemoteShareMounts(procMounts string, now time.Time) []dto.UnassignedRemoteShare {
 	var shares []dto.UnassignedRemoteShare
+	for line := range strings.SplitSeq(procMounts, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 4 {
+			continue
+		}
+		source := unescapeMountField(fields[0])
+		mountPoint := unescapeMountField(fields[1])
+		fsType := fields[2]
+		options := fields[3]
 
-	// Parse SMB mounts
-	smbShares := c.parseSMBMounts()
-	shares = append(shares, smbShares...)
+		if !isUnassignedRemoteMount(mountPoint) {
+			continue
+		}
+		readOnly := mountHasOption(options, "ro")
 
-	// Parse ISO mounts
-	isoShares := c.parseISOMounts()
-	shares = append(shares, isoShares...)
-
+		switch fsType {
+		case "cifs", "smb3", "smbfs":
+			server, share := parseSMBSource(source)
+			shares = append(shares, dto.UnassignedRemoteShare{
+				Type:       "smb",
+				Source:     source,
+				MountPoint: mountPoint,
+				Status:     "mounted",
+				ReadOnly:   readOnly,
+				SMBServer:  server,
+				SMBShare:   share,
+				Timestamp:  now,
+			})
+		case "nfs", "nfs4":
+			server, export := parseNFSSource(source)
+			shares = append(shares, dto.UnassignedRemoteShare{
+				Type:       "nfs",
+				Source:     source,
+				MountPoint: mountPoint,
+				Status:     "mounted",
+				ReadOnly:   readOnly,
+				NFSServer:  server,
+				NFSExport:  export,
+				NFSOptions: options,
+				Timestamp:  now,
+			})
+		}
+	}
 	return shares
 }
 
@@ -308,57 +506,147 @@ func (c *UnassignedCollector) getPartitionSizeInfo(partition *dto.UnassignedPart
 	partition.UsagePercent = usagePercent
 }
 
-// parseSMBMounts parses SMB mount configuration
-func (c *UnassignedCollector) parseSMBMounts() []dto.UnassignedRemoteShare {
-	configPath := "/boot/config/plugins/unassigned.devices/samba_mount.cfg"
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		return []dto.UnassignedRemoteShare{}
+// parseINISections parses a simple INI document into a map of
+// section -> key -> value. Section headers may optionally be quoted
+// (e.g. ["//server/share"]); surrounding double quotes on both section names
+// and values are stripped. This matches the format the Unassigned Devices
+// plugin writes via Unraid's save_ini_file.
+func parseINISections(data string) map[string]map[string]string {
+	sections := make(map[string]map[string]string)
+	var current string
+	for line := range strings.SplitSeq(data, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, ";") || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
+			name := strings.TrimSpace(line[1 : len(line)-1])
+			name = strings.Trim(name, "\"")
+			current = name
+			if _, ok := sections[current]; !ok {
+				sections[current] = make(map[string]string)
+			}
+			continue
+		}
+		if current == "" {
+			continue
+		}
+		key, value, found := strings.Cut(line, "=")
+		if !found {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		value = strings.Trim(strings.TrimSpace(value), "\"")
+		sections[current][key] = value
 	}
-
-	// For now, return empty list - full implementation would parse the config file
-	return []dto.UnassignedRemoteShare{}
+	return sections
 }
 
-// parseISOMounts parses ISO mount configuration
-func (c *UnassignedCollector) parseISOMounts() []dto.UnassignedRemoteShare {
-	configPath := "/boot/config/plugins/unassigned.devices/iso_mount.cfg"
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		return []dto.UnassignedRemoteShare{}
+// parseConfiguredRemoteShares builds the list of SMB/NFS remote shares defined
+// in samba_mount.cfg. Each section key is the share source (//server/share for
+// SMB, server:/export for NFS) — the same identifier the Unassigned Devices
+// plugin's rc.unassigned script accepts for mount/unmount. Shares are reported
+// as "unmounted"; collectRemoteShares overlays live mount status and capacity.
+func parseConfiguredRemoteShares(cfgData string, now time.Time) []dto.UnassignedRemoteShare {
+	if strings.TrimSpace(cfgData) == "" {
+		return nil
 	}
 
-	// Check if any ISO files are mounted
-	mounts, err := os.ReadFile("/proc/mounts")
-	if err != nil {
-		return []dto.UnassignedRemoteShare{}
-	}
-
-	var isoShares []dto.UnassignedRemoteShare
-	lines := strings.SplitSeq(string(mounts), "\n")
-	for line := range lines {
-		fields := strings.Fields(line)
-		if len(fields) < 3 {
+	var shares []dto.UnassignedRemoteShare
+	for source, cfg := range parseINISections(cfgData) {
+		if source == "" {
 			continue
 		}
 
-		// Check if it's an ISO mount (loop device mounted under /mnt/disks/)
-		if strings.HasPrefix(fields[0], "/dev/loop") && strings.HasPrefix(fields[1], "/mnt/disks/") {
-			share := dto.UnassignedRemoteShare{
+		// Determine the share type from the configured protocol, falling back
+		// to the source string format.
+		shareType := ""
+		switch strings.ToUpper(cfg["protocol"]) {
+		case "SMB", "CIFS":
+			shareType = "smb"
+		case "NFS":
+			shareType = "nfs"
+		case "ROOT":
+			// Local "root" shares are not remote network shares; skip them.
+			continue
+		default:
+			switch {
+			case strings.HasPrefix(source, "//"):
+				shareType = "smb"
+			case strings.Contains(source, ":/"):
+				shareType = "nfs"
+			default:
+				continue
+			}
+		}
+
+		share := dto.UnassignedRemoteShare{
+			Type:       shareType,
+			Source:     source,
+			MountPoint: configuredRemoteMountPoint(source, shareType, cfg["mountpoint"]),
+			Status:     "unmounted",
+			AutoMount:  cfg["automount"] == "yes",
+			ReadOnly:   cfg["read_only"] == "yes",
+			Timestamp:  now,
+		}
+		if shareType == "smb" {
+			share.SMBServer, share.SMBShare = parseSMBSource(source)
+		} else {
+			share.NFSServer, share.NFSExport = parseNFSSource(source)
+		}
+		shares = append(shares, share)
+	}
+	return shares
+}
+
+// configuredRemoteMountPoint computes the expected mount point for a configured
+// remote share, mirroring the Unassigned Devices convention of mounting under
+// /mnt/remotes/. This is best-effort for display of unmounted shares; mounted
+// shares use their actual mount point from /proc/mounts.
+func configuredRemoteMountPoint(source, shareType, override string) string {
+	if override != "" {
+		return "/mnt/remotes/" + filepath.Base(override)
+	}
+	var server, path string
+	if shareType == "smb" {
+		server, path = parseSMBSource(source)
+	} else {
+		server, path = parseNFSSource(source)
+	}
+	path = strings.Trim(path, "/")
+	name := strings.ReplaceAll(path, "/", "_")
+	if server == "" && name == "" {
+		return ""
+	}
+	return "/mnt/remotes/" + server + "_" + name
+}
+
+// parseISOMountsFromProc parses /proc/mounts content for ISO files mounted as
+// loop devices under /mnt/disks/ by the Unassigned Devices plugin. Capacity
+// fields are left zero; callers populate them via getRemoteShareSizeInfo.
+func parseISOMountsFromProc(procMounts string, now time.Time) []dto.UnassignedRemoteShare {
+	var isoShares []dto.UnassignedRemoteShare
+	for line := range strings.SplitSeq(procMounts, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		source := unescapeMountField(fields[0])
+		mountPoint := unescapeMountField(fields[1])
+
+		// An ISO mount is a loop device mounted under /mnt/disks/.
+		if strings.HasPrefix(source, "/dev/loop") && strings.HasPrefix(mountPoint, "/mnt/disks/") {
+			isoShares = append(isoShares, dto.UnassignedRemoteShare{
 				Type:       "iso",
-				Source:     fields[0],
-				MountPoint: fields[1],
+				Source:     source,
+				MountPoint: mountPoint,
 				Status:     "mounted",
 				ReadOnly:   true,
 				AutoMount:  false,
-				Timestamp:  time.Now(),
-			}
-
-			// Get size info
-			c.getRemoteShareSizeInfo(&share, fields[1])
-
-			isoShares = append(isoShares, share)
+				Timestamp:  now,
+			})
 		}
 	}
-
 	return isoShares
 }
 
