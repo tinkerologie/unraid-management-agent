@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Upgraded Go toolchain 1.26.3 → 1.26.4** — picks up the standard-library
+  security fixes in Go 1.26.4 (released 2026-06-02): CVE-2026-27145
+  (`net/textproto`, reached via `net/http` response-header parsing —
+  relevant to the daemon's outbound HTTP), CVE-2026-39822 (`crypto/x509`),
+  and CVE-2026-42504 (`mime`). Bumped the `go` directive in `go.mod` and the
+  `setup-go` version in the release workflow.
+
 ### Added
 
 - **Remote share mount/unmount control** (issue #115; resolves the mount/unmount toggle
