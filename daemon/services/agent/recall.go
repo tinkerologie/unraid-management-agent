@@ -58,7 +58,7 @@ func (s *Service) finalize(sess *dto.AgentSession) {
 		return
 	}
 	switch sess.Status {
-	case dto.SessionCompleted, dto.SessionFailed:
+	case dto.SessionCompleted, dto.SessionFailed, dto.SessionCancelled:
 	default:
 		return
 	}
@@ -72,6 +72,12 @@ func (s *Service) finalize(sess *dto.AgentSession) {
 			actions = append(actions, tc.Name)
 		}
 	}
+	// Record when the session concluded; fall back to start time if EndedAt
+	// was not set for some reason.
+	at := sess.StartedAt
+	if sess.EndedAt != nil {
+		at = *sess.EndedAt
+	}
 	s.memory.AddIncident(dto.AgentIncident{
 		ID:        "inc-" + sess.ID,
 		Signature: signatureFor(sess.Goal),
@@ -79,7 +85,7 @@ func (s *Service) finalize(sess *dto.AgentSession) {
 		Outcome:   string(sess.Status),
 		Summary:   summary,
 		Actions:   actions,
-		At:        sess.StartedAt,
+		At:        at,
 	})
 	if err := s.memory.Save(); err != nil {
 		logger.Warning("Agent: memory save failed for session %s: %v", sess.ID, err)

@@ -26,6 +26,9 @@ func (s *Service) RegisterLearningTools(reg *tools.Registry) {
 			if err := json.Unmarshal([]byte(argsJSON), &a); err != nil {
 				return "", fmt.Errorf("parse args: %w", err)
 			}
+			if a.Kind == "" || a.Subject == "" {
+				return "", fmt.Errorf("propose_preference requires non-empty 'kind' and 'subject'")
+			}
 			if s.memory == nil {
 				return "Memory disabled; cannot store preference.", nil
 			}
@@ -49,6 +52,9 @@ func (s *Service) RegisterLearningTools(reg *tools.Registry) {
 			}
 			if err := json.Unmarshal([]byte(argsJSON), &a); err != nil {
 				return "", fmt.Errorf("parse args: %w", err)
+			}
+			if a.Name == "" || a.Description == "" {
+				return "", fmt.Errorf("propose_runbook requires non-empty 'name' and 'description'")
 			}
 			if s.runbooks == nil {
 				return "Runbook store unavailable.", nil

@@ -181,16 +181,15 @@ incident for every finished session into
 
 Each incident stores:
 
-| Field       | Description                                         |
-| ----------- | --------------------------------------------------- |
-| `id`        | Unique incident ULID                                |
-| `signature` | Short stable fingerprint of the goal (for dedup)    |
-| `goal`      | Original operator goal text                         |
-| `outcome`   | `completed`, `failed`, `cancelled`, etc.            |
-| `summary`   | One-sentence LLM-generated summary of what happened |
-| `tags`      | Keywords extracted from the goal and actions taken  |
-| `actions`   | List of tool names called during the session        |
-| `timestamp` | When the session finished                           |
+| Field       | Description                                      |
+| ----------- | ------------------------------------------------ |
+| `id`        | Incident identifier (`inc-<session id>`)         |
+| `signature` | Short stable fingerprint of the goal (for dedup) |
+| `goal`      | Original operator goal text                      |
+| `outcome`   | `completed`, `failed`, or `cancelled`            |
+| `summary`   | One-sentence summary of what happened            |
+| `actions`   | List of tool names called during the session     |
+| `at`        | When the session concluded                       |
 
 ### How recall works
 
@@ -701,24 +700,23 @@ curl -s http://<unraid-ip>:8043/api/v1/agent/memory | jq .
 {
   "incidents": [
     {
-      "id": "01J3XM...",
+      "id": "inc-01J3XM...",
       "signature": "check-containers-restart",
       "goal": "Check whether any containers have exited and restart them.",
       "outcome": "completed",
       "summary": "Found plex container stopped; restarted successfully.",
-      "tags": ["docker", "restart", "container"],
       "actions": ["list_docker_containers", "restart_container"],
-      "timestamp": "2026-06-01T14:22:18Z"
+      "at": "2026-06-01T14:22:18Z"
     }
   ],
   "preferences": [
     {
-      "id": "01J3XN...",
+      "id": "pref-1",
       "kind": "auto_approve_tool",
       "subject": "restart_container",
-      "status": "confirmed",
-      "proposed_at": "2026-06-01T14:22:18Z",
-      "confirmed_at": "2026-06-01T15:00:00Z"
+      "status": "active",
+      "note": "",
+      "at": "2026-06-01T15:00:00Z"
     }
   ]
 }

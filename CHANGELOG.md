@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Remote share mount/unmount control** (issue #115; resolves the mount/unmount toggle
-  ask in ha-unraid-management-agent #79) — SMB/NFS remote shares can now be mounted and
+  ask in ruaan-deysel/ha-unraid-management-agent#79) — SMB/NFS remote shares can now be mounted and
   unmounted by source. Added the REST endpoints
   `POST /api/v1/unassigned/remote-shares/mount` and `.../unmount`
   (body `{"source": "//server/share"}`), the MCP `remote_share_action` tool, and an MQTT
@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as discrete exec arguments (never via a shell). Verified live on Unraid: mount via REST
   and unmount via MCP both toggled a real CIFS mount, with the API reflecting the change.
 - **Configured-but-unmounted remote shares are now reported** (issue #115; resolves
-  ha-unraid-management-agent #79) — the collector parses the plugin's `samba_mount.cfg`
+  ruaan-deysel/ha-unraid-management-agent#79) — the collector parses the plugin's `samba_mount.cfg`
   and merges it with `/proc/mounts`, so shares that are configured but not currently
   mounted appear with `status: "unmounted"` (plus their `auto_mount`/`read_only`
   metadata), enabling mount/unmount toggles in Home Assistant for offline shares.
@@ -35,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Remote shares (SMB/NFS) never reported** (issue #115; resolves
-  ha-unraid-management-agent issues #83, #79) — the unassigned-devices collector's
+  ruaan-deysel/ha-unraid-management-agent#83 and ruaan-deysel/ha-unraid-management-agent#79) — the unassigned-devices collector's
   `parseSMBMounts()` was a stub that always returned an empty list, and NFS mounts were
   not parsed at all, so `remote_shares` was permanently empty across the REST API
   (`/api/v1/unassigned`, `/api/v1/unassigned/remote-shares`), MQTT, and MCP. As a result

@@ -34,6 +34,32 @@ func TestProposePreferenceIsPending(t *testing.T) {
 	}
 }
 
+func TestProposePreferenceRejectsEmptyFields(t *testing.T) {
+	cfg := dto.DefaultAgentConfig()
+	cfg.Enabled = true
+	mem := memory.NewStore(t.TempDir(), 100)
+	reg := tools.BuildDefault(fakeState{}, fakeDocker{})
+	svc := NewService(cfg, llm.NewMockProvider(), reg, NewStore(t.TempDir()), mem, &capturingBroadcaster{})
+	svc.RegisterLearningTools(reg)
+
+	prefTool, _ := reg.Get("propose_preference")
+	for _, args := range []string{`{"kind":"","subject":"x"}`, `{"kind":"auto_approve_tool","subject":""}`} {
+		if _, err := prefTool.Invoke(context.Background(), args); err == nil {
+			t.Errorf("propose_preference(%s) expected validation error", args)
+		}
+	}
+	if len(mem.ListPreferences()) != 0 {
+		t.Fatalf("no preference should be stored for invalid input, got %d", len(mem.ListPreferences()))
+	}
+
+	rbTool, _ := reg.Get("propose_runbook")
+	for _, args := range []string{`{"name":"","description":"x"}`, `{"name":"x","description":""}`} {
+		if _, err := rbTool.Invoke(context.Background(), args); err == nil {
+			t.Errorf("propose_runbook(%s) expected validation error", args)
+		}
+	}
+}
+
 func newAutoApproveSvc(t *testing.T, called *bool) (*Service, *memory.Store) {
 	t.Helper()
 	// planner [] then a stop_array tool call (RiskHigh/ModeApprove).
