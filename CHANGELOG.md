@@ -7,16 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
-
-### Security
-
-- **Upgraded Go toolchain 1.26.3 → 1.26.4** — picks up the standard-library
-  security fixes in Go 1.26.4 (released 2026-06-02): CVE-2026-27145
-  (`net/textproto`, reached via `net/http` response-header parsing —
-  relevant to the daemon's outbound HTTP), CVE-2026-39822 (`crypto/x509`),
-  and CVE-2026-42504 (`mime`). Bumped the `go` directive in `go.mod` and the
-  `setup-go` version in the release workflow.
+## [2026.06.01] - 2026-06-05
 
 ### Added
 
@@ -40,46 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **MQTT Home Assistant discovery for remote shares** (issue #115) — each remote share
   now publishes a `mounted` binary sensor plus usage / used / free capacity sensors,
   mirroring the existing unassigned-device entities.
-
-### Fixed
-
-- **Remote shares (SMB/NFS) never reported** (issue #115; resolves
-  ruaan-deysel/ha-unraid-management-agent#83 and ruaan-deysel/ha-unraid-management-agent#79) — the unassigned-devices collector's
-  `parseSMBMounts()` was a stub that always returned an empty list, and NFS mounts were
-  not parsed at all, so `remote_shares` was permanently empty across the REST API
-  (`/api/v1/unassigned`, `/api/v1/unassigned/remote-shares`), MQTT, and MCP. As a result
-  Home Assistant could never create binary sensors for remote shares. The collector now
-  parses `/proc/mounts` for `cifs`/`smb3`/`smbfs` and `nfs`/`nfs4` filesystems mounted
-  under `/mnt/remotes/` and `/mnt/disks/`, populating server/share/export fields,
-  read-only status, and capacity (size/used/free/usage via `statfs`). Octal-escaped
-  mount fields (e.g. spaces) are decoded. ISO loop mounts are still detected.
-- **MCP `get_unassigned_devices` hid remote shares** (issue #115) — the tool returned
-  "No unassigned devices found" whenever the local device list was empty, even when
-  remote shares were present. It now returns data when either `Devices` or
-  `RemoteShares` is non-empty.
-- **MCP `get_parity_history` always returned "No parity check history available"**
-  (issue #114) — the cache layer's `GetParityHistoryCache()` was a stub that
-  unconditionally returned an empty result, so the MCP tool (and the parity section of
-  `system_health_report` / `get_diagnostic_summary`) never reported any history even
-  when `/boot/config/parity-checks.log` was populated. It now loads and caches the real
-  parity-checks log (60 s TTL), matching the `GET /api/v1/array/parity-check/history`
-  REST endpoint. Verified live: REST, MCP, and the on-disk log all report identical
-  record counts.
-
-### Changed
-
-- **More robust `parity_valid` determination** (issues #98, #114) — array parity
-  validity now corroborates the `var.ini` `sbSynced` signal against the parity-checks
-  log: when the array is started with parity disks and the most recent parity check/sync
-  completed successfully (exit 0, zero errors), parity is reported valid even on Unraid
-  versions that omit or zero out `sbSynced`. This corroboration is additive (it can only
-  confirm validity, never mask sync errors). Added comprehensive debug logging of every
-  signal feeding the decision (`sbSynced`, `sbSynced2`, `sbSyncErrs`, `sbSyncExit`,
-  `mdNumInvalid`, `mdResync`, `numParityDisks`, state) to aid future diagnosis.
-
-## [2026.06.01] - 2026-06-01
-
-### Added
 
 - **Agent Core (Phase 3 — Memory, Planner, Learning, Multi-turn Chat):**
 
@@ -254,11 +205,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **More robust `parity_valid` determination** (issues #98, #114) — array parity
+  validity now corroborates the `var.ini` `sbSynced` signal against the parity-checks
+  log: when the array is started with parity disks and the most recent parity check/sync
+  completed successfully (exit 0, zero errors), parity is reported valid even on Unraid
+  versions that omit or zero out `sbSynced`. This corroboration is additive (it can only
+  confirm validity, never mask sync errors). Added comprehensive debug logging of every
+  signal feeding the decision (`sbSynced`, `sbSynced2`, `sbSyncErrs`, `sbSyncExit`,
+  `mdNumInvalid`, `mdResync`, `numParityDisks`, state) to aid future diagnosis.
+
 - **`GET /api/v1/docker/updates`** now returns the cached result immediately instead
   of performing a live registry check on each request; use the new `POST
 /api/v1/docker/updates/refresh` to force an on-demand re-check.
 - **Runtime collector interval cap** raised from 3 600 s to 86 400 s (24 h) to
   accommodate the new `docker_update` collector's default 6 h schedule.
+
+### Fixed
+
+- **Remote shares (SMB/NFS) never reported** (issue #115; resolves
+  ruaan-deysel/ha-unraid-management-agent#83 and ruaan-deysel/ha-unraid-management-agent#79) — the unassigned-devices collector's
+  `parseSMBMounts()` was a stub that always returned an empty list, and NFS mounts were
+  not parsed at all, so `remote_shares` was permanently empty across the REST API
+  (`/api/v1/unassigned`, `/api/v1/unassigned/remote-shares`), MQTT, and MCP. As a result
+  Home Assistant could never create binary sensors for remote shares. The collector now
+  parses `/proc/mounts` for `cifs`/`smb3`/`smbfs` and `nfs`/`nfs4` filesystems mounted
+  under `/mnt/remotes/` and `/mnt/disks/`, populating server/share/export fields,
+  read-only status, and capacity (size/used/free/usage via `statfs`). Octal-escaped
+  mount fields (e.g. spaces) are decoded. ISO loop mounts are still detected.
+- **MCP `get_unassigned_devices` hid remote shares** (issue #115) — the tool returned
+  "No unassigned devices found" whenever the local device list was empty, even when
+  remote shares were present. It now returns data when either `Devices` or
+  `RemoteShares` is non-empty.
+- **MCP `get_parity_history` always returned "No parity check history available"**
+  (issue #114) — the cache layer's `GetParityHistoryCache()` was a stub that
+  unconditionally returned an empty result, so the MCP tool (and the parity section of
+  `system_health_report` / `get_diagnostic_summary`) never reported any history even
+  when `/boot/config/parity-checks.log` was populated. It now loads and caches the real
+  parity-checks log (60 s TTL), matching the `GET /api/v1/array/parity-check/history`
+  REST endpoint. Verified live: REST, MCP, and the on-disk log all report identical
+  record counts.
+
+### Security
+
+- **Upgraded Go toolchain 1.26.3 → 1.26.4** — picks up the standard-library
+  security fixes in Go 1.26.4 (released 2026-06-02): CVE-2026-27145
+  (`net/textproto`, reached via `net/http` response-header parsing —
+  relevant to the daemon's outbound HTTP), CVE-2026-39822 (`crypto/x509`),
+  and CVE-2026-42504 (`mime`). Bumped the `go` directive in `go.mod` and the
+  `setup-go` version in the release workflow.
 
 ## [2026.06.00] - 2026-05-30
 
