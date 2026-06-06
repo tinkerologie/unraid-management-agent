@@ -1281,6 +1281,25 @@ func (s *Server) registerControlTools() {
 		return textResult(fmt.Sprintf("Autostart %s for container %q", action, args.ContainerID)), nil, nil
 	})
 
+	// Port-conflict detection tool (read-only)
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "get_port_conflicts",
+		Description: "List any host ports bound by more than one Docker container. Returns an empty list when no conflicts exist.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
+		dockerCtrl := controllers.NewDockerController()
+		defer dockerCtrl.Close() //nolint:errcheck
+
+		conflicts, err := dockerCtrl.PortConflicts()
+		if err != nil {
+			return textResult(fmt.Sprintf("Failed to detect port conflicts: %v", err)), nil, nil
+		}
+		if len(conflicts) == 0 {
+			return textResult("No port conflicts detected"), nil, nil
+		}
+		return jsonResult(conflicts)
+	})
+
 	// VM control tool
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "vm_action",

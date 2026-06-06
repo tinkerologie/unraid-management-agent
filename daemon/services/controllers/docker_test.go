@@ -233,6 +233,59 @@ func TestDockerControllerContainerLogs(t *testing.T) {
 	})
 }
 
+// TestPortConflicts exercises detectPortConflicts without a live Docker daemon.
+func TestPortConflicts(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    map[string][]string
+		wantLen  int
+		wantPort int
+		wantN    int // container count for the first conflict (sorted by port)
+	}{
+		{
+			name:     "one conflict one non-conflict",
+			input:    map[string][]string{"8080/tcp": {"a", "b"}, "9000/tcp": {"c"}},
+			wantLen:  1,
+			wantPort: 8080,
+			wantN:    2,
+		},
+		{
+			name:    "no conflicts",
+			input:   map[string][]string{"8080/tcp": {"a"}, "9000/udp": {"b"}},
+			wantLen: 0,
+		},
+		{
+			name:    "empty bindings",
+			input:   map[string][]string{},
+			wantLen: 0,
+		},
+		{
+			name:     "multiple conflicts sorted by port",
+			input:    map[string][]string{"9000/tcp": {"x", "y"}, "443/tcp": {"p", "q", "r"}, "80/tcp": {"m"}},
+			wantLen:  2,
+			wantPort: 443, // lowest port first
+			wantN:    3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := detectPortConflicts(tt.input)
+			if len(got) != tt.wantLen {
+				t.Fatalf("detectPortConflicts() len=%d, want %d; result: %+v", len(got), tt.wantLen, got)
+			}
+			if tt.wantLen > 0 {
+				if got[0].HostPort != tt.wantPort {
+					t.Errorf("first conflict HostPort=%d, want %d", got[0].HostPort, tt.wantPort)
+				}
+				if len(got[0].Containers) != tt.wantN {
+					t.Errorf("first conflict Containers len=%d, want %d", len(got[0].Containers), tt.wantN)
+				}
+			}
+		})
+	}
+}
+
 // TestSetAutostartFile exercises the file-manipulation helper (modifyAutostartFile)
 // using a temp directory as the seam — no Docker daemon needed.
 //

@@ -617,6 +617,38 @@ func (s *Server) handleDockerAutostart(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleDockerPortConflicts godoc
+//
+//	@Summary		List Docker port conflicts
+//	@Description	Returns any host port bound by more than one running container (read-only, no confirm required).
+//	@Tags			Docker
+//	@Produce		json
+//	@Success		200	{array}		dto.PortConflict	"List of port conflicts (empty if none)"
+//	@Failure		500	{object}	dto.Response		"Failed to detect port conflicts"
+//	@Router			/docker/port-conflicts [get]
+func (s *Server) handleDockerPortConflicts(w http.ResponseWriter, _ *http.Request) {
+	logger.Info("API: GET /docker/port-conflicts")
+
+	controller := controllers.NewDockerController()
+	defer controller.Close() //nolint:errcheck
+
+	conflicts, err := controller.PortConflicts()
+	if err != nil {
+		logger.Error("API: Failed to detect port conflicts: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   "Failed to detect port conflicts",
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	if conflicts == nil {
+		conflicts = []dto.PortConflict{}
+	}
+	respondJSON(w, http.StatusOK, conflicts)
+}
+
 // handleDockerStart godoc
 //
 //	@Summary		Start Docker container

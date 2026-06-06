@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -861,6 +863,99 @@ func (dc *DockerController) ListNetworks() ([]dto.DockerNetworkInfo, error) {
 
 	logger.Info("Listed %d Docker networks", len(result))
 	return result, nil
+}
+
+// detectPortConflicts groups container names by (host port, protocol) and
+// returns entries where more than one container binds the same host port.
+// Input is keyed "<hostPort>/<proto>" → container names.
+// Output is sorted by HostPort then Protocol.
+func detectPortConflicts(bindings map[string][]string) []dto.PortConflict {
+	var conflicts []dto.PortConflict
+	for key, names := range bindings {
+		if len(names) < 2 {
+			continue
+		}
+		// Parse "<port>/<proto>"
+		slash := strings.LastIndex(key, "/")
+		if slash < 0 {
+			continue
+		}
+		portStr := key[:slash]
+		proto := key[slash+1:]
+		portNum, err := strconv.Atoi(portStr)
+		if err != nil {
+			continue
+		}
+		conflicts = append(conflicts, dto.PortConflict{
+			HostPort:   portNum,
+			Protocol:   proto,
+			Containers: names,
+		})
+	}
+	sort.Slice(conflicts, func(i, j int) bool {
+		if conflicts[i].HostPort != conflicts[j].HostPort {
+			return conflicts[i].HostPort < conflicts[j].HostPort
+		}
+		return conflicts[i].Protocol < conflicts[j].Protocol
+	})
+	return conflicts
+}
+
+// PortConflicts returns any host port bound by more than one running container.
+// It lists all containers, inspects each one's HostConfig.PortBindings to build
+// a map of "<hostPort>/<proto>" → container names, and then calls detectPortConflicts.
+//
+// The moby port field shape used here:
+//
+//	HostConfig.PortBindings  — network.PortMap = map[network.Port][]network.PortBinding
+//	  containerPort.Port()   — host port number as a string (e.g. "8080")
+//	  containerPort.Proto()  — protocol as IPProtocol (e.g. "tcp")
+//	  binding.HostPort       — the actual host-side port string
+func (dc *DockerController) PortConflicts() ([]dto.PortConflict, error) {
+	if err := dc.initClient(); err != nil {
+		return nil, fmt.Errorf("docker unavailable: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	listResult, err := dc.client.ContainerList(ctx, client.ContainerListOptions{All: true})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list containers: %w", err)
+	}
+
+	// bindings maps "<hostPort>/<proto>" → []containerNames
+	bindings := make(map[string][]string)
+
+	for _, c := range listResult.Items {
+		name := c.ID[:12]
+		if len(c.Names) > 0 {
+			name = strings.TrimPrefix(c.Names[0], "/")
+		}
+
+		inspectResult, err := dc.client.ContainerInspect(ctx, c.ID, client.ContainerInspectOptions{})
+		if err != nil {
+			logger.Warning("DockerPortConflicts: inspect failed for %s: %v", name, err)
+			continue
+		}
+
+		if inspectResult.Container.HostConfig == nil {
+			continue
+		}
+
+		for containerPort, portBindings := range inspectResult.Container.HostConfig.PortBindings {
+			for _, binding := range portBindings {
+				if binding.HostPort == "" {
+					continue
+				}
+				// Key is "<hostPort>/<proto>"
+				key := binding.HostPort + "/" + string(containerPort.Proto())
+				bindings[key] = append(bindings[key], name)
+			}
+		}
+	}
+
+	return detectPortConflicts(bindings), nil
 }
 
 // shortDigest returns a truncated digest for logging.

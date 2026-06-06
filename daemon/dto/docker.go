@@ -149,6 +149,13 @@ type ContainerAutostartRequest struct {
 	Enabled bool `json:"enabled"`
 }
 
+// PortConflict reports a host port bound by more than one container.
+type PortConflict struct {
+	HostPort   int      `json:"host_port"`
+	Protocol   string   `json:"protocol"`
+	Containers []string `json:"containers"`
+}
+
 // ContainerLogs contains log output from a Docker container
 type ContainerLogs struct {
 	ContainerID   string    `json:"container_id" example:"abc123def456"`
