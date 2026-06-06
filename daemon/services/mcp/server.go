@@ -1251,13 +1251,18 @@ func (s *Server) registerControlTools() {
 	// VM control tool
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "vm_action",
-		Description: "Perform an action on a virtual machine (start, stop, restart, pause, resume, hibernate, force-stop). Use with caution.",
+		Description: "Perform an action on a virtual machine (start, stop, restart, pause, resume, hibernate, force-stop, reset). Destructive actions (reset, force-stop) require confirm=true.",
 		Annotations: &mcp.ToolAnnotations{
 			DestructiveHint: ptr(true),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPVMActionArgs) (*mcp.CallToolResult, any, error) {
 		logger.Info("MCP: VM action '%s' requested for '%s'", args.Action, args.VMName)
+
+		// Destructive actions require explicit confirmation.
+		if (args.Action == "reset" || args.Action == "force-stop") && !args.Confirm {
+			return textResult(fmt.Sprintf("Action '%s' requires confirm=true. Set confirm to true to execute this destructive action.", args.Action)), nil, nil
+		}
 
 		vmCtrl := controllers.NewVMController()
 		var err error
@@ -1277,6 +1282,8 @@ func (s *Server) registerControlTools() {
 			err = vmCtrl.Hibernate(args.VMName)
 		case "force-stop":
 			err = vmCtrl.ForceStop(args.VMName)
+		case "reset":
+			err = vmCtrl.Reset(args.VMName)
 		default:
 			return textResult(fmt.Sprintf("Unknown action: %s", args.Action)), nil, nil
 		}

@@ -176,6 +176,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/vm/{name}/resume", s.handleVMResume).Methods("POST")
 	api.HandleFunc("/vm/{name}/hibernate", s.handleVMHibernate).Methods("POST")
 	api.HandleFunc("/vm/{name}/force-stop", s.handleVMForceStop).Methods("POST")
+	api.HandleFunc("/vm/{name}/reset", s.handleVMReset).Methods("POST")
 	api.HandleFunc("/vm/{name}/clone", s.handleVMClone).Methods("POST")
 	api.HandleFunc("/vm/{name}/snapshot", s.handleVMCreateSnapshot).Methods("POST")
 	api.HandleFunc("/vm/{name}/snapshots", s.handleVMListSnapshots).Methods("GET")

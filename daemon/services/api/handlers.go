@@ -678,6 +678,22 @@ func (s *Server) handleVMForceStop(w http.ResponseWriter, r *http.Request) {
 	s.handleVMOperation(w, r, "force stopped", controller.ForceStop)
 }
 
+// handleVMReset godoc
+//
+//	@Summary		Reset VM
+//	@Description	Hard reset a specific virtual machine by name (equivalent to the physical reset button). The VM must be running.
+//	@Tags			VMs
+//	@Produce		json
+//	@Param			name	path		string	true	"VM name"
+//	@Success		200		{object}	dto.Response	"VM reset"
+//	@Failure		400		{object}	dto.Response	"Invalid VM name"
+//	@Failure		500		{object}	dto.Response	"Failed to reset VM"
+//	@Router			/vm/{name}/reset [post]
+func (s *Server) handleVMReset(w http.ResponseWriter, r *http.Request) {
+	controller := controllers.NewVMController()
+	s.handleVMOperation(w, r, "reset", controller.Reset)
+}
+
 // handleArrayStart godoc
 //
 //	@Summary		Start array

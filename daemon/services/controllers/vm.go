@@ -182,6 +182,30 @@ func (vc *VMController) Hibernate(vmName string) error {
 	return nil
 }
 
+// Reset performs a hard reset of a running VM (equivalent to the reset button —
+// no graceful shutdown). The VM must be running.
+func (vc *VMController) Reset(vmName string) error {
+	logger.Info("VM: Resetting %s...", vmName)
+	l, domain, err := vc.connect(vmName)
+	if err != nil {
+		return err
+	}
+	defer l.Disconnect() //nolint:errcheck
+
+	state, _, err := l.DomainGetState(domain, 0)
+	if err != nil {
+		return fmt.Errorf("failed to get VM state: %w", err)
+	}
+	if libvirt.DomainState(state) != libvirt.DomainRunning {
+		return fmt.Errorf("cannot reset VM %q: not running", vmName)
+	}
+	if err := l.DomainReset(domain, 0); err != nil {
+		return fmt.Errorf("failed to reset VM %q: %w", vmName, err)
+	}
+	logger.Info("VM: %s reset", vmName)
+	return nil
+}
+
 // ForceStop immediately terminates a virtual machine by name without graceful shutdown using the libvirt API.
 func (vc *VMController) ForceStop(vmName string) error {
 	logger.Info("Force stopping VM: %s", vmName)
