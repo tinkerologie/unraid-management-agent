@@ -203,6 +203,24 @@ func (s *Server) RunSTDIO(ctx context.Context) error {
 
 // registerMonitoringTools registers all read-only monitoring tools.
 func (s *Server) registerMonitoringTools() {
+	// Self-test / OS-resilience tool
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "run_self_test",
+		Description: "Run a self-test of the agent's data sources: returns the detected Unraid version, overall health, probed capabilities, and per-subsystem source status (healthy/degraded/unavailable). Use to check whether an OS update has broken any collector.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		reg := s.ctx.Platform
+		if reg == nil {
+			return textResult("Self-test unavailable: resilience registry not initialized"), nil, nil
+		}
+		return jsonResult(map[string]any{
+			"unraid_version": reg.Capabilities().UnraidVersion,
+			"overall_state":  reg.OverallState(),
+			"capabilities":   reg.Capabilities(),
+			"subsystems":     reg.Snapshot(),
+		})
+	})
+
 	// System information tool
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "get_system_info",

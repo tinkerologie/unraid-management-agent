@@ -283,12 +283,27 @@ var (
 	)
 )
 
+// OS-resilience metrics: per-subsystem data-source health.
+var (
+	subsystemStatus = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "unraid_subsystem_status",
+		Help: "Data-source health per subsystem (0=healthy, 1=degraded, 2=unavailable)",
+	}, []string{"subsystem"})
+	degradedSubsystemCount = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "unraid_degraded_subsystem_count",
+		Help: "Number of subsystems whose data source is not healthy",
+	})
+)
+
 // metricsRegistry is a custom registry for Unraid metrics
 var metricsRegistry = prometheus.NewRegistry()
 
 func init() {
 	// Register all metrics with our custom registry
 	metricsRegistry.MustRegister(
+		// OS-resilience
+		subsystemStatus,
+		degradedSubsystemCount,
 		// System
 		systemInfo,
 		systemUptime,
@@ -350,6 +365,15 @@ func init() {
 
 // updateMetrics updates all Prometheus metrics from the server's cache
 func (s *Server) updateMetrics() {
+	// OS-resilience: per-subsystem data-source health.
+	if s.ctx.Platform != nil {
+		subsystemStatus.Reset()
+		for _, st := range s.ctx.Platform.Snapshot() {
+			subsystemStatus.WithLabelValues(st.Subsystem).Set(float64(st.State.Severity()))
+		}
+		degradedSubsystemCount.Set(float64(s.ctx.Platform.DegradedCount()))
+	}
+
 	// Load all cache values atomically (lock-free reads)
 	sysCache := s.systemCache.Load()
 	arrCache := s.arrayCache.Load()
