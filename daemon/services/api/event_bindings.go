@@ -131,12 +131,14 @@ func buildCacheDispatch(bindings []eventBinding) map[reflect.Type]func(*CacheSto
 // This ensures adding a new cache binding automatically enables its broadcast.
 func broadcastTopicNames() []string {
 	bindings := cacheBindings()
-	names := make([]string, 0, len(bindings)+1)
+	names := make([]string, 0, len(bindings)+2)
 	for _, b := range bindings {
 		names = append(names, b.topicName)
 	}
 	// CollectorStateChange is broadcast but not cached.
 	names = append(names, constants.TopicCollectorStateChange.Name)
+	// SourceStatusChanged is broadcast but not cached.
+	names = append(names, constants.TopicSourceStatusChanged.Name)
 	return names
 }
 
@@ -144,9 +146,11 @@ func broadcastTopicNames() []string {
 // for resolving the topic name of a broadcast message.
 func buildTypeToTopicMap() map[reflect.Type]string {
 	bindings := cacheBindings()
-	m := make(map[reflect.Type]string, len(bindings))
+	m := make(map[reflect.Type]string, len(bindings)+1)
 	for _, b := range bindings {
 		m[b.msgType] = b.topicName
 	}
+	// SourceStatus is broadcast but not cached.
+	m[reflect.TypeOf(dto.SourceStatus{})] = "source_status_changed"
 	return m
 }

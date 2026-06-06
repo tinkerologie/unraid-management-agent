@@ -1,6 +1,9 @@
 package domain
 
-import "github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+import (
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/platform"
+)
 
 // Intervals holds collection interval settings in seconds.
 type Intervals struct {
@@ -31,6 +34,7 @@ type Intervals struct {
 // Context holds the application runtime context including the event hub and configuration.
 type Context struct {
 	Hub                *EventBus
+	Platform           *platform.Registry
 	Intervals          Intervals
 	MQTTConfig         MQTTConfig
 	DiscoveryConfig    DiscoveryConfig

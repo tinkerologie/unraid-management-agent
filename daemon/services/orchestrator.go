@@ -14,6 +14,7 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/platform"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/alerting"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/api"
@@ -64,6 +65,21 @@ func (o *Orchestrator) Run() error {
 
 	// Initialize collector manager
 	o.collectorManager = NewCollectorManager(o.ctx, &wg)
+
+	// OS-resilience: detect capabilities and wire the status-change notifier to the bus.
+	caps := platform.Detect(resilienceProbes())
+	o.ctx.Platform.SetCapabilities(caps)
+	o.ctx.Platform.SetNotifier(func(s dto.SourceStatus) {
+		domain.Publish(o.ctx.Hub, constants.TopicSourceStatusChanged, s)
+	})
+	degraded := 0
+	for _, c := range caps.Items {
+		if !c.Available {
+			degraded++
+		}
+	}
+	logger.Info("Resilience: Unraid version %q, %d/%d probed capabilities unavailable",
+		caps.UnraidVersion, degraded, len(caps.Items))
 
 	// Register all collectors with their configured intervals
 	o.collectorManager.RegisterAllCollectors()
