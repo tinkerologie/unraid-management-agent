@@ -98,7 +98,27 @@ All surfaces read the one shared registry, so they never disagree:
 - **Unit tests** for `platform`: detector probes against temp dirs/missing binaries → `unavailable`; registry transitions invoke the notifier exactly once per transition; resolver existence checks.
 - **Live verification:** extend the ansible `verify` role to assert `GET /diagnostics/self-test` → `overall_state: healthy` on the real box, alongside existing endpoint checks.
 
+## Verification workflow (MANDATORY — every step)
+
+No implementation step is considered "done" until it has passed this full gate, in order. This applies to **every** shippable step in the rollout below, not just the end.
+
+1. **Test** — `go test ./...` (+ `go vet`, `gofmt`, golangci-lint via `make pre-commit-run`) all green.
+2. **Build** — `make local` (and `go build ./...`) succeeds.
+3. **Verify on Unraid via Ansible** — deploy to the live server and run the endpoint suite:
+   `ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --tags build,deploy,verify`
+   (non-destructive tags). The `verify` role must pass, including the new
+   `/diagnostics/self-test` → `overall_state: healthy` assertion.
+4. **CodeRabbit review** — `coderabbit review --agent -t uncommitted`; triage and fix
+   all valid Critical/Warning findings (and reasonable nits), re-run until clean or
+   only justified trivials remain.
+5. **CHANGELOG** — update `CHANGELOG.md` **only after** steps 1–4 pass and the change
+   is confirmed working on hardware. Never document a feature as done before it is verified.
+
+This gate is a hard requirement for this sub-project and the standing workflow for all future work.
+
 ## Rollout (incremental — each step shippable)
+
+> Each numbered step below must clear the **Verification workflow** gate above before it is marked done.
 
 1. `platform` pkg + `dto.SourceStatus` + registry/detector/resolver + unit tests.
 2. Wire registry into `domain.Context` + orchestrator (notifier→event bus; startup detection).
@@ -106,8 +126,8 @@ All surfaces read the one shared registry, so they never disagree:
 4. Capability-gate the 4 hot controllers.
 5. Surfaces: REST self-test, MCP tool, health integration, WS event, Prometheus metrics.
 6. Alerting template + metric injection.
-7. Golden-fixture harness + CI + docs (configuration.md, mcp.md counts, AGENTS.md) + CHANGELOG.
-8. Deploy to Unraid + verify (healthy self-test; simulate a degradation; confirm the alert).
+7. Golden-fixture harness + CI + docs (configuration.md, mcp.md counts, AGENTS.md).
+8. Deploy to Unraid + verify (healthy self-test; simulate a degradation; confirm the alert) + CodeRabbit review; **then** update CHANGELOG once confirmed working on hardware.
 
 ## Compatibility
 
@@ -119,3 +139,4 @@ Healthy responses are byte-identical to today (inline flag is `omitempty`, popul
 - Best-effort valid data continues to flow during degradation.
 - Healthy-state API responses are unchanged from the prior release.
 - Golden-fixture + breakage-simulation tests pass in CI; live self-test reports healthy on the real server.
+- Every implementation step cleared the mandatory verification gate (test → build → Ansible deploy/verify on Unraid → CodeRabbit review → CHANGELOG last).
