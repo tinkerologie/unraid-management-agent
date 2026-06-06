@@ -11,6 +11,7 @@ func TestBuiltinSubsystemDegradedRule(t *testing.T) {
 	for _, r := range BuiltinRules() {
 		if r.ID == "subsystem-degraded" {
 			rule = r
+			break
 		}
 	}
 	if rule.ID == "" {
