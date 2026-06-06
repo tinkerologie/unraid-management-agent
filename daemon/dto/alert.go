@@ -119,6 +119,9 @@ type AlertEnv struct {
 	MaxReallocatedSectors       int     `expr:"MaxReallocatedSectors"`
 	MaxPendingSectors           int     `expr:"MaxPendingSectors"`
 	DiskErrorsIncreasing        bool    `expr:"DiskErrorsIncreasing"`
+
+	// OS-resilience: number of data sources currently not healthy.
+	DegradedSubsystemCount int `expr:"DegradedSubsystemCount"`
 }
 
 // AlertRulesConfig is the top-level structure persisted to the JSON config file.

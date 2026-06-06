@@ -82,7 +82,7 @@ func NewServerWithCollectorManager(ctx *domain.Context, cm CollectorManagerInter
 		cancelFunc:       cancelFunc,
 		ready:            make(chan struct{}),
 		collectorManager: cm,
-		CacheStore:       &CacheStore{},
+		CacheStore:       &CacheStore{registry: ctx.Platform},
 	}
 
 	s.setupRoutes()

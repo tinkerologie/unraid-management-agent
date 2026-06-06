@@ -6,6 +6,7 @@ import (
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/platform"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/alerting"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/collectors"
 )
@@ -51,6 +52,19 @@ type CacheStore struct {
 	osUpdateCache        atomic.Pointer[dto.OSUpdateStatus]
 	moverCache           atomic.Pointer[dto.MoverStatus]
 	parityHistoryCache   atomic.Pointer[dto.ParityCheckHistory]
+
+	// registry is the OS-resilience status registry (may be nil in tests).
+	registry *platform.Registry
+}
+
+// DegradedSubsystemCount reports how many data sources are not healthy. It
+// satisfies the alerting DataProvider interface so the built-in
+// subsystem_degraded rule can fire. Returns 0 when the registry is absent.
+func (cs *CacheStore) DegradedSubsystemCount() int {
+	if cs.registry == nil {
+		return 0
+	}
+	return cs.registry.DegradedCount()
 }
 
 // ---------- Pointer-type getters (direct Load) ----------
