@@ -1251,7 +1251,7 @@ func (s *Server) registerControlTools() {
 	// VM control tool
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "vm_action",
-		Description: "Perform an action on a virtual machine (start, stop, restart, pause, resume, hibernate, force-stop, reset). Destructive actions (reset, force-stop) require confirm=true.",
+		Description: "Perform an action on a virtual machine (start, stop, restart, pause, resume, hibernate, force-stop, reset). The reset action requires confirm=true.",
 		Annotations: &mcp.ToolAnnotations{
 			DestructiveHint: ptr(true),
 			IdempotentHint:  true,
@@ -1259,9 +1259,9 @@ func (s *Server) registerControlTools() {
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPVMActionArgs) (*mcp.CallToolResult, any, error) {
 		logger.Info("MCP: VM action '%s' requested for '%s'", args.Action, args.VMName)
 
-		// Destructive actions require explicit confirmation.
-		if (args.Action == "reset" || args.Action == "force-stop") && !args.Confirm {
-			return textResult(fmt.Sprintf("Action '%s' requires confirm=true. Set confirm to true to execute this destructive action.", args.Action)), nil, nil
+		// The reset action requires explicit confirmation.
+		if args.Action == "reset" && !args.Confirm {
+			return textResult("Action 'reset' requires confirm=true. Set confirm to true to execute this destructive action."), nil, nil
 		}
 
 		vmCtrl := controllers.NewVMController()

@@ -35,7 +35,7 @@ type MCPVMArgs struct {
 type MCPVMActionArgs struct {
 	VMName  string `json:"vm_name" jsonschema:"The virtual machine name"`
 	Action  string `json:"action" jsonschema:"The action to perform: start, stop, restart, pause, resume, hibernate, force-stop, or reset"`
-	Confirm bool   `json:"confirm,omitempty" jsonschema:"Must be set to true to confirm destructive actions (reset, force-stop)"`
+	Confirm bool   `json:"confirm,omitempty" jsonschema:"Must be set to true to confirm the reset action"`
 }
 
 // MCPVMListArgs represents arguments for listing VMs.
