@@ -24,7 +24,7 @@
       "id": 2,
       "nativeTaskId": "27",
       "subject": "C-Task 2: Container autostart (verify mechanism)",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         1
       ],
