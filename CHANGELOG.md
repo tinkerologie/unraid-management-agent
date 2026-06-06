@@ -29,11 +29,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   machine browsed `_unraid-mgmt-agent._tcp`, resolved the instance to
   `<host>.local:8043` with the correct TXT records, and reached the advertised
   LAN IP.
+- **Agent Skill for AI coding agents** (issue #121) — added a portable Markdown
+  knowledge pack under `skills/unraid-management-agent/` following the open
+  [Agent Skills standard](https://agentskills.io), teaching agents how to monitor
+  and control Unraid through the agent's MCP server (121 tools, 5 resources,
+  6 diagnostic prompts) and REST API. Installable via `npx skills add
+ruaan-deysel/unraid-management-agent`, as a Claude Code plugin
+  (`.claude-plugin/marketplace.json`), or as a claude.ai/Claude Desktop skill zip.
+  The skill bundles the full tool catalog (with read/write + destructive flags),
+  connection setup for every MCP client, the diagnostic prompts/resources, the
+  REST surface for non-MCP clients, and request → tool workflows.
+- **ChatGPT Custom GPT Actions** (issue #121) — added a curated OpenAPI 3.0 schema
+  (`docs/integrations/chatgpt/openapi-actions.yaml`, ~30 endpoints with
+  `operationId`s and `x-openai-isConsequential` on state-changing operations) plus
+  a setup guide so ChatGPT can monitor/control Unraid via REST Actions.
+- **AI integrations index** (`docs/integrations/README.md`) and a Claude
+  integration guide (`docs/integrations/claude/README.md`).
 
 ### Changed
 
 - Upgraded the transitive `github.com/miekg/dns` dependency from `v1.1.27`
   (2020) to `v1.1.72` while adding the zeroconf dependency.
+- Updated `docs/integrations/mcp.md` counts to the current 121 tools / 74
+  read-only, replaced the stale 3-prompt list with the actual 6 diagnostic
+  prompts, and cross-linked the new Claude/ChatGPT integration guides.
 
 ---
 

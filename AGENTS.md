@@ -35,6 +35,9 @@
 │       ├── mqtt/               # MQTT client for Home Assistant integration
 │       └── watchdog/           # Health probes, remediation, runner
 ├── docs/                       # Documentation (API, MCP, WebSocket, guides)
+│   └── integrations/           # AI/automation guides: mcp, claude/, chatgpt/, mqtt, grafana
+├── skills/                     # Agent Skill (Agent Skills standard) — unraid-management-agent/
+├── .claude-plugin/             # Claude Code plugin marketplace manifest for the skill
 ├── meta/                       # Plugin metadata (XML, page files, scripts)
 ├── scripts/                    # Developer setup helpers
 ├── tests/                      # Integration tests
@@ -144,9 +147,15 @@ Each collector:
 
 Model Context Protocol endpoint at `POST /mcp` (Streamable HTTP, spec 2025-06-18):
 
-- **server.go**: MCP server with 54+ tools for monitoring and control
+- **server.go**: MCP server with 121 tools, 5 resources, and 6 prompts for monitoring and control
 - **transport.go**: HTTP transport for JSON-RPC requests
 - Tools expose system info, Docker/VM control, notifications, etc.
+
+> **AI integration assets:** the [Agent Skill](docs/integrations/claude/README.md)
+> (`skills/unraid-management-agent/`) teaches MCP-capable agents how to use these
+> tools; ChatGPT uses REST Actions instead
+> ([`docs/integrations/chatgpt/`](docs/integrations/chatgpt/)). See the
+> [integrations index](docs/integrations/README.md).
 
 #### Controllers (`daemon/services/controllers/`)
 

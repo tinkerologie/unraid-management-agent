@@ -19,6 +19,16 @@ MCP is an open protocol that standardizes how AI applications can securely conne
 - **Analyze** disk health, system performance, and troubleshoot issues
 - **Automate** routine tasks with AI-powered workflows
 
+> **Related integrations:**
+>
+> - **Claude (skill):** install the [Agent Skill](claude/README.md) so Claude
+>   knows how to use these tools effectively — works in Claude Code, Claude
+>   Desktop, claude.ai, Cursor, Copilot, and Gemini CLI.
+> - **ChatGPT:** ChatGPT consumes REST **Actions**, not MCP — see the
+>   [ChatGPT Custom GPT guide](chatgpt/README.md).
+> - See the [integrations index](README.md) for all options (MQTT, Home
+>   Assistant, Grafana, …).
+
 ## Transports
 
 The MCP server supports two transports — use the one that fits your deployment:
@@ -33,7 +43,7 @@ The MCP server supports two transports — use the one that fits your deployment
 > - Use **Streamable HTTP** if the AI client (Cursor, VS Code, etc.) runs on a different machine than the Unraid server.
 > - Use **STDIO** if the AI client (Claude Desktop, Cursor) runs locally on the Unraid server itself — it has zero network overhead and requires no authentication.
 
-## Available Tools (85 total)
+## Available Tools (121 total)
 
 ### System Monitoring Tools
 
@@ -262,9 +272,9 @@ Supported actions: `start_container`, `stop_container`, `restart_container`, `st
 
 ## Tool Safety Annotations
 
-All 85 tools include MCP safety annotations to help AI agents make safe decisions automatically:
+Tools include MCP safety annotations to help AI agents make safe decisions automatically:
 
-### Read-Only Tools (56 tools)
+### Read-Only Tools (74 tools)
 
 All monitoring and query tools are annotated with `readOnlyHint: true`, signaling to AI agents that these tools are safe to call without side effects:
 
@@ -348,11 +358,14 @@ Resources provide real-time data streams that AI agents can subscribe to:
 
 Prompts provide guided interactions for common tasks:
 
-| Prompt                | Description                                            |
-| --------------------- | ------------------------------------------------------ |
-| `analyze_disk_health` | AI-guided analysis of disk health with recommendations |
-| `system_overview`     | Comprehensive summary of system status                 |
-| `troubleshoot_issue`  | Interactive troubleshooting assistant                  |
+| Prompt                       | Description                                                                 |
+| ---------------------------- | --------------------------------------------------------------------------- |
+| `diagnose_disk_health`       | Walks SMART data, temperatures, error rates, and power-on hours per disk    |
+| `diagnose_performance_issue` | Correlates CPU, RAM, Docker usage, and VM count to find bottlenecks         |
+| `suggest_maintenance`        | Reviews parity history, disk ages, errors, and temps for a maintenance plan |
+| `explain_array_state`        | Translates raw array status into plain language with recommended actions    |
+| `system_overview`            | Comprehensive summary of system status                                      |
+| `troubleshoot_issue`         | Interactive troubleshooting assistant                                       |
 
 ## Example Usage
 

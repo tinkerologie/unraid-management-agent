@@ -1,0 +1,18 @@
+{
+  "name": "unraid-management-agent-skills",
+  "owner": {
+    "name": "ruaan-deysel",
+    "url": "https://github.com/ruaan-deysel/unraid-management-agent"
+  },
+  "metadata": {
+    "description": "Agent skill for the Unraid Management Agent: monitor and control Unraid via its MCP server (121 tools, 5 resources, 6 prompts) and REST API",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "unraid-management-agent-skills",
+      "description": "Best practices for monitoring and controlling an Unraid server through the Unraid Management Agent's MCP tools, diagnostic prompts, and REST API",
+      "source": "./"
+    }
+  ]
+}
