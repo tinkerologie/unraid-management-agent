@@ -18,7 +18,10 @@ type MCPContainerArgs struct {
 // MCPContainerActionArgs represents arguments for container control actions.
 type MCPContainerActionArgs struct {
 	ContainerID string `json:"container_id" jsonschema:"The Docker container ID or name"`
-	Action      string `json:"action" jsonschema:"The action to perform: start, stop, restart, pause, or unpause"`
+	Action      string `json:"action" jsonschema:"The action to perform: start, stop, restart, pause, unpause, or remove"`
+	// Confirm must be set to true when action is "remove" — prevents accidental removal.
+	Confirm     bool `json:"confirm,omitempty" jsonschema:"Must be set to true to confirm the remove action"`
+	RemoveImage bool `json:"remove_image,omitempty" jsonschema:"When true and action is remove, also removes the container image (best-effort)"`
 }
 
 // MCPContainerListArgs represents arguments for listing containers.

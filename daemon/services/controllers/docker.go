@@ -138,6 +138,44 @@ func (dc *DockerController) Unpause(containerID string) error {
 	return nil
 }
 
+// Remove removes a Docker container by ID or name (force-stopping it if running).
+// When removeImage is true it also removes the container's image (best-effort;
+// logs a warning if the image is still in use by other containers).
+func (dc *DockerController) Remove(containerID string, removeImage bool) error {
+	logger.Info("Removing Docker container: %s (removeImage=%v)", containerID, removeImage)
+
+	if err := dc.initClient(); err != nil {
+		return fmt.Errorf("docker unavailable: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Capture image reference before removal so we can optionally clean it up.
+	var imageRef string
+	if removeImage {
+		if inspectResult, err := dc.client.ContainerInspect(ctx, containerID, client.ContainerInspectOptions{}); err == nil {
+			imageRef = inspectResult.Container.Config.Image
+		}
+	}
+
+	if _, err := dc.client.ContainerRemove(ctx, containerID, client.ContainerRemoveOptions{Force: true}); err != nil {
+		return fmt.Errorf("failed to remove container %q: %w", containerID, err)
+	}
+
+	logger.Info("Successfully removed Docker container: %s", containerID)
+
+	if removeImage && imageRef != "" {
+		if _, err := dc.client.ImageRemove(ctx, imageRef, client.ImageRemoveOptions{}); err != nil {
+			logger.Warning("Docker: container removed but image %s not removed (may be in use by other containers): %v", imageRef, err)
+		} else {
+			logger.Info("Docker: removed image %s", imageRef)
+		}
+	}
+
+	return nil
+}
+
 // Close closes the Docker client connection.
 func (dc *DockerController) Close() error {
 	if dc.client != nil {

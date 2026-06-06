@@ -1214,13 +1214,18 @@ func (s *Server) registerControlTools() {
 	// Container control tool
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "container_action",
-		Description: "Perform an action on a Docker container (start, stop, restart, pause, unpause). Use with caution.",
+		Description: "Perform an action on a Docker container (start, stop, restart, pause, unpause, remove). The remove action requires confirm=true.",
 		Annotations: &mcp.ToolAnnotations{
 			DestructiveHint: ptr(true),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPContainerActionArgs) (*mcp.CallToolResult, any, error) {
 		logger.Info("MCP: Container action '%s' requested for '%s'", args.Action, args.ContainerID)
+
+		// The remove action requires explicit confirmation.
+		if args.Action == "remove" && !args.Confirm {
+			return textResult("Action 'remove' requires confirm=true. Set confirm to true to execute this destructive action."), nil, nil
+		}
 
 		dockerCtrl := controllers.NewDockerController()
 		var err error
@@ -1236,6 +1241,8 @@ func (s *Server) registerControlTools() {
 			err = dockerCtrl.Pause(args.ContainerID)
 		case "unpause":
 			err = dockerCtrl.Unpause(args.ContainerID)
+		case "remove":
+			err = dockerCtrl.Remove(args.ContainerID, args.RemoveImage)
 		default:
 			return textResult(fmt.Sprintf("Unknown action: %s", args.Action)), nil, nil
 		}

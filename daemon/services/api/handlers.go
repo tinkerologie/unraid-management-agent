@@ -486,6 +486,74 @@ func (s *Server) handleVMOperation(w http.ResponseWriter, r *http.Request, opera
 	})
 }
 
+// handleDockerRemove godoc
+//
+//	@Summary		Remove Docker container
+//	@Description	Permanently remove a Docker container (force-stopped if running). Requires confirm=true in the request body.
+//	@Tags			Docker
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		string						true	"Container ID or name"
+//	@Param			request	body		dto.ContainerRemoveRequest	true	"Confirm flag and optional remove_image flag"
+//	@Success		200		{object}	dto.Response				"Container removed"
+//	@Failure		400		{object}	dto.Response				"Invalid container ID or missing confirmation"
+//	@Failure		500		{object}	dto.Response				"Failed to remove container"
+//	@Router			/docker/{id}/remove [post]
+func (s *Server) handleDockerRemove(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	containerID := vars["id"]
+
+	if err := lib.ValidateContainerID(containerID); err != nil {
+		logger.Warning("Invalid container ID for remove operation: %s - %v", containerID, err)
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   err.Error(),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	var req dto.ContainerRemoveRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Invalid request body: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	if !req.Confirm {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   "confirm must be set to true to remove a container",
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	logger.Info("Removing container %s (remove_image=%v)", containerID, req.RemoveImage)
+
+	controller := controllers.NewDockerController()
+	defer controller.Close() //nolint:errcheck
+
+	if err := controller.Remove(containerID, req.RemoveImage); err != nil {
+		logger.Error("Failed to remove container %s: %v", containerID, err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   "Failed to remove container",
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   "Container removed",
+		Timestamp: time.Now(),
+	})
+}
+
 // handleDockerStart godoc
 //
 //	@Summary		Start Docker container

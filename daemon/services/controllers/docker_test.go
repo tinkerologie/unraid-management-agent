@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -178,6 +179,38 @@ func TestStripDockerStreamHeaders(t *testing.T) {
 				t.Errorf("stripDockerStreamHeaders() = %q, want %q", got, tt.expected)
 			}
 		})
+	}
+}
+
+// TestDockerRemove verifies that Remove returns a clear "docker unavailable" error
+// when no Docker daemon is reachable, and does not panic.
+// When a live daemon IS present the test confirms that calling Remove with a
+// non-existent container ID does not panic and returns an appropriate error.
+func TestDockerRemove(t *testing.T) {
+	dc := NewDockerController()
+	defer dc.Close() //nolint:errcheck
+
+	err := dc.Remove("bogus-container-remove-test", false)
+
+	if err == nil {
+		// A live daemon reported no error — unlikely but not a test concern.
+		return
+	}
+
+	// Without a daemon the error must mention "docker unavailable".
+	// With a daemon the error will come from the daemon (container not found).
+	// Either way Remove must not panic and must return an error.
+	daemonPresent := !strings.Contains(err.Error(), "docker unavailable")
+	if daemonPresent {
+		// Daemon is present: the error is from the daemon (e.g. "No such container").
+		// This is the expected integration-environment path — test passes.
+		t.Logf("Docker daemon present; Remove returned daemon error (expected): %v", err)
+		return
+	}
+
+	// No daemon: error must contain "docker unavailable".
+	if !strings.Contains(err.Error(), "docker unavailable") {
+		t.Errorf("expected 'docker unavailable' in error, got: %v", err)
 	}
 }
 

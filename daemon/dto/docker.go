@@ -136,6 +136,13 @@ type ContainerBulkUpdateResult struct {
 	Timestamp time.Time               `json:"timestamp"`
 }
 
+// ContainerRemoveRequest is the request body for POST /docker/{id}/remove.
+type ContainerRemoveRequest struct {
+	// Confirm must be set to true to authorise the destructive remove operation.
+	Confirm     bool `json:"confirm"`
+	RemoveImage bool `json:"remove_image,omitempty"`
+}
+
 // ContainerLogs contains log output from a Docker container
 type ContainerLogs struct {
 	ContainerID   string    `json:"container_id" example:"abc123def456"`
