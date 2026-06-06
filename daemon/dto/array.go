@@ -16,4 +16,7 @@ type ArrayStatus struct {
 	NumDataDisks        int       `json:"num_data_disks" example:"8"`
 	NumParityDisks      int       `json:"num_parity_disks" example:"2"`
 	Timestamp           time.Time `json:"timestamp"`
+
+	// SourceStatus is non-nil when the data source is degraded or unavailable.
+	SourceStatus *SourceStatus `json:"source_status,omitempty"`
 }

@@ -1,6 +1,6 @@
 # MCP Tool Catalog
 
-All **121 MCP tools** exposed by the Unraid Management Agent, grouped by purpose.
+All **122 MCP tools** exposed by the Unraid Management Agent, grouped by purpose.
 
 - **R** = read-only (`ReadOnlyHint: true`) — safe to call freely.
 - **W** = write/control — changes the system.
@@ -8,7 +8,7 @@ All **121 MCP tools** exposed by the Unraid Management Agent, grouped by purpose
 
 Tool names are exact. Do not invent or alias them.
 
-> Counts: 121 tools + 5 resources + 6 prompts. Resources and prompts are listed
+> Counts: 122 tools + 5 resources + 6 prompts. Resources and prompts are listed
 > in `diagnostics.md`.
 
 ---
@@ -17,6 +17,7 @@ Tool names are exact. Do not invent or alias them.
 
 | R/W | Tool | Purpose |
 | --- | --- | --- |
+| R | `run_self_test` | OS-resilience self-test: Unraid version, overall health, capabilities, per-subsystem source status (healthy/degraded/unavailable) |
 | R | `get_system_info` | Hostname, CPU/RAM usage, temperatures, uptime |
 | R | `get_health_status` | Quick health summary (API status, uptime, basics) |
 | R | `get_diagnostic_summary` | Broad snapshot: health, array, recent alerts |

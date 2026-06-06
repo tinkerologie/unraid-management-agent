@@ -121,6 +121,9 @@ func (c *DockerCollector) Collect() {
 	// Initialize client if needed
 	if err := c.initClient(); err != nil {
 		logger.Debug("Failed to initialize Docker client: %v (Docker may not be running)", err)
+		if c.appCtx.Platform != nil {
+			c.appCtx.Platform.Report("docker", dto.SourceUnavailable, "Docker client initialization failed", err)
+		}
 		// Publish empty list
 		domain.Publish(c.appCtx.Hub, constants.TopicContainerListUpdate, []*dto.ContainerInfo{})
 		return
@@ -133,6 +136,9 @@ func (c *DockerCollector) Collect() {
 	result, err := c.dockerClient.ContainerList(ctx, client.ContainerListOptions{All: true})
 	if err != nil {
 		logger.Debug("Failed to list containers via SDK: %v", err)
+		if c.appCtx.Platform != nil {
+			c.appCtx.Platform.Report("docker", dto.SourceUnavailable, "Docker daemon unreachable (ContainerList failed)", err)
+		}
 		domain.Publish(c.appCtx.Hub, constants.TopicContainerListUpdate, []*dto.ContainerInfo{})
 		return
 	}
@@ -276,6 +282,17 @@ func (c *DockerCollector) Collect() {
 
 	// Prune stale CPU snapshots for containers that no longer exist
 	c.pruneStaleSnapshots(runningContainers)
+
+	// Source healthy (zero containers is normal, not degraded). Attach the
+	// inline status flag only when not healthy.
+	if c.appCtx.Platform != nil {
+		c.appCtx.Platform.Healthy("docker")
+		if st := c.appCtx.Platform.StatusFor("docker"); st != nil {
+			for _, ci := range containers {
+				ci.SourceStatus = st
+			}
+		}
+	}
 
 	// Publish event
 	domain.Publish(c.appCtx.Hub, constants.TopicContainerListUpdate, containers)

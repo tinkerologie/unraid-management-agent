@@ -16,6 +16,10 @@ import (
 	"gopkg.in/ini.v1"
 )
 
+// arrayRequiredKeys are the var.ini keys the array collector depends on for
+// meaningful output. Their absence indicates a degraded (but not unavailable) source.
+var arrayRequiredKeys = []string{"mdState", "mdNumDisks"}
+
 // watchedArrayFiles are the INI files the array collector monitors for changes.
 var watchedArrayFiles = []string{constants.VarIni, constants.DisksIni}
 
@@ -101,12 +105,40 @@ func (c *ArrayCollector) Collect() {
 	logger.Debug("Collecting array data...")
 	logger.Debug("TRACE: About to call collectArrayStatus()")
 
+	// OS-resilience: validate var.ini is readable and contains expected keys before
+	// attempting the full parse. Report status to the platform registry so callers
+	// can detect data-source breakage without relying on error logs.
+	if c.ctx.Platform != nil {
+		cfg, loadErr := ini.Load(constants.VarIni)
+		if loadErr != nil {
+			c.ctx.Platform.Report("array", dto.SourceUnavailable, "cannot read var.ini", loadErr)
+			logger.Error("Array: Failed to load %s: %v", constants.VarIni, loadErr)
+			return // nothing valid to publish
+		}
+		// Extract the default section into a flat map for key validation.
+		section := cfg.Section("")
+		sectionMap := make(map[string]string, len(section.Keys()))
+		for _, k := range section.Keys() {
+			sectionMap[k.Name()] = strings.Trim(k.String(), `"`)
+		}
+		if ok, reason := validateRequiredKeys(sectionMap, arrayRequiredKeys...); !ok {
+			c.ctx.Platform.Report("array", dto.SourceDegraded, reason, nil)
+		} else {
+			c.ctx.Platform.Healthy("array")
+		}
+	}
+
 	// Collect array status
 	arrayStatus, err := c.collectArrayStatus()
 	logger.Debug("TRACE: Returned from collectArrayStatus, err=%v", err)
 	if err != nil {
 		logger.Error("Array: Failed to collect array status: %v", err)
 		return
+	}
+
+	// Attach inline source_status flag (nil when healthy — response unchanged).
+	if c.ctx.Platform != nil {
+		arrayStatus.SourceStatus = c.ctx.Platform.StatusFor("array")
 	}
 
 	logger.Debug("Array: Successfully collected, publishing event")

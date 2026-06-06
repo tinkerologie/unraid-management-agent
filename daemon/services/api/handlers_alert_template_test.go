@@ -28,6 +28,7 @@ func (s *stubDataProvider) GetNetworkCache() []dto.NetworkInfo           { retur
 func (s *stubDataProvider) GetNUTCache() *dto.NUTResponse                { return nil }
 func (s *stubDataProvider) GetNotificationsCache() *dto.NotificationList { return nil }
 func (s *stubDataProvider) GetPluginUpdatesCache() *dto.PluginList       { return nil }
+func (s *stubDataProvider) DegradedSubsystemCount() int                  { return 0 }
 
 // setupAlertTemplateServer creates an API server with a real in-memory alertStore
 // and a non-running alertEngine (no evaluation loop, safe for unit tests).

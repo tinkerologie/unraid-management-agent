@@ -49,6 +49,8 @@ type mockDataProvider struct {
 	containers []dto.ContainerInfo
 	vms        []dto.VMInfo
 	ups        *dto.UPSStatus
+
+	degradedCount int
 }
 
 func (m *mockDataProvider) GetSystemCache() *dto.SystemInfo              { return m.system }
@@ -63,6 +65,7 @@ func (m *mockDataProvider) GetNetworkCache() []dto.NetworkInfo           { retur
 func (m *mockDataProvider) GetNUTCache() *dto.NUTResponse                { return nil }
 func (m *mockDataProvider) GetNotificationsCache() *dto.NotificationList { return nil }
 func (m *mockDataProvider) GetPluginUpdatesCache() *dto.PluginList       { return nil }
+func (m *mockDataProvider) DegradedSubsystemCount() int                  { return m.degradedCount }
 
 func newMockProvider() *mockDataProvider {
 	return &mockDataProvider{

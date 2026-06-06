@@ -2,6 +2,11 @@
 
 The agent ships **6 MCP prompts** and **5 MCP resources** alongside its tools.
 
+> **Health/breakage check:** the `run_self_test` tool (read-only) reports the
+> detected Unraid version, overall data-source health, probed capabilities, and
+> per-subsystem status (healthy/degraded/unavailable) — use it to confirm an OS
+> update hasn't broken a collector. Same data as `GET /api/v1/diagnostics/self-test`.
+
 ## Diagnostic Prompts
 
 Prompts orchestrate the right tools for a common investigation. Prefer them over

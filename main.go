@@ -17,6 +17,7 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/cmd"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/platform"
 )
 
 // Version is the application version, set at build time via ldflags.
@@ -246,7 +247,8 @@ func main() {
 			Port:       cli.Port,
 			CORSOrigin: cli.CORSOrigin,
 		},
-		Hub: domain.NewEventBus(1024), // Buffer size for event bus
+		Hub:      domain.NewEventBus(1024), // Buffer size for event bus
+		Platform: platform.NewRegistry(),
 		MQTTConfig: domain.MQTTConfig{
 			Enabled:             cli.MQTTEnabled,
 			Broker:              cli.MQTTBroker,

@@ -16,6 +16,11 @@ func mdcmdExec(args ...string) error {
 	if lib.IsProcMdcmdAvailable() {
 		return lib.MdcmdWrite(args...)
 	}
+	// Capability gate: if neither /proc/mdcmd nor the mdcmd binary is present,
+	// return a clear "unavailable" error instead of a cryptic exec failure.
+	if err := requireBinary("array", constants.MdcmdBin); err != nil {
+		return err
+	}
 	logger.Debug("Array: /proc/mdcmd not available, falling back to mdcmd binary")
 	_, err := lib.ExecCommand(constants.MdcmdBin, args...)
 	return err

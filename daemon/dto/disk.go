@@ -44,6 +44,9 @@ type DiskInfo struct {
 	TempWarning  *int `json:"temp_warning_celsius,omitempty" example:"50"`  // Per-disk warning threshold override
 	TempCritical *int `json:"temp_critical_celsius,omitempty" example:"60"` // Per-disk critical threshold override
 
+	// SourceStatus is non-nil only when the backing data source is not healthy.
+	SourceStatus *SourceStatus `json:"source_status,omitempty"`
+
 	Timestamp time.Time `json:"timestamp"`
 }
 

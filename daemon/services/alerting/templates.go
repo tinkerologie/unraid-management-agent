@@ -2,6 +2,23 @@ package alerting
 
 import "github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 
+// BuiltinRules returns rules that ship ENABLED by default. They are seeded once
+// (idempotent by ID) on engine start, so a user may later disable or delete them
+// and the change persists across restarts.
+func BuiltinRules() []dto.AlertRule {
+	return []dto.AlertRule{
+		{
+			ID:              "subsystem-degraded",
+			Name:            "Agent data source degraded",
+			Expression:      "DegradedSubsystemCount > 0",
+			Severity:        "warning",
+			Enabled:         true,
+			Channels:        []string{"unraid"},
+			CooldownMinutes: 60,
+		},
+	}
+}
+
 // AlertRuleTemplates returns curated, DISABLED-by-default rule templates that use
 // the trend/predictive metrics. Users review and enable (and assign channels).
 func AlertRuleTemplates() []dto.AlertRule {

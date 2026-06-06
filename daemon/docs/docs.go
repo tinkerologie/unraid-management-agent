@@ -1232,6 +1232,26 @@ const docTemplate = `{
                 }
             }
         },
+        "/diagnostics/self-test": {
+            "get": {
+                "description": "Returns the detected Unraid version, overall data-source health, probed capabilities, and per-subsystem source status (healthy/degraded/unavailable).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Diagnostics"
+                ],
+                "summary": "Run agent self-test",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.selfTestResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/disks": {
             "get": {
                 "description": "Retrieve information about all disks including SMART data",
@@ -5385,6 +5405,29 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "api.selfTestResponse": {
+            "type": "object",
+            "properties": {
+                "capabilities": {
+                    "$ref": "#/definitions/dto.Capabilities"
+                },
+                "overall_state": {
+                    "$ref": "#/definitions/dto.SourceState"
+                },
+                "subsystems": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.SourceStatus"
+                    }
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "unraid_version": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.AccessURL": {
             "type": "object",
             "properties": {
@@ -5786,6 +5829,14 @@ const docTemplate = `{
                     "type": "boolean",
                     "example": true
                 },
+                "source_status": {
+                    "description": "SourceStatus is non-nil when the data source is degraded or unavailable.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.SourceStatus"
+                        }
+                    ]
+                },
                 "state": {
                     "type": "string",
                     "example": "Started"
@@ -6079,6 +6130,37 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.Capabilities": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.Capability"
+                    }
+                },
+                "unraid_version": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.Capability": {
+            "type": "object",
+            "properties": {
+                "available": {
+                    "type": "boolean"
+                },
+                "detail": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "target": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.ChassisInfo": {
             "type": "object",
             "properties": {
@@ -6296,6 +6378,9 @@ const docTemplate = `{
                     "type": "string",
                     "example": "unless-stopped"
                 },
+                "source_status": {
+                    "$ref": "#/definitions/dto.SourceStatus"
+                },
                 "state": {
                     "type": "string",
                     "example": "running"
@@ -6484,6 +6569,20 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.DegradedSubsystems": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.SourceStatus"
+                    }
+                }
+            }
+        },
         "dto.DiskCacheInfo": {
             "type": "object",
             "properties": {
@@ -6607,6 +6706,14 @@ const docTemplate = `{
                 "smart_status": {
                     "type": "string",
                     "example": "PASSED"
+                },
+                "source_status": {
+                    "description": "SourceStatus is non-nil only when the backing data source is not healthy.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.SourceStatus"
+                        }
+                    ]
                 },
                 "spin_state": {
                     "description": "\"active\", \"standby\", \"unknown\"",
@@ -7530,6 +7637,14 @@ const docTemplate = `{
             "properties": {
                 "critical_count": {
                     "type": "integer"
+                },
+                "degraded_subsystems": {
+                    "description": "DegradedSubsystems summarizes data sources whose health is not \"healthy\"\n(OS-resilience). Omitted when all sources are healthy.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.DegradedSubsystems"
+                        }
+                    ]
                 },
                 "findings": {
                     "type": "array",
@@ -9348,6 +9463,14 @@ const docTemplate = `{
                     "type": "boolean",
                     "example": true
                 },
+                "source_status": {
+                    "description": "SourceStatus is non-nil only when the backing data source is not healthy.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.SourceStatus"
+                        }
+                    ]
+                },
                 "storage": {
                     "description": "\"cache\", \"array\", \"cache+array\", or \"unknown\"",
                     "type": "string",
@@ -9372,6 +9495,39 @@ const docTemplate = `{
                 "used_bytes": {
                     "type": "integer",
                     "example": 5368709120000
+                }
+            }
+        },
+        "dto.SourceState": {
+            "type": "string",
+            "enum": [
+                "healthy",
+                "degraded",
+                "unavailable"
+            ],
+            "x-enum-varnames": [
+                "SourceHealthy",
+                "SourceDegraded",
+                "SourceUnavailable"
+            ]
+        },
+        "dto.SourceStatus": {
+            "type": "object",
+            "properties": {
+                "last_checked": {
+                    "type": "string"
+                },
+                "last_error": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "state": {
+                    "$ref": "#/definitions/dto.SourceState"
+                },
+                "subsystem": {
+                    "type": "string"
                 }
             }
         },
@@ -9515,6 +9671,14 @@ const docTemplate = `{
                     "description": "System Information",
                     "type": "string",
                     "example": "Supermicro X11SCL-F"
+                },
+                "source_status": {
+                    "description": "SourceStatus is non-nil when the data source is degraded or unavailable.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.SourceStatus"
+                        }
+                    ]
                 },
                 "swap_free_bytes": {
                     "type": "integer",
@@ -10094,6 +10258,9 @@ const docTemplate = `{
                 "persistent": {
                     "type": "boolean",
                     "example": true
+                },
+                "source_status": {
+                    "$ref": "#/definitions/dto.SourceStatus"
                 },
                 "state": {
                     "type": "string",

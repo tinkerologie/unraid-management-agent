@@ -233,6 +233,12 @@ func (vc *VMController) CreateSnapshot(vmName, snapshotName, description string)
 func (vc *VMController) ListSnapshots(vmName string) (*dto.VMSnapshotList, error) {
 	logger.Debug("Listing snapshots for VM: %s", vmName)
 
+	// Capability gate: this path shells out to virsh. Return a clear error if
+	// virsh is unavailable instead of a cryptic exec failure.
+	if err := requireBinary("vm", constants.VirshBin); err != nil {
+		return nil, err
+	}
+
 	// Use virsh snapshot-list to get snapshot details
 	lines, err := lib.ExecCommand(constants.VirshBin, "snapshot-list", vmName, "--name")
 	if err != nil {
@@ -351,6 +357,12 @@ func (vc *VMController) RestoreSnapshot(vmName, snapshotName string) error {
 // The source VM must be shut off before cloning.
 func (vc *VMController) CloneVM(vmName, cloneName string) error {
 	logger.Info("Cloning VM '%s' as '%s'", vmName, cloneName)
+
+	// Capability gate: this path shells out to virt-clone. Return a clear error
+	// if it is unavailable instead of a cryptic exec failure.
+	if err := requireBinary("vm", constants.VirtCloneBin); err != nil {
+		return err
+	}
 
 	// virt-clone handles copying disk images and generating new UUIDs/MACs
 	output, err := lib.ExecCommandOutput(

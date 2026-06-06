@@ -96,11 +96,38 @@ func (c *ShareCollector) Start(ctx context.Context, interval time.Duration) {
 func (c *ShareCollector) Collect(ctx context.Context) {
 	logger.Debug("Collecting share data...")
 
+	// OS-resilience: validate shares.ini is readable before attempting the full parse.
+	// A read error → unavailable (return without publishing); zero parsed shares → degraded
+	// but still publish best-effort; otherwise report healthy.
+	if c.ctx.Platform != nil {
+		f, openErr := os.Open(constants.SharesIni)
+		if openErr != nil {
+			c.ctx.Platform.Report("shares", dto.SourceUnavailable, "cannot read shares.ini", openErr)
+			logger.Error("Share: Failed to open %s: %v", constants.SharesIni, openErr)
+			return // nothing valid to publish
+		}
+		_ = f.Close()
+	}
+
 	// Collect share information
 	shares, err := c.collectShares(ctx)
 	if err != nil {
 		logger.Error("Share: Failed to collect share data: %v", err)
 		return
+	}
+
+	// Report source health and attach inline flag when not healthy.
+	if c.ctx.Platform != nil {
+		if len(shares) == 0 {
+			c.ctx.Platform.Report("shares", dto.SourceDegraded, "shares.ini yielded zero shares", nil)
+		} else {
+			c.ctx.Platform.Healthy("shares")
+		}
+		if st := c.ctx.Platform.StatusFor("shares"); st != nil {
+			for i := range shares {
+				shares[i].SourceStatus = st
+			}
+		}
 	}
 
 	logger.Debug("Share: Successfully collected %d shares, publishing event", len(shares))

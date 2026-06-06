@@ -84,6 +84,9 @@ func (c *VMCollector) Collect() {
 	l, err := libvirt.ConnectToURI(uri)
 	if err != nil {
 		logger.Debug("Failed to connect to libvirt: %v (libvirt may not be running)", err)
+		if c.appCtx.Platform != nil {
+			c.appCtx.Platform.Report("vm", dto.SourceUnavailable, "libvirt connection failed", err)
+		}
 		// Publish empty list
 		domain.Publish(c.appCtx.Hub, constants.TopicVMListUpdate, []*dto.VMInfo{})
 		return
@@ -95,6 +98,9 @@ func (c *VMCollector) Collect() {
 	domains, _, err := l.ConnectListAllDomains(1, flags)
 	if err != nil {
 		logger.Error("Failed to list domains via libvirt: %v", err)
+		if c.appCtx.Platform != nil {
+			c.appCtx.Platform.Report("vm", dto.SourceUnavailable, "libvirt ListAllDomains failed", err)
+		}
 		return
 	}
 
@@ -156,6 +162,17 @@ func (c *VMCollector) Collect() {
 		vm.MemoryDisplay = c.formatMemoryDisplay(vm.MemoryUsed, vm.MemoryAllocated)
 
 		vms = append(vms, vm)
+	}
+
+	// Source healthy: connection + listing succeeded. A host with no VMs is
+	// healthy, not unavailable. Attach the inline flag only when not healthy.
+	if c.appCtx.Platform != nil {
+		c.appCtx.Platform.Healthy("vm")
+		if st := c.appCtx.Platform.StatusFor("vm"); st != nil {
+			for _, vm := range vms {
+				vm.SourceStatus = st
+			}
+		}
 	}
 
 	// Publish event

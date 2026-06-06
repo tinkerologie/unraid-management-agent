@@ -114,11 +114,38 @@ func (c *DiskCollector) Collect() {
 
 	logger.Debug("Collecting disk data...")
 
+	// OS-resilience: validate disks.ini is readable before attempting the full parse.
+	// A read error → unavailable (return without publishing); zero parsed disks → degraded
+	// but still publish best-effort; otherwise report healthy.
+	if c.ctx.Platform != nil {
+		f, openErr := os.Open(constants.DisksIni)
+		if openErr != nil {
+			c.ctx.Platform.Report("disk", dto.SourceUnavailable, "cannot read disks.ini", openErr)
+			logger.Error("Disk: Failed to open %s: %v", constants.DisksIni, openErr)
+			return // nothing valid to publish
+		}
+		_ = f.Close()
+	}
+
 	// Collect disk information
 	disks, err := c.collectDisks()
 	if err != nil {
 		logger.Error("Disk: Failed to collect disk data: %v", err)
 		return
+	}
+
+	// Report source health and attach inline flag when not healthy.
+	if c.ctx.Platform != nil {
+		if len(disks) == 0 {
+			c.ctx.Platform.Report("disk", dto.SourceDegraded, "disks.ini yielded zero disks", nil)
+		} else {
+			c.ctx.Platform.Healthy("disk")
+		}
+		if st := c.ctx.Platform.StatusFor("disk"); st != nil {
+			for i := range disks {
+				disks[i].SourceStatus = st
+			}
+		}
 	}
 
 	logger.Debug("Disk: Successfully collected %d disks, publishing event", len(disks))

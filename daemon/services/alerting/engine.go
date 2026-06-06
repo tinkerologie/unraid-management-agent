@@ -37,6 +37,8 @@ type DataProvider interface {
 	GetNUTCache() *dto.NUTResponse
 	GetNotificationsCache() *dto.NotificationList
 	GetPluginUpdatesCache() *dto.PluginList
+	// DegradedSubsystemCount reports how many data sources are not healthy (OS-resilience).
+	DegradedSubsystemCount() int
 }
 
 // Engine orchestrates alert rule evaluation and notification dispatch.
@@ -79,6 +81,18 @@ func (e *Engine) Start(ctx context.Context) {
 	// Load rules from disk
 	if err := e.store.Load(); err != nil {
 		logger.Error("Alerting: Failed to load rules: %v", err)
+	}
+
+	// Seed built-in rules (idempotent by ID — only added if absent, so user
+	// edits/disabling are preserved across restarts).
+	for _, rule := range BuiltinRules() {
+		if _, err := e.store.GetRule(rule.ID); err != nil {
+			if cerr := e.store.CreateRule(rule); cerr != nil {
+				logger.Warning("Alerting: Failed to seed built-in rule %s: %v", rule.ID, cerr)
+			} else {
+				logger.Info("Alerting: Seeded built-in rule %s", rule.ID)
+			}
+		}
 	}
 
 	// Compile all loaded rules
@@ -425,6 +439,9 @@ func (e *Engine) QueryHistory(metric, entity string) dto.MetricHistoryResult {
 // buildEnv constructs an AlertEnv from the current cached collector data.
 func (e *Engine) buildEnv() dto.AlertEnv {
 	env := dto.AlertEnv{}
+
+	// OS-resilience: surface degraded data-source count for the subsystem_degraded rule.
+	env.DegradedSubsystemCount = e.provider.DegradedSubsystemCount()
 
 	// System
 	if sys := e.provider.GetSystemCache(); sys != nil {

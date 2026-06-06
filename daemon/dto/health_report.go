@@ -24,6 +24,16 @@ type HealthReport struct {
 	Warning     int             `json:"warning_count"`
 	Info        int             `json:"info_count"`
 	GeneratedAt time.Time       `json:"generated_at"`
+
+	// DegradedSubsystems summarizes data sources whose health is not "healthy"
+	// (OS-resilience). Omitted when all sources are healthy.
+	DegradedSubsystems *DegradedSubsystems `json:"degraded_subsystems,omitempty"`
+}
+
+// DegradedSubsystems is the health-report rollup of non-healthy data sources.
+type DegradedSubsystems struct {
+	Count int            `json:"count"`
+	Items []SourceStatus `json:"items"`
 }
 
 // ActionResult records the outcome of a single executor action.

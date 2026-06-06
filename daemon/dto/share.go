@@ -24,5 +24,8 @@ type ShareInfo struct {
 	CachePool2  string `json:"cache_pool2,omitempty" example:""`              // Secondary cache pool (for mover destination)
 	MoverAction string `json:"mover_action,omitempty" example:"cache->array"` // Mover action: "cache->array", "array->cache", or empty
 
+	// SourceStatus is non-nil only when the backing data source is not healthy.
+	SourceStatus *SourceStatus `json:"source_status,omitempty"`
+
 	Timestamp time.Time `json:"timestamp"`
 }

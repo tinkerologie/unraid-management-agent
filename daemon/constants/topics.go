@@ -64,4 +64,6 @@ var (
 	// TopicAgentWake is published by alerting/watchdog to wake the autonomous agent
 	// with a dto.AgentWakeEvent describing the triggering incident.
 	TopicAgentWake = domain.NewTopic[dto.AgentWakeEvent]("agent_wake")
+	// TopicSourceStatusChanged fires when a subsystem's data-source health transitions.
+	TopicSourceStatusChanged = domain.NewTopic[dto.SourceStatus]("source_status_changed")
 )
