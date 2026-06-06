@@ -107,7 +107,7 @@
       "id": 10,
       "nativeTaskId": "18",
       "subject": "Task 10: Fixtures + breakage tests + docs + final verify + CHANGELOG [USER-GATE]",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         9
       ],
