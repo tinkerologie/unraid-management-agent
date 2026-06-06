@@ -30,8 +30,17 @@ type FileConfig struct {
 	// MQTT configuration
 	MQTT *FileConfigMQTT `yaml:"mqtt,omitempty"`
 
+	// Discovery (zeroconf/mDNS) configuration
+	Discovery *FileConfigDiscovery `yaml:"discovery,omitempty"`
+
 	// Collection intervals (seconds, 0 = disabled)
 	Intervals *FileConfigIntervals `yaml:"intervals,omitempty"`
+}
+
+// FileConfigDiscovery holds zeroconf (mDNS) discovery settings from the config file.
+type FileConfigDiscovery struct {
+	Enabled     *bool   `yaml:"enabled,omitempty"`
+	ServiceName *string `yaml:"service_name,omitempty"`
 }
 
 // FileConfigMQTT holds MQTT-specific settings from the config file.

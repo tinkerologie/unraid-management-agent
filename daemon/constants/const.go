@@ -168,4 +168,12 @@ const (
 	WSMaxClients = 10
 	// WSBufferSize is the WebSocket message buffer size.
 	WSBufferSize = 256
+
+	// DiscoveryServiceType is the mDNS/DNS-SD service type advertised for
+	// zeroconf auto-discovery (e.g. by the Home Assistant integration).
+	// Integrations browse for "<DiscoveryServiceType>.<DiscoveryDomain>".
+	DiscoveryServiceType = "_unraid-mgmt-agent._tcp"
+	// DiscoveryDomain is the mDNS domain used for service registration.
+	// "local." is the standard multicast DNS domain.
+	DiscoveryDomain = "local."
 )

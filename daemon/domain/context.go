@@ -33,6 +33,7 @@ type Context struct {
 	Hub                *EventBus
 	Intervals          Intervals
 	MQTTConfig         MQTTConfig
+	DiscoveryConfig    DiscoveryConfig
 	DiagnosticLogger   *logger.DiagnosticLogger
 	LogsDir            string
 	DockerUpdateNotify bool

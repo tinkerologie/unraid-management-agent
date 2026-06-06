@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Zeroconf/mDNS auto-discovery** (issue #120) — the agent now advertises itself
+  on the local network via mDNS/DNS-SD as `_unraid-mgmt-agent._tcp.local.`, so
+  integrations such as the
+  [Home Assistant integration](https://github.com/ruaan-deysel/ha-unraid-management-agent)
+  can auto-discover the server instead of requiring a manually entered host/port.
+  The advertised TXT records expose the agent version, REST API base path
+  (`/api/v1`), and server name. Enabled by default; controllable via
+  `--discovery-enabled` / `DISCOVERY_ENABLED` and an optional instance-name
+  override `--discovery-service-name` / `DISCOVERY_SERVICE_NAME`, plus a
+  `discovery:` section in the YAML config file. Advertising is best-effort and
+  coexists with Unraid's existing `avahi-daemon`. Implemented with
+  `github.com/grandcat/zeroconf` (DNS-SD/Avahi-compatible). The agent detects
+  the primary LAN IPv4 (default-route source address) and advertises only that
+  reachable address, so it never publishes unreachable Docker/`virbr0` bridge
+  IPs on multi-interface Unraid hosts. Verified live on Unraid: a separate LAN
+  machine browsed `_unraid-mgmt-agent._tcp`, resolved the instance to
+  `<host>.local:8043` with the correct TXT records, and reached the advertised
+  LAN IP.
+
+### Changed
+
+- Upgraded the transitive `github.com/miekg/dns` dependency from `v1.1.27`
+  (2020) to `v1.1.72` while adding the zeroconf dependency.
+
+---
+
 ## [2026.06.01] - 2026-06-01
 
 ### Added
