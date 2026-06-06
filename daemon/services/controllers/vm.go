@@ -358,6 +358,12 @@ func (vc *VMController) RestoreSnapshot(vmName, snapshotName string) error {
 func (vc *VMController) CloneVM(vmName, cloneName string) error {
 	logger.Info("Cloning VM '%s' as '%s'", vmName, cloneName)
 
+	// Capability gate: this path shells out to virt-clone. Return a clear error
+	// if it is unavailable instead of a cryptic exec failure.
+	if err := requireBinary("vm", constants.VirtCloneBin); err != nil {
+		return err
+	}
+
 	// virt-clone handles copying disk images and generating new UUIDs/MACs
 	output, err := lib.ExecCommandOutput(
 		constants.VirtCloneBin,
