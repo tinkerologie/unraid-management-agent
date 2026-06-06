@@ -1,0 +1,262 @@
+# OpenAPI 3.0 schema for ChatGPT Custom GPT "Actions".
+#
+# This is a CURATED subset (~30 of the agent's 148 REST endpoints) chosen for
+# conversational usefulness and reliable GPT action selection. The full REST API
+# is documented at http://<your-unraid-ip>:8043/swagger/.
+#
+# Setup: see README.md in this directory.
+# All state-changing operations are marked x-openai-isConsequential: true so
+# ChatGPT asks the user to confirm before calling them.
+openapi: 3.0.0
+info:
+  title: Unraid Management Agent
+  description: Monitor and control an Unraid server — system, array, disks, Docker, VMs, GPU, UPS, parity, and more.
+  version: "1.0.0"
+servers:
+  # Replace with your Unraid server's address. The agent listens on port 8043 by
+  # default and has no authentication, so expose it only on a trusted LAN/VPN.
+  - url: http://your-unraid-ip:8043/api/v1
+paths:
+  /system:
+    get:
+      operationId: getSystemInfo
+      summary: Get system information
+      description: Returns hostname, CPU and RAM usage, temperatures, and uptime. Use for "how is the server doing" questions.
+      responses:
+        "200": { description: System information }
+  /health/report:
+    get:
+      operationId: getHealthReport
+      summary: Get system health report
+      description: Aggregated health signals across array, disks, containers, and alerts.
+      responses:
+        "200": { description: Health report }
+  /array:
+    get:
+      operationId: getArrayStatus
+      summary: Get array status
+      description: Array state, capacity, parity information, and disk assignments.
+      responses:
+        "200": { description: Array status }
+  /disks:
+    get:
+      operationId: listDisks
+      summary: List all disks
+      description: All disks (array, cache, unassigned) with health status.
+      responses:
+        "200": { description: Disk list }
+  /disks/{id}:
+    get:
+      operationId: getDisk
+      summary: Get one disk
+      description: Detailed information about a specific disk including SMART data.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Disk identifier }
+      responses:
+        "200": { description: Disk detail }
+  /docker:
+    get:
+      operationId: listContainers
+      summary: List Docker containers
+      description: All containers with status, resource usage, and config.
+      responses:
+        "200": { description: Container list }
+  /docker/{id}:
+    get:
+      operationId: getContainer
+      summary: Get one container
+      description: Detailed information about a specific Docker container.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Container id or name }
+      responses:
+        "200": { description: Container detail }
+  /docker/{id}/logs:
+    get:
+      operationId: getContainerLogs
+      summary: Get container logs
+      description: Recent stdout/stderr logs for a container (docker logs).
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Container id or name }
+      responses:
+        "200": { description: Container logs }
+  /docker/updates:
+    get:
+      operationId: getContainerUpdates
+      summary: Get container update status
+      description: Cached list of containers with available image updates.
+      responses:
+        "200": { description: Update status }
+  /vm:
+    get:
+      operationId: listVMs
+      summary: List virtual machines
+      description: All VMs with their status and configuration.
+      responses:
+        "200": { description: VM list }
+  /vm/{name}/snapshots:
+    get:
+      operationId: listVMSnapshots
+      summary: List VM snapshots
+      description: All snapshots for a specific virtual machine.
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string }, description: VM name }
+      responses:
+        "200": { description: Snapshot list }
+  /gpu:
+    get:
+      operationId: getGpuMetrics
+      summary: Get GPU metrics
+      description: GPU utilization, temperature, and memory usage.
+      responses:
+        "200": { description: GPU metrics }
+  /ups:
+    get:
+      operationId: getUpsStatus
+      summary: Get UPS status
+      description: UPS battery level, load, and runtime.
+      responses:
+        "200": { description: UPS status }
+  /shares:
+    get:
+      operationId: listShares
+      summary: List shares
+      description: All network shares with settings and usage.
+      responses:
+        "200": { description: Share list }
+  /notifications:
+    get:
+      operationId: getNotifications
+      summary: Get notifications
+      description: System notifications — alerts, warnings, and informational messages.
+      responses:
+        "200": { description: Notifications }
+  /array/parity-check/history:
+    get:
+      operationId: getParityHistory
+      summary: Get parity check history
+      description: Past parity checks with dates, durations, speeds, and error counts.
+      responses:
+        "200": { description: Parity history }
+  /network/access-urls:
+    get:
+      operationId: getNetworkAccessUrls
+      summary: Get access URLs
+      description: Ways to reach the server — LAN, WAN, WireGuard, mDNS, IPv6.
+      responses:
+        "200": { description: Access URLs }
+  /user-scripts:
+    get:
+      operationId: listUserScripts
+      summary: List user scripts
+      description: Available scripts from the User Scripts plugin.
+      responses:
+        "200": { description: User script list }
+
+  # ---- Control operations (state-changing; confirmation required) ----
+  /docker/{id}/start:
+    post:
+      operationId: startContainer
+      summary: Start a container
+      x-openai-isConsequential: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Container id or name }
+      responses:
+        "200": { description: Started }
+  /docker/{id}/stop:
+    post:
+      operationId: stopContainer
+      summary: Stop a container
+      x-openai-isConsequential: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Container id or name }
+      responses:
+        "200": { description: Stopped }
+  /docker/{id}/restart:
+    post:
+      operationId: restartContainer
+      summary: Restart a container
+      x-openai-isConsequential: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Container id or name }
+      responses:
+        "200": { description: Restarted }
+  /docker/{id}/update:
+    post:
+      operationId: updateContainer
+      summary: Update a container to the latest image
+      x-openai-isConsequential: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Container id or name }
+      responses:
+        "200": { description: Updated }
+  /vm/{name}/start:
+    post:
+      operationId: startVM
+      summary: Start a VM
+      x-openai-isConsequential: true
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string }, description: VM name }
+      responses:
+        "200": { description: Started }
+  /vm/{name}/stop:
+    post:
+      operationId: stopVM
+      summary: Stop a VM (graceful shutdown)
+      x-openai-isConsequential: true
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string }, description: VM name }
+      responses:
+        "200": { description: Stopped }
+  /vm/{name}/restart:
+    post:
+      operationId: restartVM
+      summary: Restart a VM
+      x-openai-isConsequential: true
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string }, description: VM name }
+      responses:
+        "200": { description: Restarted }
+  /array/start:
+    post:
+      operationId: startArray
+      summary: Start the array
+      x-openai-isConsequential: true
+      responses:
+        "200": { description: Array starting }
+  /array/stop:
+    post:
+      operationId: stopArray
+      summary: Stop the array (makes all array data inaccessible)
+      x-openai-isConsequential: true
+      responses:
+        "200": { description: Array stopping }
+  /array/parity-check/start:
+    post:
+      operationId: startParityCheck
+      summary: Start a parity check
+      x-openai-isConsequential: true
+      responses:
+        "200": { description: Parity check started }
+  /system/reboot:
+    post:
+      operationId: rebootSystem
+      summary: Reboot the server
+      x-openai-isConsequential: true
+      responses:
+        "200": { description: Rebooting }
+  /system/shutdown:
+    post:
+      operationId: shutdownSystem
+      summary: Shut down the server
+      x-openai-isConsequential: true
+      responses:
+        "200": { description: Shutting down }
+  /user-scripts/{name}/execute:
+    post:
+      operationId: executeUserScript
+      summary: Execute a user script
+      x-openai-isConsequential: true
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string }, description: User script name }
+      responses:
+        "200": { description: Executed }

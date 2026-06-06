@@ -24,8 +24,9 @@ go.work
 # Build directory (root only — anchored so it does not match ansible/roles/build/)
 /build/
 
-# Binary output from local builds
-unraid-management-agent
+# Binary output from local builds (root only — anchored so it does not match
+# the skills/unraid-management-agent/ skill directory)
+/unraid-management-agent
 
 # IDE files
 .vscode/

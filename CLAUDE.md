@@ -21,15 +21,17 @@ ansible-playbook -i ansible/inventory.yml ansible/deploy.yml
 
 ## Key Paths
 
-| Path                              | Purpose                                        |
-| --------------------------------- | ---------------------------------------------- |
-| `daemon/services/orchestrator.go` | Application lifecycle (init order is critical) |
-| `daemon/services/collectors/`     | Data collection goroutines                     |
-| `daemon/services/api/`            | REST handlers, WebSocket hub, cache            |
-| `daemon/services/controllers/`    | Control operations (Docker/VM/Array)           |
-| `daemon/services/mcp/`            | MCP server for AI agents                       |
-| `daemon/lib/validation.go`        | Input validation functions                     |
-| `daemon/constants/const.go`       | System paths, intervals, binary locations      |
+| Path                              | Purpose                                           |
+| --------------------------------- | ------------------------------------------------- |
+| `daemon/services/orchestrator.go` | Application lifecycle (init order is critical)    |
+| `daemon/services/collectors/`     | Data collection goroutines                        |
+| `daemon/services/api/`            | REST handlers, WebSocket hub, cache               |
+| `daemon/services/controllers/`    | Control operations (Docker/VM/Array)              |
+| `daemon/services/mcp/`            | MCP server for AI agents                          |
+| `daemon/lib/validation.go`        | Input validation functions                        |
+| `daemon/constants/const.go`       | System paths, intervals, binary locations         |
+| `skills/unraid-management-agent/` | Agent Skill (MCP/REST usage) — reference material |
+| `docs/integrations/`              | AI/automation guides (mcp, claude, chatgpt, mqtt) |
 
 ## Path-Specific Instructions
 
