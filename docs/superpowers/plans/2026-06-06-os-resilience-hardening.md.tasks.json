@@ -65,7 +65,7 @@
       "id": 6,
       "nativeTaskId": "14",
       "subject": "Task 6: Capability-gate array/disk/docker/vm controllers",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         5
       ],
