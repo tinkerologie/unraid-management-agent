@@ -75,7 +75,7 @@
       "id": 7,
       "nativeTaskId": "15",
       "subject": "Task 7: REST /diagnostics/self-test + health summary [USER-GATE]",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         6
       ],
