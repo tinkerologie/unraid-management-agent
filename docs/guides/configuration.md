@@ -16,15 +16,17 @@ This file is created automatically after the first installation and persists acr
 
 ### Core Settings
 
-| Option                | Default  | Description                                        |
-| --------------------- | -------- | -------------------------------------------------- |
-| `--port`              | `8043`   | HTTP API port                                      |
-| `--debug`             | `false`  | Enable debug logging                               |
-| `--mqtt-enabled`      | `false`  | Enable MQTT publishing                             |
-| `--mqtt-broker`       | -        | MQTT broker address (e.g., `tcp://localhost:1883`) |
-| `--mqtt-topic-prefix` | `unraid` | MQTT topic prefix                                  |
-| `--mqtt-username`     | -        | MQTT username (optional)                           |
-| `--mqtt-password`     | -        | MQTT password (optional)                           |
+| Option                     | Default  | Description                                        |
+| -------------------------- | -------- | -------------------------------------------------- |
+| `--port`                   | `8043`   | HTTP API port                                      |
+| `--debug`                  | `false`  | Enable debug logging                               |
+| `--mqtt-enabled`           | `false`  | Enable MQTT publishing                             |
+| `--mqtt-broker`            | -        | MQTT broker address (e.g., `tcp://localhost:1883`) |
+| `--mqtt-topic-prefix`      | `unraid` | MQTT topic prefix                                  |
+| `--mqtt-username`          | -        | MQTT username (optional)                           |
+| `--mqtt-password`          | -        | MQTT password (optional)                           |
+| `--discovery-enabled`      | `true`   | Advertise the agent via mDNS for auto-discovery    |
+| `--discovery-service-name` | -        | Override the advertised mDNS instance name         |
 
 ### Collection Intervals
 
@@ -244,6 +246,41 @@ Topics will be:
 ```bash
 MQTT_BROKER=ssl://mqtt.example.com:8883
 ```
+
+## Auto-Discovery (zeroconf/mDNS)
+
+The agent advertises itself on the local network using zeroconf (mDNS/DNS-SD),
+so integrations such as the [Home Assistant integration](https://github.com/ruaan-deysel/ha-unraid-management-agent)
+can auto-discover the server instead of requiring a manually entered IP and port.
+
+This is **enabled by default** and requires no configuration. The agent
+publishes a DNS-SD service of type `_unraid-mgmt-agent._tcp.local.` with TXT
+records describing the version, API base path, and server name:
+
+| TXT record | Example      | Purpose                         |
+| ---------- | ------------ | ------------------------------- |
+| `version`  | `2026.06.01` | Agent version                   |
+| `path`     | `/api/v1`    | REST API base path              |
+| `name`     | `tower`      | Server hostname / friendly name |
+
+### Settings
+
+```bash
+# Disable advertising (e.g. on isolated networks where mDNS is blocked)
+DISCOVERY_ENABLED=false
+
+# Optionally override the advertised instance name (defaults to the hostname)
+DISCOVERY_SERVICE_NAME=Main Unraid
+```
+
+### Notes
+
+- Advertising is **best-effort**: if registration fails (for example, when
+  multicast is blocked), the agent logs a warning and continues normally.
+- The agent coexists with Unraid's existing `avahi-daemon`; both respond only
+  for their own service types.
+- mDNS only works within a single broadcast domain (subnet). For discovery
+  across VLANs/subnets, configure an mDNS reflector/repeater on your router.
 
 ## Performance Tuning
 

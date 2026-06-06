@@ -78,6 +78,10 @@ var cli struct {
 	MQTTHomeAssistant      bool   `default:"false" env:"MQTT_HOME_ASSISTANT" help:"enable Home Assistant MQTT discovery"`
 	MQTTHAPrefix           string `default:"homeassistant" env:"MQTT_HA_PREFIX" help:"Home Assistant discovery prefix"`
 
+	// Discovery (zeroconf/mDNS) Configuration
+	DiscoveryEnabled     bool   `default:"true" env:"DISCOVERY_ENABLED" help:"advertise the agent on the local network via mDNS for auto-discovery"`
+	DiscoveryServiceName string `default:"" env:"DISCOVERY_SERVICE_NAME" help:"override the advertised mDNS instance name (default: system hostname)"`
+
 	// Collection intervals (overridable via environment variables)
 	// Use 0 to disable a collector completely
 	// Maximum interval: 86400 seconds (24 hours)
@@ -259,6 +263,10 @@ func main() {
 			HomeAssistantPrefix: cli.MQTTHAPrefix,
 			DiscoveryEnabled:    cli.MQTTHomeAssistant, // Enable discovery when HA mode is enabled
 		},
+		DiscoveryConfig: domain.DiscoveryConfig{
+			Enabled:     cli.DiscoveryEnabled,
+			ServiceName: cli.DiscoveryServiceName,
+		},
 		DiagnosticLogger:   diagLogger,
 		LogsDir:            cli.LogsDir,
 		DockerUpdateNotify: cli.DockerUpdateNotify,
@@ -349,6 +357,12 @@ func applyFileConfig(cfg *domain.FileConfig) {
 		setBool(&cli.MQTTRetain, m.Retain)
 		setBool(&cli.MQTTHomeAssistant, m.HomeAssistant)
 		setStr(&cli.MQTTHAPrefix, m.HAPrefix)
+	}
+
+	// Discovery (zeroconf/mDNS)
+	if d := cfg.Discovery; d != nil {
+		setBool(&cli.DiscoveryEnabled, d.Enabled)
+		setStr(&cli.DiscoveryServiceName, d.ServiceName)
 	}
 
 	// Intervals

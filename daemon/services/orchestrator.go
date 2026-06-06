@@ -18,6 +18,7 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/alerting"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/api"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/controllers"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/discovery"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/mcp"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/mqtt"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/watchdog"
@@ -29,6 +30,7 @@ type Orchestrator struct {
 	ctx              *domain.Context
 	collectorManager *CollectorManager
 	mqttClient       *mqtt.Client
+	discoveryService *discovery.Service
 	fanController    *controllers.FanController
 	cpuController    *controllers.CPUController
 	tuningController *controllers.TuningController
@@ -80,6 +82,12 @@ func (o *Orchestrator) Run() error {
 	// Initialize MQTT client if enabled
 	if o.ctx.MQTTConfig.Enabled {
 		o.initializeMQTT(ctx, &wg, apiServer)
+	}
+
+	// Advertise the agent on the local network via mDNS so integrations
+	// (e.g. Home Assistant) can auto-discover it. Best-effort and optional.
+	if o.ctx.DiscoveryConfig.Enabled {
+		o.initializeDiscovery(ctx)
 	}
 
 	// Initialize MCP server with Streamable HTTP transport (MCP spec 2025-06-18)
@@ -256,19 +264,27 @@ func (o *Orchestrator) Run() error {
 		logger.Info("Agent Docker controller closed")
 	}
 
-	// 5. Stop MQTT client if running
+	// 5. Stop advertising via mDNS (sends goodbye packets) before other
+	// services wind down so discovery clients drop the entry promptly.
+	if o.discoveryService != nil {
+		o.discoveryService.Shutdown()
+		o.discoveryService = nil
+		logger.Info("Discovery service stopped")
+	}
+
+	// 6. Stop MQTT client if running
 	if o.mqttClient != nil {
 		o.mqttClient.Disconnect()
 		logger.Info("MQTT client disconnected")
 	}
 
-	// 5. Stop all collectors via manager
+	// 7. Stop all collectors via manager
 	o.collectorManager.StopAll()
 
-	// 6. Stop API server (which also cancels its internal goroutines)
+	// 8. Stop API server (which also cancels its internal goroutines)
 	apiServer.Stop()
 
-	// 7. Wait for all goroutines to complete
+	// 9. Wait for all goroutines to complete
 	logger.Info("Waiting for all goroutines to complete...")
 	wg.Wait()
 
@@ -397,6 +413,23 @@ func (o *Orchestrator) RunMCPStdio() error {
 	logger.Info("MCP STDIO shutdown complete")
 
 	return err
+}
+
+// initializeDiscovery sets up mDNS/zeroconf advertising so integrations can
+// auto-discover the agent. Failures are logged but never fatal — discovery is
+// an optional convenience that must not block startup.
+func (o *Orchestrator) initializeDiscovery(ctx context.Context) {
+	hostname, err := os.Hostname()
+	if err != nil || hostname == "" {
+		hostname = "unraid"
+	}
+
+	svc := discovery.NewService(o.ctx.DiscoveryConfig, hostname, o.ctx.Port, o.ctx.Version)
+	if err := svc.Start(ctx); err != nil {
+		logger.Warning("Discovery service disabled: %v", err)
+		return
+	}
+	o.discoveryService = svc
 }
 
 // initializeMQTT sets up the MQTT client and starts publishing events.

@@ -39,6 +39,25 @@ type Config struct {
 	CORSOrigin string `json:"cors_origin,omitempty"`
 }
 
+// DiscoveryConfig holds zeroconf (mDNS/DNS-SD) auto-discovery settings.
+// When enabled, the agent advertises itself on the local network so that
+// integrations (e.g. the Home Assistant integration) can auto-discover it.
+type DiscoveryConfig struct {
+	// Enabled controls whether the agent advertises itself via mDNS.
+	Enabled bool `json:"enabled"`
+	// ServiceName optionally overrides the advertised instance name.
+	// When empty, the system hostname is used.
+	ServiceName string `json:"service_name,omitempty"`
+}
+
+// DefaultDiscoveryConfig returns the default zeroconf discovery configuration.
+func DefaultDiscoveryConfig() DiscoveryConfig {
+	return DiscoveryConfig{
+		Enabled:     true,
+		ServiceName: "",
+	}
+}
+
 // DefaultMQTTConfig returns the default MQTT configuration.
 func DefaultMQTTConfig() MQTTConfig {
 	return MQTTConfig{
