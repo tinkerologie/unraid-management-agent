@@ -202,10 +202,12 @@ func (s *Server) handleHealthReport(w http.ResponseWriter, _ *http.Request) {
 	report := BuildHealthReport(containers, s.GetArrayCache(), disks, firing)
 
 	// OS-resilience: surface any degraded/unavailable data sources in the report.
-	if s.ctx.Platform != nil && s.ctx.Platform.DegradedCount() > 0 {
-		report.DegradedSubsystems = &dto.DegradedSubsystems{
-			Count: s.ctx.Platform.DegradedCount(),
-			Items: s.ctx.Platform.Snapshot(),
+	if s.ctx.Platform != nil {
+		if degraded := s.ctx.Platform.DegradedCount(); degraded > 0 {
+			report.DegradedSubsystems = &dto.DegradedSubsystems{
+				Count: degraded,
+				Items: s.ctx.Platform.Snapshot(),
+			}
 		}
 	}
 
