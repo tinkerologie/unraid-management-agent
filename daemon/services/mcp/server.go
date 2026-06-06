@@ -1255,6 +1255,32 @@ func (s *Server) registerControlTools() {
 		return textResult(fmt.Sprintf("Successfully executed '%s' on container '%s'", args.Action, args.ContainerID)), nil, nil
 	})
 
+	// Container autostart tool
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "set_container_autostart",
+		Description: "Enable or disable autostart for a Docker container. Writes to the Unraid autostart file (/var/lib/docker/unraid-autostart). The change persists across reboots and is reversible.",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(false),
+			IdempotentHint:  true,
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPSetAutostartArgs) (*mcp.CallToolResult, any, error) {
+		logger.Info("MCP: set_container_autostart(%s, enabled=%v)", args.ContainerID, args.Enabled)
+
+		dockerCtrl := controllers.NewDockerController()
+		defer dockerCtrl.Close() //nolint:errcheck
+
+		if err := dockerCtrl.SetAutostart(args.ContainerID, args.Enabled); err != nil {
+			logger.Error("MCP: set_container_autostart failed: %v", err)
+			return textResult(fmt.Sprintf("Failed to set autostart for container %q: %v", args.ContainerID, err)), nil, nil
+		}
+
+		action := "disabled"
+		if args.Enabled {
+			action = "enabled"
+		}
+		return textResult(fmt.Sprintf("Autostart %s for container %q", action, args.ContainerID)), nil, nil
+	})
+
 	// VM control tool
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "vm_action",

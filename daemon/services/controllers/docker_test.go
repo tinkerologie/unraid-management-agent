@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -227,6 +229,128 @@ func TestDockerControllerContainerLogs(t *testing.T) {
 		// Should return an error (container doesn't exist or Docker not available)
 		if err == nil {
 			t.Log("Note: No error returned - Docker socket might not be available")
+		}
+	})
+}
+
+// TestSetAutostartFile exercises the file-manipulation helper (modifyAutostartFile)
+// using a temp directory as the seam — no Docker daemon needed.
+//
+// Verified mechanism (2026-06-07, Unraid 7.x at 192.168.20.21):
+//
+//	/var/lib/docker/unraid-autostart — one container NAME per line, plain text,
+//	no quotes. The WebUI reads/writes this file to control which containers
+//	auto-start at boot. Empty lines are ignored by Unraid.
+func TestSetAutostartFile(t *testing.T) {
+	t.Run("add to empty file", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "unraid-autostart")
+		if err := modifyAutostartFile(path, "plex", true); err != nil {
+			t.Fatalf("modifyAutostartFile(enable) error: %v", err)
+		}
+		data, _ := os.ReadFile(path)
+		if !strings.Contains(string(data), "plex") {
+			t.Errorf("expected 'plex' in file, got: %q", string(data))
+		}
+	})
+
+	t.Run("add to existing file preserves order", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "unraid-autostart")
+		if err := os.WriteFile(path, []byte("jellyfin\nsonarr\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := modifyAutostartFile(path, "radarr", true); err != nil {
+			t.Fatalf("modifyAutostartFile(enable) error: %v", err)
+		}
+		data, _ := os.ReadFile(path)
+		content := string(data)
+		if !strings.Contains(content, "jellyfin") || !strings.Contains(content, "sonarr") || !strings.Contains(content, "radarr") {
+			t.Errorf("unexpected file content: %q", content)
+		}
+		// radarr must be appended after the existing entries
+		jIdx := strings.Index(content, "jellyfin")
+		sIdx := strings.Index(content, "sonarr")
+		rIdx := strings.Index(content, "radarr")
+		if !(jIdx < sIdx && sIdx < rIdx) {
+			t.Errorf("order not preserved; want jellyfin < sonarr < radarr, got positions %d %d %d", jIdx, sIdx, rIdx)
+		}
+	})
+
+	t.Run("remove existing entry", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "unraid-autostart")
+		if err := os.WriteFile(path, []byte("jellyfin\nplex\nsonarr\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := modifyAutostartFile(path, "plex", false); err != nil {
+			t.Fatalf("modifyAutostartFile(disable) error: %v", err)
+		}
+		data, _ := os.ReadFile(path)
+		content := string(data)
+		if strings.Contains(content, "plex") {
+			t.Errorf("'plex' should have been removed, got: %q", content)
+		}
+		if !strings.Contains(content, "jellyfin") || !strings.Contains(content, "sonarr") {
+			t.Errorf("other entries must remain, got: %q", content)
+		}
+	})
+
+	t.Run("idempotent add (already present)", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "unraid-autostart")
+		if err := os.WriteFile(path, []byte("plex\nsonarr\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := modifyAutostartFile(path, "plex", true); err != nil {
+			t.Fatalf("modifyAutostartFile(enable idempotent) error: %v", err)
+		}
+		data, _ := os.ReadFile(path)
+		content := string(data)
+		// plex must appear exactly once
+		count := strings.Count(content, "plex")
+		if count != 1 {
+			t.Errorf("expected 'plex' exactly once, got %d occurrences in: %q", count, content)
+		}
+	})
+
+	t.Run("idempotent remove (already absent)", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "unraid-autostart")
+		if err := os.WriteFile(path, []byte("jellyfin\nsonarr\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := modifyAutostartFile(path, "plex", false); err != nil {
+			t.Fatalf("modifyAutostartFile(disable absent) error: %v", err)
+		}
+		data, _ := os.ReadFile(path)
+		content := string(data)
+		if strings.Contains(content, "plex") {
+			t.Errorf("'plex' should not be in file, got: %q", content)
+		}
+	})
+
+	t.Run("file does not exist — enable creates it", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "unraid-autostart")
+		if err := modifyAutostartFile(path, "homeassistant", true); err != nil {
+			t.Fatalf("modifyAutostartFile on missing file error: %v", err)
+		}
+		data, _ := os.ReadFile(path)
+		if !strings.Contains(string(data), "homeassistant") {
+			t.Errorf("expected 'homeassistant' in new file, got: %q", string(data))
+		}
+	})
+
+	t.Run("seam: dockerAutostartFile variable is overridable", func(t *testing.T) {
+		// Save and restore the global seam.
+		orig := dockerAutostartFile
+		defer func() { dockerAutostartFile = orig }()
+
+		tmp := filepath.Join(t.TempDir(), "unraid-autostart")
+		dockerAutostartFile = tmp
+
+		// modifyAutostartFile should use the overridden path.
+		if err := modifyAutostartFile(dockerAutostartFile, "mycontainer", true); err != nil {
+			t.Fatalf("modifyAutostartFile via seam error: %v", err)
+		}
+		data, _ := os.ReadFile(tmp)
+		if !strings.Contains(string(data), "mycontainer") {
+			t.Errorf("expected 'mycontainer' in temp file, got: %q", string(data))
 		}
 	})
 }

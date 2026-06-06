@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -173,6 +174,140 @@ func (dc *DockerController) Remove(containerID string, removeImage bool) error {
 		}
 	}
 
+	return nil
+}
+
+// dockerAutostartFile is the path to the Unraid autostart list. It is a package-level
+// variable so tests can point it at a temp file without touching the real path.
+//
+// VERIFIED 2026-06-07 on Unraid 7.x (192.168.20.21):
+//   - /var/lib/docker/unraid-autostart contains one container NAME per line (no quotes,
+//     no extra fields), in the order Unraid starts them at boot. The file is the
+//     canonical source of truth for which containers auto-start — the WebUI reads/writes
+//     this file directly. Empty lines are ignored by Unraid.
+//   - /boot/config/plugins/dockerMan/userprefs.cfg holds the UI ordering (indexed
+//     key=value pairs) and is NOT the runtime autostart gate; do not write to it.
+var dockerAutostartFile = "/var/lib/docker/unraid-autostart"
+
+// SetAutostart enables or disables autostart for a container by adding or removing its
+// name from the Unraid autostart file (/var/lib/docker/unraid-autostart).
+//
+// The file format is one container name per line (plain text, no quotes). Order is
+// preserved for names that remain in the file. The write is atomic (write-then-rename).
+// The container ID is resolved to a name via ContainerInspect when it does not look like
+// a plain name (i.e. when a Docker daemon is reachable and the ID is a hash).
+func (dc *DockerController) SetAutostart(containerID string, enabled bool) error {
+	logger.Info("Docker: SetAutostart(%s, %v)", containerID, enabled)
+
+	// Resolve the container name. The autostart file uses names, not IDs.
+	name, err := dc.resolveContainerName(containerID)
+	if err != nil {
+		return fmt.Errorf("cannot resolve container name for %q: %w", containerID, err)
+	}
+
+	return modifyAutostartFile(dockerAutostartFile, name, enabled)
+}
+
+// resolveContainerName returns the plain container name for a given ID or name.
+// If the Docker daemon is unreachable (no client), the input is returned unchanged so
+// that callers that already have a plain name (e.g. from the cache) still work.
+func (dc *DockerController) resolveContainerName(containerID string) (string, error) {
+	if err := dc.initClient(); err != nil {
+		// No daemon available — treat containerID as the name as-is.
+		logger.Warning("Docker: daemon unavailable for name resolution, using %q as-is: %v", containerID, err)
+		return containerID, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	info, err := dc.client.ContainerInspect(ctx, containerID, client.ContainerInspectOptions{})
+	if err != nil {
+		return "", fmt.Errorf("ContainerInspect failed: %w", err)
+	}
+
+	name := strings.TrimPrefix(info.Container.Name, "/")
+	return name, nil
+}
+
+// modifyAutostartFile is the pure, testable file-manipulation helper.
+// It reads the autostart file at path, adds or removes containerName, and writes the
+// result atomically. Order of existing entries is preserved; appends at end when adding.
+func modifyAutostartFile(path, containerName string, enabled bool) error {
+	// Read existing entries (file may not exist yet — treat as empty).
+	// path is the package-level dockerAutostartFile constant (or a test temp path) — not user input.
+	data, err := os.ReadFile(path) //nolint:gosec // G304: path is a controlled constant, not user input
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to read autostart file %s: %w", path, err)
+	}
+
+	// Parse: split on newlines, keep non-empty, non-duplicate names.
+	lines := strings.Split(string(data), "\n")
+	entries := make([]string, 0, len(lines))
+	found := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		if trimmed == containerName {
+			found = true
+			if enabled {
+				// Already present — keep it.
+				entries = append(entries, trimmed)
+			}
+			// If !enabled: skip (i.e. remove) this entry.
+		} else {
+			entries = append(entries, trimmed)
+		}
+	}
+
+	if enabled && !found {
+		// Container not in the list — append it.
+		entries = append(entries, containerName)
+	}
+
+	if !enabled && !found {
+		// Already absent — nothing to do.
+		logger.Info("Docker: autostart: %s was not in the list (no change)", containerName)
+	}
+
+	// Build file content: one name per line, trailing newline.
+	content := strings.Join(entries, "\n")
+	if len(entries) > 0 {
+		content += "\n"
+	}
+
+	// Atomic write: write to a temp file in the same directory, then rename.
+	dir := "."
+	if idx := strings.LastIndex(path, "/"); idx >= 0 {
+		dir = path[:idx]
+	}
+	tmp, err := os.CreateTemp(dir, ".autostart-tmp-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file for autostart write: %w", err)
+	}
+	tmpName := tmp.Name()
+
+	if _, err := tmp.WriteString(content); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpName)
+		return fmt.Errorf("failed to write autostart temp file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmpName)
+		return fmt.Errorf("failed to close autostart temp file: %w", err)
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		_ = os.Remove(tmpName)
+		return fmt.Errorf("failed to rename autostart temp file to %s: %w", path, err)
+	}
+
+	action := "added to"
+	if !enabled {
+		action = "removed from"
+	}
+	logger.Info("Docker: %s autostart list (%s)", containerName, action)
 	return nil
 }
 

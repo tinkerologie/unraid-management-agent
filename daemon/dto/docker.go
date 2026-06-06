@@ -143,6 +143,12 @@ type ContainerRemoveRequest struct {
 	RemoveImage bool `json:"remove_image,omitempty"`
 }
 
+// ContainerAutostartRequest is the request body for POST /docker/{id}/autostart.
+type ContainerAutostartRequest struct {
+	// Enabled controls whether autostart is turned on (true) or off (false).
+	Enabled bool `json:"enabled"`
+}
+
 // ContainerLogs contains log output from a Docker container
 type ContainerLogs struct {
 	ContainerID   string    `json:"container_id" example:"abc123def456"`

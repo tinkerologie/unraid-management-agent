@@ -169,6 +169,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/docker/{id}/pause", s.handleDockerPause).Methods("POST")
 	api.HandleFunc("/docker/{id}/unpause", s.handleDockerUnpause).Methods("POST")
 	api.HandleFunc("/docker/{id}/remove", s.handleDockerRemove).Methods("POST")
+	api.HandleFunc("/docker/{id}/autostart", s.handleDockerAutostart).Methods("POST")
 
 	api.HandleFunc("/vm/{name}/start", s.handleVMStart).Methods("POST")
 	api.HandleFunc("/vm/{name}/stop", s.handleVMStop).Methods("POST")

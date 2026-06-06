@@ -554,6 +554,69 @@ func (s *Server) handleDockerRemove(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleDockerAutostart godoc
+//
+//	@Summary		Set container autostart
+//	@Description	Enable or disable autostart for a Docker container. Uses the Unraid autostart file (/var/lib/docker/unraid-autostart). The change persists across reboots.
+//	@Tags			Docker
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		string								true	"Container ID or name"
+//	@Param			request	body		dto.ContainerAutostartRequest		true	"Enabled flag"
+//	@Success		200		{object}	dto.Response						"Autostart updated"
+//	@Failure		400		{object}	dto.Response						"Invalid container ID or request body"
+//	@Failure		500		{object}	dto.Response						"Failed to update autostart"
+//	@Router			/docker/{id}/autostart [post]
+func (s *Server) handleDockerAutostart(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	containerID := vars["id"]
+
+	if err := lib.ValidateContainerID(containerID); err != nil {
+		logger.Warning("Invalid container ID for autostart operation: %s - %v", containerID, err)
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   err.Error(),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	var req dto.ContainerAutostartRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Invalid request body: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	logger.Info("Setting autostart=%v for container %s", req.Enabled, containerID)
+
+	controller := controllers.NewDockerController()
+	defer controller.Close() //nolint:errcheck
+
+	if err := controller.SetAutostart(containerID, req.Enabled); err != nil {
+		logger.Error("Failed to set autostart for container %s: %v", containerID, err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   "Failed to update autostart",
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	action := "disabled"
+	if req.Enabled {
+		action = "enabled"
+	}
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   fmt.Sprintf("Autostart %s for container %s", action, containerID),
+		Timestamp: time.Now(),
+	})
+}
+
 // handleDockerStart godoc
 //
 //	@Summary		Start Docker container

@@ -29,6 +29,12 @@ type MCPContainerListArgs struct {
 	State string `json:"state,omitempty" jsonschema:"Filter containers by state: running, stopped, or all (default: all)"`
 }
 
+// MCPSetAutostartArgs represents arguments for the set_container_autostart tool.
+type MCPSetAutostartArgs struct {
+	ContainerID string `json:"container_id" jsonschema:"The Docker container ID or name"`
+	Enabled     bool   `json:"enabled" jsonschema:"Set to true to enable autostart, false to disable"`
+}
+
 // MCPVMArgs represents arguments for VM-related tools.
 type MCPVMArgs struct {
 	VMName string `json:"vm_name" jsonschema:"The virtual machine name"`
