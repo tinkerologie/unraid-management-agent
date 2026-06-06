@@ -25,6 +25,7 @@
 │   ├── dto/                    # Data Transfer Objects (shared structs)
 │   ├── lib/                    # Utilities: shell exec, parsing, validation
 │   ├── logger/                 # Logging wrapper (lumberjack)
+│   ├── platform/               # OS-resilience: data-source health registry, capability/version detection, path/binary resolution
 │   └── services/
 │       ├── api/                # HTTP server, REST handlers, WebSocket hub
 │       ├── agent/              # Embedded autonomous agent (LLM loop, tools, sessions)
@@ -147,7 +148,7 @@ Each collector:
 
 Model Context Protocol endpoint at `POST /mcp` (Streamable HTTP, spec 2025-06-18):
 
-- **server.go**: MCP server with 121 tools, 5 resources, and 6 prompts for monitoring and control
+- **server.go**: MCP server with 122 tools, 5 resources, and 6 prompts for monitoring and control
 - **transport.go**: HTTP transport for JSON-RPC requests
 - Tools expose system info, Docker/VM control, notifications, etc.
 

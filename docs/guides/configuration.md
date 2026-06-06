@@ -282,6 +282,30 @@ DISCOVERY_SERVICE_NAME=Main Unraid
 - mDNS only works within a single broadcast domain (subnet). For discovery
   across VLANs/subnets, configure an mDNS reflector/repeater on your router.
 
+## OS-Resilience & Self-Diagnostics
+
+The agent continuously checks that each Unraid data source it reads is healthy.
+If an OS update moves a path, changes a file format, or removes a binary, the
+affected subsystem is flagged **degraded** (or **unavailable**) instead of
+silently returning empty/wrong data — and the agent keeps serving whatever valid
+data it still has.
+
+Surfaces:
+
+- **Self-test endpoint:** `GET /api/v1/diagnostics/self-test` → detected Unraid
+  version, `overall_state`, probed capabilities, and per-subsystem source status.
+- **MCP tool:** `run_self_test` (read-only) returns the same payload for AI agents.
+- **Inline flag:** affected subsystem responses include a `source_status` field
+  (omitted entirely when healthy, so healthy responses are unchanged).
+- **Prometheus:** `unraid_subsystem_status{subsystem="…"}` (0=healthy, 1=degraded,
+  2=unavailable) and `unraid_degraded_subsystem_count`.
+- **Alert:** a built-in, enabled-by-default rule `subsystem_degraded` raises a
+  warning notification the moment any source becomes degraded (you can disable or
+  edit it like any alert rule).
+
+No configuration is required — this is always on and self-contained (no
+dependency on the official Unraid API).
+
 ## Performance Tuning
 
 ### CPU Impact

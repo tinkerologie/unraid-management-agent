@@ -43,19 +43,20 @@ The MCP server supports two transports — use the one that fits your deployment
 > - Use **Streamable HTTP** if the AI client (Cursor, VS Code, etc.) runs on a different machine than the Unraid server.
 > - Use **STDIO** if the AI client (Claude Desktop, Cursor) runs locally on the Unraid server itself — it has zero network overhead and requires no authentication.
 
-## Available Tools (121 total)
+## Available Tools (122 total)
 
 ### System Monitoring Tools
 
-| Tool                      | Description                                                               |
-| ------------------------- | ------------------------------------------------------------------------- |
-| `get_system_info`         | System information including hostname, CPU, RAM, temperatures, and uptime |
-| `get_array_status`        | Array state, capacity, parity information, and disk assignments           |
-| `get_hardware_info`       | Motherboard, CPU, and memory details from DMI/SMBIOS                      |
-| `get_registration`        | Unraid license and registration information                               |
-| `get_health_status`       | Overall system health status                                              |
-| `get_diagnostic_summary`  | Comprehensive diagnostic summary including all subsystems                 |
-| `get_network_access_urls` | All available access URLs (LAN, WAN, mDNS, IPv6)                          |
+| Tool                      | Description                                                                                             |
+| ------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `get_system_info`         | System information including hostname, CPU, RAM, temperatures, and uptime                               |
+| `run_self_test`           | OS-resilience self-test: Unraid version, overall data-source health, capabilities, per-subsystem status |
+| `get_array_status`        | Array state, capacity, parity information, and disk assignments                                         |
+| `get_hardware_info`       | Motherboard, CPU, and memory details from DMI/SMBIOS                                                    |
+| `get_registration`        | Unraid license and registration information                                                             |
+| `get_health_status`       | Overall system health status                                                                            |
+| `get_diagnostic_summary`  | Comprehensive diagnostic summary including all subsystems                                               |
+| `get_network_access_urls` | All available access URLs (LAN, WAN, mDNS, IPv6)                                                        |
 
 ### Disk & Storage Tools
 
