@@ -14,7 +14,7 @@
       "id": 1,
       "nativeTaskId": "26",
       "subject": "C-Task 1: Container remove",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         0
       ],
