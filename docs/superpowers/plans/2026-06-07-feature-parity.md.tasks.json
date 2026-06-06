@@ -34,7 +34,7 @@
       "id": 3,
       "nativeTaskId": "28",
       "subject": "C-Task 3: Port-conflict detection",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         2
       ],
