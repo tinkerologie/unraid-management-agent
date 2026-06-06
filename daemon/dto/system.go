@@ -64,6 +64,9 @@ type SystemInfo struct {
 	// Additional Metrics
 	Fans      []FanInfo `json:"fans"`
 	Timestamp time.Time `json:"timestamp"`
+
+	// SourceStatus is non-nil when the data source is degraded or unavailable.
+	SourceStatus *SourceStatus `json:"source_status,omitempty"`
 }
 
 // FanInfo contains fan speed information

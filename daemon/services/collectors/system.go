@@ -75,7 +75,23 @@ func (c *SystemCollector) Collect() {
 	systemInfo, err := c.collectSystemInfo()
 	if err != nil {
 		logger.Error("Failed to collect system info: %v", err)
+		if c.ctx.Platform != nil {
+			c.ctx.Platform.Report("system", dto.SourceUnavailable, "no system data", err)
+		}
 		return
+	}
+
+	// OS-resilience: validate the result shape — hostname and at least one CPU core
+	// are always present on a live system; their absence signals a /proc read failure.
+	if c.ctx.Platform != nil {
+		switch {
+		case systemInfo.Hostname == "" || systemInfo.CPUCores == 0:
+			c.ctx.Platform.Report("system", dto.SourceDegraded, "incomplete system info (hostname/cpu missing)", nil)
+		default:
+			c.ctx.Platform.Healthy("system")
+		}
+		// Attach inline source_status flag (nil when healthy — response unchanged).
+		systemInfo.SourceStatus = c.ctx.Platform.StatusFor("system")
 	}
 
 	// Publish event
