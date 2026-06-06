@@ -22,6 +22,8 @@ type VMInfo struct {
 	Autostart       bool      `json:"autostart" example:"false"`
 	PersistentState bool      `json:"persistent" example:"true"`
 	Timestamp       time.Time `json:"timestamp"`
+
+	SourceStatus *SourceStatus `json:"source_status,omitempty"`
 }
 
 // VMSnapshot contains information about a VM snapshot

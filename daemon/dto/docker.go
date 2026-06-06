@@ -41,6 +41,8 @@ type ContainerInfo struct {
 	UpdateAvailable *bool      `json:"update_available,omitempty"`         // null when not yet checked / registry unreachable (field omitted in JSON)
 	UpdateChecked   *time.Time `json:"update_checked,omitempty"`
 	Timestamp       time.Time  `json:"timestamp"`
+
+	SourceStatus *SourceStatus `json:"source_status,omitempty"`
 }
 
 // PortMapping represents a port mapping
