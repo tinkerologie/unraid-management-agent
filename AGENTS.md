@@ -25,7 +25,7 @@
 │   ├── dto/                    # Data Transfer Objects (shared structs)
 │   ├── lib/                    # Utilities: shell exec, parsing, validation
 │   ├── logger/                 # Logging wrapper (lumberjack)
-│   ├── platform/               # OS-resilience: data-source health registry, capability/version detection, path/binary resolution
+│   ├── platform/               # OS-resilience: source-health registry, capability detection, path/binary resolution
 │   └── services/
 │       ├── api/                # HTTP server, REST handlers, WebSocket hub
 │       ├── agent/              # Embedded autonomous agent (LLM loop, tools, sessions)
