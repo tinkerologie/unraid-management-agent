@@ -1,0 +1,99 @@
+{
+  "planPath": "docs/superpowers/plans/2026-06-06-os-resilience-hardening.md",
+  "specPath": "docs/superpowers/specs/2026-06-06-os-resilience-design.md",
+  "branch": "feat/os-resilience-hardening",
+  "tasks": [
+    {
+      "id": 0,
+      "nativeTaskId": "8",
+      "subject": "Task 0: dto.SourceStatus + platform.Registry",
+      "status": "pending",
+      "description": "**Goal:** Shared status value type + thread-safe registry with transition-notifier.\n\n**Verify:** go test ./daemon/platform/ -run TestRegistry -v\n\n```json:metadata\n{\"files\": [\"daemon/dto/source_status.go\",\"daemon/platform/registry.go\",\"daemon/platform/registry_test.go\"], \"verifyCommand\": \"go test ./daemon/platform/ -run TestRegistry -v\"}\n```"
+    },
+    {
+      "id": 1,
+      "nativeTaskId": "9",
+      "subject": "Task 1: platform Detector + Resolver + validators",
+      "status": "pending",
+      "blockedBy": [0],
+      "description": "**Goal:** Version detection, capability probing, path/binary existence, shape-validation helpers; platform imports only dto+logger+stdlib.\n\n**Verify:** go test ./daemon/platform/ -v\n\n```json:metadata\n{\"files\": [\"daemon/platform/detector.go\",\"daemon/platform/resolver.go\",\"daemon/platform/validate.go\"], \"verifyCommand\": \"go test ./daemon/platform/ -v\"}\n```"
+    },
+    {
+      "id": 2,
+      "nativeTaskId": "10",
+      "subject": "Task 2: Wire registry into context/orchestrator + WS topic",
+      "status": "pending",
+      "blockedBy": [1],
+      "description": "**Goal:** Registry on domain.Context, created in main.go, seeded by detector via daemon/services/probes.go, notifier publishes TopicSourceStatusChanged broadcast over WS.\n\n**Verify:** go build ./... && go test ./daemon/... -count=1\n\n```json:metadata\n{\"files\": [\"daemon/domain/context.go\",\"main.go\",\"daemon/services/orchestrator.go\",\"daemon/constants/topics.go\",\"daemon/services/probes.go\",\"daemon/services/api/server.go\"], \"verifyCommand\": \"go build ./... && go test ./daemon/... -count=1\"}\n```"
+    },
+    {
+      "id": 3,
+      "nativeTaskId": "11",
+      "subject": "Task 3: Validate+report in system & array collectors",
+      "status": "pending",
+      "blockedBy": [2],
+      "description": "**Goal:** system+array collectors validate, report status, publish best-effort, attach inline source_status when not healthy.\n\n**Verify:** go test ./daemon/services/collectors/ -run TestValidate -v\n\n```json:metadata\n{\"files\": [\"daemon/services/collectors/validators.go\",\"daemon/services/collectors/system.go\",\"daemon/services/collectors/array.go\",\"daemon/dto/system.go\",\"daemon/dto/array.go\"], \"verifyCommand\": \"go test ./daemon/services/collectors/ -run TestValidate -v\"}\n```"
+    },
+    {
+      "id": 4,
+      "nativeTaskId": "12",
+      "subject": "Task 4: Validate+report in disk & shares collectors",
+      "status": "pending",
+      "blockedBy": [3],
+      "description": "**Goal:** disk (disks.ini/smartctl) + shares (shares.ini) resilience pattern + inline flags.\n\n**Verify:** go test ./daemon/services/collectors/ -v\n\n```json:metadata\n{\"files\": [\"daemon/services/collectors/disk.go\",\"daemon/services/collectors/shares.go\",\"daemon/dto/disk.go\",\"daemon/dto/share.go\"], \"verifyCommand\": \"go test ./daemon/services/collectors/ -v\"}\n```"
+    },
+    {
+      "id": 5,
+      "nativeTaskId": "13",
+      "subject": "Task 5: Validate+report in docker & vm collectors [USER-GATE]",
+      "status": "pending",
+      "blockedBy": [4],
+      "userGate": true,
+      "description": "**Goal:** docker+vm resilience pattern, then first on-hardware verify.\n\n**USER-ORDERED GATE — NON-SKIPPABLE.** Close only after acceptance criteria re-validated on Unraid with output captured.\n\n**Verify:** go test ./... && ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --tags build,deploy,verify\n\n```json:metadata\n{\"files\": [\"daemon/services/collectors/docker.go\",\"daemon/services/collectors/vm.go\",\"daemon/dto/container.go\",\"daemon/dto/vm.go\"], \"verifyCommand\": \"ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --tags build,deploy,verify\", \"userGate\": true, \"tags\": [\"user-gate\"], \"gateScope\": \"this-step\"}\n```"
+    },
+    {
+      "id": 6,
+      "nativeTaskId": "14",
+      "subject": "Task 6: Capability-gate array/disk/docker/vm controllers",
+      "status": "pending",
+      "blockedBy": [5],
+      "description": "**Goal:** Control ops check capability before acting; return clear unavailable errors.\n\n**Verify:** go test ./daemon/services/controllers/ -v\n\n```json:metadata\n{\"files\": [\"daemon/services/controllers/guard.go\",\"daemon/services/controllers/array.go\",\"daemon/services/controllers/docker.go\",\"daemon/services/controllers/vm.go\"], \"verifyCommand\": \"go test ./daemon/services/controllers/ -v\"}\n```"
+    },
+    {
+      "id": 7,
+      "nativeTaskId": "15",
+      "subject": "Task 7: REST /diagnostics/self-test + health summary [USER-GATE]",
+      "status": "pending",
+      "blockedBy": [6],
+      "userGate": true,
+      "description": "**Goal:** REST self-test endpoint + health-report degraded summary; verified healthy on hardware.\n\n**USER-ORDERED GATE — NON-SKIPPABLE.** Close only after live self-test overall_state healthy on 192.168.20.21.\n\n**Verify:** go test ./daemon/services/api/ -run TestSelfTest -v && ansible-playbook ... --tags build,deploy,verify\n\n```json:metadata\n{\"files\": [\"daemon/services/api/diagnostics.go\",\"daemon/services/api/server.go\",\"daemon/services/api/handlers.go\",\"ansible/roles/verify/tasks/main.yml\"], \"verifyCommand\": \"ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --tags build,deploy,verify\", \"userGate\": true, \"tags\": [\"user-gate\"], \"gateScope\": \"this-step\"}\n```"
+    },
+    {
+      "id": 8,
+      "nativeTaskId": "16",
+      "subject": "Task 8: run_self_test MCP tool + Prometheus gauges",
+      "status": "pending",
+      "blockedBy": [7],
+      "description": "**Goal:** run_self_test MCP tool (122 tools) + unraid_subsystem_status / unraid_degraded_subsystem_count gauges.\n\n**Verify:** go test ./daemon/services/mcp/ ./daemon/services/api/ -count=1\n\n```json:metadata\n{\"files\": [\"daemon/services/mcp/server.go\",\"daemon/services/api/metrics.go\"], \"verifyCommand\": \"go test ./daemon/services/mcp/ ./daemon/services/api/ -count=1\"}\n```"
+    },
+    {
+      "id": 9,
+      "nativeTaskId": "17",
+      "subject": "Task 9: Auto-alert subsystem_degraded [USER-GATE]",
+      "status": "pending",
+      "blockedBy": [8],
+      "userGate": true,
+      "description": "**Goal:** AlertEnv.DegradedSubsystemCount + built-in enabled subsystem_degraded rule; verified by induced degradation on hardware.\n\n**USER-ORDERED GATE — NON-SKIPPABLE.** Close only after induced degradation fires the alert on the live server and resolves on recovery.\n\n**Verify:** go test ./daemon/services/alerting/ -v + live induce → /api/v1/alerts/firing\n\n```json:metadata\n{\"files\": [\"daemon/dto/alert.go\",\"daemon/services/alerting/templates.go\"], \"verifyCommand\": \"ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --tags build,deploy,verify\", \"userGate\": true, \"tags\": [\"user-gate\"], \"gateScope\": \"this-step\"}\n```"
+    },
+    {
+      "id": 10,
+      "nativeTaskId": "18",
+      "subject": "Task 10: Fixtures + breakage tests + docs + final verify + CHANGELOG [USER-GATE]",
+      "status": "pending",
+      "blockedBy": [9],
+      "userGate": true,
+      "description": "**Goal:** Sanitized fixtures + crux breakage tests + docs (122 tools) + final hardware verify + CodeRabbit, THEN CHANGELOG last.\n\n**USER-ORDERED GATE — NON-SKIPPABLE.** CHANGELOG is the LAST action, only after full hardware verify + clean CodeRabbit.\n\n**Verify:** go test ./daemon/services/collectors/ -run TestFixtures -v && final ansible-playbook ... --tags build,deploy,verify\n\n```json:metadata\n{\"files\": [\"daemon/services/collectors/fixtures_test.go\",\"docs/integrations/mcp.md\",\"AGENTS.md\",\"CHANGELOG.md\"], \"verifyCommand\": \"ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --tags build,deploy,verify\", \"userGate\": true, \"tags\": [\"user-gate\"], \"gateScope\": \"whole-plan\"}\n```"
+    }
+  ],
+  "lastUpdated": "2026-06-06"
+}
