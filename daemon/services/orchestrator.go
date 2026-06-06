@@ -322,6 +322,22 @@ func (o *Orchestrator) RunMCPStdio() error {
 
 	// Initialize collector manager and register all collectors
 	o.collectorManager = NewCollectorManager(o.ctx, &wg)
+
+	// OS-resilience: detect capabilities and wire the status-change notifier to the bus.
+	caps := platform.Detect(resilienceProbes())
+	o.ctx.Platform.SetCapabilities(caps)
+	o.ctx.Platform.SetNotifier(func(s dto.SourceStatus) {
+		domain.Publish(o.ctx.Hub, constants.TopicSourceStatusChanged, s)
+	})
+	degraded := 0
+	for _, c := range caps.Items {
+		if !c.Available {
+			degraded++
+		}
+	}
+	logger.Info("Resilience: Unraid version %q, %d/%d probed capabilities unavailable",
+		caps.UnraidVersion, degraded, len(caps.Items))
+
 	o.collectorManager.RegisterAllCollectors()
 
 	// Initialize API server for cache/subscriptions only (no HTTP)
