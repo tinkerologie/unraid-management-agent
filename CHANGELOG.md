@@ -56,7 +56,7 @@ ruaan-deysel/unraid-management-agent`, as a Claude Code plugin
 
 ---
 
-## [2026.06.01] - 2026-06-01
+## [2026.06.01] - 2026-06-05
 
 ### Added
 
