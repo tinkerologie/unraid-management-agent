@@ -22,7 +22,7 @@
       "id": 2,
       "nativeTaskId": "10",
       "subject": "Task 2: Wire registry into context/orchestrator + WS topic",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [1],
       "description": "**Goal:** Registry on domain.Context, created in main.go, seeded by detector via daemon/services/probes.go, notifier publishes TopicSourceStatusChanged broadcast over WS.\n\n**Verify:** go build ./... && go test ./daemon/... -count=1\n\n```json:metadata\n{\"files\": [\"daemon/domain/context.go\",\"main.go\",\"daemon/services/orchestrator.go\",\"daemon/constants/topics.go\",\"daemon/services/probes.go\",\"daemon/services/api/server.go\"], \"verifyCommand\": \"go build ./... && go test ./daemon/... -count=1\"}\n```"
     },
