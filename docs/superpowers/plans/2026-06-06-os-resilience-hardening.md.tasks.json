@@ -86,7 +86,7 @@
       "id": 8,
       "nativeTaskId": "16",
       "subject": "Task 8: run_self_test MCP tool + Prometheus gauges",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         7
       ],
@@ -96,7 +96,7 @@
       "id": 9,
       "nativeTaskId": "17",
       "subject": "Task 9: Auto-alert subsystem_degraded [USER-GATE]",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         8
       ],
