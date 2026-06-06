@@ -11,6 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **OS-resilience & self-diagnostics** (sub-project B) — the agent now detects
+  when an Unraid data source breaks (moved path, changed file format, missing
+  binary) via capability/shape probing, degrades gracefully (keeps serving
+  best-effort data, never silently wrong/empty), and surfaces it everywhere:
+  `GET /api/v1/diagnostics/self-test`, the `run_self_test` MCP tool (read-only;
+  brings the MCP tool count to 122), an inline `source_status` flag on affected
+  subsystem responses (omitted when healthy, so healthy responses are
+  unchanged), a `source_status_changed` WebSocket event, `unraid_subsystem_status`
+  / `unraid_degraded_subsystem_count` Prometheus gauges, a degraded summary in
+  `/api/v1/health/report`, and a built-in **enabled** `subsystem_degraded` alert
+  rule. Control operations are capability-gated (clear "unavailable" errors
+  instead of cryptic shell failures). Implemented as a new dependency-light
+  `daemon/platform` package; fully self-contained (no dependency on the official
+  Unraid API). Verified live on Unraid 7.3.1 (self-test healthy across 6
+  subsystems; golden-fixture + breakage-simulation tests in CI).
+
 - **Zeroconf/mDNS auto-discovery** (#120) — the agent now advertises itself
   on the local network via mDNS/DNS-SD as `_unraid-mgmt-agent._tcp.local.`, so
   integrations such as the
