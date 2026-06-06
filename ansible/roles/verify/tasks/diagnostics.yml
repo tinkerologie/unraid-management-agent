@@ -1,0 +1,26 @@
+---
+# OS-resilience self-test validation
+
+- name: Get diagnostics self-test
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/diagnostics/self-test"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: selftest_result
+
+- name: Validate self-test schema and overall health
+  vars:
+    st: "{{ selftest_result.json }}"
+  ansible.builtin.assert:
+    that:
+      - st.overall_state is defined
+      - st.subsystems is defined
+      - st.overall_state == "healthy"
+    fail_msg: >-
+      Self-test reports overall_state={{ st.overall_state | default('?') }};
+      degraded subsystems: {{ st.subsystems | default([]) | selectattr('state', 'ne', 'healthy') | list }}
+    success_msg: >-
+      Self-test healthy (Unraid {{ st.unraid_version | default('unknown') }},
+      {{ st.subsystems | default([]) | length }} subsystems tracked)

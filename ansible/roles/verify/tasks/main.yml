@@ -37,3 +37,6 @@
 
 - name: Notification and collector validation
   ansible.builtin.include_tasks: notifications_collectors.yml
+
+- name: OS-resilience self-test validation
+  ansible.builtin.include_tasks: diagnostics.yml
