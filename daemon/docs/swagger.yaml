@@ -1,5 +1,20 @@
 basePath: /api/v1
 definitions:
+  api.selfTestResponse:
+    properties:
+      capabilities:
+        $ref: '#/definitions/dto.Capabilities'
+      overall_state:
+        $ref: '#/definitions/dto.SourceState'
+      subsystems:
+        items:
+          $ref: '#/definitions/dto.SourceStatus'
+        type: array
+      timestamp:
+        type: string
+      unraid_version:
+        type: string
+    type: object
   dto.AccessURL:
     properties:
       ipv4:
@@ -271,6 +286,10 @@ definitions:
       parity_valid:
         example: true
         type: boolean
+      source_status:
+        allOf:
+        - $ref: '#/definitions/dto.SourceStatus'
+        description: SourceStatus is non-nil when the data source is degraded or unavailable.
       state:
         example: Started
         type: string
@@ -480,6 +499,26 @@ definitions:
         example: 800
         type: integer
     type: object
+  dto.Capabilities:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/dto.Capability'
+        type: array
+      unraid_version:
+        type: string
+    type: object
+  dto.Capability:
+    properties:
+      available:
+        type: boolean
+      detail:
+        type: string
+      name:
+        type: string
+      target:
+        type: string
+    type: object
   dto.ChassisInfo:
     properties:
       asset_tag:
@@ -633,6 +672,8 @@ definitions:
       restart_policy:
         example: unless-stopped
         type: string
+      source_status:
+        $ref: '#/definitions/dto.SourceStatus'
       state:
         example: running
         type: string
@@ -768,6 +809,15 @@ definitions:
         example: 2
         type: integer
     type: object
+  dto.DegradedSubsystems:
+    properties:
+      count:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/dto.SourceStatus'
+        type: array
+    type: object
   dto.DiskCacheInfo:
     properties:
       dirty_background_ratio:
@@ -860,6 +910,11 @@ definitions:
       smart_status:
         example: PASSED
         type: string
+      source_status:
+        allOf:
+        - $ref: '#/definitions/dto.SourceStatus'
+        description: SourceStatus is non-nil only when the backing data source is
+          not healthy.
       spin_state:
         description: '"active", "standby", "unknown"'
         example: active
@@ -1527,6 +1582,12 @@ definitions:
     properties:
       critical_count:
         type: integer
+      degraded_subsystems:
+        allOf:
+        - $ref: '#/definitions/dto.DegradedSubsystems'
+        description: |-
+          DegradedSubsystems summarizes data sources whose health is not "healthy"
+          (OS-resilience). Omitted when all sources are healthy.
       findings:
         items:
           $ref: '#/definitions/dto.HealthFinding'
@@ -2826,6 +2887,11 @@ definitions:
         description: Is share exported via SMB?
         example: true
         type: boolean
+      source_status:
+        allOf:
+        - $ref: '#/definitions/dto.SourceStatus'
+        description: SourceStatus is non-nil only when the backing data source is
+          not healthy.
       storage:
         description: '"cache", "array", "cache+array", or "unknown"'
         example: cache+array
@@ -2845,6 +2911,29 @@ definitions:
       used_bytes:
         example: 5368709120000
         type: integer
+    type: object
+  dto.SourceState:
+    enum:
+    - healthy
+    - degraded
+    - unavailable
+    type: string
+    x-enum-varnames:
+    - SourceHealthy
+    - SourceDegraded
+    - SourceUnavailable
+  dto.SourceStatus:
+    properties:
+      last_checked:
+        type: string
+      last_error:
+        type: string
+      reason:
+        type: string
+      state:
+        $ref: '#/definitions/dto.SourceState'
+      subsystem:
+        type: string
     type: object
   dto.SystemInfo:
     properties:
@@ -2951,6 +3040,10 @@ definitions:
         description: System Information
         example: Supermicro X11SCL-F
         type: string
+      source_status:
+        allOf:
+        - $ref: '#/definitions/dto.SourceStatus'
+        description: SourceStatus is non-nil when the data source is degraded or unavailable.
       swap_free_bytes:
         example: 7516192768
         type: integer
@@ -3355,6 +3448,8 @@ definitions:
       persistent:
         example: true
         type: boolean
+      source_status:
+        $ref: '#/definitions/dto.SourceStatus'
       state:
         example: running
         type: string
@@ -4561,6 +4656,20 @@ paths:
       summary: Set CPU scaling governor
       tags:
       - CPU
+  /diagnostics/self-test:
+    get:
+      description: Returns the detected Unraid version, overall data-source health,
+        probed capabilities, and per-subsystem source status (healthy/degraded/unavailable).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.selfTestResponse'
+      summary: Run agent self-test
+      tags:
+      - Diagnostics
   /disks:
     get:
       description: Retrieve information about all disks including SMART data
