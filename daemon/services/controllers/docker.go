@@ -886,6 +886,7 @@ func detectPortConflicts(bindings map[string][]string) []dto.PortConflict {
 		if err != nil {
 			continue
 		}
+		sort.Strings(names)
 		conflicts = append(conflicts, dto.PortConflict{
 			HostPort:   portNum,
 			Protocol:   proto,
@@ -936,6 +937,11 @@ func (dc *DockerController) PortConflicts() ([]dto.PortConflict, error) {
 		inspectResult, err := dc.client.ContainerInspect(ctx, c.ID, client.ContainerInspectOptions{})
 		if err != nil {
 			logger.Warning("DockerPortConflicts: inspect failed for %s: %v", name, err)
+			continue
+		}
+
+		// Only running containers actually hold host ports; skip stopped ones.
+		if inspectResult.Container.State == nil || !inspectResult.Container.State.Running {
 			continue
 		}
 

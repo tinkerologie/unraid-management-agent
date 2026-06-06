@@ -3,6 +3,7 @@ package controllers
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -266,6 +267,13 @@ func TestPortConflicts(t *testing.T) {
 			wantPort: 443, // lowest port first
 			wantN:    3,
 		},
+		{
+			name:     "containers slice is sorted alphabetically",
+			input:    map[string][]string{"8080/tcp": {"bravo", "alpha"}},
+			wantLen:  1,
+			wantPort: 8080,
+			wantN:    2,
+		},
 	}
 
 	for _, tt := range tests {
@@ -280,6 +288,13 @@ func TestPortConflicts(t *testing.T) {
 				}
 				if len(got[0].Containers) != tt.wantN {
 					t.Errorf("first conflict Containers len=%d, want %d", len(got[0].Containers), tt.wantN)
+				}
+				// Verify every conflict's Containers slice is sorted.
+				for ci, conflict := range got {
+					if !sort.StringsAreSorted(conflict.Containers) {
+						t.Errorf("conflict[%d] (port %d/%s) Containers not sorted: %v",
+							ci, conflict.HostPort, conflict.Protocol, conflict.Containers)
+					}
 				}
 			}
 		})
