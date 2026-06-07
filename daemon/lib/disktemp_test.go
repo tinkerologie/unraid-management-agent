@@ -40,6 +40,12 @@ temp=""
 	}
 }
 
+func TestReadDiskTempsDefaultPath(t *testing.T) {
+	if DiskTempsPath != "/boot/config/disks.ini" {
+		t.Errorf("DiskTempsPath = %q, want /boot/config/disks.ini", DiskTempsPath)
+	}
+}
+
 func TestReadDiskTempsMissingFile(t *testing.T) {
 	got, err := ReadDiskTempsFromFile(filepath.Join(t.TempDir(), "nope.ini"))
 	if err == nil {
