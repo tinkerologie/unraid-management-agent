@@ -31,6 +31,10 @@ type FanSafetyGuard struct {
 	config        dto.FanSafetyConfig
 	hwmon         *HwmonProvider
 	stateCaptured bool
+	// stalled tracks fans currently in the stalled state so the warning is
+	// logged once per transition (not every poll cycle). Empty/unused fan
+	// headers that read 0 RPM otherwise spam the log every interval.
+	stalled map[string]bool
 }
 
 // NewFanSafetyGuard creates a safety guard with the given configuration.
@@ -49,6 +53,7 @@ func NewFanSafetyGuard(hwmon *HwmonProvider, config dto.FanSafetyConfig) *FanSaf
 		originals: make(map[string]fanOriginalState),
 		config:    config,
 		hwmon:     hwmon,
+		stalled:   make(map[string]bool),
 	}
 }
 
@@ -119,15 +124,32 @@ func (g *FanSafetyGuard) CheckTemperatureSafety() bool {
 	return false
 }
 
-// DetectFailures checks fans for stall conditions (low RPM while PWM > 0).
+// DetectFailures checks fans for stall conditions (low RPM while PWM > 0) and
+// returns the IDs of all currently-failed fans. The stall warning is logged
+// only when a fan first enters the stalled state (and a recovery is logged once
+// when it clears), so a permanently-stalled/empty header does not spam the log
+// every poll cycle.
 func (g *FanSafetyGuard) DetectFailures(fans []dto.FanDevice) []string {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
 	var failed []string
+	current := make(map[string]bool)
 	for _, f := range fans {
 		if f.Controllable && f.PWMPercent > 10 && f.RPM < g.config.FailureRPMThreshold {
 			failed = append(failed, f.ID)
-			logger.Warning("Fan safety: %s appears stalled (RPM=%d, PWM=%d%%)", f.ID, f.RPM, f.PWMPercent)
+			current[f.ID] = true
+			if !g.stalled[f.ID] {
+				logger.Warning("Fan safety: %s appears stalled (RPM=%d, PWM=%d%%)", f.ID, f.RPM, f.PWMPercent)
+			}
 		}
 	}
+	for id := range g.stalled {
+		if !current[id] {
+			logger.Info("Fan safety: %s recovered (RPM back above threshold)", id)
+		}
+	}
+	g.stalled = current
 	return failed
 }
 
