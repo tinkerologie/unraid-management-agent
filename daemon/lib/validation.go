@@ -6,6 +6,8 @@ import (
 	"net"
 	"regexp"
 	"strings"
+
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 )
 
 var (
@@ -44,6 +46,9 @@ var (
 	// Fan IDs: alphanumeric, underscores, hyphens (max 100 chars)
 	// e.g. "hwmon0_fan1", "it8721_fan2", "ipmi_fan3"
 	fanIDRegex = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$`)
+
+	// hwmon temperature inputs look like /sys/class/hwmon/hwmon0/temp1_input
+	hwmonSensorPathRegex = regexp.MustCompile(`^/sys/class/hwmon/hwmon[0-9]+/temp[0-9]+_input$`)
 )
 
 // ValidateContainerID validates a Docker container ID format
@@ -419,6 +424,58 @@ func ValidateHostOrIP(host string) error {
 	}
 	if !hostnameRegex.MatchString(host) {
 		return fmt.Errorf("invalid host %q: must be a valid hostname or IP address", host)
+	}
+	return nil
+}
+
+// ValidateFanTempSource validates a fan curve temperature source.
+func ValidateFanTempSource(src dto.FanTempSource) error {
+	switch src.Type {
+	case dto.FanTempSourceHwmon:
+		if err := validateHwmonSensorPath(src.SensorPath); err != nil {
+			return err
+		}
+	case dto.FanTempSourceDrives:
+		if len(src.DriveIDs) == 0 {
+			return errors.New("drives source requires at least one drive ID")
+		}
+		for i, driveID := range src.DriveIDs {
+			id := strings.TrimSpace(driveID)
+			if id == "" {
+				return fmt.Errorf("drive_ids[%d] cannot be empty", i)
+			}
+			if strings.Contains(id, "..") || strings.Contains(id, "/") || strings.Contains(id, "\\") || strings.Contains(id, "\x00") {
+				return fmt.Errorf("invalid drive_ids[%d]: %q", i, driveID)
+			}
+		}
+	default:
+		return fmt.Errorf("invalid temperature source type: %q", src.Type)
+	}
+	// Fallback is optional, but if set it must be a valid hwmon path.
+	if src.FallbackSensorPath != "" {
+		if err := validateHwmonSensorPath(src.FallbackSensorPath); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateHwmonSensorPath ensures a sysfs path is under /sys/class/hwmon and
+// free of directory traversal.
+// This is a string-level guard: symlinks are resolved by the kernel at open
+// time, so callers must still open the path with appropriate (read-only) access.
+func validateHwmonSensorPath(path string) error {
+	if path == "" {
+		return errors.New("hwmon sensor path cannot be empty")
+	}
+	if len(path) > 4096 {
+		return errors.New("hwmon sensor path too long")
+	}
+	if strings.Contains(path, "..") || strings.Contains(path, "\x00") {
+		return errors.New("invalid hwmon sensor path: traversal or null byte")
+	}
+	if !hwmonSensorPathRegex.MatchString(path) {
+		return errors.New("hwmon sensor path must match /sys/class/hwmon/hwmonN/tempM_input")
 	}
 	return nil
 }

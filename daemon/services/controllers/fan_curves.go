@@ -53,21 +53,35 @@ func builtInProfiles() []dto.FanProfile {
 	}
 }
 
-// fanCurveAssignment links a fan to a profile and temperature sensor.
+// fanCurveAssignment links a fan to a profile and temperature source.
 type fanCurveAssignment struct {
-	ProfileName    string
-	TempSensorPath string
+	ProfileName string            `json:"profile_name"`
+	Source      dto.FanTempSource `json:"source"`
+}
+
+// DriveTempProvider supplies per-disk temperatures (from disks.ini).
+type DriveTempProvider interface {
+	DriveTemps() (map[string]lib.DiskTemp, error)
+}
+
+// defaultDriveTempProvider reads the real disks.ini.
+type defaultDriveTempProvider struct{}
+
+func (defaultDriveTempProvider) DriveTemps() (map[string]lib.DiskTemp, error) {
+	return lib.ReadDiskTemps()
 }
 
 // FanCurveEngine evaluates temperature→speed curves and applies PWM changes.
 type FanCurveEngine struct {
-	mu          sync.RWMutex
-	profiles    map[string]dto.FanProfile
-	assignments map[string]fanCurveAssignment // keyed by fan ID
-	hwmon       *HwmonProvider
-	safety      *FanSafetyGuard
-	cancel      context.CancelFunc
-	running     bool
+	mu           sync.RWMutex
+	profiles     map[string]dto.FanProfile
+	assignments  map[string]fanCurveAssignment // keyed by fan ID
+	hwmon        *HwmonProvider
+	safety       *FanSafetyGuard
+	cancel       context.CancelFunc
+	running      bool
+	drives       DriveTempProvider
+	driveStandby map[string]bool // fanID → currently in all-spun-down fallback (log-once)
 }
 
 // NewFanCurveEngine creates a curve engine with built-in profiles.
@@ -78,10 +92,12 @@ func NewFanCurveEngine(hwmon *HwmonProvider, safety *FanSafetyGuard) *FanCurveEn
 	}
 
 	return &FanCurveEngine{
-		profiles:    profileMap,
-		assignments: make(map[string]fanCurveAssignment),
-		hwmon:       hwmon,
-		safety:      safety,
+		profiles:     profileMap,
+		assignments:  make(map[string]fanCurveAssignment),
+		hwmon:        hwmon,
+		safety:       safety,
+		drives:       defaultDriveTempProvider{},
+		driveStandby: make(map[string]bool),
 	}
 }
 
@@ -103,8 +119,8 @@ func (e *FanCurveEngine) AddProfile(profile dto.FanProfile) error {
 	return nil
 }
 
-// AssignProfile links a fan to a named profile and optional temperature sensor.
-func (e *FanCurveEngine) AssignProfile(fanID, profileName, tempSensorPath string) error {
+// AssignProfile links a fan to a named profile and temperature source.
+func (e *FanCurveEngine) AssignProfile(fanID, profileName string, source dto.FanTempSource) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -112,10 +128,7 @@ func (e *FanCurveEngine) AssignProfile(fanID, profileName, tempSensorPath string
 		return &fanError{msg: "profile not found: " + profileName}
 	}
 
-	e.assignments[fanID] = fanCurveAssignment{
-		ProfileName:    profileName,
-		TempSensorPath: tempSensorPath,
-	}
+	e.assignments[fanID] = fanCurveAssignment{ProfileName: profileName, Source: source}
 	return nil
 }
 
@@ -135,6 +148,17 @@ func (e *FanCurveEngine) GetAssignment(fanID string) (string, bool) {
 		return "", false
 	}
 	return a.ProfileName, true
+}
+
+// GetAssignmentSource returns the temperature source for a fan, if assigned.
+func (e *FanCurveEngine) GetAssignmentSource(fanID string) (dto.FanTempSource, bool) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	a, ok := e.assignments[fanID]
+	if !ok {
+		return dto.FanTempSource{}, false
+	}
+	return a.Source, true
 }
 
 // Profiles returns a copy of all registered profiles.
@@ -200,22 +224,16 @@ func (e *FanCurveEngine) applyCurves() {
 
 	for fanID, assignment := range assignments {
 		e.mu.RLock()
-		profile, ok := e.profiles[assignment.ProfileName]
+		profile, pok := e.profiles[assignment.ProfileName]
 		e.mu.RUnlock()
-		if !ok {
+		if !pok {
 			continue
 		}
 
-		// Read the linked temperature sensor
-		tempC := 0.0
-		if assignment.TempSensorPath != "" {
-			raw := lib.ReadSysfsInt(assignment.TempSensorPath)
-			if raw > 0 {
-				tempC = float64(raw) / 1000.0
-			}
-		}
-		if tempC == 0 || !lib.IsPlausibleTempC(tempC) {
-			continue // no valid or plausible temp reading, skip
+		// Resolve the curve input from the assignment's source.
+		tempC, ok := e.resolveTempForFan(fanID, assignment.Source)
+		if !ok {
+			continue // no valid reading — hold last PWM (existing safe behavior)
 		}
 
 		targetPct := interpolateSpeed(profile.CurvePoints, tempC)
@@ -225,6 +243,92 @@ func (e *FanCurveEngine) applyCurves() {
 		if err := e.hwmon.SetPWM(fanID, targetPWM); err != nil {
 			logger.Debug("Fan curve: Failed to set PWM for %s: %v", fanID, err)
 		}
+	}
+}
+
+// resolveTemp returns the curve input temperature for a source. It tries the
+// primary source (hwmon sensor or max-of-active-drives), then the per-profile
+// hwmon fallback, then reports no reading.
+func (e *FanCurveEngine) resolveTemp(src dto.FanTempSource) (float64, bool) {
+	switch src.Type {
+	case dto.FanTempSourceHwmon:
+		if t, ok := readHwmonTemp(src.SensorPath); ok {
+			return t, true
+		}
+	case dto.FanTempSourceDrives:
+		if t, ok := e.maxActiveDriveTemp(src.DriveIDs); ok {
+			return t, true
+		}
+	}
+	if t, ok := readHwmonTemp(src.FallbackSensorPath); ok {
+		return t, true
+	}
+	return 0, false
+}
+
+// resolveTempForFan resolves a fan's source and logs the drive-spun-down
+// fallback transition once per fan. Returns the resolved temperature.
+func (e *FanCurveEngine) resolveTempForFan(fanID string, src dto.FanTempSource) (float64, bool) {
+	tempC, ok := e.resolveTemp(src)
+	if src.Type == dto.FanTempSourceDrives {
+		_, primaryOK := e.maxActiveDriveTemp(src.DriveIDs)
+		e.noteDriveFallback(fanID, !primaryOK)
+	}
+	return tempC, ok
+}
+
+// maxActiveDriveTemp returns the highest plausible temperature among the
+// selected drives that are present and not spun down.
+func (e *FanCurveEngine) maxActiveDriveTemp(ids []string) (float64, bool) {
+	temps, err := e.drives.DriveTemps()
+	if err != nil {
+		logger.Debug("Fan curve: failed to read drive temperatures: %v", err)
+		return 0, false
+	}
+	maxT := 0.0
+	found := false
+	for _, id := range ids {
+		d, ok := temps[id]
+		if !ok || d.SpunDown || !lib.IsPlausibleTempC(d.TempC) {
+			continue
+		}
+		if !found || d.TempC > maxT {
+			maxT = d.TempC
+			found = true
+		}
+	}
+	return maxT, found
+}
+
+// readHwmonTemp reads a single hwmon sysfs temp input in °C.
+func readHwmonTemp(path string) (float64, bool) {
+	if path == "" {
+		return 0, false
+	}
+	raw := lib.ReadSysfsInt(path)
+	if raw <= 0 {
+		return 0, false
+	}
+	t := float64(raw) / 1000.0
+	if !lib.IsPlausibleTempC(t) {
+		return 0, false
+	}
+	return t, true
+}
+
+// noteDriveFallback logs the first transition into and out of the all-spun-down
+// fallback state for a fan, avoiding per-poll log spam.
+func (e *FanCurveEngine) noteDriveFallback(fanID string, inFallback bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	was := e.driveStandby[fanID]
+	switch {
+	case inFallback && !was:
+		logger.Info("Fan curve: %s — selected drives spun down, falling back to fallback sensor", fanID)
+		e.driveStandby[fanID] = true
+	case !inFallback && was:
+		logger.Info("Fan curve: %s — drives active again, leaving fallback", fanID)
+		delete(e.driveStandby, fanID)
 	}
 }
 

@@ -2214,6 +2214,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/dto.Response"
                         }
+                    },
+                    "503": {
+                        "description": "Fan controller not initialized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
                     }
                 }
             }
@@ -2257,6 +2263,32 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Failed to create profile",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/fans/sensors": {
+            "get": {
+                "description": "List available hwmon temperature sensors and drives for fan-curve assignment",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Fans"
+                ],
+                "summary": "List fan temperature sources",
+                "responses": {
+                    "200": {
+                        "description": "Available sensors and drives",
+                        "schema": {
+                            "$ref": "#/definitions/dto.FanSensorCatalog"
+                        }
+                    },
+                    "503": {
+                        "description": "Fan controller not initialized",
                         "schema": {
                             "$ref": "#/definitions/dto.Response"
                         }
@@ -6068,6 +6100,48 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.AvailableDriveSensor": {
+            "type": "object",
+            "properties": {
+                "device": {
+                    "type": "string",
+                    "example": "sdb"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "disk1"
+                },
+                "spun_down": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "temp_celsius": {
+                    "type": "number",
+                    "example": 38
+                }
+            }
+        },
+        "dto.AvailableTempSensor": {
+            "type": "object",
+            "properties": {
+                "label": {
+                    "type": "string",
+                    "example": "Tctl"
+                },
+                "path": {
+                    "type": "string",
+                    "example": "/sys/class/hwmon/hwmon0/temp1_input"
+                },
+                "plausible": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "temp_celsius": {
+                    "type": "number",
+                    "example": 45
+                }
+            }
+        },
         "dto.BIOSInfo": {
             "type": "object",
             "properties": {
@@ -7383,6 +7457,9 @@ const docTemplate = `{
                 "temp_sensor_path": {
                     "type": "string",
                     "example": "/sys/class/hwmon/hwmon0/temp1_input"
+                },
+                "temp_source": {
+                    "$ref": "#/definitions/dto.FanTempSource"
                 }
             }
         },
@@ -7465,6 +7542,9 @@ const docTemplate = `{
                     "type": "string",
                     "example": "balanced"
                 },
+                "source": {
+                    "$ref": "#/definitions/dto.FanTempSource"
+                },
                 "temp_sensor_path": {
                     "type": "string",
                     "example": "/sys/class/hwmon/hwmon0/temp1_input"
@@ -7488,6 +7568,26 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.FanSensorCatalog": {
+            "type": "object",
+            "properties": {
+                "drives": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.AvailableDriveSensor"
+                    }
+                },
+                "hwmon_sensors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.AvailableTempSensor"
+                    }
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.FanSpeedRequest": {
             "type": "object",
             "properties": {
@@ -7500,6 +7600,48 @@ const docTemplate = `{
                     "example": 50
                 }
             }
+        },
+        "dto.FanTempSource": {
+            "type": "object",
+            "properties": {
+                "drive_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "disk1",
+                        "disk2"
+                    ]
+                },
+                "fallback_sensor_path": {
+                    "type": "string",
+                    "example": "/sys/class/hwmon/hwmon0/temp1_input"
+                },
+                "sensor_path": {
+                    "type": "string",
+                    "example": "/sys/class/hwmon/hwmon0/temp1_input"
+                },
+                "type": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.FanTempSourceType"
+                        }
+                    ],
+                    "example": "drives"
+                }
+            }
+        },
+        "dto.FanTempSourceType": {
+            "type": "string",
+            "enum": [
+                "hwmon",
+                "drives"
+            ],
+            "x-enum-varnames": [
+                "FanTempSourceHwmon",
+                "FanTempSourceDrives"
+            ]
         },
         "dto.FlashDriveHealth": {
             "description": "USB flash boot drive health information",

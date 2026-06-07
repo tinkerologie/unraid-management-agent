@@ -3,6 +3,8 @@ package lib
 import (
 	"strings"
 	"testing"
+
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 )
 
 func TestValidateHostOrIP(t *testing.T) {
@@ -706,6 +708,35 @@ func TestValidateUserScriptName(t *testing.T) {
 				if !strings.Contains(err.Error(), tt.errMsg) {
 					t.Errorf("ValidateUserScriptName() error = %v, want error containing %q", err, tt.errMsg)
 				}
+			}
+		})
+	}
+}
+
+func TestValidateFanTempSource(t *testing.T) {
+	tests := []struct {
+		name    string
+		src     dto.FanTempSource
+		wantErr bool
+	}{
+		{"hwmon ok", dto.FanTempSource{Type: dto.FanTempSourceHwmon, SensorPath: "/sys/class/hwmon/hwmon0/temp1_input"}, false},
+		{"drives ok", dto.FanTempSource{Type: dto.FanTempSourceDrives, DriveIDs: []string{"disk1"}, FallbackSensorPath: "/sys/class/hwmon/hwmon0/temp1_input"}, false},
+		{"bad type", dto.FanTempSource{Type: "bogus"}, true},
+		{"drives empty list", dto.FanTempSource{Type: dto.FanTempSourceDrives}, true},
+		{"path traversal", dto.FanTempSource{Type: dto.FanTempSourceHwmon, SensorPath: "/sys/class/hwmon/../../etc/passwd"}, true},
+		{"path outside hwmon", dto.FanTempSource{Type: dto.FanTempSourceHwmon, SensorPath: "/etc/passwd"}, true},
+		{"bad fallback path", dto.FanTempSource{Type: dto.FanTempSourceDrives, DriveIDs: []string{"disk1"}, FallbackSensorPath: "/etc/shadow"}, true},
+		{"path too long", dto.FanTempSource{Type: dto.FanTempSourceHwmon, SensorPath: "/sys/class/hwmon/" + strings.Repeat("a", 5000)}, true},
+		{"null byte in path", dto.FanTempSource{Type: dto.FanTempSourceHwmon, SensorPath: "/sys/class/hwmon/hwmon0/temp1_input\x00"}, true},
+		{"non-input hwmon path", dto.FanTempSource{Type: dto.FanTempSourceHwmon, SensorPath: "/sys/class/hwmon/hwmon0/name"}, true},
+		{"empty drive id", dto.FanTempSource{Type: dto.FanTempSourceDrives, DriveIDs: []string{"disk1", ""}}, true},
+		{"drive id with slash", dto.FanTempSource{Type: dto.FanTempSourceDrives, DriveIDs: []string{"../etc"}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateFanTempSource(tt.src)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateFanTempSource(%+v) err=%v wantErr=%v", tt.src, err, tt.wantErr)
 			}
 		})
 	}

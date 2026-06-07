@@ -24,6 +24,49 @@ const (
 	FanMethodIPMI FanControlMethod = "ipmi"
 )
 
+// FanTempSourceType identifies where a fan curve reads its temperature.
+type FanTempSourceType string
+
+const (
+	// FanTempSourceHwmon reads a single hwmon sysfs temperature input.
+	FanTempSourceHwmon FanTempSourceType = "hwmon"
+	// FanTempSourceDrives reads the max temperature across selected active drives.
+	FanTempSourceDrives FanTempSourceType = "drives"
+)
+
+// FanTempSource describes a fan curve's temperature input. For Type=="drives"
+// the engine uses the max temperature of the active (non-standby) DriveIDs and
+// falls back to FallbackSensorPath when they are all spun down.
+type FanTempSource struct {
+	Type               FanTempSourceType `json:"type" example:"drives"`
+	SensorPath         string            `json:"sensor_path,omitempty" example:"/sys/class/hwmon/hwmon0/temp1_input"`
+	DriveIDs           []string          `json:"drive_ids,omitempty" example:"disk1,disk2"`
+	FallbackSensorPath string            `json:"fallback_sensor_path,omitempty" example:"/sys/class/hwmon/hwmon0/temp1_input"`
+}
+
+// AvailableTempSensor is a discoverable hwmon temperature sensor.
+type AvailableTempSensor struct {
+	Path      string  `json:"path" example:"/sys/class/hwmon/hwmon0/temp1_input"`
+	Label     string  `json:"label,omitempty" example:"Tctl"`
+	TempC     float64 `json:"temp_celsius" example:"45"`
+	Plausible bool    `json:"plausible" example:"true"`
+}
+
+// AvailableDriveSensor is a discoverable drive temperature source.
+type AvailableDriveSensor struct {
+	ID       string  `json:"id" example:"disk1"`
+	Device   string  `json:"device,omitempty" example:"sdb"`
+	TempC    float64 `json:"temp_celsius" example:"38"`
+	SpunDown bool    `json:"spun_down" example:"false"`
+}
+
+// FanSensorCatalog lists everything a fan curve can be pointed at.
+type FanSensorCatalog struct {
+	HwmonSensors []AvailableTempSensor  `json:"hwmon_sensors"`
+	Drives       []AvailableDriveSensor `json:"drives"`
+	Timestamp    time.Time              `json:"timestamp"`
+}
+
 // FanDevice represents a single fan with monitoring and control state.
 type FanDevice struct {
 	ID             string         `json:"id" example:"hwmon0_fan1"`
@@ -37,6 +80,7 @@ type FanDevice struct {
 	HwmonIndex     int            `json:"hwmon_index,omitempty" example:"1"`
 	ActiveProfile  string         `json:"active_profile,omitempty" example:"balanced"`
 	TempSensorPath string         `json:"temp_sensor_path,omitempty" example:"/sys/class/hwmon/hwmon0/temp1_input"`
+	TempSource     *FanTempSource `json:"temp_source,omitempty"`
 }
 
 // FanCurvePoint defines a temperature-to-speed mapping point.
@@ -99,9 +143,10 @@ type FanModeRequest struct {
 
 // FanProfileRequest is the JSON body for assigning a profile to a fan.
 type FanProfileRequest struct {
-	FanID          string `json:"fan_id" example:"hwmon0_fan1"`
-	ProfileName    string `json:"profile_name" example:"balanced"`
-	TempSensorPath string `json:"temp_sensor_path,omitempty" example:"/sys/class/hwmon/hwmon0/temp1_input"`
+	FanID          string         `json:"fan_id" example:"hwmon0_fan1"`
+	ProfileName    string         `json:"profile_name" example:"balanced"`
+	TempSensorPath string         `json:"temp_sensor_path,omitempty" example:"/sys/class/hwmon/hwmon0/temp1_input"`
+	Source         *FanTempSource `json:"source,omitempty"`
 }
 
 // FanProfileCreateRequest is the JSON body for creating a custom profile.
