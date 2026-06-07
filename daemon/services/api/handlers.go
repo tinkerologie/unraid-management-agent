@@ -844,17 +844,67 @@ func (s *Server) handleVMForceStop(w http.ResponseWriter, r *http.Request) {
 // handleVMReset godoc
 //
 //	@Summary		Reset VM
-//	@Description	Hard reset a specific virtual machine by name (equivalent to the physical reset button). The VM must be running.
+//	@Description	Hard reset a specific virtual machine by name (equivalent to the physical reset button). The VM must be running. Requires confirm=true in the request body.
 //	@Tags			VMs
+//	@Accept			json
 //	@Produce		json
-//	@Param			name	path		string	true	"VM name"
-//	@Success		200		{object}	dto.Response	"VM reset"
-//	@Failure		400		{object}	dto.Response	"Invalid VM name"
-//	@Failure		500		{object}	dto.Response	"Failed to reset VM"
+//	@Param			name	path		string				true	"VM name"
+//	@Param			request	body		dto.VMResetRequest	true	"Confirm flag"
+//	@Success		200		{object}	dto.Response		"VM reset"
+//	@Failure		400		{object}	dto.Response		"Invalid VM name or missing confirmation"
+//	@Failure		500		{object}	dto.Response		"Failed to reset VM"
 //	@Router			/vm/{name}/reset [post]
 func (s *Server) handleVMReset(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	vmName := vars["name"]
+
+	if err := lib.ValidateVMName(vmName); err != nil {
+		logger.Warning("Invalid VM name for reset operation: %s - %v", vmName, err)
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   err.Error(),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	var req dto.VMResetRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Invalid request body: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	if !req.Confirm {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   "confirm must be set to true to reset the VM",
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	logger.Info("Resetting VM %s", vmName)
+
 	controller := controllers.NewVMController()
-	s.handleVMOperation(w, r, "reset", controller.Reset)
+	if err := controller.Reset(vmName); err != nil {
+		logger.Error("Failed to reset VM %s: %v", vmName, err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   "Failed to reset VM",
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   "VM reset",
+		Timestamp: time.Now(),
+	})
 }
 
 // handleArrayStart godoc

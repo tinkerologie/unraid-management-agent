@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
@@ -590,6 +591,114 @@ func TestNewRoutes_Exist(t *testing.T) {
 			// Route should resolve (not 404)
 			if rr.Code == http.StatusNotFound {
 				t.Errorf("route %s %s returned 404", route.method, route.path)
+			}
+		})
+	}
+}
+
+// ===== VM Reset Handler Tests =====
+
+func TestHandleVMReset_NoConfirm(t *testing.T) {
+	server, _ := setupTestServer()
+
+	body := strings.NewReader(`{"confirm": false}`)
+	req, err := http.NewRequest("POST", "/api/v1/vm/myvm/reset", body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	server.router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400 when confirm=false, got %d", rr.Code)
+	}
+
+	var resp dto.Response
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.Success {
+		t.Error("expected Success=false when confirm=false")
+	}
+}
+
+func TestHandleVMReset_MissingBody(t *testing.T) {
+	server, _ := setupTestServer()
+
+	// Empty body — confirm defaults to false (zero value)
+	body := strings.NewReader(`{}`)
+	req, err := http.NewRequest("POST", "/api/v1/vm/myvm/reset", body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	server.router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400 when confirm omitted, got %d", rr.Code)
+	}
+
+	var resp dto.Response
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.Success {
+		t.Error("expected Success=false when confirm omitted")
+	}
+}
+
+func TestHandleVMReset_InvalidBody(t *testing.T) {
+	server, _ := setupTestServer()
+
+	body := strings.NewReader(`not-json`)
+	req, err := http.NewRequest("POST", "/api/v1/vm/myvm/reset", body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	server.router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400 for invalid JSON body, got %d", rr.Code)
+	}
+}
+
+func TestHandleVMReset_InvalidVMName(t *testing.T) {
+	server, _ := setupTestServer()
+
+	tests := []struct {
+		name   string
+		vmName string
+	}{
+		{"semicolon injection", "vm;hack"},
+		{"backtick injection", "vm`id`"},
+		{"command injection", "$(id)"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			body := strings.NewReader(`{"confirm": true}`)
+			req, err := http.NewRequest("POST", "/api/v1/vm/"+tt.vmName+"/reset", body)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			rr := httptest.NewRecorder()
+			server.router.ServeHTTP(rr, req)
+
+			if rr.Code != http.StatusBadRequest {
+				t.Errorf("expected status 400 for invalid VM name %q, got %d", tt.vmName, rr.Code)
+			}
+
+			var resp dto.Response
+			if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+				t.Fatalf("failed to parse response: %v", err)
+			}
+			if resp.Success {
+				t.Error("expected Success=false for invalid VM name")
 			}
 		})
 	}
