@@ -20,6 +20,7 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/alerting"
@@ -3016,6 +3017,18 @@ func (s *Server) registerFanControlTools() {
 		return jsonResult(cache)
 	})
 
+	// Get available fan-curve temperature sources (monitoring)
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "get_fan_sensors",
+		Description: "List available hwmon temperature sensors and drives that can be used as fan-curve temperature sources",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		if s.fanController == nil {
+			return textResult("Fan controller not initialized"), nil, nil
+		}
+		return jsonResult(s.fanController.GetSensorCatalog())
+	})
+
 	// Set fan speed (control)
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "set_fan_speed",
@@ -3057,7 +3070,7 @@ func (s *Server) registerFanControlTools() {
 	// Assign fan profile (control)
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "set_fan_profile",
-		Description: "Assign a temperature curve profile to a fan. Built-in profiles: quiet, balanced, performance. Provide a temperature sensor path for automatic curve-based control.",
+		Description: "Assign a temperature curve profile to a fan. Built-in profiles: quiet, balanced, performance. Set source_type='hwmon' with temp_sensor_path, OR source_type='drives' with drive_ids (+ optional fallback_sensor_path) to curve on the max temperature of selected drives.",
 		Annotations: &mcp.ToolAnnotations{
 			DestructiveHint: ptr(true),
 			IdempotentHint:  true,
@@ -3066,8 +3079,18 @@ func (s *Server) registerFanControlTools() {
 		if s.fanController == nil {
 			return textResult("Fan controller not initialized"), nil, nil
 		}
-		logger.Info("MCP: Set fan profile '%s' for '%s'", args.ProfileName, args.FanID)
-		if err := s.fanController.SetProfile(args.FanID, args.ProfileName, dto.FanTempSource{Type: dto.FanTempSourceHwmon, SensorPath: args.TempSensorPath}); err != nil {
+		var source dto.FanTempSource
+		switch args.SourceType {
+		case string(dto.FanTempSourceDrives):
+			source = dto.FanTempSource{Type: dto.FanTempSourceDrives, DriveIDs: args.DriveIDs, FallbackSensorPath: args.FallbackSensorPath}
+		default:
+			source = dto.FanTempSource{Type: dto.FanTempSourceHwmon, SensorPath: args.TempSensorPath}
+		}
+		if err := lib.ValidateFanTempSource(source); err != nil {
+			return textResult(fmt.Sprintf("Invalid temperature source: %v", err)), nil, nil
+		}
+		logger.Info("MCP: Set fan profile '%s' for '%s' (source=%s)", args.ProfileName, args.FanID, source.Type)
+		if err := s.fanController.SetProfile(args.FanID, args.ProfileName, source); err != nil {
 			return textResult(fmt.Sprintf("Failed to assign fan profile: %v", err)), nil, nil
 		}
 		return textResult(fmt.Sprintf("Profile %s assigned to fan %s", args.ProfileName, args.FanID)), nil, nil
@@ -3122,7 +3145,7 @@ func (s *Server) registerFanControlTools() {
 		return textResult("All fans restored to automatic (BIOS-controlled) mode"), nil, nil
 	})
 
-	logger.Debug("MCP fan control tools registered (6 tools)")
+	logger.Debug("MCP fan control tools registered (7 tools)")
 }
 
 // registerCPUControlTools registers MCP tools for CPU power management and Docker stats.

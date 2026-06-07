@@ -277,9 +277,12 @@ type MCPFanModeArgs struct {
 
 // MCPFanProfileArgs represents arguments for assigning a profile to a fan.
 type MCPFanProfileArgs struct {
-	FanID          string `json:"fan_id" jsonschema:"The fan device identifier (e.g. hwmon0_fan1)"`
-	ProfileName    string `json:"profile_name" jsonschema:"Name of the profile to apply (quiet, balanced, performance, or a custom name)"`
-	TempSensorPath string `json:"temp_sensor_path,omitempty" jsonschema:"Sysfs path to the temperature sensor to link (e.g. /sys/class/hwmon/hwmon0/temp1_input)"`
+	FanID              string   `json:"fan_id" jsonschema:"The fan device identifier (e.g. hwmon0_fan1)"`
+	ProfileName        string   `json:"profile_name" jsonschema:"Name of the profile to apply (quiet, balanced, performance, or a custom name)"`
+	TempSensorPath     string   `json:"temp_sensor_path,omitempty" jsonschema:"Sysfs path to the temperature sensor to link (e.g. /sys/class/hwmon/hwmon0/temp1_input)"`
+	SourceType         string   `json:"source_type,omitempty" jsonschema:"Temperature source type: 'hwmon' (single sensor) or 'drives' (max of selected drives)"`
+	DriveIDs           []string `json:"drive_ids,omitempty" jsonschema:"Drive IDs (e.g. disk1, cache) when source_type=drives; engine uses the max temp of active drives"`
+	FallbackSensorPath string   `json:"fallback_sensor_path,omitempty" jsonschema:"Hwmon sensor path used when source_type=drives and all selected drives are spun down"`
 }
 
 // MCPCreateFanProfileArgs represents arguments for creating a custom fan profile.
