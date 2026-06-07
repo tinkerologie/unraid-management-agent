@@ -3,7 +3,9 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"reflect"
@@ -237,7 +239,12 @@ func (o *Orchestrator) Run() error {
 			}
 		}()
 		if err := apiServer.StartHTTP(); err != nil {
-			logger.Error("API server error: %v", err)
+			// ErrServerClosed is the normal result of a graceful shutdown, not an error.
+			if errors.Is(err, http.ErrServerClosed) {
+				logger.Info("API server stopped")
+			} else {
+				logger.Error("API server error: %v", err)
+			}
 		}
 	})
 
