@@ -3083,11 +3083,17 @@ func (s *Server) registerFanControlTools() {
 		switch args.SourceType {
 		case string(dto.FanTempSourceDrives):
 			source = dto.FanTempSource{Type: dto.FanTempSourceDrives, DriveIDs: args.DriveIDs, FallbackSensorPath: args.FallbackSensorPath}
-		default:
+		case "", string(dto.FanTempSourceHwmon):
 			source = dto.FanTempSource{Type: dto.FanTempSourceHwmon, SensorPath: args.TempSensorPath}
+		default:
+			return textResult(fmt.Sprintf("unknown source_type %q; valid values: hwmon, drives", args.SourceType)), nil, nil
 		}
-		if err := lib.ValidateFanTempSource(source); err != nil {
-			return textResult(fmt.Sprintf("Invalid temperature source: %v", err)), nil, nil
+		// Validate only when a source was actually specified (matches REST behavior:
+		// an empty assignment is allowed for "profile without temperature source").
+		if args.SourceType != "" || args.TempSensorPath != "" || len(args.DriveIDs) > 0 {
+			if err := lib.ValidateFanTempSource(source); err != nil {
+				return textResult(fmt.Sprintf("Invalid temperature source: %v", err)), nil, nil
+			}
 		}
 		logger.Info("MCP: Set fan profile '%s' for '%s' (source=%s)", args.ProfileName, args.FanID, source.Type)
 		if err := s.fanController.SetProfile(args.FanID, args.ProfileName, source); err != nil {
