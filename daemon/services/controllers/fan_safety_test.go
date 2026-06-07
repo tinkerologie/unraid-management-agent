@@ -13,9 +13,13 @@ import (
 
 func TestDetectFailuresLogsOncePerTransition(t *testing.T) {
 	var buf bytes.Buffer
+	prevLevel := logger.GetLevel()
 	log.SetOutput(&buf)
 	logger.SetLevel(logger.LevelInfo)
-	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	t.Cleanup(func() {
+		log.SetOutput(os.Stderr)
+		logger.SetLevel(prevLevel)
+	})
 
 	g := NewFanSafetyGuard(nil, dto.FanSafetyConfig{FailureRPMThreshold: 100, MinSpeedPercent: 20, CriticalTempC: 90})
 	stalled := []dto.FanDevice{{ID: "hwmon4_fan2", Controllable: true, PWMPercent: 50, RPM: 0}}
