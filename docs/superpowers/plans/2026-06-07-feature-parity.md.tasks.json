@@ -55,7 +55,7 @@
       "id": 5,
       "nativeTaskId": "30",
       "subject": "C-Task 5: Docs + final verify + CHANGELOG [USER-GATE]",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         4
       ],
