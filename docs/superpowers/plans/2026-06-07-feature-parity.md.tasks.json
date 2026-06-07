@@ -44,7 +44,7 @@
       "id": 4,
       "nativeTaskId": "29",
       "subject": "C-Task 4: Array safe-subset (verify-or-drop) [USER-GATE]",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         3
       ],
