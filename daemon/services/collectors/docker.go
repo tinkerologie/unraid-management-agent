@@ -71,6 +71,21 @@ func (c *DockerCollector) initClient() error {
 	return nil
 }
 
+// reportDockerSourceFailure records a Docker data-source failure, distinguishing
+// an intentionally-disabled Docker service (reported as SourceDisabled, which is
+// not counted as degraded) from a Docker that should be running but cannot be
+// reached (SourceUnavailable).
+func (c *DockerCollector) reportDockerSourceFailure(reason string, err error) {
+	if c.appCtx.Platform == nil {
+		return
+	}
+	if dockerServiceDisabled() {
+		c.appCtx.Platform.Report("docker", dto.SourceDisabled, "Docker service disabled in Unraid settings", nil)
+		return
+	}
+	c.appCtx.Platform.Report("docker", dto.SourceUnavailable, reason, err)
+}
+
 // Start begins the Docker collector's periodic data collection
 func (c *DockerCollector) Start(ctx context.Context, interval time.Duration) {
 	logger.Info("Starting docker collector (interval: %v)", interval)
@@ -121,9 +136,7 @@ func (c *DockerCollector) Collect() {
 	// Initialize client if needed
 	if err := c.initClient(); err != nil {
 		logger.Debug("Failed to initialize Docker client: %v (Docker may not be running)", err)
-		if c.appCtx.Platform != nil {
-			c.appCtx.Platform.Report("docker", dto.SourceUnavailable, "Docker client initialization failed", err)
-		}
+		c.reportDockerSourceFailure("Docker client initialization failed", err)
 		// Publish empty list
 		domain.Publish(c.appCtx.Hub, constants.TopicContainerListUpdate, []*dto.ContainerInfo{})
 		return
@@ -136,9 +149,7 @@ func (c *DockerCollector) Collect() {
 	result, err := c.dockerClient.ContainerList(ctx, client.ContainerListOptions{All: true})
 	if err != nil {
 		logger.Debug("Failed to list containers via SDK: %v", err)
-		if c.appCtx.Platform != nil {
-			c.appCtx.Platform.Report("docker", dto.SourceUnavailable, "Docker daemon unreachable (ContainerList failed)", err)
-		}
+		c.reportDockerSourceFailure("Docker daemon unreachable (ContainerList failed)", err)
 		domain.Publish(c.appCtx.Hub, constants.TopicContainerListUpdate, []*dto.ContainerInfo{})
 		return
 	}

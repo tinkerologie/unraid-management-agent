@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -112,12 +113,105 @@ func bodySizeLimitMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// rateLimitMiddleware applies a global rate limit to incoming requests to
-// mitigate denial-of-service and brute-force attacks.
-func rateLimitMiddleware(limiter *rate.Limiter) mux.MiddlewareFunc {
+// Rate limiting is per-client (keyed by source IP) rather than a single global
+// bucket. The agent is a LAN-only appliance whose clients legitimately burst:
+// the Home Assistant integration fetches 20-30 endpoints in parallel on every
+// coordinator refresh (and retries rate-limited ones, amplifying the startup
+// burst), the Web UI fires many requests per page load, and MCP/AI clients
+// issue bursts of tool calls. A single global bucket (the previous 10 req/s,
+// burst 20) let one client's burst throttle every other client and returned
+// HTTP 429 on endpoints such as /unassigned, so their entities never appeared
+// in Home Assistant.
+//
+// Giving each client IP its own bucket guarantees that legitimate LAN clients
+// are never rate-limited by each other; the only way to be throttled is for a
+// single client to exceed its own generous allowance — i.e. a genuine runaway
+// loop — which the per-client cap still contains. Steady-state load per client
+// is well under 1 req/s, so the limits below are sized for burst headroom.
+const (
+	rateLimitPerSecond = 50
+	rateLimitBurst     = 100
+
+	// rateLimiterClientTTL is how long an idle client's bucket is retained
+	// before being swept, bounding memory for transient clients.
+	rateLimiterClientTTL = 10 * time.Minute
+	// rateLimiterCleanupInterval is the minimum gap between idle-bucket sweeps.
+	rateLimiterCleanupInterval = time.Minute
+)
+
+// clientBucket is a single client's token bucket plus its last-seen time.
+type clientBucket struct {
+	limiter  *rate.Limiter
+	lastSeen time.Time
+}
+
+// perClientRateLimiter rate-limits each client (keyed by source IP) with its
+// own token bucket so that one client's burst can never throttle another. Idle
+// buckets are swept opportunistically to bound memory; no background goroutine
+// is needed, which keeps construction side-effect-free.
+type perClientRateLimiter struct {
+	mu          sync.Mutex
+	clients     map[string]*clientBucket
+	rate        rate.Limit
+	burst       int
+	clock       func() time.Time
+	lastCleanup time.Time
+}
+
+func newPerClientRateLimiter(r rate.Limit, burst int) *perClientRateLimiter {
+	return &perClientRateLimiter{
+		clients: make(map[string]*clientBucket),
+		rate:    r,
+		burst:   burst,
+		clock:   time.Now,
+	}
+}
+
+// allow reports whether a request from the given client key may proceed,
+// consuming a token from that client's bucket. It also sweeps idle buckets at
+// most once per rateLimiterCleanupInterval.
+func (p *perClientRateLimiter) allow(key string) bool {
+	p.mu.Lock()
+	now := p.clock()
+	if now.Sub(p.lastCleanup) >= rateLimiterCleanupInterval {
+		for k, b := range p.clients {
+			if now.Sub(b.lastSeen) > rateLimiterClientTTL {
+				delete(p.clients, k)
+			}
+		}
+		p.lastCleanup = now
+	}
+	b, ok := p.clients[key]
+	if !ok {
+		b = &clientBucket{limiter: rate.NewLimiter(p.rate, p.burst)}
+		p.clients[key] = b
+	}
+	b.lastSeen = now
+	limiter := b.limiter
+	p.mu.Unlock()
+	return limiter.Allow()
+}
+
+// clientKey extracts the client IP from a RemoteAddr ("host:port"), falling
+// back to the raw value when it carries no port.
+func clientKey(remoteAddr string) string {
+	if host, _, err := net.SplitHostPort(remoteAddr); err == nil {
+		return host
+	}
+	return remoteAddr
+}
+
+// rateLimitMiddleware applies a per-client rate limit to incoming requests to
+// mitigate denial-of-service and brute-force abuse without throttling
+// legitimate LAN clients against one another.
+func rateLimitMiddleware(p *perClientRateLimiter) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if !limiter.Allow() {
+			key := clientKey(r.RemoteAddr)
+			if !p.allow(key) {
+				// Log rejections so clients hitting the limit are diagnosable;
+				// rate-limited requests short-circuit before loggingMiddleware.
+				logger.Debug("Rate limit exceeded for client %s: %s %s", key, r.Method, r.URL.Path)
 				http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
 				return
 			}

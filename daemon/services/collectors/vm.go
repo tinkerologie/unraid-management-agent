@@ -74,6 +74,21 @@ func (c *VMCollector) Start(ctx context.Context, interval time.Duration) {
 	}
 }
 
+// reportVMSourceFailure records a VM data-source failure, distinguishing an
+// intentionally-disabled VM manager (reported as SourceDisabled, which is not
+// counted as degraded) from a libvirt that should be running but cannot be
+// reached (SourceUnavailable).
+func (c *VMCollector) reportVMSourceFailure(reason string, err error) {
+	if c.appCtx.Platform == nil {
+		return
+	}
+	if vmServiceDisabled() {
+		c.appCtx.Platform.Report("vm", dto.SourceDisabled, "VM manager disabled in Unraid settings", nil)
+		return
+	}
+	c.appCtx.Platform.Report("vm", dto.SourceUnavailable, reason, err)
+}
+
 // Collect gathers VM information using libvirt API and publishes to event bus
 func (c *VMCollector) Collect() {
 	startTotal := time.Now()
@@ -84,9 +99,7 @@ func (c *VMCollector) Collect() {
 	l, err := libvirt.ConnectToURI(uri)
 	if err != nil {
 		logger.Debug("Failed to connect to libvirt: %v (libvirt may not be running)", err)
-		if c.appCtx.Platform != nil {
-			c.appCtx.Platform.Report("vm", dto.SourceUnavailable, "libvirt connection failed", err)
-		}
+		c.reportVMSourceFailure("libvirt connection failed", err)
 		// Publish empty list
 		domain.Publish(c.appCtx.Hub, constants.TopicVMListUpdate, []*dto.VMInfo{})
 		return
@@ -98,9 +111,7 @@ func (c *VMCollector) Collect() {
 	domains, _, err := l.ConnectListAllDomains(1, flags)
 	if err != nil {
 		logger.Error("Failed to list domains via libvirt: %v", err)
-		if c.appCtx.Platform != nil {
-			c.appCtx.Platform.Report("vm", dto.SourceUnavailable, "libvirt ListAllDomains failed", err)
-		}
+		c.reportVMSourceFailure("libvirt ListAllDomains failed", err)
 		return
 	}
 

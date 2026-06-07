@@ -3019,11 +3019,13 @@ definitions:
     - healthy
     - degraded
     - unavailable
+    - disabled
     type: string
     x-enum-varnames:
     - SourceHealthy
     - SourceDegraded
     - SourceUnavailable
+    - SourceDisabled
   dto.SourceStatus:
     properties:
       last_checked:

@@ -13,9 +13,17 @@ const (
 	SourceDegraded SourceState = "degraded"
 	// SourceUnavailable means the source or its binary is absent.
 	SourceUnavailable SourceState = "unavailable"
+	// SourceDisabled means the underlying service is intentionally turned off in
+	// Unraid settings (e.g. Docker or the VM manager). This is a normal,
+	// non-error condition: the subsystem correctly serves empty data and is not
+	// counted as degraded. It is distinct from SourceUnavailable, which means the
+	// service should be running but cannot be reached.
+	SourceDisabled SourceState = "disabled"
 )
 
-// Severity orders states for "worst-of" rollups: healthy < degraded < unavailable.
+// Severity orders states for "worst-of" rollups: disabled/healthy < degraded <
+// unavailable. SourceDisabled ranks alongside healthy (severity 0) because an
+// intentionally-disabled service is not a fault.
 func (s SourceState) Severity() int {
 	switch s {
 	case SourceDegraded:
@@ -23,6 +31,7 @@ func (s SourceState) Severity() int {
 	case SourceUnavailable:
 		return 2
 	default:
+		// SourceHealthy and SourceDisabled
 		return 0
 	}
 }

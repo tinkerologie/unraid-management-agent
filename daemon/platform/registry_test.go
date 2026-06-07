@@ -46,3 +46,23 @@ func TestRegistrySnapshotAndCounts(t *testing.T) {
 		t.Fatalf("StatusFor degraded subsystem must be non-nil")
 	}
 }
+
+func TestRegistryDisabledNotCountedAsDegraded(t *testing.T) {
+	r := NewRegistry()
+	r.Report("docker", dto.SourceDisabled, "Docker service disabled in Unraid settings", nil)
+	r.Report("vm", dto.SourceDisabled, "VM manager disabled in Unraid settings", nil)
+	r.Report("array", dto.SourceHealthy, "", nil)
+
+	if got := r.DegradedCount(); got != 0 {
+		t.Fatalf("DegradedCount with only disabled/healthy subsystems = %d, want 0", got)
+	}
+	if got := r.OverallState(); got != dto.SourceHealthy {
+		t.Fatalf("OverallState with only disabled/healthy subsystems = %q, want %q", got, dto.SourceHealthy)
+	}
+
+	// A genuinely faulted subsystem must still be counted alongside disabled ones.
+	r.Report("disk", dto.SourceUnavailable, "cannot read disks.ini", nil)
+	if got := r.DegradedCount(); got != 1 {
+		t.Fatalf("DegradedCount with one unavailable subsystem = %d, want 1", got)
+	}
+}

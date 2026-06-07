@@ -108,13 +108,16 @@ func (r *Registry) Snapshot() []dto.SourceStatus {
 	return out
 }
 
-// DegradedCount returns the number of subsystems not in the healthy state.
+// DegradedCount returns the number of subsystems in a faulted state (degraded
+// or unavailable). Healthy and intentionally-disabled subsystems (severity 0)
+// are not counted, so a disabled service such as Docker or the VM manager does
+// not trip the "data source degraded" alert.
 func (r *Registry) DegradedCount() int {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	n := 0
 	for _, s := range r.statuses {
-		if s.State != dto.SourceHealthy {
+		if s.State.Severity() > 0 {
 			n++
 		}
 	}

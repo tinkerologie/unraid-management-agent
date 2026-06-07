@@ -96,7 +96,7 @@ func (s *Server) setupRoutes() {
 	s.router.Use(corsMiddleware(s.ctx.CORSOrigin))
 	s.router.Use(csrfMiddleware(s.ctx.CORSOrigin))
 	s.router.Use(bodySizeLimitMiddleware)
-	s.router.Use(rateLimitMiddleware(rate.NewLimiter(rate.Limit(10), 20)))
+	s.router.Use(rateLimitMiddleware(newPerClientRateLimiter(rate.Limit(rateLimitPerSecond), rateLimitBurst)))
 	s.router.Use(loggingMiddleware)
 
 	// Prometheus metrics endpoint (at root level, no /api/v1 prefix)

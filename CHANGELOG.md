@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2026.06.04] - 2026-06-08
+
+### Fixed
+
+- **API rate limit throttled the Home Assistant integration** — the REST API
+  used a single **global** bucket (**10 req/s, burst 20**), but the HA
+  integration fetches 20-30 endpoints in parallel on every coordinator refresh
+  (and retries rate-limited ones, amplifying the startup burst). One client's
+  burst could exhaust the shared bucket and return **HTTP 429** on endpoints such
+  as `/unassigned`, so the data wasn't available when the integration created
+  entities and the **remote-share binary sensors never appeared**
+  (ha-unraid-management-agent#83). Rate limiting is now **per-client (keyed by
+  source IP)** at **50 req/s, burst 100 per client**, so legitimate LAN clients
+  (the integration, the Web UI, MCP/AI clients) are never throttled by one
+  another — only a single client genuinely running away is capped. Idle client
+  buckets are swept after 10 minutes to bound memory. Rejections are now logged
+  at debug for diagnosability, since rate-limited requests short-circuit before
+  the logging middleware. Limits are named constants (`rateLimitPerSecond`,
+  `rateLimitBurst`) guarded by a regression test.
+
+- **Disabled Docker/VM falsely reported as a degraded data source** — when
+  Docker (`DOCKER_ENABLED="no"`) or the VM manager (`SERVICE="disable"`) was
+  intentionally turned off in Unraid settings, the respective collector reported
+  the subsystem as `unavailable`, which pushed `DegradedSubsystemCount > 0` and
+  fired the **"Agent data source degraded"** alert on every server with those
+  services off. A new `SourceDisabled` state (severity 0, **not** counted as
+  degraded and not worsening the overall self-test state) is now reported when a
+  service is positively detected as disabled in `docker.cfg`/`domain.cfg`. A
+  service that is enabled but genuinely unreachable is still reported as
+  `unavailable`, and an unreadable config conservatively keeps the old
+  `unavailable` behavior so real faults are never masked. The subsystem's inline
+  `source_status` now reads `disabled` instead of `unavailable`, and the Swagger
+  `dto.SourceState` enum gained the `disabled` value.
+
 ## [2026.06.03] - 2026-06-07
 
 ### Added

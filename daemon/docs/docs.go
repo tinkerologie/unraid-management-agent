@@ -9897,12 +9897,14 @@ const docTemplate = `{
             "enum": [
                 "healthy",
                 "degraded",
-                "unavailable"
+                "unavailable",
+                "disabled"
             ],
             "x-enum-varnames": [
                 "SourceHealthy",
                 "SourceDegraded",
-                "SourceUnavailable"
+                "SourceUnavailable",
+                "SourceDisabled"
             ]
         },
         "dto.SourceStatus": {
