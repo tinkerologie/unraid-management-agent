@@ -2,6 +2,8 @@ package controllers
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
@@ -25,7 +27,7 @@ func TestFanConfigNewShapeAssignment(t *testing.T) {
 	if err := json.Unmarshal(newShape, &a); err != nil {
 		t.Fatal(err)
 	}
-	if a.Source.Type != dto.FanTempSourceDrives || len(a.Source.DriveIDs) != 1 {
+	if a.ProfileName != "balanced" || a.Source.Type != dto.FanTempSourceDrives || len(a.Source.DriveIDs) != 1 {
 		t.Fatalf("new-shape parse failed: %+v", a)
 	}
 }
@@ -46,7 +48,29 @@ func TestFanConfigRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := out.Assignments["hwmon0_fan1"]
-	if got.Source.Type != dto.FanTempSourceDrives || len(got.Source.DriveIDs) != 1 || got.Source.DriveIDs[0] != "disk1" {
+	if got.ProfileName != "balanced" || got.Source.Type != dto.FanTempSourceDrives || len(got.Source.DriveIDs) != 1 || got.Source.DriveIDs[0] != "disk1" {
 		t.Fatalf("round-trip failed: %+v", got)
+	}
+}
+
+func TestFanConfigLoadMigratesLegacyFile(t *testing.T) {
+	dir := t.TempDir()
+	// Legacy on-disk shape: capitalized keys, no "source" object.
+	legacy := `{
+  "config": {"enabled": true, "control_enabled": true, "control_method": "hwmon", "poll_interval_seconds": 5, "safety": {"min_speed_percent": 20, "critical_temp_celsius": 90, "failure_rpm_threshold": 100}},
+  "assignments": {"hwmon0_fan1": {"ProfileName": "balanced", "TempSensorPath": "/sys/class/hwmon/hwmon0/temp1_input"}}
+}`
+	if err := os.WriteFile(filepath.Join(dir, "fancontrol.json"), []byte(legacy), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := NewFanConfigStore(dir)
+	out, err := store.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := out.Assignments["hwmon0_fan1"]
+	if got.ProfileName != "balanced" || got.Source.Type != dto.FanTempSourceHwmon ||
+		got.Source.SensorPath != "/sys/class/hwmon/hwmon0/temp1_input" {
+		t.Fatalf("legacy file did not migrate via Load: %+v", got)
 	}
 }

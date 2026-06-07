@@ -111,6 +111,8 @@ func (a *fanCurveAssignment) UnmarshalJSON(data []byte) error {
 		TempSensorPath string `json:"TempSensorPath"`
 	}
 	var ls legacyShape
+	// Best-effort: legacyShape has only string fields, so this cannot fail on
+	// already-valid JSON (the new-shape unmarshal above guarantees validity).
 	_ = json.Unmarshal(data, &ls)
 
 	a.ProfileName = ns.ProfileName
