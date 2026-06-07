@@ -240,7 +240,11 @@ func (c *FanController) SetProfile(fanID, profileName string, source dto.FanTemp
 // GetSensorCatalog returns the hwmon sensors and drives available as fan-curve
 // temperature sources.
 func (c *FanController) GetSensorCatalog() dto.FanSensorCatalog {
-	cat := dto.FanSensorCatalog{Timestamp: time.Now()}
+	cat := dto.FanSensorCatalog{
+		Timestamp:    time.Now(),
+		HwmonSensors: []dto.AvailableTempSensor{},
+		Drives:       []dto.AvailableDriveSensor{},
+	}
 	for _, s := range lib.DiscoverHwmonTempSensors() {
 		cat.HwmonSensors = append(cat.HwmonSensors, dto.AvailableTempSensor{
 			Path: s.Path, Label: s.Label, TempC: s.TempC, Plausible: s.Plausible,
@@ -252,6 +256,8 @@ func (c *FanController) GetSensorCatalog() dto.FanSensorCatalog {
 				ID: d.ID, Device: d.Device, TempC: d.TempC, SpunDown: d.SpunDown,
 			})
 		}
+	} else {
+		logger.Debug("Fan control: drive temperatures unavailable for sensor catalog: %v", err)
 	}
 	return cat
 }
