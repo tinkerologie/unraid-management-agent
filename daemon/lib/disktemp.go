@@ -6,10 +6,13 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 )
 
-// DiskTempsPath is the default Unraid disks.ini location.
-const DiskTempsPath = "/boot/config/disks.ini"
+// DiskTempsPath is the default Unraid disks.ini location (the live emhttpd
+// state file, the same source the disk collector watches).
+const DiskTempsPath = constants.DisksIni
 
 // DiskTemp is the temperature and spin state of a single Unraid disk,
 // parsed from disks.ini. It never wakes a drive: Unraid writes "*" for a
@@ -21,7 +24,7 @@ type DiskTemp struct {
 	SpunDown bool    // true when no usable temperature is available (Unraid "*"/empty, missing temp key, or unparsable value)
 }
 
-// ReadDiskTemps parses the default disks.ini (/boot/config/disks.ini).
+// ReadDiskTemps parses the default Unraid disks.ini (/var/local/emhttp/disks.ini).
 func ReadDiskTemps() (map[string]DiskTemp, error) {
 	return ReadDiskTempsFromFile(DiskTempsPath)
 }

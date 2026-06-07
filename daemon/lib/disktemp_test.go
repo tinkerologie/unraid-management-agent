@@ -52,8 +52,8 @@ temp="N/A"
 }
 
 func TestReadDiskTempsDefaultPath(t *testing.T) {
-	if DiskTempsPath != "/boot/config/disks.ini" {
-		t.Errorf("DiskTempsPath = %q, want /boot/config/disks.ini", DiskTempsPath)
+	if DiskTempsPath != "/var/local/emhttp/disks.ini" {
+		t.Errorf("DiskTempsPath = %q, want /var/local/emhttp/disks.ini", DiskTempsPath)
 	}
 }
 
