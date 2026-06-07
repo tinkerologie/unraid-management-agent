@@ -136,6 +136,26 @@ type ContainerBulkUpdateResult struct {
 	Timestamp time.Time               `json:"timestamp"`
 }
 
+// ContainerRemoveRequest is the request body for POST /docker/{id}/remove.
+type ContainerRemoveRequest struct {
+	// Confirm must be set to true to authorise the destructive remove operation.
+	Confirm     bool `json:"confirm"`
+	RemoveImage bool `json:"remove_image,omitempty"`
+}
+
+// ContainerAutostartRequest is the request body for POST /docker/{id}/autostart.
+type ContainerAutostartRequest struct {
+	// Enabled controls whether autostart is turned on (true) or off (false).
+	Enabled bool `json:"enabled"`
+}
+
+// PortConflict reports a host port bound by more than one container.
+type PortConflict struct {
+	HostPort   int      `json:"host_port"`
+	Protocol   string   `json:"protocol"`
+	Containers []string `json:"containers"`
+}
+
 // ContainerLogs contains log output from a Docker container
 type ContainerLogs struct {
 	ContainerID   string    `json:"container_id" example:"abc123def456"`

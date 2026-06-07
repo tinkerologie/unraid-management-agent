@@ -486,6 +486,169 @@ func (s *Server) handleVMOperation(w http.ResponseWriter, r *http.Request, opera
 	})
 }
 
+// handleDockerRemove godoc
+//
+//	@Summary		Remove Docker container
+//	@Description	Permanently remove a Docker container (force-stopped if running). Requires confirm=true in the request body.
+//	@Tags			Docker
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		string						true	"Container ID or name"
+//	@Param			request	body		dto.ContainerRemoveRequest	true	"Confirm flag and optional remove_image flag"
+//	@Success		200		{object}	dto.Response				"Container removed"
+//	@Failure		400		{object}	dto.Response				"Invalid container ID or missing confirmation"
+//	@Failure		500		{object}	dto.Response				"Failed to remove container"
+//	@Router			/docker/{id}/remove [post]
+func (s *Server) handleDockerRemove(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	containerID := vars["id"]
+
+	if err := lib.ValidateContainerID(containerID); err != nil {
+		logger.Warning("Invalid container ID for remove operation: %s - %v", containerID, err)
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   err.Error(),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	var req dto.ContainerRemoveRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Invalid request body: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	if !req.Confirm {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   "confirm must be set to true to remove a container",
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	logger.Info("Removing container %s (remove_image=%v)", containerID, req.RemoveImage)
+
+	controller := controllers.NewDockerController()
+	defer controller.Close() //nolint:errcheck
+
+	if err := controller.Remove(containerID, req.RemoveImage); err != nil {
+		logger.Error("Failed to remove container %s: %v", containerID, err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   "Failed to remove container",
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   "Container removed",
+		Timestamp: time.Now(),
+	})
+}
+
+// handleDockerAutostart godoc
+//
+//	@Summary		Set container autostart
+//	@Description	Enable or disable autostart for a Docker container. Uses the Unraid autostart file (/var/lib/docker/unraid-autostart). The change persists across reboots.
+//	@Tags			Docker
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		string								true	"Container ID or name"
+//	@Param			request	body		dto.ContainerAutostartRequest		true	"Enabled flag"
+//	@Success		200		{object}	dto.Response						"Autostart updated"
+//	@Failure		400		{object}	dto.Response						"Invalid container ID or request body"
+//	@Failure		500		{object}	dto.Response						"Failed to update autostart"
+//	@Router			/docker/{id}/autostart [post]
+func (s *Server) handleDockerAutostart(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	containerID := vars["id"]
+
+	if err := lib.ValidateContainerID(containerID); err != nil {
+		logger.Warning("Invalid container ID for autostart operation: %s - %v", containerID, err)
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   err.Error(),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	var req dto.ContainerAutostartRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Invalid request body: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	logger.Info("Setting autostart=%v for container %s", req.Enabled, containerID)
+
+	controller := controllers.NewDockerController()
+	defer controller.Close() //nolint:errcheck
+
+	if err := controller.SetAutostart(containerID, req.Enabled); err != nil {
+		logger.Error("Failed to set autostart for container %s: %v", containerID, err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   "Failed to update autostart",
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	action := "disabled"
+	if req.Enabled {
+		action = "enabled"
+	}
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   fmt.Sprintf("Autostart %s for container %s", action, containerID),
+		Timestamp: time.Now(),
+	})
+}
+
+// handleDockerPortConflicts godoc
+//
+//	@Summary		List Docker port conflicts
+//	@Description	Returns any host port bound by more than one running container (read-only, no confirm required).
+//	@Tags			Docker
+//	@Produce		json
+//	@Success		200	{array}		dto.PortConflict	"List of port conflicts (empty if none)"
+//	@Failure		500	{object}	dto.Response		"Failed to detect port conflicts"
+//	@Router			/docker/port-conflicts [get]
+func (s *Server) handleDockerPortConflicts(w http.ResponseWriter, _ *http.Request) {
+	logger.Info("API: GET /docker/port-conflicts")
+
+	controller := controllers.NewDockerController()
+	defer controller.Close() //nolint:errcheck
+
+	conflicts, err := controller.PortConflicts()
+	if err != nil {
+		logger.Error("API: Failed to detect port conflicts: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   "Failed to detect port conflicts",
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	if conflicts == nil {
+		conflicts = []dto.PortConflict{}
+	}
+	respondJSON(w, http.StatusOK, conflicts)
+}
+
 // handleDockerStart godoc
 //
 //	@Summary		Start Docker container
@@ -676,6 +839,72 @@ func (s *Server) handleVMHibernate(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleVMForceStop(w http.ResponseWriter, r *http.Request) {
 	controller := controllers.NewVMController()
 	s.handleVMOperation(w, r, "force stopped", controller.ForceStop)
+}
+
+// handleVMReset godoc
+//
+//	@Summary		Reset VM
+//	@Description	Hard reset a specific virtual machine by name (equivalent to the physical reset button). The VM must be running. Requires confirm=true in the request body.
+//	@Tags			VMs
+//	@Accept			json
+//	@Produce		json
+//	@Param			name	path		string				true	"VM name"
+//	@Param			request	body		dto.VMResetRequest	true	"Confirm flag"
+//	@Success		200		{object}	dto.Response		"VM reset"
+//	@Failure		400		{object}	dto.Response		"Invalid VM name or missing confirmation"
+//	@Failure		500		{object}	dto.Response		"Failed to reset VM"
+//	@Router			/vm/{name}/reset [post]
+func (s *Server) handleVMReset(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	vmName := vars["name"]
+
+	if err := lib.ValidateVMName(vmName); err != nil {
+		logger.Warning("Invalid VM name for reset operation: %s - %v", vmName, err)
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   err.Error(),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	var req dto.VMResetRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Invalid request body: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	if !req.Confirm {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   "confirm must be set to true to reset the VM",
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	logger.Info("Resetting VM %s", vmName)
+
+	controller := controllers.NewVMController()
+	if err := controller.Reset(vmName); err != nil {
+		logger.Error("Failed to reset VM %s: %v", vmName, err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   "Failed to reset VM",
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   "VM reset",
+		Timestamp: time.Now(),
+	})
 }
 
 // handleArrayStart godoc
@@ -899,6 +1128,36 @@ func (s *Server) handleParityCheckHistory(w http.ResponseWriter, _ *http.Request
 	}
 
 	respondJSON(w, http.StatusOK, history)
+}
+
+// handleClearDiskStats godoc
+//
+//	@Summary		Clear disk statistics
+//	@Description	Clear all array disk I/O statistics system-wide. Uses the same mechanism as the Unraid WebUI "Clear Stats" button (emhttpd clearStatistics). The operation is safe and reversible — counters reset to zero and accumulate again normally. Requires the emhttpd socket to be available.
+//	@Tags			Array
+//	@Produce		json
+//	@Success		200	{object}	dto.Response	"Disk statistics cleared"
+//	@Failure		500	{object}	dto.Response	"Failed to clear disk statistics"
+//	@Router			/array/clear-disk-stats [post]
+func (s *Server) handleClearDiskStats(w http.ResponseWriter, _ *http.Request) {
+	logger.Info("API: Clearing disk statistics")
+
+	arrayCtrl := controllers.NewArrayController(s.ctx)
+	if err := arrayCtrl.ClearDiskStats(); err != nil {
+		logger.Error("API: Failed to clear disk statistics: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to clear disk statistics: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   "Disk statistics cleared successfully",
+		Timestamp: time.Now(),
+	})
 }
 
 // handleShareConfig godoc

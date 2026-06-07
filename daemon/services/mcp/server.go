@@ -1214,13 +1214,18 @@ func (s *Server) registerControlTools() {
 	// Container control tool
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "container_action",
-		Description: "Perform an action on a Docker container (start, stop, restart, pause, unpause). Use with caution.",
+		Description: "Perform an action on a Docker container (start, stop, restart, pause, unpause, remove). The remove action requires confirm=true.",
 		Annotations: &mcp.ToolAnnotations{
 			DestructiveHint: ptr(true),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPContainerActionArgs) (*mcp.CallToolResult, any, error) {
 		logger.Info("MCP: Container action '%s' requested for '%s'", args.Action, args.ContainerID)
+
+		// The remove action requires explicit confirmation.
+		if args.Action == "remove" && !args.Confirm {
+			return textResult("Action 'remove' requires confirm=true. Set confirm to true to execute this destructive action."), nil, nil
+		}
 
 		dockerCtrl := controllers.NewDockerController()
 		var err error
@@ -1236,6 +1241,8 @@ func (s *Server) registerControlTools() {
 			err = dockerCtrl.Pause(args.ContainerID)
 		case "unpause":
 			err = dockerCtrl.Unpause(args.ContainerID)
+		case "remove":
+			err = dockerCtrl.Remove(args.ContainerID, args.RemoveImage)
 		default:
 			return textResult(fmt.Sprintf("Unknown action: %s", args.Action)), nil, nil
 		}
@@ -1248,16 +1255,66 @@ func (s *Server) registerControlTools() {
 		return textResult(fmt.Sprintf("Successfully executed '%s' on container '%s'", args.Action, args.ContainerID)), nil, nil
 	})
 
+	// Container autostart tool
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "set_container_autostart",
+		Description: "Enable or disable autostart for a Docker container. Writes to the Unraid autostart file (/var/lib/docker/unraid-autostart). The change persists across reboots and is reversible.",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(false),
+			IdempotentHint:  true,
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPSetAutostartArgs) (*mcp.CallToolResult, any, error) {
+		logger.Info("MCP: set_container_autostart(%s, enabled=%v)", args.ContainerID, args.Enabled)
+
+		dockerCtrl := controllers.NewDockerController()
+		defer dockerCtrl.Close() //nolint:errcheck
+
+		if err := dockerCtrl.SetAutostart(args.ContainerID, args.Enabled); err != nil {
+			logger.Error("MCP: set_container_autostart failed: %v", err)
+			return textResult(fmt.Sprintf("Failed to set autostart for container %q: %v", args.ContainerID, err)), nil, nil
+		}
+
+		action := "disabled"
+		if args.Enabled {
+			action = "enabled"
+		}
+		return textResult(fmt.Sprintf("Autostart %s for container %q", action, args.ContainerID)), nil, nil
+	})
+
+	// Port-conflict detection tool (read-only)
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "get_port_conflicts",
+		Description: "List any host ports bound by more than one Docker container. Returns an empty list when no conflicts exist.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
+		dockerCtrl := controllers.NewDockerController()
+		defer dockerCtrl.Close() //nolint:errcheck
+
+		conflicts, err := dockerCtrl.PortConflicts()
+		if err != nil {
+			return textResult(fmt.Sprintf("Failed to detect port conflicts: %v", err)), nil, nil
+		}
+		if len(conflicts) == 0 {
+			return textResult("No port conflicts detected"), nil, nil
+		}
+		return jsonResult(conflicts)
+	})
+
 	// VM control tool
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "vm_action",
-		Description: "Perform an action on a virtual machine (start, stop, restart, pause, resume, hibernate, force-stop). Use with caution.",
+		Description: "Perform an action on a virtual machine (start, stop, restart, pause, resume, hibernate, force-stop, reset). The reset action requires confirm=true.",
 		Annotations: &mcp.ToolAnnotations{
 			DestructiveHint: ptr(true),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPVMActionArgs) (*mcp.CallToolResult, any, error) {
 		logger.Info("MCP: VM action '%s' requested for '%s'", args.Action, args.VMName)
+
+		// The reset action requires explicit confirmation.
+		if args.Action == "reset" && !args.Confirm {
+			return textResult("Action 'reset' requires confirm=true. Set confirm to true to execute this destructive action."), nil, nil
+		}
 
 		vmCtrl := controllers.NewVMController()
 		var err error
@@ -1277,6 +1334,8 @@ func (s *Server) registerControlTools() {
 			err = vmCtrl.Hibernate(args.VMName)
 		case "force-stop":
 			err = vmCtrl.ForceStop(args.VMName)
+		case "reset":
+			err = vmCtrl.Reset(args.VMName)
 		default:
 			return textResult(fmt.Sprintf("Unknown action: %s", args.Action)), nil, nil
 		}
@@ -1546,6 +1605,26 @@ func (s *Server) registerControlTools() {
 		}
 
 		return textResult(fmt.Sprintf("Disk '%s' spin up initiated", args.DiskID)), nil, nil
+	})
+
+	// Clear disk statistics tool
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "clear_disk_stats",
+		Description: "Clear all array disk I/O statistics system-wide. Uses the same mechanism as the Unraid WebUI 'Clear Stats' button (emhttpd clearStatistics). Safe and reversible — counters reset to zero and resume accumulating normally. Requires the emhttpd socket.",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(false),
+			IdempotentHint:  true,
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		logger.Info("MCP: Clear disk statistics requested")
+
+		arrayCtrl := controllers.NewArrayController(s.ctx)
+		if err := arrayCtrl.ClearDiskStats(); err != nil {
+			logger.Error("MCP: Failed to clear disk statistics: %v", err)
+			return textResult(fmt.Sprintf("Failed to clear disk statistics: %v", err)), nil, nil
+		}
+
+		return textResult("Disk statistics cleared successfully"), nil, nil
 	})
 
 	// Execute user script tool

@@ -18,12 +18,21 @@ type MCPContainerArgs struct {
 // MCPContainerActionArgs represents arguments for container control actions.
 type MCPContainerActionArgs struct {
 	ContainerID string `json:"container_id" jsonschema:"The Docker container ID or name"`
-	Action      string `json:"action" jsonschema:"The action to perform: start, stop, restart, pause, or unpause"`
+	Action      string `json:"action" jsonschema:"The action to perform: start, stop, restart, pause, unpause, or remove"`
+	// Confirm must be set to true when action is "remove" — prevents accidental removal.
+	Confirm     bool `json:"confirm,omitempty" jsonschema:"Must be set to true to confirm the remove action"`
+	RemoveImage bool `json:"remove_image,omitempty" jsonschema:"When true and action is remove, also removes the container image (best-effort)"`
 }
 
 // MCPContainerListArgs represents arguments for listing containers.
 type MCPContainerListArgs struct {
 	State string `json:"state,omitempty" jsonschema:"Filter containers by state: running, stopped, or all (default: all)"`
+}
+
+// MCPSetAutostartArgs represents arguments for the set_container_autostart tool.
+type MCPSetAutostartArgs struct {
+	ContainerID string `json:"container_id" jsonschema:"The Docker container ID or name"`
+	Enabled     bool   `json:"enabled" jsonschema:"Set to true to enable autostart, false to disable"`
 }
 
 // MCPVMArgs represents arguments for VM-related tools.
@@ -33,8 +42,9 @@ type MCPVMArgs struct {
 
 // MCPVMActionArgs represents arguments for VM control actions.
 type MCPVMActionArgs struct {
-	VMName string `json:"vm_name" jsonschema:"The virtual machine name"`
-	Action string `json:"action" jsonschema:"The action to perform: start, stop, restart, pause, resume, hibernate, or force-stop"`
+	VMName  string `json:"vm_name" jsonschema:"The virtual machine name"`
+	Action  string `json:"action" jsonschema:"The action to perform: start, stop, restart, pause, resume, hibernate, force-stop, or reset"`
+	Confirm bool   `json:"confirm,omitempty" jsonschema:"Must be set to true to confirm the reset action"`
 }
 
 // MCPVMListArgs represents arguments for listing VMs.

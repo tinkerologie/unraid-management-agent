@@ -125,6 +125,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/shares", s.handleShares).Methods("GET")
 	api.HandleFunc("/docker", s.handleDockerList).Methods("GET")
 	api.HandleFunc("/docker/networks", s.handleDockerNetworks).Methods("GET")
+	api.HandleFunc("/docker/port-conflicts", s.handleDockerPortConflicts).Methods("GET")
 	api.HandleFunc("/docker/updates", s.handleDockerCheckUpdates).Methods("GET")
 	api.HandleFunc("/docker/updates/refresh", s.handleDockerUpdatesRefresh).Methods("POST")
 	api.HandleFunc("/docker/update-all", s.handleDockerUpdateAll).Methods("POST")
@@ -168,6 +169,8 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/docker/{id}/restart", s.handleDockerRestart).Methods("POST")
 	api.HandleFunc("/docker/{id}/pause", s.handleDockerPause).Methods("POST")
 	api.HandleFunc("/docker/{id}/unpause", s.handleDockerUnpause).Methods("POST")
+	api.HandleFunc("/docker/{id}/remove", s.handleDockerRemove).Methods("POST")
+	api.HandleFunc("/docker/{id}/autostart", s.handleDockerAutostart).Methods("POST")
 
 	api.HandleFunc("/vm/{name}/start", s.handleVMStart).Methods("POST")
 	api.HandleFunc("/vm/{name}/stop", s.handleVMStop).Methods("POST")
@@ -176,6 +179,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/vm/{name}/resume", s.handleVMResume).Methods("POST")
 	api.HandleFunc("/vm/{name}/hibernate", s.handleVMHibernate).Methods("POST")
 	api.HandleFunc("/vm/{name}/force-stop", s.handleVMForceStop).Methods("POST")
+	api.HandleFunc("/vm/{name}/reset", s.handleVMReset).Methods("POST")
 	api.HandleFunc("/vm/{name}/clone", s.handleVMClone).Methods("POST")
 	api.HandleFunc("/vm/{name}/snapshot", s.handleVMCreateSnapshot).Methods("POST")
 	api.HandleFunc("/vm/{name}/snapshots", s.handleVMListSnapshots).Methods("GET")
@@ -191,6 +195,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/array/parity-check/resume", s.handleParityCheckResume).Methods("POST")
 	api.HandleFunc("/array/parity-check/history", s.handleParityCheckHistory).Methods("GET")
 	api.HandleFunc("/array/parity-check/schedule", s.handleParitySchedule).Methods("GET") // Issue #47
+	api.HandleFunc("/array/clear-disk-stats", s.handleClearDiskStats).Methods("POST")
 
 	// Configuration endpoints (read-only)
 	api.HandleFunc("/shares/{name}/config", s.handleShareConfig).Methods("GET")

@@ -68,6 +68,15 @@ func TestVMControllerInterface(t *testing.T) {
 	})
 }
 
+func TestVMReset(t *testing.T) {
+	vc := NewVMController()
+	// No libvirt in CI → connect fails with a clear error (not a panic).
+	err := vc.Reset("nonexistent-vm")
+	if err == nil {
+		t.Skip("libvirt available; reset reached the daemon")
+	}
+}
+
 func TestVMControllerWithInvalidVM(t *testing.T) {
 	// Skip if not in integration test mode
 	if testing.Short() {

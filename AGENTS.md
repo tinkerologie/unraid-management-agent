@@ -148,7 +148,7 @@ Each collector:
 
 Model Context Protocol endpoint at `POST /mcp` (Streamable HTTP, spec 2025-06-18):
 
-- **server.go**: MCP server with 122 tools, 5 resources, and 6 prompts for monitoring and control
+- **server.go**: MCP server with 125 tools, 5 resources, and 6 prompts for monitoring and control
 - **transport.go**: HTTP transport for JSON-RPC requests
 - Tools expose system info, Docker/VM control, notifications, etc.
 

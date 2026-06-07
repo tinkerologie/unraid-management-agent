@@ -43,7 +43,7 @@ The MCP server supports two transports — use the one that fits your deployment
 > - Use **Streamable HTTP** if the AI client (Cursor, VS Code, etc.) runs on a different machine than the Unraid server.
 > - Use **STDIO** if the AI client (Claude Desktop, Cursor) runs locally on the Unraid server itself — it has zero network overhead and requires no authentication.
 
-## Available Tools (122 total)
+## Available Tools (125 total)
 
 ### System Monitoring Tools
 

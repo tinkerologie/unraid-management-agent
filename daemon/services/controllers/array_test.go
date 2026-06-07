@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
@@ -152,5 +153,35 @@ func TestArrayControllerDiskOperations(t *testing.T) {
 		if err == nil {
 			t.Log("Note: No error - mdcmd might be available")
 		}
+	})
+}
+
+// TestArrayDiskClearStats tests the ClearDiskStats method.
+func TestArrayDiskClearStats(t *testing.T) {
+	ctx := &domain.Context{}
+	ac := NewArrayController(ctx)
+
+	t.Run("has ClearDiskStats method", func(t *testing.T) {
+		// Verify the method exists on the controller.
+		_ = ac.ClearDiskStats
+	})
+
+	t.Run("capability gate: socket absent returns socket-unavailable error", func(t *testing.T) {
+		// In CI / non-Unraid environments the emhttpd socket is absent.
+		// ClearDiskStats must return a socket-unavailable error, not panic.
+		err := ac.ClearDiskStats()
+		if err == nil {
+			// Socket is present (running on Unraid hardware); nothing to assert here.
+			t.Log("Note: emhttpd socket present — ClearDiskStats reached the emhttpd socket")
+			return
+		}
+		// Error must be non-nil and reference the socket when unavailable.
+		if err.Error() == "" {
+			t.Error("ClearDiskStats returned a non-nil error with empty message")
+		}
+		if !strings.Contains(err.Error(), "emhttpd socket") {
+			t.Errorf("expected socket-unavailable error, got: %v", err)
+		}
+		t.Logf("ClearDiskStats (no socket) correctly returned: %v", err)
 	})
 }

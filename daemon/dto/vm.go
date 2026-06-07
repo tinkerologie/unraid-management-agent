@@ -37,6 +37,13 @@ type VMSnapshot struct {
 	IsCurrent   bool   `json:"is_current" example:"true"`
 }
 
+// VMResetRequest is the request body for POST /vm/{name}/reset.
+// Confirm must be explicitly set to true to authorise the hard-reset operation.
+type VMResetRequest struct {
+	// Confirm must be set to true to authorise the destructive hard-reset operation.
+	Confirm bool `json:"confirm"`
+}
+
 // VMSnapshotList contains a list of VM snapshots
 type VMSnapshotList struct {
 	VMName    string       `json:"vm_name" example:"Windows 11"`

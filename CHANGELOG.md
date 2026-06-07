@@ -11,6 +11,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Control feature parity with the official Unraid API** (sub-project C) — added
+  the safe control operations the official GraphQL API had that this agent
+  lacked: **VM reset** (`vm_action reset` + `POST /vm/{name}/reset`, hard
+  power-cycle via libvirt `DomainReset`, `confirm=true` required on both REST and
+  MCP); Docker **container remove** (`container_action remove` +
+  `POST /docker/{id}/remove`, optional image removal, `confirm=true`), **autostart
+  control** (`POST /docker/{id}/autostart` + `set_container_autostart`, writing
+  Unraid's `/var/lib/docker/unraid-autostart`), and read-only **port-conflict
+  detection** (`GET /docker/port-conflicts` + `get_port_conflicts`); and array
+  **clear-disk-statistics** (`POST /array/clear-disk-stats` + `clear_disk_stats`,
+  via the emhttpd socket — the same path the WebUI uses). The MCP tool count is
+  now 125. Destructive ops are confirm-gated and capability-gated. Verified live
+  on Unraid 7.3.1. Per-disk array mount/unmount was intentionally **dropped** —
+  Unraid exposes no safe per-disk mechanism (only array-wide start/stop) — and
+  the dangerous add/remove-disk-to-array operations were deliberately left to the
+  official API / WebUI.
+
 - **OS-resilience & self-diagnostics** (sub-project B) — the agent now detects
   when an Unraid data source breaks (moved path, changed file format, missing
   binary) via capability/shape probing, degrades gracefully (keeps serving

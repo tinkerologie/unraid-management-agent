@@ -1,0 +1,67 @@
+{
+  "planPath": "docs/superpowers/plans/2026-06-07-feature-parity.md",
+  "specPath": "docs/superpowers/specs/2026-06-07-feature-parity-design.md",
+  "branch": "feat/feature-parity",
+  "tasks": [
+    {
+      "id": 0,
+      "nativeTaskId": "25",
+      "subject": "C-Task 0: VM reset",
+      "status": "completed",
+      "description": "**Goal:** vm_action gains `reset` (libvirt DomainReset on a running VM).\n\n**Verify:** go test ./daemon/services/controllers/ -run TestVMReset -v\n\n```json:metadata\n{\"files\": [\"daemon/services/controllers/vm.go\",\"daemon/services/api/handlers.go\",\"daemon/services/mcp/server.go\"], \"verifyCommand\": \"go test ./daemon/services/controllers/ -run TestVMReset -v\"}\n```"
+    },
+    {
+      "id": 1,
+      "nativeTaskId": "26",
+      "subject": "C-Task 1: Container remove",
+      "status": "completed",
+      "blockedBy": [
+        0
+      ],
+      "description": "**Goal:** container_action gains `remove` (+remove_image), confirm-gated, via SDK ContainerRemove(Force).\n\n**Verify:** go test ./daemon/services/controllers/ -run TestDockerRemove -v\n\n```json:metadata\n{\"files\": [\"daemon/services/controllers/docker.go\",\"daemon/services/api/handlers.go\",\"daemon/services/mcp/server.go\"], \"verifyCommand\": \"go test ./daemon/services/controllers/ -run TestDockerRemove -v\"}\n```"
+    },
+    {
+      "id": 2,
+      "nativeTaskId": "27",
+      "subject": "C-Task 2: Container autostart (verify mechanism)",
+      "status": "completed",
+      "blockedBy": [
+        1
+      ],
+      "description": "**Goal:** SetAutostart(id, enabled) through the Unraid WebUI mechanism (verify file/format first).\n\n**Verify:** go test ./daemon/services/controllers/ -run Autostart -v\n\n```json:metadata\n{\"files\": [\"daemon/services/controllers/docker.go\",\"daemon/services/api/handlers.go\",\"daemon/services/mcp/server.go\"], \"verifyCommand\": \"go test ./daemon/services/controllers/ -run Autostart -v\"}\n```"
+    },
+    {
+      "id": 3,
+      "nativeTaskId": "28",
+      "subject": "C-Task 3: Port-conflict detection",
+      "status": "completed",
+      "blockedBy": [
+        2
+      ],
+      "description": "**Goal:** read-only PortConflicts() + pure detectPortConflicts; GET /docker/port-conflicts + get_port_conflicts.\n\n**Verify:** go test ./daemon/services/controllers/ -run TestPortConflicts -v\n\n```json:metadata\n{\"files\": [\"daemon/services/controllers/docker.go\",\"daemon/dto/docker.go\",\"daemon/services/api/handlers.go\",\"daemon/services/mcp/server.go\"], \"verifyCommand\": \"go test ./daemon/services/controllers/ -run TestPortConflicts -v\"}\n```"
+    },
+    {
+      "id": 4,
+      "nativeTaskId": "29",
+      "subject": "C-Task 4: Array safe-subset (verify-or-drop) [USER-GATE]",
+      "status": "completed",
+      "blockedBy": [
+        3
+      ],
+      "userGate": true,
+      "description": "**Goal:** clear-stats + disk mount/unmount ONLY if a safe Unraid mechanism is verified; else drop+document.\n\n**USER-ORDERED GATE \u2014 NON-SKIPPABLE.** Close only after each op is verified on hardware (reversibly) or explicitly dropped+documented.\n\n**Verify:** go test ./daemon/services/controllers/ -run TestArrayDisk -v + ansible-playbook ... --tags build,deploy,verify\n\n```json:metadata\n{\"files\": [\"daemon/services/controllers/array.go\",\"daemon/services/api/handlers.go\",\"daemon/services/mcp/server.go\"], \"verifyCommand\": \"ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --tags build,deploy,verify\", \"userGate\": true, \"tags\": [\"user-gate\"], \"gateScope\": \"this-step\"}\n```"
+    },
+    {
+      "id": 5,
+      "nativeTaskId": "30",
+      "subject": "C-Task 5: Docs + final verify + CHANGELOG [USER-GATE]",
+      "status": "completed",
+      "blockedBy": [
+        4
+      ],
+      "userGate": true,
+      "description": "**Goal:** docs/swagger/tool-count updates, final full hardware verify + CodeRabbit, THEN CHANGELOG last.\n\n**USER-ORDERED GATE \u2014 NON-SKIPPABLE.** CHANGELOG is the LAST action, only after full hardware verify + clean CodeRabbit.\n\n**Verify:** final ansible-playbook ... --tags build,deploy,verify failed=0\n\n```json:metadata\n{\"files\": [\"docs/integrations/mcp.md\",\"skills/unraid-management-agent/references/mcp-tools.md\",\"AGENTS.md\",\"CHANGELOG.md\"], \"verifyCommand\": \"ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --tags build,deploy,verify\", \"userGate\": true, \"tags\": [\"user-gate\"], \"gateScope\": \"whole-plan\"}\n```"
+    }
+  ],
+  "lastUpdated": "2026-06-07"
+}

@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -135,6 +138,178 @@ func (dc *DockerController) Unpause(containerID string) error {
 	}
 
 	logger.Info("Successfully unpaused Docker container: %s", containerID)
+	return nil
+}
+
+// Remove removes a Docker container by ID or name (force-stopping it if running).
+// When removeImage is true it also removes the container's image (best-effort;
+// logs a warning if the image is still in use by other containers).
+func (dc *DockerController) Remove(containerID string, removeImage bool) error {
+	logger.Info("Removing Docker container: %s (removeImage=%v)", containerID, removeImage)
+
+	if err := dc.initClient(); err != nil {
+		return fmt.Errorf("docker unavailable: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Capture image reference before removal so we can optionally clean it up.
+	var imageRef string
+	if removeImage {
+		if inspectResult, err := dc.client.ContainerInspect(ctx, containerID, client.ContainerInspectOptions{}); err == nil {
+			imageRef = inspectResult.Container.Config.Image
+		}
+	}
+
+	if _, err := dc.client.ContainerRemove(ctx, containerID, client.ContainerRemoveOptions{Force: true}); err != nil {
+		return fmt.Errorf("failed to remove container %q: %w", containerID, err)
+	}
+
+	logger.Info("Successfully removed Docker container: %s", containerID)
+
+	if removeImage && imageRef != "" {
+		if _, err := dc.client.ImageRemove(ctx, imageRef, client.ImageRemoveOptions{}); err != nil {
+			logger.Warning("Docker: container removed but image %s not removed (may be in use by other containers): %v", imageRef, err)
+		} else {
+			logger.Info("Docker: removed image %s", imageRef)
+		}
+	}
+
+	return nil
+}
+
+// dockerAutostartFile is the path to the Unraid autostart list. It is a package-level
+// variable so tests can point it at a temp file without touching the real path.
+//
+// VERIFIED 2026-06-07 on Unraid 7.x (192.168.20.21):
+//   - /var/lib/docker/unraid-autostart contains one container NAME per line (no quotes,
+//     no extra fields), in the order Unraid starts them at boot. The file is the
+//     canonical source of truth for which containers auto-start — the WebUI reads/writes
+//     this file directly. Empty lines are ignored by Unraid.
+//   - /boot/config/plugins/dockerMan/userprefs.cfg holds the UI ordering (indexed
+//     key=value pairs) and is NOT the runtime autostart gate; do not write to it.
+var dockerAutostartFile = "/var/lib/docker/unraid-autostart"
+
+// SetAutostart enables or disables autostart for a container by adding or removing its
+// name from the Unraid autostart file (/var/lib/docker/unraid-autostart).
+//
+// The file format is one container name per line (plain text, no quotes). Order is
+// preserved for names that remain in the file. The write is atomic (write-then-rename).
+// The container ID is resolved to a name via ContainerInspect when it does not look like
+// a plain name (i.e. when a Docker daemon is reachable and the ID is a hash).
+func (dc *DockerController) SetAutostart(containerID string, enabled bool) error {
+	logger.Info("Docker: SetAutostart(%s, %v)", containerID, enabled)
+
+	// Resolve the container name. The autostart file uses names, not IDs.
+	name, err := dc.resolveContainerName(containerID)
+	if err != nil {
+		return fmt.Errorf("cannot resolve container name for %q: %w", containerID, err)
+	}
+
+	return modifyAutostartFile(dockerAutostartFile, name, enabled)
+}
+
+// resolveContainerName returns the plain container name for a given ID or name.
+// If the Docker daemon is unreachable (no client), the input is returned unchanged so
+// that callers that already have a plain name (e.g. from the cache) still work.
+func (dc *DockerController) resolveContainerName(containerID string) (string, error) {
+	if err := dc.initClient(); err != nil {
+		// No daemon available — treat containerID as the name as-is.
+		logger.Warning("Docker: daemon unavailable for name resolution, using %q as-is: %v", containerID, err)
+		return containerID, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	info, err := dc.client.ContainerInspect(ctx, containerID, client.ContainerInspectOptions{})
+	if err != nil {
+		return "", fmt.Errorf("ContainerInspect failed: %w", err)
+	}
+
+	name := strings.TrimPrefix(info.Container.Name, "/")
+	return name, nil
+}
+
+// modifyAutostartFile is the pure, testable file-manipulation helper.
+// It reads the autostart file at path, adds or removes containerName, and writes the
+// result atomically. Order of existing entries is preserved; appends at end when adding.
+func modifyAutostartFile(path, containerName string, enabled bool) error {
+	// Read existing entries (file may not exist yet — treat as empty).
+	// path is the package-level dockerAutostartFile constant (or a test temp path) — not user input.
+	data, err := os.ReadFile(path) //nolint:gosec // G304: path is a controlled constant, not user input
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to read autostart file %s: %w", path, err)
+	}
+
+	// Parse: split on newlines, keep non-empty, non-duplicate names.
+	lines := strings.Split(string(data), "\n")
+	entries := make([]string, 0, len(lines))
+	found := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		if trimmed == containerName {
+			found = true
+			if enabled {
+				// Already present — keep it.
+				entries = append(entries, trimmed)
+			}
+			// If !enabled: skip (i.e. remove) this entry.
+		} else {
+			entries = append(entries, trimmed)
+		}
+	}
+
+	if enabled && !found {
+		// Container not in the list — append it.
+		entries = append(entries, containerName)
+	}
+
+	if !enabled && !found {
+		// Already absent — nothing to do.
+		logger.Info("Docker: autostart: %s was not in the list (no change)", containerName)
+	}
+
+	// Build file content: one name per line, trailing newline.
+	content := strings.Join(entries, "\n")
+	if len(entries) > 0 {
+		content += "\n"
+	}
+
+	// Atomic write: write to a temp file in the same directory, then rename.
+	dir := "."
+	if idx := strings.LastIndex(path, "/"); idx >= 0 {
+		dir = path[:idx]
+	}
+	tmp, err := os.CreateTemp(dir, ".autostart-tmp-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file for autostart write: %w", err)
+	}
+	tmpName := tmp.Name()
+
+	if _, err := tmp.WriteString(content); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpName)
+		return fmt.Errorf("failed to write autostart temp file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmpName)
+		return fmt.Errorf("failed to close autostart temp file: %w", err)
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		_ = os.Remove(tmpName)
+		return fmt.Errorf("failed to rename autostart temp file to %s: %w", path, err)
+	}
+
+	action := "added to"
+	if !enabled {
+		action = "removed from"
+	}
+	logger.Info("Docker: %s autostart list (%s)", containerName, action)
 	return nil
 }
 
@@ -688,6 +863,105 @@ func (dc *DockerController) ListNetworks() ([]dto.DockerNetworkInfo, error) {
 
 	logger.Info("Listed %d Docker networks", len(result))
 	return result, nil
+}
+
+// detectPortConflicts groups container names by (host port, protocol) and
+// returns entries where more than one container binds the same host port.
+// Input is keyed "<hostPort>/<proto>" → container names.
+// Output is sorted by HostPort then Protocol.
+func detectPortConflicts(bindings map[string][]string) []dto.PortConflict {
+	var conflicts []dto.PortConflict
+	for key, names := range bindings {
+		if len(names) < 2 {
+			continue
+		}
+		// Parse "<port>/<proto>"
+		slash := strings.LastIndex(key, "/")
+		if slash < 0 {
+			continue
+		}
+		portStr := key[:slash]
+		proto := key[slash+1:]
+		portNum, err := strconv.Atoi(portStr)
+		if err != nil {
+			continue
+		}
+		sort.Strings(names)
+		conflicts = append(conflicts, dto.PortConflict{
+			HostPort:   portNum,
+			Protocol:   proto,
+			Containers: names,
+		})
+	}
+	sort.Slice(conflicts, func(i, j int) bool {
+		if conflicts[i].HostPort != conflicts[j].HostPort {
+			return conflicts[i].HostPort < conflicts[j].HostPort
+		}
+		return conflicts[i].Protocol < conflicts[j].Protocol
+	})
+	return conflicts
+}
+
+// PortConflicts returns any host port bound by more than one running container.
+// It lists all containers, inspects each one's HostConfig.PortBindings to build
+// a map of "<hostPort>/<proto>" → container names, and then calls detectPortConflicts.
+//
+// The moby port field shape used here:
+//
+//	HostConfig.PortBindings  — network.PortMap = map[network.Port][]network.PortBinding
+//	  containerPort.Port()   — host port number as a string (e.g. "8080")
+//	  containerPort.Proto()  — protocol as IPProtocol (e.g. "tcp")
+//	  binding.HostPort       — the actual host-side port string
+func (dc *DockerController) PortConflicts() ([]dto.PortConflict, error) {
+	if err := dc.initClient(); err != nil {
+		return nil, fmt.Errorf("docker unavailable: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	listResult, err := dc.client.ContainerList(ctx, client.ContainerListOptions{All: true})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list containers: %w", err)
+	}
+
+	// bindings maps "<hostPort>/<proto>" → []containerNames
+	bindings := make(map[string][]string)
+
+	for _, c := range listResult.Items {
+		name := c.ID[:12]
+		if len(c.Names) > 0 {
+			name = strings.TrimPrefix(c.Names[0], "/")
+		}
+
+		inspectResult, err := dc.client.ContainerInspect(ctx, c.ID, client.ContainerInspectOptions{})
+		if err != nil {
+			logger.Warning("DockerPortConflicts: inspect failed for %s: %v", name, err)
+			continue
+		}
+
+		// Only running containers actually hold host ports; skip stopped ones.
+		if inspectResult.Container.State == nil || !inspectResult.Container.State.Running {
+			continue
+		}
+
+		if inspectResult.Container.HostConfig == nil {
+			continue
+		}
+
+		for containerPort, portBindings := range inspectResult.Container.HostConfig.PortBindings {
+			for _, binding := range portBindings {
+				if binding.HostPort == "" {
+					continue
+				}
+				// Key is "<hostPort>/<proto>"
+				key := binding.HostPort + "/" + string(containerPort.Proto())
+				bindings[key] = append(bindings[key], name)
+			}
+		}
+	}
+
+	return detectPortConflicts(bindings), nil
 }
 
 // shortDigest returns a truncated digest for logging.
