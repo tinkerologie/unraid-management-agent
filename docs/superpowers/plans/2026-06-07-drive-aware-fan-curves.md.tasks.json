@@ -50,10 +50,10 @@
     {
       "id": 8,
       "subject": "Task 8: Full-suite, hardware verify, CodeRabbit, CHANGELOG",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [1, 2, 3, 4, 5, 6, 7],
       "description": "**Goal:** Prove the feature works end-to-end on the live Unraid server and record it in the changelog.\n\n> USER-ORDERED GATE \u2014 NON-SKIPPABLE. Close only after every acceptanceCriteria item is re-validated independently, with output captured.\n\n**Files:**\n- Modify: CHANGELOG.md\n\n**Acceptance Criteria:**\n- go test ./... passes and make local builds (regenerated swagger).\n- ansible-playbook ... --tags build,deploy,verify reports failed=0.\n- Live curl /api/v1/fans/sensors returns JSON with hwmon_sensors and non-empty drives.\n- Live POST /fans/profile drives-source on a real controllable fan succeeds and GET /fans shows temp_source.type==drives (or documented hw limitation); defaults restored.\n- coderabbit review --agent --base main = 0 findings (or addressed).\n- CHANGELOG.md Added entry under next version, written last.\n\n**Verify:** go test ./... && make local then ansible-playbook ... --tags build,deploy,verify (failed=0) + curl /api/v1/fans/sensors + coderabbit review --agent --base main\n\n```json:metadata\n{\"userGate\": true, \"tags\": [\"user-gate\"], \"files\": [\"CHANGELOG.md\"], \"verifyCommand\": \"go test ./... && make local && ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --tags build,deploy,verify && curl -s http://192.168.20.21:8043/api/v1/fans/sensors | head -c 2000\", \"acceptanceCriteria\": [\"go test ./... passes and make local builds\", \"ansible build,deploy,verify failed=0\", \"GET /fans/sensors returns hwmon_sensors + non-empty drives on Unraid\", \"live drives-source POST /fans/profile succeeds and GET /fans shows temp_source.type=drives (or documented hw limitation); defaults restored\", \"coderabbit review --agent --base main = 0 findings\", \"CHANGELOG.md Added entry written last\"]}\n```"
     }
   ],
-  "lastUpdated": "2026-06-07T02:57:50Z"
+  "lastUpdated": "2026-06-07T03:21:45Z"
 }
