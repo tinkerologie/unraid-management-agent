@@ -44,6 +44,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Unraid API). Verified live on Unraid 7.3.1 (self-test healthy across 6
   subsystems; golden-fixture + breakage-simulation tests in CI).
 
+- **Go runtime & process metrics on `/metrics`** — the Prometheus endpoint now
+  exposes the standard Go runtime and process collectors
+  (`go_goroutines`, `go_memstats_heap_inuse_bytes` and the full `go_memstats_*`
+  family, `process_resident_memory_bytes`, `process_open_fds`, …), enabling
+  long-term goroutine/heap/RSS leak and resource-health monitoring of the agent
+  itself. Verified live on Unraid 7.3.1.
+
 ### Fixed
 
 - **Fan-safety log spam** — the fan safety guard logged a "fan appears stalled"
