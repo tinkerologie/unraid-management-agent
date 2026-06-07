@@ -4534,21 +4534,39 @@ func (s *Server) handleSetFanMode(w http.ResponseWriter, r *http.Request) {
 //	@Param			request	body		dto.FanProfileRequest	true	"Fan profile request"
 //	@Success		200		{object}	dto.Response			"Profile assigned"
 //	@Failure		400		{object}	dto.Response			"Invalid request"
+//	@Failure		503		{object}	dto.Response			"Fan controller not initialized"
 //	@Failure		500		{object}	dto.Response			"Failed to assign profile"
 //	@Router			/fans/profile [post]
 func (s *Server) handleSetFanProfile(w http.ResponseWriter, r *http.Request) {
-	if s.fanController == nil {
-		respondWithError(w, http.StatusServiceUnavailable, "Fan controller not initialized")
-		return
-	}
-
 	var req dto.FanProfileRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondWithError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	if err := s.fanController.SetProfile(req.FanID, req.ProfileName, req.TempSensorPath); err != nil {
+	// Resolve temperature source: explicit Source wins; else legacy path.
+	var source dto.FanTempSource
+	switch {
+	case req.Source != nil:
+		source = *req.Source
+	case req.TempSensorPath != "":
+		source = dto.FanTempSource{Type: dto.FanTempSourceHwmon, SensorPath: req.TempSensorPath}
+	default:
+		source = dto.FanTempSource{Type: dto.FanTempSourceHwmon}
+	}
+	if req.Source != nil || req.TempSensorPath != "" {
+		if err := lib.ValidateFanTempSource(source); err != nil {
+			respondWithError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+
+	if s.fanController == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Fan controller not initialized")
+		return
+	}
+
+	if err := s.fanController.SetProfile(req.FanID, req.ProfileName, source); err != nil {
 		logger.Error("API: Failed to assign fan profile: %v", err)
 		respondWithError(w, http.StatusInternalServerError, "Failed to assign fan profile")
 		return
@@ -4559,6 +4577,23 @@ func (s *Server) handleSetFanProfile(w http.ResponseWriter, r *http.Request) {
 		Message:   fmt.Sprintf("Profile %s assigned to fan %s", req.ProfileName, req.FanID),
 		Timestamp: time.Now(),
 	})
+}
+
+// handleFanSensors godoc
+//
+//	@Summary		List fan temperature sources
+//	@Description	List available hwmon temperature sensors and drives for fan-curve assignment
+//	@Tags			Fans
+//	@Produce		json
+//	@Success		200	{object}	dto.FanSensorCatalog	"Available sensors and drives"
+//	@Failure		503	{object}	dto.Response			"Fan controller not initialized"
+//	@Router			/fans/sensors [get]
+func (s *Server) handleFanSensors(w http.ResponseWriter, _ *http.Request) {
+	if s.fanController == nil {
+		respondWithError(w, http.StatusServiceUnavailable, "Fan controller not initialized")
+		return
+	}
+	respondJSON(w, http.StatusOK, s.fanController.GetSensorCatalog())
 }
 
 // handleCreateFanProfile godoc

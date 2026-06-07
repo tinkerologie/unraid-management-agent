@@ -3067,7 +3067,7 @@ func (s *Server) registerFanControlTools() {
 			return textResult("Fan controller not initialized"), nil, nil
 		}
 		logger.Info("MCP: Set fan profile '%s' for '%s'", args.ProfileName, args.FanID)
-		if err := s.fanController.SetProfile(args.FanID, args.ProfileName, args.TempSensorPath); err != nil {
+		if err := s.fanController.SetProfile(args.FanID, args.ProfileName, dto.FanTempSource{Type: dto.FanTempSourceHwmon, SensorPath: args.TempSensorPath}); err != nil {
 			return textResult(fmt.Sprintf("Failed to assign fan profile: %v", err)), nil, nil
 		}
 		return textResult(fmt.Sprintf("Profile %s assigned to fan %s", args.ProfileName, args.FanID)), nil, nil

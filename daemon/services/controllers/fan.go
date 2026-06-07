@@ -210,8 +210,8 @@ func (c *FanController) SetMode(fanID string, mode string) error {
 	return nil
 }
 
-// SetProfile assigns a fan curve profile to a fan, optionally linking a temperature sensor.
-func (c *FanController) SetProfile(fanID, profileName, tempSensorPath string) error {
+// SetProfile assigns a fan curve profile to a fan using the given temperature source.
+func (c *FanController) SetProfile(fanID, profileName string, source dto.FanTempSource) error {
 	if err := lib.ValidateFanID(fanID); err != nil {
 		return err
 	}
@@ -223,26 +223,37 @@ func (c *FanController) SetProfile(fanID, profileName, tempSensorPath string) er
 		return fmt.Errorf("fan control is not enabled; enable it via the configuration endpoint first")
 	}
 
-	// Set fan to manual mode first
 	if err := c.hwmon.SetMode(fanID, dto.FanModeManual); err != nil {
 		return fmt.Errorf("set manual mode for profile: %w", err)
 	}
-
-	src := dto.FanTempSource{Type: dto.FanTempSourceHwmon, SensorPath: tempSensorPath}
-	if err := c.curves.AssignProfile(fanID, profileName, src); err != nil {
+	if err := c.curves.AssignProfile(fanID, profileName, source); err != nil {
 		return fmt.Errorf("assign profile: %w", err)
 	}
-
-	// Start curve engine if it's not running
 	if !c.curves.running {
 		c.curves.Start(time.Duration(c.config.PollInterval) * time.Second)
 	}
-
-	// Persist
 	c.saveConfigLocked()
-
-	logger.Info("Fan control: Assigned profile %q to %s", profileName, fanID)
+	logger.Info("Fan control: Assigned profile %q to %s (source=%s)", profileName, fanID, source.Type)
 	return nil
+}
+
+// GetSensorCatalog returns the hwmon sensors and drives available as fan-curve
+// temperature sources.
+func (c *FanController) GetSensorCatalog() dto.FanSensorCatalog {
+	cat := dto.FanSensorCatalog{Timestamp: time.Now()}
+	for _, s := range lib.DiscoverHwmonTempSensors() {
+		cat.HwmonSensors = append(cat.HwmonSensors, dto.AvailableTempSensor{
+			Path: s.Path, Label: s.Label, TempC: s.TempC, Plausible: s.Plausible,
+		})
+	}
+	if drives, err := lib.ReadDiskTemps(); err == nil {
+		for _, d := range drives {
+			cat.Drives = append(cat.Drives, dto.AvailableDriveSensor{
+				ID: d.ID, Device: d.Device, TempC: d.TempC, SpunDown: d.SpunDown,
+			})
+		}
+	}
+	return cat
 }
 
 // CreateProfile registers a custom fan profile.

@@ -318,6 +318,7 @@ func (s *Server) setupRoutes() {
 
 	// Fan control endpoints (monitoring)
 	api.HandleFunc("/fans", s.handleFanControl).Methods("GET")
+	api.HandleFunc("/fans/sensors", s.handleFanSensors).Methods("GET")
 	// Fan control endpoints (control)
 	api.HandleFunc("/fans/speed", s.handleSetFanSpeed).Methods("POST")
 	api.HandleFunc("/fans/mode", s.handleSetFanMode).Methods("POST")
