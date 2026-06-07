@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
@@ -165,19 +166,22 @@ func TestArrayDiskClearStats(t *testing.T) {
 		_ = ac.ClearDiskStats
 	})
 
-	t.Run("capability gate: emcmd absent returns clear error", func(t *testing.T) {
-		// In CI / non-Unraid environments the emcmd binary is absent.
-		// ClearDiskStats must return a clear "unavailable" error, not panic.
+	t.Run("capability gate: socket absent returns socket-unavailable error", func(t *testing.T) {
+		// In CI / non-Unraid environments the emhttpd socket is absent.
+		// ClearDiskStats must return a socket-unavailable error, not panic.
 		err := ac.ClearDiskStats()
 		if err == nil {
-			// emcmd is present (running on Unraid hardware); nothing to assert here.
-			t.Log("Note: emcmd present — ClearDiskStats reached the emhttpd socket")
+			// Socket is present (running on Unraid hardware); nothing to assert here.
+			t.Log("Note: emhttpd socket present — ClearDiskStats reached the emhttpd socket")
 			return
 		}
-		// Error must be non-nil and descriptive when the binary is absent.
+		// Error must be non-nil and reference the socket when unavailable.
 		if err.Error() == "" {
 			t.Error("ClearDiskStats returned a non-nil error with empty message")
 		}
-		t.Logf("ClearDiskStats (no emcmd) correctly returned: %v", err)
+		if !strings.Contains(err.Error(), "emhttpd socket") {
+			t.Errorf("expected socket-unavailable error, got: %v", err)
+		}
+		t.Logf("ClearDiskStats (no socket) correctly returned: %v", err)
 	})
 }

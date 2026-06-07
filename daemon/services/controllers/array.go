@@ -170,8 +170,8 @@ func (c *ArrayController) SpinUpDisk(diskName string) error {
 func (c *ArrayController) ClearDiskStats() error {
 	logger.Info("Array: Clearing disk statistics...")
 
-	if err := requireBinary("array", constants.EmcmdBin); err != nil {
-		return err
+	if !lib.IsEmhttpdAvailable() {
+		return fmt.Errorf("array control unavailable: emhttpd socket not found at %s", lib.EmhttpdSocket)
 	}
 
 	if err := lib.EmhttpdRequest(map[string]string{"clearStatistics": "true"}); err != nil {

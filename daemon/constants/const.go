@@ -60,9 +60,6 @@ const (
 	VirshBin = "/usr/bin/virsh"
 	// MdcmdBin is the path to the mdcmd binary.
 	MdcmdBin = "/usr/local/sbin/mdcmd"
-	// EmcmdBin is the path to the emcmd binary (PHP wrapper around the emhttpd socket).
-	// Used to issue commands to the Unraid emhttpd daemon (e.g. clearStatistics).
-	EmcmdBin = "/usr/local/sbin/emcmd"
 	// ApcaccessBin is the path to the apcaccess binary.
 	ApcaccessBin = "/sbin/apcaccess"
 	// UpscBin is the path to the upsc binary.
