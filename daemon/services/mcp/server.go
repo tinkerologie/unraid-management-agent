@@ -3079,6 +3079,10 @@ func (s *Server) registerFanControlTools() {
 		if s.fanController == nil {
 			return textResult("Fan controller not initialized"), nil, nil
 		}
+		// Infer drives source when drive_ids are given without an explicit type.
+		if args.SourceType == "" && len(args.DriveIDs) > 0 {
+			args.SourceType = string(dto.FanTempSourceDrives)
+		}
 		var source dto.FanTempSource
 		switch args.SourceType {
 		case string(dto.FanTempSourceDrives):
@@ -3088,12 +3092,8 @@ func (s *Server) registerFanControlTools() {
 		default:
 			return textResult(fmt.Sprintf("unknown source_type %q; valid values: hwmon, drives", args.SourceType)), nil, nil
 		}
-		// Validate only when a source was actually specified (matches REST behavior:
-		// an empty assignment is allowed for "profile without temperature source").
-		if args.SourceType != "" || args.TempSensorPath != "" || len(args.DriveIDs) > 0 {
-			if err := lib.ValidateFanTempSource(source); err != nil {
-				return textResult(fmt.Sprintf("Invalid temperature source: %v", err)), nil, nil
-			}
+		if err := lib.ValidateFanTempSource(source); err != nil {
+			return textResult(fmt.Sprintf("Invalid temperature source: %v", err)), nil, nil
 		}
 		logger.Info("MCP: Set fan profile '%s' for '%s' (source=%s)", args.ProfileName, args.FanID, source.Type)
 		if err := s.fanController.SetProfile(args.FanID, args.ProfileName, source); err != nil {

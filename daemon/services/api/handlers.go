@@ -4554,11 +4554,9 @@ func (s *Server) handleSetFanProfile(w http.ResponseWriter, r *http.Request) {
 	default:
 		source = dto.FanTempSource{Type: dto.FanTempSourceHwmon}
 	}
-	if req.Source != nil || req.TempSensorPath != "" {
-		if err := lib.ValidateFanTempSource(source); err != nil {
-			respondWithError(w, http.StatusBadRequest, err.Error())
-			return
-		}
+	if err := lib.ValidateFanTempSource(source); err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
 	}
 
 	if s.fanController == nil {

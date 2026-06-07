@@ -282,6 +282,7 @@ func (e *FanCurveEngine) resolveTempForFan(fanID string, src dto.FanTempSource) 
 func (e *FanCurveEngine) maxActiveDriveTemp(ids []string) (float64, bool) {
 	temps, err := e.drives.DriveTemps()
 	if err != nil {
+		logger.Debug("Fan curve: failed to read drive temperatures: %v", err)
 		return 0, false
 	}
 	maxT := 0.0

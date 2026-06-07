@@ -102,7 +102,7 @@ func (a *fanCurveAssignment) UnmarshalJSON(data []byte) error {
 	}
 	var ns newShape
 	if err := json.Unmarshal(data, &ns); err != nil {
-		return err
+		return fmt.Errorf("unmarshal fan curve assignment: %w", err)
 	}
 
 	// Legacy shape (capitalized keys from the old default Go encoding).
