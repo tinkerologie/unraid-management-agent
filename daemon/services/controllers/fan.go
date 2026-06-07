@@ -77,7 +77,7 @@ func (c *FanController) Initialize() error {
 
 	// Restore saved assignments
 	for fanID, assignment := range cfgData.Assignments {
-		if assignErr := c.curves.AssignProfile(fanID, assignment.ProfileName, assignment.TempSensorPath); assignErr != nil {
+		if assignErr := c.curves.AssignProfile(fanID, assignment.ProfileName, assignment.Source); assignErr != nil {
 			logger.Warning("Fan control: Failed to restore assignment for %s: %v", fanID, assignErr)
 		}
 	}
@@ -113,8 +113,17 @@ func (c *FanController) GetStatus() *dto.FanControlStatus {
 
 	// Annotate fans with profile assignments
 	for i := range fans {
-		if profileName, ok := c.curves.GetAssignment(fans[i].ID); ok {
+		src, ok := c.curves.GetAssignmentSource(fans[i].ID)
+		if !ok {
+			continue
+		}
+		if profileName, pok := c.curves.GetAssignment(fans[i].ID); pok {
 			fans[i].ActiveProfile = profileName
+		}
+		s := src
+		fans[i].TempSource = &s
+		if src.Type == dto.FanTempSourceHwmon {
+			fans[i].TempSensorPath = src.SensorPath
 		}
 	}
 
@@ -219,7 +228,8 @@ func (c *FanController) SetProfile(fanID, profileName, tempSensorPath string) er
 		return fmt.Errorf("set manual mode for profile: %w", err)
 	}
 
-	if err := c.curves.AssignProfile(fanID, profileName, tempSensorPath); err != nil {
+	src := dto.FanTempSource{Type: dto.FanTempSourceHwmon, SensorPath: tempSensorPath}
+	if err := c.curves.AssignProfile(fanID, profileName, src); err != nil {
 		return fmt.Errorf("assign profile: %w", err)
 	}
 
