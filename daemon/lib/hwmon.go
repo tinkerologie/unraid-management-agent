@@ -17,6 +17,9 @@ const MaxHwmonDevices = 10
 // MaxFanChannels is the upper bound for fan channel scanning per hwmon device.
 const MaxFanChannels = 20
 
+// MaxTempChannels is the upper bound for hwmon temperature channel scanning per device.
+const MaxTempChannels = 20
+
 // MaxPlausibleRPM is the upper bound for plausible fan RPM readings.
 // Values above this are treated as bogus sensor data. Even extreme server
 // fans (Delta, Nidec) rarely exceed 15 000 RPM; 25 000 gives headroom.
@@ -193,11 +196,15 @@ func classifyTempSensorPlausible(label string, tempC float64) bool {
 // DiscoverHwmonTempSensors enumerates all readable hwmon temperature inputs.
 // Implausible / unreliable sensors are INCLUDED but flagged Plausible=false,
 // so callers see the full picture rather than a silently-filtered subset.
+//
+// A sensor that reads exactly 0 is skipped: ReadSysfsInt returns 0 for both a
+// missing file and a genuine 0 °C reading, which cannot be distinguished here
+// (same behavior as ReadMaxHwmonTemp).
 func DiscoverHwmonTempSensors() []HwmonTempSensor {
 	var sensors []HwmonTempSensor
 	for i := range MaxHwmonDevices {
 		hwmonDir := filepath.Join(HwmonBasePath, fmt.Sprintf("hwmon%d", i))
-		for j := 1; j <= 20; j++ {
+		for j := 1; j <= MaxTempChannels; j++ {
 			tempPath := filepath.Join(hwmonDir, fmt.Sprintf("temp%d_input", j))
 			raw := ReadSysfsInt(tempPath)
 			if raw == 0 {
