@@ -302,6 +302,36 @@ definitions:
         example: 45.5
         type: number
     type: object
+  dto.AvailableDriveSensor:
+    properties:
+      device:
+        example: sdb
+        type: string
+      id:
+        example: disk1
+        type: string
+      spun_down:
+        example: false
+        type: boolean
+      temp_celsius:
+        example: 38
+        type: number
+    type: object
+  dto.AvailableTempSensor:
+    properties:
+      label:
+        example: Tctl
+        type: string
+      path:
+        example: /sys/class/hwmon/hwmon0/temp1_input
+        type: string
+      plausible:
+        example: true
+        type: boolean
+      temp_celsius:
+        example: 45
+        type: number
+    type: object
   dto.BIOSInfo:
     properties:
       address:
@@ -1242,6 +1272,8 @@ definitions:
       temp_sensor_path:
         example: /sys/class/hwmon/hwmon0/temp1_input
         type: string
+      temp_source:
+        $ref: '#/definitions/dto.FanTempSource'
     type: object
   dto.FanInfo:
     properties:
@@ -1298,6 +1330,8 @@ definitions:
       profile_name:
         example: balanced
         type: string
+      source:
+        $ref: '#/definitions/dto.FanTempSource'
       temp_sensor_path:
         example: /sys/class/hwmon/hwmon0/temp1_input
         type: string
@@ -1314,6 +1348,19 @@ definitions:
         example: 20
         type: integer
     type: object
+  dto.FanSensorCatalog:
+    properties:
+      drives:
+        items:
+          $ref: '#/definitions/dto.AvailableDriveSensor'
+        type: array
+      hwmon_sensors:
+        items:
+          $ref: '#/definitions/dto.AvailableTempSensor'
+        type: array
+      timestamp:
+        type: string
+    type: object
   dto.FanSpeedRequest:
     properties:
       fan_id:
@@ -1323,6 +1370,34 @@ definitions:
         example: 50
         type: integer
     type: object
+  dto.FanTempSource:
+    properties:
+      drive_ids:
+        example:
+        - disk1
+        - disk2
+        items:
+          type: string
+        type: array
+      fallback_sensor_path:
+        example: /sys/class/hwmon/hwmon0/temp1_input
+        type: string
+      sensor_path:
+        example: /sys/class/hwmon/hwmon0/temp1_input
+        type: string
+      type:
+        allOf:
+        - $ref: '#/definitions/dto.FanTempSourceType'
+        example: drives
+    type: object
+  dto.FanTempSourceType:
+    enum:
+    - hwmon
+    - drives
+    type: string
+    x-enum-varnames:
+    - FanTempSourceHwmon
+    - FanTempSourceDrives
   dto.FlashDriveHealth:
     description: USB flash boot drive health information
     properties:
@@ -5352,6 +5427,10 @@ paths:
           description: Failed to assign profile
           schema:
             $ref: '#/definitions/dto.Response'
+        "503":
+          description: Fan controller not initialized
+          schema:
+            $ref: '#/definitions/dto.Response'
       summary: Assign fan profile
       tags:
       - Fans
@@ -5383,6 +5462,24 @@ paths:
           schema:
             $ref: '#/definitions/dto.Response'
       summary: Create fan profile
+      tags:
+      - Fans
+  /fans/sensors:
+    get:
+      description: List available hwmon temperature sensors and drives for fan-curve
+        assignment
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Available sensors and drives
+          schema:
+            $ref: '#/definitions/dto.FanSensorCatalog'
+        "503":
+          description: Fan controller not initialized
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: List fan temperature sources
       tags:
       - Fans
   /fans/speed:
