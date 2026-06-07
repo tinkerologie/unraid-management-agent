@@ -756,6 +756,32 @@ const docTemplate = `{
                 }
             }
         },
+        "/array/clear-disk-stats": {
+            "post": {
+                "description": "Clear all array disk I/O statistics system-wide. Uses the same mechanism as the Unraid WebUI \"Clear Stats\" button (emhttpd clearStatistics). The operation is safe and reversible — counters reset to zero and accumulate again normally. Requires the emhttpd socket to be available.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Array"
+                ],
+                "summary": "Clear disk statistics",
+                "responses": {
+                    "200": {
+                        "description": "Disk statistics cleared",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to clear disk statistics",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/array/parity-check/history": {
             "get": {
                 "description": "Retrieve the history of parity check operations",
@@ -1353,6 +1379,35 @@ const docTemplate = `{
                 }
             }
         },
+        "/docker/port-conflicts": {
+            "get": {
+                "description": "Returns any host port bound by more than one running container (read-only, no confirm required).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Docker"
+                ],
+                "summary": "List Docker port conflicts",
+                "responses": {
+                    "200": {
+                        "description": "List of port conflicts (empty if none)",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.PortConflict"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to detect port conflicts",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/docker/stats": {
             "get": {
                 "description": "Returns aggregate CPU and memory statistics across all running containers",
@@ -1479,6 +1534,59 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Container not found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/docker/{id}/autostart": {
+            "post": {
+                "description": "Enable or disable autostart for a Docker container. Uses the Unraid autostart file (/var/lib/docker/unraid-autostart). The change persists across reboots.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Docker"
+                ],
+                "summary": "Set container autostart",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container ID or name",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Enabled flag",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.ContainerAutostartRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Autostart updated",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid container ID or request body",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to update autostart",
                         "schema": {
                             "$ref": "#/definitions/dto.Response"
                         }
@@ -1620,6 +1728,59 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Failed to pause container",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/docker/{id}/remove": {
+            "post": {
+                "description": "Permanently remove a Docker container (force-stopped if running). Requires confirm=true in the request body.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Docker"
+                ],
+                "summary": "Remove Docker container",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container ID or name",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Confirm flag and optional remove_image flag",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.ContainerRemoveRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Container removed",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid container ID or missing confirmation",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to remove container",
                         "schema": {
                             "$ref": "#/definitions/dto.Response"
                         }
@@ -4914,6 +5075,47 @@ const docTemplate = `{
                 }
             }
         },
+        "/vm/{name}/reset": {
+            "post": {
+                "description": "Hard reset a specific virtual machine by name (equivalent to the physical reset button). The VM must be running.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "VMs"
+                ],
+                "summary": "Reset VM",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "VM name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "VM reset",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid VM name",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to reset VM",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/vm/{name}/restart": {
             "post": {
                 "description": "Restart a specific virtual machine by name",
@@ -6264,6 +6466,15 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.ContainerAutostartRequest": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "description": "Enabled controls whether autostart is turned on (true) or off (false).",
+                    "type": "boolean"
+                }
+            }
+        },
         "dto.ContainerBulkUpdateResult": {
             "type": "object",
             "properties": {
@@ -6444,6 +6655,18 @@ const docTemplate = `{
                 },
                 "timestamp": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.ContainerRemoveRequest": {
+            "type": "object",
+            "properties": {
+                "confirm": {
+                    "description": "Confirm must be set to true to authorise the destructive remove operation.",
+                    "type": "boolean"
+                },
+                "remove_image": {
+                    "type": "boolean"
                 }
             }
         },
@@ -9101,6 +9324,23 @@ const docTemplate = `{
                     "example": true
                 },
                 "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.PortConflict": {
+            "type": "object",
+            "properties": {
+                "containers": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "host_port": {
+                    "type": "integer"
+                },
+                "protocol": {
                     "type": "string"
                 }
             }

@@ -1080,6 +1080,36 @@ func (s *Server) handleParityCheckHistory(w http.ResponseWriter, _ *http.Request
 	respondJSON(w, http.StatusOK, history)
 }
 
+// handleClearDiskStats godoc
+//
+//	@Summary		Clear disk statistics
+//	@Description	Clear all array disk I/O statistics system-wide. Uses the same mechanism as the Unraid WebUI "Clear Stats" button (emhttpd clearStatistics). The operation is safe and reversible — counters reset to zero and accumulate again normally. Requires the emhttpd socket to be available.
+//	@Tags			Array
+//	@Produce		json
+//	@Success		200	{object}	dto.Response	"Disk statistics cleared"
+//	@Failure		500	{object}	dto.Response	"Failed to clear disk statistics"
+//	@Router			/array/clear-disk-stats [post]
+func (s *Server) handleClearDiskStats(w http.ResponseWriter, _ *http.Request) {
+	logger.Info("API: Clearing disk statistics")
+
+	arrayCtrl := controllers.NewArrayController(s.ctx)
+	if err := arrayCtrl.ClearDiskStats(); err != nil {
+		logger.Error("API: Failed to clear disk statistics: %v", err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to clear disk statistics: %v", err),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   "Disk statistics cleared successfully",
+		Timestamp: time.Now(),
+	})
+}
+
 // handleShareConfig godoc
 //
 //	@Summary		Get share configuration

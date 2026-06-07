@@ -1607,6 +1607,26 @@ func (s *Server) registerControlTools() {
 		return textResult(fmt.Sprintf("Disk '%s' spin up initiated", args.DiskID)), nil, nil
 	})
 
+	// Clear disk statistics tool
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "clear_disk_stats",
+		Description: "Clear all array disk I/O statistics system-wide. Uses the same mechanism as the Unraid WebUI 'Clear Stats' button (emhttpd clearStatistics). Safe and reversible — counters reset to zero and resume accumulating normally. Requires the emhttpd socket.",
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: ptr(false),
+			IdempotentHint:  true,
+		},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		logger.Info("MCP: Clear disk statistics requested")
+
+		arrayCtrl := controllers.NewArrayController(s.ctx)
+		if err := arrayCtrl.ClearDiskStats(); err != nil {
+			logger.Error("MCP: Failed to clear disk statistics: %v", err)
+			return textResult(fmt.Sprintf("Failed to clear disk statistics: %v", err)), nil, nil
+		}
+
+		return textResult("Disk statistics cleared successfully"), nil, nil
+	})
+
 	// Execute user script tool
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "execute_user_script",

@@ -154,3 +154,31 @@ func (c *ArrayController) SpinUpDisk(diskName string) error {
 	logger.Info("Array: Disk %s spun up successfully", diskName)
 	return nil
 }
+
+// ClearDiskStats clears all array disk I/O statistics system-wide.
+//
+// Mechanism: issues "clearStatistics=true" via the emhttpd Unix socket — the same
+// call the Unraid WebUI makes when the user clicks "Clear Stats" on the Main page
+// (ArrayOperation.page → ToggleState.php → emcmd clearStatistics=true).  The
+// operation is safe and reversible: statistics simply reset to zero and accumulate
+// again as normal.
+//
+// Note: the operation clears ALL disk statistics globally; there is no per-disk
+// variant exposed by the emhttpd API.
+//
+// Capability gate: requires the emhttpd socket (/var/run/emhttpd.socket).
+func (c *ArrayController) ClearDiskStats() error {
+	logger.Info("Array: Clearing disk statistics...")
+
+	if err := requireBinary("array", constants.EmcmdBin); err != nil {
+		return err
+	}
+
+	if err := lib.EmhttpdRequest(map[string]string{"clearStatistics": "true"}); err != nil {
+		logger.Error("Array: Failed to clear disk statistics: %v", err)
+		return fmt.Errorf("failed to clear disk statistics: %w", err)
+	}
+
+	logger.Info("Array: Disk statistics cleared successfully")
+	return nil
+}
