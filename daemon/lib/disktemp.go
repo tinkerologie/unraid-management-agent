@@ -18,7 +18,7 @@ type DiskTemp struct {
 	ID       string  // disks.ini section name: "disk1", "cache", "parity"
 	Device   string  // "sdb"
 	TempC    float64 // 0 when unavailable
-	SpunDown bool    // disks.ini temp == "*" or empty
+	SpunDown bool    // true when no usable temperature is available (Unraid "*"/empty, missing temp key, or unparsable value)
 }
 
 // ReadDiskTemps parses the default disks.ini (/boot/config/disks.ini).
@@ -31,7 +31,7 @@ func ReadDiskTemps() (map[string]DiskTemp, error) {
 func ReadDiskTempsFromFile(path string) (map[string]DiskTemp, error) {
 	result := make(map[string]DiskTemp)
 
-	// #nosec G304 -- path is a fixed const in production; tests pass a temp file.
+	// #nosec G304 -- callers are either ReadDiskTemps (fixed const) or tests; never user-controlled input.
 	file, err := os.Open(path)
 	if err != nil {
 		return result, fmt.Errorf("open disks.ini: %w", err)
@@ -51,9 +51,10 @@ func ReadDiskTempsFromFile(path string) (map[string]DiskTemp, error) {
 
 		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
 			flush()
-			id := strings.Trim(line, "[]")
+			id := strings.TrimPrefix(line, "[")
+			id = strings.TrimSuffix(id, "]")
 			id = strings.Trim(id, `"`)
-			cur = &DiskTemp{ID: id}
+			cur = &DiskTemp{ID: id, SpunDown: true} // assume no reading until a valid temp parses
 			continue
 		}
 
@@ -69,11 +70,11 @@ func ReadDiskTempsFromFile(path string) (map[string]DiskTemp, error) {
 			cur.Device = val
 		case "temp":
 			// Unraid writes "*" (or empty) for a spun-down disk — do NOT wake it.
-			if val == "*" || val == "" {
-				cur.SpunDown = true
-			} else if t, perr := strconv.ParseFloat(val, 64); perr == nil {
+			if t, perr := strconv.ParseFloat(val, 64); perr == nil {
 				cur.TempC = t
+				cur.SpunDown = false
 			}
+			// "*", "", or unparsable leaves SpunDown=true (set at section start).
 		}
 	}
 	flush()

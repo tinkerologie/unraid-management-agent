@@ -17,6 +17,11 @@ temp="*"
 ["cache"]
 device="nvme0n1"
 temp=""
+["disk4"]
+device="sdd"
+["disk5"]
+device="sde"
+temp="N/A"
 `
 	dir := t.TempDir()
 	p := filepath.Join(dir, "disks.ini")
@@ -37,6 +42,12 @@ temp=""
 	}
 	if d := got["cache"]; !d.SpunDown {
 		t.Errorf("cache (empty temp): got %+v, want spundown=true", d)
+	}
+	if d := got["disk4"]; !d.SpunDown || d.TempC != 0 {
+		t.Errorf("disk4 (no temp key): got %+v, want spundown=true temp=0", d)
+	}
+	if d := got["disk5"]; !d.SpunDown || d.TempC != 0 {
+		t.Errorf("disk5 (unparsable temp): got %+v, want spundown=true temp=0", d)
 	}
 }
 
