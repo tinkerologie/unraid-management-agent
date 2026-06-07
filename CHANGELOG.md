@@ -7,11 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2026.06.02] - 2026-06-06
+## [2026.06.03] - 2026-06-07
 
 ### Added
 
-- **Control feature parity with the official Unraid API** (sub-project C) — added
+- **Control feature parity with the official Unraid API** — added
   the safe control operations the official GraphQL API had that this agent
   lacked: **VM reset** (`vm_action reset` + `POST /vm/{name}/reset`, hard
   power-cycle via libvirt `DomainReset`, `confirm=true` required on both REST and
@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the dangerous add/remove-disk-to-array operations were deliberately left to the
   official API / WebUI.
 
-- **OS-resilience & self-diagnostics** (sub-project B) — the agent now detects
+- **OS-resilience & self-diagnostics** — the agent now detects
   when an Unraid data source breaks (moved path, changed file format, missing
   binary) via capability/shape probing, degrades gracefully (keeps serving
   best-effort data, never silently wrong/empty), and surfaces it everywhere:
@@ -43,6 +43,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `daemon/platform` package; fully self-contained (no dependency on the official
   Unraid API). Verified live on Unraid 7.3.1 (self-test healthy across 6
   subsystems; golden-fixture + breakage-simulation tests in CI).
+
+### Fixed
+
+- **Fan-safety log spam** — the fan safety guard logged a "fan appears stalled"
+  warning on **every** poll cycle for each driven-but-not-spinning header (e.g.
+  empty/unused fan headers reading 0 RPM), producing thousands of warnings. It
+  now logs the warning **once per transition** into the stalled state (and a
+  recovery line once when it clears), mirroring the OS-resilience registry's
+  transition logging. Verified on Unraid: warnings/36-min dropped from ~3,600 to
+  single digits.
+- **Clean-shutdown logged at ERROR** — a graceful HTTP-server shutdown
+  (`http.ErrServerClosed`) was logged as `ERROR: API server error`; it is now an
+  informational "API server stopped" line.
+
+## [2026.06.02] - 2026-06-06
+
+### Added
 
 - **Zeroconf/mDNS auto-discovery** (#120) — the agent now advertises itself
   on the local network via mDNS/DNS-SD as `_unraid-mgmt-agent._tcp.local.`, so
