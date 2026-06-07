@@ -257,3 +257,22 @@ func TestMetricsArrayStateValues(t *testing.T) {
 		})
 	}
 }
+
+// TestRuntimeMetricsExposed verifies the Go runtime collectors are registered
+// so go_goroutines and heap stats are scrapable for long-term leak monitoring.
+// (process_* metrics are Linux-only, so they are not asserted here.)
+func TestRuntimeMetricsExposed(t *testing.T) {
+	ctx := &domain.Context{Config: domain.Config{Port: 8043}}
+	server := NewServer(ctx)
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	w := httptest.NewRecorder()
+	server.handleMetrics(w, req)
+
+	body := w.Body.String()
+	for _, want := range []string{"go_goroutines", "go_memstats_heap_inuse_bytes"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("expected runtime metric %q in /metrics output", want)
+		}
+	}
+}

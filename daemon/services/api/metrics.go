@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -360,6 +361,14 @@ func init() {
 		// Fans
 		fanRPM,
 		fanPWMPercent,
+	)
+
+	// Go runtime + process collectors so heap, goroutines, and resident memory
+	// are scrapable (e.g. go_goroutines, go_memstats_heap_inuse_bytes,
+	// process_resident_memory_bytes) — enabling long-term leak/health monitoring.
+	metricsRegistry.MustRegister(
+		collectors.NewGoCollector(),
+		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
 	)
 }
 
