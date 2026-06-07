@@ -450,9 +450,14 @@ func ValidateFanTempSource(src dto.FanTempSource) error {
 
 // validateHwmonSensorPath ensures a sysfs path is under /sys/class/hwmon and
 // free of directory traversal.
+// This is a string-level guard: symlinks are resolved by the kernel at open
+// time, so callers must still open the path with appropriate (read-only) access.
 func validateHwmonSensorPath(path string) error {
 	if path == "" {
 		return errors.New("hwmon sensor path cannot be empty")
+	}
+	if len(path) > 4096 {
+		return errors.New("hwmon sensor path too long")
 	}
 	if strings.Contains(path, "..") || strings.Contains(path, "\x00") {
 		return errors.New("invalid hwmon sensor path: traversal or null byte")

@@ -726,6 +726,7 @@ func TestValidateFanTempSource(t *testing.T) {
 		{"path traversal", dto.FanTempSource{Type: dto.FanTempSourceHwmon, SensorPath: "/sys/class/hwmon/../../etc/passwd"}, true},
 		{"path outside hwmon", dto.FanTempSource{Type: dto.FanTempSourceHwmon, SensorPath: "/etc/passwd"}, true},
 		{"bad fallback path", dto.FanTempSource{Type: dto.FanTempSourceDrives, DriveIDs: []string{"disk1"}, FallbackSensorPath: "/etc/shadow"}, true},
+		{"path too long", dto.FanTempSource{Type: dto.FanTempSourceHwmon, SensorPath: "/sys/class/hwmon/" + strings.Repeat("a", 5000)}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
