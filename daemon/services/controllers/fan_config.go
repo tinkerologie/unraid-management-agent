@@ -91,6 +91,40 @@ func (s *FanConfigStore) Save(data fanConfigData) error {
 	return nil
 }
 
+// UnmarshalJSON accepts both the current shape ({profile_name, source}) and the
+// legacy flat shape ({ProfileName, TempSensorPath}) so existing fancontrol.json
+// files keep working. A legacy TempSensorPath maps to a hwmon source.
+func (a *fanCurveAssignment) UnmarshalJSON(data []byte) error {
+	// New shape first.
+	type newShape struct {
+		ProfileName string            `json:"profile_name"`
+		Source      dto.FanTempSource `json:"source"`
+	}
+	var ns newShape
+	if err := json.Unmarshal(data, &ns); err != nil {
+		return err
+	}
+
+	// Legacy shape (capitalized keys from the old default Go encoding).
+	type legacyShape struct {
+		ProfileName    string `json:"ProfileName"`
+		TempSensorPath string `json:"TempSensorPath"`
+	}
+	var ls legacyShape
+	_ = json.Unmarshal(data, &ls)
+
+	a.ProfileName = ns.ProfileName
+	if a.ProfileName == "" {
+		a.ProfileName = ls.ProfileName
+	}
+
+	a.Source = ns.Source
+	if a.Source.Type == "" && ls.TempSensorPath != "" {
+		a.Source = dto.FanTempSource{Type: dto.FanTempSourceHwmon, SensorPath: ls.TempSensorPath}
+	}
+	return nil
+}
+
 // defaultFanControlConfig returns the initial configuration with monitoring
 // enabled but active control disabled (safe default).
 func defaultFanControlConfig() dto.FanControlConfig {
