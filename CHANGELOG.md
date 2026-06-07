@@ -51,6 +51,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   long-term goroutine/heap/RSS leak and resource-health monitoring of the agent
   itself. Verified live on Unraid 7.3.1.
 
+- **Drive-aware fan curves + sensor discovery** — a fan curve can now read its
+  temperature from a selected set of drives (the **max** of the active ones,
+  sourced non-destructively from `disks.ini` — spun-down drives are skipped,
+  never woken) and **fail over** to a per-profile hwmon sensor when those drives
+  are spun down (logged once per transition, no spam). New read-only
+  `GET /api/v1/fans/sensors` endpoint and `get_fan_sensors` MCP tool list every
+  hwmon temperature sensor (path, label, value, plausibility flag) and drive
+  (id, device, temp, spin state) available as a curve source — so users no longer
+  need to hand-discover sysfs paths. `POST /fans/profile` and `set_fan_profile`
+  accept a structured `source` (`hwmon` single sensor, or `drives` with optional
+  fallback) while remaining backward compatible with the legacy
+  `temp_sensor_path`; existing `fancontrol.json` assignments migrate
+  transparently on load. Source paths are validated to the
+  `/sys/class/hwmon/hwmonN/tempM_input` shape and drive IDs are sanity-checked.
+  The emergency thermal cutoff remains **hwmon-only** by design (a spun-down
+  array can never suppress it). MCP tool count → 126. Mirrors the
+  `SimonFair/IPMI-unRAID` drive-selection model. Verified live on Unraid 7.3.1.
+
 ### Fixed
 
 - **Fan-safety log spam** — the fan safety guard logged a "fan appears stalled"
