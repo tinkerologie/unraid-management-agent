@@ -3483,6 +3483,13 @@ definitions:
       timestamp:
         type: string
     type: object
+  dto.VMResetRequest:
+    properties:
+      confirm:
+        description: Confirm must be set to true to authorise the destructive hard-reset
+          operation.
+        type: boolean
+    type: object
   dto.VMSettings:
     properties:
       default_settings:
@@ -7250,14 +7257,23 @@ paths:
       - VMs
   /vm/{name}/reset:
     post:
+      consumes:
+      - application/json
       description: Hard reset a specific virtual machine by name (equivalent to the
-        physical reset button). The VM must be running.
+        physical reset button). The VM must be running. Requires confirm=true in the
+        request body.
       parameters:
       - description: VM name
         in: path
         name: name
         required: true
         type: string
+      - description: Confirm flag
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.VMResetRequest'
       produces:
       - application/json
       responses:
@@ -7266,7 +7282,7 @@ paths:
           schema:
             $ref: '#/definitions/dto.Response'
         "400":
-          description: Invalid VM name
+          description: Invalid VM name or missing confirmation
           schema:
             $ref: '#/definitions/dto.Response'
         "500":

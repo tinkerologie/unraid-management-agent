@@ -1,6 +1,6 @@
 # MCP Tool Catalog
 
-All **122 MCP tools** exposed by the Unraid Management Agent, grouped by purpose.
+All **125 MCP tools** exposed by the Unraid Management Agent, grouped by purpose.
 
 - **R** = read-only (`ReadOnlyHint: true`) — safe to call freely.
 - **W** = write/control — changes the system.
@@ -8,7 +8,7 @@ All **122 MCP tools** exposed by the Unraid Management Agent, grouped by purpose
 
 Tool names are exact. Do not invent or alias them.
 
-> Counts: 122 tools + 5 resources + 6 prompts. Resources and prompts are listed
+> Counts: 125 tools + 5 resources + 6 prompts. Resources and prompts are listed
 > in `diagnostics.md`.
 
 ---
@@ -63,6 +63,7 @@ Tool names are exact. Do not invent or alias them.
 | R | `get_container_size` | Writable-layer + virtual size of a container |
 | R | `get_docker_stats` | Aggregate CPU/memory across running containers |
 | R | `list_docker_networks` | Docker networks: driver, scope, IPAM |
+| R | `get_port_conflicts` | Host ports bound by more than one running container |
 | R | `check_container_updates` | Check all containers for image updates |
 | R | `check_container_update` | Check one container for an image update |
 | R | `refresh_container_updates` | Force registry digest re-check (all) |
@@ -137,7 +138,10 @@ Tool names are exact. Do not invent or alias them.
 | R/W | Tool | Purpose |
 | --- | --- | --- |
 | W | `container_action` | start / stop / restart / pause / unpause a container |
+| W ⚠️ | `container_action` (remove) | remove a container (+optional image) — requires confirm |
+| W | `set_container_autostart` | enable/disable a container's auto-start at boot |
 | W | `vm_action` | start / stop / restart / pause / resume / hibernate / force-stop a VM |
+| W ⚠️ | `vm_action` (reset) | hard-reset a running VM (power-cycle) — requires confirm |
 | W | `update_container` | Update one container to latest image |
 | W ⚠️ | `update_all_containers` | Update all containers with available updates |
 | W | `create_vm_snapshot` | Snapshot a VM |
@@ -161,6 +165,7 @@ Tool names are exact. Do not invent or alias them.
 | --- | --- | --- |
 | W | `disk_spin_down` | Spin a disk down (saves power) |
 | W | `disk_spin_up` | Spin a disk up from standby |
+| W | `clear_disk_stats` | Reset array disk I/O statistics counters (system-wide) |
 
 ## Control — System & Services (write)
 

@@ -5077,7 +5077,10 @@ const docTemplate = `{
         },
         "/vm/{name}/reset": {
             "post": {
-                "description": "Hard reset a specific virtual machine by name (equivalent to the physical reset button). The VM must be running.",
+                "description": "Hard reset a specific virtual machine by name (equivalent to the physical reset button). The VM must be running. Requires confirm=true in the request body.",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -5092,6 +5095,15 @@ const docTemplate = `{
                         "name": "name",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "description": "Confirm flag",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.VMResetRequest"
+                        }
                     }
                 ],
                 "responses": {
@@ -5102,7 +5114,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid VM name",
+                        "description": "Invalid VM name or missing confirmation",
                         "schema": {
                             "$ref": "#/definitions/dto.Response"
                         }
@@ -10508,6 +10520,15 @@ const docTemplate = `{
                 },
                 "timestamp": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.VMResetRequest": {
+            "type": "object",
+            "properties": {
+                "confirm": {
+                    "description": "Confirm must be set to true to authorise the destructive hard-reset operation.",
+                    "type": "boolean"
                 }
             }
         },
