@@ -170,6 +170,59 @@ func IsPlausibleTempC(tempC float64) bool {
 	return tempC > -40.0 && tempC < 125.0
 }
 
+// HwmonTempSensor describes one discovered hwmon temperature input.
+type HwmonTempSensor struct {
+	Path      string
+	Label     string
+	TempC     float64
+	Plausible bool
+}
+
+// classifyTempSensorPlausible reports whether a sensor reading is trustworthy
+// for fan-curve use: within range AND not a known-unreliable label.
+func classifyTempSensorPlausible(label string, tempC float64) bool {
+	if !IsPlausibleTempC(tempC) {
+		return false
+	}
+	if label != "" && isUnreliableTempLabel(label) {
+		return false
+	}
+	return true
+}
+
+// DiscoverHwmonTempSensors enumerates all readable hwmon temperature inputs.
+// Implausible / unreliable sensors are INCLUDED but flagged Plausible=false,
+// so callers see the full picture rather than a silently-filtered subset.
+func DiscoverHwmonTempSensors() []HwmonTempSensor {
+	var sensors []HwmonTempSensor
+	for i := range MaxHwmonDevices {
+		hwmonDir := filepath.Join(HwmonBasePath, fmt.Sprintf("hwmon%d", i))
+		for j := 1; j <= 20; j++ {
+			tempPath := filepath.Join(hwmonDir, fmt.Sprintf("temp%d_input", j))
+			raw := ReadSysfsInt(tempPath)
+			if raw == 0 {
+				continue
+			}
+			tempC := float64(raw) / 1000.0
+
+			labelPath := filepath.Join(hwmonDir, fmt.Sprintf("temp%d_label", j))
+			label := ReadSysfsString(labelPath)
+			display := label
+			if display == "" {
+				display = fmt.Sprintf("hwmon%d_temp%d", i, j)
+			}
+
+			sensors = append(sensors, HwmonTempSensor{
+				Path:      tempPath,
+				Label:     display,
+				TempC:     tempC,
+				Plausible: classifyTempSensorPlausible(label, tempC),
+			})
+		}
+	}
+	return sensors
+}
+
 // ReadMaxHwmonTemp scans hwmon temp*_input files and returns the highest
 // temperature in °C.  It filters out:
 //   - readings outside the -40 °C … 125 °C plausible range
