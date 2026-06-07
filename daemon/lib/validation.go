@@ -6,6 +6,8 @@ import (
 	"net"
 	"regexp"
 	"strings"
+
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 )
 
 var (
@@ -419,6 +421,44 @@ func ValidateHostOrIP(host string) error {
 	}
 	if !hostnameRegex.MatchString(host) {
 		return fmt.Errorf("invalid host %q: must be a valid hostname or IP address", host)
+	}
+	return nil
+}
+
+// ValidateFanTempSource validates a fan curve temperature source.
+func ValidateFanTempSource(src dto.FanTempSource) error {
+	switch src.Type {
+	case dto.FanTempSourceHwmon:
+		if err := validateHwmonSensorPath(src.SensorPath); err != nil {
+			return err
+		}
+	case dto.FanTempSourceDrives:
+		if len(src.DriveIDs) == 0 {
+			return errors.New("drives source requires at least one drive ID")
+		}
+	default:
+		return fmt.Errorf("invalid temperature source type: %q", src.Type)
+	}
+	// Fallback is optional, but if set it must be a valid hwmon path.
+	if src.FallbackSensorPath != "" {
+		if err := validateHwmonSensorPath(src.FallbackSensorPath); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateHwmonSensorPath ensures a sysfs path is under /sys/class/hwmon and
+// free of directory traversal.
+func validateHwmonSensorPath(path string) error {
+	if path == "" {
+		return errors.New("hwmon sensor path cannot be empty")
+	}
+	if strings.Contains(path, "..") || strings.Contains(path, "\x00") {
+		return errors.New("invalid hwmon sensor path: traversal or null byte")
+	}
+	if !strings.HasPrefix(path, "/sys/class/hwmon/") {
+		return errors.New("hwmon sensor path must be under /sys/class/hwmon/")
 	}
 	return nil
 }
