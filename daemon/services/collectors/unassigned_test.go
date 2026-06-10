@@ -1,6 +1,8 @@
 package collectors
 
 import (
+	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -281,6 +283,44 @@ func TestGetFilesystemUsage(t *testing.T) {
 	}
 	if usagePercent < 0 || usagePercent > 100 {
 		t.Fatalf("expected usage percent in range 0..100, got %f", usagePercent)
+	}
+}
+
+func TestGetFilesystemUsageTimed_HealthyMount(t *testing.T) {
+	path := t.TempDir()
+
+	size, _, _, _, err := getFilesystemUsageTimed(path, 5*time.Second)
+	if err != nil {
+		t.Fatalf("getFilesystemUsageTimed returned error: %v", err)
+	}
+	if size == 0 {
+		t.Fatal("expected non-zero filesystem size")
+	}
+}
+
+func TestGetFilesystemUsageTimed_HungMountTimesOut(t *testing.T) {
+	orig := statfsFn
+	release := make(chan struct{})
+	// Simulate a dead CIFS/NFS mount: statfs blocks until the kernel gives up.
+	statfsFn = func(_ string, _ *syscall.Statfs_t) error {
+		<-release
+		return nil
+	}
+	t.Cleanup(func() {
+		close(release) // unblock the abandoned probe goroutine
+		statfsFn = orig
+	})
+
+	start := time.Now()
+	_, _, _, _, err := getFilesystemUsageTimed("/mnt/remotes/dead_share", 50*time.Millisecond)
+	if err == nil {
+		t.Fatal("expected timeout error for hung statfs")
+	}
+	if !strings.Contains(err.Error(), "timed out") {
+		t.Fatalf("expected timeout-related error, got: %v", err)
+	}
+	if elapsed := time.Since(start); elapsed > 2*time.Second {
+		t.Fatalf("timed statfs blocked for %v, want prompt timeout", elapsed)
 	}
 }
 

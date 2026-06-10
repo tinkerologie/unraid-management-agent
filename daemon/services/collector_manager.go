@@ -496,10 +496,10 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 	// collectors→controllers import cycle.
 	cm.Register("docker_update", func(ctx *domain.Context) Collector {
 		c := collectors.NewDockerUpdateCollector(ctx)
-		c.CheckFn = func() (*dto.ContainerUpdatesResult, error) {
+		c.CheckFn = func(checkCtx context.Context) (*dto.ContainerUpdatesResult, error) {
 			dc := controllers.NewDockerController()
 			defer func() { _ = dc.Close() }()
-			return dc.CheckAllContainerUpdates()
+			return dc.CheckAllContainerUpdates(checkCtx)
 		}
 		c.NotifyFn = func(names []string) {
 			if err := controllers.CreateNotification(
@@ -533,9 +533,9 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 	// collectors→controllers import cycle.
 	cm.Register("plugin_update", func(ctx *domain.Context) Collector {
 		c := collectors.NewPluginUpdateCollector(ctx)
-		c.CheckFn = func() (*dto.PluginList, error) {
+		c.CheckFn = func(checkCtx context.Context) (*dto.PluginList, error) {
 			pc := controllers.NewPluginController()
-			updates, err := pc.CheckPluginUpdates()
+			updates, err := pc.CheckPluginUpdates(checkCtx)
 			if err != nil {
 				return nil, err
 			}

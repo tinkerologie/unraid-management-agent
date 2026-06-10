@@ -41,8 +41,13 @@ type SourceStatus struct {
 	Subsystem   string      `json:"subsystem"`
 	State       SourceState `json:"state"`
 	Reason      string      `json:"reason,omitempty"`
-	LastChecked time.Time   `json:"last_checked"`
-	LastError   string      `json:"last_error,omitempty"`
+	LastChecked time.Time   `json:"last_checked" format:"date-time"`
+	// LastHealthy is the RFC3339 timestamp of when the subsystem last reported
+	// healthy. It is preserved across degradations so a persistent degraded
+	// state can be dated. Omitted from JSON when the subsystem has never been
+	// healthy.
+	LastHealthy time.Time `json:"last_healthy,omitzero" format:"date-time"`
+	LastError   string    `json:"last_error,omitempty"`
 }
 
 // Capability is one probed OS capability (a binary or a path).

@@ -1,6 +1,7 @@
 package collectors
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -23,9 +24,9 @@ func TestDockerUpdateCollector_PublishesAndDedupes(t *testing.T) {
 	}
 
 	c := NewDockerUpdateCollector(&domain.Context{Hub: hub})
-	c.CheckFn = func() (*dto.ContainerUpdatesResult, error) { return result, nil }
+	c.CheckFn = func(_ context.Context) (*dto.ContainerUpdatesResult, error) { return result, nil }
 
-	c.Collect()
+	c.Collect(context.Background())
 	select {
 	case msg := <-sub:
 		got, ok := msg.(*dto.ContainerUpdatesResult)
@@ -36,7 +37,7 @@ func TestDockerUpdateCollector_PublishesAndDedupes(t *testing.T) {
 		t.Fatal("expected first publish, got none")
 	}
 
-	c.Collect() // identical → must NOT publish
+	c.Collect(context.Background()) // identical → must NOT publish
 	select {
 	case msg := <-sub:
 		t.Fatalf("expected no re-publish on unchanged result, got %#v", msg)
@@ -50,7 +51,7 @@ func TestDockerUpdateCollector_NilCheckFnIsSafe(t *testing.T) {
 	defer hub.Unsub(sub)
 
 	c := NewDockerUpdateCollector(&domain.Context{Hub: hub})
-	c.Collect() // CheckFn nil → must not panic, must not publish
+	c.Collect(context.Background()) // CheckFn nil → must not panic, must not publish
 
 	select {
 	case msg := <-sub:
@@ -66,13 +67,13 @@ func TestDockerUpdateCollector_RepublishesOnChange(t *testing.T) {
 
 	c := NewDockerUpdateCollector(&domain.Context{Hub: hub})
 
-	c.CheckFn = func() (*dto.ContainerUpdatesResult, error) {
+	c.CheckFn = func(_ context.Context) (*dto.ContainerUpdatesResult, error) {
 		return &dto.ContainerUpdatesResult{
 			Containers: []dto.ContainerUpdateInfo{{ContainerID: "a", UpdateAvailable: false}},
 			TotalCount: 1,
 		}, nil
 	}
-	c.Collect()
+	c.Collect(context.Background())
 
 	select {
 	case <-sub: // drain first publish
@@ -81,14 +82,14 @@ func TestDockerUpdateCollector_RepublishesOnChange(t *testing.T) {
 	}
 
 	// flip UpdateAvailable — signature changes, so a second publish must occur
-	c.CheckFn = func() (*dto.ContainerUpdatesResult, error) {
+	c.CheckFn = func(_ context.Context) (*dto.ContainerUpdatesResult, error) {
 		return &dto.ContainerUpdatesResult{
 			Containers:       []dto.ContainerUpdateInfo{{ContainerID: "a", UpdateAvailable: true}},
 			TotalCount:       1,
 			UpdatesAvailable: 1,
 		}, nil
 	}
-	c.Collect()
+	c.Collect(context.Background())
 
 	select {
 	case <-sub: // success: changed signature triggered republish
@@ -102,8 +103,8 @@ func TestDockerUpdateCollector_CheckErrorNoPublish(t *testing.T) {
 	sub := hub.Sub(constants.TopicDockerUpdatesUpdate.Name)
 	defer hub.Unsub(sub)
 	c := NewDockerUpdateCollector(&domain.Context{Hub: hub})
-	c.CheckFn = func() (*dto.ContainerUpdatesResult, error) { return nil, fmt.Errorf("boom") }
-	c.Collect()
+	c.CheckFn = func(_ context.Context) (*dto.ContainerUpdatesResult, error) { return nil, fmt.Errorf("boom") }
+	c.Collect(context.Background())
 	select {
 	case <-sub:
 		t.Fatal("expected no publish on check error")
@@ -121,8 +122,8 @@ func TestDockerUpdateNotify_FiresOnNewTransitionOnly(t *testing.T) {
 		Containers: []dto.ContainerUpdateInfo{{ContainerID: "a", ContainerName: "plex", LatestDigest: "x", UpdateAvailable: true}},
 		TotalCount: 1, UpdatesAvailable: 1,
 	}
-	c.CheckFn = func() (*dto.ContainerUpdatesResult, error) { return step1, nil }
-	c.Collect() // baseline → no notify
+	c.CheckFn = func(_ context.Context) (*dto.ContainerUpdatesResult, error) { return step1, nil }
+	c.Collect(context.Background()) // baseline → no notify
 	if len(notified) != 0 {
 		t.Fatalf("first run should not notify, got %v", notified)
 	}
@@ -134,10 +135,43 @@ func TestDockerUpdateNotify_FiresOnNewTransitionOnly(t *testing.T) {
 		},
 		TotalCount: 2, UpdatesAvailable: 2,
 	}
-	c.CheckFn = func() (*dto.ContainerUpdatesResult, error) { return step2, nil }
-	c.Collect() // sonarr newly available → notify only sonarr
+	c.CheckFn = func(_ context.Context) (*dto.ContainerUpdatesResult, error) { return step2, nil }
+	c.Collect(context.Background()) // sonarr newly available → notify only sonarr
 	if len(notified) != 1 || notified[0] != "sonarr" {
 		t.Fatalf("expected notify [sonarr], got %v", notified)
+	}
+}
+
+func TestDockerUpdateCollector_CheckFnContextHasDeadline(t *testing.T) {
+	hub := domain.NewEventBus(16)
+	c := NewDockerUpdateCollector(&domain.Context{Hub: hub})
+
+	var gotDeadline bool
+	c.CheckFn = func(ctx context.Context) (*dto.ContainerUpdatesResult, error) {
+		_, gotDeadline = ctx.Deadline()
+		return nil, nil
+	}
+	c.Collect(context.Background())
+	if !gotDeadline {
+		t.Fatal("CheckFn context must carry a deadline so registry checks fail fast")
+	}
+}
+
+func TestDockerUpdateCollector_CheckFnContextCancelledOnShutdown(t *testing.T) {
+	hub := domain.NewEventBus(16)
+	c := NewDockerUpdateCollector(&domain.Context{Hub: hub})
+
+	runCtx, cancel := context.WithCancel(context.Background())
+	cancel() // simulate collector shutdown before the check runs
+
+	var checkErr error
+	c.CheckFn = func(ctx context.Context) (*dto.ContainerUpdatesResult, error) {
+		checkErr = ctx.Err()
+		return nil, ctx.Err()
+	}
+	c.Collect(runCtx)
+	if checkErr == nil {
+		t.Fatal("CheckFn context must be cancelled when the lifecycle context is cancelled")
 	}
 }
 
@@ -146,11 +180,11 @@ func TestDockerUpdateNotify_DisabledByDefault(t *testing.T) {
 	called := false
 	c := NewDockerUpdateCollector(&domain.Context{Hub: hub}) // DockerUpdateNotify false
 	c.NotifyFn = func(names []string) { called = true }
-	c.CheckFn = func() (*dto.ContainerUpdatesResult, error) {
+	c.CheckFn = func(_ context.Context) (*dto.ContainerUpdatesResult, error) {
 		return &dto.ContainerUpdatesResult{Containers: []dto.ContainerUpdateInfo{{ContainerID: "a", ContainerName: "plex", LatestDigest: "x", UpdateAvailable: true}}, TotalCount: 1, UpdatesAvailable: 1}, nil
 	}
-	c.Collect()
-	c.Collect()
+	c.Collect(context.Background())
+	c.Collect(context.Background())
 	if called {
 		t.Fatal("notify must not fire when DockerUpdateNotify is false")
 	}

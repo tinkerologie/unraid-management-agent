@@ -17,6 +17,12 @@ import (
 // detection does not pile onto boot alongside every other collector.
 const pluginUpdateStartupStagger = 30 * time.Second
 
+// pluginUpdateCheckTimeout bounds a full plugin update check. The check shells
+// out to `plugin check`, which downloads update metadata; on networks without
+// outbound internet access (issue #123) it must fail fast instead of wedging
+// the collector for minutes per cycle.
+const pluginUpdateCheckTimeout = 30 * time.Second
+
 // PluginUpdateCollector periodically checks all plugins for available updates
 // and publishes the result. It runs on a long interval because the check
 // command downloads update metadata from the network.
@@ -24,8 +30,9 @@ type PluginUpdateCollector struct {
 	appCtx *domain.Context
 	// CheckFn fetches plugin update status; the collector factory in package
 	// services injects the controller-backed implementation to avoid a
-	// collectors→controllers import cycle.
-	CheckFn func() (*dto.PluginList, error)
+	// collectors→controllers import cycle. The context carries a deadline and
+	// is cancelled on shutdown so the check command never outlives the collector.
+	CheckFn func(ctx context.Context) (*dto.PluginList, error)
 	// NotifyFn is called with the names of plugins that newly became
 	// update-available since the previous run. Injected by the factory in
 	// package services to avoid a collectors→controllers import cycle.
@@ -62,7 +69,7 @@ func (c *PluginUpdateCollector) Start(ctx context.Context, interval time.Duratio
 				logger.LogPanicWithStack("PluginUpdate collector", r)
 			}
 		}()
-		c.Collect()
+		c.Collect(ctx)
 	}()
 
 	ticker := time.NewTicker(interval)
@@ -80,7 +87,7 @@ func (c *PluginUpdateCollector) Start(ctx context.Context, interval time.Duratio
 						logger.LogPanicWithStack("PluginUpdate collector", r)
 					}
 				}()
-				c.Collect()
+				c.Collect(ctx)
 			}()
 		}
 	}
@@ -88,12 +95,15 @@ func (c *PluginUpdateCollector) Start(ctx context.Context, interval time.Duratio
 
 // Collect runs a plugin update check and publishes the result only if it
 // changed since the last publish (dedupe to avoid no-op WebSocket broadcasts).
-func (c *PluginUpdateCollector) Collect() {
+// The passed lifecycle context bounds the check so it is cancelled on shutdown.
+func (c *PluginUpdateCollector) Collect(parentCtx context.Context) {
 	if c.CheckFn == nil {
 		logger.Warning("PluginUpdate: CheckFn not set, skipping collect")
 		return
 	}
-	result, err := c.CheckFn()
+	ctx, cancel := context.WithTimeout(parentCtx, pluginUpdateCheckTimeout)
+	defer cancel()
+	result, err := c.CheckFn(ctx)
 	if err != nil {
 		logger.Warning("PluginUpdate: check failed: %v", err)
 		return

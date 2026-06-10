@@ -17,6 +17,11 @@ import (
 // detection does not pile onto boot alongside every other collector.
 const dockerUpdateStartupStagger = 45 * time.Second
 
+// dockerUpdateCheckTimeout bounds a full update-check run. Registry calls hang
+// on networks without outbound internet access (issue #123), so the check must
+// fail fast instead of wedging the collector for minutes per cycle.
+const dockerUpdateCheckTimeout = 30 * time.Second
+
 // DockerUpdateCollector periodically checks all containers for available image
 // updates (registry digest comparison) and publishes the result. It runs on a
 // long interval because DistributionInspect hits the registry and Docker Hub
@@ -25,8 +30,9 @@ type DockerUpdateCollector struct {
 	appCtx *domain.Context
 	// CheckFn fetches container update status; the collector factory in package
 	// services injects the controller-backed implementation to avoid a
-	// collectors→controllers import cycle.
-	CheckFn func() (*dto.ContainerUpdatesResult, error)
+	// collectors→controllers import cycle. The context carries a deadline and
+	// is cancelled on shutdown so registry calls never outlive the collector.
+	CheckFn func(ctx context.Context) (*dto.ContainerUpdatesResult, error)
 	// NotifyFn is called with the names of containers that newly became
 	// update-available since the previous run. Injected by the factory in
 	// package services to avoid a collectors→controllers import cycle.
@@ -63,7 +69,7 @@ func (c *DockerUpdateCollector) Start(ctx context.Context, interval time.Duratio
 				logger.LogPanicWithStack("DockerUpdate collector", r)
 			}
 		}()
-		c.Collect()
+		c.Collect(ctx)
 	}()
 
 	ticker := time.NewTicker(interval)
@@ -81,20 +87,23 @@ func (c *DockerUpdateCollector) Start(ctx context.Context, interval time.Duratio
 						logger.LogPanicWithStack("DockerUpdate collector", r)
 					}
 				}()
-				c.Collect()
+				c.Collect(ctx)
 			}()
 		}
 	}
 }
 
 // Collect runs an update check and publishes the result only if it changed
-// since the last publish (dedupe to avoid no-op WebSocket broadcasts).
-func (c *DockerUpdateCollector) Collect() {
+// since the last publish (dedupe to avoid no-op WebSocket broadcasts). The
+// passed lifecycle context bounds the check so it is cancelled on shutdown.
+func (c *DockerUpdateCollector) Collect(parentCtx context.Context) {
 	if c.CheckFn == nil {
 		logger.Warning("DockerUpdate: CheckFn not set, skipping collect")
 		return
 	}
-	result, err := c.CheckFn()
+	ctx, cancel := context.WithTimeout(parentCtx, dockerUpdateCheckTimeout)
+	defer cancel()
+	result, err := c.CheckFn(ctx)
 	if err != nil {
 		logger.Warning("DockerUpdate: check failed: %v", err)
 		return

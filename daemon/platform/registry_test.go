@@ -47,6 +47,41 @@ func TestRegistrySnapshotAndCounts(t *testing.T) {
 	}
 }
 
+func TestRegistryLastHealthyTracking(t *testing.T) {
+	r := NewRegistry()
+	t0 := time.Unix(1000, 0)
+	t1 := time.Unix(2000, 0)
+	t2 := time.Unix(3000, 0)
+	now := t0
+	r.SetClock(func() time.Time { return now })
+
+	// Before any healthy report, LastHealthy must be zero.
+	r.Report("disk", dto.SourceDegraded, "stale", nil)
+	s, _ := r.Get("disk")
+	if !s.LastHealthy.IsZero() {
+		t.Fatalf("LastHealthy before first healthy report = %v, want zero", s.LastHealthy)
+	}
+
+	// A healthy report stamps LastHealthy with the current time.
+	now = t1
+	r.Healthy("disk")
+	s, _ = r.Get("disk")
+	if !s.LastHealthy.Equal(t1) {
+		t.Fatalf("LastHealthy after healthy report = %v, want %v", s.LastHealthy, t1)
+	}
+
+	// Transitioning away from healthy preserves the last healthy timestamp.
+	now = t2
+	r.Report("disk", dto.SourceUnavailable, "cannot read disks.ini", errors.New("boom"))
+	s, _ = r.Get("disk")
+	if !s.LastHealthy.Equal(t1) {
+		t.Fatalf("LastHealthy after degradation = %v, want preserved %v", s.LastHealthy, t1)
+	}
+	if !s.LastChecked.Equal(t2) {
+		t.Fatalf("LastChecked after degradation = %v, want %v", s.LastChecked, t2)
+	}
+}
+
 func TestRegistryDisabledNotCountedAsDegraded(t *testing.T) {
 	r := NewRegistry()
 	r.Report("docker", dto.SourceDisabled, "Docker service disabled in Unraid settings", nil)

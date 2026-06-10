@@ -11,7 +11,8 @@ import (
 // reports the detected Unraid version, the worst current subsystem state, the
 // startup capability snapshot, and the per-subsystem source health — so an
 // operator (or AI agent) can tell at a glance whether an OS update has broken a
-// data source.
+// data source. Each subsystem includes last_healthy so a persistent degraded
+// state can be dated (issue #123).
 type selfTestResponse struct {
 	UnraidVersion string             `json:"unraid_version"`
 	OverallState  dto.SourceState    `json:"overall_state"`

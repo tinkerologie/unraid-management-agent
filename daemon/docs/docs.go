@@ -9290,10 +9290,20 @@ const docTemplate = `{
             "description": "Parity check schedule configuration",
             "type": "object",
             "properties": {
+                "check_cron": {
+                    "description": "CheckCron is the authoritative cron spec of the scheduled check entry\nfrom parity-check.cron (the line Unraid actually runs), valid for every\nscheduled mode including custom. Use it to compute the next check\nwithout re-implementing Unraid's scheduling rules (Issue #124).",
+                    "type": "string",
+                    "example": "0 0 1 1 *"
+                },
                 "correcting": {
                     "description": "Correcting vs non-correcting check",
                     "type": "boolean",
                     "example": true
+                },
+                "cron": {
+                    "description": "Cron is the raw cron expression configured in dynamix.cfg for custom\nmode (mode \"custom\"); empty for the other modes (Issue #124).",
+                    "type": "string",
+                    "example": "0 3 * * 0"
                 },
                 "cumulative": {
                     "description": "Resume paused checks",
@@ -9301,12 +9311,12 @@ const docTemplate = `{
                     "example": true
                 },
                 "day": {
-                    "description": "Day of week (0-6) or day of month (1-31)",
+                    "description": "Cron day of week (0=Sunday..6=Saturday) for weekly mode",
                     "type": "integer",
                     "example": 0
                 },
                 "day_of_month": {
-                    "description": "Day of month for monthly schedule",
+                    "description": "Day of month (1-31) for monthly/yearly schedule",
                     "type": "integer",
                     "example": 1
                 },
@@ -9321,7 +9331,7 @@ const docTemplate = `{
                     "example": 1
                 },
                 "hour": {
-                    "description": "Hour to run (0-23)",
+                    "description": "Hour to run (0-23). dynamix.cfg stores \"minute hour\"; only the hour part is exposed here — use check_cron for the exact time",
                     "type": "integer",
                     "example": 0
                 },
@@ -9329,6 +9339,11 @@ const docTemplate = `{
                     "description": "Schedule settings",
                     "type": "string",
                     "example": "manual"
+                },
+                "month": {
+                    "description": "Month of year (1-12) for yearly schedule (Issue #124)",
+                    "type": "integer",
+                    "example": 1
                 },
                 "pause_hour": {
                     "description": "Pause/resume schedule",
@@ -9911,10 +9926,16 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "last_checked": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "date-time"
                 },
                 "last_error": {
                     "type": "string"
+                },
+                "last_healthy": {
+                    "description": "LastHealthy is the RFC3339 timestamp of when the subsystem last reported\nhealthy. It is preserved across degradations so a persistent degraded\nstate can be dated. Omitted from JSON when the subsystem has never been\nhealthy.",
+                    "type": "string",
+                    "format": "date-time"
                 },
                 "reason": {
                     "type": "string"

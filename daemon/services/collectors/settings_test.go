@@ -3,7 +3,10 @@ package collectors
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 )
 
 func TestSettingsCollector_GetDiskSettingsExtended(t *testing.T) {
@@ -133,6 +136,87 @@ func TestSettingsCollector_GetParitySchedule(t *testing.T) {
 
 	if !schedule.Correcting {
 		t.Error("Expected Correcting=true by default")
+	}
+}
+
+func TestParseParityScheduleSection_YearlyWithMonth(t *testing.T) {
+	// Exact [parity] section from issue #124 (yearly mode, January 1st).
+	cfg := `[display]
+theme="black"
+[parity]
+mode="4"
+day="0"
+hour="0 0"
+dotm="1"
+frequency="1"
+duration="6"
+month="1"
+cumulative="1"
+`
+	schedule := &dto.ParitySchedule{}
+	if err := parseParityScheduleSection(strings.NewReader(cfg), schedule); err != nil {
+		t.Fatalf("parseParityScheduleSection returned error: %v", err)
+	}
+
+	if schedule.Mode != "yearly" {
+		t.Errorf("Mode = %q, want \"yearly\"", schedule.Mode)
+	}
+	if schedule.Month != 1 {
+		t.Errorf("Month = %d, want 1 (issue #124)", schedule.Month)
+	}
+	if schedule.DayOfMonth != 1 {
+		t.Errorf("DayOfMonth = %d, want 1", schedule.DayOfMonth)
+	}
+	if schedule.Duration != 6 {
+		t.Errorf("Duration = %d, want 6", schedule.Duration)
+	}
+	if !schedule.Cumulative {
+		t.Error("Cumulative = false, want true")
+	}
+	if schedule.Cron != "" {
+		t.Errorf("Cron = %q, want empty for non-custom mode", schedule.Cron)
+	}
+}
+
+func TestParseParityScheduleSection_CustomModeCron(t *testing.T) {
+	cfg := `[parity]
+mode="5"
+cron="0 3 * * 0"
+`
+	schedule := &dto.ParitySchedule{}
+	if err := parseParityScheduleSection(strings.NewReader(cfg), schedule); err != nil {
+		t.Fatalf("parseParityScheduleSection returned error: %v", err)
+	}
+
+	if schedule.Mode != "custom" {
+		t.Errorf("Mode = %q, want \"custom\"", schedule.Mode)
+	}
+	if schedule.Cron != "0 3 * * 0" {
+		t.Errorf("Cron = %q, want \"0 3 * * 0\" (issue #124)", schedule.Cron)
+	}
+}
+
+func TestParseParityCheckCronLines_CheckEntryAndPauseResume(t *testing.T) {
+	// Realistic parity-check.cron: the resume entry is "mdcmd check resume"
+	// and must not be mistaken for the scheduled check entry.
+	cron := `# Generated parity check schedule:
+30 2 * * * /usr/local/sbin/mdcmd check resume &> /dev/null
+0 6 * * * /usr/local/sbin/mdcmd nocheck pause &> /dev/null
+0 0 1 1 * /usr/local/sbin/mdcmd check  &> /dev/null
+`
+	schedule := &dto.ParitySchedule{}
+	if err := parseParityCheckCronLines(strings.NewReader(cron), schedule); err != nil {
+		t.Fatalf("parseParityCheckCronLines returned error: %v", err)
+	}
+
+	if schedule.CheckCron != "0 0 1 1 *" {
+		t.Errorf("CheckCron = %q, want \"0 0 1 1 *\" (issue #124)", schedule.CheckCron)
+	}
+	if schedule.PauseHour != 6 {
+		t.Errorf("PauseHour = %d, want 6", schedule.PauseHour)
+	}
+	if schedule.ResumeHour != 2 {
+		t.Errorf("ResumeHour = %d, want 2", schedule.ResumeHour)
 	}
 }
 

@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2026.06.05] - 2026-06-11
+
+### Fixed
+
+- **Parity schedule endpoint missing `month` and `cron` from dynamix.cfg**
+  (#124) — `GET /api/v1/array/parity-check/schedule` did not parse two keys
+  from the `[parity]` section, so consumers (e.g. the Home Assistant
+  integration) could not compute the next check for **yearly** schedules
+  (missing `month`, fell back to January by coincidence) or **custom**
+  schedules (missing raw `cron` expression — next check showed "Unknown").
+  Both are now parsed and exposed (`month`, `cron`). Additionally, the
+  authoritative scheduled-check entry from `parity-check.cron` (the line
+  Unraid actually runs, e.g. `0 0 1 1 *`) is exposed as **`check_cron`**,
+  valid for every scheduled mode including custom, so consumers can compute
+  the exact next check without re-implementing Unraid's scheduling rules.
+  The DTO now also documents Unraid's conventions: `day` is cron day-of-week
+  (0 = Sunday) and the dynamix `hour` key holds a `"minute hour"` pair (only
+  the hour part is exposed — use `check_cron` for the exact time).
+
+- **Agent stalled for 1+ hour after array start on networks without outbound
+  internet access** (#123) — several collector and API paths performed
+  blocking network operations with long (or no) timeouts, so on isolated
+  VLANs (no internet, unreachable remote-share servers) the agent kept
+  serving stale data long after boot:
+  - **Unassigned Devices remote shares**: the collector ran `statfs()`
+    sequentially on every mounted SMB/NFS share with no timeout. A share
+    whose server is unreachable blocks `statfs` in uninterruptible sleep for
+    minutes; with many remote shares mounted at boot this wedged the whole
+    collector for hours. Capacity probes are now bounded at **5 s per
+    share** — on timeout the share is still reported (without capacity data)
+    and the collector moves on.
+  - **Docker container update checks**: `CheckAllContainerUpdates` ran under
+    an independent 5-minute background context, with each per-container
+    registry check holding its own 60-second context, and could not be
+    cancelled on shutdown. Checks are now context-aware end to end
+    (cancelled with the collector lifecycle) and bounded at **30 s overall /
+    10 s per container**.
+  - **Plugin update checks**: `plugin check` (which downloads update
+    metadata from GitHub) ran with a 120-second timeout and could not be
+    cancelled. It is now context-aware and bounded at **30 s**; locally
+    cached update files are still read afterwards, so previously fetched
+    results are preserved.
+  - **WAN IP discovery** (`/api/v1/network/access-urls`): each of the three
+    public-IP services was tried with a 5-second timeout (up to 15 s per
+    request on a blackholed network). Reduced to **2 s per service** (~6 s
+    worst case); the first successful response still wins.
+
+### Added
+
+- **`last_healthy` timestamp per subsystem** in the platform health registry,
+  exposed via `GET /api/v1/diagnostics/self-test` (#123). The registry stamps
+  the timestamp on every healthy report and preserves it across degradations,
+  so a persistent `degraded`/`unavailable` state can be dated from the API
+  ("when did this subsystem last work?"). Omitted from JSON when a subsystem
+  has never been healthy. Documented in Swagger as RFC3339 `date-time`.
+
 ## [2026.06.04] - 2026-06-08
 
 ### Fixed

@@ -3,6 +3,7 @@ package collectors
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"maps"
 	"os"
 	"path/filepath"
@@ -351,7 +352,12 @@ func (c *SettingsCollector) parseParityScheduleFromDynamix(schedule *dto.ParityS
 	}
 	defer file.Close() //nolint:errcheck // Error checking not needed for defer Close
 
-	scanner := bufio.NewScanner(file)
+	return parseParityScheduleSection(file, schedule)
+}
+
+// parseParityScheduleSection parses the [parity] section of dynamix.cfg content.
+func parseParityScheduleSection(r io.Reader, schedule *dto.ParitySchedule) error {
+	scanner := bufio.NewScanner(r)
 	inParitySection := false
 
 	for scanner.Scan() {
@@ -419,6 +425,14 @@ func (c *SettingsCollector) parseParityScheduleFromDynamix(schedule *dto.ParityS
 			if dotm, err := strconv.Atoi(value); err == nil {
 				schedule.DayOfMonth = dotm
 			}
+		case "month":
+			// Month of year (1-12), used by yearly mode (Issue #124)
+			if month, err := strconv.Atoi(value); err == nil {
+				schedule.Month = month
+			}
+		case "cron":
+			// Raw cron expression, used by custom mode (Issue #124)
+			schedule.Cron = value
 		case "frequency":
 			if freq, err := strconv.Atoi(value); err == nil {
 				schedule.Frequency = freq
@@ -438,7 +452,8 @@ func (c *SettingsCollector) parseParityScheduleFromDynamix(schedule *dto.ParityS
 	return scanner.Err()
 }
 
-// parseParityCheckCron reads pause/resume times from parity-check.cron
+// parseParityCheckCron reads the scheduled check entry and pause/resume times
+// from parity-check.cron
 func (c *SettingsCollector) parseParityCheckCron(schedule *dto.ParitySchedule) error {
 	file, err := os.Open(constants.ParityCheckCron)
 	if err != nil {
@@ -446,7 +461,13 @@ func (c *SettingsCollector) parseParityCheckCron(schedule *dto.ParitySchedule) e
 	}
 	defer file.Close() //nolint:errcheck // Error checking not needed for defer Close
 
-	scanner := bufio.NewScanner(file)
+	return parseParityCheckCronLines(file, schedule)
+}
+
+// parseParityCheckCronLines parses parity-check.cron content: the authoritative
+// `mdcmd check` entry (exposed as CheckCron, Issue #124) plus pause/resume hours.
+func parseParityCheckCronLines(r io.Reader, schedule *dto.ParitySchedule) error {
+	scanner := bufio.NewScanner(r)
 	pauseRe := regexp.MustCompile(`^(\d+)\s+(\d+)\s+.*pause`)
 	resumeRe := regexp.MustCompile(`^(\d+)\s+(\d+)\s+.*resume`)
 
@@ -460,11 +481,23 @@ func (c *SettingsCollector) parseParityCheckCron(schedule *dto.ParitySchedule) e
 			if hour, err := strconv.Atoi(matches[2]); err == nil {
 				schedule.PauseHour = hour
 			}
+			continue
 		}
 
 		if matches := resumeRe.FindStringSubmatch(line); len(matches) == 3 {
 			if hour, err := strconv.Atoi(matches[2]); err == nil {
 				schedule.ResumeHour = hour
+			}
+			continue
+		}
+
+		// The scheduled check entry, e.g.
+		// "0 0 1 1 * /usr/local/sbin/mdcmd check  &> /dev/null".
+		// Unraid's resume entry is "mdcmd check resume", so it is skipped by
+		// the `continue` above and cannot be mistaken for the check line.
+		if strings.Contains(line, "mdcmd check") {
+			if fields := strings.Fields(line); len(fields) >= 6 {
+				schedule.CheckCron = strings.Join(fields[:5], " ")
 			}
 		}
 	}
