@@ -1,29 +1,129 @@
 name: Release
 
+# Releases are triggered three ways:
+#   1. Auto-detect (push to main): when the VERSION file holds a version that
+#      has no v<VERSION> tag yet AND CHANGELOG.md contains a matching
+#      "## [<VERSION>] - <date>" heading, the workflow creates the tag and
+#      release automatically. Bump VERSION + add the changelog section and the
+#      release happens on push. No paths filter is used on purpose: the bump
+#      and the changelog entry may land in separate commits, and the tag
+#      existence check makes the detection idempotent either way.
+#   2. Tag push (v*): the classic manual flow still works.
+#   3. workflow_dispatch: optional tag input; left empty it falls back to the
+#      VERSION file (same checks as auto-detect).
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*"
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to release (e.g., v2025.12.1)"
-        required: true
+        description: "Tag to release (e.g., v2025.12.1). Leave empty to release the version in the VERSION file."
+        required: false
         type: string
+        default: ""
 
 permissions:
   contents: write
 
+# Never run two releases at once (e.g. a tag push racing the auto-detection).
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
-  release:
-    name: Build and Release
+  detect:
+    name: Detect Release
     runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.decide.outputs.should_release }}
+      tag: ${{ steps.decide.outputs.tag }}
+      version: ${{ steps.decide.outputs.version }}
+      prerelease: ${{ steps.decide.outputs.prerelease }}
+      checkout_ref: ${{ steps.decide.outputs.checkout_ref }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Decide whether to release
+        id: decide
+        run: |
+          SHOULD_RELEASE="false"
+          TAG=""
+          VERSION=""
+          CHECKOUT_REF="${GITHUB_SHA}"
+
+          if [ "${{ github.event_name }}" == "push" ] && [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            # Classic flow: a v* tag was pushed manually.
+            TAG=${GITHUB_REF#refs/tags/}
+            VERSION=${TAG#v}
+            CHECKOUT_REF="${GITHUB_REF}"
+            SHOULD_RELEASE="true"
+            echo "Trigger: tag push ($TAG)"
+          elif [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -n "${{ github.event.inputs.tag }}" ]; then
+            # Manual dispatch with an explicit tag.
+            TAG="${{ github.event.inputs.tag }}"
+            VERSION=${TAG#v}
+            CHECKOUT_REF="$TAG"
+            SHOULD_RELEASE="true"
+            echo "Trigger: workflow_dispatch ($TAG)"
+          else
+            # Auto-detect: push to main (or dispatch without a tag input).
+            VERSION=$(tr -d '[:space:]' < VERSION)
+            TAG="v$VERSION"
+            echo "Trigger: auto-detect (VERSION file: $VERSION)"
+
+            if [ -z "$VERSION" ]; then
+              echo "::error::VERSION file is empty"
+              exit 1
+            fi
+
+            # Guard 1: do not release a version that is already tagged.
+            if git rev-parse -q --verify "refs/tags/$TAG" > /dev/null; then
+              echo "Tag $TAG already exists — nothing to release."
+            # Guard 2: require a matching changelog heading "## [VERSION] - <date>"
+            # so a VERSION bump without release notes never ships silently.
+            elif ! grep -qF "## [$VERSION] -" CHANGELOG.md; then
+              echo "::warning::VERSION is $VERSION but CHANGELOG.md has no '## [$VERSION] - <date>' heading yet. Skipping release until the changelog entry lands."
+            else
+              SHOULD_RELEASE="true"
+              echo "VERSION $VERSION is untagged and has a CHANGELOG entry — releasing."
+            fi
+          fi
+
+          # Pre-release detection (date-based stable versions never match).
+          if [[ "$VERSION" =~ (alpha|beta|rc) ]]; then
+            PRERELEASE="true"
+          else
+            PRERELEASE="false"
+          fi
+
+          {
+            echo "should_release=$SHOULD_RELEASE"
+            echo "tag=$TAG"
+            echo "version=$VERSION"
+            echo "prerelease=$PRERELEASE"
+            echo "checkout_ref=$CHECKOUT_REF"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "should_release=$SHOULD_RELEASE tag=$TAG version=$VERSION prerelease=$PRERELEASE"
+
+  release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.should_release == 'true'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.detect.outputs.checkout_ref }}
           fetch-depth: 0
 
       - name: Set up Go
@@ -31,35 +131,10 @@ jobs:
         with:
           go-version: "1.26.4"
 
-      - name: Extract version from tag
-        id: version
-        run: |
-          # Handle both tag push and manual workflow dispatch
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            TAG="${{ github.event.inputs.tag }}"
-            VERSION=${TAG#v}
-          else
-            TAG=${GITHUB_REF#refs/tags/}
-            VERSION=${TAG#v}
-          fi
-
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Version: $VERSION (Tag: $TAG)"
-
-          # Check if this is a pre-release
-          if [[ "$VERSION" =~ (alpha|beta|rc) ]]; then
-            echo "prerelease=true" >> $GITHUB_OUTPUT
-            echo "This is a pre-release"
-          else
-            echo "prerelease=false" >> $GITHUB_OUTPUT
-            echo "This is a stable release"
-          fi
-
       - name: Verify VERSION file matches tag
         run: |
-          FILE_VERSION=$(cat VERSION | tr -d '\n')
-          TAG_VERSION="${{ steps.version.outputs.version }}"
+          FILE_VERSION=$(tr -d '[:space:]' < VERSION)
+          TAG_VERSION="${{ needs.detect.outputs.version }}"
 
           if [ "$FILE_VERSION" != "$TAG_VERSION" ]; then
             echo "ERROR: VERSION file ($FILE_VERSION) does not match tag ($TAG_VERSION)"
@@ -80,7 +155,7 @@ jobs:
           make package
 
           # Verify the package was created
-          PACKAGE_FILE="build/unraid-management-agent-${{ steps.version.outputs.version }}.tgz"
+          PACKAGE_FILE="build/unraid-management-agent-${{ needs.detect.outputs.version }}.tgz"
           if [ ! -f "$PACKAGE_FILE" ]; then
             echo "ERROR: Package file not found: $PACKAGE_FILE"
             ls -la build/
@@ -93,7 +168,7 @@ jobs:
       - name: Calculate MD5 checksum
         id: checksum
         run: |
-          PACKAGE_FILE="build/unraid-management-agent-${{ steps.version.outputs.version }}.tgz"
+          PACKAGE_FILE="build/unraid-management-agent-${{ needs.detect.outputs.version }}.tgz"
 
           # Calculate MD5 checksum (Linux uses md5sum, macOS uses md5)
           if command -v md5sum &> /dev/null; then
@@ -111,57 +186,69 @@ jobs:
       - name: Extract release notes from CHANGELOG
         id: changelog
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
+          VERSION="${{ needs.detect.outputs.version }}"
 
-          # Extract release notes for this version from CHANGELOG.md
-          # Look for the section between [VERSION] and the next version header
+          # Extract this version's section body: everything between the
+          # "## [VERSION]" heading and the next "## [" heading (or EOF when it
+          # is the last/only section). Fixed-string matching — no regex
+          # surprises from the dots in date-based versions.
+          NOTES=$(awk -v ver="$VERSION" '
+            /^## \[/ {
+              if (found) exit
+              if (index($0, "[" ver "]") > 0) { found = 1; next }
+            }
+            found { print }
+          ' CHANGELOG.md)
 
-          if grep -q "\[$VERSION\]" CHANGELOG.md; then
-            # Extract the section for this version
-            NOTES=$(awk "/\[$VERSION\]/,/^## \[/" CHANGELOG.md | sed '1d;$d' | sed '/^$/d')
+          # Trim leading/trailing blank lines while preserving inner spacing.
+          NOTES=$(printf '%s\n' "$NOTES" | sed -e '/./,$!d' | sed -e ':a' -e '/^\n*$/{$d;N;ba' -e '}')
 
-            if [ -z "$NOTES" ]; then
-              echo "⚠️  No release notes found for version $VERSION in CHANGELOG.md"
-              NOTES="See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details."
-            else
-              echo "✅ Extracted release notes for version $VERSION"
-            fi
+          if [ -n "$NOTES" ]; then
+            echo "✅ Extracted release notes for version $VERSION from CHANGELOG.md"
+            printf '%s\n' "$NOTES" > build/RELEASE_NOTES.md
+            {
+              echo ""
+              echo "See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for the full history."
+            } >> build/RELEASE_NOTES.md
           else
-            echo "⚠️  Version $VERSION not found in CHANGELOG.md"
-            NOTES="See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details."
+            echo "::warning::No release notes found for version $VERSION in CHANGELOG.md"
+            echo "See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details." > build/RELEASE_NOTES.md
           fi
 
-          # Save to file (GitHub Actions doesn't handle multiline outputs well)
-          echo "$NOTES" > build/RELEASE_NOTES.md
-
           # Add MD5 checksum to release notes
-          echo "" >> build/RELEASE_NOTES.md
-          echo "---" >> build/RELEASE_NOTES.md
-          echo "" >> build/RELEASE_NOTES.md
-          echo "**MD5 Checksum:**" >> build/RELEASE_NOTES.md
-          echo "\`\`\`" >> build/RELEASE_NOTES.md
-          echo "${{ steps.checksum.outputs.md5 }}  unraid-management-agent-$VERSION.tgz" >> build/RELEASE_NOTES.md
-          echo "\`\`\`" >> build/RELEASE_NOTES.md
+          {
+            echo ""
+            echo "---"
+            echo ""
+            echo "**MD5 Checksum:**"
+            echo '```'
+            echo "${{ steps.checksum.outputs.md5 }}  unraid-management-agent-$VERSION.tgz"
+            echo '```'
+          } >> build/RELEASE_NOTES.md
 
           cat build/RELEASE_NOTES.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: v${{ steps.version.outputs.version }}
+          # On auto-detect runs the tag does not exist yet; action-gh-release
+          # creates it at target_commitish. On tag-push runs it already exists
+          # and target_commitish is ignored.
+          tag_name: ${{ needs.detect.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: v${{ needs.detect.outputs.version }}
           body_path: build/RELEASE_NOTES.md
           files: |
-            build/unraid-management-agent-${{ steps.version.outputs.version }}.tgz
+            build/unraid-management-agent-${{ needs.detect.outputs.version }}.tgz
             build/MD5SUM
-          prerelease: ${{ steps.version.outputs.prerelease }}
+          prerelease: ${{ needs.detect.outputs.prerelease }}
           draft: false
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update PLG files with MD5 hash
         run: |
           MD5="${{ steps.checksum.outputs.md5 }}"
-          VERSION="${{ steps.version.outputs.version }}"
+          VERSION="${{ needs.detect.outputs.version }}"
 
           echo "Updating PLG file with MD5: $MD5"
 
@@ -193,23 +280,23 @@ jobs:
             sed -i "s/<!ENTITY md5.*\".*\">/<!ENTITY md5         \"$MD5\">/" unraid-management-agent.plg
 
             git add unraid-management-agent.plg
-            git commit -m "chore: update PLG MD5 hash for v${{ steps.version.outputs.version }} [skip ci]"
+            git commit -m "chore: update PLG MD5 hash for v${{ needs.detect.outputs.version }} [skip ci]"
             git push origin main
             echo "✅ Committed and pushed PLG update"
           fi
 
       - name: Release Summary
         run: |
-          echo "## 🎉 v${{ steps.version.outputs.version }} Created Successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "## 🎉 v${{ needs.detect.outputs.version }} Created Successfully!" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Package:** \`unraid-management-agent-${{ steps.version.outputs.version }}.tgz\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Package:** \`unraid-management-agent-${{ needs.detect.outputs.version }}.tgz\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**MD5 Checksum:** \`${{ steps.checksum.outputs.md5 }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Release URL:** https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Release URL:** https://github.com/${{ github.repository }}/releases/tag/v${{ needs.detect.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          if [ "${{ steps.version.outputs.prerelease }}" == "true" ]; then
+          if [ "${{ needs.detect.outputs.prerelease }}" == "true" ]; then
             echo "**Type:** Pre-release" >> $GITHUB_STEP_SUMMARY
           else
             echo "**Type:** Stable release" >> $GITHUB_STEP_SUMMARY
