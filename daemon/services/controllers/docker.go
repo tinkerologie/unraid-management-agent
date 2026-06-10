@@ -18,6 +18,17 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
+// Update-check timeouts. Registry calls (DistributionInspect) hang on networks
+// without outbound internet access (issue #123), so checks are bounded tightly:
+// a healthy registry answers in well under a second, while an unreachable one
+// must fail fast instead of wedging the update collector for minutes.
+const (
+	// allContainersUpdateCheckTimeout bounds a full all-containers check.
+	allContainersUpdateCheckTimeout = 30 * time.Second
+	// containerUpdateCheckTimeout bounds a single container's registry check.
+	containerUpdateCheckTimeout = 10 * time.Second
+)
+
 // DockerController provides control operations for Docker containers using the Docker SDK.
 // It handles container lifecycle operations including start, stop, restart, pause, and unpause.
 type DockerController struct {
@@ -434,14 +445,16 @@ func stripDockerStreamHeaders(raw []byte) string {
 // CheckContainerUpdate checks if a specific container has an update available.
 // It uses DistributionInspect to compare the local image digest with the registry digest
 // without pulling the image, making it significantly faster and bandwidth-free.
-func (dc *DockerController) CheckContainerUpdate(containerRef string) (*dto.ContainerUpdateInfo, error) {
+// The check is bounded by both the caller's context (cancellable on shutdown)
+// and containerUpdateCheckTimeout.
+func (dc *DockerController) CheckContainerUpdate(parentCtx context.Context, containerRef string) (*dto.ContainerUpdateInfo, error) {
 	logger.Info("Checking for update: container %s", containerRef)
 
 	if err := dc.initClient(); err != nil {
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, containerUpdateCheckTimeout)
 	defer cancel()
 
 	// Inspect container to get image reference
@@ -509,14 +522,17 @@ func (dc *DockerController) CheckContainerUpdate(containerRef string) (*dto.Cont
 
 // CheckAllContainerUpdates checks all running containers for available updates.
 // Uses concurrent registry checks with a semaphore to avoid overwhelming the registry.
-func (dc *DockerController) CheckAllContainerUpdates() (*dto.ContainerUpdatesResult, error) {
+// The run is bounded by both the caller's context (cancellable on shutdown) and
+// allContainersUpdateCheckTimeout; containers not checked before the deadline
+// are reported without update information.
+func (dc *DockerController) CheckAllContainerUpdates(parentCtx context.Context) (*dto.ContainerUpdatesResult, error) {
 	logger.Info("Checking all containers for updates")
 
 	if err := dc.initClient(); err != nil {
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(parentCtx, allContainersUpdateCheckTimeout)
 	defer cancel()
 
 	// List all containers
@@ -549,7 +565,7 @@ func (dc *DockerController) CheckAllContainerUpdates() (*dto.ContainerUpdatesRes
 				name = strings.TrimPrefix(c.Names[0], "/")
 			}
 
-			updateInfo, err := dc.CheckContainerUpdate(c.ID)
+			updateInfo, err := dc.CheckContainerUpdate(ctx, c.ID)
 			if err != nil {
 				logger.Warning("Docker: Failed to check update for %s: %v", name, err)
 				results[i] = dto.ContainerUpdateInfo{
@@ -742,7 +758,7 @@ func (dc *DockerController) UpdateAllContainers() (*dto.ContainerBulkUpdateResul
 	logger.Info("Updating all containers")
 
 	// First check for updates
-	updatesResult, err := dc.CheckAllContainerUpdates()
+	updatesResult, err := dc.CheckAllContainerUpdates(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to check for updates: %w", err)
 	}

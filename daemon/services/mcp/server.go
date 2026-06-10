@@ -953,11 +953,11 @@ func (s *Server) registerNewMonitoringTools() {
 		Name:        "check_container_updates",
 		Description: "Check all Docker containers for available image updates. Pulls latest images and compares digests.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
 		logger.Info("MCP: Checking all containers for updates")
 		dockerCtrl := controllers.NewDockerController()
 		defer dockerCtrl.Close() //nolint:errcheck
-		result, err := dockerCtrl.CheckAllContainerUpdates()
+		result, err := dockerCtrl.CheckAllContainerUpdates(ctx)
 		if err != nil {
 			return textResult(fmt.Sprintf("Failed to check container updates: %v", err)), nil, nil
 		}
@@ -969,11 +969,11 @@ func (s *Server) registerNewMonitoringTools() {
 		Name:        "check_container_update",
 		Description: "Check a specific Docker container for an available image update by pulling the latest image and comparing digests.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPContainerSizeArgs) (*mcp.CallToolResult, any, error) {
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, args dto.MCPContainerSizeArgs) (*mcp.CallToolResult, any, error) {
 		logger.Info("MCP: Checking container '%s' for updates", args.ContainerID)
 		dockerCtrl := controllers.NewDockerController()
 		defer dockerCtrl.Close() //nolint:errcheck
-		result, err := dockerCtrl.CheckContainerUpdate(args.ContainerID)
+		result, err := dockerCtrl.CheckContainerUpdate(ctx, args.ContainerID)
 		if err != nil {
 			return textResult(fmt.Sprintf("Failed to check container update: %v", err)), nil, nil
 		}
@@ -988,11 +988,11 @@ func (s *Server) registerNewMonitoringTools() {
 			IdempotentHint:  true,
 			DestructiveHint: ptr(false),
 		},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
 		logger.Info("MCP: Refreshing container updates")
 		dockerCtrl := controllers.NewDockerController()
 		defer dockerCtrl.Close() //nolint:errcheck
-		result, err := dockerCtrl.CheckAllContainerUpdates()
+		result, err := dockerCtrl.CheckAllContainerUpdates(ctx)
 		if err != nil {
 			return textResult(fmt.Sprintf("Failed to refresh container updates: %v", err)), nil, nil
 		}
@@ -1066,10 +1066,10 @@ func (s *Server) registerNewMonitoringTools() {
 			IdempotentHint:  true,
 			DestructiveHint: ptr(false),
 		},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
 		logger.Info("MCP: Refreshing plugin updates")
 		pluginCtrl := controllers.NewPluginController()
-		updates, err := pluginCtrl.CheckPluginUpdates()
+		updates, err := pluginCtrl.CheckPluginUpdates(ctx)
 		if err != nil {
 			return textResult(fmt.Sprintf("Failed to refresh plugin updates: %v", err)), nil, nil
 		}

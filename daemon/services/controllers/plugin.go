@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,12 @@ import (
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
+// pluginCheckTimeout bounds the `plugin check` command, which downloads update
+// metadata for every installed plugin. On networks without outbound internet
+// access (issue #123) the command hangs, so it must fail fast; locally cached
+// update files are still read afterwards.
+const pluginCheckTimeout = 30 * time.Second
+
 // PluginController provides operations for managing Unraid plugins.
 type PluginController struct{}
 
@@ -20,15 +27,17 @@ func NewPluginController() *PluginController {
 	return &PluginController{}
 }
 
-// CheckPluginUpdates checks all plugins for available updates.
-func (pc *PluginController) CheckPluginUpdates() ([]dto.PluginInfo, error) {
+// CheckPluginUpdates checks all plugins for available updates. The check is
+// bounded by both the caller's context (cancellable on shutdown) and
+// pluginCheckTimeout.
+func (pc *PluginController) CheckPluginUpdates(parentCtx context.Context) ([]dto.PluginInfo, error) {
 	logger.Info("Plugin: Checking for plugin updates")
 
+	ctx, cancel := context.WithTimeout(parentCtx, pluginCheckTimeout)
+	defer cancel()
+
 	// Run the plugin check command to download update info
-	_, err := lib.ExecCommandWithTimeout(
-		120*time.Second,
-		constants.PluginBin, "check",
-	)
+	_, err := lib.ExecCommandOutputWithContext(ctx, constants.PluginBin, "check")
 	if err != nil {
 		logger.Warning("Plugin: Check command returned error (may be normal): %v", err)
 	}
@@ -83,7 +92,7 @@ func (pc *PluginController) UpdateAllPlugins() ([]dto.PluginUpdateResult, error)
 	logger.Info("Plugin: Updating all plugins with available updates")
 
 	// First check for updates
-	updatesAvailable, err := pc.CheckPluginUpdates()
+	updatesAvailable, err := pc.CheckPluginUpdates(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to check for updates: %w", err)
 	}

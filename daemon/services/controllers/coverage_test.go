@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"testing"
 )
 
@@ -161,7 +162,7 @@ func TestListProcesses_NoLimit(t *testing.T) {
 
 func TestPluginControllerCheckUpdates(t *testing.T) {
 	pc := NewPluginController()
-	updates, err := pc.CheckPluginUpdates()
+	updates, err := pc.CheckPluginUpdates(context.Background())
 	if err != nil {
 		// Expected on macOS: plugin command doesn't exist
 		t.Logf("CheckPluginUpdates error (expected on macOS): %v", err)
@@ -193,7 +194,7 @@ func TestPluginControllerUpdateAllPlugins(t *testing.T) {
 func TestDockerControllerCheckContainerUpdate(t *testing.T) {
 	dc := NewDockerController()
 	defer dc.Close() //nolint:errcheck
-	result, err := dc.CheckContainerUpdate("nonexistent-container-id")
+	result, err := dc.CheckContainerUpdate(context.Background(), "nonexistent-container-id")
 	if err != nil {
 		t.Logf("CheckContainerUpdate error: %v", err)
 	}
@@ -203,7 +204,7 @@ func TestDockerControllerCheckContainerUpdate(t *testing.T) {
 func TestDockerControllerCheckAllContainerUpdates(t *testing.T) {
 	dc := NewDockerController()
 	defer dc.Close() //nolint:errcheck
-	result, err := dc.CheckAllContainerUpdates()
+	result, err := dc.CheckAllContainerUpdates(context.Background())
 	if err != nil {
 		t.Logf("CheckAllContainerUpdates error: %v", err)
 	}

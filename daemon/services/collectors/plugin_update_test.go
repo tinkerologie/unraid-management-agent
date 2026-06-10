@@ -1,6 +1,7 @@
 package collectors
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -23,9 +24,9 @@ func TestPluginUpdateCollector_PublishesAndDedupes(t *testing.T) {
 	}
 
 	c := NewPluginUpdateCollector(&domain.Context{Hub: hub})
-	c.CheckFn = func() (*dto.PluginList, error) { return result, nil }
+	c.CheckFn = func(_ context.Context) (*dto.PluginList, error) { return result, nil }
 
-	c.Collect()
+	c.Collect(context.Background())
 	select {
 	case msg := <-sub:
 		got, ok := msg.(*dto.PluginList)
@@ -36,7 +37,7 @@ func TestPluginUpdateCollector_PublishesAndDedupes(t *testing.T) {
 		t.Fatal("expected first publish, got none")
 	}
 
-	c.Collect() // identical → must NOT publish
+	c.Collect(context.Background()) // identical → must NOT publish
 	select {
 	case msg := <-sub:
 		t.Fatalf("expected no re-publish on unchanged result, got %#v", msg)
@@ -50,7 +51,7 @@ func TestPluginUpdateCollector_NilCheckFnIsSafe(t *testing.T) {
 	defer hub.Unsub(sub)
 
 	c := NewPluginUpdateCollector(&domain.Context{Hub: hub})
-	c.Collect() // CheckFn nil → must not panic, must not publish
+	c.Collect(context.Background()) // CheckFn nil → must not panic, must not publish
 
 	select {
 	case msg := <-sub:
@@ -66,13 +67,13 @@ func TestPluginUpdateCollector_RepublishesOnChange(t *testing.T) {
 
 	c := NewPluginUpdateCollector(&domain.Context{Hub: hub})
 
-	c.CheckFn = func() (*dto.PluginList, error) {
+	c.CheckFn = func(_ context.Context) (*dto.PluginList, error) {
 		return &dto.PluginList{
 			Plugins:    []dto.PluginInfo{{Name: "myplugin", Version: "1.0", UpdateAvailable: false}},
 			TotalCount: 1,
 		}, nil
 	}
-	c.Collect()
+	c.Collect(context.Background())
 
 	select {
 	case <-sub: // drain first publish
@@ -81,14 +82,14 @@ func TestPluginUpdateCollector_RepublishesOnChange(t *testing.T) {
 	}
 
 	// flip UpdateAvailable — signature changes, so a second publish must occur
-	c.CheckFn = func() (*dto.PluginList, error) {
+	c.CheckFn = func(_ context.Context) (*dto.PluginList, error) {
 		return &dto.PluginList{
 			Plugins:          []dto.PluginInfo{{Name: "myplugin", Version: "1.0", UpdateAvailable: true, LatestVersion: "1.1"}},
 			TotalCount:       1,
 			UpdatesAvailable: 1,
 		}, nil
 	}
-	c.Collect()
+	c.Collect(context.Background())
 
 	select {
 	case <-sub: // success: changed signature triggered republish
@@ -102,8 +103,8 @@ func TestPluginUpdateCollector_CheckErrorNoPublish(t *testing.T) {
 	sub := hub.Sub(constants.TopicPluginUpdatesUpdate.Name)
 	defer hub.Unsub(sub)
 	c := NewPluginUpdateCollector(&domain.Context{Hub: hub})
-	c.CheckFn = func() (*dto.PluginList, error) { return nil, fmt.Errorf("boom") }
-	c.Collect()
+	c.CheckFn = func(_ context.Context) (*dto.PluginList, error) { return nil, fmt.Errorf("boom") }
+	c.Collect(context.Background())
 	select {
 	case <-sub:
 		t.Fatal("expected no publish on check error")
@@ -121,8 +122,8 @@ func TestPluginUpdateNotify_FiresOnNewTransitionOnly(t *testing.T) {
 		Plugins:    []dto.PluginInfo{{Name: "community.applications", Version: "1.0", UpdateAvailable: true, LatestVersion: "1.1"}},
 		TotalCount: 1, UpdatesAvailable: 1,
 	}
-	c.CheckFn = func() (*dto.PluginList, error) { return step1, nil }
-	c.Collect() // baseline → no notify
+	c.CheckFn = func(_ context.Context) (*dto.PluginList, error) { return step1, nil }
+	c.Collect(context.Background()) // baseline → no notify
 	if len(notified) != 0 {
 		t.Fatalf("first run should not notify, got %v", notified)
 	}
@@ -134,17 +135,32 @@ func TestPluginUpdateNotify_FiresOnNewTransitionOnly(t *testing.T) {
 		},
 		TotalCount: 2, UpdatesAvailable: 2,
 	}
-	c.CheckFn = func() (*dto.PluginList, error) { return step2, nil }
-	c.Collect() // dynamix.system.stats newly available → notify only that one
+	c.CheckFn = func(_ context.Context) (*dto.PluginList, error) { return step2, nil }
+	c.Collect(context.Background()) // dynamix.system.stats newly available → notify only that one
 	if len(notified) != 1 || notified[0] != "dynamix.system.stats" {
 		t.Fatalf("expected notify [dynamix.system.stats], got %v", notified)
+	}
+}
+
+func TestPluginUpdateCollector_CheckFnContextHasDeadline(t *testing.T) {
+	hub := domain.NewEventBus(16)
+	c := NewPluginUpdateCollector(&domain.Context{Hub: hub})
+
+	var gotDeadline bool
+	c.CheckFn = func(ctx context.Context) (*dto.PluginList, error) {
+		_, gotDeadline = ctx.Deadline()
+		return nil, nil
+	}
+	c.Collect(context.Background())
+	if !gotDeadline {
+		t.Fatal("CheckFn context must carry a deadline so the check command fails fast")
 	}
 }
 
 func TestPluginUpdateNotify_NotifyFnNilIsSafe(t *testing.T) {
 	hub := domain.NewEventBus(16)
 	c := NewPluginUpdateCollector(&domain.Context{Hub: hub}) // NotifyFn nil
-	c.CheckFn = func() (*dto.PluginList, error) {
+	c.CheckFn = func(_ context.Context) (*dto.PluginList, error) {
 		return &dto.PluginList{
 			Plugins:          []dto.PluginInfo{{Name: "myplugin", Version: "1.0", UpdateAvailable: true, LatestVersion: "1.1"}},
 			TotalCount:       1,
@@ -152,6 +168,6 @@ func TestPluginUpdateNotify_NotifyFnNilIsSafe(t *testing.T) {
 		}, nil
 	}
 	// Must not panic
-	c.Collect()
-	c.Collect()
+	c.Collect(context.Background())
+	c.Collect(context.Background())
 }

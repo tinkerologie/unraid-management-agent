@@ -3,6 +3,7 @@ package collectors
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -475,9 +476,18 @@ func (c *UnassignedCollector) getDeviceInfo(device string) *dto.UnassignedDevice
 	return unassignedDevice
 }
 
+// remoteStatfsTimeout bounds statfs probes on remote (network) mount points. A
+// CIFS/NFS mount whose server is unreachable blocks statfs in uninterruptible
+// sleep for minutes; with many remote shares this wedged the whole collector
+// for hours after boot on isolated networks (issue #123).
+const remoteStatfsTimeout = 5 * time.Second
+
+// statfsFn is swappable in tests to simulate hung network mounts.
+var statfsFn = syscall.Statfs
+
 func getFilesystemUsage(path string) (size, used, free uint64, usagePercent float64, err error) {
 	var stat syscall.Statfs_t
-	if err := syscall.Statfs(path, &stat); err != nil {
+	if err := statfsFn(path, &stat); err != nil {
 		return 0, 0, 0, 0, err
 	}
 
@@ -650,10 +660,39 @@ func parseISOMountsFromProc(procMounts string, now time.Time) []dto.UnassignedRe
 	return isoShares
 }
 
-// getRemoteShareSizeInfo retrieves size information for a remote share
+// getFilesystemUsageTimed runs getFilesystemUsage with a timeout. statfs on a
+// dead network mount blocks in uninterruptible sleep and cannot be cancelled,
+// so on timeout the probe goroutine is abandoned (it exits once the kernel
+// call eventually returns) and an error is returned so the caller skips
+// capacity data instead of blocking the collector.
+func getFilesystemUsageTimed(path string, timeout time.Duration) (size, used, free uint64, usagePercent float64, err error) {
+	type usageResult struct {
+		size, used, free uint64
+		usagePercent     float64
+		err              error
+	}
+	ch := make(chan usageResult, 1)
+	go func() {
+		var r usageResult
+		r.size, r.used, r.free, r.usagePercent, r.err = getFilesystemUsage(path)
+		ch <- r
+	}()
+
+	select {
+	case r := <-ch:
+		return r.size, r.used, r.free, r.usagePercent, r.err
+	case <-time.After(timeout):
+		return 0, 0, 0, 0, fmt.Errorf("statfs on %s timed out after %v (unreachable network mount?)", path, timeout)
+	}
+}
+
+// getRemoteShareSizeInfo retrieves size information for a remote share. The
+// statfs probe is bounded so an unreachable SMB/NFS server cannot wedge the
+// collector (issue #123); on timeout the share keeps zero capacity fields.
 func (c *UnassignedCollector) getRemoteShareSizeInfo(share *dto.UnassignedRemoteShare, mountPoint string) {
-	size, used, free, usagePercent, err := getFilesystemUsage(mountPoint)
+	size, used, free, usagePercent, err := getFilesystemUsageTimed(mountPoint, remoteStatfsTimeout)
 	if err != nil {
+		logger.Debug("Unassigned: skipping capacity for %s: %v", mountPoint, err)
 		return
 	}
 

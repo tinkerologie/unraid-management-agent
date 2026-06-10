@@ -3003,10 +3003,10 @@ func (s *Server) handleDockerCheckUpdates(w http.ResponseWriter, _ *http.Request
 //	@Success		200	{object}	dto.ContainerUpdatesResult	"Refreshed update status"
 //	@Failure		500	{object}	dto.Response				"Check failed"
 //	@Router			/docker/updates/refresh [post]
-func (s *Server) handleDockerUpdatesRefresh(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleDockerUpdatesRefresh(w http.ResponseWriter, r *http.Request) {
 	dc := controllers.NewDockerController()
 	defer func() { _ = dc.Close() }()
-	result, err := dc.CheckAllContainerUpdates()
+	result, err := dc.CheckAllContainerUpdates(r.Context())
 	if err != nil {
 		logger.Error("API: container update refresh failed: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
@@ -3065,7 +3065,7 @@ func (s *Server) handleDockerCheckUpdate(w http.ResponseWriter, r *http.Request)
 	controller := controllers.NewDockerController()
 	defer controller.Close() //nolint:errcheck
 
-	result, err := controller.CheckContainerUpdate(containerRef)
+	result, err := controller.CheckContainerUpdate(r.Context(), containerRef)
 	if err != nil {
 		logger.Error("API: Failed to check container update for %s: %v", containerRef, err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
@@ -3220,9 +3220,9 @@ func (s *Server) handlePluginCheckUpdates(w http.ResponseWriter, _ *http.Request
 //	@Success		200	{object}	dto.PluginList	"Refreshed plugin update status"
 //	@Failure		500	{object}	dto.Response	"Check failed"
 //	@Router			/plugins/updates/refresh [post]
-func (s *Server) handlePluginUpdatesRefresh(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handlePluginUpdatesRefresh(w http.ResponseWriter, r *http.Request) {
 	controller := controllers.NewPluginController()
-	updates, err := controller.CheckPluginUpdates()
+	updates, err := controller.CheckPluginUpdates(r.Context())
 	if err != nil {
 		logger.Error("API: plugin update refresh failed: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{

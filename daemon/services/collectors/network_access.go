@@ -195,8 +195,11 @@ func getWANAccessURL() *dto.AccessURL {
 		"https://icanhazip.com",
 	}
 
+	// 2s per service keeps worst-case discovery under ~6s on networks without
+	// outbound internet access (issue #123); a reachable IP service answers in
+	// well under a second. The first successful response wins.
 	client := &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout: 2 * time.Second,
 	}
 
 	for _, service := range services {

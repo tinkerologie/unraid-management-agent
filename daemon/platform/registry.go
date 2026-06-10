@@ -47,11 +47,18 @@ func (r *Registry) Capabilities() dto.Capabilities { r.mu.RLock(); defer r.mu.RU
 func (r *Registry) Report(subsystem string, state dto.SourceState, reason string, err error) {
 	r.mu.Lock()
 	prev, existed := r.statuses[subsystem]
+	now := r.clock()
 	status := dto.SourceStatus{
 		Subsystem:   subsystem,
 		State:       state,
 		Reason:      reason,
-		LastChecked: r.clock(),
+		LastChecked: now,
+		// Preserve the last healthy timestamp across degradations so persistent
+		// degraded states can be dated; stamp it fresh on every healthy report.
+		LastHealthy: prev.LastHealthy,
+	}
+	if state == dto.SourceHealthy {
+		status.LastHealthy = now
 	}
 	if err != nil {
 		status.LastError = err.Error()
