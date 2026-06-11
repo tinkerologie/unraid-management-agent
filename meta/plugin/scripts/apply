@@ -7,6 +7,9 @@ SCRIPTS_DIR="/usr/local/emhttp/plugins/$PLUGIN/scripts"
 CONFIG_FILE="/boot/config/plugins/$PLUGIN/config.cfg"
 LOG_FILE="/var/log/unraid-management-agent.log"
 DEFAULT_PORT=8043
+# Absolute path: when invoked from the webgui (php-fpm), PATH lacks /usr/sbin.
+IP_BIN="/usr/sbin/ip"
+[ -x "$IP_BIN" ] || IP_BIN="/sbin/ip"
 
 # Ensure config file has restrictive permissions (contains MQTT password)
 if [ -f "$CONFIG_FILE" ]; then
@@ -40,8 +43,8 @@ if [ -f "$CONFIG_FILE" ]; then
         *)
             # Case-insensitive match: ip(8) prints IPv6 hex in lowercase but
             # users may enter uppercase (e.g. 2001:DB8::1).
-            if ! ip addr show 2>/dev/null | grep -iFq "inet ${BIND_ADDRESS}/" &&
-                ! ip addr show 2>/dev/null | grep -iFq "inet6 ${BIND_ADDRESS}/"; then
+            if ! "$IP_BIN" addr show 2>/dev/null | grep -iFq "inet ${BIND_ADDRESS}/" &&
+                ! "$IP_BIN" addr show 2>/dev/null | grep -iFq "inet6 ${BIND_ADDRESS}/"; then
                 reject_reason="address is not assigned to any local interface"
             fi
             ;;

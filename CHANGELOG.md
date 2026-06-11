@@ -29,7 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (plugin settings page, `BIND_ADDRESS="…"` in `config.cfg`,
   `bind_address: …` in `config.yml`, or `--bind-address` /
   `BIND_ADDRESS=…`) that binds the API/WebSocket/MCP server to a specific
-  IP on multi-homed / multi-VLAN systems instead of all interfaces. mDNS
+  IP on multi-homed / multi-VLAN systems instead of all interfaces. The
+  settings page offers a dropdown of the IPs detected on the server's
+  interfaces and VLANs (container/VM bridges and link-local excluded), so
+  no manual entry is needed. mDNS
   discovery advertises the configured address, so Home Assistant
   auto-discovers the endpoint on the intended network. The address must be
   assigned to a local interface, and loopback addresses (127.x.x.x, ::1)

@@ -62,9 +62,13 @@ $running = ($pid_rc === 0 && !empty($pids));
 // br-<hash>, virbr, veth) — binding there would hide the agent from
 // integrations such as Home Assistant.
 function localBindIPs() {
+    // Absolute path: php-fpm's PATH does not include /usr/sbin.
+    $ip_bin = is_executable('/usr/sbin/ip') ? '/usr/sbin/ip' : '/sbin/ip';
+    // Non-numeric keys: PHP casts numeric string keys ('4') to int, which
+    // breaks strict comparisons against the loop key.
     $commands = [
-        '4' => 'ip -4 addr show 2>/dev/null',
-        '6' => 'ip -6 addr show 2>/dev/null',
+        'v4' => "$ip_bin -4 addr show 2>/dev/null",
+        'v6' => "$ip_bin -6 addr show 2>/dev/null",
     ];
     $result = [];
     $seen = [];
@@ -81,7 +85,7 @@ function localBindIPs() {
             if ($iface !== '' && preg_match('/^(docker|br-[0-9a-f]{12}|virbr|veth|lo$)/', $iface)) {
                 continue;
             }
-            if ($family === '4') {
+            if ($family === 'v4') {
                 if (!preg_match('/inet\s+([0-9.]+)\//', $line, $m) || strpos($m[1], '127.') === 0) {
                     continue;
                 }
