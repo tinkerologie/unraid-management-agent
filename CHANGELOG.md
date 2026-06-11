@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.06.06] - 2026-06-12
+
 ### Added
 
 - **MCP read-only mode** (#126) — a new `READ_ONLY` setting (plugin settings
