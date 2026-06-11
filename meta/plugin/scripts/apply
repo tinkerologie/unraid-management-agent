@@ -5,6 +5,8 @@
 PLUGIN="unraid-management-agent"
 SCRIPTS_DIR="/usr/local/emhttp/plugins/$PLUGIN/scripts"
 CONFIG_FILE="/boot/config/plugins/$PLUGIN/config.cfg"
+LOG_FILE="/var/log/unraid-management-agent.log"
+DEFAULT_PORT=8043
 
 # Ensure config file has restrictive permissions (contains MQTT password)
 if [ -f "$CONFIG_FILE" ]; then
@@ -12,6 +14,54 @@ if [ -f "$CONFIG_FILE" ]; then
         echo "Error: chmod 0600 failed on $CONFIG_FILE" >&2
         exit 1
     fi
+fi
+
+# Read a single key from the config without sourcing it (prevents code injection).
+read_cfg() {
+    grep -E "^${1}=" "$CONFIG_FILE" 2>/dev/null | head -1 | sed "s/^${1}=//; s/^[\"']//; s/[\"'].*//"
+}
+
+# ── Server-side bind address validation ──────────────────────
+# The HTML form cannot validate this reliably. Loopback is rejected outright
+# (integrations such as Home Assistant must be able to reach the agent) and
+# addresses not assigned to a local interface are reset, mirroring the
+# daemon's own startup fallback so the UI always shows the effective value.
+BIND_ADDRESS=""
+if [ -f "$CONFIG_FILE" ]; then
+    BIND_ADDRESS="$(read_cfg BIND_ADDRESS)"
+    reject_reason=""
+    case "${BIND_ADDRESS:-}" in
+        "" | 0.0.0.0 | ::) ;; # empty/wildcard = all interfaces
+        127.* | ::1)
+            reject_reason="loopback addresses are not allowed (integrations must be able to reach the agent)"
+            ;;
+        *)
+            if ! ip addr show 2>/dev/null | grep -Fq "inet ${BIND_ADDRESS}/" &&
+                ! ip addr show 2>/dev/null | grep -Fq "inet6 ${BIND_ADDRESS}/"; then
+                reject_reason="address is not assigned to any local interface"
+            fi
+            ;;
+    esac
+    if [ -n "$reject_reason" ]; then
+        echo "Warning: bind address '${BIND_ADDRESS}' rejected: ${reject_reason}; resetting to all interfaces"
+        if ! sed -i 's/^BIND_ADDRESS=.*/BIND_ADDRESS=""/' "$CONFIG_FILE"; then
+            echo "Error: failed to reset BIND_ADDRESS in $CONFIG_FILE" >&2
+            exit 1
+        fi
+        BIND_ADDRESS=""
+    fi
+fi
+
+# ── Server-side port validation ───────────────────────────────
+# The HTML form enforces 1024-65535 client-side only; an invalid value would
+# make the daemon fail to bind and exit silently.
+PORT="$(read_cfg PORT)"
+if ! echo "${PORT:-}" | grep -Eq '^[0-9]+$' || [ "$PORT" -lt 1024 ] || [ "$PORT" -gt 65535 ]; then
+    if [ -n "${PORT:-}" ]; then
+        echo "Warning: port '${PORT}' is invalid (must be 1024-65535); resetting to ${DEFAULT_PORT}"
+        sed -i "s/^PORT=.*/PORT=\"${DEFAULT_PORT}\"/" "$CONFIG_FILE" 2>/dev/null
+    fi
+    PORT="$DEFAULT_PORT"
 fi
 
 # Only restart if the service is currently running
@@ -44,5 +94,40 @@ if pidof "$PLUGIN" > /dev/null 2>&1; then
     if [ $start_rc -ne 0 ]; then
         echo "Error: start script failed (rc=$start_rc)" >&2
         exit $start_rc
+    fi
+
+    # Verify the daemon actually came back up and answers HTTP. Probe the
+    # address it binds to — a hardcoded loopback probe fails when a specific
+    # NIC address is configured. Wildcards are reachable via loopback; IPv6
+    # literals need brackets in a URL.
+    PROBE_HOST="127.0.0.1"
+    case "${BIND_ADDRESS:-}" in
+        "" | 0.0.0.0 | ::) PROBE_HOST="127.0.0.1" ;;
+        *:*) PROBE_HOST="[${BIND_ADDRESS}]" ;;
+        *) PROBE_HOST="$BIND_ADDRESS" ;;
+    esac
+
+    daemon_up=0
+    for _ in {1..6}; do
+        if ! pidof "$PLUGIN" > /dev/null 2>&1; then
+            daemon_up=0
+            break
+        fi
+        if command -v curl > /dev/null 2>&1 &&
+            curl -fsS -m 2 -o /dev/null "http://${PROBE_HOST}:${PORT}/api/v1/health" 2>/dev/null; then
+            daemon_up=1
+            break
+        fi
+        # Process alive but HTTP not answering yet — keep waiting.
+        daemon_up=1
+        sleep 1
+    done
+
+    if [ "$daemon_up" -eq 1 ]; then
+        echo "Service restarted (bind ${BIND_ADDRESS:-all interfaces}, port ${PORT})"
+    else
+        echo "Error: service failed to restart — check the log:" >&2
+        tail -5 "$LOG_FILE" 2>/dev/null >&2
+        exit 1
     fi
 fi

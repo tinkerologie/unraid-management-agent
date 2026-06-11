@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **MCP read-only mode** (#126) — a new `READ_ONLY` setting (plugin settings
+  page under **AI Agent Access (MCP)**, `READ_ONLY="true"` in `config.cfg`,
+  `read_only: true` in `config.yml`, or `--read-only` / `READ_ONLY=true`)
+  that blocks **all 49 state-changing MCP tools** at the server, so AI
+  agents can only consume data. Write tools stay visible in tool listings
+  but every invocation is rejected with a clear message, and each blocked
+  attempt is logged with the tool name. The dual-mode diagnostic tools
+  `system_health_report` and `run_runbook` still return their report /
+  dry-run plan but never execute remediation actions, even with
+  `confirm: true`. Destructive tools keep their existing `confirm: true`
+  gating when read-only mode is off; the REST API and WebSocket are not
+  affected.
+
+- **Configurable HTTP bind address** (#125) — a new `BIND_ADDRESS` setting
+  (plugin settings page, `BIND_ADDRESS="…"` in `config.cfg`,
+  `bind_address: …` in `config.yml`, or `--bind-address` /
+  `BIND_ADDRESS=…`) that binds the API/WebSocket/MCP server to a specific
+  IP on multi-homed / multi-VLAN systems instead of all interfaces. mDNS
+  discovery advertises the configured address, so Home Assistant
+  auto-discovers the endpoint on the intended network. The address must be
+  assigned to a local interface, and loopback addresses (127.x.x.x, ::1)
+  are rejected so integrations can always reach the agent — invalid or
+  stale values (e.g. after a VLAN change) log a warning and fall back to
+  all interfaces rather than leaving the agent unreachable. Applying the
+  setting from the plugin page validates it server-side, persists it, and
+  restarts the service automatically, then health-probes the new endpoint
+  to confirm the agent came back up. IPv6 addresses are supported.
+  Defaults to all interfaces (unchanged behaviour).
+
+---
+
 ## [2026.06.05] - 2026-06-11
 
 ### Fixed

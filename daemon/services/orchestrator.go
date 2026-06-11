@@ -463,7 +463,7 @@ func (o *Orchestrator) initializeDiscovery(ctx context.Context) {
 		hostname = "unraid"
 	}
 
-	svc := discovery.NewService(o.ctx.DiscoveryConfig, hostname, o.ctx.Port, o.ctx.Version)
+	svc := discovery.NewService(o.ctx.DiscoveryConfig, hostname, o.ctx.Port, o.ctx.Version, o.ctx.BindAddress)
 	if err := svc.Start(ctx); err != nil {
 		logger.Warning("Discovery service disabled: %v", err)
 		return

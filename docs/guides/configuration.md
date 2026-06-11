@@ -16,17 +16,19 @@ This file is created automatically after the first installation and persists acr
 
 ### Core Settings
 
-| Option                     | Default  | Description                                        |
-| -------------------------- | -------- | -------------------------------------------------- |
-| `--port`                   | `8043`   | HTTP API port                                      |
-| `--debug`                  | `false`  | Enable debug logging                               |
-| `--mqtt-enabled`           | `false`  | Enable MQTT publishing                             |
-| `--mqtt-broker`            | -        | MQTT broker address (e.g., `tcp://localhost:1883`) |
-| `--mqtt-topic-prefix`      | `unraid` | MQTT topic prefix                                  |
-| `--mqtt-username`          | -        | MQTT username (optional)                           |
-| `--mqtt-password`          | -        | MQTT password (optional)                           |
-| `--discovery-enabled`      | `true`   | Advertise the agent via mDNS for auto-discovery    |
-| `--discovery-service-name` | -        | Override the advertised mDNS instance name         |
+| Option                     | Default  | Description                                                                                                                                                                                                                                                                                       |
+| -------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--port`                   | `8043`   | HTTP API port                                                                                                                                                                                                                                                                                     |
+| `--bind-address`           | -        | IP address to bind the HTTP server to (empty = all interfaces). Useful on multi-VLAN systems; mDNS discovery advertises this address. Loopback addresses are rejected (integrations must be able to reach the agent); invalid or unassigned addresses fall back to all interfaces with a warning. |
+| `--read-only`              | `false`  | Block all state-changing MCP tools (AI agents can only consume data; REST API unaffected)                                                                                                                                                                                                         |
+| `--debug`                  | `false`  | Enable debug logging                                                                                                                                                                                                                                                                              |
+| `--mqtt-enabled`           | `false`  | Enable MQTT publishing                                                                                                                                                                                                                                                                            |
+| `--mqtt-broker`            | -        | MQTT broker address (e.g., `tcp://localhost:1883`)                                                                                                                                                                                                                                                |
+| `--mqtt-topic-prefix`      | `unraid` | MQTT topic prefix                                                                                                                                                                                                                                                                                 |
+| `--mqtt-username`          | -        | MQTT username (optional)                                                                                                                                                                                                                                                                          |
+| `--mqtt-password`          | -        | MQTT password (optional)                                                                                                                                                                                                                                                                          |
+| `--discovery-enabled`      | `true`   | Advertise the agent via mDNS for auto-discovery                                                                                                                                                                                                                                                   |
+| `--discovery-service-name` | -        | Override the advertised mDNS instance name                                                                                                                                                                                                                                                        |
 
 ### Collection Intervals
 
@@ -83,6 +85,13 @@ Future versions will include a web UI for configuration.
    # Unraid Management Agent Configuration
    PORT=8043
    DEBUG=false
+
+   # Bind the API server to a specific IP (empty = all interfaces).
+   # Handy on multi-VLAN systems so Home Assistant connects via the right network.
+   BIND_ADDRESS=192.168.40.10
+
+   # Block all state-changing MCP tools (AI agents can only read)
+   READ_ONLY=false
 
    # MQTT Settings
    MQTT_ENABLED=true

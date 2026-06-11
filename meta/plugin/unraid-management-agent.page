@@ -24,6 +24,8 @@ if (file_exists($config_file)) {
 
 // Default values
 $port = $config['PORT'] ?? '8043';
+$bind_address = $config['BIND_ADDRESS'] ?? '';
+$read_only = $config['READ_ONLY'] ?? 'false';
 
 // MQTT defaults
 $mqtt_enabled = $config['MQTT_ENABLED'] ?? 'false';
@@ -248,8 +250,13 @@ function intervalOptions($selected, $type = 'standard') {
     </span>
 
     <?php
-        // Bracket-wrap IPv6 addresses for valid URLs (e.g. http://[::1]:8043/)
+        // Show the configured bind address when one is set; otherwise the
+        // address the WebUI was reached on (agent listens on all interfaces).
         $raw_addr = $_SERVER['SERVER_ADDR'];
+        if (!empty($bind_address) && $bind_address !== '0.0.0.0' && $bind_address !== '::') {
+            $raw_addr = $bind_address;
+        }
+        // Bracket-wrap IPv6 addresses for valid URLs (e.g. http://[::1]:8043/)
         $addr_esc = htmlspecialchars(
             (strpos($raw_addr, ':') !== false) ? "[$raw_addr]" : $raw_addr,
             ENT_QUOTES, 'UTF-8'
@@ -285,6 +292,32 @@ _(API Port)_:
 
 <blockquote class="inline_help">
 Port number for the API server (default: 8043).
+</blockquote>
+
+_(Bind Address)_:
+: <input type="text" name="BIND_ADDRESS" value="<?= htmlspecialchars($bind_address) ?>" placeholder="All interfaces (default)">
+
+<blockquote class="inline_help">
+IP address the API server listens on, useful when the server has multiple networks/VLANs (e.g. 192.168.40.10).
+Leave blank to listen on all interfaces. mDNS discovery advertises this address so integrations such as
+Home Assistant connect to the correct endpoint. Loopback addresses (127.x.x.x, ::1) are not allowed —
+integrations must be able to reach the agent over the network. Invalid or unassigned addresses are reset
+to all interfaces. Changes apply after clicking Apply, which restarts the service automatically.
+</blockquote>
+
+<div class="title"><span class="left"><i class="title fa fa-shield"></i>AI Agent Access (MCP)</span></div>
+
+_(Read-Only Mode)_:
+: <label class="uma-toggle-switch">
+    <input type="checkbox" name="READ_ONLY_CB" id="read_only" <?= ($read_only === 'true') ? 'checked' : '' ?> onchange="updateReadOnly()">
+    <span class="uma-toggle-slider"></span>
+  </label>
+  <input type="hidden" name="READ_ONLY" id="read_only_val" value="<?= $read_only ?>">
+
+<blockquote class="inline_help">
+When enabled, AI agents connected via MCP can only read data: every state-changing MCP tool
+(container/VM/array actions, reboot, shutdown, updates, fan/CPU control, etc.) is blocked.
+The REST API and WebSocket are not affected.
 </blockquote>
 
 <div class="title"><span class="left"><i class="title fa fa-comments"></i>MQTT Integration</span></div>
@@ -557,6 +590,11 @@ function toggleMQTTFields() {
 function updateMQTTHA() {
     var enabled = document.getElementById('mqtt_ha_enabled').checked;
     document.getElementById('mqtt_ha_val').value = enabled ? 'true' : 'false';
+}
+
+function updateReadOnly() {
+    var enabled = document.getElementById('read_only').checked;
+    document.getElementById('read_only_val').value = enabled ? 'true' : 'false';
 }
 
 // Highlight disabled interval selects

@@ -271,6 +271,29 @@ Supported actions: `start_container`, `stop_container`, `restart_container`, `st
 
 > **⚠️ Warning:** Destructive actions (array stop, reboot, shutdown, user scripts) require explicit confirmation via the `confirm: true` parameter.
 
+## Read-Only Mode
+
+Read-only mode blocks **every state-changing MCP tool** at the server, so AI agents can monitor and diagnose but never modify the system — regardless of which client connects or what it asks for.
+
+Enable it in any of the usual configuration layers:
+
+| Method                     | Setting                                    |
+| -------------------------- | ------------------------------------------ |
+| Plugin settings page       | **AI Agent Access (MCP) → Read-Only Mode** |
+| Config file (`config.cfg`) | `READ_ONLY="true"`                         |
+| YAML config (`config.yml`) | `read_only: true`                          |
+| CLI flag / env var         | `--read-only` / `READ_ONLY=true`           |
+
+Behaviour while enabled:
+
+- Write tools stay visible in tool listings (less confusing for clients), but every invocation returns: `This operation is blocked: the agent is running in read-only mode`.
+- All read-only monitoring tools work normally.
+- The dual-mode tools `system_health_report` and `run_runbook` still return their report / dry-run plan, but never execute remediation actions, even with `confirm: true`.
+- Blocked attempts are logged with the tool name for auditability.
+- The REST API and WebSocket are **not** affected — read-only mode governs MCP access only.
+
+Read-only mode is enforced in addition to the per-tool `confirm: true` gating described below; destructive tools always require explicit confirmation even when read-only mode is off.
+
 ## Tool Safety Annotations
 
 Tools include MCP safety annotations to help AI agents make safe decisions automatically:

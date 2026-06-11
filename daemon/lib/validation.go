@@ -428,6 +428,37 @@ func ValidateHostOrIP(host string) error {
 	return nil
 }
 
+// ValidateBindAddress validates an IP address for the HTTP server to bind to.
+// The address must parse as an IP and either be unspecified (0.0.0.0 / ::) or
+// be assigned to a local interface, so a typo or stale address is caught
+// before the listener fails with a less obvious error. Loopback addresses are
+// rejected: integrations (e.g. Home Assistant) must be able to reach the
+// agent over the network.
+func ValidateBindAddress(addr string) error {
+	ip := net.ParseIP(addr)
+	if ip == nil {
+		return fmt.Errorf("invalid bind address %q: must be an IP address", addr)
+	}
+	if ip.IsUnspecified() {
+		return nil
+	}
+	if ip.IsLoopback() {
+		return fmt.Errorf("bind address %q is a loopback address: integrations must be able to reach the agent (use a LAN IP, or leave empty for all interfaces)", addr)
+	}
+	ifaceAddrs, err := net.InterfaceAddrs()
+	if err != nil {
+		// Cannot enumerate interfaces — accept the address and let the
+		// listener surface any bind error.
+		return nil
+	}
+	for _, a := range ifaceAddrs {
+		if ipNet, ok := a.(*net.IPNet); ok && ipNet.IP.Equal(ip) {
+			return nil
+		}
+	}
+	return fmt.Errorf("bind address %q is not assigned to any local interface", addr)
+}
+
 // ValidateFanTempSource validates a fan curve temperature source.
 func ValidateFanTempSource(src dto.FanTempSource) error {
 	switch src.Type {

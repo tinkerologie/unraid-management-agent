@@ -829,3 +829,41 @@ func TestValidateLogFilename(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateBindAddress(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+		errMsg  string
+	}{
+		// Unspecified addresses always pass (bind to all interfaces).
+		{name: "IPv4 unspecified", input: "0.0.0.0", wantErr: false},
+		{name: "IPv6 unspecified", input: "::", wantErr: false},
+		// Loopback is rejected: integrations must be able to reach the agent.
+		{name: "IPv4 loopback", input: "127.0.0.1", wantErr: true, errMsg: "loopback"},
+		{name: "IPv4 loopback range", input: "127.0.0.53", wantErr: true, errMsg: "loopback"},
+		{name: "IPv6 loopback", input: "::1", wantErr: true, errMsg: "loopback"},
+		// Not an IP at all.
+		{name: "empty string", input: "", wantErr: true, errMsg: "must be an IP address"},
+		{name: "hostname", input: "myserver.local", wantErr: true, errMsg: "must be an IP address"},
+		{name: "garbage", input: "not-an-ip", wantErr: true, errMsg: "must be an IP address"},
+		{name: "flag injection", input: "-flag", wantErr: true, errMsg: "must be an IP address"},
+		{name: "ip with port", input: "192.168.1.1:8043", wantErr: true, errMsg: "must be an IP address"},
+		// Valid IP but never assigned locally (TEST-NET-1, RFC 5737).
+		{name: "non-local IP", input: "192.0.2.55", wantErr: true, errMsg: "not assigned to any local interface"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateBindAddress(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateBindAddress(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+				return
+			}
+			if tt.wantErr && tt.errMsg != "" && err != nil && !strings.Contains(err.Error(), tt.errMsg) {
+				t.Errorf("ValidateBindAddress(%q) error = %q, want it to contain %q", tt.input, err, tt.errMsg)
+			}
+		})
+	}
+}

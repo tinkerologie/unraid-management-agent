@@ -34,9 +34,15 @@ type MQTTConfig struct {
 
 // Config holds the application configuration settings.
 type Config struct {
-	Version    string `json:"version"`
-	Port       int    `json:"port"`
-	CORSOrigin string `json:"cors_origin,omitempty"`
+	Version string `json:"version"`
+	Port    int    `json:"port"`
+	// BindAddress is the IP address the HTTP server binds to.
+	// Empty means all interfaces (the default).
+	BindAddress string `json:"bind_address,omitempty"`
+	CORSOrigin  string `json:"cors_origin,omitempty"`
+	// ReadOnly blocks all state-changing MCP tools so AI agents can only
+	// consume data. The REST API is unaffected.
+	ReadOnly bool `json:"read_only,omitempty"`
 }
 
 // DiscoveryConfig holds zeroconf (mDNS/DNS-SD) auto-discovery settings.

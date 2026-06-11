@@ -16,6 +16,7 @@ import (
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/cmd"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/platform"
 )
@@ -50,10 +51,14 @@ var validCollectorNames = map[string]bool{
 }
 
 var cli struct {
-	LogsDir  string `default:"/var/log" help:"directory to store logs"`
-	Port     int    `default:"8043" help:"HTTP server port"`
-	Debug    bool   `default:"false" help:"enable debug mode with stdout logging"`
-	LogLevel string `default:"info" help:"log level: debug, info, warning, error"`
+	LogsDir     string `default:"/var/log" help:"directory to store logs"`
+	Port        int    `default:"8043" help:"HTTP server port"`
+	BindAddress string `default:"" env:"BIND_ADDRESS" help:"IP address to bind the HTTP server to (empty = all interfaces)"`
+	Debug       bool   `default:"false" help:"enable debug mode with stdout logging"`
+	LogLevel    string `default:"info" help:"log level: debug, info, warning, error"`
+
+	// Read-only mode - blocks all state-changing MCP tools (REST API unaffected)
+	ReadOnly bool `default:"false" env:"READ_ONLY" help:"block all state-changing MCP tools so AI agents can only consume data"`
 
 	// CORS
 	CORSOrigin string `default:"*" env:"CORS_ORIGIN" help:"Access-Control-Allow-Origin value (default: *)"`
@@ -197,6 +202,22 @@ func main() {
 
 	log.Printf("Starting Unraid Management Agent v%s (log level: %s)", Version, cli.LogLevel)
 
+	// Validate the bind address. Fall back to all interfaces rather than
+	// refusing to start, so a stale config value (e.g. after a VLAN change)
+	// can never make the agent unreachable.
+	if cli.BindAddress != "" {
+		if err := lib.ValidateBindAddress(cli.BindAddress); err != nil {
+			logger.Warning("%v; falling back to all interfaces", err)
+			cli.BindAddress = ""
+		} else {
+			logger.Info("HTTP server will bind to %s only", cli.BindAddress)
+		}
+	}
+
+	if cli.ReadOnly {
+		logger.Info("Read-only mode enabled: all state-changing MCP tools are blocked")
+	}
+
 	// Parse disabled collectors from CLI/env and create a map
 	disabledCollectors := make(map[string]bool)
 	if cli.DisableCollectors != "" {
@@ -243,9 +264,11 @@ func main() {
 	// Create application context with intervals from CLI/env
 	appCtx := &domain.Context{
 		Config: domain.Config{
-			Version:    Version,
-			Port:       cli.Port,
-			CORSOrigin: cli.CORSOrigin,
+			Version:     Version,
+			Port:        cli.Port,
+			BindAddress: cli.BindAddress,
+			CORSOrigin:  cli.CORSOrigin,
+			ReadOnly:    cli.ReadOnly,
 		},
 		Hub:      domain.NewEventBus(1024), // Buffer size for event bus
 		Platform: platform.NewRegistry(),
@@ -337,9 +360,11 @@ func applyFileConfig(cfg *domain.FileConfig) {
 
 	// Server settings
 	setInt(&cli.Port, cfg.Port)
+	setStr(&cli.BindAddress, cfg.BindAddress)
 	setStr(&cli.LogLevel, cfg.LogLevel)
 	setStr(&cli.LogsDir, cfg.LogsDir)
 	setBool(&cli.Debug, cfg.Debug)
+	setBool(&cli.ReadOnly, cfg.ReadOnly)
 	setBool(&cli.LowPowerMode, cfg.LowPowerMode)
 	setStr(&cli.DisableCollectors, cfg.DisableCollectors)
 	setStr(&cli.CORSOrigin, cfg.CORSOrigin)
