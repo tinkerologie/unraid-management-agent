@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"net"
 	"strings"
 	"testing"
 
@@ -825,6 +826,68 @@ func TestValidateLogFilename(t *testing.T) {
 			err := ValidateLogFilename(tt.filename)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidateLogFilename(%q) error = %v, wantErr %v", tt.filename, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateBindAddress(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+		errMsg  string
+	}{
+		// Unspecified addresses always pass (bind to all interfaces).
+		{name: "IPv4 unspecified", input: "0.0.0.0", wantErr: false},
+		{name: "IPv6 unspecified", input: "::", wantErr: false},
+		// Loopback is rejected: integrations must be able to reach the agent.
+		{name: "IPv4 loopback", input: "127.0.0.1", wantErr: true, errMsg: "loopback"},
+		{name: "IPv4 loopback range", input: "127.0.0.53", wantErr: true, errMsg: "loopback"},
+		{name: "IPv6 loopback", input: "::1", wantErr: true, errMsg: "loopback"},
+		// Not an IP at all.
+		{name: "empty string", input: "", wantErr: true, errMsg: "must be an IP address"},
+		{name: "hostname", input: "myserver.local", wantErr: true, errMsg: "must be an IP address"},
+		{name: "garbage", input: "not-an-ip", wantErr: true, errMsg: "must be an IP address"},
+		{name: "flag injection", input: "-flag", wantErr: true, errMsg: "must be an IP address"},
+		{name: "ip with port", input: "192.168.1.1:8043", wantErr: true, errMsg: "must be an IP address"},
+		// Valid IP but never assigned locally (TEST-NET-1, RFC 5737).
+		{name: "non-local IP", input: "192.0.2.55", wantErr: true, errMsg: "not assigned to any local interface"},
+		// Security cases: malformed input must never pass.
+		{name: "null byte", input: "127.0.0.1\x00", wantErr: true, errMsg: "must be an IP address"},
+		{name: "excessively long input", input: strings.Repeat("1", 1000), wantErr: true, errMsg: "must be an IP address"},
+		{name: "IPv4-mapped IPv6 loopback", input: "::ffff:127.0.0.1", wantErr: true, errMsg: "loopback"},
+	}
+
+	// Positive case: a real local non-loopback IP must validate. Discovered
+	// dynamically because interface addresses differ per machine.
+	t.Run("valid local non-loopback IP", func(t *testing.T) {
+		ifaceAddrs, err := net.InterfaceAddrs()
+		if err != nil {
+			t.Skipf("cannot enumerate interfaces: %v", err)
+		}
+		for _, a := range ifaceAddrs {
+			ipNet, ok := a.(*net.IPNet)
+			if !ok || ipNet.IP.IsLoopback() || ipNet.IP.IsUnspecified() {
+				continue
+			}
+			if err := ValidateBindAddress(ipNet.IP.String()); err != nil {
+				t.Errorf("ValidateBindAddress(%q) = %v, want nil", ipNet.IP, err)
+			}
+			return
+		}
+		t.Skip("no non-loopback local IP found")
+	})
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateBindAddress(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateBindAddress(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+				return
+			}
+			if tt.wantErr && tt.errMsg != "" && err != nil && !strings.Contains(err.Error(), tt.errMsg) {
+				t.Errorf("ValidateBindAddress(%q) error = %q, want it to contain %q", tt.input, err, tt.errMsg)
 			}
 		})
 	}

@@ -3,8 +3,10 @@ package api
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"reflect"
+	"strconv"
 	"sync"
 	"time"
 
@@ -406,8 +408,10 @@ func (s *Server) Ready() <-chan struct{} {
 
 // StartHTTP starts the HTTP server
 func (s *Server) StartHTTP() error {
+	// JoinHostPort brackets IPv6 addresses; an empty BindAddress yields
+	// ":port", which preserves the bind-to-all-interfaces default.
 	s.httpServer = &http.Server{
-		Addr:              fmt.Sprintf(":%d", s.ctx.Port),
+		Addr:              net.JoinHostPort(s.ctx.BindAddress, strconv.Itoa(s.ctx.Port)),
 		Handler:           s.router,
 		ReadTimeout:       30 * time.Second,
 		ReadHeaderTimeout: 10 * time.Second,

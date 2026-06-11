@@ -24,6 +24,8 @@ if (file_exists($config_file)) {
 
 // Default values
 $port = $config['PORT'] ?? '8043';
+$bind_address = $config['BIND_ADDRESS'] ?? '';
+$read_only = $config['READ_ONLY'] ?? 'false';
 
 // MQTT defaults
 $mqtt_enabled = $config['MQTT_ENABLED'] ?? 'false';
@@ -54,6 +56,77 @@ $interval_unassigned = $config['INTERVAL_UNASSIGNED'] ?? '60';
 // Check if service is running
 exec("pidof $plugin 2>/dev/null", $pids, $pid_rc);
 $running = ($pid_rc === 0 && !empty($pids));
+
+// Enumerate local interface IPs for the bind address dropdown. Skips
+// loopback, link-local, and container/VM bridge interfaces (docker,
+// br-<hash>, virbr, veth) — binding there would hide the agent from
+// integrations such as Home Assistant.
+function localBindIPs() {
+    // Absolute path: php-fpm's PATH does not include /usr/sbin.
+    $ip_bin = is_executable('/usr/sbin/ip') ? '/usr/sbin/ip' : '/sbin/ip';
+    // Non-numeric keys: PHP casts numeric string keys ('4') to int, which
+    // breaks strict comparisons against the loop key.
+    $commands = [
+        'v4' => "$ip_bin -4 addr show 2>/dev/null",
+        'v6' => "$ip_bin -6 addr show 2>/dev/null",
+    ];
+    $result = [];
+    $seen = [];
+    foreach ($commands as $family => $command) {
+        $output = @shell_exec($command);
+        if (!$output) {
+            continue;
+        }
+        $iface = '';
+        foreach (explode("\n", trim($output)) as $line) {
+            if (preg_match('/^\d+:\s+(\S+):/', $line, $m)) {
+                $iface = explode('@', $m[1])[0]; // br0.40@br0 -> br0.40
+            }
+            if ($iface !== '' && preg_match('/^(docker|br-[0-9a-f]{12}|virbr|veth|lo$)/', $iface)) {
+                continue;
+            }
+            if ($family === 'v4') {
+                if (!preg_match('/inet\s+([0-9.]+)\//', $line, $m) || strpos($m[1], '127.') === 0) {
+                    continue;
+                }
+            } else {
+                if (!preg_match('/inet6\s+([0-9a-fA-F:]+)\//', $line, $m) || strtolower($m[1]) === '::1') {
+                    continue;
+                }
+                if (stripos($m[1], 'fe80:') === 0) {
+                    continue;
+                }
+                if (!filter_var($m[1], FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+                    continue;
+                }
+            }
+            $key = $family . ':' . strtolower($m[1]);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $result[] = ['ip' => $m[1], 'iface' => $iface];
+        }
+    }
+    return $result;
+}
+
+// Build the bind address <option> list from the detected interface IPs.
+$bind_options = '<option value="">All interfaces (default)</option>';
+$bind_known = [''];
+foreach (localBindIPs() as $nic) {
+    $ip_esc = htmlspecialchars($nic['ip'], ENT_QUOTES, 'UTF-8');
+    $iface_esc = htmlspecialchars($nic['iface'], ENT_QUOTES, 'UTF-8');
+    $sel = ($bind_address === $nic['ip']) ? ' selected' : '';
+    $bind_options .= "<option value=\"$ip_esc\"$sel>$ip_esc ($iface_esc)</option>";
+    $bind_known[] = $nic['ip'];
+}
+if (!in_array($bind_address, $bind_known, true)) {
+    // Saved address no longer exists (e.g. VLAN removed) — show it so the
+    // selection is honest; apply resets it to all interfaces server-side.
+    $stale_esc = htmlspecialchars($bind_address, ENT_QUOTES, 'UTF-8');
+    $bind_options .= "<option value=\"$stale_esc\" selected>$stale_esc (not detected — resets to all interfaces)</option>";
+}
 
 // Helper function to generate interval select options
 function intervalOptions($selected, $type = 'standard') {
@@ -248,8 +321,13 @@ function intervalOptions($selected, $type = 'standard') {
     </span>
 
     <?php
-        // Bracket-wrap IPv6 addresses for valid URLs (e.g. http://[::1]:8043/)
+        // Show the configured bind address when one is set; otherwise the
+        // address the WebUI was reached on (agent listens on all interfaces).
         $raw_addr = $_SERVER['SERVER_ADDR'];
+        if (!empty($bind_address) && $bind_address !== '0.0.0.0' && $bind_address !== '::') {
+            $raw_addr = $bind_address;
+        }
+        // Bracket-wrap IPv6 addresses for valid URLs (e.g. http://[::1]:8043/)
         $addr_esc = htmlspecialchars(
             (strpos($raw_addr, ':') !== false) ? "[$raw_addr]" : $raw_addr,
             ENT_QUOTES, 'UTF-8'
@@ -285,6 +363,32 @@ _(API Port)_:
 
 <blockquote class="inline_help">
 Port number for the API server (default: 8043).
+</blockquote>
+
+_(Bind Address)_:
+: <select name="BIND_ADDRESS"><?= $bind_options ?></select>
+
+<blockquote class="inline_help">
+Network address the API server listens on — the list shows the addresses detected on this server's
+interfaces and VLANs. Pick a specific address on multi-VLAN systems so integrations such as Home Assistant
+connect via the right network; mDNS discovery advertises the selected address. The default listens on all
+interfaces. Loopback and container-bridge addresses are excluded because integrations must be able to reach
+the agent. Changes apply after clicking Apply, which restarts the service automatically.
+</blockquote>
+
+<div class="title"><span class="left"><i class="title fa fa-shield"></i>AI Agent Access (MCP)</span></div>
+
+_(Read-Only Mode)_:
+: <label class="uma-toggle-switch">
+    <input type="checkbox" name="READ_ONLY_CB" id="read_only" <?= ($read_only === 'true') ? 'checked' : '' ?> onchange="updateReadOnly()">
+    <span class="uma-toggle-slider"></span>
+  </label>
+  <input type="hidden" name="READ_ONLY" id="read_only_val" value="<?= $read_only ?>">
+
+<blockquote class="inline_help">
+When enabled, AI agents connected via MCP can only read data: every state-changing MCP tool
+(container/VM/array actions, reboot, shutdown, updates, fan/CPU control, etc.) is blocked.
+The REST API and WebSocket are not affected.
 </blockquote>
 
 <div class="title"><span class="left"><i class="title fa fa-comments"></i>MQTT Integration</span></div>
@@ -557,6 +661,11 @@ function toggleMQTTFields() {
 function updateMQTTHA() {
     var enabled = document.getElementById('mqtt_ha_enabled').checked;
     document.getElementById('mqtt_ha_val').value = enabled ? 'true' : 'false';
+}
+
+function updateReadOnly() {
+    var enabled = document.getElementById('read_only').checked;
+    document.getElementById('read_only_val').value = enabled ? 'true' : 'false';
 }
 
 // Highlight disabled interval selects

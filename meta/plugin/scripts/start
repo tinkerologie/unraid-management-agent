@@ -32,6 +32,8 @@ sanitize_bool() { [ "$1" = "true" ] && echo "true" || echo "false"; }
 
 # ── Set defaults ──────────────────────────────────────────────
 PORT="${PORT:-8043}"
+BIND_ADDRESS="${BIND_ADDRESS:-}"
+READ_ONLY="${READ_ONLY:-false}"
 LOG_LEVEL="${LOG_LEVEL:-info}"
 # Defaults follow industry standards (Zabbix, Prometheus, Datadog)
 INTERVAL_SYSTEM="${INTERVAL_SYSTEM:-15}"
@@ -62,6 +64,10 @@ MQTT_HOME_ASSISTANT="${MQTT_HOME_ASSISTANT:-false}"
 
 # ── Sanitize all config values ────────────────────────────────
 PORT=$(sanitize_int "$PORT");                       PORT="${PORT:-8043}"
+# Bind address: keep only IP characters (hex digits, dots, colons).
+# The daemon validates the value and falls back to all interfaces if invalid.
+BIND_ADDRESS=$(echo "$BIND_ADDRESS" | tr -cd '0-9a-fA-F.:')
+READ_ONLY=$(sanitize_bool "$READ_ONLY")
 LOG_LEVEL=$(echo "$LOG_LEVEL" | grep -xE 'debug|info|warning|error' || echo "info")
 LOG_LEVEL="${LOG_LEVEL:-info}"
 
@@ -82,6 +88,8 @@ MQTT_PORT=$(sanitize_int "$MQTT_PORT");             MQTT_PORT="${MQTT_PORT:-1883
 
 # ── Launch using env(1) to pass variables safely ──────────────
 nohup env \
+  BIND_ADDRESS="$BIND_ADDRESS" \
+  READ_ONLY="$READ_ONLY" \
   INTERVAL_SYSTEM="$INTERVAL_SYSTEM" \
   INTERVAL_ARRAY="$INTERVAL_ARRAY" \
   INTERVAL_DISK="$INTERVAL_DISK" \

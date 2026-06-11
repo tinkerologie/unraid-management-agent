@@ -981,7 +981,7 @@ func (s *Server) registerNewMonitoringTools() {
 	})
 
 	// Force refresh of all container update checks and publish results
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "refresh_container_updates",
 		Description: "Force an immediate registry digest re-check for all containers and publish the result (updates cache, WebSocket, and alerts).",
 		Annotations: &mcp.ToolAnnotations{
@@ -1059,7 +1059,7 @@ func (s *Server) registerNewMonitoringTools() {
 	})
 
 	// Force refresh of all plugin update checks and publish results
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "refresh_plugin_updates",
 		Description: "Force an immediate plugin update check for all installed plugins and publish the result (updates cache, WebSocket, and alerts).",
 		Annotations: &mcp.ToolAnnotations{
@@ -1213,7 +1213,7 @@ func (s *Server) registerNewMonitoringTools() {
 // registerControlTools registers tools that can modify system state.
 func (s *Server) registerControlTools() {
 	// Container control tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "container_action",
 		Description: "Perform an action on a Docker container (start, stop, restart, pause, unpause, remove). The remove action requires confirm=true.",
 		Annotations: &mcp.ToolAnnotations{
@@ -1257,7 +1257,7 @@ func (s *Server) registerControlTools() {
 	})
 
 	// Container autostart tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "set_container_autostart",
 		Description: "Enable or disable autostart for a Docker container. Writes to the Unraid autostart file (/var/lib/docker/unraid-autostart). The change persists across reboots and is reversible.",
 		Annotations: &mcp.ToolAnnotations{
@@ -1302,7 +1302,7 @@ func (s *Server) registerControlTools() {
 	})
 
 	// VM control tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "vm_action",
 		Description: "Perform an action on a virtual machine (start, stop, restart, pause, resume, hibernate, force-stop, reset). The reset action requires confirm=true.",
 		Annotations: &mcp.ToolAnnotations{
@@ -1350,7 +1350,7 @@ func (s *Server) registerControlTools() {
 	})
 
 	// Array control tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "array_action",
 		Description: "Start or stop the Unraid array. CAUTION: Stopping the array will make all data inaccessible. Requires confirmation.",
 		Annotations: &mcp.ToolAnnotations{
@@ -1385,7 +1385,7 @@ func (s *Server) registerControlTools() {
 	})
 
 	// Remote share mount/unmount tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "remote_share_action",
 		Description: "Mount or unmount an Unassigned Devices SMB/NFS remote share by its source (//server/share or server:/export, as reported by get_remote_shares).",
 		Annotations: &mcp.ToolAnnotations{
@@ -1415,7 +1415,7 @@ func (s *Server) registerControlTools() {
 	})
 
 	// Parity check tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "parity_check_action",
 		Description: "Start a parity check operation on the Unraid array",
 		Annotations: &mcp.ToolAnnotations{
@@ -1441,7 +1441,7 @@ func (s *Server) registerControlTools() {
 	})
 
 	// System reboot tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "system_reboot",
 		Description: "Reboot the Unraid server. CAUTION: This will restart the entire system. Requires confirmation.",
 		Annotations: &mcp.ToolAnnotations{
@@ -1466,7 +1466,7 @@ func (s *Server) registerControlTools() {
 	})
 
 	// System shutdown tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "system_shutdown",
 		Description: "Shutdown the Unraid server. CAUTION: This will power off the entire system. Requires confirmation.",
 		Annotations: &mcp.ToolAnnotations{
@@ -1491,7 +1491,7 @@ func (s *Server) registerControlTools() {
 	})
 
 	// Parity check stop tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "parity_check_stop",
 		Description: "Stop a running parity check operation",
 		Annotations: &mcp.ToolAnnotations{
@@ -1513,7 +1513,7 @@ func (s *Server) registerControlTools() {
 	})
 
 	// Parity check pause tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "parity_check_pause",
 		Description: "Pause a running parity check operation",
 		Annotations: &mcp.ToolAnnotations{
@@ -1535,7 +1535,7 @@ func (s *Server) registerControlTools() {
 	})
 
 	// Parity check resume tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "parity_check_resume",
 		Description: "Resume a paused parity check operation",
 		Annotations: &mcp.ToolAnnotations{
@@ -1557,7 +1557,7 @@ func (s *Server) registerControlTools() {
 	})
 
 	// Disk spin down tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "disk_spin_down",
 		Description: "Spin down a specific disk to save power. The disk will spin up automatically when accessed.",
 		Annotations: &mcp.ToolAnnotations{
@@ -1583,7 +1583,7 @@ func (s *Server) registerControlTools() {
 	})
 
 	// Disk spin up tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "disk_spin_up",
 		Description: "Spin up a specific disk that is in standby mode",
 		Annotations: &mcp.ToolAnnotations{
@@ -1609,7 +1609,7 @@ func (s *Server) registerControlTools() {
 	})
 
 	// Clear disk statistics tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "clear_disk_stats",
 		Description: "Clear all array disk I/O statistics system-wide. Uses the same mechanism as the Unraid WebUI 'Clear Stats' button (emhttpd clearStatistics). Safe and reversible — counters reset to zero and resume accumulating normally. Requires the emhttpd socket.",
 		Annotations: &mcp.ToolAnnotations{
@@ -1629,7 +1629,7 @@ func (s *Server) registerControlTools() {
 	})
 
 	// Execute user script tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "execute_user_script",
 		Description: "Execute a user script from the User Scripts plugin. Requires confirmation for safety.",
 		Annotations: &mcp.ToolAnnotations{
@@ -1656,7 +1656,7 @@ func (s *Server) registerControlTools() {
 	})
 
 	// Collector control tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "collector_action",
 		Description: "Enable or disable a data collector at runtime. Note: some collectors like 'system' are required and cannot be disabled.",
 		Annotations: &mcp.ToolAnnotations{
@@ -1694,7 +1694,7 @@ func (s *Server) registerControlTools() {
 	})
 
 	// Update collector interval tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "update_collector_interval",
 		Description: "Update the collection interval for a specific collector. Interval must be between 5 and 86400 seconds.",
 		Annotations: &mcp.ToolAnnotations{
@@ -1732,7 +1732,7 @@ func (s *Server) registerControlTools() {
 // registerNewControlTools registers new control tools for updates, snapshots, services.
 func (s *Server) registerNewControlTools() {
 	// Update single container
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "update_container",
 		Description: "Update a Docker container to the latest image. Stops the container, pulls the latest image, recreates with the same config, and starts it.",
 		Annotations: &mcp.ToolAnnotations{
@@ -1754,7 +1754,7 @@ func (s *Server) registerNewControlTools() {
 	})
 
 	// Update all containers
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "update_all_containers",
 		Description: "Update all Docker containers that have available image updates. Stops, pulls latest images, recreates, and starts each container.",
 		Annotations: &mcp.ToolAnnotations{
@@ -1775,7 +1775,7 @@ func (s *Server) registerNewControlTools() {
 	})
 
 	// Update single plugin
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "update_plugin",
 		Description: "Update a specific Unraid plugin to the latest version.",
 		Annotations: &mcp.ToolAnnotations{
@@ -1799,7 +1799,7 @@ func (s *Server) registerNewControlTools() {
 	})
 
 	// Update all plugins
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "update_all_plugins",
 		Description: "Update all installed Unraid plugins that have available updates.",
 		Annotations: &mcp.ToolAnnotations{
@@ -1819,7 +1819,7 @@ func (s *Server) registerNewControlTools() {
 	})
 
 	// Create VM snapshot
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "create_vm_snapshot",
 		Description: "Create a snapshot of a virtual machine for backup or rollback purposes.",
 		Annotations: &mcp.ToolAnnotations{
@@ -1841,7 +1841,7 @@ func (s *Server) registerNewControlTools() {
 	})
 
 	// Delete VM snapshot
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "delete_vm_snapshot",
 		Description: "Delete a snapshot of a virtual machine. This cannot be undone.",
 		Annotations: &mcp.ToolAnnotations{
@@ -1861,7 +1861,7 @@ func (s *Server) registerNewControlTools() {
 	})
 
 	// Restore VM snapshot
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "restore_vm_snapshot",
 		Description: "Restore a virtual machine to a previously created snapshot. WARNING: This reverts the VM to the snapshot state and the current state is lost.",
 		Annotations: &mcp.ToolAnnotations{
@@ -1884,7 +1884,7 @@ func (s *Server) registerNewControlTools() {
 	})
 
 	// Clone VM
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "clone_vm",
 		Description: "Clone a virtual machine including its disk images. The source VM must be shut off.",
 		Annotations: &mcp.ToolAnnotations{
@@ -1907,7 +1907,7 @@ func (s *Server) registerNewControlTools() {
 	})
 
 	// Service control
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "service_action",
 		Description: "Start, stop, or restart an Unraid system service (docker, libvirt, smb, nfs, ftp, sshd, nginx, syslog, ntpd, avahi, wireguard).",
 		Annotations: &mcp.ToolAnnotations{
@@ -1980,6 +1980,16 @@ func (s *Server) registerRemediationTools() {
 			})
 		}
 
+		// Read-only mode: return the report but never execute actions.
+		if s.ctx.ReadOnly {
+			logger.Warning("MCP: blocked system_health_report action execution: agent is in read-only mode")
+			return jsonResult(map[string]any{
+				"report":   report,
+				"executed": false,
+				"note":     readOnlyBlockedMessage,
+			})
+		}
+
 		// Execute path — construct executor from live controllers.
 		dockerCtrl := controllers.NewDockerController()
 		defer func() { _ = dockerCtrl.Close() }()
@@ -2044,21 +2054,32 @@ func (s *Server) registerRemediationTools() {
 			}
 		}
 
+		// Read-only mode: always behave as a dry-run, even with confirm=true.
+		confirm := args.Confirm
+		if confirm && s.ctx.ReadOnly {
+			logger.Warning("MCP: blocked run_runbook execution: agent is in read-only mode")
+			confirm = false
+		}
+
 		dockerCtrl := controllers.NewDockerController()
 		defer func() { _ = dockerCtrl.Close() }()
 		vmCtrl := controllers.NewVMController()
 		exec := remediation.NewExecutor(dockerCtrl, vmCtrl)
-		results, steps, err := remediation.RunRunbook(ctx, exec, args.Name, args.Confirm, targets)
+		results, steps, err := remediation.RunRunbook(ctx, exec, args.Name, confirm, targets)
 		if err != nil {
 			return textResult(fmt.Sprintf("run_runbook error: %v", err)), nil, nil
 		}
 
-		if !args.Confirm {
-			return jsonResult(map[string]any{
+		if !confirm {
+			resp := map[string]any{
 				"runbook":  args.Name,
 				"executed": false,
 				"steps":    steps,
-			})
+			}
+			if args.Confirm {
+				resp["note"] = readOnlyBlockedMessage
+			}
+			return jsonResult(resp)
 		}
 
 		logger.Info("MCP run_runbook: name=%s targets=%v confirm=%v", args.Name, targets, args.Confirm)
@@ -2190,7 +2211,7 @@ func (s *Server) registerAlertingTools() {
 	})
 
 	// Create alert rule
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "create_alert_rule",
 		Description: "Create a new alert rule with an expr-lang expression that evaluates against system metrics. Available variables: CPU, RAMUsedPct, CPUTemp, MotherboardTemp, ArrayState, ArrayUsedPct, ParityValid, ContainerCount, RunningContainers, StoppedContainers, VMCount, RunningVMs, MaxDiskTemp, MaxDiskUsedPct, TotalDiskErrors, UPSStatus, UPSBatteryCharge, UPSLoadPercent, UPSRuntimeLeft",
 		Annotations: &mcp.ToolAnnotations{
@@ -2230,7 +2251,7 @@ func (s *Server) registerAlertingTools() {
 	})
 
 	// Delete alert rule
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "delete_alert_rule",
 		Description: "Delete an alert rule by ID. Requires confirm=true to proceed.",
 		Annotations: &mcp.ToolAnnotations{
@@ -2312,7 +2333,7 @@ func (s *Server) registerAlertingTools() {
 	})
 
 	// Enable alert rule template (idempotent upsert)
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "enable_alert_template",
 		Description: "Enable a curated alert rule template by ID. Creates the alert rule if it does not exist, or updates it if it does (idempotent). Optional channels override the default 'unraid' system notification. Template IDs: tmpl-array-fill, tmpl-disk-temp-climb, tmpl-container-flapping, tmpl-smart-reallocated, tmpl-disk-errors-rising.",
 		Annotations: &mcp.ToolAnnotations{
@@ -2397,7 +2418,7 @@ func (s *Server) registerWatchdogTools() {
 	})
 
 	// Create health check
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "create_health_check",
 		Description: "Create a new health check probe (HTTP, TCP, or container state). Probes run at configurable intervals with optional remediation actions on failure (notify, restart container, or webhook).",
 		Annotations: &mcp.ToolAnnotations{
@@ -2437,7 +2458,7 @@ func (s *Server) registerWatchdogTools() {
 	})
 
 	// Delete health check
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "delete_health_check",
 		Description: "Delete a health check by ID. Requires confirm=true to proceed.",
 		Annotations: &mcp.ToolAnnotations{
@@ -2477,7 +2498,7 @@ func (s *Server) registerWatchdogTools() {
 	})
 
 	// Run health check manually
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "run_health_check",
 		Description: "Manually trigger a specific health check probe and return the immediate result",
 		Annotations: &mcp.ToolAnnotations{
@@ -2522,7 +2543,7 @@ func (s *Server) registerAgentTools() {
 	type startArgs struct {
 		Goal string `json:"goal" jsonschema:"The goal or question for the agent to investigate or remediate"`
 	}
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name: "agent_start_session",
 		Description: "Start an autonomous agent session to investigate or remediate a goal. " +
 			"May return status 'awaiting_approval' if a high-risk action is proposed.",
@@ -2574,7 +2595,7 @@ func (s *Server) registerAgentTools() {
 		ActionID  string `json:"action_id" jsonschema:"The pending approval action id"`
 		Approve   bool   `json:"approve" jsonschema:"True to approve, false to deny"`
 	}
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "agent_approve_action",
 		Description: "Approve or deny a high-risk action a session is awaiting, then resume it.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, args approveArgs) (*mcp.CallToolResult, any, error) {
@@ -2592,7 +2613,7 @@ func (s *Server) registerAgentTools() {
 		SessionID string `json:"session_id" jsonschema:"The session id to continue"`
 		Message   string `json:"message" jsonschema:"The follow-up message for the agent"`
 	}
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "agent_send_message",
 		Description: "Continue a finished agent session with a follow-up message, then run it.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, args sendArgs) (*mcp.CallToolResult, any, error) {
@@ -2623,7 +2644,7 @@ func (s *Server) registerAgentTools() {
 	type confirmArgs struct {
 		PreferenceID string `json:"preference_id" jsonschema:"The preference id to confirm"`
 	}
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "agent_confirm_preference",
 		Description: "Confirm (activate) a pending learned preference.",
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args confirmArgs) (*mcp.CallToolResult, any, error) {
@@ -2970,6 +2991,26 @@ Please describe your issue and I'll gather the relevant system information to he
 	logger.Debug("MCP prompts registered (6 prompts)")
 }
 
+// readOnlyBlockedMessage is returned for every write tool call while the
+// agent runs in read-only mode.
+const readOnlyBlockedMessage = "This operation is blocked: the agent is running in read-only mode"
+
+// addWriteTool registers a state-changing MCP tool with a read-only mode
+// guard. The tool stays visible in listings (less confusing for clients),
+// but every invocation is rejected before reaching the handler while the
+// agent runs in read-only mode. Read-only tools keep using mcp.AddTool
+// directly. Tools with both a read and an execute path (system_health_report,
+// run_runbook) instead guard only their execute path inline.
+func addWriteTool[In any](s *Server, tool *mcp.Tool, handler mcp.ToolHandlerFor[In, any]) {
+	mcp.AddTool(s.mcpServer, tool, func(ctx context.Context, req *mcp.CallToolRequest, args In) (*mcp.CallToolResult, any, error) {
+		if s.ctx.ReadOnly {
+			logger.Warning("MCP: blocked write tool '%s': agent is in read-only mode", tool.Name)
+			return textResult(readOnlyBlockedMessage), nil, nil
+		}
+		return handler(ctx, req, args)
+	})
+}
+
 // textResult creates a tool result with text content.
 func textResult(text string) *mcp.CallToolResult {
 	return &mcp.CallToolResult{
@@ -3030,7 +3071,7 @@ func (s *Server) registerFanControlTools() {
 	})
 
 	// Set fan speed (control)
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "set_fan_speed",
 		Description: "Set the PWM speed for a specific fan. Requires fan control to be enabled. Speed is clamped to safety minimums.",
 		Annotations: &mcp.ToolAnnotations{
@@ -3049,7 +3090,7 @@ func (s *Server) registerFanControlTools() {
 	})
 
 	// Set fan mode (control)
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "set_fan_mode",
 		Description: "Set the control mode for a specific fan (automatic = BIOS-controlled, manual = software-controlled)",
 		Annotations: &mcp.ToolAnnotations{
@@ -3068,7 +3109,7 @@ func (s *Server) registerFanControlTools() {
 	})
 
 	// Assign fan profile (control)
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "set_fan_profile",
 		Description: "Assign a temperature curve profile to a fan. Built-in profiles: quiet, balanced, performance. Set source_type='hwmon' with temp_sensor_path, OR source_type='drives' with drive_ids (+ optional fallback_sensor_path) to curve on the max temperature of selected drives.",
 		Annotations: &mcp.ToolAnnotations{
@@ -3103,7 +3144,7 @@ func (s *Server) registerFanControlTools() {
 	})
 
 	// Create custom fan profile (control)
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "create_fan_profile",
 		Description: "Create a custom temperature curve profile. Provide curve_points as a JSON array of {\"temp_celsius\": N, \"speed_percent\": N} objects.",
 		Annotations: &mcp.ToolAnnotations{
@@ -3133,7 +3174,7 @@ func (s *Server) registerFanControlTools() {
 	})
 
 	// Restore fan defaults (control)
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "restore_fan_defaults",
 		Description: "Restore all fans to automatic (BIOS-controlled) mode. Safe operation that returns control to hardware.",
 		Annotations: &mcp.ToolAnnotations{
@@ -3157,7 +3198,7 @@ func (s *Server) registerFanControlTools() {
 // registerCPUControlTools registers MCP tools for CPU power management and Docker stats.
 func (s *Server) registerCPUControlTools() {
 	// Set CPU scaling governor (control)
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "set_cpu_governor",
 		Description: "Set the CPU scaling governor for all cores. Common governors: performance (max speed), powersave (power saving), ondemand/schedutil (dynamic). Equivalent to Unraid Tips & Tweaks CPU governor setting.",
 		Annotations: &mcp.ToolAnnotations{
@@ -3240,7 +3281,7 @@ func (s *Server) registerTuningTools() {
 	})
 
 	// Set turbo boost (control)
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "set_turbo_boost",
 		Description: "Enable or disable Intel Turbo Boost / AMD Performance Boost. Affects CPU maximum frequency.",
 		Annotations: &mcp.ToolAnnotations{
@@ -3266,7 +3307,7 @@ func (s *Server) registerTuningTools() {
 	})
 
 	// Set disk cache parameters (control)
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "set_disk_cache",
 		Description: "Set Linux disk cache parameters (vm.dirty_*). Controls how aggressively dirty pages are written to disk. Higher ratios = more caching = better performance but more data at risk.",
 		Annotations: &mcp.ToolAnnotations{
@@ -3293,7 +3334,7 @@ func (s *Server) registerTuningTools() {
 	})
 
 	// Set inotify limits (control)
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addWriteTool(s, &mcp.Tool{
 		Name:        "set_inotify_limits",
 		Description: "Set Linux inotify kernel limits. Increase max_user_watches if applications report 'too many open files' or inotify watch limit errors.",
 		Annotations: &mcp.ToolAnnotations{

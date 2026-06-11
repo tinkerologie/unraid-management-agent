@@ -15,10 +15,14 @@ const DefaultConfigPath = "/boot/config/plugins/unraid-management-agent/config.y
 // by CLI flags and environment variables.
 type FileConfig struct {
 	// Server settings
-	Port     *int    `yaml:"port,omitempty"`
-	LogLevel *string `yaml:"log_level,omitempty"`
-	LogsDir  *string `yaml:"logs_dir,omitempty"`
-	Debug    *bool   `yaml:"debug,omitempty"`
+	Port        *int    `yaml:"port,omitempty"`
+	BindAddress *string `yaml:"bind_address,omitempty"`
+	LogLevel    *string `yaml:"log_level,omitempty"`
+	LogsDir     *string `yaml:"logs_dir,omitempty"`
+	Debug       *bool   `yaml:"debug,omitempty"`
+
+	// ReadOnly blocks all state-changing MCP tools (AI agents can only read).
+	ReadOnly *bool `yaml:"read_only,omitempty"`
 
 	// Power mode
 	LowPowerMode      *bool   `yaml:"low_power_mode,omitempty"`

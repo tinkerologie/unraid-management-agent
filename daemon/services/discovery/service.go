@@ -22,24 +22,29 @@ import (
 // responder (e.g. Unraid's avahi-daemon) and a failure to register is logged
 // but never fatal, mirroring the agent's other optional services.
 type Service struct {
-	config   domain.DiscoveryConfig
-	hostname string
-	port     int
-	version  string
+	config      domain.DiscoveryConfig
+	hostname    string
+	port        int
+	version     string
+	bindAddress string
 
 	mu     sync.Mutex
 	server *zeroconf.Server
 }
 
 // NewService creates a discovery service that will advertise the given metadata.
-// hostname is the server's hostname, port is the agent's HTTP port and version
-// is the agent version string.
-func NewService(config domain.DiscoveryConfig, hostname string, port int, version string) *Service {
+// hostname is the server's hostname, port is the agent's HTTP port, version is
+// the agent version string and bindAddress is the HTTP server's configured bind
+// address (empty = all interfaces). When a specific bind address is set it is
+// advertised instead of the auto-detected primary IP, so discovery always
+// points at the endpoint the server actually listens on.
+func NewService(config domain.DiscoveryConfig, hostname string, port int, version string, bindAddress string) *Service {
 	return &Service{
-		config:   config,
-		hostname: hostname,
-		port:     port,
-		version:  version,
+		config:      config,
+		hostname:    hostname,
+		port:        port,
+		version:     version,
+		bindAddress: bindAddress,
 	}
 }
 
@@ -77,6 +82,13 @@ func (s *Service) Start(_ context.Context) error {
 		return nil // already registered
 	}
 
+	// A loopback bind address is unreachable from the LAN, so advertising
+	// any address would mislead integrations. Skip discovery entirely.
+	if ip := net.ParseIP(s.bindAddress); ip != nil && ip.IsLoopback() {
+		logger.Info("Discovery: HTTP server is bound to loopback (%s); skipping mDNS advertisement", s.bindAddress)
+		return nil
+	}
+
 	server, advertised, err := s.register()
 	if err != nil {
 		return fmt.Errorf("registering mDNS service: %w", err)
@@ -90,14 +102,15 @@ func (s *Service) Start(_ context.Context) error {
 	return nil
 }
 
-// register registers the service with zeroconf. When the primary LAN IPv4 can
-// be determined it is advertised explicitly via RegisterProxy, so a single,
-// reachable address is published regardless of how many (docker/virtual)
-// interfaces the host has. If detection fails it falls back to Register, which
-// derives addresses from the interface a query arrives on. The returned string
-// describes the advertised address(es) for logging.
+// register registers the service with zeroconf. When an advertise address is
+// known (the configured bind address, or the detected primary LAN IPv4) it is
+// advertised explicitly via RegisterProxy, so a single, reachable address is
+// published regardless of how many (docker/virtual) interfaces the host has.
+// Otherwise it falls back to Register, which derives addresses from the
+// interface a query arrives on. The returned string describes the advertised
+// address(es) for logging.
 func (s *Service) register() (*zeroconf.Server, string, error) {
-	if ip := primaryIPv4(); ip != nil {
+	if ip := s.advertiseIP(); ip != nil {
 		server, err := zeroconf.RegisterProxy(
 			s.instanceName(),
 			constants.DiscoveryServiceType,
@@ -126,6 +139,17 @@ func (s *Service) register() (*zeroconf.Server, string, error) {
 		return nil, "", err
 	}
 	return server, "all interfaces", nil
+}
+
+// advertiseIP returns the IP to advertise via mDNS: the configured bind
+// address when it is a specific, LAN-reachable IP, otherwise the detected
+// primary outbound IPv4. Unspecified addresses (0.0.0.0 / ::) mean "all
+// interfaces" and defer to the heuristic; loopback is handled in Start.
+func (s *Service) advertiseIP() net.IP {
+	if ip := net.ParseIP(s.bindAddress); ip != nil && !ip.IsUnspecified() && !ip.IsLoopback() {
+		return ip
+	}
+	return primaryIPv4()
 }
 
 // primaryIPv4 returns the host's primary outbound IPv4 address — the source
