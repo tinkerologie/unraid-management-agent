@@ -43,7 +43,7 @@ The MCP server supports two transports — use the one that fits your deployment
 > - Use **Streamable HTTP** if the AI client (Cursor, VS Code, etc.) runs on a different machine than the Unraid server.
 > - Use **STDIO** if the AI client (Claude Desktop, Cursor) runs locally on the Unraid server itself — it has zero network overhead and requires no authentication.
 
-## Available Tools (125 total)
+## Available Tools (126 total)
 
 ### System Monitoring Tools
 
@@ -298,7 +298,7 @@ Read-only mode is enforced in addition to the per-tool `confirm: true` gating de
 
 Tools include MCP safety annotations to help AI agents make safe decisions automatically:
 
-### Read-Only Tools (74 tools)
+### Read-Only Tools (77 tools)
 
 All monitoring and query tools are annotated with `readOnlyHint: true`, signaling to AI agents that these tools are safe to call without side effects:
 

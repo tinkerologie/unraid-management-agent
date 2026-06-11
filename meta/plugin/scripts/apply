@@ -16,7 +16,9 @@ if [ -f "$CONFIG_FILE" ]; then
     fi
 fi
 
-# Read a single key from the config without sourcing it (prevents code injection).
+# Read a single key from the config without sourcing it (prevents code
+# injection). Internal use only: callers pass literal known keys (e.g.
+# BIND_ADDRESS, PORT), never user-supplied input.
 read_cfg() {
     grep -E "^${1}=" "$CONFIG_FILE" 2>/dev/null | head -1 | sed "s/^${1}=//; s/^[\"']//; s/[\"'].*//"
 }
@@ -36,8 +38,10 @@ if [ -f "$CONFIG_FILE" ]; then
             reject_reason="loopback addresses are not allowed (integrations must be able to reach the agent)"
             ;;
         *)
-            if ! ip addr show 2>/dev/null | grep -Fq "inet ${BIND_ADDRESS}/" &&
-                ! ip addr show 2>/dev/null | grep -Fq "inet6 ${BIND_ADDRESS}/"; then
+            # Case-insensitive match: ip(8) prints IPv6 hex in lowercase but
+            # users may enter uppercase (e.g. 2001:DB8::1).
+            if ! ip addr show 2>/dev/null | grep -iFq "inet ${BIND_ADDRESS}/" &&
+                ! ip addr show 2>/dev/null | grep -iFq "inet6 ${BIND_ADDRESS}/"; then
                 reject_reason="address is not assigned to any local interface"
             fi
             ;;
@@ -59,7 +63,10 @@ PORT="$(read_cfg PORT)"
 if ! echo "${PORT:-}" | grep -Eq '^[0-9]+$' || [ "$PORT" -lt 1024 ] || [ "$PORT" -gt 65535 ]; then
     if [ -n "${PORT:-}" ]; then
         echo "Warning: port '${PORT}' is invalid (must be 1024-65535); resetting to ${DEFAULT_PORT}"
-        sed -i "s/^PORT=.*/PORT=\"${DEFAULT_PORT}\"/" "$CONFIG_FILE" 2>/dev/null
+        if ! sed -i "s/^PORT=.*/PORT=\"${DEFAULT_PORT}\"/" "$CONFIG_FILE"; then
+            echo "Error: failed to reset PORT in $CONFIG_FILE" >&2
+            exit 1
+        fi
     fi
     PORT="$DEFAULT_PORT"
 fi
@@ -107,27 +114,33 @@ if pidof "$PLUGIN" > /dev/null 2>&1; then
         *) PROBE_HOST="$BIND_ADDRESS" ;;
     esac
 
-    daemon_up=0
+    process_alive=0
+    probe_ok=0
     for _ in {1..6}; do
         if ! pidof "$PLUGIN" > /dev/null 2>&1; then
-            daemon_up=0
+            process_alive=0
             break
         fi
+        process_alive=1
         if command -v curl > /dev/null 2>&1 &&
             curl -fsS -m 2 -o /dev/null "http://${PROBE_HOST}:${PORT}/api/v1/health" 2>/dev/null; then
-            daemon_up=1
+            probe_ok=1
             break
         fi
         # Process alive but HTTP not answering yet — keep waiting.
-        daemon_up=1
         sleep 1
     done
 
-    if [ "$daemon_up" -eq 1 ]; then
-        echo "Service restarted (bind ${BIND_ADDRESS:-all interfaces}, port ${PORT})"
-    else
+    if [ "$process_alive" -ne 1 ]; then
         echo "Error: service failed to restart — check the log:" >&2
         tail -5 "$LOG_FILE" 2>/dev/null >&2
         exit 1
+    fi
+    if [ "$probe_ok" -eq 1 ]; then
+        echo "Service restarted (bind ${BIND_ADDRESS:-all interfaces}, port ${PORT})"
+    else
+        # Treated as success: the daemon is running, the probe may simply be
+        # blocked or still warming up.
+        echo "Warning: service restarted but the HTTP health check on http://${PROBE_HOST}:${PORT} did not answer yet"
     fi
 fi

@@ -14,8 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **MCP read-only mode** (#126) — a new `READ_ONLY` setting (plugin settings
   page under **AI Agent Access (MCP)**, `READ_ONLY="true"` in `config.cfg`,
   `read_only: true` in `config.yml`, or `--read-only` / `READ_ONLY=true`)
-  that blocks **all 49 state-changing MCP tools** at the server, so AI
-  agents can only consume data. Write tools stay visible in tool listings
+  that blocks **every state-changing MCP tool** (49 of the 126 registered
+  tools) at the server, so AI agents can only consume data. Write tools
+  stay visible in tool listings
   but every invocation is rejected with a clear message, and each blocked
   attempt is logged with the tool name. The dual-mode diagnostic tools
   `system_health_report` and `run_runbook` still return their report /

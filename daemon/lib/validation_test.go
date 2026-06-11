@@ -852,6 +852,10 @@ func TestValidateBindAddress(t *testing.T) {
 		{name: "ip with port", input: "192.168.1.1:8043", wantErr: true, errMsg: "must be an IP address"},
 		// Valid IP but never assigned locally (TEST-NET-1, RFC 5737).
 		{name: "non-local IP", input: "192.0.2.55", wantErr: true, errMsg: "not assigned to any local interface"},
+		// Security cases: malformed input must never pass.
+		{name: "null byte", input: "127.0.0.1\x00", wantErr: true, errMsg: "must be an IP address"},
+		{name: "excessively long input", input: strings.Repeat("1", 1000), wantErr: true, errMsg: "must be an IP address"},
+		{name: "IPv4-mapped IPv6 loopback", input: "::ffff:127.0.0.1", wantErr: true, errMsg: "loopback"},
 	}
 
 	for _, tt := range tests {
