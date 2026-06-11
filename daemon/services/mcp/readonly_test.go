@@ -52,9 +52,9 @@ func TestReadOnlyModeBlocksWriteTools(t *testing.T) {
 		{"update_container", map[string]any{"container_id": "abc", "confirm": true}},
 		{"create_vm_snapshot", map[string]any{"vm_name": "vm1", "snapshot_name": "snap1"}},
 		{"clear_disk_stats", map[string]any{}},
-		// registerNewMonitoringTools
 		{"collector_action", map[string]any{"collector_name": "docker", "action": "disable"}},
 		{"update_collector_interval", map[string]any{"collector_name": "docker", "interval": 60}},
+		// registerNewMonitoringTools
 		{"refresh_container_updates", map[string]any{}},
 		// registerAlertingTools
 		{"create_alert_rule", map[string]any{"id": "r1", "name": "rule 1", "expression": "CPU > 90"}},

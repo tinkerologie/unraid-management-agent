@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"net"
 	"strings"
 	"testing"
 
@@ -857,6 +858,26 @@ func TestValidateBindAddress(t *testing.T) {
 		{name: "excessively long input", input: strings.Repeat("1", 1000), wantErr: true, errMsg: "must be an IP address"},
 		{name: "IPv4-mapped IPv6 loopback", input: "::ffff:127.0.0.1", wantErr: true, errMsg: "loopback"},
 	}
+
+	// Positive case: a real local non-loopback IP must validate. Discovered
+	// dynamically because interface addresses differ per machine.
+	t.Run("valid local non-loopback IP", func(t *testing.T) {
+		ifaceAddrs, err := net.InterfaceAddrs()
+		if err != nil {
+			t.Skipf("cannot enumerate interfaces: %v", err)
+		}
+		for _, a := range ifaceAddrs {
+			ipNet, ok := a.(*net.IPNet)
+			if !ok || ipNet.IP.IsLoopback() || ipNet.IP.IsUnspecified() {
+				continue
+			}
+			if err := ValidateBindAddress(ipNet.IP.String()); err != nil {
+				t.Errorf("ValidateBindAddress(%q) = %v, want nil", ipNet.IP, err)
+			}
+			return
+		}
+		t.Skip("no non-loopback local IP found")
+	})
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -138,12 +138,16 @@ func TestAdvertiseIP(t *testing.T) {
 }
 
 func TestStartSkipsAdvertisementOnLoopbackBind(t *testing.T) {
-	s := NewService(domain.DiscoveryConfig{Enabled: true}, "tower", 8043, "2026.06.01", "127.0.0.1")
-	if err := s.Start(context.Background()); err != nil {
-		t.Fatalf("Start() with loopback bind returned error: %v", err)
+	for _, bindAddr := range []string{"127.0.0.1", "127.0.0.53", "::1"} {
+		t.Run(bindAddr, func(t *testing.T) {
+			s := NewService(domain.DiscoveryConfig{Enabled: true}, "tower", 8043, "2026.06.01", bindAddr)
+			if err := s.Start(context.Background()); err != nil {
+				t.Fatalf("Start() with loopback bind %q returned error: %v", bindAddr, err)
+			}
+			if s.server != nil {
+				t.Errorf("Start() with loopback bind %q must not register an mDNS server", bindAddr)
+			}
+			s.Shutdown()
+		})
 	}
-	if s.server != nil {
-		t.Error("Start() with loopback bind must not register an mDNS server")
-	}
-	s.Shutdown()
 }
