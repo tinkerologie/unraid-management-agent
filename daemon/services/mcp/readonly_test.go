@@ -143,12 +143,7 @@ func TestReadOnlyModeRunbookForcesDryRun(t *testing.T) {
 		Note     string `json:"note"`
 	}
 	if err := json.Unmarshal([]byte(text), &resp); err != nil {
-		// Unknown runbook or executor errors come back as plain text; either
-		// way nothing may execute, so only a JSON "executed": true is a failure.
-		if strings.Contains(text, `"executed": true`) {
-			t.Fatalf("run_runbook executed in read-only mode: %s", text)
-		}
-		return
+		t.Fatalf("expected JSON dry-run response, got: %s", text)
 	}
 	if resp.Executed {
 		t.Error("run_runbook must not execute in read-only mode")
