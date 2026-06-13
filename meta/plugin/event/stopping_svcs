@@ -1,2 +1,5 @@
 #!/bin/bash
-/usr/local/emhttp/plugins/unraid-management-agent/scripts/stop
+# Route output to syslog instead of stdout: emhttpd stores event-script stdout
+# in fsProgress, which the webGUI footer displays until the next array
+# operation overwrites it (see event/started).
+/usr/local/emhttp/plugins/unraid-management-agent/scripts/stop 2>&1 | logger -t unraid-management-agent

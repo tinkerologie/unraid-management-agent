@@ -1,3 +1,7 @@
 #!/bin/bash
-# Always start the service when the array starts
-/usr/local/emhttp/plugins/unraid-management-agent/scripts/start
+# Always start the service when the array starts.
+# Route output to syslog instead of stdout: emhttpd stores event-script stdout
+# in fsProgress, which the webGUI footer displays until the next array
+# operation overwrites it — on idle systems the text sticks for hours and
+# reads like a hang (issue #123 follow-up).
+/usr/local/emhttp/plugins/unraid-management-agent/scripts/start 2>&1 | logger -t unraid-management-agent
