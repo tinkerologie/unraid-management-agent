@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.06.07] - 2026-06-13
+
+### Changed
+
+- **Redesigned plugin icons** — the Community Applications icon (`icon.png`)
+  was a pixelated 256×256 upscale; it is now a crisp 512×512 PNG (CA requires
+  256×256 minimum with transparency) rendered from a 4× supersampled flat
+  design (dark slate squircle, server slats with status LEDs, Unraid-orange
+  telemetry arcs). The webGUI page icons (48/64/128 px under
+  `meta/plugin/images/`) are exported from the same master, and
+  `scripts/generate_icon.py` regenerates all sizes from one source.
+
+### Fixed
+
+- **WebGUI footer stuck on "unraid-management-agent started on port …" after
+  array start** (#123 follow-up, reported in ha-unraid-management-agent#83) —
+  the plugin's `started`/`stopping_svcs` event scripts wrote their status
+  line to stdout, which emhttpd captures into its `fsProgress` variable; the
+  webGUI footer displays `fsProgress` until the next array operation
+  overwrites it, so on systems that stay idle after boot the text lingered
+  for many hours and made the agent look hung even when it was healthy (it
+  remained even with the service stopped). Event scripts now route their
+  output to syslog via `logger -t unraid-management-agent` instead of
+  stdout, so the footer is never touched and the start/stop trace is still
+  logged.
+
 ## [2026.06.06] - 2026-06-12
 
 ### Added
