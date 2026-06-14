@@ -65,11 +65,6 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ---
 
-## Claude-Specific Instructions
-
-- **Use Context7** — automatically use Context7 MCP tools to get library documentation without explicit prompting
-- **Sequential Thinking** — reason step-by-step internally before answering, keeping reasoning hidden unless requested
-
 ## Quick Reference
 
 ```bash
