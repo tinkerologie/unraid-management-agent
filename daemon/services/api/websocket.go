@@ -121,11 +121,31 @@ func (h *WSHub) Run(ctx context.Context) {
 				if _, ok := h.clients[client]; ok {
 					delete(h.clients, client)
 					close(client.send)
+					// A client is evicted when its send buffer (WSBufferSize) is
+					// full, i.e. it cannot keep up with the broadcast rate — on a
+					// congested link this surfaces to the consumer as a dropped
+					// connection ("EOF"). Log it so this is diagnosable from the
+					// agent log instead of being silent (ha-unraid-management-agent#83).
+					logger.Warning("WebSocket: evicting slow client %s — send buffer full (%d) on topic %q; it must reconnect",
+						clientRemoteAddr(client), constants.WSBufferSize, event.Event)
 				}
 			}
 			h.mu.Unlock()
 		}
 	}
+}
+
+// clientRemoteAddr returns the client's remote address for logging, or
+// "unknown" if the connection is unavailable. Kept defensive so a logging call
+// can never panic on a half-torn-down connection.
+func clientRemoteAddr(c *WSClient) string {
+	if c == nil || c.conn == nil {
+		return "unknown"
+	}
+	if addr := c.conn.RemoteAddr(); addr != nil {
+		return addr.String()
+	}
+	return "unknown"
 }
 
 // wantsTopic returns true if the client is subscribed to the given topic.

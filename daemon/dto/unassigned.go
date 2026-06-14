@@ -51,7 +51,7 @@ type UnassignedPartition struct {
 // UnassignedRemoteShare represents a mounted remote SMB/NFS share
 type UnassignedRemoteShare struct {
 	// Share identification
-	Type       string `json:"type"`   // "smb", "nfs", "iso"
+	Type       string `json:"type"`   // "smb", "nfs", "iso", "root"
 	Source     string `json:"source"` // "//server/share", "server:/export", "/path/file.iso"
 	MountPoint string `json:"mount_point"`
 

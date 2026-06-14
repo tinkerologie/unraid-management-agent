@@ -4,13 +4,38 @@ package logger
 import (
 	"fmt"
 	"log"
+	"runtime"
 	"runtime/debug"
 )
 
-// stackBuf captures a goroutine stack trace and returns it as a string.
-// Extracted to avoid direct debug.Stack() calls in hot paths.
+// stackBuf captures the current goroutine's stack trace and returns it as a
+// string. Extracted to avoid direct debug.Stack() calls in hot paths.
 func stackBuf() string {
 	return string(debug.Stack())
+}
+
+// AllGoroutineStacks returns the stack traces of every running goroutine. Unlike
+// stackBuf (current goroutine only), this captures the whole runtime, which is
+// what a stalled collector looks like from the outside: the watchdog goroutine
+// is healthy while another goroutine is blocked in a syscall. The buffer grows
+// until the dump fits, capped so a pathological goroutine count can't allocate
+// without bound.
+func AllGoroutineStacks() string {
+	const maxBuf = 16 << 20 // 16 MiB ceiling
+	size := 1 << 20         // 1 MiB
+	for {
+		buf := make([]byte, size)
+		// runtime.Stack returns the number of bytes written (always <= len(buf));
+		// n == size means the buffer was filled and the dump was likely truncated.
+		n := runtime.Stack(buf, true)
+		if n < size {
+			return string(buf[:n])
+		}
+		if size >= maxBuf {
+			return string(buf[:n]) // truncated at the ceiling (n == size here)
+		}
+		size *= 2
+	}
 }
 
 // LogLevel represents the logging verbosity level

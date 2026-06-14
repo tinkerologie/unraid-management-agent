@@ -2,6 +2,7 @@ package diagnostics
 
 import (
 	"archive/zip"
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -137,5 +138,83 @@ func TestCreateArchive_EmptyHostname(t *testing.T) {
 	base := filepath.Base(outputPath)
 	if !strings.Contains(base, "unraid-diagnostics-unknown-") {
 		t.Errorf("expected 'unknown' hostname in filename, got: %s", base)
+	}
+}
+
+func TestArchiveFilename_SecurityCases(t *testing.T) {
+	// The hostname feeds a filename and an HTTP Content-Disposition header, so a
+	// hostile value must never survive verbatim. hostnameCleanRe collapses any
+	// run of characters outside [a-zA-Z0-9._-] to a single underscore.
+	cases := []struct {
+		name     string
+		hostname string
+	}{
+		{"path traversal slash", "../../etc/passwd"},
+		{"path traversal backslash", `..\..\windows`},
+		{"null byte", "host\x00name"},
+		{"command injection", "host; rm -rf /"},
+		{"backtick injection", "host`whoami`"},
+		{"crlf header injection", "host\r\nSet-Cookie: x"},
+		{"quotes", `ho"st'name`},
+		{"only hostile chars", "../../"},
+		{"empty", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			bundle := &dto.DiagnosticBundle{Metadata: dto.BundleMetadata{Hostname: tc.hostname}}
+			got := ArchiveFilename(bundle)
+
+			if !strings.HasPrefix(got, "unraid-diagnostics-") || !strings.HasSuffix(got, ".zip") {
+				t.Errorf("filename %q does not match expected format", got)
+			}
+			for _, bad := range []string{"/", `\`, ";", "`", "\x00", "\r", "\n", `"`, "'", " "} {
+				if strings.Contains(got, bad) {
+					t.Errorf("filename %q contains unsafe character %q", got, bad)
+				}
+			}
+		})
+	}
+}
+
+func TestWriteArchive_StreamsValidZip(t *testing.T) {
+	bundle := &dto.DiagnosticBundle{
+		Metadata:      dto.BundleMetadata{Hostname: "stream-host", AgentVersion: "2026.06.08"},
+		SystemState:   dto.BundleSystemState{CPUUsage: 5},
+		ArrayStatus:   dto.BundleArrayStatus{State: "Started"},
+		Containers:    []dto.BundleContainer{{Name: "plex"}},
+		VMs:           []dto.BundleVM{{Name: "win"}},
+		Network:       []dto.BundleNetwork{{Name: "eth0"}},
+		Logs:          dto.BundleLogs{AgentLog: []string{"a", "b"}, SysLog: []string{"s"}},
+		Configuration: dto.BundleConfiguration{Port: 8043},
+	}
+
+	var buf bytes.Buffer
+	if err := WriteArchive(&buf, bundle); err != nil {
+		t.Fatalf("WriteArchive() error = %v", err)
+	}
+
+	reader, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+	if err != nil {
+		t.Fatalf("streamed bytes are not a valid ZIP: %v", err)
+	}
+
+	want := []string{
+		"metadata.json", "system_state.json", "array_status.json",
+		"containers.json", "vms.json", "network.json",
+		"config/configuration.json", "logs/agent.log", "logs/syslog.log",
+	}
+	got := make(map[string]bool, len(reader.File))
+	for _, f := range reader.File {
+		got[f.Name] = true
+	}
+	for _, name := range want {
+		if !got[name] {
+			t.Errorf("expected entry %q missing from streamed archive", name)
+		}
+	}
+
+	// The streamed filename must match the file-based archive convention.
+	if fn := ArchiveFilename(bundle); !strings.HasPrefix(fn, "unraid-diagnostics-stream-host-") || !strings.HasSuffix(fn, ".zip") {
+		t.Errorf("unexpected ArchiveFilename: %s", fn)
 	}
 }

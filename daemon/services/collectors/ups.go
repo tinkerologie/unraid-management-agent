@@ -36,7 +36,7 @@ func (c *UPSCollector) Start(ctx context.Context, interval time.Duration) {
 				logger.LogPanicWithStack("UPS collector ("+phase+")", r)
 			}
 		}()
-		c.Collect()
+		collectWithWatchdog(ctx, "UPS", interval, c.Collect)
 	}
 
 	runCollectSafely("startup")

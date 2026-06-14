@@ -38,7 +38,7 @@ func (c *ShareCollector) Start(ctx context.Context, interval time.Duration) {
 				logger.LogPanicWithStack("Share collector", r)
 			}
 		}()
-		c.Collect(ctx)
+		collectWithWatchdog(ctx, "Share", interval, func() { c.Collect(ctx) })
 	}()
 
 	// Set up fsnotify watcher for instant state updates on shares.ini changes
@@ -63,7 +63,7 @@ func (c *ShareCollector) Start(ctx context.Context, interval time.Duration) {
 						}
 					}()
 					logger.Debug("Share collector: shares.ini changed, collecting immediately")
-					c.Collect(ctx)
+					collectWithWatchdog(ctx, "Share", interval, func() { c.Collect(ctx) })
 				}()
 			})
 		}()
@@ -85,7 +85,7 @@ func (c *ShareCollector) Start(ctx context.Context, interval time.Duration) {
 						logger.LogPanicWithStack("Share collector", r)
 					}
 				}()
-				c.Collect(ctx)
+				collectWithWatchdog(ctx, "Share", interval, func() { c.Collect(ctx) })
 			}()
 		}
 	}

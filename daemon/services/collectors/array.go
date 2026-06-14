@@ -46,7 +46,7 @@ func (c *ArrayCollector) Start(ctx context.Context, interval time.Duration) {
 				logger.LogPanicWithStack("Array collector", r)
 			}
 		}()
-		c.Collect()
+		collectWithWatchdog(ctx, "Array", interval, c.Collect)
 	}()
 
 	// Set up fsnotify watcher for instant state updates on INI file changes
@@ -71,7 +71,7 @@ func (c *ArrayCollector) Start(ctx context.Context, interval time.Duration) {
 						}
 					}()
 					logger.Debug("Array collector: INI file changed, collecting immediately")
-					c.Collect()
+					collectWithWatchdog(ctx, "Array", interval, c.Collect)
 				}()
 			})
 		}()
@@ -93,7 +93,7 @@ func (c *ArrayCollector) Start(ctx context.Context, interval time.Duration) {
 						logger.LogPanicWithStack("Array collector", r)
 					}
 				}()
-				c.Collect()
+				collectWithWatchdog(ctx, "Array", interval, c.Collect)
 			}()
 		}
 	}

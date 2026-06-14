@@ -58,7 +58,7 @@ func (c *MoverCollector) Start(ctx context.Context, interval time.Duration) {
 				logger.LogPanicWithStack("Mover collector", r)
 			}
 		}()
-		c.Collect()
+		collectWithWatchdog(ctx, "Mover", interval, c.Collect)
 	}()
 
 	ticker := time.NewTicker(interval)
@@ -76,7 +76,7 @@ func (c *MoverCollector) Start(ctx context.Context, interval time.Duration) {
 						logger.LogPanicWithStack("Mover collector", r)
 					}
 				}()
-				c.Collect()
+				collectWithWatchdog(ctx, "Mover", interval, c.Collect)
 			}()
 		}
 	}

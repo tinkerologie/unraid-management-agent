@@ -1258,6 +1258,32 @@ const docTemplate = `{
                 }
             }
         },
+        "/diagnostics/bundle": {
+            "get": {
+                "description": "Collects a redacted diagnostics bundle (system state, array, containers, VMs, network, recent agent/syslog logs, and redacted configuration) and returns it as a downloadable ZIP archive. Safe to attach to bug reports — secrets (MQTT credentials, etc.) are redacted. Enable Debug Logging first for richer agent logs in the bundle.",
+                "produces": [
+                    "application/zip"
+                ],
+                "tags": [
+                    "Diagnostics"
+                ],
+                "summary": "Download diagnostics bundle",
+                "responses": {
+                    "200": {
+                        "description": "ZIP archive (binary)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to build diagnostics bundle",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/diagnostics/self-test": {
             "get": {
                 "description": "Returns the detected Unraid version, overall data-source health, probed capabilities, and per-subsystem source status (healthy/degraded/unavailable).",

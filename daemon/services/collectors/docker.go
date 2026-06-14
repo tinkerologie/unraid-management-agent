@@ -97,7 +97,7 @@ func (c *DockerCollector) Start(ctx context.Context, interval time.Duration) {
 				logger.LogPanicWithStack("Docker collector", r)
 			}
 		}()
-		c.Collect()
+		collectWithWatchdog(ctx, "Docker", interval, c.Collect)
 	}()
 
 	ticker := time.NewTicker(interval)
@@ -122,7 +122,7 @@ func (c *DockerCollector) Start(ctx context.Context, interval time.Duration) {
 						logger.LogPanicWithStack("Docker collector", r)
 					}
 				}()
-				c.Collect()
+				collectWithWatchdog(ctx, "Docker", interval, c.Collect)
 			}()
 		}
 	}

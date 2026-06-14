@@ -9,9 +9,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2026.06.07] - 2026-06-13
+## [2026.06.08] - 2026-06-15
+
+### Added
+
+- **Unassigned Devices Root Shares are now reported** (ha-unraid-management-agent#83)
+  — the agent previously skipped UD "Root Share" entries. It now surfaces them in
+  `GET /api/v1/unassigned` with `type: "root"`, covering both configured
+  `protocol="ROOT"` entries in `samba_mount.cfg` (e.g. `//server/mnt/user`) and
+  live local root shares gathered under `/mnt/rootshare/<name>` (a `fuse.shfs`
+  mount).
+- **Per-share status debug logging for Unassigned remote shares** — at debug
+  level the collector now logs each remote share's `source`, `type`, `status`,
+  and `mount_point` every cycle, so a "HA shows mounted but Unraid shows
+  unmounted" report can be checked against exactly what the agent served
+  (ha-unraid-management-agent#83).
+- **Diagnostics tools in the plugin UI** — the **Diagnostics** section now has a
+  **Download Diagnostics** button and a **Run Self-Test** button:
+  - **Download Diagnostics** saves a redacted ZIP (system state, array,
+    containers, VMs, network, recent agent & system logs, and configuration
+    with secrets removed) to attach to bug reports. It is served by a new
+    `GET /api/v1/diagnostics/bundle` endpoint — the same bundle the CLI
+    `diagnostics` command produces, now downloadable from the browser. The
+    download streams through a same-origin PHP proxy so it works in every
+    browser (Safari blocks cross-origin downloads) and on HTTPS webGUIs.
+  - **Run Self-Test** calls `GET /api/v1/diagnostics/self-test` (via the same
+    proxy, since the agent does not send CORS headers) and shows the Unraid
+    version, overall data-source health, capability count, and per-subsystem
+    status inline.
+- **Debug logging toggle in the plugin UI** — a new **Diagnostics** section on
+  the settings page with a **Debug Logging** switch, so verbose logging can be
+  enabled from the web UI instead of editing `config.cfg` over SSH. Off keeps
+  the level at `info`; on sets `debug`. A manually-set `warning`/`error` level
+  is preserved unless the toggle is touched. Applying restarts the service.
+- **Collector stall diagnostics (watchdog) across the I/O-bound collectors**
+  (investigating ha-unraid-management-agent#83, #123) — each collect cycle now
+  logs its start and duration at debug level, and a watchdog logs a warning plus
+  a full goroutine stack dump if a cycle runs longer than an
+  **interval-derived threshold** (the collector's interval, clamped to
+  30s–5min), then logs again when it eventually finishes. Collectors run cycles
+  serially on one goroutine, so a single blocked cycle stops that collector's
+  updates until it returns; this makes the blocking call visible in the agent
+  log. Wired into the collectors that shell out or do blocking I/O —
+  unassigned, disk, docker, zfs, ups, nut, network, shares, gpu, hardware,
+  mover, and array — covering both startup and periodic cycles. The watchdog is
+  purely observational; it never cancels or alters a cycle. Set the plugin log
+  level to **debug** to capture this.
+- **WebSocket slow-client eviction is now logged** — when a client's send
+  buffer fills (it cannot keep up with the broadcast rate, e.g. on a congested
+  link) the hub evicts it so other clients are unaffected; this previously
+  happened silently and surfaced to the consumer only as a dropped connection
+  ("EOF"). The eviction now logs a warning naming the client and topic, so the
+  disconnect is diagnosable from the agent log.
 
 ### Changed
+
+- **Left-aligned the plugin settings layout** — the form labels and inputs were
+  centered (a wide right-aligned label column); they are now left-aligned in a
+  compact column so the settings read naturally from the left.
 
 - **Redesigned plugin icons** — the Community Applications icon (`icon.png`)
   was a pixelated 256×256 upscale; it is now a crisp 512×512 PNG (CA requires
@@ -23,6 +78,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Bounded the Unassigned Devices statfs probe goroutines to prevent an
+  unbounded leak** — capacity probes run in a goroutine because `statfs` on a
+  dead network mount cannot be cancelled. Previously each cycle could leak one
+  such goroutine per wedged share, so a permanently-unreachable remote server
+  would grow the abandoned-goroutine (and pinned-OS-thread) count without bound
+  until the daemon ran out of memory. Probes are now capped (16 in flight); once
+  that many are stalled, new probes are skipped (the share is reported without
+  capacity) instead of spawning more, so memory stays bounded. Also fixed a
+  data race in the statfs timeout test so the full suite is race-clean.
 - **WebGUI footer stuck on "unraid-management-agent started on port …" after
   array start** (#123 follow-up, reported in ha-unraid-management-agent#83) —
   the plugin's `started`/`stopping_svcs` event scripts wrote their status

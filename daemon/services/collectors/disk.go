@@ -53,7 +53,7 @@ func (c *DiskCollector) Start(ctx context.Context, interval time.Duration) {
 				logger.LogPanicWithStack("Disk collector", r)
 			}
 		}()
-		c.Collect()
+		collectWithWatchdog(ctx, "Disk", interval, c.Collect)
 	}()
 
 	// Set up fsnotify watcher for instant state updates on disks.ini changes
@@ -78,7 +78,7 @@ func (c *DiskCollector) Start(ctx context.Context, interval time.Duration) {
 						}
 					}()
 					logger.Debug("Disk collector: disks.ini changed, collecting immediately")
-					c.Collect()
+					collectWithWatchdog(ctx, "Disk", interval, c.Collect)
 				}()
 			})
 		}()
@@ -100,7 +100,7 @@ func (c *DiskCollector) Start(ctx context.Context, interval time.Duration) {
 						logger.LogPanicWithStack("Disk collector", r)
 					}
 				}()
-				c.Collect()
+				collectWithWatchdog(ctx, "Disk", interval, c.Collect)
 			}()
 		}
 	}

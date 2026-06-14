@@ -40,7 +40,7 @@ func (c *ZFSCollector) Start(ctx context.Context, interval time.Duration) {
 				logger.LogPanicWithStack("ZFS collector", r)
 			}
 		}()
-		c.collect()
+		collectWithWatchdog(ctx, "ZFS", interval, c.collect)
 	}()
 
 	for {
@@ -55,7 +55,7 @@ func (c *ZFSCollector) Start(ctx context.Context, interval time.Duration) {
 						logger.LogPanicWithStack("ZFS collector", r)
 					}
 				}()
-				c.collect()
+				collectWithWatchdog(ctx, "ZFS", interval, c.collect)
 			}()
 		}
 	}

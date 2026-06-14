@@ -118,6 +118,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/health", s.handleHealth).Methods("GET")
 	api.HandleFunc("/health/report", s.handleHealthReport).Methods("GET")
 	api.HandleFunc("/diagnostics/self-test", s.handleSelfTest).Methods("GET")
+	api.HandleFunc("/diagnostics/bundle", s.handleDiagnosticsBundle).Methods("GET")
 
 	// Monitoring endpoints
 	api.HandleFunc("/system", s.handleSystem).Methods("GET")

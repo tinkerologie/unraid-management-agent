@@ -34,7 +34,7 @@ func (c *HardwareCollector) Start(ctx context.Context, interval time.Duration) {
 				logger.LogPanicWithStack("Hardware collector", r)
 			}
 		}()
-		c.Collect()
+		collectWithWatchdog(ctx, "Hardware", interval, c.Collect)
 	}()
 
 	ticker := time.NewTicker(interval)
@@ -52,7 +52,7 @@ func (c *HardwareCollector) Start(ctx context.Context, interval time.Duration) {
 						logger.LogPanicWithStack("Hardware collector", r)
 					}
 				}()
-				c.Collect()
+				collectWithWatchdog(ctx, "Hardware", interval, c.Collect)
 			}()
 		}
 	}

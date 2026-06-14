@@ -50,7 +50,7 @@ func (c *NetworkCollector) Start(ctx context.Context, interval time.Duration) {
 				logger.LogPanicWithStack("Network collector", r)
 			}
 		}()
-		c.Collect()
+		collectWithWatchdog(ctx, "Network", interval, c.Collect)
 	}()
 
 	ticker := time.NewTicker(interval)
@@ -68,7 +68,7 @@ func (c *NetworkCollector) Start(ctx context.Context, interval time.Duration) {
 						logger.LogPanicWithStack("Network collector", r)
 					}
 				}()
-				c.Collect()
+				collectWithWatchdog(ctx, "Network", interval, c.Collect)
 			}()
 		}
 	}

@@ -45,7 +45,7 @@ func (c *UnassignedCollector) Start(ctx context.Context, interval time.Duration)
 				logger.LogPanicWithStack("Unassigned collector", r)
 			}
 		}()
-		c.collect()
+		collectWithWatchdog(ctx, "Unassigned", interval, c.collect)
 	}()
 
 	ticker := time.NewTicker(interval)
@@ -63,7 +63,7 @@ func (c *UnassignedCollector) Start(ctx context.Context, interval time.Duration)
 						logger.LogPanicWithStack("Unassigned collector", r)
 					}
 				}()
-				c.collect()
+				collectWithWatchdog(ctx, "Unassigned", interval, c.collect)
 			}()
 		}
 	}
@@ -84,6 +84,14 @@ func (c *UnassignedCollector) collect() {
 	domain.Publish(c.ctx.Hub, constants.TopicUnassignedDevicesUpdate, deviceList)
 	logger.Debug("Published unassigned devices update - devices=%d, remote_shares=%d",
 		len(devices), len(remoteShares))
+	// Log each remote share's reported status so a "HA shows mounted but Unraid
+	// shows unmounted" report can be checked against what the agent actually
+	// served (debug level only). ha-unraid-management-agent#83.
+	for i := range remoteShares {
+		s := &remoteShares[i]
+		logger.Debug("Remote share status: source=%q type=%s status=%s mount=%q",
+			s.Source, s.Type, s.Status, s.MountPoint)
+	}
 }
 
 // collectUnassignedDevices discovers and collects unassigned disk devices
@@ -224,6 +232,10 @@ func mergeRemoteShares(configured, mounted []dto.UnassignedRemoteShare) []dto.Un
 // Devices plugin for remote (network) shares.
 var unassignedRemotePrefixes = []string{"/mnt/remotes/", "/mnt/disks/"}
 
+// rootShareMountPrefix is where the Unassigned Devices "Root Share" feature
+// gathers local Unraid shares (one fuse.shfs mount per named root share).
+const rootShareMountPrefix = "/mnt/rootshare/"
+
 // isUnassignedRemoteMount reports whether a mount point belongs to one of the
 // Unassigned Devices remote-share locations.
 func isUnassignedRemoteMount(mountPoint string) bool {
@@ -304,6 +316,22 @@ func parseRemoteShareMounts(procMounts string, now time.Time) []dto.UnassignedRe
 		mountPoint := unescapeMountField(fields[1])
 		fsType := fields[2]
 		options := fields[3]
+
+		// Root Shares (the UD "Root Share" feature) gather local Unraid shares
+		// under /mnt/rootshare/<name> as a fuse.shfs mount, so they are matched by
+		// mount point rather than fsType. The bare /mnt/rootshare tmpfs (no name)
+		// is skipped.
+		if name, ok := strings.CutPrefix(mountPoint, rootShareMountPrefix); ok && name != "" {
+			shares = append(shares, dto.UnassignedRemoteShare{
+				Type:       "root",
+				Source:     name,
+				MountPoint: mountPoint,
+				Status:     "mounted",
+				ReadOnly:   mountHasOption(options, "ro"),
+				Timestamp:  now,
+			})
+			continue
+		}
 
 		if !isUnassignedRemoteMount(mountPoint) {
 			continue
@@ -577,8 +605,9 @@ func parseConfiguredRemoteShares(cfgData string, now time.Time) []dto.Unassigned
 		case "NFS":
 			shareType = "nfs"
 		case "ROOT":
-			// Local "root" shares are not remote network shares; skip them.
-			continue
+			// Unassigned Devices "Root Share" — surfaced (type "root") so consumers
+			// can see it. The configured source is an SMB-style //server/path.
+			shareType = "root"
 		default:
 			switch {
 			case strings.HasPrefix(source, "//"):
@@ -599,7 +628,7 @@ func parseConfiguredRemoteShares(cfgData string, now time.Time) []dto.Unassigned
 			ReadOnly:   cfg["read_only"] == "yes",
 			Timestamp:  now,
 		}
-		if shareType == "smb" {
+		if shareType == "smb" || shareType == "root" {
 			share.SMBServer, share.SMBShare = parseSMBSource(source)
 		} else {
 			share.NFSServer, share.NFSExport = parseNFSSource(source)
@@ -614,11 +643,18 @@ func parseConfiguredRemoteShares(cfgData string, now time.Time) []dto.Unassigned
 // /mnt/remotes/. This is best-effort for display of unmounted shares; mounted
 // shares use their actual mount point from /proc/mounts.
 func configuredRemoteMountPoint(source, shareType, override string) string {
+	// Root Shares mount under /mnt/rootshare/, all other remote shares under
+	// /mnt/remotes/. For unmounted shares this is best-effort display only;
+	// mounted shares use their actual mount point from /proc/mounts.
+	prefix := "/mnt/remotes/"
+	if shareType == "root" {
+		prefix = rootShareMountPrefix
+	}
 	if override != "" {
-		return "/mnt/remotes/" + filepath.Base(override)
+		return prefix + filepath.Base(override)
 	}
 	var server, path string
-	if shareType == "smb" {
+	if shareType == "smb" || shareType == "root" {
 		server, path = parseSMBSource(source)
 	} else {
 		server, path = parseNFSSource(source)
@@ -628,7 +664,7 @@ func configuredRemoteMountPoint(source, shareType, override string) string {
 	if server == "" && name == "" {
 		return ""
 	}
-	return "/mnt/remotes/" + server + "_" + name
+	return prefix + server + "_" + name
 }
 
 // parseISOMountsFromProc parses /proc/mounts content for ISO files mounted as
@@ -665,7 +701,26 @@ func parseISOMountsFromProc(procMounts string, now time.Time) []dto.UnassignedRe
 // so on timeout the probe goroutine is abandoned (it exits once the kernel
 // call eventually returns) and an error is returned so the caller skips
 // capacity data instead of blocking the collector.
+// maxConcurrentStatfsProbes bounds how many statfs probe goroutines may be
+// outstanding at once. A probe that hangs on a dead network mount cannot be
+// cancelled — its goroutine is held until the kernel call eventually returns —
+// so without a cap these abandoned goroutines (and the OS threads they pin in
+// the blocking syscall) would grow without bound while a remote server is
+// unreachable, eventually exhausting memory and crashing the daemon. Healthy
+// probes return in microseconds and release their slot immediately, so this
+// cap only ever engages when mounts are genuinely wedged.
+const maxConcurrentStatfsProbes = 16
+
+var statfsProbeSlots = make(chan struct{}, maxConcurrentStatfsProbes)
+
 func getFilesystemUsageTimed(path string, timeout time.Duration) (size, used, free uint64, usagePercent float64, err error) {
+	// Refuse to start a new probe if too many earlier ones are still wedged.
+	select {
+	case statfsProbeSlots <- struct{}{}:
+	default:
+		return 0, 0, 0, 0, fmt.Errorf("statfs on %s skipped: %d probes already stalled (unreachable mounts?)", path, maxConcurrentStatfsProbes)
+	}
+
 	type usageResult struct {
 		size, used, free uint64
 		usagePercent     float64
@@ -673,6 +728,9 @@ func getFilesystemUsageTimed(path string, timeout time.Duration) (size, used, fr
 	}
 	ch := make(chan usageResult, 1)
 	go func() {
+		// Release the slot when (if) the kernel returns. A leaked/hung probe holds
+		// its slot until then, which is exactly what bounds the abandoned count.
+		defer func() { <-statfsProbeSlots }()
 		var r usageResult
 		r.size, r.used, r.free, r.usagePercent, r.err = getFilesystemUsage(path)
 		ch <- r

@@ -301,13 +301,16 @@ func TestGetFilesystemUsageTimed_HealthyMount(t *testing.T) {
 func TestGetFilesystemUsageTimed_HungMountTimesOut(t *testing.T) {
 	orig := statfsFn
 	release := make(chan struct{})
+	probeDone := make(chan struct{})
 	// Simulate a dead CIFS/NFS mount: statfs blocks until the kernel gives up.
 	statfsFn = func(_ string, _ *syscall.Statfs_t) error {
 		<-release
+		close(probeDone) // signal after the probe goroutine has used statfsFn
 		return nil
 	}
 	t.Cleanup(func() {
 		close(release) // unblock the abandoned probe goroutine
+		<-probeDone    // wait until it stops referencing statfsFn before restoring it
 		statfsFn = orig
 	})
 
@@ -577,13 +580,22 @@ ip="tower"
 path="scratch"`
 
 	shares := parseConfiguredRemoteShares(cfg, now)
-	if len(shares) != 2 {
-		t.Fatalf("expected 2 configured shares (ROOT skipped), got %d: %+v", len(shares), shares)
+	if len(shares) != 3 {
+		t.Fatalf("expected 3 configured shares (smb, nfs, root), got %d: %+v", len(shares), shares)
 	}
 
 	byType := map[string]dto.UnassignedRemoteShare{}
 	for _, s := range shares {
 		byType[s.Type] = s
+	}
+
+	root, ok := byType["root"]
+	if !ok {
+		t.Fatal("expected a root share")
+	}
+	if root.Source != "//tower/scratch" || root.SMBServer != "tower" ||
+		root.SMBShare != "scratch" || root.Status != "unmounted" {
+		t.Errorf("unexpected root share: %+v", root)
 	}
 
 	smb, ok := byType["smb"]

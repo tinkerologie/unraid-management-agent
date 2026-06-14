@@ -38,7 +38,7 @@ func (c *NUTCollector) Start(ctx context.Context, interval time.Duration) {
 				logger.LogPanicWithStack("NUT collector", r)
 			}
 		}()
-		c.Collect()
+		collectWithWatchdog(ctx, "NUT", interval, c.Collect)
 	}()
 
 	ticker := time.NewTicker(interval)
@@ -56,7 +56,7 @@ func (c *NUTCollector) Start(ctx context.Context, interval time.Duration) {
 						logger.LogPanicWithStack("NUT collector", r)
 					}
 				}()
-				c.Collect()
+				collectWithWatchdog(ctx, "NUT", interval, c.Collect)
 			}()
 		}
 	}

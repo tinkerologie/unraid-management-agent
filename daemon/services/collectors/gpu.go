@@ -41,7 +41,7 @@ func (c *GPUCollector) Start(ctx context.Context, interval time.Duration) {
 				logger.LogPanicWithStack("GPU collector", r)
 			}
 		}()
-		c.Collect()
+		collectWithWatchdog(ctx, "GPU", interval, c.Collect)
 	}()
 
 	ticker := time.NewTicker(interval)
@@ -59,7 +59,7 @@ func (c *GPUCollector) Start(ctx context.Context, interval time.Duration) {
 						logger.LogPanicWithStack("GPU collector", r)
 					}
 				}()
-				c.Collect()
+				collectWithWatchdog(ctx, "GPU", interval, c.Collect)
 			}()
 		}
 	}
