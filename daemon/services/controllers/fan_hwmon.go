@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
+	"sync"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
@@ -14,6 +16,12 @@ import (
 // HwmonProvider reads and controls fans via Linux hwmon sysfs.
 type HwmonProvider struct {
 	fanMap map[string]hwmonFanPaths
+
+	// modifiedMu guards modified, the set of fan IDs the agent has written to.
+	// Only these fans are restored on shutdown, so the agent never touches fans
+	// it did not change (e.g. fans owned by a third-party fan-control plugin).
+	modifiedMu sync.Mutex
+	modified   map[string]bool
 }
 
 // hwmonFanPaths holds the sysfs paths for a single fan channel.
@@ -27,8 +35,29 @@ type hwmonFanPaths struct {
 // NewHwmonProvider creates a new hwmon fan provider.
 func NewHwmonProvider() *HwmonProvider {
 	return &HwmonProvider{
-		fanMap: make(map[string]hwmonFanPaths),
+		fanMap:   make(map[string]hwmonFanPaths),
+		modified: make(map[string]bool),
 	}
+}
+
+// markModified records that the agent wrote to a fan, so it can be restored on
+// shutdown.
+func (p *HwmonProvider) markModified(fanID string) {
+	p.modifiedMu.Lock()
+	defer p.modifiedMu.Unlock()
+	p.modified[fanID] = true
+}
+
+// ModifiedFans returns the IDs of fans the agent has written to since startup.
+func (p *HwmonProvider) ModifiedFans() []string {
+	p.modifiedMu.Lock()
+	defer p.modifiedMu.Unlock()
+	ids := make([]string, 0, len(p.modified))
+	for id := range p.modified {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
 }
 
 // Discover scans hwmon sysfs for fan devices and caches their write paths.
@@ -98,7 +127,11 @@ func (p *HwmonProvider) SetPWM(fanID string, value int) error {
 	if _, err := os.Stat(paths.pwmPath); err != nil {
 		return fmt.Errorf("fan %q does not support PWM control", fanID)
 	}
-	return lib.WriteSysfs(paths.pwmPath, strconv.Itoa(value))
+	if err := lib.WriteSysfs(paths.pwmPath, strconv.Itoa(value)); err != nil {
+		return err
+	}
+	p.markModified(fanID)
+	return nil
 }
 
 // SetMode sets the PWM enable mode (0=off, 1=manual, 2=automatic).
@@ -110,7 +143,11 @@ func (p *HwmonProvider) SetMode(fanID string, mode dto.FanControlMode) error {
 	if _, err := os.Stat(paths.enablePath); err != nil {
 		return fmt.Errorf("fan %q does not support mode control", fanID)
 	}
-	return lib.WriteSysfs(paths.enablePath, strconv.Itoa(modeToHwmonEnable(mode)))
+	if err := lib.WriteSysfs(paths.enablePath, strconv.Itoa(modeToHwmonEnable(mode))); err != nil {
+		return err
+	}
+	p.markModified(fanID)
+	return nil
 }
 
 // hwmonEnableToMode converts a pwm_enable sysfs value to a FanControlMode.

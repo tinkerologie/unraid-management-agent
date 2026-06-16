@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -20,15 +21,31 @@ type FanController struct {
 	configStore *FanConfigStore
 	config      dto.FanControlConfig
 	initialized bool
+
+	// detectExternal reports whether a third-party fan-control plugin is active.
+	// It is evaluated live (not cached) so a plugin enabled after startup is
+	// honoured without a daemon restart. Injectable for tests.
+	detectExternal func() dto.ExternalFanControl
 }
 
 // NewFanController creates a new fan controller. Call Initialize() to discover hardware.
 func NewFanController() *FanController {
 	return &FanController{
-		hwmon:       NewHwmonProvider(),
-		ipmi:        NewIPMIProvider(),
-		configStore: NewFanConfigStore(""),
+		hwmon:          NewHwmonProvider(),
+		ipmi:           NewIPMIProvider(),
+		configStore:    NewFanConfigStore(""),
+		detectExternal: lib.DetectExternalFanControl,
 	}
+}
+
+// externalStatus returns the current third-party fan-control status, evaluated
+// live. Safe to call on a controller without an injected detector (returns the
+// inactive zero value).
+func (c *FanController) externalStatus() dto.ExternalFanControl {
+	if c.detectExternal == nil {
+		return dto.ExternalFanControl{}
+	}
+	return c.detectExternal()
 }
 
 // Initialize discovers hardware, loads config, and sets up safety guards.
@@ -47,6 +64,15 @@ func (c *FanController) Initialize() error {
 
 	// Discover hardware
 	c.hwmon.Discover()
+
+	// Detect third-party fan-control plugins. When one is active the agent
+	// stays monitor-only and refuses to modify fan speeds so it does not fight
+	// the other controller. Detection is re-evaluated live on each write/status,
+	// this is just a startup log of the current state.
+	if ext := c.externalStatus(); ext.Active {
+		logger.Info("Fan control: Detected active third-party fan control (%s); staying monitor-only and will not modify fan speeds",
+			strings.Join(ext.Controllers, ", "))
+	}
 
 	// Check IPMI availability
 	if c.config.ControlMethod == dto.FanMethodIPMI {
@@ -93,12 +119,15 @@ func (c *FanController) GetStatus() *dto.FanControlStatus {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
+	ext := c.externalStatus()
+
 	if !c.initialized {
 		return &dto.FanControlStatus{
-			Fans:      []dto.FanDevice{},
-			Profiles:  builtInProfiles(),
-			Config:    c.config,
-			Timestamp: time.Now(),
+			Fans:            []dto.FanDevice{},
+			Profiles:        builtInProfiles(),
+			Config:          c.config,
+			ExternalControl: &ext,
+			Timestamp:       time.Now(),
 		}
 	}
 
@@ -127,8 +156,10 @@ func (c *FanController) GetStatus() *dto.FanControlStatus {
 		}
 	}
 
-	// Check temperature safety
-	if c.config.ControlEnabled && c.safety.CheckTemperatureSafety() {
+	// Check temperature safety. When deferring to a third-party controller the
+	// agent never forces full speed itself (that controller owns thermal
+	// response); CheckTemperatureSafety still logs the critical-temp warning.
+	if c.config.ControlEnabled && c.safety.CheckTemperatureSafety() && !ext.Active {
 		c.safety.EmergencyFullSpeed()
 	}
 
@@ -152,8 +183,19 @@ func (c *FanController) GetStatus() *dto.FanControlStatus {
 			ControllableFans: controllable,
 			FailedFans:       failedFans,
 		},
-		Timestamp: time.Now(),
+		ExternalControl: &ext,
+		Timestamp:       time.Now(),
 	}
+}
+
+// deferralError returns a non-nil error when a third-party fan controller is
+// active, signalling that the agent must not modify fan speeds. Returns nil
+// when no external controller is active.
+func (c *FanController) deferralError() error {
+	if ext := c.externalStatus(); ext.Active {
+		return fmt.Errorf("fan control deferred to active plugin: %s", strings.Join(ext.Controllers, ", "))
+	}
+	return nil
 }
 
 // SetSpeed sets a fan's PWM duty cycle by percentage (0-100).
@@ -169,6 +211,9 @@ func (c *FanController) SetSpeed(fanID string, pct int) error {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
+	if err := c.deferralError(); err != nil {
+		return err
+	}
 	if !c.config.ControlEnabled {
 		return fmt.Errorf("fan control is not enabled; enable it via the configuration endpoint first")
 	}
@@ -197,6 +242,9 @@ func (c *FanController) SetMode(fanID string, mode string) error {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
+	if err := c.deferralError(); err != nil {
+		return err
+	}
 	if !c.config.ControlEnabled {
 		return fmt.Errorf("fan control is not enabled; enable it via the configuration endpoint first")
 	}
@@ -219,6 +267,9 @@ func (c *FanController) SetProfile(fanID, profileName string, source dto.FanTemp
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	if err := c.deferralError(); err != nil {
+		return err
+	}
 	if !c.config.ControlEnabled {
 		return fmt.Errorf("fan control is not enabled; enable it via the configuration endpoint first")
 	}
@@ -281,6 +332,10 @@ func (c *FanController) CreateProfile(profile dto.FanProfile) error {
 func (c *FanController) RestoreDefaults() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	if err := c.deferralError(); err != nil {
+		return err
+	}
 
 	c.curves.Stop()
 

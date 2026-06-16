@@ -1161,6 +1161,18 @@ definitions:
       timestamp:
         type: string
     type: object
+  dto.ExternalFanControl:
+    properties:
+      active:
+        example: true
+        type: boolean
+      controllers:
+        example:
+        - FanCTRL Plus
+        items:
+          type: string
+        type: array
+    type: object
   dto.FanControlConfig:
     properties:
       control_enabled:
@@ -1201,6 +1213,8 @@ definitions:
     properties:
       config:
         $ref: '#/definitions/dto.FanControlConfig'
+      external_control:
+        $ref: '#/definitions/dto.ExternalFanControl'
       fans:
         items:
           $ref: '#/definitions/dto.FanDevice'

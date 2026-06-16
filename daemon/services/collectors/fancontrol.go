@@ -56,7 +56,12 @@ func (c *FanControlCollector) Start(ctx context.Context, interval time.Duration)
 // Collect reads the current fan status and publishes it to the event bus.
 func (c *FanControlCollector) Collect() {
 	logger.Debug("Collecting fan control data...")
+	domain.Publish(c.ctx.Hub, constants.TopicFanControlUpdate, c.buildStatus())
+}
 
+// buildStatus reads the current fan status, including whether a third-party fan
+// controller is active so consumers can see when the agent is deferring.
+func (c *FanControlCollector) buildStatus() *dto.FanControlStatus {
 	hwmonFans := lib.DiscoverHwmonFans()
 
 	fans := make([]dto.FanDevice, 0, len(hwmonFans))
@@ -83,7 +88,8 @@ func (c *FanControlCollector) Collect() {
 		fans = append(fans, fan)
 	}
 
-	status := &dto.FanControlStatus{
+	ext := lib.DetectExternalFanControl()
+	return &dto.FanControlStatus{
 		Fans: fans,
 		Config: dto.FanControlConfig{
 			Enabled:       true,
@@ -93,10 +99,9 @@ func (c *FanControlCollector) Collect() {
 			TotalFans:        len(fans),
 			ControllableFans: controllable,
 		},
-		Timestamp: time.Now(),
+		ExternalControl: &ext,
+		Timestamp:       time.Now(),
 	}
-
-	domain.Publish(c.ctx.Hub, constants.TopicFanControlUpdate, status)
 }
 
 // hwmonEnableToMode converts a pwm_enable sysfs value to a FanControlMode.

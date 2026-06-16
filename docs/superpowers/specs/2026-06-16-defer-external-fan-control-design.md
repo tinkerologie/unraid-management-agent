@@ -86,9 +86,11 @@ A controller is active when its plugin is **installed AND enabled**:
 
 ### 2. Stand-down in `FanController`
 
-- `Initialize()` runs detection once, stores the result, and logs clearly when
-  active: `Fan control: Detected active third-party fan control (FanCTRL Plus);
-staying monitor-only and will not modify fan speeds`.
+- Detection is evaluated **live** (not cached) on each write/status via an
+  injectable `detectExternal` func, so a plugin enabled _after_ the daemon
+  starts is honoured without a restart. `Initialize()` calls it once only to log
+  the startup state: `Fan control: Detected active third-party fan control
+(FanCTRL Plus); staying monitor-only and will not modify fan speeds`.
 - When active, the write methods refuse with an explanatory error:
   `SetSpeed`, `SetMode`, `SetProfile`, `RestoreDefaults`.
 - `GetStatus()` skips `EmergencyFullSpeed` when active (it still logs the
@@ -113,32 +115,38 @@ control active), `ModifiedFans()` is empty and shutdown writes nothing.
 ### 4. Surface the state
 
 - Add `ExternalControl *ExternalFanControl` to `dto.FanControlStatus`.
-- `FanController.GetStatus()` populates it (from the cached Initialize result).
-- `FanControlCollector.Collect()` populates it via the same `lib` function so the
-  WebSocket / MQTT / dashboard feed reflects deferral even with control disabled.
+- Both `FanController.GetStatus()` and `FanControlCollector.Collect()` populate
+  it by calling the same `lib` detector **live**, so the write path and the
+  API/MQTT/dashboard feed share one source of truth and never diverge.
 
 ## Data Flow
 
-```
-Initialize ──> lib.DetectExternalFanControl() ──> store on FanController
-                                              └──> log if active
-
-API/MCP write ──> FanController.Set* ──> if external.Active: return error
+```text
+API/MCP write ──> FanController.Set* ──> if DetectExternalFanControl().Active: return error
                                     └──> else hwmon.Set* (marks modified)
 
-Collector tick ──> lib.DiscoverHwmonFans() + lib.DetectExternalFanControl()
-                                          └──> publish FanControlStatus (incl. ExternalControl)
+GetStatus / Collector tick ──> lib.DiscoverHwmonFans() + lib.DetectExternalFanControl()
+                                          └──> FanControlStatus (incl. ExternalControl)
 
 Shutdown ──> RestoreAll() ──> for id in hwmon.ModifiedFans(): restore original
 ```
 
 ## Error Handling
 
-- Refused writes return a clear error naming the active controller, so the API
-  surfaces _why_ (e.g. `fan control deferred to active plugin: FanCTRL Plus`).
+- Refused writes return a clear controller error naming the active plugin (e.g.
+  `fan control deferred to active plugin: FanCTRL Plus`). The REST handlers log
+  this detail and return their usual generic failure message (matching how the
+  existing `fan control is not enabled` refusal is handled — no handler change);
+  callers that propagate controller errors (e.g. the MCP tool) surface the
+  reason directly.
 - Detection is best-effort: any unreadable cfg / proc entry is skipped, never
-  fatal. Detection failure defaults to "not active" (agent behaves as today),
-  which is the safe direction because #3 already prevents stray shutdown writes.
+  fatal. A plugin that is installed but genuinely disabled (`service="0"`, no
+  process) must report **not active** so the agent can still control fans — so
+  detection deliberately does _not_ fail closed on a missing/disabled signal
+  (that would wrongly seize control from a user who only has the plugin
+  installed). The real guard against stray writes is #3: the agent restores only
+  fans it actually modified, so even if detection mis-reports, shutdown never
+  touches a fan the agent never wrote to.
 
 ## Testing
 

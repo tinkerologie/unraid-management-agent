@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The agent no longer fights third-party fan-control plugins** (#128) — fan
+  state is restored on shutdown only for fans the agent actually modified.
+  Previously `RestoreAll()` ran on every daemon shutdown (including plugin
+  auto-updates) and wrote `pwm_enable` to **every** controllable fan even when
+  the user never enabled the agent's fan control, yanking the enable-mode out
+  from under controllers like FanCTRL Plus and Dynamix Auto Fan Control. The
+  agent now tracks which fans it wrote to and leaves all others untouched, so a
+  monitor-only install performs zero fan writes.
+
+### Added
+
+- **Automatic stand-down when a third-party fan controller is active** (#128) —
+  the agent now detects **FanCTRL Plus** and **Dynamix Auto Fan Control** (each
+  counted active only when installed _and_ enabled, via its `service="1"` config
+  or a running control process). While one is active the agent stays
+  monitor-only: `SetSpeed`, `SetMode`, `SetProfile`, `RestoreDefaults` refuse
+  with a clear "deferred to active plugin" error and the emergency full-speed
+  override is suppressed (the active plugin owns thermal response). Detection is
+  evaluated live, so enabling a plugin after startup takes effect without a
+  restart. The fan status (`GET /api/v1/fan`, MQTT, dashboard feed) now includes
+  an `external_control` object reporting whether the agent is deferring and to
+  which controller.
+
 ## [2026.06.08] - 2026-06-15
 
 ### Added

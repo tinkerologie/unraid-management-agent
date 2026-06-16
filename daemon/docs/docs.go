@@ -7323,6 +7323,24 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.ExternalFanControl": {
+            "type": "object",
+            "properties": {
+                "active": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "controllers": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "FanCTRL Plus"
+                    ]
+                }
+            }
+        },
         "dto.FanControlConfig": {
             "type": "object",
             "properties": {
@@ -7380,6 +7398,9 @@ const docTemplate = `{
             "properties": {
                 "config": {
                     "$ref": "#/definitions/dto.FanControlConfig"
+                },
+                "external_control": {
+                    "$ref": "#/definitions/dto.ExternalFanControl"
                 },
                 "fans": {
                     "type": "array",

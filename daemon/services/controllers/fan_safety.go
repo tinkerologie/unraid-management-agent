@@ -79,8 +79,10 @@ func (g *FanSafetyGuard) CaptureState(fans []dto.FanDevice) {
 	logger.Info("Fan safety: Captured original state for %d controllable fans", len(g.originals))
 }
 
-// RestoreAll sets every fan back to its original mode and PWM.
-// This MUST be called on shutdown to prevent fans from staying at a manual speed.
+// RestoreAll sets the fans the agent actually modified back to their original
+// mode and PWM. Fans the agent never wrote to (e.g. fans owned by a third-party
+// fan-control plugin) are left untouched. This MUST be called on shutdown to
+// prevent fans from staying at a manual speed the agent set.
 func (g *FanSafetyGuard) RestoreAll() {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -89,7 +91,12 @@ func (g *FanSafetyGuard) RestoreAll() {
 		return
 	}
 
-	for fanID, orig := range g.originals {
+	restored := 0
+	for _, fanID := range g.hwmon.ModifiedFans() {
+		orig, ok := g.originals[fanID]
+		if !ok {
+			continue // modified but never captured — nothing to restore to
+		}
 		if err := g.hwmon.SetMode(fanID, orig.Mode); err != nil {
 			logger.Error("Fan safety: Failed to restore mode for %s: %v", fanID, err)
 		}
@@ -98,8 +105,9 @@ func (g *FanSafetyGuard) RestoreAll() {
 				logger.Error("Fan safety: Failed to restore PWM for %s: %v", fanID, err)
 			}
 		}
+		restored++
 	}
-	logger.Info("Fan safety: Restored original state for %d fans", len(g.originals))
+	logger.Info("Fan safety: Restored original state for %d fans", restored)
 }
 
 // ValidatePWM enforces the minimum speed threshold. If the requested

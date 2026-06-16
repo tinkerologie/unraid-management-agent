@@ -120,13 +120,23 @@ type FanControlSummary struct {
 	FailedFans       []string `json:"failed_fans,omitempty"`
 }
 
+// ExternalFanControl reports whether a known third-party fan-control plugin
+// (FanCTRL Plus or Dynamix Auto Fan Control) is installed and enabled. When
+// Active is true the agent defers: it stays monitor-only and refuses to modify
+// fan speeds so it does not fight the other controller.
+type ExternalFanControl struct {
+	Active      bool     `json:"active" example:"true"`
+	Controllers []string `json:"controllers,omitempty" example:"FanCTRL Plus"`
+}
+
 // FanControlStatus is the top-level DTO published by the fan control collector.
 type FanControlStatus struct {
-	Fans      []FanDevice       `json:"fans"`
-	Profiles  []FanProfile      `json:"profiles"`
-	Config    FanControlConfig  `json:"config"`
-	Summary   FanControlSummary `json:"summary"`
-	Timestamp time.Time         `json:"timestamp"`
+	Fans            []FanDevice         `json:"fans"`
+	Profiles        []FanProfile        `json:"profiles"`
+	Config          FanControlConfig    `json:"config"`
+	Summary         FanControlSummary   `json:"summary"`
+	ExternalControl *ExternalFanControl `json:"external_control,omitempty"`
+	Timestamp       time.Time           `json:"timestamp"`
 }
 
 // FanSpeedRequest is the JSON body for setting a fan's PWM speed.
