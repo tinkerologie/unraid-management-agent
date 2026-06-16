@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.06.09] - 2026-06-16
+
 ### Fixed
 
 - **The agent no longer fights third-party fan-control plugins** (#128) — fan
