@@ -157,6 +157,31 @@ func TestToDTOConfig_ZeroPort(t *testing.T) {
 	}
 }
 
+func TestConfigTLSEnabled(t *testing.T) {
+	tests := []struct {
+		name     string
+		certFile string
+		keyFile  string
+		want     bool
+	}{
+		{name: "both set enables TLS", certFile: "/boot/cert.pem", keyFile: "/boot/key.pem", want: true},
+		{name: "neither set disables TLS", certFile: "", keyFile: "", want: false},
+		{name: "only cert set disables TLS", certFile: "/boot/cert.pem", keyFile: "", want: false},
+		{name: "only key set disables TLS", certFile: "", keyFile: "/boot/key.pem", want: false},
+		{name: "whitespace-only paths disable TLS", certFile: "  ", keyFile: "\t\n", want: false},
+		{name: "whitespace cert with real key disables TLS", certFile: "   ", keyFile: "/boot/key.pem", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := Config{TLSCertFile: tt.certFile, TLSKeyFile: tt.keyFile}
+			if got := c.TLSEnabled(); got != tt.want {
+				t.Errorf("TLSEnabled() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestContextFields(t *testing.T) {
 	ctx := Context{
 		Config: Config{

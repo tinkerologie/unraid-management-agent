@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Native HTTPS/TLS for the HTTP & MCP server** (#131) — the agent can now serve
+  the REST API and the `/mcp` endpoint over HTTPS when pointed at a PEM
+  certificate/key pair via `--tls-cert-file`/`--tls-key-file`, the
+  `TLS_CERT_FILE`/`TLS_KEY_FILE` environment variables, or `tls_cert_file`/
+  `tls_key_file` in `config.yml`. TLS is enabled only when both files are set;
+  an invalid, half-configured, or unloadable pair logs a warning and falls back
+  to plain HTTP so a stale path can never make the agent unreachable. mDNS
+  discovery now advertises a `scheme=https`/`scheme=http` TXT record and the
+  `/network/access-urls` endpoint returns `https://…` URLs when TLS is active.
+
+### Fixed
+
+- **Claude Desktop "HTTP is not supported" when adding the agent** (#131) — the
+  Claude integration guide now documents that Custom Connectors are reached from
+  Anthropic's cloud (so a LAN URL is unreachable even over HTTPS) and gives the
+  two paths that actually work: the `mcp-remote --allow-http` stdio bridge for
+  LAN-only use (no TLS required), and native HTTPS with a publicly-trusted
+  certificate behind a port-forward/tunnel for Custom Connectors.
+
 ## [2026.06.09] - 2026-06-16
 
 ### Fixed

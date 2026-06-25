@@ -408,8 +408,7 @@ func (s *Server) handleNetwork(w http.ResponseWriter, _ *http.Request) {
 //	@Success		200	{object}	dto.NetworkAccessURLs	"Network access URLs"
 //	@Router			/network/access-urls [get]
 func (s *Server) handleNetworkAccessURLs(w http.ResponseWriter, _ *http.Request) {
-	accessURLs := collectors.CollectNetworkAccessURLs()
-	respondJSON(w, http.StatusOK, accessURLs)
+	respondJSON(w, http.StatusOK, s.GetNetworkAccessURLs())
 }
 
 // Generic Docker operation handler to reduce code duplication

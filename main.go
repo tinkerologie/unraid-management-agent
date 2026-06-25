@@ -63,6 +63,10 @@ var cli struct {
 	// CORS
 	CORSOrigin string `default:"*" env:"CORS_ORIGIN" help:"Access-Control-Allow-Origin value (default: *)"`
 
+	// TLS: serve HTTPS (incl. the /mcp endpoint) when both files are provided
+	TLSCertFile string `default:"" env:"TLS_CERT_FILE" help:"path to a PEM TLS certificate file (enables HTTPS when set with --tls-key-file)"`
+	TLSKeyFile  string `default:"" env:"TLS_KEY_FILE" help:"path to a PEM TLS private key file (enables HTTPS when set with --tls-cert-file)"`
+
 	// Low power mode - multiplies all intervals for resource-constrained systems
 	LowPowerMode bool `default:"false" env:"UNRAID_LOW_POWER" help:"enable low power mode (4x longer intervals for old/slow hardware)"`
 
@@ -214,6 +218,18 @@ func main() {
 		}
 	}
 
+	// Validate TLS configuration. A bad or half-configured cert/key pair falls
+	// back to plain HTTP rather than refusing to start, mirroring the bind
+	// address behaviour, so a stale cert path can never make the agent
+	// unreachable. ValidateTLSConfig treats an empty pair as "TLS disabled".
+	if err := lib.ValidateTLSConfig(cli.TLSCertFile, cli.TLSKeyFile); err != nil {
+		logger.Warning("TLS is configured but invalid (%v); falling back to plain HTTP — the server will NOT be encrypted. Fix the certificate/key paths or remove the TLS settings.", err)
+		cli.TLSCertFile = ""
+		cli.TLSKeyFile = ""
+	} else if cli.TLSCertFile != "" && cli.TLSKeyFile != "" {
+		logger.Info("HTTPS enabled (certificate: %s)", cli.TLSCertFile)
+	}
+
 	if cli.ReadOnly {
 		logger.Info("Read-only mode enabled: all state-changing MCP tools are blocked")
 	}
@@ -269,6 +285,8 @@ func main() {
 			BindAddress: cli.BindAddress,
 			CORSOrigin:  cli.CORSOrigin,
 			ReadOnly:    cli.ReadOnly,
+			TLSCertFile: cli.TLSCertFile,
+			TLSKeyFile:  cli.TLSKeyFile,
 		},
 		Hub:      domain.NewEventBus(1024), // Buffer size for event bus
 		Platform: platform.NewRegistry(),
@@ -368,6 +386,8 @@ func applyFileConfig(cfg *domain.FileConfig) {
 	setBool(&cli.LowPowerMode, cfg.LowPowerMode)
 	setStr(&cli.DisableCollectors, cfg.DisableCollectors)
 	setStr(&cli.CORSOrigin, cfg.CORSOrigin)
+	setStr(&cli.TLSCertFile, cfg.TLSCertFile)
+	setStr(&cli.TLSKeyFile, cfg.TLSKeyFile)
 
 	// MQTT
 	if m := cfg.MQTT; m != nil {

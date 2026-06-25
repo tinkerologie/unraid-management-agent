@@ -248,7 +248,11 @@ func (o *Orchestrator) Run() error {
 		}
 	})
 
-	logger.Success("API server started on port %d", o.ctx.Port)
+	scheme := "http"
+	if o.ctx.TLSEnabled() {
+		scheme = "https"
+	}
+	logger.Success("API server started on %s port %d (MCP endpoint: %s://<host>:%d/mcp)", scheme, o.ctx.Port, scheme, o.ctx.Port)
 	logger.Success("Agent startup complete")
 
 	// Wait for shutdown signal
@@ -463,7 +467,7 @@ func (o *Orchestrator) initializeDiscovery(ctx context.Context) {
 		hostname = "unraid"
 	}
 
-	svc := discovery.NewService(o.ctx.DiscoveryConfig, hostname, o.ctx.Port, o.ctx.Version, o.ctx.BindAddress)
+	svc := discovery.NewService(o.ctx.DiscoveryConfig, hostname, o.ctx.Port, o.ctx.Version, o.ctx.BindAddress, o.ctx.TLSEnabled())
 	if err := svc.Start(ctx); err != nil {
 		logger.Warning("Discovery service disabled: %v", err)
 		return

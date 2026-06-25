@@ -65,7 +65,7 @@ func TestInstanceName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := NewService(tt.config, tt.hostname, 8043, "2026.06.01", "")
+			s := NewService(tt.config, tt.hostname, 8043, "2026.06.01", "", false)
 			if got := s.instanceName(); got != tt.want {
 				t.Errorf("instanceName() = %q, want %q", got, tt.want)
 			}
@@ -74,22 +74,43 @@ func TestInstanceName(t *testing.T) {
 }
 
 func TestTxtRecords(t *testing.T) {
-	s := NewService(domain.DiscoveryConfig{Enabled: true}, "tower", 8043, "2026.06.01", "")
-	got := s.txtRecords()
-
-	want := []string{"version=2026.06.01", "path=/api/v1", "name=tower"}
-	if len(got) != len(want) {
-		t.Errorf("txtRecords() returned %d records (%v), want %d (%v)", len(got), got, len(want), want)
+	tests := []struct {
+		name       string
+		tlsEnabled bool
+		wantScheme string
+	}{
+		{name: "plain HTTP advertises scheme=http", tlsEnabled: false, wantScheme: "scheme=http"},
+		{name: "TLS enabled advertises scheme=https", tlsEnabled: true, wantScheme: "scheme=https"},
 	}
-	for _, rec := range want {
-		if !slices.Contains(got, rec) {
-			t.Errorf("txtRecords() = %v, missing %q", got, rec)
-		}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewService(domain.DiscoveryConfig{Enabled: true}, "tower", 8043, "2026.06.01", "", tt.tlsEnabled)
+			got := s.txtRecords()
+
+			want := []string{"version=2026.06.01", "path=/api/v1", "name=tower", tt.wantScheme}
+			if len(got) != len(want) {
+				t.Errorf("txtRecords() returned %d records (%v), want %d (%v)", len(got), got, len(want), want)
+			}
+			for _, rec := range want {
+				if !slices.Contains(got, rec) {
+					t.Errorf("txtRecords() = %v, missing %q", got, rec)
+				}
+			}
+			// The opposite scheme must never appear.
+			otherScheme := "scheme=https"
+			if tt.tlsEnabled {
+				otherScheme = "scheme=http"
+			}
+			if slices.Contains(got, otherScheme) {
+				t.Errorf("txtRecords() = %v, must not contain %q", got, otherScheme)
+			}
+		})
 	}
 }
 
 func TestShutdownWithoutStartIsSafe(t *testing.T) {
-	s := NewService(domain.DiscoveryConfig{Enabled: true}, "tower", 8043, "2026.06.01", "")
+	s := NewService(domain.DiscoveryConfig{Enabled: true}, "tower", 8043, "2026.06.01", "", false)
 	// Shutdown before Start must be a no-op and must not panic.
 	s.Shutdown()
 }
@@ -120,7 +141,7 @@ func TestAdvertiseIP(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := NewService(domain.DiscoveryConfig{Enabled: true}, "tower", 8043, "2026.06.01", tt.bindAddress)
+			s := NewService(domain.DiscoveryConfig{Enabled: true}, "tower", 8043, "2026.06.01", tt.bindAddress, false)
 			got := s.advertiseIP()
 			if tt.wantFixed != "" {
 				if got == nil || got.String() != tt.wantFixed {
@@ -140,7 +161,7 @@ func TestAdvertiseIP(t *testing.T) {
 func TestStartSkipsAdvertisementOnLoopbackBind(t *testing.T) {
 	for _, bindAddr := range []string{"127.0.0.1", "127.0.0.53", "::1"} {
 		t.Run(bindAddr, func(t *testing.T) {
-			s := NewService(domain.DiscoveryConfig{Enabled: true}, "tower", 8043, "2026.06.01", bindAddr)
+			s := NewService(domain.DiscoveryConfig{Enabled: true}, "tower", 8043, "2026.06.01", bindAddr, false)
 			if err := s.Start(context.Background()); err != nil {
 				t.Fatalf("Start() with loopback bind %q returned error: %v", bindAddr, err)
 			}

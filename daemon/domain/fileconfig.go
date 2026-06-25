@@ -31,6 +31,10 @@ type FileConfig struct {
 	// CORS
 	CORSOrigin *string `yaml:"cors_origin,omitempty"`
 
+	// TLS: serve HTTPS when both a certificate and key file are provided.
+	TLSCertFile *string `yaml:"tls_cert_file,omitempty"`
+	TLSKeyFile  *string `yaml:"tls_key_file,omitempty"`
+
 	// MQTT configuration
 	MQTT *FileConfigMQTT `yaml:"mqtt,omitempty"`
 

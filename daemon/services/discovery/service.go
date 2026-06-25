@@ -27,6 +27,7 @@ type Service struct {
 	port        int
 	version     string
 	bindAddress string
+	tlsEnabled  bool
 
 	mu     sync.Mutex
 	server *zeroconf.Server
@@ -37,14 +38,16 @@ type Service struct {
 // the agent version string and bindAddress is the HTTP server's configured bind
 // address (empty = all interfaces). When a specific bind address is set it is
 // advertised instead of the auto-detected primary IP, so discovery always
-// points at the endpoint the server actually listens on.
-func NewService(config domain.DiscoveryConfig, hostname string, port int, version string, bindAddress string) *Service {
+// points at the endpoint the server actually listens on. tlsEnabled reports
+// whether the agent serves HTTPS, so discovery consumers learn the scheme.
+func NewService(config domain.DiscoveryConfig, hostname string, port int, version string, bindAddress string, tlsEnabled bool) *Service {
 	return &Service{
 		config:      config,
 		hostname:    hostname,
 		port:        port,
 		version:     version,
 		bindAddress: bindAddress,
+		tlsEnabled:  tlsEnabled,
 	}
 }
 
@@ -61,10 +64,15 @@ func (s *Service) instanceName() string {
 // integrations rich metadata (version + API path + friendly name) without an
 // extra HTTP round-trip during discovery.
 func (s *Service) txtRecords() []string {
+	scheme := "http"
+	if s.tlsEnabled {
+		scheme = "https"
+	}
 	return []string{
 		"version=" + s.version,
 		"path=/api/v1",
 		"name=" + s.hostname,
+		"scheme=" + scheme,
 	}
 }
 

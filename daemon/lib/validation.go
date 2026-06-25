@@ -1,14 +1,20 @@
 package lib
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
+	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 )
+
+// maxTLSPathLen caps TLS file paths defensively. Filesystem paths are well under
+// this on Unraid; the cap exists only to reject absurd input early.
+const maxTLSPathLen = 4096
 
 var (
 	// Docker container IDs are either 12 or 64 hexadecimal characters
@@ -457,6 +463,56 @@ func ValidateBindAddress(addr string) error {
 		}
 	}
 	return fmt.Errorf("bind address %q is not assigned to any local interface", addr)
+}
+
+// ValidateTLSConfig validates the optional HTTPS certificate/key configuration.
+// TLS is treated as enabled only when both paths are supplied; supplying just
+// one is a misconfiguration. Each path is checked defensively and the pair must
+// form a loadable X.509 key pair, so a bad cert is caught before the listener
+// starts. An empty pair (TLS disabled) is valid and returns nil.
+func ValidateTLSConfig(certFile, keyFile string) error {
+	if certFile == "" && keyFile == "" {
+		return nil // TLS disabled — plain HTTP
+	}
+	if certFile == "" || keyFile == "" {
+		return errors.New("TLS requires both a certificate and a key file (set tls_cert_file and tls_key_file together)")
+	}
+	if err := validateTLSPath(certFile, "TLS certificate file"); err != nil {
+		return err
+	}
+	if err := validateTLSPath(keyFile, "TLS key file"); err != nil {
+		return err
+	}
+	if _, err := tls.LoadX509KeyPair(certFile, keyFile); err != nil {
+		return fmt.Errorf("loading TLS key pair: %w", err)
+	}
+	return nil
+}
+
+// validateTLSPath applies the standard path guard sequence used across the
+// validators: non-empty, length cap, null-byte (CWE-158), path traversal
+// (CWE-22), and an absolute-path requirement.
+func validateTLSPath(path, field string) error {
+	if path == "" {
+		return fmt.Errorf("%s cannot be empty", field)
+	}
+	if len(path) > maxTLSPathLen {
+		return fmt.Errorf("%s exceeds maximum length of %d characters", field, maxTLSPathLen)
+	}
+	if strings.ContainsRune(path, 0) {
+		return fmt.Errorf("%s cannot contain null bytes", field) // CWE-158
+	}
+	// Reject a literal ".." path segment (CWE-22) without rejecting legitimate
+	// names that merely contain dots, e.g. /boot/certs/archive..old/cert.pem.
+	for _, seg := range strings.Split(filepath.ToSlash(path), "/") {
+		if seg == ".." {
+			return fmt.Errorf("%s cannot contain path traversal sequences", field) // CWE-22
+		}
+	}
+	if !filepath.IsAbs(path) {
+		return fmt.Errorf("%s must be an absolute path", field)
+	}
+	return nil
 }
 
 // ValidateFanTempSource validates a fan curve temperature source.

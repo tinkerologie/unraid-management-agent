@@ -420,6 +420,11 @@ func (s *Server) StartHTTP() error {
 		IdleTimeout:       120 * time.Second,
 	}
 
+	if s.ctx.TLSEnabled() {
+		logger.Info("HTTPS server listening on %s", s.httpServer.Addr)
+		return s.httpServer.ListenAndServeTLS(s.ctx.TLSCertFile, s.ctx.TLSKeyFile)
+	}
+
 	logger.Info("HTTP server listening on %s", s.httpServer.Addr)
 	return s.httpServer.ListenAndServe()
 }
@@ -614,9 +619,14 @@ func (s *Server) GetShareConfig(name string) *dto.ShareConfig {
 	return config
 }
 
-// GetNetworkAccessURLs returns all network access URLs for the server.
+// GetNetworkAccessURLs returns all network access URLs for the server. When the
+// agent serves HTTPS the URLs are rewritten to https:// with the configured
+// port, so clients are pointed at the scheme the server actually listens on.
 func (s *Server) GetNetworkAccessURLs() *dto.NetworkAccessURLs {
 	accessURLs := collectors.CollectNetworkAccessURLs()
+	if s.ctx.TLSEnabled() {
+		accessURLs.URLs = collectors.GetHTTPSURLs(accessURLs.URLs, s.ctx.Port)
+	}
 	return accessURLs
 }
 
