@@ -105,3 +105,10 @@ node_modules/
 # AI scratch directory (temporary AI working files)
 .ai-scratch/*
 !.ai-scratch/.gitkeep
+
+# graphify knowledge-graph output (locally generated, never committed)
+graphify-out/
+
+# superpowers/planning docs — kept locally, not committed
+docs/superpowers/
+docs/plans/
