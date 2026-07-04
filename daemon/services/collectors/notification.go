@@ -245,13 +245,12 @@ func (c *NotificationCollector) parseNotificationFile(path string, notifType str
 			// before the issue #134 fix wrote a quoted datetime string. Bound
 			// the epoch to years [1970,9999]: a rogue value (e.g. a millisecond
 			// epoch) would yield a time.Time that fails JSON marshaling and
-			// kill encoding of the whole NotificationList. MarshalJSON checks
-			// the year in the time's own location, so the local year must be
-			// checked too: near the cap, east-of-UTC hosts render year 10000.
-			// (The epoch cap runs first so time.Unix cannot overflow.)
-			if epoch, err := strconv.ParseInt(value, 10, 64); err == nil && epoch >= 0 && epoch <= 253402300799 &&
-				time.Unix(epoch, 0).Year() <= 9999 {
-				notification.Timestamp = time.Unix(epoch, 0)
+			// kill encoding of the whole NotificationList. The value is stored
+			// as UTC, so the cap (9999-12-31T23:59:59Z) alone bounds the year
+			// MarshalJSON validates, and every parse path renders the same
+			// Z-suffixed RFC3339 form regardless of host timezone.
+			if epoch, err := strconv.ParseInt(value, 10, 64); err == nil && epoch >= 0 && epoch <= 253402300799 {
+				notification.Timestamp = time.Unix(epoch, 0).UTC()
 				notification.FormattedTimestamp = notification.Timestamp.Format(time.RFC3339)
 			} else if ts, err := time.Parse("2006-01-02 15:04:05", value); err == nil {
 				notification.Timestamp = ts
@@ -265,8 +264,8 @@ func (c *NotificationCollector) parseNotificationFile(path string, notifType str
 	// If timestamp wasn't parsed, use file modification time
 	if notification.Timestamp.IsZero() {
 		if info, err := os.Stat(path); err == nil {
-			notification.Timestamp = info.ModTime()
-			notification.FormattedTimestamp = info.ModTime().Format(time.RFC3339)
+			notification.Timestamp = info.ModTime().UTC()
+			notification.FormattedTimestamp = notification.Timestamp.Format(time.RFC3339)
 		}
 	}
 

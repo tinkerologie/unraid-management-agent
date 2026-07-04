@@ -455,8 +455,10 @@ func TestParseNotificationFile_StockFormat(t *testing.T) {
 			name:    "unquoted epoch timestamp",
 			content: "timestamp=1751500000\nevent=\"Test\"\nsubject=\"S\"\ndescription=\"D\"\nimportance=\"warning\"\nlink=\"\"\n",
 			checkFunc: func(n *dto.Notification) bool {
+				// Host-independent literal: timestamps are stored as UTC so
+				// every parse path renders the same Z-suffixed RFC3339 form.
 				return n != nil && n.Timestamp.Unix() == 1751500000 &&
-					n.FormattedTimestamp == time.Unix(1751500000, 0).Format(time.RFC3339)
+					n.FormattedTimestamp == "2025-07-02T23:46:40Z"
 			},
 		},
 		{
@@ -492,7 +494,7 @@ func TestParseNotificationFile_StockFormat(t *testing.T) {
 			name:    "epoch at the marshalable boundary",
 			content: "timestamp=253402300799\nevent=\"Test\"\nsubject=\"S\"\ndescription=\"D\"\nimportance=\"warning\"\nlink=\"\"\n",
 			checkFunc: func(n *dto.Notification) bool {
-				if n == nil {
+				if n == nil || n.Timestamp.Unix() != 253402300799 {
 					return false
 				}
 				_, err := json.Marshal(n)

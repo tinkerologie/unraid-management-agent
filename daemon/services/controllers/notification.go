@@ -103,16 +103,7 @@ func ArchiveNotification(id string) error {
 		return fmt.Errorf("failed to create archive directory: %w", err)
 	}
 
-	// Since the issue #134 fix an archive copy (without link) is written at
-	// creation, so archiving normally only needs to remove the unread file,
-	// like the stock notify script's 'archive' verb; renaming over the copy
-	// would clobber it. Fall back to a rename for files with no archive copy.
-	if _, err := os.Stat(dst); err == nil {
-		if err := os.Remove(src); err != nil {
-			logger.Error("Failed to archive notification %s: %v", id, err)
-			return fmt.Errorf("failed to archive notification: %w", err)
-		}
-	} else if err := os.Rename(src, dst); err != nil {
+	if err := archiveOrRemove(src, dst); err != nil {
 		logger.Error("Failed to archive notification %s: %v", id, err)
 		return fmt.Errorf("failed to archive notification: %w", err)
 	}
@@ -194,13 +185,7 @@ func ArchiveAllNotifications() error {
 		src := filepath.Join(notificationsDir, file.Name())
 		dst := filepath.Join(notificationsArchiveDir, file.Name())
 
-		// Keep the creation archive copy when it exists (see ArchiveNotification).
-		if _, err := os.Stat(dst); err == nil {
-			if err := os.Remove(src); err != nil {
-				logger.Warning("Failed to archive %s: %v", file.Name(), err)
-				continue
-			}
-		} else if err := os.Rename(src, dst); err != nil {
+		if err := archiveOrRemove(src, dst); err != nil {
 			logger.Warning("Failed to archive %s: %v", file.Name(), err)
 			continue
 		}
@@ -274,6 +259,18 @@ func writeFileAtomic(dir, name string, content []byte) error {
 		return err
 	}
 	return nil
+}
+
+// archiveOrRemove moves the unread file src into the archive as dst. Since the
+// issue #134 fix an archive copy (without link) is written at creation, so
+// archiving normally only needs to remove the unread file, like the stock
+// notify script's 'archive' verb; renaming over the copy would clobber it.
+// Files with no creation copy (legacy format) fall back to the rename.
+func archiveOrRemove(src, dst string) error {
+	if _, err := os.Stat(dst); err == nil {
+		return os.Remove(src)
+	}
+	return os.Rename(src, dst)
 }
 
 // validateFilename validates a filename to prevent path traversal attacks
