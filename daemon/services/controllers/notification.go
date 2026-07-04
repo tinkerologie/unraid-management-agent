@@ -26,7 +26,13 @@ func init() {
 	notificationsDir, notificationsArchiveDir = collectors.ResolveNotificationDirs(constants.DynamixCfg)
 }
 
-// CreateNotification creates a new notification file
+// CreateNotification creates a new notification file in the same format as the
+// stock webGui notify script so both stock consumers (the legacy PHP parser and
+// unraid-api) can read it: an unquoted unix-epoch timestamp as the first line
+// (the stock parser treats the first line as the timestamp), stock field order
+// and value escaping, a safe_filename() style name, and an archive copy written
+// first. Files are written atomically so a failed write (e.g. ENOSPC) never
+// leaves a partial .notify file behind. See issue #134.
 func CreateNotification(title, subject, description, importance, link string) error {
 	// Validate importance
 	if importance != "alert" && importance != "warning" && importance != "info" {
@@ -34,16 +40,17 @@ func CreateNotification(title, subject, description, importance, link string) er
 	}
 
 	timestamp := time.Now()
-	sanitizedTitle := sanitizeFilename(title)
+	event := safeFilename(title)
+	if len(event) > 50 {
+		event = event[:50]
+	}
 
 	// Validate sanitized title to prevent path traversal
-	if err := validateFilename(sanitizedTitle); err != nil {
+	if err := validateFilename(event); err != nil {
 		return fmt.Errorf("invalid title: %w", err)
 	}
 
-	filename := fmt.Sprintf("%s-%s.notify",
-		timestamp.Format("20060102-150405"),
-		sanitizedTitle)
+	filename := fmt.Sprintf("%s_%d.notify", event, timestamp.Unix())
 
 	path := filepath.Join(notificationsDir, filename)
 
@@ -53,17 +60,20 @@ func CreateNotification(title, subject, description, importance, link string) er
 		return fmt.Errorf("invalid notification path: path escapes notifications directory")
 	}
 
-	content := fmt.Sprintf(`event="%s"
-subject="%s"
-description="%s"
-importance="%s"
-timestamp="%s"
-link="%s"`,
-		title, subject, description, importance,
-		timestamp.Format("2006-01-02 15:04:05"), link)
+	fields := fmt.Sprintf("timestamp=%d\nevent=%s\nsubject=%s\ndescription=%s\nimportance=%s\n",
+		timestamp.Unix(), iniQuote(title), iniQuote(subject), iniQuote(description), iniQuote(importance))
 
-	// #nosec G306 - Notification files need to be readable by Unraid web UI (0644)
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+	// The stock script always writes the archive copy (without link) first and
+	// ignores its failure; only the unread copy decides the call's outcome.
+	// #nosec G301 - Unraid standard permissions (0755 for directories)
+	if err := os.MkdirAll(notificationsArchiveDir, 0755); err != nil {
+		logger.Warning("Failed to create archive directory for notification %s: %v", filename, err)
+	} else if err := writeFileAtomic(notificationsArchiveDir, filename, []byte(fields)); err != nil {
+		logger.Warning("Failed to write archive copy of notification %s: %v", filename, err)
+	}
+
+	unread := fields + fmt.Sprintf("link=%s\n", iniQuote(link))
+	if err := writeFileAtomic(notificationsDir, filename, []byte(unread)); err != nil {
 		logger.Error("Failed to create notification: %v", err)
 		return fmt.Errorf("failed to create notification: %w", err)
 	}
@@ -93,7 +103,16 @@ func ArchiveNotification(id string) error {
 		return fmt.Errorf("failed to create archive directory: %w", err)
 	}
 
-	if err := os.Rename(src, dst); err != nil {
+	// Since the issue #134 fix an archive copy (without link) is written at
+	// creation, so archiving normally only needs to remove the unread file,
+	// like the stock notify script's 'archive' verb; renaming over the copy
+	// would clobber it. Fall back to a rename for files with no archive copy.
+	if _, err := os.Stat(dst); err == nil {
+		if err := os.Remove(src); err != nil {
+			logger.Error("Failed to archive notification %s: %v", id, err)
+			return fmt.Errorf("failed to archive notification: %w", err)
+		}
+	} else if err := os.Rename(src, dst); err != nil {
 		logger.Error("Failed to archive notification %s: %v", id, err)
 		return fmt.Errorf("failed to archive notification: %w", err)
 	}
@@ -175,7 +194,13 @@ func ArchiveAllNotifications() error {
 		src := filepath.Join(notificationsDir, file.Name())
 		dst := filepath.Join(notificationsArchiveDir, file.Name())
 
-		if err := os.Rename(src, dst); err != nil {
+		// Keep the creation archive copy when it exists (see ArchiveNotification).
+		if _, err := os.Stat(dst); err == nil {
+			if err := os.Remove(src); err != nil {
+				logger.Warning("Failed to archive %s: %v", file.Name(), err)
+				continue
+			}
+		} else if err := os.Rename(src, dst); err != nil {
 			logger.Warning("Failed to archive %s: %v", file.Name(), err)
 			continue
 		}
@@ -186,22 +211,73 @@ func ArchiveAllNotifications() error {
 	return nil
 }
 
-// sanitizeFilename removes invalid characters from filename
-func sanitizeFilename(s string) string {
-	// Replace spaces with underscores
-	s = strings.ReplaceAll(s, " ", "_")
-	// Remove any character that's not alphanumeric, underscore, or hyphen
-	reg := regexp.MustCompile(`[^a-zA-Z0-9_-]`)
-	s = reg.ReplaceAllString(s, "")
-	// Limit length
-	if len(s) > 50 {
-		s = s[:50]
+var (
+	// notifySpecialChars removes the special characters the stock notify
+	// script's safe_filename() strips from notification file names.
+	notifySpecialChars = strings.NewReplacer(
+		"?", "", "[", "", "]", "", "/", "", "\\", "", "=", "", "<", "", ">", "",
+		":", "", ";", "", ",", "", "'", "", "\"", "", "&", "", "$", "", "#", "",
+		"*", "", "(", "", ")", "", "|", "", "~", "", "`", "", "!", "", "{", "", "}", "",
+	)
+	// notifyDisallowedChars matches everything else the stock safe_filename()
+	// removes: characters outside 0-9, a-z and the ASCII range 0x20-0x5F
+	// (written " -_" in the stock script; it already contains A-Z, which is
+	// why stock's /i flag is redundant). Deliberately no (?i): Go would apply
+	// Unicode case folding to the class, keeping U+212A/U+017F, which the
+	// stock byte-oriented pattern strips like any other non-ASCII input.
+	notifyDisallowedChars = regexp.MustCompile(`[^0-9a-z -_]`)
+	// notifyDashSpace converts hyphens and spaces to underscores like the
+	// stock safe_filename().
+	notifyDashSpace = strings.NewReplacer("-", "_", " ", "_")
+	// iniEscaper escapes backslashes and double quotes the same way the stock
+	// notify script's ini_encode_value() does (PHP strtr, single pass).
+	iniEscaper = strings.NewReplacer(`\`, `\\`, `"`, `\"`)
+)
+
+// safeFilename replicates the stock webGui notify script's safe_filename()
+// so agent notifications get the same file names the stock script produces.
+func safeFilename(s string) string {
+	s = strings.TrimSpace(notifySpecialChars.Replace(s))
+	s = notifyDisallowedChars.ReplaceAllString(s, "")
+	s = notifyDashSpace.Replace(s)
+	return strings.TrimSpace(s)
+}
+
+// iniQuote wraps a string value in double quotes with stock-compatible escaping.
+func iniQuote(v string) string {
+	return `"` + iniEscaper.Replace(v) + `"`
+}
+
+// writeFileAtomic writes content to dir/name via a temporary file and rename,
+// so a failed write (e.g. ENOSPC) never leaves a partial or empty .notify
+// file for the Unraid UI to flag as invalid. The temporary name does not end
+// in .notify, keeping it invisible to notification consumers.
+func writeFileAtomic(dir, name string, content []byte) error {
+	tmp, err := os.CreateTemp(dir, ".notify-tmp-*")
+	if err != nil {
+		return err
 	}
-	return s
+	tmpName := tmp.Name()
+	_, err = tmp.Write(content)
+	if closeErr := tmp.Close(); err == nil {
+		err = closeErr
+	}
+	if err == nil {
+		// #nosec G302 - Notification files need to be readable by Unraid web UI (0644)
+		err = os.Chmod(tmpName, 0644)
+	}
+	if err == nil {
+		err = os.Rename(tmpName, filepath.Join(dir, name))
+	}
+	if err != nil {
+		_ = os.Remove(tmpName)
+		return err
+	}
+	return nil
 }
 
 // validateFilename validates a filename to prevent path traversal attacks
-// This is used after sanitizeFilename to ensure the sanitized result is safe
+// This is used after safeFilename to ensure the sanitized result is safe
 func validateFilename(filename string) error {
 	if filename == "" {
 		return fmt.Errorf("filename cannot be empty")

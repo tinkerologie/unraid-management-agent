@@ -2,6 +2,7 @@ package collectors
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -435,5 +436,88 @@ func TestNotificationCollectorPanic(t *testing.T) {
 
 	if panicOccurred {
 		t.Error("Unexpected panic occurred")
+	}
+}
+
+// TestParseNotificationFile_StockFormat verifies the parser understands the
+// stock notify script format (unquoted unix-epoch timestamp, backslash-escaped
+// quoted values) while still parsing the legacy quoted-datetime format written
+// by older agent versions (issue #134).
+func TestParseNotificationFile_StockFormat(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	tests := []struct {
+		name      string
+		content   string
+		checkFunc func(*dto.Notification) bool
+	}{
+		{
+			name:    "unquoted epoch timestamp",
+			content: "timestamp=1751500000\nevent=\"Test\"\nsubject=\"S\"\ndescription=\"D\"\nimportance=\"warning\"\nlink=\"\"\n",
+			checkFunc: func(n *dto.Notification) bool {
+				return n != nil && n.Timestamp.Unix() == 1751500000 &&
+					n.FormattedTimestamp == time.Unix(1751500000, 0).Format(time.RFC3339)
+			},
+		},
+		{
+			name:    "legacy quoted datetime timestamp",
+			content: "event=\"Test\"\nsubject=\"S\"\ndescription=\"D\"\nimportance=\"warning\"\ntimestamp=\"2026-07-03 15:20:00\"\nlink=\"\"\n",
+			checkFunc: func(n *dto.Notification) bool {
+				want, _ := time.Parse("2006-01-02 15:04:05", "2026-07-03 15:20:00")
+				return n != nil && n.Timestamp.Equal(want)
+			},
+		},
+		{
+			name:    "escaped quotes and backslashes in values",
+			content: "timestamp=1751500000\nevent=\"Test\"\nsubject=\"Say \\\"hi\\\"\"\ndescription=\"back\\\\slash\"\nimportance=\"warning\"\nlink=\"\"\n",
+			checkFunc: func(n *dto.Notification) bool {
+				return n != nil && n.Subject == `Say "hi"` && n.Description == `back\slash`
+			},
+		},
+		{
+			// A millisecond epoch (or any value past year 9999) must fall back
+			// to the file's mtime: a time.Time outside years [0,9999] fails
+			// JSON marshaling and would kill the whole NotificationList.
+			name:    "out-of-range epoch falls back to mtime",
+			content: "timestamp=1751500000000\nevent=\"Test\"\nsubject=\"S\"\ndescription=\"D\"\nimportance=\"warning\"\nlink=\"\"\n",
+			checkFunc: func(n *dto.Notification) bool {
+				st, err := os.Stat(filepath.Join(tmpDir, "stock-format-test.notify"))
+				return err == nil && n != nil && n.Timestamp.Equal(st.ModTime())
+			},
+		},
+		{
+			// 9999-12-31T23:59:59Z. MarshalJSON validates the year in the
+			// time's own location, so whatever the host timezone, an accepted
+			// epoch must produce a marshalable notification.
+			name:    "epoch at the marshalable boundary",
+			content: "timestamp=253402300799\nevent=\"Test\"\nsubject=\"S\"\ndescription=\"D\"\nimportance=\"warning\"\nlink=\"\"\n",
+			checkFunc: func(n *dto.Notification) bool {
+				if n == nil {
+					return false
+				}
+				_, err := json.Marshal(n)
+				return err == nil
+			},
+		},
+	}
+
+	hub := domain.NewEventBus(10)
+	ctx := &domain.Context{Hub: hub}
+	collector := NewNotificationCollector(ctx)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filePath := filepath.Join(tmpDir, "stock-format-test.notify")
+			if err := os.WriteFile(filePath, []byte(tt.content), 0644); err != nil {
+				t.Fatalf("Failed to write test file: %v", err)
+			}
+			defer os.Remove(filePath) //nolint:errcheck
+
+			notif := collector.parseNotificationFile(filePath, "unread")
+
+			if !tt.checkFunc(notif) {
+				t.Errorf("Notification check failed: %+v", notif)
+			}
+		})
 	}
 }

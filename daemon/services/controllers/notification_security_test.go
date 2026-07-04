@@ -167,8 +167,9 @@ func TestDeleteNotificationSecurity(t *testing.T) {
 	}
 }
 
-// TestSanitizeFilename tests the sanitizeFilename function
-func TestSanitizeFilename(t *testing.T) {
+// TestSafeFilename tests the safeFilename function, which replicates the
+// stock webGui notify script's safe_filename() (issue #134)
+func TestSafeFilename(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
@@ -187,12 +188,12 @@ func TestSanitizeFilename(t *testing.T) {
 		{
 			name:     "filename with special characters",
 			input:    "test@file#name!",
-			expected: "testfilename",
+			expected: "test@filename",
 		},
 		{
 			name:     "filename with dots",
 			input:    "test.file.name",
-			expected: "testfilename",
+			expected: "test.file.name",
 		},
 		{
 			name:     "filename with path separators",
@@ -202,12 +203,12 @@ func TestSanitizeFilename(t *testing.T) {
 		{
 			name:     "filename with parent dir refs",
 			input:    "../../../etc/passwd",
-			expected: "etcpasswd",
+			expected: "......etcpasswd",
 		},
 		{
-			name:     "filename with mixed chars",
+			name:     "hyphens become underscores like stock",
 			input:    "test-file_123",
-			expected: "test-file_123",
+			expected: "test_file_123",
 		},
 		{
 			name:     "empty string",
@@ -215,22 +216,24 @@ func TestSanitizeFilename(t *testing.T) {
 			expected: "",
 		},
 		{
-			name:     "very long filename",
-			input:    "this_is_a_very_long_filename_that_exceeds_the_fifty_character_limit_for_filenames",
-			expected: "this_is_a_very_long_filename_that_exceeds_the_fift",
-		},
-		{
 			name:     "unicode characters",
 			input:    "test_éàü_file",
+			expected: "test__file",
+		},
+		{
+			// U+212A (KELVIN SIGN) and U+017F (LONG S) case-fold to k/s, so a
+			// (?i) class would keep them; stock's byte-oriented PCRE strips them.
+			name:     "unicode case-fold characters",
+			input:    "test_\u212A\u017F_file",
 			expected: "test__file",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := sanitizeFilename(tt.input)
+			result := safeFilename(tt.input)
 			if result != tt.expected {
-				t.Errorf("sanitizeFilename(%q) = %q, want %q", tt.input, result, tt.expected)
+				t.Errorf("safeFilename(%q) = %q, want %q", tt.input, result, tt.expected)
 			}
 		})
 	}
@@ -321,6 +324,11 @@ func TestCreateNotificationValidation(t *testing.T) {
 	})
 
 	t.Run("valid importance levels", func(t *testing.T) {
+		// Redirect the package-level dirs: without this, a root run would
+		// create real files under /boot via the archive-first write path.
+		cleanup := setupNotificationTestDirs(t)
+		defer cleanup()
+
 		levels := []string{"alert", "warning", "info"}
 		for _, level := range levels {
 			t.Run(level, func(t *testing.T) {

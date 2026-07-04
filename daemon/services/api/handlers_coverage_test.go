@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -763,6 +764,9 @@ func TestHandleCreateNotification_MissingTitle(t *testing.T) {
 }
 
 func TestHandleCreateNotification_ValidNotification(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("as root this would create real files under /boot (controllers notification dirs are not overridable from this package)")
+	}
 	server, _ := setupTestServer()
 
 	body := `{"title":"Test Alert","subject":"Test","description":"Test notification","importance":"warning","link":"https://example.com"}`
@@ -785,6 +789,9 @@ func TestHandleCreateNotification_ValidNotification(t *testing.T) {
 }
 
 func TestHandleCreateNotification_DefaultImportance(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("as root this would create real files under /boot (controllers notification dirs are not overridable from this package)")
+	}
 	server, _ := setupTestServer()
 
 	// When importance is omitted, it should default to "info"

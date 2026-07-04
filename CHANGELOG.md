@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Agent-created notifications no longer crash the stock notification parser** (#134) —
+  `CreateNotification` now writes `.notify` files in a stock-compatible format matching
+  the webGui `notify` script's output: an unquoted unix-epoch `timestamp` as the first
+  line (the stock PHP parser blindly `date()`-formats the first value, so the old
+  `event="..."` first line caused a fatal TypeError that killed every notification
+  poll), stock field order and value escaping, a stock-style `safe_filename()` file
+  name (`Event_Name_<epoch>.notify`), and an archive copy written first (archiving now
+  removes the unread file and keeps that copy, like the stock `archive` verb). Files
+  are written atomically (temp file + rename, cleaned up on failure), so a full disk
+  can no longer leave 0-byte `.notify` files that the UI flags as invalid
+  notifications. The notification collector now parses stock-format files (unquoted
+  epoch timestamps, escaped values) while still reading the legacy quoted-datetime
+  format.
+
 ## [2026.06.10] - 2026-06-26
 
 ### Added
