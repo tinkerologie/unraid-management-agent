@@ -255,7 +255,9 @@ func writeFileAtomic(dir, name string, content []byte) error {
 		err = os.Rename(tmpName, filepath.Join(dir, name))
 	}
 	if err != nil {
-		_ = os.Remove(tmpName)
+		if rmErr := os.Remove(tmpName); rmErr != nil {
+			logger.Warning("Failed to clean up temp notification file %s: %v", tmpName, rmErr)
+		}
 		return err
 	}
 	return nil
