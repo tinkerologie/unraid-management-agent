@@ -1,7 +1,9 @@
 package controllers
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -616,6 +618,58 @@ func TestArchiveAllNotifications_KeepsCreationArchiveCopies(t *testing.T) {
 	}
 	if strings.Contains(string(content), "link=") {
 		t.Errorf("Archive copy was clobbered by the unread file (contains a link line):\n%s", content)
+	}
+}
+
+// TestArchiveOrRemove_AmbiguousCheckTouchesNothing verifies that when the
+// archive destination cannot be checked at all (stat fails with something
+// other than not-exists), the helper returns that error without attempting a
+// rename (which could clobber an existing archive copy) or a remove (which
+// could delete the only copy). The returned error's Op pins that the helper
+// stopped at the failed check rather than attempting a mutation.
+func TestArchiveOrRemove_AmbiguousCheckTouchesNothing(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("directory permissions are not enforced for root")
+	}
+
+	tmpDir := t.TempDir()
+	srcDir := filepath.Join(tmpDir, "unread")
+	dstDir := filepath.Join(tmpDir, "archive")
+	for _, d := range []string{srcDir, dstDir} {
+		if err := os.MkdirAll(d, 0755); err != nil {
+			t.Fatalf("Failed to create %s: %v", d, err)
+		}
+	}
+	src := filepath.Join(srcDir, "test.notify")
+	if err := os.WriteFile(src, []byte("data"), 0644); err != nil {
+		t.Fatalf("Failed to write source file: %v", err)
+	}
+	if err := os.Chmod(dstDir, 0000); err != nil {
+		t.Fatalf("Failed to make archive dir unreadable: %v", err)
+	}
+	defer os.Chmod(dstDir, 0755) //nolint:errcheck
+
+	err := archiveOrRemove(src, filepath.Join(dstDir, "test.notify"))
+	if err == nil {
+		t.Fatal("Expected an error when the destination cannot be checked")
+	}
+	var pathErr *fs.PathError
+	if !errors.As(err, &pathErr) || pathErr.Op != "stat" {
+		t.Errorf("Expected the stat error itself (no rename/remove attempted), got: %v", err)
+	}
+
+	if _, statErr := os.Stat(src); statErr != nil {
+		t.Errorf("Source file should be untouched after an ambiguous check: %v", statErr)
+	}
+	if err := os.Chmod(dstDir, 0755); err != nil {
+		t.Fatalf("Failed to restore archive dir permissions: %v", err)
+	}
+	entries, err := os.ReadDir(dstDir)
+	if err != nil {
+		t.Fatalf("Failed to read archive dir: %v", err)
+	}
+	for _, e := range entries {
+		t.Errorf("Archive dir should be untouched, found: %s", e.Name())
 	}
 }
 

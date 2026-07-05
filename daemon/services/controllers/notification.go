@@ -265,10 +265,15 @@ func writeFileAtomic(dir, name string, content []byte) error {
 // issue #134 fix an archive copy (without link) is written at creation, so
 // archiving normally only needs to remove the unread file, like the stock
 // notify script's 'archive' verb; renaming over the copy would clobber it.
-// Files with no creation copy (legacy format) fall back to the rename.
+// Files with no creation copy (legacy format) fall back to the rename. When
+// the check itself fails, the error is returned without touching either file:
+// renaming could clobber an existing copy and removing could delete the only
+// copy, and neither risk is worth taking blind.
 func archiveOrRemove(src, dst string) error {
 	if _, err := os.Stat(dst); err == nil {
 		return os.Remove(src)
+	} else if !os.IsNotExist(err) {
+		return err
 	}
 	return os.Rename(src, dst)
 }
