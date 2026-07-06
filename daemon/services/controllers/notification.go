@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -243,7 +244,11 @@ func writeFileAtomic(dir, name string, content []byte) error {
 		return err
 	}
 	tmpName := tmp.Name()
-	_, err = tmp.Write(content)
+	n, err := tmp.Write(content)
+	if err == nil && n < len(content) {
+		// Belt-and-braces like os.WriteFile: surface a short write as an error.
+		err = io.ErrShortWrite
+	}
 	if closeErr := tmp.Close(); err == nil {
 		err = closeErr
 	}
