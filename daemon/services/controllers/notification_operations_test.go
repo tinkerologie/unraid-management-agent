@@ -1,9 +1,16 @@
 package controllers
 
 import (
+	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
 )
 
 // setupNotificationTestDirs creates temp directories and overrides the package-level vars.
@@ -240,7 +247,7 @@ func TestCreateNotification_ValidInput(t *testing.T) {
 	}
 
 	// Verify a file was created
-	files, _ := filepath.Glob(filepath.Join(notificationsDir, "*Test_Notification.notify"))
+	files, _ := filepath.Glob(filepath.Join(notificationsDir, "Test_Notification_*.notify"))
 	if len(files) == 0 {
 		t.Error("Expected notification file to be created")
 	}
@@ -279,13 +286,24 @@ func TestCreateNotification_SpecialCharactersInTitle(t *testing.T) {
 	defer cleanup()
 
 	tests := []struct {
-		name  string
-		title string
+		name    string
+		title   string
+		wantErr bool
 	}{
-		{"with spaces", "Test With Spaces"},
-		{"with special chars", "Test!@#$%^&*()"},
-		{"with slashes", "Test/With/Slashes"},
-		{"with dots", "Test...Dots"},
+		{"with spaces", "Test With Spaces", false},
+		{"with special chars", "Test!@#$%^&*()", false},
+		{"with slashes", "Test/With/Slashes", false},
+		// Dots survive the stock safe_filename() replica, so a title whose
+		// sanitized form contains ".." is rejected by the pre-existing
+		// path-traversal guard (stricter than stock, which would allow it).
+		{"with consecutive dots", "Test...Dots", true},
+		// safeFilename trims whitespace before converting spaces, like stock,
+		// so whitespace-only titles sanitize to empty and are rejected.
+		{"whitespace only", "   ", true},
+		// Characters stock's safe_filename() keeps (@ % ^ + .) survive the
+		// replica too, so punctuation-only titles are accepted like stock
+		// (the old sanitizer stripped them all and rejected the empty result).
+		{"punctuation only", "@%^+.", false},
 	}
 
 	for _, tt := range tests {
@@ -298,9 +316,381 @@ func TestCreateNotification_SpecialCharactersInTitle(t *testing.T) {
 				"",
 			)
 
-			if err != nil {
-				t.Logf("CreateNotification with '%s' failed: %v", tt.title, err)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("CreateNotification with %q should be rejected by the filename guard", tt.title)
+				}
+			} else if err != nil {
+				t.Errorf("CreateNotification with %q failed: %v", tt.title, err)
 			}
 		})
+	}
+}
+
+// TestCreateNotification_StockNotifyFormat verifies notification files match the
+// format written by Unraid's stock webGui notify script so the legacy PHP parser
+// and unraid-api can read them: an unquoted unix-epoch timestamp as the first
+// line, stock field order, escaped quotes/backslashes, a trailing newline, and
+// a safe_filename() style file name (issue #134).
+func TestCreateNotification_StockNotifyFormat(t *testing.T) {
+	cleanup := setupNotificationTestDirs(t)
+	defer cleanup()
+
+	before := time.Now().Unix()
+	err := CreateNotification(
+		"Management Agent Alert",
+		"Resolved: Agent data source degraded",
+		`Rule "cpu" resolved on \srv01`,
+		"warning",
+		"",
+	)
+	after := time.Now().Unix()
+
+	if err != nil {
+		t.Fatalf("CreateNotification failed: %v", err)
+	}
+
+	files, err := filepath.Glob(filepath.Join(notificationsDir, "*.notify"))
+	if err != nil {
+		t.Fatalf("Glob failed: %v", err)
+	}
+	if len(files) != 1 {
+		t.Fatalf("Expected exactly one .notify file, got %d", len(files))
+	}
+
+	name := filepath.Base(files[0])
+	if !regexp.MustCompile(`^Management_Agent_Alert_\d+\.notify$`).MatchString(name) {
+		t.Errorf("Filename %q does not match the stock safe_filename() scheme", name)
+	}
+
+	content, err := os.ReadFile(files[0])
+	if err != nil {
+		t.Fatalf("Failed to read notification file: %v", err)
+	}
+
+	info, err := os.Stat(files[0])
+	if err != nil {
+		t.Fatalf("Failed to stat notification file: %v", err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o644 {
+		t.Errorf("Notification file mode = %04o, want 0644 (readable by the Unraid web UI)", perm)
+	}
+
+	firstLine := strings.SplitN(string(content), "\n", 2)[0]
+	match := regexp.MustCompile(`^timestamp=(\d+)$`).FindStringSubmatch(firstLine)
+	if match == nil {
+		t.Fatalf("First line %q is not an unquoted unix-epoch timestamp", firstLine)
+	}
+	epoch, err := strconv.ParseInt(match[1], 10, 64)
+	if err != nil {
+		t.Fatalf("Failed to parse timestamp %q: %v", match[1], err)
+	}
+	if epoch < before || epoch > after {
+		t.Errorf("Timestamp %d outside test window [%d, %d]", epoch, before, after)
+	}
+
+	want := fmt.Sprintf("timestamp=%d\n"+
+		"event=\"Management Agent Alert\"\n"+
+		"subject=\"Resolved: Agent data source degraded\"\n"+
+		"description=\"Rule \\\"cpu\\\" resolved on \\\\srv01\"\n"+
+		"importance=\"warning\"\n"+
+		"link=\"\"\n", epoch)
+	if string(content) != want {
+		t.Errorf("Content mismatch:\ngot:\n%q\nwant:\n%q", string(content), want)
+	}
+}
+
+// TestCreateNotification_WritesArchiveCopy verifies a stock-style archive copy
+// (same fields, no link line) is written alongside the unread file, matching
+// the stock notify script behavior (issue #134).
+func TestCreateNotification_WritesArchiveCopy(t *testing.T) {
+	cleanup := setupNotificationTestDirs(t)
+	defer cleanup()
+
+	err := CreateNotification("Test Event", "Subject", "Description", "info", "http://example.com/x")
+	if err != nil {
+		t.Fatalf("CreateNotification failed: %v", err)
+	}
+
+	unreadFiles, err := filepath.Glob(filepath.Join(notificationsDir, "*.notify"))
+	if err != nil {
+		t.Fatalf("Glob failed: %v", err)
+	}
+	if len(unreadFiles) != 1 {
+		t.Fatalf("Expected one unread file, got %d", len(unreadFiles))
+	}
+	name := filepath.Base(unreadFiles[0])
+
+	archiveContent, err := os.ReadFile(filepath.Join(notificationsArchiveDir, name))
+	if err != nil {
+		t.Fatalf("Expected archive copy of %s: %v", name, err)
+	}
+
+	unreadContent, err := os.ReadFile(unreadFiles[0])
+	if err != nil {
+		t.Fatalf("Failed to read unread file: %v", err)
+	}
+	wantArchive := strings.Replace(string(unreadContent), "link=\"http://example.com/x\"\n", "", 1)
+	if string(archiveContent) != wantArchive {
+		t.Errorf("Archive copy mismatch:\ngot:\n%q\nwant:\n%q", string(archiveContent), wantArchive)
+	}
+}
+
+// TestCreateNotification_LongTitleCapped verifies the event part of the file
+// name keeps the pre-existing 50 character cap.
+func TestCreateNotification_LongTitleCapped(t *testing.T) {
+	cleanup := setupNotificationTestDirs(t)
+	defer cleanup()
+
+	longTitle := strings.Repeat("a", 80)
+	if err := CreateNotification(longTitle, "Subject", "Description", "info", ""); err != nil {
+		t.Fatalf("CreateNotification failed: %v", err)
+	}
+
+	files, err := filepath.Glob(filepath.Join(notificationsDir, "*.notify"))
+	if err != nil || len(files) != 1 {
+		t.Fatalf("Expected exactly one .notify file, got %d (err=%v)", len(files), err)
+	}
+
+	event := strings.SplitN(filepath.Base(files[0]), "_", 2)[0]
+	if len(event) != 50 {
+		t.Errorf("Expected event part capped at 50 characters, got %d (%q)", len(event), event)
+	}
+}
+
+// TestCreateNotification_NoFileLeftOnWriteFailure verifies a failed dispatch
+// leaves no partial, empty, or temporary file behind (issue #134).
+func TestCreateNotification_NoFileLeftOnWriteFailure(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("directory permissions are not enforced for root")
+	}
+
+	cleanup := setupNotificationTestDirs(t)
+	defer cleanup()
+
+	for _, dir := range []string{notificationsDir, notificationsArchiveDir} {
+		if err := os.Chmod(dir, 0555); err != nil {
+			t.Fatalf("Failed to make %s read-only: %v", dir, err)
+		}
+		defer os.Chmod(dir, 0755) //nolint:errcheck
+	}
+
+	if err := CreateNotification("Test Event", "Subject", "Description", "info", ""); err == nil {
+		t.Fatal("Expected an error when the notifications directory is not writable")
+	}
+
+	entries, err := os.ReadDir(notificationsDir)
+	if err != nil {
+		t.Fatalf("Failed to read notifications dir: %v", err)
+	}
+	for _, e := range entries {
+		if e.IsDir() && e.Name() == filepath.Base(notificationsArchiveDir) {
+			continue // archive dir is nested inside the unread dir in tests
+		}
+		t.Errorf("Unexpected leftover entry after failed write: %s", e.Name())
+	}
+	archiveEntries, err := os.ReadDir(notificationsArchiveDir)
+	if err != nil {
+		t.Fatalf("Failed to read archive dir: %v", err)
+	}
+	for _, e := range archiveEntries {
+		t.Errorf("Unexpected leftover entry in archive after failed write: %s", e.Name())
+	}
+}
+
+// TestCreateNotification_ArchiveFailureDoesNotAbort verifies that a failed
+// archive copy is tolerated like the stock notify script tolerates it: the
+// unread notification is still delivered and no error is returned (issue #134).
+func TestCreateNotification_ArchiveFailureDoesNotAbort(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("directory permissions are not enforced for root")
+	}
+
+	cleanup := setupNotificationTestDirs(t)
+	defer cleanup()
+
+	if err := os.Chmod(notificationsArchiveDir, 0555); err != nil {
+		t.Fatalf("Failed to make archive dir read-only: %v", err)
+	}
+	defer os.Chmod(notificationsArchiveDir, 0755) //nolint:errcheck
+
+	if err := CreateNotification("Test Event", "Subject", "Description", "info", ""); err != nil {
+		t.Fatalf("CreateNotification should tolerate an archive write failure, got: %v", err)
+	}
+
+	unreadFiles, err := filepath.Glob(filepath.Join(notificationsDir, "*.notify"))
+	if err != nil || len(unreadFiles) != 1 {
+		t.Fatalf("Expected exactly one unread .notify file, got %d (err=%v)", len(unreadFiles), err)
+	}
+
+	archiveEntries, err := os.ReadDir(notificationsArchiveDir)
+	if err != nil {
+		t.Fatalf("Failed to read archive dir: %v", err)
+	}
+	for _, e := range archiveEntries {
+		t.Errorf("Unexpected entry in read-only archive dir: %s", e.Name())
+	}
+}
+
+// TestCreateNotification_UnreadFailureKeepsArchiveCopy pins the stock write
+// order: the archive copy is written first, so when only the unread write
+// fails the archive record is retained, exactly like the stock notify script
+// (issue #134).
+func TestCreateNotification_UnreadFailureKeepsArchiveCopy(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("directory permissions are not enforced for root")
+	}
+
+	cleanup := setupNotificationTestDirs(t)
+	defer cleanup()
+
+	if err := os.Chmod(notificationsDir, 0555); err != nil {
+		t.Fatalf("Failed to make notifications dir read-only: %v", err)
+	}
+	defer os.Chmod(notificationsDir, 0755) //nolint:errcheck
+
+	if err := CreateNotification("Test Event", "Subject", "Description", "info", ""); err == nil {
+		t.Fatal("Expected an error when the unread directory is not writable")
+	}
+
+	archiveFiles, err := filepath.Glob(filepath.Join(notificationsArchiveDir, "Test_Event_*.notify"))
+	if err != nil || len(archiveFiles) != 1 {
+		t.Fatalf("Expected the archive copy to be retained after unread write failure, got %d (err=%v)", len(archiveFiles), err)
+	}
+}
+
+// TestArchiveNotification_KeepsCreationArchiveCopy verifies that archiving via
+// the agent preserves the archive copy written at creation (which has no link
+// line), like the stock notify script's 'archive' verb, which only deletes the
+// unread file. Renaming the unread file over it would clobber that copy
+// (issue #134).
+func TestArchiveNotification_KeepsCreationArchiveCopy(t *testing.T) {
+	cleanup := setupNotificationTestDirs(t)
+	defer cleanup()
+
+	if err := CreateNotification("Test Event", "Subject", "Description", "info", "http://example.com/x"); err != nil {
+		t.Fatalf("CreateNotification failed: %v", err)
+	}
+	unreadFiles, err := filepath.Glob(filepath.Join(notificationsDir, "*.notify"))
+	if err != nil || len(unreadFiles) != 1 {
+		t.Fatalf("Expected one unread file, got %d (err=%v)", len(unreadFiles), err)
+	}
+	name := filepath.Base(unreadFiles[0])
+
+	if err := ArchiveNotification(name); err != nil {
+		t.Fatalf("ArchiveNotification failed: %v", err)
+	}
+
+	if _, err := os.Stat(unreadFiles[0]); !os.IsNotExist(err) {
+		t.Errorf("Expected unread file to be removed, stat err: %v", err)
+	}
+	content, err := os.ReadFile(filepath.Join(notificationsArchiveDir, name))
+	if err != nil {
+		t.Fatalf("Expected the creation archive copy to remain: %v", err)
+	}
+	if strings.Contains(string(content), "link=") {
+		t.Errorf("Archive copy was clobbered by the unread file (contains a link line):\n%s", content)
+	}
+}
+
+// TestArchiveAllNotifications_KeepsCreationArchiveCopies verifies the bulk
+// archive operation preserves creation archive copies the same way (issue #134).
+func TestArchiveAllNotifications_KeepsCreationArchiveCopies(t *testing.T) {
+	cleanup := setupNotificationTestDirs(t)
+	defer cleanup()
+
+	if err := CreateNotification("Bulk Event", "Subject", "Description", "info", "http://example.com/y"); err != nil {
+		t.Fatalf("CreateNotification failed: %v", err)
+	}
+	unreadFiles, err := filepath.Glob(filepath.Join(notificationsDir, "*.notify"))
+	if err != nil || len(unreadFiles) != 1 {
+		t.Fatalf("Expected one unread file, got %d (err=%v)", len(unreadFiles), err)
+	}
+	name := filepath.Base(unreadFiles[0])
+
+	if err := ArchiveAllNotifications(); err != nil {
+		t.Fatalf("ArchiveAllNotifications failed: %v", err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(notificationsArchiveDir, name))
+	if err != nil {
+		t.Fatalf("Expected the creation archive copy to remain: %v", err)
+	}
+	if strings.Contains(string(content), "link=") {
+		t.Errorf("Archive copy was clobbered by the unread file (contains a link line):\n%s", content)
+	}
+}
+
+// TestArchiveOrRemove_AmbiguousCheckTouchesNothing verifies that when the
+// archive destination cannot be checked at all (stat fails with something
+// other than not-exists), the helper returns that error without attempting a
+// rename (which could clobber an existing archive copy) or a remove (which
+// could delete the only copy). The returned error's Op pins that the helper
+// stopped at the failed check rather than attempting a mutation.
+func TestArchiveOrRemove_AmbiguousCheckTouchesNothing(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("directory permissions are not enforced for root")
+	}
+
+	tmpDir := t.TempDir()
+	srcDir := filepath.Join(tmpDir, "unread")
+	dstDir := filepath.Join(tmpDir, "archive")
+	for _, d := range []string{srcDir, dstDir} {
+		if err := os.MkdirAll(d, 0755); err != nil {
+			t.Fatalf("Failed to create %s: %v", d, err)
+		}
+	}
+	src := filepath.Join(srcDir, "test.notify")
+	if err := os.WriteFile(src, []byte("data"), 0644); err != nil {
+		t.Fatalf("Failed to write source file: %v", err)
+	}
+	if err := os.Chmod(dstDir, 0000); err != nil {
+		t.Fatalf("Failed to make archive dir unreadable: %v", err)
+	}
+	defer os.Chmod(dstDir, 0755) //nolint:errcheck
+
+	err := archiveOrRemove(src, filepath.Join(dstDir, "test.notify"))
+	if err == nil {
+		t.Fatal("Expected an error when the destination cannot be checked")
+	}
+	var pathErr *fs.PathError
+	if !errors.As(err, &pathErr) || pathErr.Op != "stat" {
+		t.Errorf("Expected the stat error itself (no rename/remove attempted), got: %v", err)
+	}
+
+	if _, statErr := os.Stat(src); statErr != nil {
+		t.Errorf("Source file should be untouched after an ambiguous check: %v", statErr)
+	}
+	if err := os.Chmod(dstDir, 0755); err != nil {
+		t.Fatalf("Failed to restore archive dir permissions: %v", err)
+	}
+	entries, err := os.ReadDir(dstDir)
+	if err != nil {
+		t.Fatalf("Failed to read archive dir: %v", err)
+	}
+	for _, e := range entries {
+		t.Errorf("Archive dir should be untouched, found: %s", e.Name())
+	}
+}
+
+// TestWriteFileAtomic_CleansUpTempOnFailure verifies the atomic writer removes
+// its temporary file when the write cannot complete, so a failure mid-dispatch
+// (e.g. ENOSPC) never leaves anything behind in the directory (issue #134).
+func TestWriteFileAtomic_CleansUpTempOnFailure(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Renaming onto a path inside a nonexistent subdirectory must fail after
+	// the temporary file has already been created and written.
+	err := writeFileAtomic(tmpDir, filepath.Join("missing-subdir", "test.notify"), []byte("data"))
+	if err == nil {
+		t.Fatal("Expected an error when the rename target cannot be created")
+	}
+
+	entries, readErr := os.ReadDir(tmpDir)
+	if readErr != nil {
+		t.Fatalf("Failed to read temp dir: %v", readErr)
+	}
+	for _, e := range entries {
+		t.Errorf("Unexpected leftover entry after failed atomic write: %s", e.Name())
 	}
 }
