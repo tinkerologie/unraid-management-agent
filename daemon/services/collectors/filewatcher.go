@@ -111,7 +111,7 @@ func (fw *FileWatcher) debouncedCallback(key string, cb func()) {
 		// Guard against overlapping callback executions: if the previous callback
 		// is still running, skip this firing rather than queuing behind it.
 		if !fw.callbackMu.TryLock() {
-			logger.Debug("FileWatcher: callback for %s skipped — previous run still in progress", key)
+			logger.Warning("FileWatcher: callback for %s skipped — previous run still in progress; change will be re-read on next collector tick", key)
 			return
 		}
 		defer fw.callbackMu.Unlock()

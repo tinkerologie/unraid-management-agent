@@ -47,6 +47,7 @@ func emcmdSpin(emhttpdKey, mdcmdCmd, diskName string) error {
 }
 
 
+// ArrayController provides control operations for the Unraid array.
 // It handles array start/stop, parity check operations, and array management commands.
 type ArrayController struct {
 	ctx *domain.Context
