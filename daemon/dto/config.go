@@ -12,7 +12,8 @@ type ShareConfig struct {
 	IncludeDisks []string  `json:"include_disks,omitempty"` // Disks to include
 	ExcludeDisks []string  `json:"exclude_disks,omitempty"` // Disks to exclude
 	UseCache     string    `json:"use_cache,omitempty"`     // "yes", "no", "only", "prefer"
-	Export       string    `json:"export,omitempty"`        // SMB/NFS/AFP export settings
+	Export       string    `json:"export,omitempty"`        // SMB export flag ("e"/"-")
+	ExportNFS    string    `json:"export_nfs,omitempty"`    // NFS export flag ("e"/"-")
 	Security     string    `json:"security,omitempty"`      // "public", "private", "secure"
 	Timestamp    time.Time `json:"timestamp"`
 }

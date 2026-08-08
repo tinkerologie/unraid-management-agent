@@ -156,10 +156,15 @@ func TestIsSMBExported(t *testing.T) {
 		{"public security", "", "public", true},
 		{"private security", "", "private", true},
 		{"secure security", "", "secure", true},
+		// Primary "e"/"-" flag semantics (Unraid shareExport field)
+		{"e flag exported", "e", "", true},
+		{"-  flag not exported", "-", "", false},
+		// Backward-compat: legacy substring values still detected
 		{"smb in export", "smb", "", true},
 		{"-e flag in export", "-e", "", true},
 		{"no export", "", "", false},
-		{"nfs only", "nfs", "", false},
+		// With new primary check, any non-empty non-"-" value is treated as exported
+		{"nfs value treated as exported", "nfs", "", true},
 		{"empty both", "", "", false},
 	}
 
@@ -177,22 +182,26 @@ func TestIsNFSExported(t *testing.T) {
 	c := &ShareCollector{}
 
 	tests := []struct {
-		name   string
-		export string
-		want   bool
+		name      string
+		exportNFS string
+		want      bool
 	}{
-		{"nfs in export", "nfs", true},
-		{"-n flag in export", "-n", true},
+		// Primary "e"/"-" flag semantics (Unraid shareExportNFS field)
+		{"e flag exported", "e", true},
+		{"- flag not exported", "-", false},
 		{"empty", "", false},
-		{"smb only", "smb", false},
-		{"-e flag", "-e", false},
+		// Any non-empty non-"-" value is treated as exported (non-standard but safe)
+		{"nfs value", "nfs", true},
+		{"-n value", "-n", true},
+		{"smb value", "smb", true},
+		{"-e value", "-e", true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := c.isNFSExported(tt.export)
+			got := c.isNFSExported(tt.exportNFS)
 			if got != tt.want {
-				t.Errorf("isNFSExported(%q) = %v, want %v", tt.export, got, tt.want)
+				t.Errorf("isNFSExported(%q) = %v, want %v", tt.exportNFS, got, tt.want)
 			}
 		})
 	}

@@ -20,7 +20,10 @@ func ExecCommand(command string, args ...string) ([]string, error) {
 	return ExecCommandWithTimeout(60*time.Second, command, args...)
 }
 
-// ExecCommandWithTimeout executes a command with a specific timeout
+// ExecCommandWithTimeout executes a command with a specific timeout.
+// stdout reading runs on a separate goroutine so a child process stuck in
+// uninterruptible sleep (e.g. smartctl against an unresponsive disk) cannot
+// block the caller past the configured deadline.
 func ExecCommandWithTimeout(timeout time.Duration, command string, args ...string) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -35,18 +38,43 @@ func ExecCommandWithTimeout(timeout time.Duration, command string, args ...strin
 		return nil, fmt.Errorf("failed to start command: %w", err)
 	}
 
+	type readResult struct {
+		lines []string
+		err   error
+	}
+	resultCh := make(chan readResult, 1)
+
+	go func() {
+		var lines []string
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() {
+			lines = append(lines, scanner.Text())
+		}
+		resultCh <- readResult{lines: lines, err: scanner.Err()}
+	}()
+
 	var lines []string
-	scanner := bufio.NewScanner(stdout)
-	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
+	var scanErr error
+
+	select {
+	case res := <-resultCh:
+		lines = res.lines
+		scanErr = res.err
+	case <-ctx.Done():
+		// Context expired while reading — kill the process and drain the result channel.
+		_ = cmd.Process.Kill()
+		res := <-resultCh
+		lines = res.lines
+		_ = cmd.Wait()
+		return lines, fmt.Errorf("command timed out after %v", timeout)
 	}
 
-	if err := scanner.Err(); err != nil {
-		return lines, fmt.Errorf("error reading output: %w", err)
+	if scanErr != nil {
+		_ = cmd.Wait()
+		return lines, fmt.Errorf("error reading output: %w", scanErr)
 	}
 
 	if err := cmd.Wait(); err != nil {
-		// Check if it was a timeout
 		if ctx.Err() == context.DeadlineExceeded {
 			return lines, fmt.Errorf("command timed out after %v", timeout)
 		}

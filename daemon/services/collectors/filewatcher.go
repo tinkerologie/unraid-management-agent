@@ -15,10 +15,11 @@ import (
 // It provides debouncing to coalesce rapid successive fs events (e.g. truncate+write)
 // into a single callback invocation.
 type FileWatcher struct {
-	watcher  *fsnotify.Watcher
-	mu       sync.Mutex
-	debounce time.Duration
-	timers   map[string]*time.Timer
+	watcher   *fsnotify.Watcher
+	mu        sync.Mutex
+	debounce  time.Duration
+	timers    map[string]*time.Timer
+	callbackMu sync.Mutex // guards the in-flight callback to prevent overlapping executions
 }
 
 // NewFileWatcher creates a new FileWatcher with the given debounce duration.
@@ -106,5 +107,14 @@ func (fw *FileWatcher) debouncedCallback(key string, cb func()) {
 	if t, exists := fw.timers[key]; exists {
 		t.Stop()
 	}
-	fw.timers[key] = time.AfterFunc(fw.debounce, cb)
+	fw.timers[key] = time.AfterFunc(fw.debounce, func() {
+		// Guard against overlapping callback executions: if the previous callback
+		// is still running, skip this firing rather than queuing behind it.
+		if !fw.callbackMu.TryLock() {
+			logger.Debug("FileWatcher: callback for %s skipped — previous run still in progress", key)
+			return
+		}
+		defer fw.callbackMu.Unlock()
+		cb()
+	})
 }

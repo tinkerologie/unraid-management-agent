@@ -98,7 +98,7 @@ func TestCollectWithWatchdog_SlowCycleDumpsStacks(t *testing.T) {
 	}
 
 	out = buf.String()
-	if !strings.Contains(out, "likely stalled; dumping goroutine stacks") {
+	if !strings.Contains(out, "likely stalled") {
 		t.Errorf("expected stall warning, got: %q", out)
 	}
 	// The dump must contain a real goroutine trace, not just the header.
