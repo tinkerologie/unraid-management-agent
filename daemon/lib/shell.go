@@ -68,13 +68,10 @@ func ExecCommandWithTimeout(timeout time.Duration, command string, args ...strin
 		select {
 		case res := <-resultCh:
 			lines = res.lines
-		default:
+		case <-time.After(10 * time.Millisecond):
 		}
 		go func() {
-			select {
-			case <-resultCh:
-			default:
-			}
+			<-resultCh
 			_ = cmd.Wait()
 		}()
 		return lines, fmt.Errorf("command timed out after %v", timeout)

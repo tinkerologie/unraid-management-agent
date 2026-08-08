@@ -158,7 +158,7 @@ func TestIsSMBExported(t *testing.T) {
 		{"secure security", "", "secure", true},
 		// Primary "e"/"-" flag semantics (Unraid shareExport field)
 		{"e flag exported", "e", "", true},
-		{"-  flag not exported", "-", "", false},
+		{"- flag not exported", "-", "", false},
 		// Backward-compat: legacy substring values still detected
 		{"smb in export", "smb", "", true},
 		{"-e flag in export", "-e", "", true},
