@@ -28,16 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stdout reading now runs on a separate goroutine and unblocks when the context expires,
   so a `smartctl` call against an unresponsive disk cannot hold the calling goroutine
   indefinitely past its configured timeout.
-- **`list_shares` NFS export always false** (#141) — `shareExportNFS` is now parsed from
-  the per-share `.cfg` file and used to derive `nfs_export`, fixing the always-`false`
-  result on shares that have NFS export enabled.
-- **SMB export detection aligned with Unraid flag format** (#141) — `isSMBExported` now
-  uses the authoritative `shareExport` `"e"`/`"-"` flag as its primary check, with
-  the existing security and substring checks retained as fallbacks.
-- **`disk_spin_up`/`disk_spin_down` no longer fail with "invalid argument" on Unraid 7.3.x**
-  (#140) — spin operations now use the `emhttpd` socket command (`cmdSpinup`/`cmdSpindown`)
-  matching the WebGUI mechanism, with `/proc/mdcmd` retained as a fallback for environments
-  where the socket is unavailable.
 
 ## [2026.07.00] - 2026-07-10
 

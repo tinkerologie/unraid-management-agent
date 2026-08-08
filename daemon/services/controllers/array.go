@@ -3,6 +3,8 @@ package controllers
 
 import (
 	"fmt"
+	"strings"
+	"unicode"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
@@ -32,6 +34,10 @@ func mdcmdExec(args ...string) error {
 // emhttpdKey is the HTTP parameter key (e.g. "cmdSpinup"), mdcmdCmd is the legacy
 // mdcmd argument (e.g. "spinup").
 func emcmdSpin(emhttpdKey, mdcmdCmd, diskName string) error {
+	if strings.IndexFunc(diskName, unicode.IsSpace) >= 0 {
+		return fmt.Errorf("invalid disk name %q: must not contain whitespace", diskName)
+	}
+
 	if lib.IsEmhttpdAvailable() {
 		params := map[string]string{emhttpdKey: diskName}
 		if state := lib.ReadStartState(); state != "" {
@@ -45,7 +51,6 @@ func emcmdSpin(emhttpdKey, mdcmdCmd, diskName string) error {
 	logger.Debug("Array: emhttpd socket not available, falling back to /proc/mdcmd for %s %s", mdcmdCmd, diskName)
 	return mdcmdExec(mdcmdCmd, diskName)
 }
-
 
 // ArrayController provides control operations for the Unraid array.
 // It handles array start/stop, parity check operations, and array management commands.

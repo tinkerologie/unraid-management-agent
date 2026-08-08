@@ -29,6 +29,7 @@ func ExecCommandWithTimeout(timeout time.Duration, command string, args ...strin
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, command, args...) // #nosec G204 -- callers pass validated commands and arguments without shell interpolation
+	cmd.WaitDelay = time.Second
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
@@ -61,11 +62,21 @@ func ExecCommandWithTimeout(timeout time.Duration, command string, args ...strin
 		lines = res.lines
 		scanErr = res.err
 	case <-ctx.Done():
-		// Context expired while reading — kill the process and drain the result channel.
+		// Context expired while reading — kill and clean up without blocking caller.
 		_ = cmd.Process.Kill()
-		res := <-resultCh
-		lines = res.lines
-		_ = cmd.Wait()
+		_ = stdout.Close()
+		select {
+		case res := <-resultCh:
+			lines = res.lines
+		default:
+		}
+		go func() {
+			select {
+			case <-resultCh:
+			default:
+			}
+			_ = cmd.Wait()
+		}()
 		return lines, fmt.Errorf("command timed out after %v", timeout)
 	}
 

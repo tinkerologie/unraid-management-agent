@@ -331,29 +331,29 @@ func (c *ShareCollector) determineStorage(useCache string) string {
 
 // isSMBExported checks if share is exported via SMB
 func (c *ShareCollector) isSMBExported(export string, security string) bool {
-	// Primary: use the authoritative "e"/"-" export flag
-	if export != "" && export != "-" {
+	// Primary: use the authoritative "e"/"-" export flag.
+	switch export {
+	case "e":
 		return true
+	case "-":
+		return false
 	}
 
-	// Fallback: if security is set, share is typically SMB exported
-	if security == "public" || security == "private" || security == "secure" {
-		return true
+	if export == "" {
+		// Fallback: if security is set, share is typically SMB exported.
+		if security == "public" || security == "private" || security == "secure" {
+			return true
+		}
+		return false
 	}
 
-	// Legacy fallback: substring checks for older config formats
-	if strings.Contains(export, "smb") || strings.Contains(export, "-e") {
-		return true
-	}
-
-	return false
+	// Legacy fallback: substring checks for older config formats.
+	return strings.Contains(export, "smb") || strings.Contains(export, "-e")
 }
 
 // isNFSExported checks if share is exported via NFS using the shareExportNFS flag
 func (c *ShareCollector) isNFSExported(exportNFS string) bool {
-	// The NFS export flag uses "e" for enabled and "-" for disabled.
-	// Any non-empty value that is not "-" means NFS is exported.
-	return exportNFS != "" && exportNFS != "-"
+	return exportNFS == "e"
 }
 
 // zfsDatasetSizes runs "zfs list -Hp -o name,refer" and returns a map of

@@ -163,8 +163,7 @@ func TestIsSMBExported(t *testing.T) {
 		{"smb in export", "smb", "", true},
 		{"-e flag in export", "-e", "", true},
 		{"no export", "", "", false},
-		// With new primary check, any non-empty non-"-" value is treated as exported
-		{"nfs value treated as exported", "nfs", "", true},
+		{"nfs value treated as not exported", "nfs", "", false},
 		{"empty both", "", "", false},
 	}
 
@@ -190,11 +189,10 @@ func TestIsNFSExported(t *testing.T) {
 		{"e flag exported", "e", true},
 		{"- flag not exported", "-", false},
 		{"empty", "", false},
-		// Any non-empty non-"-" value is treated as exported (non-standard but safe)
-		{"nfs value", "nfs", true},
-		{"-n value", "-n", true},
-		{"smb value", "smb", true},
-		{"-e value", "-e", true},
+		{"nfs value", "nfs", false},
+		{"-n value", "-n", false},
+		{"smb value", "smb", false},
+		{"-e value", "-e", false},
 	}
 
 	for _, tt := range tests {
