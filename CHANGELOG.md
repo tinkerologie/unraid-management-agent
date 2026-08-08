@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Disk collector no longer stacks blocked collect goroutines when runs overlap** (#138) —
+  overlapping trigger paths (ticker/fsnotify/watchdog wrapper) now skip a new disk
+  collect cycle if the previous one is still running, instead of blocking on the
+  collector mutex and repeatedly emitting long `sync.Mutex.Lock` stall stack traces
+  into the agent log.
+
 ## [2026.07.00] - 2026-07-10
 
 ### Fixed
