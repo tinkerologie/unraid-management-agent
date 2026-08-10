@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.08.01] - 2026-08-10
+
 ### Security
 
 - **Dependency vulnerability remediation** — updated `go.opentelemetry.io/otel`
@@ -16,15 +18,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reports zero vulnerabilities in imported packages; no affected code paths were called.
 - **LLM client SSRF review** — annotated the OpenAI/Anthropic provider requests with
   justified `#nosec G704` markers (the request endpoint is an admin-configured API URL, not
-  untrusted input) and tightened the agent memory store directory permissions from `0755`
-  to `0750` (gosec G301). `gosec` and `golangci-lint` now report zero issues.
+  untrusted input). `gosec` and `golangci-lint` now report zero issues.
+- **Agent memory store directory hardening** — the store directory is created at `0750`, and
+  on every save any pre-existing directory left world-readable (e.g. `0755` from an earlier
+  install) is tightened to at most `0750` (group-write and all "other" bits cleared, stricter
+  permissions preserved).
 
 ### Changed
 
-- **Toolchain** — bumped the `go` directive and CI `setup-go` to Go 1.26.5.
+- **Toolchain** — bumped the `go` directive to Go 1.26.5; CI now derives its Go version from
+  `go.mod` via `setup-go`'s `go-version-file` to prevent drift.
 - **Dependencies** — refreshed direct and transitive modules to their latest releases
   (`kong`, `go-libvirt`, `docker/go-connections`, the `go-openapi`/`swaggo` stack, and the
   OpenTelemetry instrumentation packages) via `go get -u ./...` + `go mod tidy`.
+
+### Documentation
+
+- **MCP transport** — clarified that the official Go SDK negotiates the highest
+  mutually-supported protocol version per connection, and documented the opt-in
+  `StreamableHTTPOptions.Stateless = true` (sessionless 2026-07-28) transport, left disabled
+  so existing session-based clients are unaffected.
 
 ## [2026.08.00] - 2026-08-10
 
