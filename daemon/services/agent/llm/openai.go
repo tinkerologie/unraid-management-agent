@@ -161,6 +161,7 @@ func (o *OpenAIProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRespon
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+o.apiKey)
 
+	// #nosec G704 -- endpoint is an admin-configured LLM API URL, not untrusted request input
 	resp, err := o.client.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("openai request failed: %w", err)

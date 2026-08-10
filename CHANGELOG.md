@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Dependency vulnerability remediation** — updated `go.opentelemetry.io/otel`
+  1.43.0 → 1.45.0 to clear GO-2026-5158 (unbounded baggage header parsing). `govulncheck`
+  reports zero vulnerabilities in imported packages; no affected code paths were called.
+- **LLM client SSRF review** — annotated the OpenAI/Anthropic provider requests with
+  justified `#nosec G704` markers (the request endpoint is an admin-configured API URL, not
+  untrusted input) and tightened the agent memory store directory permissions from `0755`
+  to `0750` (gosec G301). `gosec` and `golangci-lint` now report zero issues.
+
+### Changed
+
+- **Toolchain** — bumped the `go` directive and CI `setup-go` to Go 1.26.5.
+- **Dependencies** — refreshed direct and transitive modules to their latest releases
+  (`kong`, `go-libvirt`, `docker/go-connections`, the `go-openapi`/`swaggo` stack, and the
+  OpenTelemetry instrumentation packages) via `go get -u ./...` + `go mod tidy`.
+
 ## [2026.08.00] - 2026-08-10
 
 ### Fixed

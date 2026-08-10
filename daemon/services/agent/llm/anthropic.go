@@ -139,6 +139,7 @@ func (a *AnthropicProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRes
 	httpReq.Header.Set("x-api-key", a.apiKey)
 	httpReq.Header.Set("anthropic-version", anthropicVersion)
 
+	// #nosec G704 -- endpoint is an admin-configured LLM API URL, not untrusted request input
 	resp, err := a.client.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("anthropic request failed: %w", err)

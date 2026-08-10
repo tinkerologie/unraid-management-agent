@@ -164,7 +164,7 @@ func (s *Store) Save() error {
 	copy(preferences, s.preferences)
 	s.mu.RUnlock()
 	data := persisted{Incidents: incidents, Preferences: preferences}
-	if err := os.MkdirAll(filepath.Dir(s.filePath), 0o755); err != nil { // #nosec G301 -- plugin config dir
+	if err := os.MkdirAll(filepath.Dir(s.filePath), 0o750); err != nil {
 		return fmt.Errorf("creating agent config dir: %w", err)
 	}
 	b, err := json.MarshalIndent(data, "", "  ")
