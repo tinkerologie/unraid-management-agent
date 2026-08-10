@@ -307,7 +307,7 @@ func (c *ShareCollector) enrichShareWithConfig(share *dto.ShareInfo, configColle
 	share.Security = config.Security
 	share.Storage = c.determineStorage(share.UseCache)
 	share.SMBExport = c.isSMBExported(config.Export, config.Security)
-	share.NFSExport = c.isNFSExported(config.Export)
+	share.NFSExport = c.isNFSExported(config.ExportNFS)
 
 	// Determine mover action based on cache settings (Issue #53)
 	share.MoverAction = c.determineMoverAction(share.UseCache, share.CachePool, share.CachePool2)
@@ -331,23 +331,29 @@ func (c *ShareCollector) determineStorage(useCache string) string {
 
 // isSMBExported checks if share is exported via SMB
 func (c *ShareCollector) isSMBExported(export string, security string) bool {
-	// If security is set, share is typically SMB exported
-	if security == "public" || security == "private" || security == "secure" {
+	// Primary: use the authoritative "e"/"-" export flag.
+	switch export {
+	case "e":
 		return true
+	case "-":
+		return false
 	}
 
-	// Check export field for SMB indicators
-	if strings.Contains(export, "smb") || strings.Contains(export, "-e") {
-		return true
+	if export == "" {
+		// Fallback: if security is set, share is typically SMB exported.
+		if security == "public" || security == "private" || security == "secure" {
+			return true
+		}
+		return false
 	}
 
-	return false
+	// Legacy fallback: substring checks for older config formats.
+	return strings.Contains(export, "smb") || strings.Contains(export, "-e")
 }
 
-// isNFSExported checks if share is exported via NFS
-func (c *ShareCollector) isNFSExported(export string) bool {
-	// Check export field for NFS indicators
-	return strings.Contains(export, "nfs") || strings.Contains(export, "-n")
+// isNFSExported checks if share is exported via NFS using the shareExportNFS flag
+func (c *ShareCollector) isNFSExported(exportNFS string) bool {
+	return exportNFS == "e"
 }
 
 // zfsDatasetSizes runs "zfs list -Hp -o name,refer" and returns a map of

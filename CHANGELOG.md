@@ -16,6 +16,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   those dispatches always failed with `invalid importance level: normal` before any file was
   written. `CreateNotification` now accepts `normal` — the stock notify script's own level for
   informational notifications — alongside `alert`, `warning`, and the agent's own `info`.
+- **`list_shares` now reports `nfs_export` correctly** (#141) — the share collector read the
+  SMB export flag for the NFS field, so every share reported `nfs_export: false` regardless of
+  configuration. NFS export is now derived from the dedicated `shareExportNFS` flag, and SMB/NFS
+  export flags are parsed from the authoritative `"e"`/`"-"` values.
+- **`disk_spin_up`/`disk_spin_down` restored on Unraid 7.3.x** (#140) — direct writes to
+  `/proc/mdcmd` were rejected with `invalid argument`. Spin commands now go through the emhttpd
+  socket (matching the Unraid WebGUI), falling back to `/proc/mdcmd` when the socket is
+  unavailable, with disk names validated against whitespace/newline injection.
+- **Disk collector no longer stacks blocked collect goroutines when runs overlap** (#138) —
+  overlapping trigger paths (ticker/fsnotify/watchdog wrapper) now skip a new disk
+  collect cycle if the previous one is still running, instead of blocking on the
+  collector mutex and repeatedly emitting long `sync.Mutex.Lock` stall stack traces
+  into the agent log.
+- **FileWatcher callback in-flight guard** (#138) — the debounced fsnotify callback
+  now skips a new firing if the previous callback is still executing, preventing
+  additional goroutines from stacking up behind the collector mutex.
+- **Watchdog stall-dump throttling** (#138) — full goroutine stack dumps are now emitted
+  at most once per 5-minute cooldown window per collector, preventing a persistently
+  slow collector from flooding `/var/log` with repeated multi-megabyte dumps.
+- **Goroutine stack dump size capped at 512 KiB** (#138) — `AllGoroutineStacks()` now
+  truncates output so a single log entry cannot exceed the lumberjack rotation threshold.
+- **`ExecCommandWithTimeout` no longer blocks past deadline on stuck processes** (#138) —
+  stdout reading now runs on a separate goroutine and unblocks when the context expires,
+  so a `smartctl` call against an unresponsive disk cannot hold the calling goroutine
+  indefinitely past its configured timeout.
 
 ## [2026.07.00] - 2026-07-10
 

@@ -156,6 +156,29 @@ func TestArrayControllerDiskOperations(t *testing.T) {
 	})
 }
 
+func TestEmcmdSpinRejectsWhitespaceDiskNames(t *testing.T) {
+	tests := []struct {
+		name     string
+		diskName string
+	}{
+		{name: "space", diskName: "disk 1"},
+		{name: "tab", diskName: "disk\t1"},
+		{name: "newline", diskName: "disk1\nstart"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := emcmdSpin("cmdSpinup", "spinup", tt.diskName)
+			if err == nil {
+				t.Fatalf("emcmdSpin(%q) expected error for whitespace disk name", tt.diskName)
+			}
+			if !strings.Contains(err.Error(), "must not contain whitespace") {
+				t.Fatalf("emcmdSpin(%q) error = %v, want whitespace validation error", tt.diskName, err)
+			}
+		})
+	}
+}
+
 // TestArrayDiskClearStats tests the ClearDiskStats method.
 func TestArrayDiskClearStats(t *testing.T) {
 	ctx := &domain.Context{}

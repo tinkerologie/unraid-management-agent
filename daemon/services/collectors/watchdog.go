@@ -2,6 +2,7 @@ package collectors
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
@@ -13,8 +14,15 @@ import (
 // even long-interval collectors (e.g. hardware at 10m, the update checkers at
 // hours) surface a stall within a few minutes rather than waiting a whole cycle.
 const (
-	watchdogFloor = 30 * time.Second
-	watchdogCeil  = 5 * time.Minute
+	watchdogFloor     = 30 * time.Second
+	watchdogCeil      = 5 * time.Minute
+	stallDumpCooldown = 5 * time.Minute // minimum time between full goroutine dumps per collector
+)
+
+// stallCooldowns tracks the last time a full goroutine dump was emitted per collector name.
+var (
+	stallCooldownMu sync.Mutex
+	stallCooldowns  = make(map[string]time.Time)
 )
 
 // watchdogThreshold derives the stall threshold for a collector from its
@@ -32,13 +40,25 @@ func watchdogThreshold(interval time.Duration) time.Duration {
 	}
 }
 
+// shouldEmitFullDump reports whether enough time has passed since the last full
+// goroutine dump for the named collector, and records the emission time if so.
+func shouldEmitFullDump(name string) bool {
+	stallCooldownMu.Lock()
+	defer stallCooldownMu.Unlock()
+	if last, ok := stallCooldowns[name]; ok && time.Since(last) < stallDumpCooldown {
+		return false
+	}
+	stallCooldowns[name] = time.Now()
+	return true
+}
+
 // collectWithWatchdog runs a single collector cycle and observes how long it
 // takes. Every cycle's start and duration are logged at debug; if a cycle does
 // not finish within the interval-derived threshold, a warning plus a full
-// goroutine stack dump are logged once, and a second warning is logged when the
-// cycle eventually finishes. This makes a stalled cycle visible and diagnosable
-// from the agent log: the gap between "starting" and "finished", and the
-// goroutine dump, reveal exactly which call is blocked.
+// goroutine stack dump are logged once per cooldown window, and a second warning
+// is logged when the cycle eventually finishes. This makes a stalled cycle
+// visible and diagnosable from the agent log: the gap between "starting" and
+// "finished", and the goroutine dump, reveal exactly which call is blocked.
 //
 // Motivation: collectors run cycles serially on one goroutine, so one blocked
 // cycle freezes that collector's updates until the call returns — e.g. the
@@ -66,8 +86,14 @@ func runCollectWithWatchdog(ctx context.Context, name string, threshold time.Dur
 		case <-ctx.Done():
 			// Daemon shutting down — not a stall; exit without dumping.
 		case <-time.After(threshold):
-			logger.Warning("%s: collect cycle still running after %v — likely stalled; dumping goroutine stacks", name, threshold)
-			logger.Warning("%s: goroutine dump follows:\n%s", name, logger.AllGoroutineStacks())
+			logger.Warning("%s: collect cycle still running after %v — likely stalled", name, threshold)
+			// Emit the full goroutine dump at most once per cooldown window to
+			// avoid flooding the log when a collector is persistently slow.
+			if shouldEmitFullDump(name) {
+				logger.Warning("%s: goroutine dump follows:\n%s", name, logger.AllGoroutineStacks())
+			} else {
+				logger.Warning("%s: goroutine dump suppressed (cooldown active)", name)
+			}
 		}
 	}()
 

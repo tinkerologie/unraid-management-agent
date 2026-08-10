@@ -109,7 +109,10 @@ func (c *DiskCollector) Start(ctx context.Context, interval time.Duration) {
 // Collect gathers detailed disk information and publishes it to the event bus.
 // It collects data from multiple sources including lsblk, smartctl, and Unraid configuration files.
 func (c *DiskCollector) Collect() {
-	c.mu.Lock()
+	if !c.mu.TryLock() {
+		logger.Debug("Disk: previous collect cycle still running, skipping overlapping run")
+		return
+	}
 	defer c.mu.Unlock()
 
 	logger.Debug("Collecting disk data...")

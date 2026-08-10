@@ -123,6 +123,25 @@ func readCSRFToken() (string, error) {
 	return "", errors.New("csrf_token not found in var.ini")
 }
 
+// ReadStartState reads the current array state from var.ini.
+// Returns the value of mdState (e.g. "STARTED", "STOPPED") or an empty string if unavailable.
+func ReadStartState() string {
+	// #nosec G304 - VarIniPath is a controlled constant path
+	data, err := os.ReadFile(VarIniPath)
+	if err != nil {
+		return ""
+	}
+
+	for line := range strings.SplitSeq(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if after, ok := strings.CutPrefix(line, "mdState="); ok {
+			state := strings.Trim(after, `"`)
+			return state
+		}
+	}
+	return ""
+}
+
 // IsEmhttpdAvailable checks if the emhttpd socket is available.
 func IsEmhttpdAvailable() bool {
 	info, err := os.Stat(EmhttpdSocket)

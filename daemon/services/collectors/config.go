@@ -86,6 +86,8 @@ func (c *ConfigCollector) GetShareConfig(shareName string) (*dto.ShareConfig, er
 			config.UseCache = value
 		case "shareExport":
 			config.Export = value
+		case "shareExportNFS":
+			config.ExportNFS = value
 		case "shareSecurity":
 			config.Security = value
 		}

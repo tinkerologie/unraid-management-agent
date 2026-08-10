@@ -3,6 +3,8 @@ package controllers
 
 import (
 	"fmt"
+	"strings"
+	"unicode"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
@@ -24,6 +26,30 @@ func mdcmdExec(args ...string) error {
 	logger.Debug("Array: /proc/mdcmd not available, falling back to mdcmd binary")
 	_, err := lib.ExecCommand(constants.MdcmdBin, args...)
 	return err
+}
+
+// emcmdSpin sends a disk spin-up or spin-down command via the emhttpd socket
+// (primary path, matching the Unraid WebGUI mechanism). Falls back to the
+// /proc/mdcmd path when the socket is unavailable so older environments keep working.
+// emhttpdKey is the HTTP parameter key (e.g. "cmdSpinup"), mdcmdCmd is the legacy
+// mdcmd argument (e.g. "spinup").
+func emcmdSpin(emhttpdKey, mdcmdCmd, diskName string) error {
+	if strings.IndexFunc(diskName, unicode.IsSpace) >= 0 {
+		return fmt.Errorf("invalid disk name %q: must not contain whitespace", diskName)
+	}
+
+	if lib.IsEmhttpdAvailable() {
+		params := map[string]string{emhttpdKey: diskName}
+		if state := lib.ReadStartState(); state != "" {
+			params["startState"] = state
+		} else {
+			logger.Warning("Array: could not read startState from var.ini; sending spin command without it")
+		}
+		return lib.EmhttpdRequest(params)
+	}
+	// Fallback: write directly to /proc/mdcmd (may fail on Unraid 7.3.x)
+	logger.Debug("Array: emhttpd socket not available, falling back to /proc/mdcmd for %s %s", mdcmdCmd, diskName)
+	return mdcmdExec(mdcmdCmd, diskName)
 }
 
 // ArrayController provides control operations for the Unraid array.
@@ -128,11 +154,12 @@ func (c *ArrayController) ResumeParityCheck() error {
 }
 
 // SpinDownDisk spins down a specific disk.
-// Uses direct /proc/mdcmd write for zero shell overhead with fallback to mdcmd binary.
+// Uses the emhttpd socket command (matching the Unraid WebGUI), falling back to
+// /proc/mdcmd when the socket is unavailable.
 func (c *ArrayController) SpinDownDisk(diskName string) error {
 	logger.Info("Array: Spinning down disk %s...", diskName)
 
-	if err := mdcmdExec("spindown", diskName); err != nil {
+	if err := emcmdSpin("cmdSpindown", "spindown", diskName); err != nil {
 		logger.Error("Array: Failed to spin down disk %s: %v", diskName, err)
 		return fmt.Errorf("failed to spin down disk: %w", err)
 	}
@@ -142,11 +169,12 @@ func (c *ArrayController) SpinDownDisk(diskName string) error {
 }
 
 // SpinUpDisk spins up a specific disk.
-// Uses direct /proc/mdcmd write for zero shell overhead with fallback to mdcmd binary.
+// Uses the emhttpd socket command (matching the Unraid WebGUI), falling back to
+// /proc/mdcmd when the socket is unavailable.
 func (c *ArrayController) SpinUpDisk(diskName string) error {
 	logger.Info("Array: Spinning up disk %s...", diskName)
 
-	if err := mdcmdExec("spinup", diskName); err != nil {
+	if err := emcmdSpin("cmdSpinup", "spinup", diskName); err != nil {
 		logger.Error("Array: Failed to spin up disk %s: %v", diskName, err)
 		return fmt.Errorf("failed to spin up disk: %w", err)
 	}

@@ -3,6 +3,7 @@ package collectors
 import (
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
@@ -20,6 +21,27 @@ func TestNewDiskCollector(t *testing.T) {
 
 	if collector.ctx != ctx {
 		t.Error("DiskCollector context not set correctly")
+	}
+}
+
+func TestDiskCollectorCollectSkipsWhenAlreadyRunning(t *testing.T) {
+	hub := domain.NewEventBus(10)
+	ctx := &domain.Context{Hub: hub}
+	collector := NewDiskCollector(ctx)
+
+	collector.mu.Lock()
+	defer collector.mu.Unlock()
+
+	done := make(chan struct{})
+	go func() {
+		collector.Collect()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("Collect() blocked while collector mutex was already held")
 	}
 }
 

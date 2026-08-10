@@ -91,14 +91,14 @@ func TestCollectWithWatchdog_SlowCycleDumpsStacks(t *testing.T) {
 	// ends, so it is present by now. Poll briefly to absorb scheduler latency.
 	deadline := time.Now().Add(time.Second)
 	for time.Now().Before(deadline) {
-		if strings.Contains(buf.String(), "dumping goroutine stacks") {
+		if strings.Contains(buf.String(), "goroutine dump follows:") {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
 
 	out = buf.String()
-	if !strings.Contains(out, "likely stalled; dumping goroutine stacks") {
+	if !strings.Contains(out, "likely stalled") {
 		t.Errorf("expected stall warning, got: %q", out)
 	}
 	// The dump must contain a real goroutine trace, not just the header.

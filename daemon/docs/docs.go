@@ -9835,7 +9835,11 @@ const docTemplate = `{
                     }
                 },
                 "export": {
-                    "description": "SMB/NFS/AFP export settings",
+                    "description": "SMB export flag (\"e\"/\"-\")",
+                    "type": "string"
+                },
+                "export_nfs": {
+                    "description": "NFS export flag (\"e\"/\"-\")",
                     "type": "string"
                 },
                 "floor": {

@@ -19,20 +19,30 @@ func stackBuf() string {
 // what a stalled collector looks like from the outside: the watchdog goroutine
 // is healthy while another goroutine is blocked in a syscall. The buffer grows
 // until the dump fits, capped so a pathological goroutine count can't allocate
-// without bound.
+// without bound. Output is additionally capped at 512 KiB to prevent a single
+// log entry from exceeding the lumberjack rotation threshold.
 func AllGoroutineStacks() string {
-	const maxBuf = 16 << 20 // 16 MiB ceiling
-	size := 1 << 20         // 1 MiB
+	const (
+		maxBuf    = 4 << 20   // 4 MiB hard ceiling for the runtime.Stack buffer
+		maxOutput = 512 << 10 // 512 KiB cap for what we actually log
+	)
+	size := 1 << 20 // start at 1 MiB
 	for {
 		buf := make([]byte, size)
-		// runtime.Stack returns the number of bytes written (always <= len(buf));
-		// n == size means the buffer was filled and the dump was likely truncated.
 		n := runtime.Stack(buf, true)
 		if n < size {
-			return string(buf[:n])
+			s := string(buf[:n])
+			if len(s) > maxOutput {
+				return s[:maxOutput] + "\n... (truncated)"
+			}
+			return s
 		}
 		if size >= maxBuf {
-			return string(buf[:n]) // truncated at the ceiling (n == size here)
+			s := string(buf[:n])
+			if len(s) > maxOutput {
+				return s[:maxOutput] + "\n... (truncated)"
+			}
+			return s
 		}
 		size *= 2
 	}
