@@ -1,7 +1,14 @@
 // Package mcp provides a Model Context Protocol (MCP) server implementation for the Unraid Management Agent.
 // It exposes Unraid system monitoring and control capabilities to AI agents via the standardized MCP protocol.
 //
-// Uses the official MCP Go SDK (github.com/modelcontextprotocol/go-sdk) implementing protocol version 2025-06-18.
+// Uses the official MCP Go SDK (github.com/modelcontextprotocol/go-sdk). The SDK negotiates the
+// highest mutually-supported protocol version per connection. The default stateful transport keeps
+// Mcp-Session-Id sessions and currently negotiates up to 2025-11-25.
+//
+// The sessionless 2026-07-28 protocol (server/discover, per-request metadata) can be enabled with
+// StreamableHTTPOptions.Stateless = true: each request gets a temporary session, GET/DELETE return
+// 405, and server->client requests are rejected (in-request notifications still work). It is left
+// off here so existing session-based clients are unaffected.
 // Supports two transports:
 //   - Streamable HTTP: for remote connections (Claude, ChatGPT, Cursor, Copilot, Codex, Windsurf, Gemini, etc.)
 //   - STDIO: for local connections on the Unraid server (newline-delimited JSON over stdin/stdout)
@@ -132,13 +139,17 @@ func (s *Server) Initialize() error {
 	s.registerCPUControlTools()
 	s.registerTuningTools()
 
-	// Create the Streamable HTTP handler (implements MCP 2025-06-18 transport)
+	// Create the Streamable HTTP handler. Stateful sessions are used so existing
+	// session-based clients keep working; the SDK still negotiates the highest
+	// mutually-supported protocol version per connection. Set
+	// StreamableHTTPOptions.Stateless = true to serve the sessionless 2026-07-28
+	// protocol (SEP-2567).
 	s.httpHandler = mcp.NewStreamableHTTPHandler(
 		func(_ *http.Request) *mcp.Server { return s.mcpServer },
 		nil,
 	)
 
-	logger.Info("MCP server initialized with official SDK (protocol 2025-06-18), tools, resources, and prompts")
+	logger.Info("MCP server initialized with official SDK (streamable HTTP with version negotiation), tools, resources, and prompts")
 	return nil
 }
 
