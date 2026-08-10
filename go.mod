@@ -15,7 +15,7 @@ require (
 	github.com/moby/moby/api v1.55.0
 	github.com/moby/moby/client v0.5.1
 	github.com/modelcontextprotocol/go-sdk v1.7.0
-	github.com/nicholas-fedor/shoutrrr v0.16.3
+	github.com/nicholas-fedor/shoutrrr v0.17.0
 	github.com/prometheus/client_golang v1.24.1
 	github.com/swaggo/http-swagger/v2 v2.0.2
 	github.com/swaggo/swag v1.16.6
