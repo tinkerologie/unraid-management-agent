@@ -1,6 +1,8 @@
 package memory
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -55,5 +57,31 @@ func TestPreferenceConfirm(t *testing.T) {
 	}
 	if err := s.ConfirmPreference("missing"); err == nil {
 		t.Fatal("expected error confirming unknown preference")
+	}
+}
+
+// TestSaveTightensExistingConfigDirPerms verifies that Save restricts a
+// pre-existing, world-readable config dir (e.g. one left at 0755 by an older
+// install) down to at most 0750, since MkdirAll alone won't touch it.
+func TestSaveTightensExistingConfigDirPerms(t *testing.T) {
+	sub := filepath.Join(t.TempDir(), "cfg")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	// Force the mode in case the process umask stripped bits at creation.
+	if err := os.Chmod(sub, 0o755); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+
+	if err := NewStore(sub, 100).Save(); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	info, err := os.Stat(sub)
+	if err != nil {
+		t.Fatalf("stat: %v", err)
+	}
+	if perm := info.Mode().Perm(); perm&0o027 != 0 {
+		t.Fatalf("expected config dir tightened to <=0750, got %04o", perm)
 	}
 }

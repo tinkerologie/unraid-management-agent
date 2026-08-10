@@ -164,8 +164,18 @@ func (s *Store) Save() error {
 	copy(preferences, s.preferences)
 	s.mu.RUnlock()
 	data := persisted{Incidents: incidents, Preferences: preferences}
-	if err := os.MkdirAll(filepath.Dir(s.filePath), 0o750); err != nil {
+	dir := filepath.Dir(s.filePath)
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("creating agent config dir: %w", err)
+	}
+	// MkdirAll leaves a pre-existing dir's mode untouched; tighten group-write and
+	// all "other" bits so an upgraded install can't keep a world-readable config dir.
+	if info, statErr := os.Stat(dir); statErr == nil {
+		if mode := info.Mode().Perm(); mode&0o027 != 0 {
+			if err := os.Chmod(dir, mode&^0o027); err != nil {
+				return fmt.Errorf("tightening agent config dir perms: %w", err)
+			}
+		}
 	}
 	b, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
