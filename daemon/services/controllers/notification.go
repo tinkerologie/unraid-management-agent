@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/collectors"
 )
@@ -35,9 +36,8 @@ func init() {
 // first. Files are written atomically so a failed write (e.g. ENOSPC) never
 // leaves a partial .notify file behind. See issue #134.
 func CreateNotification(title, subject, description, importance, link string) error {
-	// Validate importance
-	if importance != "alert" && importance != "warning" && importance != "info" {
-		return fmt.Errorf("invalid importance level: %s (must be alert, warning, or info)", importance)
+	if err := lib.ValidateNotificationImportance(importance); err != nil {
+		return err
 	}
 
 	timestamp := time.Now()

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Info-severity alerts now reach the `unraid` channel** (#144) — the alert dispatcher
+  sends importance `normal` for info-severity events, which `CreateNotification` rejected, so
+  those dispatches always failed with `invalid importance level: normal` before any file was
+  written. `CreateNotification` now accepts `normal` — the stock notify script's own level for
+  informational notifications — alongside `alert`, `warning`, and the agent's own `info`.
+
 ## [2026.07.00] - 2026-07-10
 
 ### Fixed

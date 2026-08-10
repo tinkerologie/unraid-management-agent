@@ -613,3 +613,16 @@ func ValidateRemoteShareSource(source string) error {
 	}
 	return nil
 }
+
+// ValidateNotificationImportance validates an Unraid notification importance
+// level. "normal" is the stock notify script's own level for informational
+// notifications (and what the alert dispatcher sends for info-severity events);
+// "info" is the agent's own equivalent, and remains the REST default.
+func ValidateNotificationImportance(importance string) error {
+	switch importance {
+	case "alert", "warning", "normal", "info":
+		return nil
+	default:
+		return fmt.Errorf("invalid importance level: %s (must be alert, warning, normal, or info)", importance)
+	}
+}

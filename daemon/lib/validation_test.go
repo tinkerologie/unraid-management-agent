@@ -892,3 +892,33 @@ func TestValidateBindAddress(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateNotificationImportance(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{name: "alert", input: "alert"},
+		{name: "warning", input: "warning"},
+		{name: "normal (stock informational level)", input: "normal"},
+		{name: "info (agent equivalent)", input: "info"},
+		{name: "unknown level", input: "debug", wantErr: true},
+		{name: "empty", input: "", wantErr: true},
+		{name: "wrong case", input: "Alert", wantErr: true},
+		{name: "not trimmed", input: " normal ", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateNotificationImportance(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateNotificationImportance(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+				return
+			}
+			if tt.wantErr && !strings.Contains(err.Error(), "invalid importance level") {
+				t.Errorf("ValidateNotificationImportance(%q) error = %q, want it to contain %q", tt.input, err, "invalid importance level")
+			}
+		})
+	}
+}

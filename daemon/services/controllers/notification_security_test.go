@@ -329,13 +329,11 @@ func TestCreateNotificationValidation(t *testing.T) {
 		cleanup := setupNotificationTestDirs(t)
 		defer cleanup()
 
-		levels := []string{"alert", "warning", "info"}
+		levels := []string{"alert", "warning", "normal", "info"}
 		for _, level := range levels {
 			t.Run(level, func(t *testing.T) {
-				err := CreateNotification("test-"+level, "subject", "desc", level, "")
-				// Will fail without notifications directory, but validates importance first
-				if err != nil && err.Error() == "invalid importance level: "+level {
-					t.Errorf("Should accept importance level %q", level)
+				if err := CreateNotification("test-"+level, "subject", "desc", level, ""); err != nil {
+					t.Errorf("Should accept importance level %q: %v", level, err)
 				}
 			})
 		}

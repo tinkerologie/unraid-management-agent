@@ -254,6 +254,11 @@ func TestCreateNotification_ValidInput(t *testing.T) {
 }
 
 func TestCreateNotification_InvalidImportance(t *testing.T) {
+	// Redirect the package-level dirs so the assertions below distinguish a
+	// validation rejection from an incidental write failure.
+	cleanup := setupNotificationTestDirs(t)
+	defer cleanup()
+
 	err := CreateNotification(
 		"Test",
 		"Subject",
@@ -263,7 +268,23 @@ func TestCreateNotification_InvalidImportance(t *testing.T) {
 	)
 
 	if err == nil {
-		t.Error("Expected error for invalid importance level")
+		t.Fatal("Expected error for invalid importance level")
+	}
+	// Assert the whole message: it advertises the accepted levels, so this
+	// pins that list as part of the error contract.
+	const want = "invalid importance level: invalid (must be alert, warning, normal, or info)"
+	if got := err.Error(); got != want {
+		t.Errorf("CreateNotification() error = %q, want %q", got, want)
+	}
+	// Validation rejects before anything is written.
+	for _, dir := range []string{notificationsDir, notificationsArchiveDir} {
+		files, err := filepath.Glob(filepath.Join(dir, "*.notify"))
+		if err != nil {
+			t.Fatalf("Failed to glob %s: %v", dir, err)
+		}
+		if len(files) != 0 {
+			t.Errorf("Expected no .notify files in %s, got %d", dir, len(files))
+		}
 	}
 }
 
@@ -322,6 +343,42 @@ func TestCreateNotification_SpecialCharactersInTitle(t *testing.T) {
 				}
 			} else if err != nil {
 				t.Errorf("CreateNotification with %q failed: %v", tt.title, err)
+			}
+		})
+	}
+}
+
+// TestCreateNotification_InformationalImportance pins both informational
+// importance levels: "normal", the stock notify script's own level and what the
+// alert dispatcher sends for info-severity events, and "info", which existing
+// API callers still send. Each is written verbatim to the unread and archive
+// copies, so neither is silently rewritten as the other.
+func TestCreateNotification_InformationalImportance(t *testing.T) {
+	for _, importance := range []string{"normal", "info"} {
+		t.Run(importance, func(t *testing.T) {
+			cleanup := setupNotificationTestDirs(t)
+			defer cleanup()
+
+			if err := CreateNotification("Test Event", "Subject", "Description", importance, ""); err != nil {
+				t.Fatalf("CreateNotification should accept importance %q: %v", importance, err)
+			}
+
+			want := fmt.Sprintf("importance=%q\n", importance)
+			for _, dir := range []string{notificationsDir, notificationsArchiveDir} {
+				files, err := filepath.Glob(filepath.Join(dir, "*.notify"))
+				if err != nil {
+					t.Fatalf("Failed to glob %s: %v", dir, err)
+				}
+				if len(files) != 1 {
+					t.Fatalf("Expected exactly one .notify file in %s, got %d", dir, len(files))
+				}
+				content, err := os.ReadFile(files[0])
+				if err != nil {
+					t.Fatalf("Failed to read notification file: %v", err)
+				}
+				if !strings.Contains(string(content), want) {
+					t.Errorf("Expected %s in %s, got:\n%s", want, dir, content)
+				}
 			}
 		})
 	}
