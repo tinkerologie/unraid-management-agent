@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.08.00] - 2026-08-10
+
 ### Fixed
 
 - **Info-severity alerts now reach the `unraid` channel** (#144) — the alert dispatcher
@@ -41,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stdout reading now runs on a separate goroutine and unblocks when the context expires,
   so a `smartctl` call against an unresponsive disk cannot hold the calling goroutine
   indefinitely past its configured timeout.
+
+### Changed
+
+- **Dependencies** — bumped `github.com/nicholas-fedor/shoutrrr` from 0.16.3 to 0.17.0 (#146).
 
 ## [2026.07.00] - 2026-07-10
 
