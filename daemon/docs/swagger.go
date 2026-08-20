@@ -62,3 +62,12 @@ package docs
 //	@tag.description			Unraid OS and plugin update availability
 //	@tag.name					Tuning
 //	@tag.description			System tuning endpoints (turbo boost, disk cache, inotify, NIC offloads, ring buffers)
+//
+// Keep the security definition last: swag v1 keeps consuming general-info
+// attributes into the securityDefinitions block, so any @tag.* lines placed
+// after it are silently dropped from the generated spec.
+//
+//	@securityDefinitions.apikey	BearerAuth
+//	@in							header
+//	@name						Authorization
+//	@description				Optional bearer-token authentication. Disabled by default; enabled by setting API_TOKEN. When enabled, send "Bearer <token>" on every request. /api/v1/health and /swagger/ stay open, so uptime monitoring and this documentation UI keep working.

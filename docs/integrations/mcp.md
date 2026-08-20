@@ -43,6 +43,39 @@ The MCP server supports two transports — use the one that fits your deployment
 > - Use **Streamable HTTP** if the AI client (Cursor, VS Code, etc.) runs on a different machine than the Unraid server.
 > - Use **STDIO** if the AI client (Claude Desktop, Cursor) runs locally on the Unraid server itself — it has zero network overhead and requires no authentication.
 
+### Authentication
+
+If the agent is configured with an API token (see
+[Configuration → Authentication](../guides/configuration.md#authentication)), the
+`/mcp` endpoint requires it on every request:
+
+```
+Authorization: Bearer <token>
+```
+
+Clients that accept custom headers can send it directly:
+
+```json
+{
+  "url": "http://your-unraid-ip:8043/mcp",
+  "headers": {
+    "Authorization": "Bearer your-generated-token"
+  }
+}
+```
+
+For clients that cannot set headers, `mcp-remote` can pass one through:
+
+```json
+{
+  "command": "npx",
+  "args": ["mcp-remote", "http://your-unraid-ip:8043/mcp", "--header", "Authorization: Bearer your-generated-token"]
+}
+```
+
+The STDIO transport is unaffected — it does not go through the HTTP server, so no
+token is needed.
+
 ## Available Tools (126 total)
 
 ### System Monitoring Tools

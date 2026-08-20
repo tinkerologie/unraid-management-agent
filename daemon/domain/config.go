@@ -41,6 +41,14 @@ type Config struct {
 	// Empty means all interfaces (the default).
 	BindAddress string `json:"bind_address,omitempty"`
 	CORSOrigin  string `json:"cors_origin,omitempty"`
+	// APIToken, when non-empty, requires HTTP requests to present
+	// "Authorization: Bearer <token>". The health endpoint and the Swagger UI
+	// are exempt so uptime monitoring and the docs page keep working. Empty
+	// (the default) leaves the API unauthenticated, preserving the behaviour
+	// of earlier releases.
+	// The field name contains "token", so lib.RedactStruct masks it in
+	// diagnostics output automatically.
+	APIToken string `json:"api_token,omitempty"`
 	// ReadOnly blocks all state-changing MCP tools so AI agents can only
 	// consume data. The REST API is unaffected.
 	ReadOnly bool `json:"read_only,omitempty"`

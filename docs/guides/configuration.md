@@ -21,6 +21,7 @@ This file is created automatically after the first installation and persists acr
 | `--port`                   | `8043`   | HTTP API port                                                                                      |
 | `--bind-address`           | -        | IP to bind the HTTP server to (empty = all). mDNS advertises it. Loopback rejected; invalid → all. |
 | `--read-only`              | `false`  | Block state-changing MCP tools (AI agents read-only; REST API unaffected)                          |
+| `--api-token`              | -        | Require `Authorization: Bearer <token>` on the HTTP API and `/mcp` (empty = no authentication)     |
 | `--debug`                  | `false`  | Enable debug logging                                                                               |
 | `--mqtt-enabled`           | `false`  | Enable MQTT publishing                                                                             |
 | `--mqtt-broker`            | -        | MQTT broker address (e.g., `tcp://localhost:1883`)                                                 |
@@ -92,6 +93,10 @@ Future versions will include a web UI for configuration.
 
    # Block all state-changing MCP tools (AI agents can only read)
    READ_ONLY=false
+
+   # Require "Authorization: Bearer <token>" on the API and /mcp.
+   # Empty (the default) leaves the API unauthenticated.
+   API_TOKEN=
 
    # MQTT Settings
    MQTT_ENABLED=true
@@ -422,9 +427,100 @@ Claude Desktop.
 > cert. For LAN-only use, the `mcp-remote` bridge needs no TLS at all. See the
 > [Claude integration guide](../integrations/claude/README.md#2-connect-claude-to-your-server-mcp).
 
-### Authentication (Future)
+### Authentication
 
-Authentication is planned for future versions. Current options:
+Set an API token to require `Authorization: Bearer <token>`. When the token is
+empty (the default) the API stays unauthenticated, so upgrading an existing
+install changes nothing until you opt in.
+
+Prefer the config key or the `API_TOKEN` environment variable over the
+`--api-token` flag: command-line arguments are visible to any user who can read
+the process list.
+
+| Setting   | CLI flag      | Env var     | Config key  |
+| --------- | ------------- | ----------- | ----------- |
+| API token | `--api-token` | `API_TOKEN` | `api_token` |
+
+```bash
+# Generate a token and enable authentication
+API_TOKEN=$(head -c 32 /dev/urandom | base64)
+echo "$API_TOKEN"
+```
+
+Add it to `config.cfg`:
+
+```bash
+API_TOKEN='paste-the-generated-token-here'
+```
+
+**Use single quotes.** The plugin launcher reads `config.cfg` with `source`,
+which expands `$`, `` ` ``, and `\` inside a double-quoted value — so
+`API_TOKEN="tok$en"` reaches the daemon truncated, or empty. Single quotes stop
+that. The launcher compares the sourced value against the raw file contents and
+refuses to start on a mismatch, so this fails loudly rather than leaving
+authentication quietly disabled, but quoting it correctly avoids the problem in
+the first place.
+
+Tokens generated the way shown above contain only `A-Za-z0-9+/=` and are always
+safe. If you choose your own, the quoting rules are:
+
+| Token contains                            | Use                                                                                                 |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| none of `'`, `"`, `$`, `` ` ``, `\`       | either quote style                                                                                  |
+| `"`, `$`, `` ` `` or `\` — but no `'`     | single quotes — `API_TOKEN='to$ken'`                                                                |
+| `'` — but none of `"`, `$`, `` ` ``, `\`  | double quotes — `API_TOKEN="a'b"`                                                                   |
+| `'` **and** any of `"`, `$`, `` ` ``, `\` | not expressible in `config.cfg` — use the `API_TOKEN` environment variable, or generate a new token |
+
+Single quotes cannot contain a single quote, and double quotes cannot contain a
+double quote, which is what the last row reflects. The usual shell escape
+`API_TOKEN='a'\''b'` does not help: it is rejected too, because the launcher
+compares against the raw line rather than re-implementing shell quoting. All of
+these fail at startup with an explanation rather than starting with a corrupted
+credential.
+
+Then pass it on every request:
+
+```bash
+curl -H "Authorization: Bearer $API_TOKEN" https://your-unraid-ip:8043/api/v1/system
+```
+
+Use `https://` wherever the agent has TLS configured (see
+[HTTPS / TLS](#https--tls)) — a bearer token sent over plain `http://` travels in
+clear text and is readable by anything on the path. On a trusted LAN with TLS
+disabled, substitute `http://`.
+
+The token is never sanitised or rewritten: the value you configure is the value
+compared. Via the `API_TOKEN` environment variable or `--api-token`, any
+character is safe to use; via `config.cfg` the quoting table above applies.
+Anything that would make the effective token differ from the configured one is
+a startup error rather than a silent change: control characters, leading or
+trailing whitespace (the server trims what a client sends, per normal HTTP
+header handling, so a padded token would authenticate as its trimmed form), and
+a whitespace-only value, which would otherwise fall back to no authentication
+at all.
+
+**What is protected**: every REST endpoint, `/mcp`, and `/metrics`.
+
+**What is not**:
+
+- `/api/v1/health` — so external uptime monitoring keeps working without
+  embedding a credential. It reports liveness only and exposes no system data.
+- `/swagger/` — the docs UI is a browser page that cannot attach an
+  `Authorization` header when fetching its own `doc.json`, so requiring one
+  would leave it permanently broken rather than merely gated. It serves the API
+  schema and no system data.
+
+Requests without a valid token receive `401 Unauthorized` with a
+`WWW-Authenticate: Bearer` challenge. The token is compared in constant time,
+and because the field name contains "token" it is automatically redacted from
+diagnostics output.
+
+> [!NOTE]
+> The token is sent as a plain header, so pair it with HTTPS (see
+> [HTTPS / TLS](#https--tls)) on any network you do not fully trust. Over plain
+> HTTP the token is readable by anything on the path.
+
+Complementary options, still worth combining with a token:
 
 1. **Reverse Proxy**: nginx with basic auth
 2. **VPN Only**: WireGuard/Tailscale

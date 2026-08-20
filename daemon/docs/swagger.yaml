@@ -7809,6 +7809,15 @@ paths:
 schemes:
 - http
 - https
+securityDefinitions:
+  BearerAuth:
+    description: Optional bearer-token authentication. Disabled by default; enabled
+      by setting API_TOKEN. When enabled, send "Bearer <token>" on every request.
+      /api/v1/health and /swagger/ stay open, so uptime monitoring and this documentation
+      UI keep working.
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"
 tags:
 - description: System monitoring and control endpoints (CPU, RAM, temps, reboot/shutdown)

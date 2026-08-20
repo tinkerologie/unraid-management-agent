@@ -34,6 +34,7 @@ sanitize_bool() { [ "$1" = "true" ] && echo "true" || echo "false"; }
 PORT="${PORT:-8043}"
 BIND_ADDRESS="${BIND_ADDRESS:-}"
 READ_ONLY="${READ_ONLY:-false}"
+API_TOKEN="${API_TOKEN:-}"
 LOG_LEVEL="${LOG_LEVEL:-info}"
 # Defaults follow industry standards (Zabbix, Prometheus, Datadog)
 INTERVAL_SYSTEM="${INTERVAL_SYSTEM:-15}"
@@ -84,12 +85,54 @@ done
 for var in MQTT_BROKER MQTT_USERNAME MQTT_PASSWORD MQTT_CLIENT_ID MQTT_TOPIC_PREFIX; do
     eval "$var=\$(sanitize_str \"\$$var\")"
 done
+
+# API_TOKEN is deliberately NOT passed through sanitize_str. Stripping shell
+# metacharacters would silently alter the credential, and the resulting 401s
+# give no hint as to why. The value is handed to env(1) as a single quoted
+# argument, so its contents are never interpreted by the shell.
+
+# `source` above expands $, `, and \ inside a double-quoted value, so a token
+# written as API_TOKEN="tok$en" arrives here truncated — or empty, which would
+# leave authentication silently disabled on a server the operator believes is
+# protected. Compare against the raw file value and refuse to start on any
+# mismatch; single-quoting the token in config.cfg avoids this entirely.
+raw_api_token=$(sed -n 's/^[[:space:]]*API_TOKEN=//p' "$CONFIG_FILE" | tail -n1)
+# Remove at most one matching wrapper, chosen by the first character. Stripping
+# both quote styles in sequence would turn API_TOKEN="'token'" into token while
+# the shell yields 'token', refusing a perfectly valid config.
+case "$raw_api_token" in
+    '"'*'"')
+        raw_api_token=${raw_api_token#\"}
+        raw_api_token=${raw_api_token%\"}
+        ;;
+    "'"*"'")
+        raw_api_token=${raw_api_token#\'}
+        raw_api_token=${raw_api_token%\'}
+        ;;
+esac
+if [ "$raw_api_token" != "$API_TOKEN" ]; then
+    echo "Error: API_TOKEN in $CONFIG_FILE was altered by shell expansion." >&2
+    echo "       Single-quote it, e.g. API_TOKEN='your-token'." >&2
+    echo "       If the token contains a literal single quote, double-quote it" >&2
+    echo "       instead; if it also contains \$, \` or \\, set the API_TOKEN" >&2
+    echo "       environment variable rather than config.cfg." >&2
+    exit 1
+fi
+
+# Reject control characters, which cannot appear in an HTTP header value anyway.
+# tr, not grep: grep is line-oriented and never sees an embedded newline as a
+# character within a line, so it silently accepts the most likely stray byte.
+if [ -n "$API_TOKEN" ] && [ "$(printf '%s' "$API_TOKEN" | tr -d '[:cntrl:]')" != "$API_TOKEN" ]; then
+    echo "Error: API_TOKEN contains control characters; refusing to start" >&2
+    exit 1
+fi
 MQTT_PORT=$(sanitize_int "$MQTT_PORT");             MQTT_PORT="${MQTT_PORT:-1883}"
 
 # ── Launch using env(1) to pass variables safely ──────────────
 nohup env \
   BIND_ADDRESS="$BIND_ADDRESS" \
   READ_ONLY="$READ_ONLY" \
+  API_TOKEN="$API_TOKEN" \
   INTERVAL_SYSTEM="$INTERVAL_SYSTEM" \
   INTERVAL_ARRAY="$INTERVAL_ARRAY" \
   INTERVAL_DISK="$INTERVAL_DISK" \

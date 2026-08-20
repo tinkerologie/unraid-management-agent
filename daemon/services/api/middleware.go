@@ -2,6 +2,7 @@ package api
 
 import (
 	"bufio"
+	"crypto/subtle"
 	"fmt"
 	"net"
 	"net/http"
@@ -36,6 +37,84 @@ func corsMiddleware(allowedOrigin string) mux.MiddlewareFunc {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// healthPath is exempt from authentication so that external uptime monitoring
+// keeps working without embedding a credential. It reports only liveness.
+const healthPath = "/api/v1/health"
+
+// swaggerPathPrefix is exempt because the Swagger UI is a browser page that
+// cannot attach an Authorization header when fetching its own doc.json.
+// Protecting it would leave the documentation UI permanently broken rather
+// than merely gated. It serves the API schema — which is public in the
+// repository — and no system data.
+//
+// The trailing slash matches the route registered in setupRoutes. Bare
+// "/swagger" matches no route, so middleware never runs for it and it 404s
+// like any other unknown path. If a redirect from "/swagger" is ever added,
+// exempt that exact path here too — otherwise the redirect starts returning
+// 401 as soon as a token is configured.
+const swaggerPathPrefix = "/swagger/"
+
+// isAuthExempt reports whether a path bypasses authentication. See healthPath
+// and swaggerPathPrefix for why each is exempt.
+func isAuthExempt(u *url.URL) bool {
+	if u == nil {
+		return false
+	}
+	return u.Path == healthPath || strings.HasPrefix(u.Path, swaggerPathPrefix)
+}
+
+// authMiddleware requires "Authorization: Bearer <token>" on every request when
+// an API token is configured, except for the health endpoint and the Swagger UI
+// (see isAuthExempt). When the token is empty the middleware is a no-op, so
+// existing unauthenticated installs behave exactly as before after an upgrade.
+//
+// CORS preflights never reach this middleware: corsMiddleware runs earlier and
+// short-circuits OPTIONS. That matters because browsers do not send
+// Authorization on a preflight, so requiring it here would break legitimate
+// cross-origin clients.
+func authMiddleware(token string) mux.MiddlewareFunc {
+	expected := []byte(strings.TrimSpace(token))
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if len(expected) == 0 {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			if isAuthExempt(r.URL) {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			presented := bearerToken(r)
+			// ConstantTimeCompare returns 0 for unequal lengths, so a length
+			// mismatch is rejected without leaking timing information about
+			// the token's contents.
+			if subtle.ConstantTimeCompare([]byte(presented), expected) != 1 {
+				logger.Debug("Rejected unauthenticated request: %s %s", r.Method, r.URL.Path)
+				w.Header().Set("WWW-Authenticate", `Bearer realm="unraid-management-agent"`)
+				respondJSON(w, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// bearerToken extracts the credential from an Authorization header. It returns
+// an empty string when the header is absent or is not a Bearer credential; the
+// caller's constant-time comparison then rejects it.
+func bearerToken(r *http.Request) string {
+	const prefix = "Bearer "
+	header := r.Header.Get("Authorization")
+	if len(header) < len(prefix) || !strings.EqualFold(header[:len(prefix)], prefix) {
+		return ""
+	}
+	return strings.TrimSpace(header[len(prefix):])
 }
 
 // statusRecorder wraps http.ResponseWriter to capture the response status code.

@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Optional bearer-token authentication** — a new `API_TOKEN` setting (`--api-token`
+  flag, `API_TOKEN` env var, `api_token` config key) makes the agent require
+  `Authorization: Bearer <token>` on every request. It protects all REST endpoints,
+  `/mcp`, and `/metrics`; `/api/v1/health` stays open so external uptime monitoring keeps
+  working without a credential. The token defaults to empty, which leaves the API
+  unauthenticated exactly as before, so upgrades are non-breaking. Comparison is
+  constant-time via `crypto/subtle`, authentication runs after rate limiting so
+  unauthenticated floods are throttled first, CORS preflights are unaffected, and
+  rejected requests get `401` with a `WWW-Authenticate: Bearer` challenge. The token is
+  redacted from diagnostics output automatically.
+
 ## [2026.08.01] - 2026-08-10
 
 ### Security

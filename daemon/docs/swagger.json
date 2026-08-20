@@ -11250,6 +11250,14 @@
             }
         }
     },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "Optional bearer-token authentication. Disabled by default; enabled by setting API_TOKEN. When enabled, send \"Bearer \u003ctoken\u003e\" on every request. /api/v1/health and /swagger/ stay open, so uptime monitoring and this documentation UI keep working.",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    },
     "tags": [
         {
             "description": "System monitoring and control endpoints (CPU, RAM, temps, reboot/shutdown)",

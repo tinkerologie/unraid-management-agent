@@ -465,6 +465,35 @@ func ValidateBindAddress(addr string) error {
 	return fmt.Errorf("bind address %q is not assigned to any local interface", addr)
 }
 
+// ValidateAPIToken validates the optional bearer token used for HTTP
+// authentication. An empty token is valid and means authentication is disabled.
+//
+// A non-empty token is rejected when it is whitespace-only, carries leading or
+// trailing whitespace, or contains control characters. Each would otherwise
+// fail confusingly rather than loudly: the middleware trims the configured
+// token, so a whitespace-only value would silently disable authentication on a
+// server the operator believes is protected and a padded value would silently
+// authenticate a different credential than the one configured, and a control
+// character cannot appear in an HTTP header value, so no client could ever
+// present a matching credential.
+func ValidateAPIToken(token string) error {
+	if token == "" {
+		return nil
+	}
+	if strings.TrimSpace(token) == "" {
+		return errors.New("api token is whitespace-only (leave it empty to disable authentication)")
+	}
+	if strings.TrimSpace(token) != token {
+		return errors.New("api token has leading or trailing whitespace (the server trims it, so the effective token would not be the one configured)")
+	}
+	for _, r := range token {
+		if r < 0x20 || r == 0x7f {
+			return fmt.Errorf("api token contains a control character (0x%02x)", r)
+		}
+	}
+	return nil
+}
+
 // ValidateTLSConfig validates the optional HTTPS certificate/key configuration.
 // TLS is treated as enabled only when both paths are supplied; supplying just
 // one is a misconfiguration. Each path is checked defensively and the pair must

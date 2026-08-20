@@ -31,6 +31,9 @@ type FileConfig struct {
 	// CORS
 	CORSOrigin *string `yaml:"cors_origin,omitempty"`
 
+	// APIToken enables bearer-token authentication when non-empty.
+	APIToken *string `yaml:"api_token,omitempty"`
+
 	// TLS: serve HTTPS when both a certificate and key file are provided.
 	TLSCertFile *string `yaml:"tls_cert_file,omitempty"`
 	TLSKeyFile  *string `yaml:"tls_key_file,omitempty"`

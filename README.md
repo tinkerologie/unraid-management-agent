@@ -554,6 +554,34 @@ Changes require a service restart:
 /usr/local/emhttp/plugins/unraid-management-agent/scripts/start
 ```
 
+### Authentication
+
+The API is unauthenticated by default. Set an API token to require
+`Authorization: Bearer <token>`:
+
+```bash
+# In /boot/config/plugins/unraid-management-agent/config.cfg
+API_TOKEN="your-generated-token"
+```
+
+Keep the token out of your shell history and the process list by reading it from
+the environment rather than typing it into commands:
+
+```bash
+export API_TOKEN='your-generated-token'
+curl -H "Authorization: Bearer $API_TOKEN" \
+  http://your-unraid-ip:8043/api/v1/system
+```
+
+This protects every REST endpoint, `/mcp`, and `/metrics`. Two paths stay open:
+`/api/v1/health`, so uptime monitoring works without a credential, and
+`/swagger/`, because the docs UI cannot send an `Authorization` header when
+fetching its own schema. Leaving the token empty preserves the previous
+unauthenticated behaviour, so upgrades are non-breaking.
+
+See [Configuration → Authentication](docs/guides/configuration.md#authentication)
+for token generation and TLS guidance.
+
 ### Logging
 
 The agent uses log rotation with the following settings:

@@ -348,3 +348,206 @@ func TestMiddlewareChainWithPanic(t *testing.T) {
 		t.Errorf("Access-Control-Allow-Origin = %q, want %q", got, "*")
 	}
 }
+
+func TestAuthMiddleware(t *testing.T) {
+	const token = "s3cr3t-token"
+
+	// reached records whether the request made it past the middleware.
+	newHandler := func(configured string, reached *bool) http.Handler {
+		return authMiddleware(configured)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			*reached = true
+			w.WriteHeader(http.StatusOK)
+		}))
+	}
+
+	t.Run("no token configured leaves the API open", func(t *testing.T) {
+		reached := false
+		req := httptest.NewRequest("POST", "/api/v1/system", nil)
+		rr := httptest.NewRecorder()
+
+		newHandler("", &reached).ServeHTTP(rr, req)
+
+		if !reached {
+			t.Error("handler was not reached; unauthenticated behaviour must be preserved when no token is set")
+		}
+		if rr.Code != http.StatusOK {
+			t.Errorf("status = %d, want %d", rr.Code, http.StatusOK)
+		}
+	})
+
+	t.Run("whitespace-only token is treated as unset", func(t *testing.T) {
+		reached := false
+		req := httptest.NewRequest("GET", "/api/v1/system", nil)
+		rr := httptest.NewRecorder()
+
+		newHandler("   ", &reached).ServeHTTP(rr, req)
+
+		if !reached {
+			t.Error("handler was not reached; a whitespace-only token must not enable auth")
+		}
+	})
+
+	tests := []struct {
+		name       string
+		path       string
+		authHeader string
+		wantStatus int
+		wantReach  bool
+	}{
+		{
+			name:       "correct bearer token is accepted",
+			path:       "/api/v1/system",
+			authHeader: "Bearer " + token,
+			wantStatus: http.StatusOK,
+			wantReach:  true,
+		},
+		{
+			name:       "scheme match is case-insensitive",
+			path:       "/api/v1/system",
+			authHeader: "bearer " + token,
+			wantStatus: http.StatusOK,
+			wantReach:  true,
+		},
+		{
+			name:       "surrounding whitespace is trimmed",
+			path:       "/api/v1/system",
+			authHeader: "Bearer   " + token + "  ",
+			wantStatus: http.StatusOK,
+			wantReach:  true,
+		},
+		{
+			name:       "missing header is rejected",
+			path:       "/api/v1/system",
+			authHeader: "",
+			wantStatus: http.StatusUnauthorized,
+			wantReach:  false,
+		},
+		{
+			name:       "wrong token is rejected",
+			path:       "/api/v1/system",
+			authHeader: "Bearer wrong-token",
+			wantStatus: http.StatusUnauthorized,
+			wantReach:  false,
+		},
+		{
+			name:       "token as a prefix of the expected value is rejected",
+			path:       "/api/v1/system",
+			authHeader: "Bearer s3cr3t",
+			wantStatus: http.StatusUnauthorized,
+			wantReach:  false,
+		},
+		{
+			name:       "non-bearer scheme is rejected",
+			path:       "/api/v1/system",
+			authHeader: "Basic " + token,
+			wantStatus: http.StatusUnauthorized,
+			wantReach:  false,
+		},
+		{
+			name:       "bare token without a scheme is rejected",
+			path:       "/api/v1/system",
+			authHeader: token,
+			wantStatus: http.StatusUnauthorized,
+			wantReach:  false,
+		},
+		{
+			name:       "mcp endpoint is protected",
+			path:       "/mcp",
+			authHeader: "",
+			wantStatus: http.StatusUnauthorized,
+			wantReach:  false,
+		},
+		{
+			name:       "metrics endpoint is protected",
+			path:       "/metrics",
+			authHeader: "",
+			wantStatus: http.StatusUnauthorized,
+			wantReach:  false,
+		},
+		{
+			name:       "health endpoint stays open for uptime monitoring",
+			path:       healthPath,
+			authHeader: "",
+			wantStatus: http.StatusOK,
+			wantReach:  true,
+		},
+		{
+			name:       "swagger UI stays open so the docs page keeps working",
+			path:       "/swagger/index.html",
+			authHeader: "",
+			wantStatus: http.StatusOK,
+			wantReach:  true,
+		},
+		{
+			name:       "swagger doc.json stays open (the UI fetches it without a header)",
+			path:       "/swagger/doc.json",
+			authHeader: "",
+			wantStatus: http.StatusOK,
+			wantReach:  true,
+		},
+		{
+			// The exemption is a prefix match on "/swagger/", so a path that
+			// merely starts with the same letters must still be protected.
+			name:       "path resembling the swagger prefix is still protected",
+			path:       "/swaggerish/secrets",
+			authHeader: "",
+			wantStatus: http.StatusUnauthorized,
+			wantReach:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reached := false
+			req := httptest.NewRequest("GET", tt.path, nil)
+			if tt.authHeader != "" {
+				req.Header.Set("Authorization", tt.authHeader)
+			}
+			rr := httptest.NewRecorder()
+
+			newHandler(token, &reached).ServeHTTP(rr, req)
+
+			if rr.Code != tt.wantStatus {
+				t.Errorf("status = %d, want %d", rr.Code, tt.wantStatus)
+			}
+			if reached != tt.wantReach {
+				t.Errorf("handler reached = %v, want %v", reached, tt.wantReach)
+			}
+			if tt.wantStatus == http.StatusUnauthorized {
+				if got := rr.Header().Get("WWW-Authenticate"); got == "" {
+					t.Error("WWW-Authenticate header missing on 401 response")
+				}
+			}
+		})
+	}
+}
+
+func TestBearerToken(t *testing.T) {
+	tests := []struct {
+		name   string
+		header string
+		want   string
+	}{
+		{name: "standard bearer", header: "Bearer abc123", want: "abc123"},
+		{name: "lowercase scheme", header: "bearer abc123", want: "abc123"},
+		{name: "mixed-case scheme", header: "BeArEr abc123", want: "abc123"},
+		{name: "extra whitespace trimmed", header: "Bearer   abc123  ", want: "abc123"},
+		{name: "empty header", header: "", want: ""},
+		{name: "basic scheme", header: "Basic abc123", want: ""},
+		{name: "scheme only", header: "Bearer ", want: ""},
+		{name: "no scheme", header: "abc123", want: ""},
+		{name: "shorter than prefix", header: "Bear", want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/", nil)
+			if tt.header != "" {
+				req.Header.Set("Authorization", tt.header)
+			}
+			if got := bearerToken(req); got != tt.want {
+				t.Errorf("bearerToken() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
