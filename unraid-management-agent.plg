@@ -10,7 +10,7 @@
     <!ENTITY launch      "Settings/unraid-management-agent">
     <!ENTITY bundle      "&name;-&version;.tgz">
     <!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
-    <!ENTITY md5         "2e4402018c0b6a9607b6692db7e336d7">
+    <!ENTITY md5         "f4746e8f30b0b4a3ba3cfa3a8463efba">
 ]>
 
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" icon="server" min="7.2.0" pluginURL="&pluginURL;" support="&supportURL;" project="&gitURL;" readme="&gitURL;#readme">
