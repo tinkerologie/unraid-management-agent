@@ -234,43 +234,28 @@ func (s *Server) registerMonitoringTools() {
 	})
 
 	// System information tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "get_system_info",
-		Description: "Get comprehensive Unraid system information including hostname, CPU usage, RAM usage, temperatures, and uptime",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
-		info := s.cacheProvider.GetSystemCache()
-		if info == nil {
-			return textResult("System information not available yet"), nil, nil
-		}
-		return jsonResult(info)
-	})
+	addReadTool[dto.MCPEmptyArgs](s,
+		"get_system_info",
+		"Get comprehensive Unraid system information including hostname, CPU usage, RAM usage, temperatures, and uptime",
+		"System information not available yet",
+		func() (*dto.SystemInfo, bool) { v := s.cacheProvider.GetSystemCache(); return v, v != nil },
+	)
 
 	// Array status tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "get_array_status",
-		Description: "Get Unraid array status including state, capacity, parity information, and disk assignments",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
-		status := s.cacheProvider.GetArrayCache()
-		if status == nil {
-			return textResult("Array status not available yet"), nil, nil
-		}
-		return jsonResult(status)
-	})
+	addReadTool[dto.MCPEmptyArgs](s,
+		"get_array_status",
+		"Get Unraid array status including state, capacity, parity information, and disk assignments",
+		"Array status not available yet",
+		func() (*dto.ArrayStatus, bool) { v := s.cacheProvider.GetArrayCache(); return v, v != nil },
+	)
 
 	// List all disks tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "list_disks",
-		Description: "List all disks in the Unraid server including array disks, cache, and unassigned devices with their health status",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPDiskArgs) (*mcp.CallToolResult, any, error) {
-		disks := s.cacheProvider.GetDisksCache()
-		if disks == nil {
-			return textResult("Disk information not available yet"), nil, nil
-		}
-		return jsonResult(disks)
-	})
+	addReadTool[dto.MCPDiskArgs](s,
+		"list_disks",
+		"List all disks in the Unraid server including array disks, cache, and unassigned devices with their health status",
+		"Disk information not available yet",
+		func() ([]dto.DiskInfo, bool) { v := s.cacheProvider.GetDisksCache(); return v, v != nil },
+	)
 
 	// Get specific disk info tool
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
@@ -291,17 +276,12 @@ func (s *Server) registerMonitoringTools() {
 	})
 
 	// List shares tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "list_shares",
-		Description: "List all network shares configured on the Unraid server with their settings and usage",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
-		shares := s.cacheProvider.GetSharesCache()
-		if shares == nil {
-			return textResult("Share information not available yet"), nil, nil
-		}
-		return jsonResult(shares)
-	})
+	addReadTool[dto.MCPEmptyArgs](s,
+		"list_shares",
+		"List all network shares configured on the Unraid server with their settings and usage",
+		"Share information not available yet",
+		func() ([]dto.ShareInfo, bool) { v := s.cacheProvider.GetSharesCache(); return v, v != nil },
+	)
 
 	// List Docker containers tool
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
@@ -347,17 +327,15 @@ func (s *Server) registerMonitoringTools() {
 	})
 
 	// List Docker networks tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "list_docker_networks",
-		Description: "List all Docker networks on the Unraid server with their driver, scope, IPAM settings, and connected containers",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
-		cached := s.cacheProvider.GetDockerNetworksCache()
-		if cached == nil {
-			return textResult("Docker network information not available yet"), nil, nil
-		}
-		return jsonResult(cached)
-	})
+	addReadTool[struct{}](s,
+		"list_docker_networks",
+		"List all Docker networks on the Unraid server with their driver, scope, IPAM settings, and connected containers",
+		"Docker network information not available yet",
+		func() (*dto.DockerNetworkList, bool) {
+			v := s.cacheProvider.GetDockerNetworksCache()
+			return v, v != nil
+		},
+	)
 
 	// List VMs tool
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
@@ -404,82 +382,52 @@ func (s *Server) registerMonitoringTools() {
 	})
 
 	// UPS status tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "get_ups_status",
-		Description: "Get UPS (Uninterruptible Power Supply) status including battery level, load, and runtime",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
-		ups := s.cacheProvider.GetUPSCache()
-		if ups == nil {
-			return textResult("UPS not configured or information not available"), nil, nil
-		}
-		return jsonResult(ups)
-	})
+	addReadTool[dto.MCPEmptyArgs](s,
+		"get_ups_status",
+		"Get UPS (Uninterruptible Power Supply) status including battery level, load, and runtime",
+		"UPS not configured or information not available",
+		func() (*dto.UPSStatus, bool) { v := s.cacheProvider.GetUPSCache(); return v, v != nil },
+	)
 
 	// GPU metrics tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "get_gpu_metrics",
-		Description: "Get GPU metrics including utilization, temperature, and memory usage for all GPUs",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
-		gpus := s.cacheProvider.GetGPUCache()
-		if len(gpus) == 0 {
-			return textResult("No GPUs detected or GPU information not available"), nil, nil
-		}
-		return jsonResult(gpus)
-	})
+	addReadTool[dto.MCPEmptyArgs](s,
+		"get_gpu_metrics",
+		"Get GPU metrics including utilization, temperature, and memory usage for all GPUs",
+		"No GPUs detected or GPU information not available",
+		func() ([]*dto.GPUMetrics, bool) { v := s.cacheProvider.GetGPUCache(); return v, len(v) > 0 },
+	)
 
 	// Network interfaces tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "get_network_info",
-		Description: "Get network interface information including IP addresses, speeds, and traffic statistics",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
-		network := s.cacheProvider.GetNetworkCache()
-		if network == nil {
-			return textResult("Network information not available yet"), nil, nil
-		}
-		return jsonResult(network)
-	})
+	addReadTool[dto.MCPEmptyArgs](s,
+		"get_network_info",
+		"Get network interface information including IP addresses, speeds, and traffic statistics",
+		"Network information not available yet",
+		func() ([]dto.NetworkInfo, bool) { v := s.cacheProvider.GetNetworkCache(); return v, v != nil },
+	)
 
 	// Hardware info tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "get_hardware_info",
-		Description: "Get detailed hardware information including motherboard, CPU, and memory details from DMI/SMBIOS",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
-		hardware := s.cacheProvider.GetHardwareCache()
-		if hardware == nil {
-			return textResult("Hardware information not available yet"), nil, nil
-		}
-		return jsonResult(hardware)
-	})
+	addReadTool[dto.MCPEmptyArgs](s,
+		"get_hardware_info",
+		"Get detailed hardware information including motherboard, CPU, and memory details from DMI/SMBIOS",
+		"Hardware information not available yet",
+		func() (*dto.HardwareInfo, bool) { v := s.cacheProvider.GetHardwareCache(); return v, v != nil },
+	)
 
 	// Registration/License info tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "get_registration",
-		Description: "Get Unraid license/registration information including license type and key status",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
-		reg := s.cacheProvider.GetRegistrationCache()
-		if reg == nil {
-			return textResult("Registration information not available yet"), nil, nil
-		}
-		return jsonResult(reg)
-	})
+	addReadTool[dto.MCPEmptyArgs](s,
+		"get_registration",
+		"Get Unraid license/registration information including license type and key status",
+		"Registration information not available yet",
+		func() (*dto.Registration, bool) { v := s.cacheProvider.GetRegistrationCache(); return v, v != nil },
+	)
 
 	// Notifications tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "get_notifications",
-		Description: "Get system notifications including alerts, warnings, and informational messages",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPNotificationArgs) (*mcp.CallToolResult, any, error) {
-		notifications := s.cacheProvider.GetNotificationsCache()
-		if notifications == nil {
-			return textResult("Notifications not available yet"), nil, nil
-		}
-		return jsonResult(notifications)
-	})
+	addReadTool[dto.MCPNotificationArgs](s,
+		"get_notifications",
+		"Get system notifications including alerts, warnings, and informational messages",
+		"Notifications not available yet",
+		func() (*dto.NotificationList, bool) { v := s.cacheProvider.GetNotificationsCache(); return v, v != nil },
+	)
 
 	// ZFS pools tool
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
@@ -505,82 +453,61 @@ func (s *Server) registerMonitoringTools() {
 	})
 
 	// ZFS datasets tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "get_zfs_datasets",
-		Description: "Get ZFS dataset information including snapshots, quotas, and usage",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
-		datasets := s.cacheProvider.GetZFSDatasetsCache()
-		if len(datasets) == 0 {
-			return textResult("No ZFS datasets found or ZFS information not available"), nil, nil
-		}
-		return jsonResult(datasets)
-	})
+	addReadTool[dto.MCPEmptyArgs](s,
+		"get_zfs_datasets",
+		"Get ZFS dataset information including snapshots, quotas, and usage",
+		"No ZFS datasets found or ZFS information not available",
+		func() ([]dto.ZFSDataset, bool) { v := s.cacheProvider.GetZFSDatasetsCache(); return v, len(v) > 0 },
+	)
 
 	// ZFS snapshots tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "get_zfs_snapshots",
-		Description: "Get ZFS snapshot information for all pools and datasets",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
-		snapshots := s.cacheProvider.GetZFSSnapshotsCache()
-		if len(snapshots) == 0 {
-			return textResult("No ZFS snapshots found or ZFS information not available"), nil, nil
-		}
-		return jsonResult(snapshots)
-	})
+	addReadTool[dto.MCPEmptyArgs](s,
+		"get_zfs_snapshots",
+		"Get ZFS snapshot information for all pools and datasets",
+		"No ZFS snapshots found or ZFS information not available",
+		func() ([]dto.ZFSSnapshot, bool) { v := s.cacheProvider.GetZFSSnapshotsCache(); return v, len(v) > 0 },
+	)
 
 	// ZFS ARC stats tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "get_zfs_arc_stats",
-		Description: "Get ZFS ARC (Adaptive Replacement Cache) statistics including hit ratio and memory usage",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
-		arcStats := s.cacheProvider.GetZFSARCStatsCache()
-		if arcStats == nil {
-			return textResult("ZFS ARC statistics not available"), nil, nil
-		}
-		return jsonResult(arcStats)
-	})
+	addReadTool[dto.MCPEmptyArgs](s,
+		"get_zfs_arc_stats",
+		"Get ZFS ARC (Adaptive Replacement Cache) statistics including hit ratio and memory usage",
+		"ZFS ARC statistics not available",
+		func() (*dto.ZFSARCStats, bool) { v := s.cacheProvider.GetZFSARCStatsCache(); return v, v != nil },
+	)
 
 	// Unassigned devices tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "get_unassigned_devices",
-		Description: "Get information about unassigned (non-array) devices including USB drives, unassigned disks, and remote SMB/NFS/ISO shares",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
-		unassigned := s.cacheProvider.GetUnassignedCache()
-		if unassigned == nil || (len(unassigned.Devices) == 0 && len(unassigned.RemoteShares) == 0) {
-			return textResult("No unassigned devices or remote shares found, or Unassigned Devices plugin not installed"), nil, nil
-		}
-		return jsonResult(unassigned)
-	})
+	addReadTool[dto.MCPEmptyArgs](s,
+		"get_unassigned_devices",
+		"Get information about unassigned (non-array) devices including USB drives, unassigned disks, and remote SMB/NFS/ISO shares",
+		"No unassigned devices or remote shares found, or Unassigned Devices plugin not installed",
+		func() (*dto.UnassignedDeviceList, bool) {
+			v := s.cacheProvider.GetUnassignedCache()
+			return v, v != nil && (len(v.Devices) > 0 || len(v.RemoteShares) > 0)
+		},
+	)
 
 	// Remote shares tool (SMB/NFS/ISO mounts managed by Unassigned Devices)
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "get_remote_shares",
-		Description: "Get SMB/NFS/ISO remote share mount status and space usage from the Unassigned Devices plugin",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
-		unassigned := s.cacheProvider.GetUnassignedCache()
-		if unassigned == nil || len(unassigned.RemoteShares) == 0 {
-			return textResult("No remote shares found or Unassigned Devices plugin not installed"), nil, nil
-		}
-		return jsonResult(unassigned.RemoteShares)
-	})
+	addReadTool[dto.MCPEmptyArgs](s,
+		"get_remote_shares",
+		"Get SMB/NFS/ISO remote share mount status and space usage from the Unassigned Devices plugin",
+		"No remote shares found or Unassigned Devices plugin not installed",
+		func() (any, bool) {
+			v := s.cacheProvider.GetUnassignedCache()
+			if v == nil || len(v.RemoteShares) == 0 {
+				return nil, false
+			}
+			return v.RemoteShares, true
+		},
+	)
 
 	// NUT (Network UPS Tools) status tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "get_nut_status",
-		Description: "Get detailed NUT (Network UPS Tools) status including all UPS variables and metrics",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
-		nut := s.cacheProvider.GetNUTCache()
-		if nut == nil {
-			return textResult("NUT not configured or NUT information not available"), nil, nil
-		}
-		return jsonResult(nut)
-	})
+	addReadTool[dto.MCPEmptyArgs](s,
+		"get_nut_status",
+		"Get detailed NUT (Network UPS Tools) status including all UPS variables and metrics",
+		"NUT not configured or NUT information not available",
+		func() (*dto.NUTResponse, bool) { v := s.cacheProvider.GetNUTCache(); return v, v != nil },
+	)
 
 	// User scripts list tool
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
@@ -599,17 +526,15 @@ func (s *Server) registerMonitoringTools() {
 	})
 
 	// Parity history tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "get_parity_history",
-		Description: "Get parity check history including past check dates, durations, speeds, and error counts",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
-		history := s.cacheProvider.GetParityHistoryCache()
-		if history == nil || len(history.Records) == 0 {
-			return textResult("No parity check history available"), nil, nil
-		}
-		return jsonResult(history)
-	})
+	addReadTool[dto.MCPEmptyArgs](s,
+		"get_parity_history",
+		"Get parity check history including past check dates, durations, speeds, and error counts",
+		"No parity check history available",
+		func() (*dto.ParityCheckHistory, bool) {
+			v := s.cacheProvider.GetParityHistoryCache()
+			return v, v != nil && len(v.Records) > 0
+		},
+	)
 
 	// List log files tool
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
@@ -720,56 +645,36 @@ func (s *Server) registerMonitoringTools() {
 	})
 
 	// Get system settings tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "get_system_settings",
-		Description: "Get system configuration settings including server name, timezone, security mode, and date/time formats",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
-		settings := s.cacheProvider.GetSystemSettings()
-		if settings == nil {
-			return textResult("System settings not available"), nil, nil
-		}
-		return jsonResult(settings)
-	})
+	addReadTool[dto.MCPEmptyArgs](s,
+		"get_system_settings",
+		"Get system configuration settings including server name, timezone, security mode, and date/time formats",
+		"System settings not available",
+		func() (*dto.SystemSettings, bool) { v := s.cacheProvider.GetSystemSettings(); return v, v != nil },
+	)
 
 	// Get Docker settings tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "get_docker_settings",
-		Description: "Get Docker configuration settings including enabled state, image path, and network configuration",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
-		settings := s.cacheProvider.GetDockerSettings()
-		if settings == nil {
-			return textResult("Docker settings not available"), nil, nil
-		}
-		return jsonResult(settings)
-	})
+	addReadTool[dto.MCPEmptyArgs](s,
+		"get_docker_settings",
+		"Get Docker configuration settings including enabled state, image path, and network configuration",
+		"Docker settings not available",
+		func() (*dto.DockerSettings, bool) { v := s.cacheProvider.GetDockerSettings(); return v, v != nil },
+	)
 
 	// Get VM settings tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "get_vm_settings",
-		Description: "Get VM Manager configuration settings including enabled state, PCI/USB passthrough devices",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
-		settings := s.cacheProvider.GetVMSettings()
-		if settings == nil {
-			return textResult("VM settings not available"), nil, nil
-		}
-		return jsonResult(settings)
-	})
+	addReadTool[dto.MCPEmptyArgs](s,
+		"get_vm_settings",
+		"Get VM Manager configuration settings including enabled state, PCI/USB passthrough devices",
+		"VM settings not available",
+		func() (*dto.VMSettings, bool) { v := s.cacheProvider.GetVMSettings(); return v, v != nil },
+	)
 
 	// Get disk settings tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "get_disk_settings",
-		Description: "Get disk configuration settings including spindown delay, auto-start, spinup groups, and default filesystem",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
-		settings := s.cacheProvider.GetDiskSettings()
-		if settings == nil {
-			return textResult("Disk settings not available"), nil, nil
-		}
-		return jsonResult(settings)
-	})
+	addReadTool[dto.MCPEmptyArgs](s,
+		"get_disk_settings",
+		"Get disk configuration settings including spindown delay, auto-start, spinup groups, and default filesystem",
+		"Disk settings not available",
+		func() (*dto.DiskSettings, bool) { v := s.cacheProvider.GetDiskSettings(); return v, v != nil },
+	)
 
 	// Get share config tool
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
@@ -788,17 +693,12 @@ func (s *Server) registerMonitoringTools() {
 	})
 
 	// Get network access URLs tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "get_network_access_urls",
-		Description: "Get all available methods to access the Unraid server including LAN, WAN, WireGuard, mDNS, and IPv6 addresses",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
-		urls := s.cacheProvider.GetNetworkAccessURLs()
-		if urls == nil {
-			return textResult("Network access URLs not available"), nil, nil
-		}
-		return jsonResult(urls)
-	})
+	addReadTool[dto.MCPEmptyArgs](s,
+		"get_network_access_urls",
+		"Get all available methods to access the Unraid server including LAN, WAN, WireGuard, mDNS, and IPv6 addresses",
+		"Network access URLs not available",
+		func() (*dto.NetworkAccessURLs, bool) { v := s.cacheProvider.GetNetworkAccessURLs(); return v, v != nil },
+	)
 
 	// Get health status tool
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
@@ -811,17 +711,18 @@ func (s *Server) registerMonitoringTools() {
 	})
 
 	// Get notifications overview tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "get_notifications_overview",
-		Description: "Get a summary of notification counts by type (unread/archive) and importance level (alert/warning/info)",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
-		notifications := s.cacheProvider.GetNotificationsCache()
-		if notifications == nil {
-			return textResult("Notifications not available"), nil, nil
-		}
-		return jsonResult(notifications.Overview)
-	})
+	addReadTool[dto.MCPEmptyArgs](s,
+		"get_notifications_overview",
+		"Get a summary of notification counts by type (unread/archive) and importance level (alert/warning/info)",
+		"Notifications not available",
+		func() (any, bool) {
+			v := s.cacheProvider.GetNotificationsCache()
+			if v == nil {
+				return nil, false
+			}
+			return v.Overview, true
+		},
+	)
 
 	// Search containers tool
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
@@ -3019,6 +2920,26 @@ func addWriteTool[In any](s *Server, tool *mcp.Tool, handler mcp.ToolHandlerFor[
 			return textResult(readOnlyBlockedMessage), nil, nil
 		}
 		return handler(ctx, req, args)
+	})
+}
+
+// addReadTool registers a read-only monitoring tool that returns a cached
+// snapshot. The get closure returns the payload and whether it is available;
+// when unavailable, emptyMsg is returned as plain text. It concentrates the
+// ReadOnlyHint annotation, availability check, and JSON encoding shared by the
+// snapshot tools into one place. The In type parameter preserves each tool's
+// advertised input schema even though snapshot reads ignore their arguments.
+func addReadTool[In, T any](s *Server, name, description, emptyMsg string, get func() (T, bool)) {
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        name,
+		Description: description,
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ In) (*mcp.CallToolResult, any, error) {
+		data, ok := get()
+		if !ok {
+			return textResult(emptyMsg), nil, nil
+		}
+		return jsonResult(data)
 	})
 }
 

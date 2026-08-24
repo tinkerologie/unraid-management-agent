@@ -22,6 +22,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rejected requests get `401` with a `WWW-Authenticate: Bearer` challenge. The token is
   redacted from diagnostics output automatically.
 
+### Changed
+
+- **MCP snapshot tools collapsed behind one registration helper** — the ~24 read-only
+  monitoring tools that simply return a cached snapshot (system, array, disks, shares, GPU,
+  hardware, ZFS, settings, etc.) now register through a single generic `addReadTool` helper
+  instead of ~12 lines of duplicated boilerplate each. The helper concentrates the
+  `ReadOnlyHint` annotation, availability check, and JSON encoding in one place; each tool is
+  now a one-line spec (name, description, empty message, getter). Tool names, descriptions,
+  input schemas, and responses are unchanged.
+- **REST and metrics reads routed through the cache interface** — the REST GET handlers and
+  the Prometheus metrics exporter now read cached data through the `CacheStore` getter methods
+  (the same interface the MCP server and alerting engine already use) instead of reaching into
+  raw atomic cache fields. This closes the seam so cache-shape changes stay local to the store;
+  responses are unchanged.
+
 ## [2026.08.01] - 2026-08-10
 
 ### Security

@@ -42,7 +42,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 //	@Router			/system [get]
 func (s *Server) handleSystem(w http.ResponseWriter, _ *http.Request) {
 	// Get latest system info from cache
-	info := s.systemCache.Load()
+	info := s.GetSystemCache()
 
 	if info == nil {
 		info = &dto.SystemInfo{
@@ -129,7 +129,7 @@ func (s *Server) handleSystemShutdown(w http.ResponseWriter, _ *http.Request) {
 //	@Router			/array [get]
 func (s *Server) handleArray(w http.ResponseWriter, _ *http.Request) {
 	// Get latest array status from cache
-	status := s.arrayCache.Load()
+	status := s.GetArrayCache()
 
 	if status == nil {
 		status = &dto.ArrayStatus{
@@ -326,7 +326,7 @@ func (s *Server) handleVMInfo(w http.ResponseWriter, r *http.Request) {
 //	@Router			/ups [get]
 func (s *Server) handleUPS(w http.ResponseWriter, _ *http.Request) {
 	// Get latest UPS status from cache
-	ups := s.upsCache.Load()
+	ups := s.GetUPSCache()
 
 	if ups == nil {
 		ups = &dto.UPSStatus{
@@ -348,7 +348,7 @@ func (s *Server) handleUPS(w http.ResponseWriter, _ *http.Request) {
 //	@Router			/nut [get]
 func (s *Server) handleNUT(w http.ResponseWriter, _ *http.Request) {
 	// Get latest NUT status from cache
-	nut := s.nutCache.Load()
+	nut := s.GetNUTCache()
 
 	if nut == nil {
 		nut = &dto.NUTResponse{
@@ -1516,7 +1516,7 @@ func (s *Server) handleUserScriptExecute(w http.ResponseWriter, r *http.Request)
 //	@Success		200	{object}	dto.HardwareInfo	"Hardware information"
 //	@Router			/hardware/full [get]
 func (s *Server) handleHardwareFull(w http.ResponseWriter, _ *http.Request) {
-	hardware := s.hardwareCache.Load()
+	hardware := s.GetHardwareCache()
 
 	if hardware == nil {
 		hardware = &dto.HardwareInfo{
@@ -1537,7 +1537,7 @@ func (s *Server) handleHardwareFull(w http.ResponseWriter, _ *http.Request) {
 //	@Failure		404	{object}	map[string]string	"BIOS info not available"
 //	@Router			/hardware/bios [get]
 func (s *Server) handleHardwareBIOS(w http.ResponseWriter, _ *http.Request) {
-	hardware := s.hardwareCache.Load()
+	hardware := s.GetHardwareCache()
 
 	if hardware == nil || hardware.BIOS == nil {
 		respondJSON(w, http.StatusNotFound, map[string]string{"error": "BIOS information not available"})
@@ -1557,7 +1557,7 @@ func (s *Server) handleHardwareBIOS(w http.ResponseWriter, _ *http.Request) {
 //	@Failure		404	{object}	map[string]string	"Baseboard info not available"
 //	@Router			/hardware/baseboard [get]
 func (s *Server) handleHardwareBaseboard(w http.ResponseWriter, _ *http.Request) {
-	hardware := s.hardwareCache.Load()
+	hardware := s.GetHardwareCache()
 
 	if hardware == nil || hardware.Baseboard == nil {
 		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Baseboard information not available"})
@@ -1577,7 +1577,7 @@ func (s *Server) handleHardwareBaseboard(w http.ResponseWriter, _ *http.Request)
 //	@Failure		404	{object}	map[string]string	"CPU info not available"
 //	@Router			/hardware/cpu [get]
 func (s *Server) handleHardwareCPU(w http.ResponseWriter, _ *http.Request) {
-	hardware := s.hardwareCache.Load()
+	hardware := s.GetHardwareCache()
 
 	if hardware == nil || hardware.CPU == nil {
 		respondJSON(w, http.StatusNotFound, map[string]string{"error": "CPU hardware information not available"})
@@ -1597,7 +1597,7 @@ func (s *Server) handleHardwareCPU(w http.ResponseWriter, _ *http.Request) {
 //	@Failure		404	{object}	map[string]string	"Cache info not available"
 //	@Router			/hardware/cache [get]
 func (s *Server) handleHardwareCache(w http.ResponseWriter, _ *http.Request) {
-	hardware := s.hardwareCache.Load()
+	hardware := s.GetHardwareCache()
 
 	if hardware == nil || len(hardware.Cache) == 0 {
 		respondJSON(w, http.StatusNotFound, map[string]string{"error": "CPU cache information not available"})
@@ -1617,7 +1617,7 @@ func (s *Server) handleHardwareCache(w http.ResponseWriter, _ *http.Request) {
 //	@Failure		404	{object}	map[string]string	"Memory array info not available"
 //	@Router			/hardware/memory-array [get]
 func (s *Server) handleHardwareMemoryArray(w http.ResponseWriter, _ *http.Request) {
-	hardware := s.hardwareCache.Load()
+	hardware := s.GetHardwareCache()
 
 	if hardware == nil || hardware.MemoryArray == nil {
 		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Memory array information not available"})
@@ -1637,7 +1637,7 @@ func (s *Server) handleHardwareMemoryArray(w http.ResponseWriter, _ *http.Reques
 //	@Failure		404	{object}	map[string]string		"Memory device info not available"
 //	@Router			/hardware/memory-devices [get]
 func (s *Server) handleHardwareMemoryDevices(w http.ResponseWriter, _ *http.Request) {
-	hardware := s.hardwareCache.Load()
+	hardware := s.GetHardwareCache()
 
 	if hardware == nil || len(hardware.MemoryDevices) == 0 {
 		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Memory device information not available"})
@@ -1658,7 +1658,7 @@ func (s *Server) handleHardwareMemoryDevices(w http.ResponseWriter, _ *http.Requ
 func (s *Server) handleRegistration(w http.ResponseWriter, _ *http.Request) {
 	logger.Debug("API: Getting registration information")
 
-	registration := s.registrationCache.Load()
+	registration := s.GetRegistrationCache()
 
 	if registration == nil {
 		registration = &dto.Registration{
@@ -1805,7 +1805,7 @@ func respondWithError(w http.ResponseWriter, status int, message string) {
 //	@Success		200			{object}	dto.NotificationList	"Notifications with overview"
 //	@Router			/notifications [get]
 func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
-	notificationList := s.notificationsCache.Load()
+	notificationList := s.GetNotificationsCache()
 
 	if notificationList == nil {
 		notificationList = &dto.NotificationList{
@@ -1842,7 +1842,7 @@ func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
 //	@Success		200	{object}	map[string]interface{}	"Unread notifications with count"
 //	@Router			/notifications/unread [get]
 func (s *Server) handleNotificationsUnread(w http.ResponseWriter, _ *http.Request) {
-	notificationList := s.notificationsCache.Load()
+	notificationList := s.GetNotificationsCache()
 
 	if notificationList == nil {
 		respondJSON(w, http.StatusOK, map[string]any{
@@ -1874,7 +1874,7 @@ func (s *Server) handleNotificationsUnread(w http.ResponseWriter, _ *http.Reques
 //	@Success		200	{object}	map[string]interface{}	"Archived notifications with count"
 //	@Router			/notifications/archive [get]
 func (s *Server) handleNotificationsArchive(w http.ResponseWriter, _ *http.Request) {
-	notificationList := s.notificationsCache.Load()
+	notificationList := s.GetNotificationsCache()
 
 	if notificationList == nil {
 		respondJSON(w, http.StatusOK, map[string]any{
@@ -1906,7 +1906,7 @@ func (s *Server) handleNotificationsArchive(w http.ResponseWriter, _ *http.Reque
 //	@Success		200	{object}	dto.NotificationOverview	"Notification counts by category"
 //	@Router			/notifications/overview [get]
 func (s *Server) handleNotificationsOverview(w http.ResponseWriter, _ *http.Request) {
-	notificationList := s.notificationsCache.Load()
+	notificationList := s.GetNotificationsCache()
 
 	if notificationList == nil {
 		respondJSON(w, http.StatusOK, dto.NotificationOverview{
@@ -1933,7 +1933,7 @@ func (s *Server) handleNotificationByID(w http.ResponseWriter, r *http.Request) 
 	vars := mux.Vars(r)
 	id := vars["id"]
 
-	notificationList := s.notificationsCache.Load()
+	notificationList := s.GetNotificationsCache()
 
 	if notificationList == nil {
 		respondWithError(w, http.StatusNotFound, "Notification not found")
@@ -2095,7 +2095,7 @@ func (s *Server) handleArchiveAllNotifications(w http.ResponseWriter, _ *http.Re
 //	@Success		200	{object}	dto.UnassignedDeviceList	"Unassigned devices and remote shares"
 //	@Router			/unassigned [get]
 func (s *Server) handleUnassignedDevices(w http.ResponseWriter, _ *http.Request) {
-	cache := s.unassignedCache.Load()
+	cache := s.GetUnassignedCache()
 
 	if cache == nil {
 		respondJSON(w, http.StatusOK, map[string]any{
@@ -2118,7 +2118,7 @@ func (s *Server) handleUnassignedDevices(w http.ResponseWriter, _ *http.Request)
 //	@Success		200	{object}	map[string]interface{}	"Unassigned devices"
 //	@Router			/unassigned/devices [get]
 func (s *Server) handleUnassignedDevicesList(w http.ResponseWriter, _ *http.Request) {
-	cache := s.unassignedCache.Load()
+	cache := s.GetUnassignedCache()
 
 	if cache == nil {
 		respondJSON(w, http.StatusOK, map[string]any{
@@ -2143,7 +2143,7 @@ func (s *Server) handleUnassignedDevicesList(w http.ResponseWriter, _ *http.Requ
 //	@Success		200	{object}	map[string]interface{}	"Remote shares"
 //	@Router			/unassigned/remote-shares [get]
 func (s *Server) handleUnassignedRemoteShares(w http.ResponseWriter, _ *http.Request) {
-	cache := s.unassignedCache.Load()
+	cache := s.GetUnassignedCache()
 
 	if cache == nil {
 		respondJSON(w, http.StatusOK, map[string]any{
@@ -2347,7 +2347,7 @@ func (s *Server) handleZFSSnapshots(w http.ResponseWriter, _ *http.Request) {
 //	@Success		200	{object}	dto.ZFSARCStats	"ZFS ARC statistics"
 //	@Router			/zfs/arc [get]
 func (s *Server) handleZFSARC(w http.ResponseWriter, _ *http.Request) {
-	arcStats := s.zfsARCStatsCache.Load()
+	arcStats := s.GetZFSARCStatsCache()
 
 	if arcStats == nil {
 		arcStats = &dto.ZFSARCStats{
@@ -4437,7 +4437,7 @@ func (s *Server) handleFanControl(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	// Fall back to cached collector data
-	cache := s.fanControlCache.Load()
+	cache := s.GetFanControlCache()
 	if cache == nil {
 		respondJSON(w, http.StatusOK, &dto.FanControlStatus{
 			Fans:      []dto.FanDevice{},

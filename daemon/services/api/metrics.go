@@ -384,12 +384,12 @@ func (s *Server) updateMetrics() {
 	}
 
 	// Load all cache values atomically (lock-free reads)
-	sysCache := s.systemCache.Load()
-	arrCache := s.arrayCache.Load()
+	sysCache := s.GetSystemCache()
+	arrCache := s.GetArrayCache()
 	disksSlice := s.GetDisksCache()
 	dockerSlice := s.GetDockerCache()
 	vmsSlice := s.GetVMsCache()
-	upsVal := s.upsCache.Load()
+	upsVal := s.GetUPSCache()
 	sharesSlice := s.GetSharesCache()
 	gpuSlice := s.GetGPUCache()
 
@@ -580,7 +580,7 @@ func (s *Server) updateMetrics() {
 	}
 
 	// Update fan metrics
-	if fanCache := s.fanControlCache.Load(); fanCache != nil {
+	if fanCache := s.GetFanControlCache(); fanCache != nil {
 		fanRPM.Reset()
 		fanPWMPercent.Reset()
 
