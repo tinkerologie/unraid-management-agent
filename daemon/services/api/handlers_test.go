@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -1985,9 +1986,27 @@ func TestDiskSettingsEndpoint(t *testing.T) {
 	}
 }
 
+type fakeSystemController struct {
+	rebootCalled   bool
+	shutdownCalled bool
+	err            error
+}
+
+func (m *fakeSystemController) Reboot() error {
+	m.rebootCalled = true
+	return m.err
+}
+
+func (m *fakeSystemController) Shutdown() error {
+	m.shutdownCalled = true
+	return m.err
+}
+
 // Test system reboot/shutdown handlers
 func TestSystemRebootEndpoint(t *testing.T) {
 	server, _ := setupTestServer()
+	mockCtrl := &fakeSystemController{}
+	server.SetSystemController(mockCtrl)
 
 	req, err := http.NewRequest("POST", "/api/v1/system/reboot", nil)
 	if err != nil {
@@ -1997,9 +2016,54 @@ func TestSystemRebootEndpoint(t *testing.T) {
 	rr := httptest.NewRecorder()
 	server.router.ServeHTTP(rr, req)
 
-	// Should return error since reboot command is not available
-	if status := rr.Code; status != http.StatusOK && status != http.StatusInternalServerError {
-		t.Errorf("handler returned unexpected status code: got %v", status)
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("handler returned unexpected status code: got %v, want %v", status, http.StatusOK)
+	}
+	if !mockCtrl.rebootCalled {
+		t.Error("expected Reboot() to be called on controller")
+	}
+
+	// Test error case
+	mockCtrlErr := &fakeSystemController{err: errors.New("reboot failed")}
+	server.SetSystemController(mockCtrlErr)
+
+	rrErr := httptest.NewRecorder()
+	server.router.ServeHTTP(rrErr, req)
+
+	if status := rrErr.Code; status != http.StatusInternalServerError {
+		t.Errorf("handler returned unexpected status code on error: got %v, want %v", status, http.StatusInternalServerError)
+	}
+}
+
+func TestSystemShutdownEndpoint(t *testing.T) {
+	server, _ := setupTestServer()
+	mockCtrl := &fakeSystemController{}
+	server.SetSystemController(mockCtrl)
+
+	req, err := http.NewRequest("POST", "/api/v1/system/shutdown", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	server.router.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("handler returned unexpected status code: got %v, want %v", status, http.StatusOK)
+	}
+	if !mockCtrl.shutdownCalled {
+		t.Error("expected Shutdown() to be called on controller")
+	}
+
+	// Test error case
+	mockCtrlErr := &fakeSystemController{err: errors.New("shutdown failed")}
+	server.SetSystemController(mockCtrlErr)
+
+	rrErr := httptest.NewRecorder()
+	server.router.ServeHTTP(rrErr, req)
+
+	if status := rrErr.Code; status != http.StatusInternalServerError {
+		t.Errorf("handler returned unexpected status code on error: got %v, want %v", status, http.StatusInternalServerError)
 	}
 }
 

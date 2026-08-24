@@ -146,7 +146,7 @@ jobs:
       - name: Install swag CLI
         run: |
           echo "Installing swag for Swagger documentation generation..."
-          go install github.com/swaggo/swag/cmd/swag@latest
+          go install github.com/swaggo/swag/cmd/swag@v1.16.6
           echo "✅ swag installed"
 
       - name: Build release package

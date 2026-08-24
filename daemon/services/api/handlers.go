@@ -62,12 +62,26 @@ func (s *Server) handleSystem(w http.ResponseWriter, _ *http.Request) {
 //	@Tags			System
 //	@Produce		json
 //	@Success		200	{object}	dto.Response	"Reboot initiated"
+func (s *Server) getSystemController() SystemControllerInterface {
+	if s.systemController != nil {
+		return s.systemController
+	}
+	return controllers.NewSystemController(s.ctx)
+}
+
+// handleSystemReboot godoc
+//
+//	@Summary		Reboot system
+//	@Description	Initiate a system reboot
+//	@Tags			System
+//	@Produce		json
+//	@Success		200	{object}	dto.Response	"Reboot initiated"
 //	@Failure		500	{object}	dto.Response	"Failed to initiate reboot"
 //	@Router			/system/reboot [post]
 func (s *Server) handleSystemReboot(w http.ResponseWriter, _ *http.Request) {
 	logger.Info("API: System reboot requested")
 
-	systemCtrl := controllers.NewSystemController(s.ctx)
+	systemCtrl := s.getSystemController()
 	err := systemCtrl.Reboot()
 
 	if err != nil {
@@ -99,7 +113,7 @@ func (s *Server) handleSystemReboot(w http.ResponseWriter, _ *http.Request) {
 func (s *Server) handleSystemShutdown(w http.ResponseWriter, _ *http.Request) {
 	logger.Info("API: System shutdown requested")
 
-	systemCtrl := controllers.NewSystemController(s.ctx)
+	systemCtrl := s.getSystemController()
 	err := systemCtrl.Shutdown()
 
 	if err != nil {

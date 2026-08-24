@@ -23,7 +23,7 @@ swagger:
 		"$$(go env GOPATH)/bin/swag" init -g daemon/docs/swagger.go -o daemon/docs --parseDependency --parseInternal; \
 	else \
 		echo "swag not found, installing..."; \
-		go install github.com/swaggo/swag/cmd/swag@latest; \
+		go install github.com/swaggo/swag/cmd/swag@v1.16.6; \
 		"$$(go env GOPATH)/bin/swag" init -g daemon/docs/swagger.go -o daemon/docs --parseDependency --parseInternal; \
 	fi
 

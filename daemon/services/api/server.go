@@ -42,6 +42,12 @@ type MQTTClientInterface interface {
 	PublishCustom(topic string, payload any, retain bool) error
 }
 
+// SystemControllerInterface defines the methods required for system power operations.
+type SystemControllerInterface interface {
+	Reboot() error
+	Shutdown() error
+}
+
 // Server represents the HTTP API server that handles REST endpoints and WebSocket connections.
 // It maintains an in-memory cache of data from collectors and broadcasts updates to WebSocket clients.
 type Server struct {
@@ -54,6 +60,7 @@ type Server struct {
 	ready            chan struct{} // closed when subscriptions are fully wired
 	collectorManager CollectorManagerInterface
 	mqttClient       MQTTClientInterface
+	systemController SystemControllerInterface
 	alertEngine      *alerting.Engine
 	alertStore       *alerting.Store
 	watchdogRunner   *watchdog.Runner
@@ -711,6 +718,11 @@ func (s *Server) SetWatchdog(runner *watchdog.Runner, store *watchdog.Store) {
 // SetFanController sets the fan controller for fan control API endpoints.
 func (s *Server) SetFanController(fc *controllers.FanController) {
 	s.fanController = fc
+}
+
+// SetSystemController injects the system controller for power operations.
+func (s *Server) SetSystemController(sc SystemControllerInterface) {
+	s.systemController = sc
 }
 
 // SetCPUController injects the CPU controller after initialization.

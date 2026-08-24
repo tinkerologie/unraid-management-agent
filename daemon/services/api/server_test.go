@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/gorilla/mux"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 )
 
@@ -185,7 +186,7 @@ func TestControlRoutes(t *testing.T) {
 
 	server := NewServer(ctx)
 
-	// Control routes should exist but may return errors without valid data
+	// Control routes should be registered in the router
 	routes := []struct {
 		method string
 		path   string
@@ -207,11 +208,8 @@ func TestControlRoutes(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			rr := httptest.NewRecorder()
-			server.router.ServeHTTP(rr, req)
-
-			// Route should exist (not return 404)
-			if rr.Code == http.StatusNotFound {
+			var match mux.RouteMatch
+			if !server.router.Match(req, &match) || match.MatchErr == mux.ErrNotFound {
 				t.Errorf("Route %s %s not found", route.method, route.path)
 			}
 		})

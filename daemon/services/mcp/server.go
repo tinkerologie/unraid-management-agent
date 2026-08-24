@@ -87,6 +87,12 @@ type CacheProvider interface {
 // ptr returns a pointer to the given value. Used for optional ToolAnnotations fields.
 func ptr[T any](v T) *T { return &v }
 
+// SystemControllerInterface defines the methods required for system power operations.
+type SystemControllerInterface interface {
+	Reboot() error
+	Shutdown() error
+}
+
 // Server represents the MCP server that exposes Unraid capabilities to AI agents.
 type Server struct {
 	ctx              *domain.Context
@@ -97,6 +103,7 @@ type Server struct {
 	alertStore       *alerting.Store
 	watchdogRunner   *watchdog.Runner
 	watchdogStore    *watchdog.Store
+	systemController SystemControllerInterface
 	fanController    *controllers.FanController
 	cpuController    *controllers.CPUController
 	tuningController *controllers.TuningController
@@ -163,6 +170,18 @@ func (s *Server) SetAlertEngine(engine *alerting.Engine, store *alerting.Store) 
 func (s *Server) SetWatchdog(runner *watchdog.Runner, store *watchdog.Store) {
 	s.watchdogRunner = runner
 	s.watchdogStore = store
+}
+
+// SetSystemController sets the system controller for MCP power operations.
+func (s *Server) SetSystemController(sc SystemControllerInterface) {
+	s.systemController = sc
+}
+
+func (s *Server) getSystemController() SystemControllerInterface {
+	if s.systemController != nil {
+		return s.systemController
+	}
+	return controllers.NewSystemController(s.ctx)
 }
 
 // SetFanController sets the fan controller for MCP fan control tools.
@@ -1366,7 +1385,7 @@ func (s *Server) registerControlTools() {
 
 		logger.Info("MCP: System reboot requested (confirmed)")
 
-		systemCtrl := controllers.NewSystemController(s.ctx)
+		systemCtrl := s.getSystemController()
 		err := systemCtrl.Reboot()
 
 		if err != nil {
@@ -1391,7 +1410,7 @@ func (s *Server) registerControlTools() {
 
 		logger.Info("MCP: System shutdown requested (confirmed)")
 
-		systemCtrl := controllers.NewSystemController(s.ctx)
+		systemCtrl := s.getSystemController()
 		err := systemCtrl.Shutdown()
 
 		if err != nil {

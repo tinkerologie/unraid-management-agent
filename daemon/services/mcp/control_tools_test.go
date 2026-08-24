@@ -293,30 +293,57 @@ func TestToolSystemShutdown_Unconfirmed(t *testing.T) {
 	}
 }
 
+type mockSystemController struct {
+	rebootCalled   bool
+	shutdownCalled bool
+	err            error
+}
+
+func (m *mockSystemController) Reboot() error {
+	m.rebootCalled = true
+	return m.err
+}
+
+func (m *mockSystemController) Shutdown() error {
+	m.shutdownCalled = true
+	return m.err
+}
+
 func TestToolSystemReboot_Confirmed(t *testing.T) {
 	server, _ := setupInitializedServer(t)
+	mockCtrl := &mockSystemController{}
+	server.SetSystemController(mockCtrl)
+
 	cs, cleanup := connectClientToServer(t, server)
 	defer cleanup()
 
 	_, text := callToolJSON(t, cs, "system_reboot", map[string]any{
 		"confirm": true,
 	})
-	// Will fail on non-Unraid (no reboot command)
-	if text == "" {
-		t.Error("Expected non-empty response")
+	if !mockCtrl.rebootCalled {
+		t.Error("Expected Reboot() to be called on controller")
+	}
+	if !strings.Contains(text, "System reboot initiated") {
+		t.Errorf("Expected success message, got: %s", text)
 	}
 }
 
 func TestToolSystemShutdown_Confirmed(t *testing.T) {
 	server, _ := setupInitializedServer(t)
+	mockCtrl := &mockSystemController{}
+	server.SetSystemController(mockCtrl)
+
 	cs, cleanup := connectClientToServer(t, server)
 	defer cleanup()
 
 	_, text := callToolJSON(t, cs, "system_shutdown", map[string]any{
 		"confirm": true,
 	})
-	if text == "" {
-		t.Error("Expected non-empty response")
+	if !mockCtrl.shutdownCalled {
+		t.Error("Expected Shutdown() to be called on controller")
+	}
+	if !strings.Contains(text, "System shutdown initiated") {
+		t.Errorf("Expected success message, got: %s", text)
 	}
 }
 

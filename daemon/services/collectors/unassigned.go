@@ -519,6 +519,8 @@ func getFilesystemUsage(path string) (size, used, free uint64, usagePercent floa
 		return 0, 0, 0, 0, err
 	}
 
+	// Calculate sizes in bytes (safe conversion - Bsize is always positive)
+	//nolint:gosec // G115: Bsize is always positive on Linux systems
 	blockSize := uint64(stat.Bsize)
 	size = stat.Blocks * blockSize
 	used = (stat.Blocks - stat.Bfree) * blockSize

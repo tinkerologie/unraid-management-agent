@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Developer tooling and pre-commit checks** — added gosec G115 annotation for `syscall.Statfs_t` block size conversion in `unassigned.go` so `golangci-lint run` passes cleanly on Linux targets, regenerated `.secrets.baseline` with active plugins to restore `detect-secrets` scanning, and pinned `swag` CLI to `v1.16.6` in `Makefile` and CI release workflow to preserve Swagger 2.0 format reproducibility ([#150](https://github.com/ruaan-deysel/unraid-management-agent/issues/150)).
+- **Test safety against accidental machine reboot or shutdown** — made `SystemController` command execution injectable with safe defaults and wired `SystemControllerInterface` into API and MCP servers with test mocks, preventing test runs on systemd Linux hosts from inadvertently issuing destructive `/sbin/shutdown` commands during `make test` ([#149](https://github.com/ruaan-deysel/unraid-management-agent/issues/149)).
+
 ## [2026.08.02] - 2026-08-24
 
 ### Added
