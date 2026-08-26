@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.08.03] - 2026-08-26
+
 ### Fixed
 
 - **Plugin update CLI argument format** — normalised plugin names in `PluginController.UpdatePlugin` to pass bare `.plg` filenames instead of absolute filesystem paths to the Unraid `plugin update` CLI command, which rejects arguments containing path separators, added input validation to the MCP `update_plugin` tool, and introduced an injectable command execution seam on `PluginController` with comprehensive regression test coverage ([#153](https://github.com/ruaan-deysel/unraid-management-agent/issues/153)).
