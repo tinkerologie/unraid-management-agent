@@ -20,11 +20,27 @@ import (
 const pluginCheckTimeout = 30 * time.Second
 
 // PluginController provides operations for managing Unraid plugins.
-type PluginController struct{}
+type PluginController struct {
+	execOutput func(string, ...string) (string, error)
+}
 
 // NewPluginController creates a new plugin controller.
 func NewPluginController() *PluginController {
-	return &PluginController{}
+	return &PluginController{
+		execOutput: lib.ExecCommandOutput,
+	}
+}
+
+// NewPluginControllerWithExec creates a new plugin controller with a custom command output executor.
+func NewPluginControllerWithExec(execFn func(string, ...string) (string, error)) *PluginController {
+	return &PluginController{
+		execOutput: execFn,
+	}
+}
+
+// SetExec sets a custom command output executor for the plugin controller.
+func (pc *PluginController) SetExec(execFn func(string, ...string) (string, error)) {
+	pc.execOutput = execFn
 }
 
 // CheckPluginUpdates checks all plugins for available updates. The check is
@@ -75,10 +91,18 @@ func (pc *PluginController) CheckPluginUpdates(parentCtx context.Context) ([]dto
 func (pc *PluginController) UpdatePlugin(pluginName string) error {
 	logger.Info("Plugin: Updating plugin %s", pluginName)
 
-	pluginFile := filepath.Join(constants.PluginsConfigDir, pluginName+".plg")
+	baseName := strings.TrimSuffix(filepath.Base(pluginName), ".plg")
+	fileName := baseName + ".plg"
+	pluginFile := filepath.Join(constants.PluginsConfigDir, fileName)
+	bareFile := filepath.Base(pluginFile)
 
-	// Use the plugin update command
-	output, err := lib.ExecCommandOutput(constants.PluginBin, "update", pluginFile)
+	execFn := pc.execOutput
+	if execFn == nil {
+		execFn = lib.ExecCommandOutput
+	}
+
+	// Use the plugin update command with bare .plg filename
+	output, err := execFn(constants.PluginBin, "update", bareFile)
 	if err != nil {
 		return fmt.Errorf("failed to update plugin %s: %w (output: %s)", pluginName, err, output)
 	}

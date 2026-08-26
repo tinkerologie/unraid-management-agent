@@ -1720,6 +1720,9 @@ func (s *Server) registerNewControlTools() {
 		if args.PluginName == "" {
 			return textResult("plugin_name is required for single plugin updates"), nil, nil
 		}
+		if err := lib.ValidatePluginName(args.PluginName); err != nil {
+			return textResult(fmt.Sprintf("Invalid plugin name: %v", err)), nil, nil
+		}
 		logger.Info("MCP: Updating plugin '%s'", args.PluginName)
 		pluginCtrl := controllers.NewPluginController()
 		err := pluginCtrl.UpdatePlugin(args.PluginName)

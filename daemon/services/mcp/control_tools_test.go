@@ -532,6 +532,35 @@ func TestToolUpdatePlugin_EmptyName(t *testing.T) {
 	}
 }
 
+func TestToolUpdatePlugin_InvalidName(t *testing.T) {
+	server, _ := setupInitializedServer(t)
+	cs, cleanup := connectClientToServer(t, server)
+	defer cleanup()
+
+	tests := []struct {
+		name       string
+		pluginName string
+	}{
+		{"path traversal parent", "../evil-plugin"},
+		{"absolute path", "/boot/config/plugins/plugin.plg"},
+		{"semicolon injection", "plugin;id.plg"},
+		{"command substitution", "$(id).plg"},
+		{"null byte", "plugin\x00.plg"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, text := callToolJSON(t, cs, "update_plugin", map[string]any{
+				"plugin_name": tt.pluginName,
+				"confirm":     true,
+			})
+			if !strings.Contains(text, "Invalid plugin name") {
+				t.Errorf("Expected 'Invalid plugin name' message for %q, got: %s", tt.pluginName, text)
+			}
+		})
+	}
+}
+
 func TestToolUpdateAllPlugins_Unconfirmed(t *testing.T) {
 	server, _ := setupInitializedServer(t)
 	cs, cleanup := connectClientToServer(t, server)
