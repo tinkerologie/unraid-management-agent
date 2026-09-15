@@ -15,12 +15,12 @@ require (
 	github.com/moby/moby/api v1.56.0
 	github.com/moby/moby/client v0.6.0
 	github.com/modelcontextprotocol/go-sdk v1.7.0
-	github.com/nicholas-fedor/shoutrrr v0.19.0
+	github.com/nicholas-fedor/shoutrrr v0.20.0
 	github.com/prometheus/client_golang v1.24.1
 	github.com/swaggo/http-swagger/v2 v2.0.2
 	github.com/swaggo/swag v1.16.6
 	go.yaml.in/yaml/v3 v3.0.5
-	golang.org/x/time v0.15.0
+	golang.org/x/time v0.16.0
 	gopkg.in/ini.v1 v1.67.3
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
