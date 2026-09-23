@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.09.00] - 2026-09-23
+
 ### Added
 
 - **Per-tool MCP access policy** — added granular per-tool access policies (`default`, `hidden`, `read_only`, `allow`, `ask`) to control tool visibility and execution for AI agents, complete with `GET`/`PUT` REST API endpoints at `/api/v1/mcp/tool-policy`, WebUI settings panel with search, category filtering, and bulk policy controls, and persistent storage in `/boot/config/plugins/unraid-management-agent/tool_policy.json` ([#156](https://github.com/ruaan-deysel/unraid-management-agent/issues/156)).
