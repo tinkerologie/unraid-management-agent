@@ -433,7 +433,7 @@ func TestCreateNotification_StockNotifyFormat(t *testing.T) {
 		t.Errorf("Notification file mode = %04o, want 0644 (readable by the Unraid web UI)", perm)
 	}
 
-	firstLine := strings.SplitN(string(content), "\n", 2)[0]
+	firstLine, _, _ := strings.Cut(string(content), "\n")
 	match := regexp.MustCompile(`^timestamp=(\d+)$`).FindStringSubmatch(firstLine)
 	if match == nil {
 		t.Fatalf("First line %q is not an unquoted unix-epoch timestamp", firstLine)
@@ -509,7 +509,7 @@ func TestCreateNotification_LongTitleCapped(t *testing.T) {
 		t.Fatalf("Expected exactly one .notify file, got %d (err=%v)", len(files), err)
 	}
 
-	event := strings.SplitN(filepath.Base(files[0]), "_", 2)[0]
+	event, _, _ := strings.Cut(filepath.Base(files[0]), "_")
 	if len(event) != 50 {
 		t.Errorf("Expected event part capped at 50 characters, got %d (%q)", len(event), event)
 	}

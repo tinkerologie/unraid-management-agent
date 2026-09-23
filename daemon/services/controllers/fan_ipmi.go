@@ -47,7 +47,7 @@ func (p *IPMIProvider) ReadAll() []dto.FanDevice {
 	}
 
 	var fans []dto.FanDevice
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue

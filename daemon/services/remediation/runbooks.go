@@ -65,7 +65,6 @@ func RunRunbook(ctx context.Context, exec *Executor, name string, confirm bool, 
 	// Look up the runbook.
 	var found *Runbook
 	for _, rb := range Runbooks() {
-		rb := rb // capture loop variable
 		if rb.Name == name {
 			found = &rb
 			break

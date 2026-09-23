@@ -12,11 +12,9 @@ import (
 func setupReadOnlyServer(t *testing.T) (*Server, *MockCacheProvider) {
 	t.Helper()
 	ctx := &domain.Context{
-		Config: domain.Config{
-			Version:  "test-1.0.0",
-			Port:     8043,
-			ReadOnly: true,
-		},
+		Version:  "test-1.0.0",
+		Port:     8043,
+		ReadOnly: true,
 	}
 	mock := newMockCacheProvider()
 	server := NewServer(ctx, mock)
@@ -51,9 +49,11 @@ func TestReadOnlyModeBlocksWriteTools(t *testing.T) {
 		// registerNewControlTools
 		{"update_container", map[string]any{"container_id": "abc", "confirm": true}},
 		{"create_vm_snapshot", map[string]any{"vm_name": "vm1", "snapshot_name": "snap1"}},
+		{"delete_vm_snapshot", map[string]any{"vm_name": "vm1", "snapshot_name": "snap1", "confirm": true}},
 		{"clear_disk_stats", map[string]any{}},
 		{"collector_action", map[string]any{"collector_name": "docker", "action": "disable"}},
 		{"update_collector_interval", map[string]any{"collector_name": "docker", "interval": 60}},
+		{"remote_share_action", map[string]any{"source": "//server/share", "action": "mount", "confirm": true}},
 		// registerNewMonitoringTools
 		{"refresh_container_updates", map[string]any{}},
 		// registerAlertingTools
@@ -63,7 +63,11 @@ func TestReadOnlyModeBlocksWriteTools(t *testing.T) {
 		{"create_health_check", map[string]any{"id": "hc1", "name": "hc 1", "type": "http", "target": "http://localhost"}},
 		{"run_health_check", map[string]any{"check_id": "hc1"}},
 		// registerFanControlTools / CPU / tuning
-		{"set_fan_mode", map[string]any{"fan_id": "hwmon0_fan1", "mode": "automatic"}},
+		{"set_fan_speed", map[string]any{"fan_id": "hwmon0_fan1", "pwm_percent": 50, "confirm": true}},
+		{"set_fan_mode", map[string]any{"fan_id": "hwmon0_fan1", "mode": "automatic", "confirm": true}},
+		{"set_fan_profile", map[string]any{"fan_id": "hwmon0_fan1", "profile_name": "quiet", "confirm": true}},
+		{"create_fan_profile", map[string]any{"name": "p1", "curve_points": `[{"temp_celsius": 40, "speed_percent": 30}]`, "confirm": true}},
+		{"restore_fan_defaults", map[string]any{"confirm": true}},
 		{"set_cpu_governor", map[string]any{"governor": "performance", "confirm": true}},
 		{"set_turbo_boost", map[string]any{"enabled": true, "confirm": true}},
 		// registerAgentTools
@@ -161,11 +165,26 @@ func TestWriteToolsStillWorkWhenNotReadOnly(t *testing.T) {
 	cs, cleanup := connectClientToServer(t, server)
 	defer cleanup()
 
-	_, text := callToolJSON(t, cs, "array_action", map[string]any{"action": "stop", "confirm": false})
-	if strings.Contains(text, "read-only mode") {
-		t.Errorf("write tool blocked despite read-only mode being disabled: %s", text)
+	toolsToTest := []struct {
+		tool string
+		args map[string]any
+	}{
+		{"array_action", map[string]any{"action": "stop", "confirm": false}},
+		{"delete_vm_snapshot", map[string]any{"vm_name": "vm1", "snapshot_name": "snap1", "confirm": false}},
+		{"set_fan_speed", map[string]any{"fan_id": "hwmon0_fan1", "pwm_percent": 50, "confirm": false}},
+		{"remote_share_action", map[string]any{"source": "//server/share", "action": "mount", "confirm": false}},
+		{"restore_fan_defaults", map[string]any{"confirm": false}},
 	}
-	if !strings.Contains(text, "confirm") {
-		t.Errorf("expected confirm gating message, got: %s", text)
+
+	for _, tt := range toolsToTest {
+		t.Run(tt.tool, func(t *testing.T) {
+			_, text := callToolJSON(t, cs, tt.tool, tt.args)
+			if strings.Contains(text, "read-only mode") {
+				t.Errorf("write tool %s blocked despite read-only mode being disabled: %s", tt.tool, text)
+			}
+			if !strings.Contains(text, "confirm") {
+				t.Errorf("expected confirm gating message for %s, got: %s", tt.tool, text)
+			}
+		})
 	}
 }

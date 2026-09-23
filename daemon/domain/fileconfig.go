@@ -24,6 +24,9 @@ type FileConfig struct {
 	// ReadOnly blocks all state-changing MCP tools (AI agents can only read).
 	ReadOnly *bool `yaml:"read_only,omitempty"`
 
+	// ToolPolicy configures per-tool access policies (hidden, read_only, allow, ask, default).
+	ToolPolicy map[string]string `yaml:"tool_policy,omitempty"`
+
 	// Power mode
 	LowPowerMode      *bool   `yaml:"low_power_mode,omitempty"`
 	DisableCollectors *string `yaml:"disable_collectors,omitempty"`

@@ -13,7 +13,8 @@ import (
 // BuildHealthReport unit tests
 // ---------------------------------------------------------------------------
 
-func boolPtr(b bool) *bool { return &b }
+//go:fix inline
+func boolPtr(b bool) *bool { return new(b) }
 
 // TestBuildHealthReport_StoppedContainer verifies that a stopped container
 // produces a finding with a start_container ActionRef pointing at the right ID.

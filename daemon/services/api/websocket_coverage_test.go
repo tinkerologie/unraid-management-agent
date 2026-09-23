@@ -19,8 +19,8 @@ func newTestServerWithHub(t *testing.T) (*Server, func()) {
 	t.Helper()
 	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{
-		Hub:    hub,
-		Config: domain.Config{Version: "test"},
+		Hub:     hub,
+		Version: "test",
 	}
 	server := NewServer(ctx)
 	populateTestCaches(server)
@@ -443,11 +443,9 @@ func newTestServerWithCORSOrigin(t *testing.T, corsOrigin string) (*Server, func
 	t.Helper()
 	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{
-		Hub: hub,
-		Config: domain.Config{
-			Version:    "test",
-			CORSOrigin: corsOrigin,
-		},
+		Hub:        hub,
+		Version:    "test",
+		CORSOrigin: corsOrigin,
 	}
 	server := NewServer(ctx)
 	populateTestCaches(server)

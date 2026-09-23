@@ -34,7 +34,7 @@ func (s *stubDataProvider) DegradedSubsystemCount() int                  { retur
 // and a non-running alertEngine (no evaluation loop, safe for unit tests).
 func setupAlertTemplateServer(t *testing.T) *Server {
 	t.Helper()
-	ctx := &domain.Context{Config: domain.Config{Port: 8080}}
+	ctx := &domain.Context{Port: 8080}
 	server := NewServer(ctx)
 
 	store := alerting.NewStore(t.TempDir())

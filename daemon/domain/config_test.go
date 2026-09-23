@@ -184,10 +184,8 @@ func TestConfigTLSEnabled(t *testing.T) {
 
 func TestContextFields(t *testing.T) {
 	ctx := Context{
-		Config: Config{
-			Version: "2025.01.01",
-			Port:    8043,
-		},
+		Version: "2025.01.01",
+		Port:    8043,
 		Intervals: Intervals{
 			System: 15,
 			Array:  30,

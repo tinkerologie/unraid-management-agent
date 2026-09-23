@@ -30,7 +30,7 @@ func TestMetricsHistory_SlopeAndETA(t *testing.T) {
 func TestMetricsHistory_BoundedByCount(t *testing.T) {
 	h := NewMetricsHistory(5, time.Hour)
 	base := time.Unix(1_700_000_000, 0)
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		h.recordAt("cpu_temp", "", float64(i), ts(base, i))
 	}
 	if n := len(h.globalSeries["cpu_temp"]); n != 5 {
@@ -41,7 +41,7 @@ func TestMetricsHistory_BoundedByCount(t *testing.T) {
 func TestMetricsHistory_BoundedByAge(t *testing.T) {
 	h := NewMetricsHistory(1000, 10*time.Second)
 	base := time.Unix(1_700_000_000, 0)
-	for i := 0; i < 30; i++ {
+	for i := range 30 {
 		h.recordAt("cpu_temp", "", float64(i), ts(base, i))
 	}
 	// cutoff = newest(t=29s) - 10s = t=19s; samples dropped where t.Before(cutoff)

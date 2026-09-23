@@ -159,6 +159,13 @@ type MCPVMSnapshotArgs struct {
 	Description  string `json:"description,omitempty" jsonschema:"Optional description for the snapshot"`
 }
 
+// MCPVMSnapshotDeleteArgs represents arguments for deleting a VM snapshot.
+type MCPVMSnapshotDeleteArgs struct {
+	VMName       string `json:"vm_name" jsonschema:"required,The virtual machine name"`
+	SnapshotName string `json:"snapshot_name" jsonschema:"required,Name of the snapshot to delete"`
+	Confirm      bool   `json:"confirm" jsonschema:"required,Must be set to true to confirm deletion - this cannot be undone"`
+}
+
 // MCPVMCloneArgs represents arguments for VM clone operations.
 type MCPVMCloneArgs struct {
 	VMName    string `json:"vm_name" jsonschema:"The source virtual machine name to clone"`
@@ -265,31 +272,40 @@ type MCPRunHealthCheckArgs struct {
 
 // MCPFanSpeedArgs represents arguments for setting a fan's PWM speed.
 type MCPFanSpeedArgs struct {
-	FanID      string `json:"fan_id" jsonschema:"The fan device identifier (e.g. hwmon0_fan1)"`
-	PWMPercent int    `json:"pwm_percent" jsonschema:"Target speed as a percentage (0-100)"`
+	FanID      string `json:"fan_id" jsonschema:"required,The fan device identifier (e.g. hwmon0_fan1)"`
+	PWMPercent int    `json:"pwm_percent" jsonschema:"required,Target speed as a percentage (0-100)"`
+	Confirm    bool   `json:"confirm" jsonschema:"required,Must be set to true to confirm setting fan speed"`
 }
 
 // MCPFanModeArgs represents arguments for setting a fan's control mode.
 type MCPFanModeArgs struct {
-	FanID string `json:"fan_id" jsonschema:"The fan device identifier (e.g. hwmon0_fan1)"`
-	Mode  string `json:"mode" jsonschema:"Control mode: automatic or manual"`
+	FanID   string `json:"fan_id" jsonschema:"required,The fan device identifier (e.g. hwmon0_fan1)"`
+	Mode    string `json:"mode" jsonschema:"required,Control mode: automatic or manual"`
+	Confirm bool   `json:"confirm" jsonschema:"required,Must be set to true to confirm setting fan mode"`
 }
 
 // MCPFanProfileArgs represents arguments for assigning a profile to a fan.
 type MCPFanProfileArgs struct {
-	FanID              string   `json:"fan_id" jsonschema:"The fan device identifier (e.g. hwmon0_fan1)"`
-	ProfileName        string   `json:"profile_name" jsonschema:"Name of the profile to apply (quiet, balanced, performance, or a custom name)"`
+	FanID              string   `json:"fan_id" jsonschema:"required,The fan device identifier (e.g. hwmon0_fan1)"`
+	ProfileName        string   `json:"profile_name" jsonschema:"required,Name of the profile to apply (quiet, balanced, performance, or a custom name)"`
 	TempSensorPath     string   `json:"temp_sensor_path,omitempty" jsonschema:"Sysfs path to the temperature sensor to link (e.g. /sys/class/hwmon/hwmon0/temp1_input)"`
 	SourceType         string   `json:"source_type,omitempty" jsonschema:"Temperature source type: 'hwmon' (single sensor) or 'drives' (max of selected drives)"`
 	DriveIDs           []string `json:"drive_ids,omitempty" jsonschema:"Drive IDs (e.g. disk1, cache) when source_type=drives; engine uses the max temp of active drives"`
 	FallbackSensorPath string   `json:"fallback_sensor_path,omitempty" jsonschema:"Hwmon sensor path used when source_type=drives and all selected drives are spun down"`
+	Confirm            bool     `json:"confirm" jsonschema:"required,Must be set to true to confirm setting fan profile"`
 }
 
 // MCPCreateFanProfileArgs represents arguments for creating a custom fan profile.
 type MCPCreateFanProfileArgs struct {
-	Name        string `json:"name" jsonschema:"Unique profile name (alphanumeric, underscores, hyphens)"`
+	Name        string `json:"name" jsonschema:"required,Unique profile name (alphanumeric, underscores, hyphens)"`
 	Description string `json:"description,omitempty" jsonschema:"Human-readable description of the profile"`
-	CurvePoints string `json:"curve_points" jsonschema:"JSON array of {temp_celsius, speed_percent} objects defining the fan curve"`
+	CurvePoints string `json:"curve_points" jsonschema:"required,JSON array of {temp_celsius, speed_percent} objects defining the fan curve"`
+	Confirm     bool   `json:"confirm" jsonschema:"required,Must be set to true to confirm creating fan profile"`
+}
+
+// MCPRestoreFanDefaultsArgs represents arguments for restoring fan defaults.
+type MCPRestoreFanDefaultsArgs struct {
+	Confirm bool `json:"confirm" jsonschema:"required,Must be set to true to confirm restoring all fans to automatic (BIOS-controlled) mode"`
 }
 
 // MCPSetCPUGovernorArgs represents arguments for setting the CPU scaling governor.
@@ -338,8 +354,9 @@ type MCPMetricHistoryArgs struct {
 // MCPRemoteShareActionArgs represents arguments for mounting/unmounting an
 // Unassigned Devices SMB/NFS remote share.
 type MCPRemoteShareActionArgs struct {
-	Source string `json:"source" jsonschema:"The remote share source as reported in remote_shares: //server/share for SMB or server:/export for NFS"`
-	Action string `json:"action" jsonschema:"The action to perform: mount or unmount"`
+	Source  string `json:"source" jsonschema:"required,The remote share source as reported in remote_shares: //server/share for SMB or server:/export for NFS"`
+	Action  string `json:"action" jsonschema:"required,The action to perform: mount or unmount"`
+	Confirm bool   `json:"confirm" jsonschema:"required,Must be set to true to confirm the action"`
 }
 
 // MCPRunRunbookArgs represents arguments for the run_runbook tool.
@@ -347,6 +364,29 @@ type MCPRemoteShareActionArgs struct {
 // When Confirm is true supported-action steps are executed via the executor.
 type MCPRunRunbookArgs struct {
 	Name    string   `json:"name" jsonschema:"required,runbook name e.g. restart_unhealthy_containers"`
-	Confirm bool     `json:"confirm,omitempty" jsonschema:"Set to true to execute the runbook steps; false (default) returns a dry-run plan only"`
+	Confirm bool     `json:"confirm" jsonschema:"required,Set to true to execute the runbook steps; false returns a dry-run plan only"`
 	Targets []string `json:"targets,omitempty" jsonschema:"container IDs for restart_unhealthy_containers; leave empty to auto-resolve from cache"`
+}
+
+// MCPToolCatalogItem represents a single tool's metadata and effective policy.
+type MCPToolCatalogItem struct {
+	Name             string `json:"name"`
+	Category         string `json:"category"`
+	Description      string `json:"description"`
+	ReadOnly         bool   `json:"read_only"`
+	Destructive      bool   `json:"destructive"`
+	ConfiguredPolicy string `json:"configured_policy"`
+	EffectivePolicy  string `json:"effective_policy"`
+}
+
+// MCPToolPolicyResponse represents the response payload for GET /api/v1/mcp/tool-policy.
+type MCPToolPolicyResponse struct {
+	GlobalReadOnly bool                 `json:"global_read_only"`
+	Tools          []MCPToolCatalogItem `json:"tools"`
+	Policies       map[string]string    `json:"policies"`
+}
+
+// MCPToolPolicyUpdateRequest represents the request payload for PUT /api/v1/mcp/tool-policy.
+type MCPToolPolicyUpdateRequest struct {
+	Policies map[string]string `json:"policies" binding:"required"`
 }

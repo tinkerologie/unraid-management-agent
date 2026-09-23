@@ -3,6 +3,8 @@ package collectors
 import (
 	"bufio"
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -22,13 +24,16 @@ const osUpdateStartupStagger = 60 * time.Second
 // variable to point at fixture files without touching the real filesystem.
 //
 // Supported file formats (one per file):
-//   - INI key-value:  version=7.2.1  (quoted or unquoted)
-//   - Plain text:     7.2.1
+//   - JSON (Unraid unraidcheck): {"version":"7.3.2","isNewer":true}
+//   - INI key-value:            version=7.2.1  (quoted or unquoted)
+//   - Plain text:               7.2.1
 //
 // Candidate order reflects decreasing reliability:
-//  1. /tmp/unraidcheck/result — written by the Unraid update-check cron job
-//  2. /var/local/emhttp/update.ini — runtime update metadata exposed by emhttp
+//  1. /tmp/unraidcheck/result.json — written by the Unraid update-check cron job
+//  2. /tmp/unraidcheck/result      — legacy format written by older scripts
+//  3. /var/local/emhttp/update.ini — runtime update metadata exposed by emhttp
 var osUpdateCandidatePaths = []string{
+	"/tmp/unraidcheck/result.json",
 	"/tmp/unraidcheck/result",
 	"/var/local/emhttp/update.ini",
 }
@@ -148,24 +153,36 @@ func (c *OSUpdateCollector) Collect() {
 		result.Status, result.CurrentVersion, result.LatestVersion)
 }
 
+type localOSUpdateInfo struct {
+	Version string
+	IsNewer *bool
+}
+
 // defaultCheck implements the local-file-only OS update check.
 func (c *OSUpdateCollector) defaultCheck() (*dto.OSUpdateStatus, error) {
 	current := readCurrentOSVersion()
-	latest, found := readLocalLatestVersion()
+	info, found := readLocalLatestVersion()
 
 	result := &dto.OSUpdateStatus{
 		CurrentVersion: current,
 		Timestamp:      time.Now(),
 	}
 
-	if !found || latest == "" {
+	if !found || info == nil || info.Version == "" {
 		result.Status = dto.OSUpdateStatusUnknown
 		result.UpdateAvailable = false
 		return result, nil
 	}
 
-	result.LatestVersion = latest
-	if latest != "" && latest != current {
+	result.LatestVersion = info.Version
+	if info.IsNewer != nil {
+		result.UpdateAvailable = *info.IsNewer
+		if *info.IsNewer {
+			result.Status = dto.OSUpdateStatusAvailable
+		} else {
+			result.Status = dto.OSUpdateStatusUpToDate
+		}
+	} else if isVersionNewer(info.Version, current) {
 		result.UpdateAvailable = true
 		result.Status = dto.OSUpdateStatusAvailable
 	} else {
@@ -202,31 +219,45 @@ func readCurrentOSVersion() string {
 }
 
 // readLocalLatestVersion iterates osUpdateCandidatePaths and returns the first
-// parseable version string it finds.  Returns ("", false) if none are available.
-func readLocalLatestVersion() (string, bool) {
+// parseable version info it finds.  Returns (nil, false) if none are available.
+func readLocalLatestVersion() (*localOSUpdateInfo, bool) {
 	for _, path := range osUpdateCandidatePaths {
-		if v, ok := parseVersionFile(path); ok {
-			return v, true
+		if info, ok := parseVersionFile(path); ok {
+			return info, true
 		}
 	}
-	return "", false
+	return nil, false
 }
 
-// parseVersionFile reads a single candidate file and extracts a version string.
+// parseVersionFile reads a single candidate file and extracts version information.
 // Supported formats:
-//   - version=7.2.1  (INI key with optional quotes)
+//   - JSON:          {"version": "7.3.2", "isNewer": true}
+//   - INI key-value: version=7.2.1  (quoted or unquoted)
 //   - VERSION=7.2.1
-//   - 7.2.1          (plain text, no key)
-func parseVersionFile(path string) (string, bool) {
+//   - Plain text:    7.2.1
+func parseVersionFile(path string) (*localOSUpdateInfo, bool) {
 	// #nosec G304 -- path comes from the package-level osUpdateCandidatePaths
 	// variable which is only overridden in tests using safe temp-dir paths.
-	f, err := os.Open(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
-		return "", false
+		return nil, false
 	}
-	defer f.Close() //nolint:errcheck
 
-	scanner := bufio.NewScanner(f)
+	trimmed := strings.TrimSpace(string(data))
+	if strings.HasPrefix(trimmed, "{") {
+		var jsonResult struct {
+			Version string `json:"version"`
+			IsNewer *bool  `json:"isNewer"`
+		}
+		if err := json.Unmarshal([]byte(trimmed), &jsonResult); err == nil && jsonResult.Version != "" {
+			return &localOSUpdateInfo{
+				Version: jsonResult.Version,
+				IsNewer: jsonResult.IsNewer,
+			}, true
+		}
+	}
+
+	scanner := bufio.NewScanner(strings.NewReader(trimmed))
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" || strings.HasPrefix(line, "#") {
@@ -240,7 +271,7 @@ func parseVersionFile(path string) (string, bool) {
 			if len(parts) == 2 {
 				v := strings.Trim(strings.TrimSpace(parts[1]), `"`)
 				if v != "" {
-					return v, true
+					return &localOSUpdateInfo{Version: v}, true
 				}
 			}
 			continue
@@ -248,11 +279,11 @@ func parseVersionFile(path string) (string, bool) {
 
 		// Plain version string (e.g. "7.2.1")
 		if looksLikeVersion(line) {
-			return line, true
+			return &localOSUpdateInfo{Version: line}, true
 		}
 	}
 
-	return "", false
+	return nil, false
 }
 
 // looksLikeVersion returns true if s matches a simple N.N.N-style version token.
@@ -268,4 +299,41 @@ func looksLikeVersion(s string) bool {
 	}
 	// Must contain at least one dot
 	return strings.ContainsRune(s, '.')
+}
+
+// isVersionNewer compares semver-like version strings (e.g. "7.2.1" vs "7.2.0").
+// Returns true if latest is strictly newer than current.
+func isVersionNewer(latest, current string) bool {
+	latest = strings.TrimPrefix(strings.TrimSpace(latest), "v")
+	current = strings.TrimPrefix(strings.TrimSpace(current), "v")
+	if latest == "" || latest == current {
+		return false
+	}
+	if current == "" {
+		return true
+	}
+
+	latestBase, _, _ := strings.Cut(latest, "-")
+	currentBase, _, _ := strings.Cut(current, "-")
+
+	lParts := strings.Split(latestBase, ".")
+	cParts := strings.Split(currentBase, ".")
+
+	maxLen := max(len(lParts), len(cParts))
+	for i := range maxLen {
+		var lNum, cNum int
+		if i < len(lParts) {
+			_, _ = fmt.Sscanf(lParts[i], "%d", &lNum)
+		}
+		if i < len(cParts) {
+			_, _ = fmt.Sscanf(cParts[i], "%d", &cNum)
+		}
+		if lNum > cNum {
+			return true
+		}
+		if lNum < cNum {
+			return false
+		}
+	}
+	return false
 }

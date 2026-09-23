@@ -3,6 +3,7 @@ package alerting
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -200,8 +201,8 @@ func (e *Engine) isCoolingDown(rule dto.AlertRule) bool {
 	}
 
 	// Search backward through history for the most recent firing event for this rule
-	for i := len(e.alertHistory) - 1; i >= 0; i-- {
-		ev := e.alertHistory[i]
+	for _, ev := range slices.Backward(e.alertHistory) {
+
 		if ev.RuleID == rule.ID && ev.State == "firing" {
 			return time.Since(ev.FiredAt) < cooldown
 		}

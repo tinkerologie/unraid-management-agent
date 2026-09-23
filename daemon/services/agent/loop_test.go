@@ -64,7 +64,7 @@ func TestLoopToolThenAnswer(t *testing.T) {
 
 func TestLoopHitsIterationCap(t *testing.T) {
 	loop := []*llm.ChatResponse{{Text: "[]"}}
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		loop = append(loop, &llm.ChatResponse{ToolCalls: []llm.ToolCall{{ID: "x", Name: "get_system_info", Args: "{}"}}, OutputTokens: 1})
 	}
 	p := llm.NewMockProvider(loop...)

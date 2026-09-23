@@ -66,9 +66,9 @@ func (s *BundleService) collectMetadata(hostname string) dto.BundleMetadata {
 
 	// Read Unraid version from /etc/unraid-version
 	if data, err := os.ReadFile("/etc/unraid-version"); err == nil {
-		for _, line := range strings.Split(string(data), "\n") {
-			if strings.HasPrefix(line, "version=") {
-				meta.UnraidVersion = strings.Trim(strings.TrimPrefix(line, "version="), "\"")
+		for line := range strings.SplitSeq(string(data), "\n") {
+			if after, ok := strings.CutPrefix(line, "version="); ok {
+				meta.UnraidVersion = strings.Trim(after, "\"")
 				break
 			}
 		}
@@ -107,7 +107,7 @@ func (s *BundleService) collectSystemState() dto.BundleSystemState {
 // parseMemInfo parses /proc/meminfo into a key-value map of kB values.
 func parseMemInfo(data string) map[string]int64 {
 	result := make(map[string]int64)
-	for _, line := range strings.Split(data, "\n") {
+	for line := range strings.SplitSeq(data, "\n") {
 		parts := strings.Fields(line)
 		if len(parts) >= 2 {
 			key := strings.TrimSuffix(parts[0], ":")
@@ -127,12 +127,12 @@ func (s *BundleService) collectArrayStatus() dto.BundleArrayStatus {
 
 	// Try reading array state from var.ini
 	if data, err := os.ReadFile("/var/local/emhttp/var.ini"); err == nil {
-		for _, line := range strings.Split(string(data), "\n") {
-			if strings.HasPrefix(line, "mdState=") {
-				status.State = strings.Trim(strings.TrimPrefix(line, "mdState="), "\"")
+		for line := range strings.SplitSeq(string(data), "\n") {
+			if after, ok := strings.CutPrefix(line, "mdState="); ok {
+				status.State = strings.Trim(after, "\"")
 			}
-			if strings.HasPrefix(line, "mdNumDisks=") {
-				if _, err := fmt.Sscanf(strings.TrimPrefix(line, "mdNumDisks="), "%d", &status.TotalDisks); err != nil {
+			if after, ok := strings.CutPrefix(line, "mdNumDisks="); ok {
+				if _, err := fmt.Sscanf(after, "%d", &status.TotalDisks); err != nil {
 					logger.Debug("failed to parse mdNumDisks: %v", err)
 				}
 			}
@@ -152,7 +152,7 @@ func (s *BundleService) collectContainers() []dto.BundleContainer {
 	}
 
 	var containers []dto.BundleContainer
-	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
 		if line == "" {
 			continue
 		}
@@ -183,7 +183,7 @@ func (s *BundleService) collectVMs() []dto.BundleVM {
 	}
 
 	var vms []dto.BundleVM
-	for _, name := range strings.Split(strings.TrimSpace(output), "\n") {
+	for name := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
 		name = strings.TrimSpace(name)
 		if name == "" {
 			continue
@@ -204,7 +204,7 @@ func (s *BundleService) collectNetwork() []dto.BundleNetwork {
 	if data, err := os.ReadFile("/var/local/emhttp/network.ini"); err == nil {
 		// Parse simple network entries
 		var current dto.BundleNetwork
-		for _, line := range strings.Split(string(data), "\n") {
+		for line := range strings.SplitSeq(string(data), "\n") {
 			line = strings.TrimSpace(line)
 			if strings.HasPrefix(line, "NAME=") {
 				if current.Name != "" {
@@ -212,8 +212,8 @@ func (s *BundleService) collectNetwork() []dto.BundleNetwork {
 				}
 				current = dto.BundleNetwork{Name: strings.Trim(strings.TrimPrefix(line, "NAME="), "\"")}
 			}
-			if strings.HasPrefix(line, "IPADDR:0=") {
-				current.IPAddr = strings.Trim(strings.TrimPrefix(line, "IPADDR:0="), "\"")
+			if after, ok := strings.CutPrefix(line, "IPADDR:0="); ok {
+				current.IPAddr = strings.Trim(after, "\"")
 			}
 		}
 		if current.Name != "" {
@@ -231,7 +231,7 @@ func (s *BundleService) collectLogs(ctx context.Context) dto.BundleLogs {
 	diagPath := filepath.Join(s.ctx.LogsDir, "diagnostic.jsonl")
 	// #nosec G304 -- path built from trusted LogsDir config
 	if data, err := os.ReadFile(diagPath); err == nil {
-		for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		for line := range strings.SplitSeq(strings.TrimSpace(string(data)), "\n") {
 			if line == "" {
 				continue
 			}

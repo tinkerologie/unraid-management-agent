@@ -156,7 +156,7 @@ func sampleProcIO() map[int]procIOCounters {
 		}
 
 		var c procIOCounters
-		for _, line := range strings.Split(string(data), "\n") {
+		for line := range strings.SplitSeq(string(data), "\n") {
 			fields := strings.Fields(line)
 			if len(fields) != 2 {
 				continue

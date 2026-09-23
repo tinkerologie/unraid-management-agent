@@ -74,6 +74,27 @@ if ! echo "${PORT:-}" | grep -Eq '^[0-9]+$' || [ "$PORT" -lt 1024 ] || [ "$PORT"
     PORT="$DEFAULT_PORT"
 fi
 
+# ── Server-side API_TOKEN quoting ─────────────────────────────
+# Unraid's /update.php writes variables double-quoted (e.g. API_TOKEN="...").
+# Double quotes allow shell expansion ($ ` \) when sourced by scripts/start.
+# Rewrite API_TOKEN with single quotes so arbitrary tokens are preserved literally.
+if [ -f "$CONFIG_FILE" ] && grep -q '^API_TOKEN=' "$CONFIG_FILE"; then
+    raw_token=$(sed -n 's/^[[:space:]]*API_TOKEN=//p' "$CONFIG_FILE" | tail -n1)
+    case "$raw_token" in
+        '"'*'"')
+            raw_token=${raw_token#\"}
+            raw_token=${raw_token%\"}
+            ;;
+        "'"*"'")
+            raw_token=${raw_token#\'}
+            raw_token=${raw_token%\'}
+            ;;
+    esac
+    quoted_token=$(printf '%s\n' "$raw_token" | sed -e "s/'/'\\\\''/g")
+    escaped_token=$(printf '%s\n' "$quoted_token" | sed -e 's/[\\&|]/\\&/g')
+    sed -i "s|^API_TOKEN=.*|API_TOKEN='${escaped_token}'|" "$CONFIG_FILE"
+fi
+
 # Only restart if the service is currently running
 if pidof "$PLUGIN" > /dev/null 2>&1; then
     "$SCRIPTS_DIR/stop"

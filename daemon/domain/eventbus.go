@@ -1,6 +1,9 @@
 package domain
 
-import "sync"
+import (
+	"slices"
+	"sync"
+)
 
 // EventBus is a type-safe publish/subscribe event bus.
 // It provides an untyped API (Sub/Pub/Unsub) that mirrors the cskr/pubsub
@@ -77,10 +80,8 @@ func (bus *EventBus) Unsub(ch chan any, topics ...string) {
 
 	// Close ch only if it is no longer subscribed to any remaining topic.
 	for _, subs := range bus.subs {
-		for _, s := range subs {
-			if s == ch {
-				return // still subscribed elsewhere
-			}
+		if slices.Contains(subs, ch) {
+			return // still subscribed elsewhere
 		}
 	}
 	close(ch)
@@ -88,8 +89,8 @@ func (bus *EventBus) Unsub(ch chan any, topics ...string) {
 
 // removeChan removes ch from a slice of channels without preserving order.
 func removeChan(subs []chan any, ch chan any) []chan any {
-	for i, s := range subs {
-		if s == ch {
+	for i, c := range subs {
+		if c == ch {
 			subs[i] = subs[len(subs)-1]
 			return subs[:len(subs)-1]
 		}
@@ -112,11 +113,18 @@ func NewTopic[T any](name string) Topic[T] {
 	return Topic[T]{Name: name}
 }
 
+// Publish sends typed data to all subscribers of topic using Go 1.27 generic method support.
+// Because topic carries type parameter T, passing the wrong data type is
+// a compile-time error.
+func (bus *EventBus) Publish[T any](topic Topic[T], data T) {
+	bus.Pub(data, topic.Name)
+}
+
 // Publish sends typed data to all subscribers of topic.
 // Because topic carries type parameter T, passing the wrong data type is
 // a compile-time error.
 func Publish[T any](bus *EventBus, topic Topic[T], data T) {
-	bus.Pub(data, topic.Name)
+	bus.Publish(topic, data)
 }
 
 // topicNamer is satisfied by any Topic[T] and allows accepting mixed generic

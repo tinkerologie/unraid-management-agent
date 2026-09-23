@@ -151,6 +151,6 @@ func buildTypeToTopicMap() map[reflect.Type]string {
 		m[b.msgType] = b.topicName
 	}
 	// SourceStatus is broadcast but not cached.
-	m[reflect.TypeOf(dto.SourceStatus{})] = "source_status_changed"
+	m[reflect.TypeFor[dto.SourceStatus]()] = "source_status_changed"
 	return m
 }

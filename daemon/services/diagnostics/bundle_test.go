@@ -9,10 +9,8 @@ import (
 
 func TestCollectDiagnostics(t *testing.T) {
 	ctx := &domain.Context{
-		Config: domain.Config{
-			Version: "2026.04.00",
-			Port:    8043,
-		},
+		Version: "2026.04.00",
+		Port:    8043,
 		Hub:     domain.NewEventBus(16),
 		LogsDir: t.TempDir(),
 		Intervals: domain.Intervals{
@@ -51,10 +49,8 @@ func TestCollectDiagnostics(t *testing.T) {
 
 func TestCollectDiagnostics_RedactsMQTTConfig(t *testing.T) {
 	ctx := &domain.Context{
-		Config: domain.Config{
-			Version: "test",
-			Port:    8043,
-		},
+		Version: "test",
+		Port:    8043,
 		Hub:     domain.NewEventBus(16),
 		LogsDir: t.TempDir(),
 		MQTTConfig: domain.MQTTConfig{

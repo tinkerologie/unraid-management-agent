@@ -136,8 +136,7 @@ func TestWSHubBroadcast(t *testing.T) {
 
 func TestWSHubBroadcastEvictsBlockedClientAndKeepsHealthyClients(t *testing.T) {
 	hub := NewWSHub()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	go hub.Run(ctx)
 	time.Sleep(10 * time.Millisecond)

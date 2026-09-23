@@ -184,7 +184,7 @@ Tool names are exact. Do not invent or alias them.
 | --- | --- | --- |
 | W | `update_plugin` | Update one plugin |
 | W ⚠️ | `update_all_plugins` | Update all plugins with available updates |
-| W | `remote_share_action` | Mount/unmount an SMB/NFS remote share by source |
+| W ⚠️ | `remote_share_action` | Mount/unmount an SMB/NFS remote share by source (confirm=true) |
 
 ---
 
@@ -238,11 +238,11 @@ Tool names are exact. Do not invent or alias them.
 | R/W | Tool | Purpose |
 | --- | --- | --- |
 | R | `get_fan_status` | Fan speeds, modes, profiles, config |
-| W | `set_fan_speed` | Set PWM speed for a fan (manual mode) |
-| W | `set_fan_mode` | automatic (BIOS) or manual (software) |
-| W | `set_fan_profile` | Assign a temp-curve profile (quiet/balanced/performance) |
-| W | `create_fan_profile` | Create a custom temp-curve profile |
-| W | `restore_fan_defaults` | Return all fans to automatic (safe) |
+| W ⚠️ | `set_fan_speed` | Set PWM speed for a fan (confirm=true) |
+| W ⚠️ | `set_fan_mode` | automatic (BIOS) or manual (software) (confirm=true) |
+| W ⚠️ | `set_fan_profile` | Assign a temp-curve profile (quiet/balanced/performance) (confirm=true) |
+| W ⚠️ | `create_fan_profile` | Create a custom temp-curve profile (confirm=true) |
+| W ⚠️ | `restore_fan_defaults` | Return all fans to automatic (safe) (confirm=true) |
 
 ## CPU Control
 

@@ -27,7 +27,7 @@ func startSubscribeToEvents(t *testing.T, server *Server) context.CancelFunc {
 
 func TestSubscribeToEvents_SystemUpdate(t *testing.T) {
 	hub := domain.NewEventBus(10)
-	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
+	appCtx := &domain.Context{Hub: hub, Version: "test"}
 	server := NewServer(appCtx)
 
 	cancel := startSubscribeToEvents(t, server)
@@ -49,7 +49,7 @@ func TestSubscribeToEvents_SystemUpdate(t *testing.T) {
 
 func TestSubscribeToEvents_ArrayStatusUpdate(t *testing.T) {
 	hub := domain.NewEventBus(10)
-	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
+	appCtx := &domain.Context{Hub: hub, Version: "test"}
 	server := NewServer(appCtx)
 
 	cancel := startSubscribeToEvents(t, server)
@@ -71,7 +71,7 @@ func TestSubscribeToEvents_ArrayStatusUpdate(t *testing.T) {
 
 func TestSubscribeToEvents_DiskListUpdate(t *testing.T) {
 	hub := domain.NewEventBus(10)
-	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
+	appCtx := &domain.Context{Hub: hub, Version: "test"}
 	server := NewServer(appCtx)
 
 	cancel := startSubscribeToEvents(t, server)
@@ -90,7 +90,7 @@ func TestSubscribeToEvents_DiskListUpdate(t *testing.T) {
 
 func TestSubscribeToEvents_ShareListUpdate(t *testing.T) {
 	hub := domain.NewEventBus(10)
-	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
+	appCtx := &domain.Context{Hub: hub, Version: "test"}
 	server := NewServer(appCtx)
 
 	cancel := startSubscribeToEvents(t, server)
@@ -109,7 +109,7 @@ func TestSubscribeToEvents_ShareListUpdate(t *testing.T) {
 
 func TestSubscribeToEvents_ContainerListUpdate(t *testing.T) {
 	hub := domain.NewEventBus(10)
-	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
+	appCtx := &domain.Context{Hub: hub, Version: "test"}
 	server := NewServer(appCtx)
 
 	cancel := startSubscribeToEvents(t, server)
@@ -135,7 +135,7 @@ func TestSubscribeToEvents_ContainerListUpdate(t *testing.T) {
 
 func TestSubscribeToEvents_VMListUpdate(t *testing.T) {
 	hub := domain.NewEventBus(10)
-	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
+	appCtx := &domain.Context{Hub: hub, Version: "test"}
 	server := NewServer(appCtx)
 
 	cancel := startSubscribeToEvents(t, server)
@@ -157,7 +157,7 @@ func TestSubscribeToEvents_VMListUpdate(t *testing.T) {
 
 func TestSubscribeToEvents_UPSStatusUpdate(t *testing.T) {
 	hub := domain.NewEventBus(10)
-	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
+	appCtx := &domain.Context{Hub: hub, Version: "test"}
 	server := NewServer(appCtx)
 
 	cancel := startSubscribeToEvents(t, server)
@@ -179,7 +179,7 @@ func TestSubscribeToEvents_UPSStatusUpdate(t *testing.T) {
 
 func TestSubscribeToEvents_NUTStatusUpdate(t *testing.T) {
 	hub := domain.NewEventBus(10)
-	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
+	appCtx := &domain.Context{Hub: hub, Version: "test"}
 	server := NewServer(appCtx)
 
 	cancel := startSubscribeToEvents(t, server)
@@ -201,7 +201,7 @@ func TestSubscribeToEvents_NUTStatusUpdate(t *testing.T) {
 
 func TestSubscribeToEvents_GPUMetricsUpdate(t *testing.T) {
 	hub := domain.NewEventBus(10)
-	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
+	appCtx := &domain.Context{Hub: hub, Version: "test"}
 	server := NewServer(appCtx)
 
 	cancel := startSubscribeToEvents(t, server)
@@ -220,7 +220,7 @@ func TestSubscribeToEvents_GPUMetricsUpdate(t *testing.T) {
 
 func TestSubscribeToEvents_NetworkListUpdate(t *testing.T) {
 	hub := domain.NewEventBus(10)
-	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
+	appCtx := &domain.Context{Hub: hub, Version: "test"}
 	server := NewServer(appCtx)
 
 	cancel := startSubscribeToEvents(t, server)
@@ -239,7 +239,7 @@ func TestSubscribeToEvents_NetworkListUpdate(t *testing.T) {
 
 func TestSubscribeToEvents_HardwareUpdate(t *testing.T) {
 	hub := domain.NewEventBus(10)
-	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
+	appCtx := &domain.Context{Hub: hub, Version: "test"}
 	server := NewServer(appCtx)
 
 	cancel := startSubscribeToEvents(t, server)
@@ -261,7 +261,7 @@ func TestSubscribeToEvents_HardwareUpdate(t *testing.T) {
 
 func TestSubscribeToEvents_RegistrationUpdate(t *testing.T) {
 	hub := domain.NewEventBus(10)
-	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
+	appCtx := &domain.Context{Hub: hub, Version: "test"}
 	server := NewServer(appCtx)
 
 	cancel := startSubscribeToEvents(t, server)
@@ -283,7 +283,7 @@ func TestSubscribeToEvents_RegistrationUpdate(t *testing.T) {
 
 func TestSubscribeToEvents_NotificationsUpdate(t *testing.T) {
 	hub := domain.NewEventBus(10)
-	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
+	appCtx := &domain.Context{Hub: hub, Version: "test"}
 	server := NewServer(appCtx)
 
 	cancel := startSubscribeToEvents(t, server)
@@ -309,7 +309,7 @@ func TestSubscribeToEvents_NotificationsUpdate(t *testing.T) {
 
 func TestSubscribeToEvents_UnassignedDevicesUpdate(t *testing.T) {
 	hub := domain.NewEventBus(10)
-	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
+	appCtx := &domain.Context{Hub: hub, Version: "test"}
 	server := NewServer(appCtx)
 
 	cancel := startSubscribeToEvents(t, server)
@@ -333,7 +333,7 @@ func TestSubscribeToEvents_UnassignedDevicesUpdate(t *testing.T) {
 
 func TestSubscribeToEvents_ZFSPoolsUpdate(t *testing.T) {
 	hub := domain.NewEventBus(10)
-	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
+	appCtx := &domain.Context{Hub: hub, Version: "test"}
 	server := NewServer(appCtx)
 
 	cancel := startSubscribeToEvents(t, server)
@@ -352,7 +352,7 @@ func TestSubscribeToEvents_ZFSPoolsUpdate(t *testing.T) {
 
 func TestSubscribeToEvents_ZFSDatasetsUpdate(t *testing.T) {
 	hub := domain.NewEventBus(10)
-	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
+	appCtx := &domain.Context{Hub: hub, Version: "test"}
 	server := NewServer(appCtx)
 
 	cancel := startSubscribeToEvents(t, server)
@@ -371,7 +371,7 @@ func TestSubscribeToEvents_ZFSDatasetsUpdate(t *testing.T) {
 
 func TestSubscribeToEvents_ZFSSnapshotsUpdate(t *testing.T) {
 	hub := domain.NewEventBus(10)
-	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
+	appCtx := &domain.Context{Hub: hub, Version: "test"}
 	server := NewServer(appCtx)
 
 	cancel := startSubscribeToEvents(t, server)
@@ -390,7 +390,7 @@ func TestSubscribeToEvents_ZFSSnapshotsUpdate(t *testing.T) {
 
 func TestSubscribeToEvents_ZFSARCStatsUpdate(t *testing.T) {
 	hub := domain.NewEventBus(10)
-	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
+	appCtx := &domain.Context{Hub: hub, Version: "test"}
 	server := NewServer(appCtx)
 
 	cancel := startSubscribeToEvents(t, server)
@@ -413,7 +413,7 @@ func TestSubscribeToEvents_ZFSARCStatsUpdate(t *testing.T) {
 
 func TestSubscribeToEvents_ContextCancellation(t *testing.T) {
 	hub := domain.NewEventBus(10)
-	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
+	appCtx := &domain.Context{Hub: hub, Version: "test"}
 	server := NewServer(appCtx)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -438,7 +438,7 @@ func TestSubscribeToEvents_ContextCancellation(t *testing.T) {
 
 func TestSubscribeToEvents_UnknownType(t *testing.T) {
 	hub := domain.NewEventBus(10)
-	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
+	appCtx := &domain.Context{Hub: hub, Version: "test"}
 	server := NewServer(appCtx)
 
 	cancel := startSubscribeToEvents(t, server)
@@ -456,7 +456,7 @@ func TestSubscribeToEvents_UnknownType(t *testing.T) {
 
 func TestBroadcastEvents_ContextCancellation(t *testing.T) {
 	hub := domain.NewEventBus(10)
-	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
+	appCtx := &domain.Context{Hub: hub, Version: "test"}
 	server := NewServer(appCtx)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -481,7 +481,7 @@ func TestBroadcastEvents_ContextCancellation(t *testing.T) {
 
 func TestBroadcastEvents_ForwardsToWSHub(t *testing.T) {
 	hub := domain.NewEventBus(10)
-	appCtx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
+	appCtx := &domain.Context{Hub: hub, Version: "test"}
 	server := NewServer(appCtx)
 
 	// Start WSHub

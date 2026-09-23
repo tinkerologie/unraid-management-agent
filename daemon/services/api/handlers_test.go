@@ -14,9 +14,7 @@ import (
 
 func setupTestServer() (*Server, *domain.Context) {
 	ctx := &domain.Context{
-		Config: domain.Config{
-			Port: 8080,
-		},
+		Port: 8080,
 	}
 
 	server := NewServer(ctx)

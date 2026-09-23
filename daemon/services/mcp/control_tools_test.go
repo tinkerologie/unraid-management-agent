@@ -604,6 +604,21 @@ func TestToolCreateVMSnapshot_AutoName(t *testing.T) {
 	}
 }
 
+func TestToolDeleteVMSnapshot_Unconfirmed(t *testing.T) {
+	server, _ := setupInitializedServer(t)
+	cs, cleanup := connectClientToServer(t, server)
+	defer cleanup()
+
+	_, text := callToolJSON(t, cs, "delete_vm_snapshot", map[string]any{
+		"vm_name":       "test-vm",
+		"snapshot_name": "snap1",
+		"confirm":       false,
+	})
+	if !strings.Contains(text, "Snapshot deletion requires confirm=true") {
+		t.Errorf("Expected 'Snapshot deletion requires confirm=true' message, got: %s", text)
+	}
+}
+
 func TestToolDeleteVMSnapshot_EmptyName(t *testing.T) {
 	server, _ := setupInitializedServer(t)
 	cs, cleanup := connectClientToServer(t, server)
@@ -612,13 +627,14 @@ func TestToolDeleteVMSnapshot_EmptyName(t *testing.T) {
 	_, text := callToolJSON(t, cs, "delete_vm_snapshot", map[string]any{
 		"vm_name":       "test-vm",
 		"snapshot_name": "",
+		"confirm":       true,
 	})
 	if !strings.Contains(text, "snapshot_name is required") {
 		t.Errorf("Expected 'snapshot_name is required' message, got: %s", text)
 	}
 }
 
-func TestToolDeleteVMSnapshot(t *testing.T) {
+func TestToolDeleteVMSnapshot_Confirmed(t *testing.T) {
 	server, _ := setupInitializedServer(t)
 	cs, cleanup := connectClientToServer(t, server)
 	defer cleanup()
@@ -626,9 +642,10 @@ func TestToolDeleteVMSnapshot(t *testing.T) {
 	_, text := callToolJSON(t, cs, "delete_vm_snapshot", map[string]any{
 		"vm_name":       "test-vm",
 		"snapshot_name": "snap1",
+		"confirm":       true,
 	})
-	if text == "" {
-		t.Error("Expected non-empty response")
+	if strings.Contains(text, "requires confirm=true") {
+		t.Errorf("Expected confirm requirement to be satisfied, got: %s", text)
 	}
 }
 
@@ -950,5 +967,123 @@ func TestToolRestoreVMSnapshot_Confirmed(t *testing.T) {
 	// Will fail on non-Unraid but covers code path
 	if text == "" {
 		t.Error("Expected non-empty response")
+	}
+}
+
+// ===== Fan Control & Remote Share Tool Tests =====
+
+func TestFanAndRemoteShareConfirmation(t *testing.T) {
+	server, _ := setupInitializedServer(t)
+	cs, cleanup := connectClientToServer(t, server)
+	defer cleanup()
+
+	testCases := []struct {
+		name              string
+		tool              string
+		unconfirmedArgs   map[string]any
+		confirmedArgs     map[string]any
+		expectedPromptSub string
+	}{
+		{
+			name: "set_fan_speed",
+			tool: "set_fan_speed",
+			unconfirmedArgs: map[string]any{
+				"fan_id":      "hwmon0_fan1",
+				"pwm_percent": 50,
+				"confirm":     false,
+			},
+			confirmedArgs: map[string]any{
+				"fan_id":      "hwmon0_fan1",
+				"pwm_percent": 50,
+				"confirm":     true,
+			},
+			expectedPromptSub: "Setting fan speed requires confirm=true",
+		},
+		{
+			name: "set_fan_mode",
+			tool: "set_fan_mode",
+			unconfirmedArgs: map[string]any{
+				"fan_id":  "hwmon0_fan1",
+				"mode":    "manual",
+				"confirm": false,
+			},
+			confirmedArgs: map[string]any{
+				"fan_id":  "hwmon0_fan1",
+				"mode":    "manual",
+				"confirm": true,
+			},
+			expectedPromptSub: "Setting fan mode requires confirm=true",
+		},
+		{
+			name: "set_fan_profile",
+			tool: "set_fan_profile",
+			unconfirmedArgs: map[string]any{
+				"fan_id":       "hwmon0_fan1",
+				"profile_name": "quiet",
+				"confirm":      false,
+			},
+			confirmedArgs: map[string]any{
+				"fan_id":       "hwmon0_fan1",
+				"profile_name": "quiet",
+				"confirm":      true,
+			},
+			expectedPromptSub: "Setting fan profile requires confirm=true",
+		},
+		{
+			name: "create_fan_profile",
+			tool: "create_fan_profile",
+			unconfirmedArgs: map[string]any{
+				"name":         "custom_test",
+				"curve_points": `[{"temp_celsius": 40, "speed_percent": 30}]`,
+				"confirm":      false,
+			},
+			confirmedArgs: map[string]any{
+				"name":         "custom_test",
+				"curve_points": `[{"temp_celsius": 40, "speed_percent": 30}]`,
+				"confirm":      true,
+			},
+			expectedPromptSub: "Creating fan profile requires confirm=true",
+		},
+		{
+			name: "restore_fan_defaults",
+			tool: "restore_fan_defaults",
+			unconfirmedArgs: map[string]any{
+				"confirm": false,
+			},
+			confirmedArgs: map[string]any{
+				"confirm": true,
+			},
+			expectedPromptSub: "Restoring fan defaults requires confirm=true",
+		},
+		{
+			name: "remote_share_action",
+			tool: "remote_share_action",
+			unconfirmedArgs: map[string]any{
+				"source":  "//server/share",
+				"action":  "mount",
+				"confirm": false,
+			},
+			confirmedArgs: map[string]any{
+				"source":  "//server/share",
+				"action":  "mount",
+				"confirm": true,
+			},
+			expectedPromptSub: "Remote share action requires confirm=true",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name+"/unconfirmed", func(t *testing.T) {
+			_, text := callToolJSON(t, cs, tc.tool, tc.unconfirmedArgs)
+			if !strings.Contains(text, tc.expectedPromptSub) {
+				t.Errorf("expected %q in unconfirmed response, got: %s", tc.expectedPromptSub, text)
+			}
+		})
+		t.Run(tc.name+"/confirmed", func(t *testing.T) {
+			_, text := callToolJSON(t, cs, tc.tool, tc.confirmedArgs)
+			if strings.Contains(text, "requires confirm=true") {
+				t.Errorf("expected confirmation gate to be satisfied, got: %s", text)
+			}
+		})
 	}
 }

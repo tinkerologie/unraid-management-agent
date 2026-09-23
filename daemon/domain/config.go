@@ -57,7 +57,25 @@ type Config struct {
 	// when either is empty the server stays on plain HTTP.
 	TLSCertFile string `json:"tls_cert_file,omitempty"`
 	TLSKeyFile  string `json:"tls_key_file,omitempty"`
+	// ToolPolicy configures per-tool access controls for MCP tools.
+	ToolPolicy map[string]ToolPolicyValue `json:"tool_policy,omitempty"`
 }
+
+// ToolPolicyValue defines the access policy for an individual MCP tool.
+type ToolPolicyValue string
+
+const (
+	// PolicyDefault keeps the default behavior: reads work, destructive tools require confirm, other writes proceed.
+	PolicyDefault ToolPolicyValue = "default"
+	// PolicyHidden omits the tool from tools/list and rejects invocations as unknown.
+	PolicyHidden ToolPolicyValue = "hidden"
+	// PolicyReadOnly allows tool in tools/list but blocks state-changing invocations. Read tools are unaffected.
+	PolicyReadOnly ToolPolicyValue = "read_only"
+	// PolicyAllow executes state-changing tools without requiring the confirmation gate.
+	PolicyAllow ToolPolicyValue = "allow"
+	// PolicyAsk requires explicit confirmation (confirm: true) before executing state-changing tools.
+	PolicyAsk ToolPolicyValue = "ask"
+)
 
 // TLSEnabled reports whether HTTPS should be served. TLS is considered enabled
 // only when both a certificate and key file are configured. Whitespace-only

@@ -54,6 +54,10 @@ type Client struct {
 	// unassigned discovery publish.
 	remoteShareMu      sync.RWMutex
 	remoteShareSources map[string]string
+
+	// remoteSharePublishMu serializes background remote-share state republishing
+	// to ensure rapid command sequences (e.g. mount/unmount) publish in correct order.
+	remoteSharePublishMu sync.Mutex
 }
 
 // setRemoteShareSources atomically replaces the remote-share ID→source map.
@@ -636,7 +640,11 @@ func (c *Client) publish(topic, payload string, retained bool) error {
 	}
 
 	token := c.client.Publish(topic, normalizeQoS(c.config.QoS), retained, payload)
-	token.Wait()
+	if !token.WaitTimeout(5 * time.Second) {
+		c.msgErrors.Add(1)
+		logger.Debug("MQTT: Publish to %s timed out after 5s", topic)
+		return fmt.Errorf("MQTT publish to %s timed out after 5s", topic)
+	}
 
 	if token.Error() != nil {
 		c.msgErrors.Add(1)

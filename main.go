@@ -60,6 +60,9 @@ var cli struct {
 	// Read-only mode - blocks all state-changing MCP tools (REST API unaffected)
 	ReadOnly bool `default:"false" env:"READ_ONLY" help:"block all state-changing MCP tools so AI agents can only consume data"`
 
+	// Per-tool MCP access policy - comma-separated list of tool=policy entries (e.g. array_action=hidden,system_reboot=ask)
+	ToolPolicy string `default:"" env:"TOOL_POLICY" help:"comma-separated list of tool=policy entries (e.g. array_action=hidden,system_reboot=ask)"`
+
 	// CORS
 	CORSOrigin string `default:"*" env:"CORS_ORIGIN" help:"Access-Control-Allow-Origin value (default: *)"`
 
@@ -294,20 +297,42 @@ func main() {
 		"unraid-management-agent",
 	)
 
+	// Parse per-tool MCP access policies
+	toolPolicy := make(map[string]domain.ToolPolicyValue)
+	if fileCfg != nil && fileCfg.ToolPolicy != nil {
+		for k, v := range fileCfg.ToolPolicy {
+			if err := lib.ValidateToolPolicyValue(v); err != nil {
+				log.Printf("WARNING: Invalid tool policy %q for tool %q in config.yml, falling back to default: %v", v, k, err)
+				continue
+			}
+			if v != "" && v != "default" {
+				toolPolicy[k] = domain.ToolPolicyValue(v)
+			}
+		}
+	}
+	if cli.ToolPolicy != "" {
+		for k, v := range parseToolPolicyCSV(cli.ToolPolicy) {
+			if v == domain.PolicyDefault {
+				delete(toolPolicy, k)
+			} else {
+				toolPolicy[k] = v
+			}
+		}
+	}
+
 	// Create application context with intervals from CLI/env
 	appCtx := &domain.Context{
-		Config: domain.Config{
-			Version:     Version,
-			Port:        cli.Port,
-			BindAddress: cli.BindAddress,
-			CORSOrigin:  cli.CORSOrigin,
-			APIToken:    cli.APIToken,
-			ReadOnly:    cli.ReadOnly,
-			TLSCertFile: cli.TLSCertFile,
-			TLSKeyFile:  cli.TLSKeyFile,
-		},
-		Hub:      domain.NewEventBus(1024), // Buffer size for event bus
-		Platform: platform.NewRegistry(),
+		Version:     Version,
+		Port:        cli.Port,
+		BindAddress: cli.BindAddress,
+		CORSOrigin:  cli.CORSOrigin,
+		APIToken:    cli.APIToken,
+		ReadOnly:    cli.ReadOnly,
+		TLSCertFile: cli.TLSCertFile,
+		TLSKeyFile:  cli.TLSKeyFile,
+		ToolPolicy:  toolPolicy,
+		Hub:         domain.NewEventBus(1024), // Buffer size for event bus
+		Platform:    platform.NewRegistry(),
 		MQTTConfig: domain.MQTTConfig{
 			Enabled:             cli.MQTTEnabled,
 			Broker:              cli.MQTTBroker,
@@ -456,4 +481,35 @@ func applyFileConfig(cfg *domain.FileConfig) {
 		setInt(&cli.IntervalOSUpdate, iv.OSUpdate)
 		setInt(&cli.IntervalMover, iv.Mover)
 	}
+}
+
+// parseToolPolicyCSV parses a comma-separated tool=policy string into a map of ToolPolicyValue.
+func parseToolPolicyCSV(csv string) map[string]domain.ToolPolicyValue {
+	result := make(map[string]domain.ToolPolicyValue)
+	if strings.TrimSpace(csv) == "" {
+		return result
+	}
+	for part := range strings.SplitSeq(csv, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		k, v, ok := strings.Cut(part, "=")
+		if !ok {
+			continue
+		}
+		k = strings.TrimSpace(k)
+		v = strings.TrimSpace(v)
+		if k == "" {
+			continue
+		}
+		if err := lib.ValidateToolPolicyValue(v); err != nil {
+			log.Printf("WARNING: Invalid tool policy %q for tool %q in TOOL_POLICY, falling back to default: %v", v, k, err)
+			continue
+		}
+		if v != "" {
+			result[k] = domain.ToolPolicyValue(v)
+		}
+	}
+	return result
 }

@@ -19,3 +19,43 @@ if (isset($_POST['MQTT_PASSWORD']) && $_POST['MQTT_PASSWORD'] === '') {
         }
     }
 }
+
+// Preserve API token: the form leaves the input empty when unchanged.
+// If the user explicitly cleared the token (API_TOKEN_CLEAR == "1"), set it to empty.
+// Otherwise, when empty, restore the existing token from config.cfg.
+if (isset($_POST['API_TOKEN'])) {
+    if (!empty($_POST['API_TOKEN_CLEAR']) && $_POST['API_TOKEN_CLEAR'] === '1') {
+        $_POST['API_TOKEN'] = '';
+    } elseif ($_POST['API_TOKEN'] === '') {
+        if (is_file($cfg_path)) {
+            $existing = parse_ini_file($cfg_path, false, INI_SCANNER_RAW);
+            if (!empty($existing['API_TOKEN'])) {
+                $_POST['API_TOKEN'] = $existing['API_TOKEN'];
+            }
+        }
+    }
+}
+
+// Save tool policy JSON if submitted
+$policy_file = "/boot/config/plugins/$plugin/tool_policy.json";
+if (isset($_POST['TOOL_POLICY_JSON'])) {
+    $json_data = trim($_POST['TOOL_POLICY_JSON']);
+    if ($json_data !== '') {
+        $decoded = json_decode($json_data, true);
+        if (is_array($decoded)) {
+            $allowed_policies = ['default', 'hidden', 'read_only', 'allow', 'ask'];
+            $clean_policies = [];
+            foreach ($decoded as $tool => $pol) {
+                if (is_string($tool) && preg_match('/^[a-zA-Z0-9_.-]+$/', $tool) &&
+                    is_string($pol) && in_array($pol, $allowed_policies, true) &&
+                    $pol !== 'default' && $pol !== '') {
+                    $clean_policies[$tool] = $pol;
+                }
+            }
+            @mkdir(dirname($policy_file), 0750, true);
+            file_put_contents($policy_file, json_encode((object)$clean_policies, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        }
+    }
+    unset($_POST['TOOL_POLICY_JSON']);
+}
+

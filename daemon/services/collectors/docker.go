@@ -61,7 +61,7 @@ func (c *DockerCollector) initClient() error {
 		return nil
 	}
 
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation()) //nolint:staticcheck,govet // SA1019: Updating to new API in future version
+	dockerClient, err := client.New(client.FromEnv, client.WithAPIVersionNegotiation()) //nolint:staticcheck,govet // SA1019: Updating to new API in future version
 	if err != nil {
 		return err
 	}
@@ -427,7 +427,7 @@ func (c *DockerCollector) getCPUFromCgroups(fullID string, cont *dto.ContainerIn
 	}
 
 	var usageUsec int64
-	for _, line := range strings.Split(string(data), "\n") {
+	for line := range strings.SplitSeq(string(data), "\n") {
 		if strings.HasPrefix(line, "usage_usec ") {
 			if _, err := fmt.Sscanf(line, "usage_usec %d", &usageUsec); err != nil {
 				return
@@ -492,15 +492,15 @@ func parseProcNetDev(r io.Reader) (rx, tx uint64) {
 	sc := bufio.NewScanner(r)
 	for sc.Scan() {
 		line := sc.Text()
-		colon := strings.IndexByte(line, ':')
-		if colon < 0 {
+		before, after, ok := strings.Cut(line, ":")
+		if !ok {
 			continue // header lines have no colon in the iface position
 		}
-		iface := strings.TrimSpace(line[:colon])
+		iface := strings.TrimSpace(before)
 		if iface == "" || iface == "lo" {
 			continue
 		}
-		fields := strings.Fields(line[colon+1:])
+		fields := strings.Fields(after)
 		if len(fields) < 9 {
 			continue
 		}

@@ -13,7 +13,7 @@ import (
 
 // With no fan controller wired (unit-test server), the endpoint reports 503.
 func TestFanSensorsNilController(t *testing.T) {
-	server := NewServer(&domain.Context{Config: domain.Config{Port: 8043}})
+	server := NewServer(&domain.Context{Port: 8043})
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/fans/sensors", nil)
 	w := httptest.NewRecorder()
 	server.handleFanSensors(w, req)
@@ -25,7 +25,7 @@ func TestFanSensorsNilController(t *testing.T) {
 // An invalid temperature source must be rejected with 400 before the controller
 // is consulted (so it fails fast even when the controller is unavailable).
 func TestSetFanProfileSourceValidation(t *testing.T) {
-	server := NewServer(&domain.Context{Config: domain.Config{Port: 8043}})
+	server := NewServer(&domain.Context{Port: 8043})
 	body, _ := json.Marshal(dto.FanProfileRequest{
 		FanID:       "hwmon0_fan1",
 		ProfileName: "balanced",

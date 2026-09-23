@@ -55,7 +55,7 @@ func TestDriveSourceFallbackLogsOnce(t *testing.T) {
 		Type: dto.FanTempSourceDrives, DriveIDs: []string{"disk1"},
 		FallbackSensorPath: "/sys/class/hwmon/hwmon0/temp1_input", // may read 0 in CI; logging is what we assert
 	}
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		e.resolveTempForFan("hwmon0_fan1", src)
 	}
 	if n := strings.Count(buf.String(), "falling back"); n != 1 {

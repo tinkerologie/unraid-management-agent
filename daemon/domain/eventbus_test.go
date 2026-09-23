@@ -230,3 +230,30 @@ func TestTypedPublish_Pointer(t *testing.T) {
 		t.Fatal("timed out")
 	}
 }
+
+func TestEventBus_GenericMethodPublish(t *testing.T) {
+	type status struct {
+		Code int
+		Msg  string
+	}
+	topic := NewTopic[status]("generic_method_topic")
+	bus := NewEventBus(10)
+
+	ch := bus.Sub(topic.Name)
+
+	// Call generic method on *EventBus (Go 1.27 feature)
+	bus.Publish(topic, status{Code: 200, Msg: "OK"})
+
+	select {
+	case msg := <-ch:
+		st, ok := msg.(status)
+		if !ok {
+			t.Fatalf("expected status type, got %T", msg)
+		}
+		if st.Code != 200 || st.Msg != "OK" {
+			t.Errorf("unexpected payload: %+v", st)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for message via bus.Publish generic method")
+	}
+}

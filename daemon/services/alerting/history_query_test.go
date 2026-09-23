@@ -8,7 +8,7 @@ import (
 func TestQueryHistory(t *testing.T) {
 	e := NewEngine(NewStore(t.TempDir()), &mockDataProvider{})
 	base := time.Unix(1_700_000_000, 0)
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		e.history.Record("cpu_temp", "", float64(40+i), base.Add(time.Duration(i)*time.Second))
 	}
 	r := e.QueryHistory("cpu_temp", "")

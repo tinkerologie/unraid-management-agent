@@ -87,7 +87,7 @@ func TestToolGetSystemInfo(t *testing.T) {
 }
 
 func TestToolGetSystemInfoNil(t *testing.T) {
-	ctx := &domain.Context{Config: domain.Config{Version: "test"}}
+	ctx := &domain.Context{Version: "test"}
 	mock := &MockCacheProvider{enabledCollectors: make(map[string]bool), collectorIntervals: make(map[string]int), collectorStatuses: map[string]*dto.CollectorStatus{}}
 	server := NewServer(ctx, mock)
 	if err := server.Initialize(); err != nil {
@@ -717,7 +717,7 @@ func TestToolGetDiagnosticSummary(t *testing.T) {
 // ===== Monitoring tools with nil caches =====
 
 func TestToolsNilCaches(t *testing.T) {
-	ctx := &domain.Context{Config: domain.Config{Version: "test"}}
+	ctx := &domain.Context{Version: "test"}
 	mock := &MockCacheProvider{
 		enabledCollectors:  make(map[string]bool),
 		collectorIntervals: make(map[string]int),

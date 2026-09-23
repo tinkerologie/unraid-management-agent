@@ -35,7 +35,10 @@ if ($bind === '' || $bind === '0.0.0.0' || $bind === '::') {
 }
 $base = "http://$host:$port";
 
-// action may arrive via GET (download navigation) or POST (self-test AJAX).
+$token = trim((string)($config['API_TOKEN'] ?? ''));
+$auth_header = $token !== '' ? '-H ' . escapeshellarg("Authorization: Bearer $token") : '';
+
+// action may arrive via GET (download navigation) or POST (self-test AJAX, policy AJAX).
 $action = $_REQUEST['action'] ?? '';
 
 switch ($action) {
@@ -44,7 +47,7 @@ switch ($action) {
         $url = "$base/api/v1/diagnostics/self-test";
         // Use the curl binary (always present on Unraid) rather than the PHP
         // curl extension, consistent with scripts/apply.
-        exec('curl -fsS -m 10 ' . escapeshellarg($url) . ' 2>/dev/null', $out, $rc);
+        exec("curl -fsS -m 10 $auth_header " . escapeshellarg($url) . ' 2>/dev/null', $out, $rc);
         if ($rc !== 0) {
             http_response_code(502);
             echo json_encode([
@@ -65,7 +68,7 @@ switch ($action) {
         // body binary-safely; the bundle is small (logs are capped), so buffering
         // it lets us send an accurate Content-Length for a well-formed response.
         $url = "$base/api/v1/diagnostics/bundle";
-        $data = shell_exec('curl -fsS -m 60 ' . escapeshellarg($url));
+        $data = shell_exec("curl -fsS -m 60 $auth_header " . escapeshellarg($url));
         if ($data === null || $data === '') {
             header('Content-Type: application/json');
             http_response_code(502);
@@ -78,6 +81,112 @@ switch ($action) {
         header('X-Content-Type-Options: nosniff');
         header('Content-Length: ' . strlen($data));
         echo $data;
+        break;
+
+    case 'get_tool_policy':
+        header('Content-Type: application/json');
+        $url = "$base/api/v1/mcp/tool-policy";
+        exec("curl -fsS -m 10 $auth_header " . escapeshellarg($url) . ' 2>/dev/null', $out, $rc);
+        if ($rc === 0) {
+            echo implode("\n", $out);
+            break;
+        }
+        // Fallback when daemon is stopped or unreachable: read saved file
+        $policy_file = "/boot/config/plugins/$plugin/tool_policy.json";
+        $saved = [];
+        if (file_exists($policy_file)) {
+            $saved = json_decode(file_get_contents($policy_file), true) ?: [];
+        }
+        echo json_encode([
+            'global_read_only' => (($config['READ_ONLY'] ?? 'false') === 'true'),
+            'policies'         => $saved,
+            'tools'            => [],
+        ]);
+        break;
+
+    case 'save_tool_policy':
+        header('Content-Type: application/json');
+        $raw = file_get_contents('php://input');
+        if (empty($raw) && isset($_POST['policies'])) {
+            $raw = json_encode(['policies' => $_POST['policies']]);
+        }
+        if (empty($raw)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'No policy payload received']);
+            exit;
+        }
+
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid JSON payload']);
+            exit;
+        }
+
+        $input_map = isset($decoded['policies']) && is_array($decoded['policies']) ? $decoded['policies'] : $decoded;
+        $allowed_policies = ['default', 'hidden', 'read_only', 'allow', 'ask'];
+        $clean_policies = [];
+
+        foreach ($input_map as $tool => $pol) {
+            if (!is_string($tool) || !preg_match('/^[a-zA-Z0-9_.-]+$/', $tool)) {
+                http_response_code(400);
+                echo json_encode(['error' => "Invalid tool name: $tool"]);
+                exit;
+            }
+            if (!is_string($pol) || !in_array($pol, $allowed_policies, true)) {
+                http_response_code(400);
+                echo json_encode(['error' => "Invalid policy value '$pol' for tool '$tool'"]);
+                exit;
+            }
+            if ($pol !== 'default' && $pol !== '') {
+                $clean_policies[$tool] = $pol;
+            }
+        }
+
+        // Update live agent first if running
+        $url = "$base/api/v1/mcp/tool-policy";
+        $payload_for_daemon = json_encode(['policies' => (object)$clean_policies]);
+        $cmd = "curl -fsS -m 10 -X PUT -H 'Content-Type: application/json' $auth_header -d " . escapeshellarg($payload_for_daemon) . ' ' . escapeshellarg($url) . ' 2>&1';
+        $out = [];
+        $rc = 0;
+        exec($cmd, $out, $rc);
+        if ($rc === 22) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Live agent rejected policy update', 'details' => implode("\n", $out)]);
+            exit;
+        }
+
+        // Save to file on disk
+        $policy_file = "/boot/config/plugins/$plugin/tool_policy.json";
+        @mkdir(dirname($policy_file), 0750, true);
+        $json_to_write = json_encode((object)$clean_policies, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        if (file_put_contents($policy_file, $json_to_write) === false) {
+            http_response_code(500);
+            echo json_encode(['error' => 'Failed to write tool policy file to disk']);
+            exit;
+        }
+
+        // Keep TOOL_POLICY in config.cfg synchronized
+        if (file_exists($config_file)) {
+            $pairs = [];
+            foreach ($clean_policies as $k => $v) {
+                $pairs[] = "$k=$v";
+            }
+            $tool_policy_str = implode(',', $pairs);
+            $cfg_content = file_get_contents($config_file);
+            if (preg_match('/^TOOL_POLICY=.*$/m', $cfg_content)) {
+                $cfg_content = preg_replace('/^TOOL_POLICY=.*$/m', 'TOOL_POLICY="' . addcslashes($tool_policy_str, '"\\$') . '"', $cfg_content);
+            } else {
+                $cfg_content .= "\nTOOL_POLICY=\"" . addcslashes($tool_policy_str, '"\\$') . "\"\n";
+            }
+            @file_put_contents($config_file, $cfg_content);
+        }
+
+        echo json_encode([
+            'success'     => true,
+            'live_update' => ($rc === 0),
+            'message'     => ($rc === 0) ? 'Policies applied instantly to running agent and saved to disk.' : 'Policies saved to disk (agent will apply them on next start).',
+        ]);
         break;
 
     default:

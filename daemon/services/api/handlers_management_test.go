@@ -15,7 +15,7 @@ import (
 // ===== Collector Management Handler Tests =====
 
 func setupTestServerWithCollectorManager() (*Server, *mockCollectorManager) {
-	ctx := &domain.Context{Config: domain.Config{Port: 8080}}
+	ctx := &domain.Context{Port: 8080}
 	mock := newMockCollectorManager()
 	server := NewServerWithCollectorManager(ctx, mock)
 	return server, mock

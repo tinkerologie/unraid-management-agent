@@ -393,7 +393,7 @@ func TestComputeRates(t *testing.T) {
 func TestComputeRatesConcurrent(t *testing.T) {
 	c := newTestCollector(t)
 	var wg sync.WaitGroup
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()

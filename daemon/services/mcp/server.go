@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 	"time"
 
@@ -84,9 +85,6 @@ type CacheProvider interface {
 	GetHealthStatus() map[string]any
 }
 
-// ptr returns a pointer to the given value. Used for optional ToolAnnotations fields.
-func ptr[T any](v T) *T { return &v }
-
 // SystemControllerInterface defines the methods required for system power operations.
 type SystemControllerInterface interface {
 	Reboot() error
@@ -108,14 +106,43 @@ type Server struct {
 	cpuController    *controllers.CPUController
 	tuningController *controllers.TuningController
 	agentSvc         *agent.Service
+	toolPolicyStore  *ToolPolicyStore
 }
 
 // NewServer creates a new MCP server instance.
 func NewServer(ctx *domain.Context, cacheProvider CacheProvider) *Server {
-	return &Server{
-		ctx:           ctx,
-		cacheProvider: cacheProvider,
+	var initialPolicies map[string]domain.ToolPolicyValue
+	if ctx != nil {
+		initialPolicies = ctx.ToolPolicy
 	}
+	return &Server{
+		ctx:             ctx,
+		cacheProvider:   cacheProvider,
+		toolPolicyStore: NewToolPolicyStore("", initialPolicies),
+	}
+}
+
+// SetToolPolicyStore sets the tool policy store for per-tool access control.
+func (s *Server) SetToolPolicyStore(store *ToolPolicyStore) {
+	if store != nil {
+		s.toolPolicyStore = store
+	}
+}
+
+// GetToolPolicyStore returns the tool policy store.
+func (s *Server) GetToolPolicyStore() *ToolPolicyStore {
+	return s.toolPolicyStore
+}
+
+// effectivePolicy returns the calculated policy for a tool, taking global ReadOnly mode into account.
+func (s *Server) effectivePolicy(toolName string) domain.ToolPolicyValue {
+	if s.toolPolicyStore != nil {
+		return s.toolPolicyStore.GetEffectivePolicy(toolName, s.ctx.ReadOnly)
+	}
+	if s.ctx.ReadOnly {
+		return domain.PolicyReadOnly
+	}
+	return domain.PolicyDefault
 }
 
 // Initialize sets up the MCP server with all tools, resources, and prompts.
@@ -130,6 +157,39 @@ func (s *Server) Initialize() error {
 				"VM management, array operations, and comprehensive diagnostics via MCP tools.",
 		},
 	)
+
+	// Add receiving middleware for hidden tools enforcement (protocol compliance)
+	s.mcpServer.AddReceivingMiddleware(func(next mcp.MethodHandler) mcp.MethodHandler {
+		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
+			if method == "tools/call" {
+				if callReq, ok := req.(*mcp.CallToolRequest); ok && callReq.Params != nil {
+					toolName := callReq.Params.Name
+					if s.toolPolicyStore != nil && s.toolPolicyStore.GetEffectivePolicy(toolName, s.ctx.ReadOnly) == domain.PolicyHidden {
+						return nil, fmt.Errorf("unknown tool %q", toolName)
+					}
+				}
+			}
+
+			res, err := next(ctx, method, req)
+			if err != nil {
+				return nil, err
+			}
+
+			if method == "tools/list" {
+				if lr, ok := res.(*mcp.ListToolsResult); ok && lr.Tools != nil && s.toolPolicyStore != nil {
+					filtered := make([]*mcp.Tool, 0, len(lr.Tools))
+					for _, t := range lr.Tools {
+						if s.toolPolicyStore.GetEffectivePolicy(t.Name, s.ctx.ReadOnly) != domain.PolicyHidden {
+							filtered = append(filtered, t)
+						}
+					}
+					lr.Tools = filtered
+				}
+			}
+
+			return res, nil
+		}
+	})
 
 	// Register all tools, resources, and prompts
 	s.registerMonitoringTools()
@@ -235,7 +295,7 @@ func (s *Server) RunSTDIO(ctx context.Context) error {
 // registerMonitoringTools registers all read-only monitoring tools.
 func (s *Server) registerMonitoringTools() {
 	// Self-test / OS-resilience tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "run_self_test",
 		Description: "Run a self-test of the agent's data sources: returns the detected Unraid version, overall health, probed capabilities, and per-subsystem source status (healthy/degraded/unavailable). Use to check whether an OS update has broken any collector.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -277,7 +337,7 @@ func (s *Server) registerMonitoringTools() {
 	)
 
 	// Get specific disk info tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_disk_info",
 		Description: "Get detailed information about a specific disk including SMART data and health status",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -303,7 +363,7 @@ func (s *Server) registerMonitoringTools() {
 	)
 
 	// List Docker containers tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "list_containers",
 		Description: "List all Docker containers on the Unraid server with their status, resource usage, and configuration",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -328,7 +388,7 @@ func (s *Server) registerMonitoringTools() {
 	})
 
 	// Get specific container info tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_container_info",
 		Description: "Get detailed information about a specific Docker container",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -357,7 +417,7 @@ func (s *Server) registerMonitoringTools() {
 	)
 
 	// List VMs tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "list_vms",
 		Description: "List all virtual machines on the Unraid server with their status and configuration",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -383,7 +443,7 @@ func (s *Server) registerMonitoringTools() {
 	})
 
 	// Get specific VM info tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_vm_info",
 		Description: "Get detailed information about a specific virtual machine",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -449,7 +509,7 @@ func (s *Server) registerMonitoringTools() {
 	)
 
 	// ZFS pools tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_zfs_pools",
 		Description: "Get ZFS pool information including health status, capacity, and configuration",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -529,7 +589,7 @@ func (s *Server) registerMonitoringTools() {
 	)
 
 	// User scripts list tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "list_user_scripts",
 		Description: "List all available user scripts from the User Scripts plugin",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -556,7 +616,7 @@ func (s *Server) registerMonitoringTools() {
 	)
 
 	// List log files tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "list_log_files",
 		Description: "List all available log files on the Unraid server including system logs, Docker logs, and plugin logs",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -569,7 +629,7 @@ func (s *Server) registerMonitoringTools() {
 	})
 
 	// Get log content tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_log_content",
 		Description: "Retrieve content from a specific log file with optional line limits. Returns the last N lines (tail behavior) or specific range.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -595,7 +655,7 @@ func (s *Server) registerMonitoringTools() {
 	})
 
 	// Get syslog tool (convenience wrapper)
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_syslog",
 		Description: "Get the system log (syslog) - convenient shortcut for viewing system messages",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -616,7 +676,7 @@ func (s *Server) registerMonitoringTools() {
 	})
 
 	// Get Docker log tool (convenience wrapper)
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_docker_log",
 		Description: "Get the Docker daemon log - useful for diagnosing container issues",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -637,7 +697,7 @@ func (s *Server) registerMonitoringTools() {
 	})
 
 	// List collectors status tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "list_collectors",
 		Description: "List all data collectors with their status, intervals, and runtime information",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -647,7 +707,7 @@ func (s *Server) registerMonitoringTools() {
 	})
 
 	// Get specific collector status tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_collector_status",
 		Description: "Get detailed status of a specific collector including enabled state, interval, last run time, and error count",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -696,7 +756,7 @@ func (s *Server) registerMonitoringTools() {
 	)
 
 	// Get share config tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_share_config",
 		Description: "Get detailed share configuration including allocation method, cache settings, disk inclusion/exclusion, and export settings",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -720,7 +780,7 @@ func (s *Server) registerMonitoringTools() {
 	)
 
 	// Get health status tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_health_status",
 		Description: "Get a quick health check summary of the Unraid server including API status, uptime, and basic connectivity",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -744,7 +804,7 @@ func (s *Server) registerMonitoringTools() {
 	)
 
 	// Search containers tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "search_containers",
 		Description: "Search Docker containers by name, image, or state. Returns matching containers.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -778,7 +838,7 @@ func (s *Server) registerMonitoringTools() {
 	})
 
 	// Search VMs tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "search_vms",
 		Description: "Search virtual machines by name or state. Returns matching VMs.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -811,7 +871,7 @@ func (s *Server) registerMonitoringTools() {
 	})
 
 	// Get diagnostic summary tool
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_diagnostic_summary",
 		Description: "Get a comprehensive diagnostic summary including system health, array status, recent alerts, disk health, and resource usage",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -880,7 +940,7 @@ func (s *Server) registerMonitoringTools() {
 // registerNewMonitoringTools registers new monitoring tools for updates, snapshots, services, and processes.
 func (s *Server) registerNewMonitoringTools() {
 	// Check all container updates
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "check_container_updates",
 		Description: "Check all Docker containers for available image updates. Pulls latest images and compares digests.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -896,7 +956,7 @@ func (s *Server) registerNewMonitoringTools() {
 	})
 
 	// Check single container update
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "check_container_update",
 		Description: "Check a specific Docker container for an available image update by pulling the latest image and comparing digests.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -917,7 +977,7 @@ func (s *Server) registerNewMonitoringTools() {
 		Description: "Force an immediate registry digest re-check for all containers and publish the result (updates cache, WebSocket, and alerts).",
 		Annotations: &mcp.ToolAnnotations{
 			IdempotentHint:  true,
-			DestructiveHint: ptr(false),
+			DestructiveHint: new(false),
 		},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
 		logger.Info("MCP: Refreshing container updates")
@@ -932,7 +992,7 @@ func (s *Server) registerNewMonitoringTools() {
 	})
 
 	// Get container size
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_container_size",
 		Description: "Get the disk size of a specific Docker container including writable layer and virtual size.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -948,7 +1008,7 @@ func (s *Server) registerNewMonitoringTools() {
 	})
 
 	// Get OS update status (local-file only, no network calls)
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_os_update",
 		Description: "Return the cached Unraid OS update availability. Sources local files only — no outbound network calls are made. Status is 'unknown' until the os_update collector has run.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -964,7 +1024,7 @@ func (s *Server) registerNewMonitoringTools() {
 	})
 
 	// Get mover status (local files only: var.ini + mover.log)
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_mover_status",
 		Description: "Return the cached mover status (active state, schedule, and last-run duration/files/bytes parsed from /var/log/mover.log). Local files only — no outbound network calls.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -977,7 +1037,7 @@ func (s *Server) registerNewMonitoringTools() {
 	})
 
 	// Check plugin updates (returns cached result)
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "check_plugin_updates",
 		Description: "Return the cached plugin update status. Use refresh_plugin_updates to force a fresh check.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -995,7 +1055,7 @@ func (s *Server) registerNewMonitoringTools() {
 		Description: "Force an immediate plugin update check for all installed plugins and publish the result (updates cache, WebSocket, and alerts).",
 		Annotations: &mcp.ToolAnnotations{
 			IdempotentHint:  true,
-			DestructiveHint: ptr(false),
+			DestructiveHint: new(false),
 		},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
 		logger.Info("MCP: Refreshing plugin updates")
@@ -1015,7 +1075,7 @@ func (s *Server) registerNewMonitoringTools() {
 	})
 
 	// List VM snapshots
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "list_vm_snapshots",
 		Description: "List all snapshots for a specific virtual machine.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -1030,7 +1090,7 @@ func (s *Server) registerNewMonitoringTools() {
 	})
 
 	// Get service status
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_service_status",
 		Description: "Get the running status of an Unraid system service (docker, libvirt, smb, nfs, ftp, sshd, nginx, syslog, ntpd, avahi, wireguard).",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -1048,7 +1108,7 @@ func (s *Server) registerNewMonitoringTools() {
 	})
 
 	// List all services
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "list_services",
 		Description: "List all managed Unraid system services and their running status.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -1071,7 +1131,7 @@ func (s *Server) registerNewMonitoringTools() {
 	})
 
 	// List processes
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "list_processes",
 		Description: "List running processes on the Unraid server sorted by CPU or memory usage.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -1094,7 +1154,7 @@ func (s *Server) registerNewMonitoringTools() {
 	})
 
 	// Top processes by disk I/O (native /proc/<pid>/io sampling)
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "list_process_io",
 		Description: "List the top processes by current disk I/O rate (bytes/sec), sampled from /proc. Useful for finding what is driving disk activity.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -1116,7 +1176,7 @@ func (s *Server) registerNewMonitoringTools() {
 	})
 
 	// Get container logs (per-container stdout/stderr)
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_container_logs",
 		Description: "Get stdout/stderr logs from a specific Docker container (equivalent to docker logs). Returns the most recent log lines.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -1148,7 +1208,7 @@ func (s *Server) registerControlTools() {
 		Name:        "container_action",
 		Description: "Perform an action on a Docker container (start, stop, restart, pause, unpause, remove). The remove action requires confirm=true.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(true),
+			DestructiveHint: new(true),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPContainerActionArgs) (*mcp.CallToolResult, any, error) {
@@ -1192,7 +1252,7 @@ func (s *Server) registerControlTools() {
 		Name:        "set_container_autostart",
 		Description: "Enable or disable autostart for a Docker container. Writes to the Unraid autostart file (/var/lib/docker/unraid-autostart). The change persists across reboots and is reversible.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(false),
+			DestructiveHint: new(false),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPSetAutostartArgs) (*mcp.CallToolResult, any, error) {
@@ -1214,7 +1274,7 @@ func (s *Server) registerControlTools() {
 	})
 
 	// Port-conflict detection tool (read-only)
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_port_conflicts",
 		Description: "List any host ports bound by more than one Docker container. Returns an empty list when no conflicts exist.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -1237,7 +1297,7 @@ func (s *Server) registerControlTools() {
 		Name:        "vm_action",
 		Description: "Perform an action on a virtual machine (start, stop, restart, pause, resume, hibernate, force-stop, reset). The reset action requires confirm=true.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(true),
+			DestructiveHint: new(true),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPVMActionArgs) (*mcp.CallToolResult, any, error) {
@@ -1285,7 +1345,7 @@ func (s *Server) registerControlTools() {
 		Name:        "array_action",
 		Description: "Start or stop the Unraid array. CAUTION: Stopping the array will make all data inaccessible. Requires confirmation.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(true),
+			DestructiveHint: new(true),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPArrayActionArgs) (*mcp.CallToolResult, any, error) {
@@ -1320,10 +1380,13 @@ func (s *Server) registerControlTools() {
 		Name:        "remote_share_action",
 		Description: "Mount or unmount an Unassigned Devices SMB/NFS remote share by its source (//server/share or server:/export, as reported by get_remote_shares).",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(true),
+			DestructiveHint: new(true),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPRemoteShareActionArgs) (*mcp.CallToolResult, any, error) {
+		if !args.Confirm {
+			return textResult("Remote share action requires confirm=true."), nil, nil
+		}
 		logger.Info("MCP: Remote share action '%s' requested for '%s'", args.Action, args.Source)
 
 		ctrl := controllers.NewRemoteShareController()
@@ -1350,7 +1413,7 @@ func (s *Server) registerControlTools() {
 		Name:        "parity_check_action",
 		Description: "Start a parity check operation on the Unraid array",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(false),
+			DestructiveHint: new(false),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPParityCheckArgs) (*mcp.CallToolResult, any, error) {
@@ -1376,7 +1439,7 @@ func (s *Server) registerControlTools() {
 		Name:        "system_reboot",
 		Description: "Reboot the Unraid server. CAUTION: This will restart the entire system. Requires confirmation.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(true),
+			DestructiveHint: new(true),
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPSystemActionArgs) (*mcp.CallToolResult, any, error) {
 		if !args.Confirm {
@@ -1401,7 +1464,7 @@ func (s *Server) registerControlTools() {
 		Name:        "system_shutdown",
 		Description: "Shutdown the Unraid server. CAUTION: This will power off the entire system. Requires confirmation.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(true),
+			DestructiveHint: new(true),
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPSystemActionArgs) (*mcp.CallToolResult, any, error) {
 		if !args.Confirm {
@@ -1426,7 +1489,7 @@ func (s *Server) registerControlTools() {
 		Name:        "parity_check_stop",
 		Description: "Stop a running parity check operation",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(false),
+			DestructiveHint: new(false),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
@@ -1448,7 +1511,7 @@ func (s *Server) registerControlTools() {
 		Name:        "parity_check_pause",
 		Description: "Pause a running parity check operation",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(false),
+			DestructiveHint: new(false),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
@@ -1470,7 +1533,7 @@ func (s *Server) registerControlTools() {
 		Name:        "parity_check_resume",
 		Description: "Resume a paused parity check operation",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(false),
+			DestructiveHint: new(false),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
@@ -1492,7 +1555,7 @@ func (s *Server) registerControlTools() {
 		Name:        "disk_spin_down",
 		Description: "Spin down a specific disk to save power. The disk will spin up automatically when accessed.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(false),
+			DestructiveHint: new(false),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPDiskArgs) (*mcp.CallToolResult, any, error) {
@@ -1518,7 +1581,7 @@ func (s *Server) registerControlTools() {
 		Name:        "disk_spin_up",
 		Description: "Spin up a specific disk that is in standby mode",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(false),
+			DestructiveHint: new(false),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPDiskArgs) (*mcp.CallToolResult, any, error) {
@@ -1544,7 +1607,7 @@ func (s *Server) registerControlTools() {
 		Name:        "clear_disk_stats",
 		Description: "Clear all array disk I/O statistics system-wide. Uses the same mechanism as the Unraid WebUI 'Clear Stats' button (emhttpd clearStatistics). Safe and reversible — counters reset to zero and resume accumulating normally. Requires the emhttpd socket.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(false),
+			DestructiveHint: new(false),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
@@ -1564,7 +1627,7 @@ func (s *Server) registerControlTools() {
 		Name:        "execute_user_script",
 		Description: "Execute a user script from the User Scripts plugin. Requires confirmation for safety.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(true),
+			DestructiveHint: new(true),
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPUserScriptArgs) (*mcp.CallToolResult, any, error) {
 		if !args.Confirm {
@@ -1591,7 +1654,7 @@ func (s *Server) registerControlTools() {
 		Name:        "collector_action",
 		Description: "Enable or disable a data collector at runtime. Note: some collectors like 'system' are required and cannot be disabled.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(false),
+			DestructiveHint: new(false),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPCollectorControlArgs) (*mcp.CallToolResult, any, error) {
@@ -1629,7 +1692,7 @@ func (s *Server) registerControlTools() {
 		Name:        "update_collector_interval",
 		Description: "Update the collection interval for a specific collector. Interval must be between 5 and 86400 seconds.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(false),
+			DestructiveHint: new(false),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPCollectorIntervalArgs) (*mcp.CallToolResult, any, error) {
@@ -1667,7 +1730,7 @@ func (s *Server) registerNewControlTools() {
 		Name:        "update_container",
 		Description: "Update a Docker container to the latest image. Stops the container, pulls the latest image, recreates with the same config, and starts it.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(true),
+			DestructiveHint: new(true),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPContainerUpdateArgs) (*mcp.CallToolResult, any, error) {
@@ -1689,7 +1752,7 @@ func (s *Server) registerNewControlTools() {
 		Name:        "update_all_containers",
 		Description: "Update all Docker containers that have available image updates. Stops, pulls latest images, recreates, and starts each container.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(true),
+			DestructiveHint: new(true),
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPContainerUpdateArgs) (*mcp.CallToolResult, any, error) {
 		if !args.Confirm {
@@ -1710,7 +1773,7 @@ func (s *Server) registerNewControlTools() {
 		Name:        "update_plugin",
 		Description: "Update a specific Unraid plugin to the latest version.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(true),
+			DestructiveHint: new(true),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPPluginUpdateArgs) (*mcp.CallToolResult, any, error) {
@@ -1737,7 +1800,7 @@ func (s *Server) registerNewControlTools() {
 		Name:        "update_all_plugins",
 		Description: "Update all installed Unraid plugins that have available updates.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(true),
+			DestructiveHint: new(true),
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPPluginUpdateArgs) (*mcp.CallToolResult, any, error) {
 		if !args.Confirm {
@@ -1757,7 +1820,7 @@ func (s *Server) registerNewControlTools() {
 		Name:        "create_vm_snapshot",
 		Description: "Create a snapshot of a virtual machine for backup or rollback purposes.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(false),
+			DestructiveHint: new(false),
 			IdempotentHint:  false,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPVMSnapshotArgs) (*mcp.CallToolResult, any, error) {
@@ -1779,9 +1842,12 @@ func (s *Server) registerNewControlTools() {
 		Name:        "delete_vm_snapshot",
 		Description: "Delete a snapshot of a virtual machine. This cannot be undone.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(true),
+			DestructiveHint: new(true),
 		},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPVMSnapshotArgs) (*mcp.CallToolResult, any, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPVMSnapshotDeleteArgs) (*mcp.CallToolResult, any, error) {
+		if !args.Confirm {
+			return textResult("Snapshot deletion requires confirm=true. WARNING: This cannot be undone."), nil, nil
+		}
 		if args.SnapshotName == "" {
 			return textResult("snapshot_name is required"), nil, nil
 		}
@@ -1799,7 +1865,7 @@ func (s *Server) registerNewControlTools() {
 		Name:        "restore_vm_snapshot",
 		Description: "Restore a virtual machine to a previously created snapshot. WARNING: This reverts the VM to the snapshot state and the current state is lost.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(true),
+			DestructiveHint: new(true),
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPVMSnapshotRestoreArgs) (*mcp.CallToolResult, any, error) {
 		if !args.Confirm {
@@ -1822,7 +1888,7 @@ func (s *Server) registerNewControlTools() {
 		Name:        "clone_vm",
 		Description: "Clone a virtual machine including its disk images. The source VM must be shut off.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(false),
+			DestructiveHint: new(false),
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPVMCloneArgs) (*mcp.CallToolResult, any, error) {
 		if !args.Confirm {
@@ -1845,7 +1911,7 @@ func (s *Server) registerNewControlTools() {
 		Name:        "service_action",
 		Description: "Start, stop, or restart an Unraid system service (docker, libvirt, smb, nfs, ftp, sshd, nginx, syslog, ntpd, avahi, wireguard).",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(true),
+			DestructiveHint: new(true),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPServiceActionArgs) (*mcp.CallToolResult, any, error) {
@@ -1877,7 +1943,7 @@ func (s *Server) registerNewControlTools() {
 // registerRemediationTools registers the system_health_report tool which aggregates
 // health signals and optionally executes remediation actions with explicit confirm.
 func (s *Server) registerRemediationTools() {
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name: "system_health_report",
 		Description: "Aggregate health signals from array, disks, containers, and firing alerts into a " +
 			"prioritised list of findings with recommended actions. " +
@@ -1885,7 +1951,7 @@ func (s *Server) registerRemediationTools() {
 			"To execute remediation actions set confirm=true AND provide the actions list from a previous report. " +
 			"Only executor-supported actions (start/stop/restart_container, start/stop/restart/force_stop_vm) are ever executed.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(true),
+			DestructiveHint: new(true),
 			IdempotentHint:  false,
 		},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, args dto.MCPHealthReportArgs) (*mcp.CallToolResult, any, error) {
@@ -1906,6 +1972,12 @@ func (s *Server) registerRemediationTools() {
 
 		report := api.BuildHealthReport(containers, s.cacheProvider.GetArrayCache(), disks, firing)
 
+		effectivePolicy := s.effectivePolicy("system_health_report")
+
+		if effectivePolicy == domain.PolicyAllow && len(args.Actions) > 0 {
+			args.Confirm = true
+		}
+
 		// Recommend-only path (no confirm or no actions).
 		if !args.Confirm || len(args.Actions) == 0 {
 			return jsonResult(map[string]any{
@@ -1915,12 +1987,16 @@ func (s *Server) registerRemediationTools() {
 		}
 
 		// Read-only mode: return the report but never execute actions.
-		if s.ctx.ReadOnly {
-			logger.Warning("MCP: blocked system_health_report action execution: agent is in read-only mode")
+		if s.ctx.ReadOnly || effectivePolicy == domain.PolicyReadOnly {
+			logger.Warning("MCP: blocked system_health_report action execution: read-only mode")
+			note := readOnlyBlockedMessage
+			if effectivePolicy == domain.PolicyReadOnly && !s.ctx.ReadOnly {
+				note = "Blocked by tool access policy: 'system_health_report' is set to read-only"
+			}
 			return jsonResult(map[string]any{
 				"report":   report,
 				"executed": false,
-				"note":     readOnlyBlockedMessage,
+				"note":     note,
 			})
 		}
 
@@ -1955,7 +2031,7 @@ func (s *Server) registerRemediationTools() {
 	})
 
 	// list_runbooks — read-only; returns the static catalogue of reviewed runbooks.
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "list_runbooks",
 		Description: "List all reviewed remediation runbooks with their names, descriptions, and default step shapes.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -1964,7 +2040,7 @@ func (s *Server) registerRemediationTools() {
 	})
 
 	// run_runbook — executes a named runbook with optional confirm gating.
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name: "run_runbook",
 		Description: "Run a named remediation runbook. " +
 			"Without confirm=true the tool is a dry-run: it returns the planned steps without executing anything. " +
@@ -1973,7 +2049,7 @@ func (s *Server) registerRemediationTools() {
 			"stopped/exited containers from the cache automatically.",
 		Annotations: &mcp.ToolAnnotations{
 			IdempotentHint:  true,
-			DestructiveHint: ptr(true),
+			DestructiveHint: new(true),
 		},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, args dto.MCPRunRunbookArgs) (*mcp.CallToolResult, any, error) {
 		targets := args.Targets
@@ -1988,10 +2064,14 @@ func (s *Server) registerRemediationTools() {
 			}
 		}
 
+		effectivePolicy := s.effectivePolicy("run_runbook")
+
 		// Read-only mode: always behave as a dry-run, even with confirm=true.
 		confirm := args.Confirm
-		if confirm && s.ctx.ReadOnly {
-			logger.Warning("MCP: blocked run_runbook execution: agent is in read-only mode")
+		if effectivePolicy == domain.PolicyReadOnly || s.ctx.ReadOnly {
+			if confirm {
+				logger.Warning("MCP: blocked run_runbook execution: read-only mode")
+			}
 			confirm = false
 		}
 
@@ -2011,7 +2091,11 @@ func (s *Server) registerRemediationTools() {
 				"steps":    steps,
 			}
 			if args.Confirm {
-				resp["note"] = readOnlyBlockedMessage
+				note := readOnlyBlockedMessage
+				if effectivePolicy == domain.PolicyReadOnly && !s.ctx.ReadOnly {
+					note = "Blocked by tool access policy: 'run_runbook' is set to read-only"
+				}
+				resp["note"] = note
 			}
 			return jsonResult(resp)
 		}
@@ -2026,7 +2110,7 @@ func (s *Server) registerRemediationTools() {
 	})
 
 	// find_root_cause — read-only correlation of system signals.
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name: "find_root_cause",
 		Description: "Correlate cached system signals (CPU, array state, parity, disk temperatures, containers) " +
 			"to surface the most likely root causes of degraded performance or health. " +
@@ -2113,7 +2197,7 @@ func (s *Server) registerRemediationTools() {
 // registerAlertingTools registers MCP tools for alert rule management and monitoring.
 func (s *Server) registerAlertingTools() {
 	// List alert rules
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "list_alert_rules",
 		Description: "List all configured alert rules with their expressions, severity, channels, and enabled state",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -2129,7 +2213,7 @@ func (s *Server) registerAlertingTools() {
 	})
 
 	// Get alert rule by ID
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_alert_rule",
 		Description: "Get details of a specific alert rule by ID",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -2149,7 +2233,7 @@ func (s *Server) registerAlertingTools() {
 		Name:        "create_alert_rule",
 		Description: "Create a new alert rule with an expr-lang expression that evaluates against system metrics. Available variables: CPU, RAMUsedPct, CPUTemp, MotherboardTemp, ArrayState, ArrayUsedPct, ParityValid, ContainerCount, RunningContainers, StoppedContainers, VMCount, RunningVMs, MaxDiskTemp, MaxDiskUsedPct, TotalDiskErrors, UPSStatus, UPSBatteryCharge, UPSLoadPercent, UPSRuntimeLeft",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(false),
+			DestructiveHint: new(false),
 			IdempotentHint:  false,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPCreateAlertRuleArgs) (*mcp.CallToolResult, any, error) {
@@ -2189,7 +2273,7 @@ func (s *Server) registerAlertingTools() {
 		Name:        "delete_alert_rule",
 		Description: "Delete an alert rule by ID. Requires confirm=true to proceed.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(true),
+			DestructiveHint: new(true),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPDeleteAlertRuleArgs) (*mcp.CallToolResult, any, error) {
@@ -2210,7 +2294,7 @@ func (s *Server) registerAlertingTools() {
 	})
 
 	// Get alert status
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_alert_status",
 		Description: "Get the current evaluation status of all enabled alert rules (ok, pending, firing)",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -2226,7 +2310,7 @@ func (s *Server) registerAlertingTools() {
 	})
 
 	// Get firing alerts
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_firing_alerts",
 		Description: "Get only alert rules that are currently in the firing (triggered) state",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -2242,7 +2326,7 @@ func (s *Server) registerAlertingTools() {
 	})
 
 	// Get alert history
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_alert_history",
 		Description: "Get recent alert events (last 100), including firing and resolved transitions",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -2258,7 +2342,7 @@ func (s *Server) registerAlertingTools() {
 	})
 
 	// List alert rule templates
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "list_alert_templates",
 		Description: "List curated, disabled-by-default alert rule templates that use trend/predictive metrics (array fill ETA, disk temp slope, container restarts, reallocated sectors, disk errors). Users can review and enable these rules.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -2271,7 +2355,7 @@ func (s *Server) registerAlertingTools() {
 		Name:        "enable_alert_template",
 		Description: "Enable a curated alert rule template by ID. Creates the alert rule if it does not exist, or updates it if it does (idempotent). Optional channels override the default 'unraid' system notification. Template IDs: tmpl-array-fill, tmpl-disk-temp-climb, tmpl-container-flapping, tmpl-smart-reallocated, tmpl-disk-errors-rising.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(false),
+			DestructiveHint: new(false),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPEnableAlertTemplateArgs) (*mcp.CallToolResult, any, error) {
@@ -2300,7 +2384,7 @@ func (s *Server) registerAlertingTools() {
 	})
 
 	// Query metric history
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "query_metric_history",
 		Description: "Query the in-memory ring-buffer history for a named metric series. Returns all buffered samples plus summary statistics (slope per second, min, max, average, last value). Global metrics (no entity): cpu_temp, array_used_pct. Per-entity metrics (provide entity id): disk_temp, disk_used_pct, disk_errors, reallocated, pending, restart_count.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -2320,7 +2404,7 @@ func (s *Server) registerAlertingTools() {
 // registerWatchdogTools registers MCP tools for health check management and monitoring.
 func (s *Server) registerWatchdogTools() {
 	// List health checks
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "list_health_checks",
 		Description: "List all configured health check probes with their type, target, interval, and enabled state",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -2336,7 +2420,7 @@ func (s *Server) registerWatchdogTools() {
 	})
 
 	// Get health check by ID
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_health_check",
 		Description: "Get details of a specific health check by ID",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -2356,7 +2440,7 @@ func (s *Server) registerWatchdogTools() {
 		Name:        "create_health_check",
 		Description: "Create a new health check probe (HTTP, TCP, or container state). Probes run at configurable intervals with optional remediation actions on failure (notify, restart container, or webhook).",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(false),
+			DestructiveHint: new(false),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPCreateHealthCheckArgs) (*mcp.CallToolResult, any, error) {
@@ -2396,7 +2480,7 @@ func (s *Server) registerWatchdogTools() {
 		Name:        "delete_health_check",
 		Description: "Delete a health check by ID. Requires confirm=true to proceed.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(true),
+			DestructiveHint: new(true),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPDeleteHealthCheckArgs) (*mcp.CallToolResult, any, error) {
@@ -2416,7 +2500,7 @@ func (s *Server) registerWatchdogTools() {
 	})
 
 	// Get health check status
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_health_check_status",
 		Description: "Get the current status of all health checks including healthy/unhealthy state, consecutive failures, and last check time",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -2436,7 +2520,7 @@ func (s *Server) registerWatchdogTools() {
 		Name:        "run_health_check",
 		Description: "Manually trigger a specific health check probe and return the immediate result",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(false),
+			DestructiveHint: new(false),
 			IdempotentHint:  true,
 		},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, args dto.MCPHealthCheckIDArgs) (*mcp.CallToolResult, any, error) {
@@ -2454,7 +2538,7 @@ func (s *Server) registerWatchdogTools() {
 	})
 
 	// Get health check history
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_health_check_history",
 		Description: "Get recent health check state change events (up to 100), including transitions between healthy and unhealthy states and any remediation actions taken",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -2498,7 +2582,7 @@ func (s *Server) registerAgentTools() {
 	type idArgs struct {
 		SessionID string `json:"session_id" jsonschema:"The session id"`
 	}
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "agent_get_session",
 		Description: "Get a single agent session (status, steps, pending approval, answer).",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -2513,7 +2597,7 @@ func (s *Server) registerAgentTools() {
 		return jsonResult(sess)
 	})
 
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "agent_list_sessions",
 		Description: "List all agent sessions, newest first.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -2561,7 +2645,7 @@ func (s *Server) registerAgentTools() {
 		return jsonResult(sess)
 	})
 
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "agent_get_memory",
 		Description: "Get the agent's episodic incidents and learned preferences.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -2929,30 +3013,104 @@ Please describe your issue and I'll gather the relevant system information to he
 // agent runs in read-only mode.
 const readOnlyBlockedMessage = "This operation is blocked: the agent is running in read-only mode"
 
-// addWriteTool registers a state-changing MCP tool with a read-only mode
-// guard. The tool stays visible in listings (less confusing for clients),
-// but every invocation is rejected before reaching the handler while the
-// agent runs in read-only mode. Read-only tools keep using mcp.AddTool
-// directly. Tools with both a read and an execute path (system_health_report,
-// run_runbook) instead guard only their execute path inline.
-func addWriteTool[In any](s *Server, tool *mcp.Tool, handler mcp.ToolHandlerFor[In, any]) {
-	mcp.AddTool(s.mcpServer, tool, func(ctx context.Context, req *mcp.CallToolRequest, args In) (*mcp.CallToolResult, any, error) {
-		if s.ctx.ReadOnly {
-			logger.Warning("MCP: blocked write tool '%s': agent is in read-only mode", tool.Name)
-			return textResult(readOnlyBlockedMessage), nil, nil
+// setConfirmField attempts to set a "Confirm" boolean field to val on args if present.
+func setConfirmField(args any, val bool) {
+	if args == nil {
+		return
+	}
+	v := reflect.ValueOf(args)
+	if v.Kind() == reflect.Pointer {
+		v = v.Elem()
+	}
+	if v.Kind() == reflect.Struct {
+		f := v.FieldByName("Confirm")
+		if f.IsValid() && f.CanSet() && f.Kind() == reflect.Bool {
+			f.SetBool(val)
 		}
+	}
+}
+
+// isConfirmed checks whether the caller confirmed the action, either via the
+// typed args struct Confirm field or via raw JSON arguments.
+func isConfirmed(raw json.RawMessage, args any) bool {
+	if args != nil {
+		v := reflect.ValueOf(args)
+		if v.Kind() == reflect.Pointer {
+			v = v.Elem()
+		}
+		if v.Kind() == reflect.Struct {
+			f := v.FieldByName("Confirm")
+			if f.IsValid() && f.Kind() == reflect.Bool && f.Bool() {
+				return true
+			}
+		}
+	}
+	if len(raw) > 0 {
+		var m map[string]any
+		if err := json.Unmarshal(raw, &m); err == nil {
+			if c, ok := m["confirm"]; ok {
+				if b, ok := c.(bool); ok && b {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// addToolDirect registers a tool into the MCP server and registers its metadata
+// into the tool policy store catalog.
+func addToolDirect[In, Out any](s *Server, tool *mcp.Tool, handler mcp.ToolHandlerFor[In, Out]) {
+	readOnly := tool.Annotations != nil && tool.Annotations.ReadOnlyHint
+	destructive := tool.Annotations != nil && tool.Annotations.DestructiveHint != nil && *tool.Annotations.DestructiveHint
+	if s.toolPolicyStore != nil {
+		s.toolPolicyStore.RegisterTool(tool.Name, tool.Description, readOnly, destructive)
+	}
+	mcp.AddTool(s.mcpServer, tool, handler)
+}
+
+// addWriteTool registers a state-changing MCP tool with per-tool access policy
+// and read-only mode guards.
+func addWriteTool[In any](s *Server, tool *mcp.Tool, handler mcp.ToolHandlerFor[In, any]) {
+	addToolDirect(s, tool, func(ctx context.Context, req *mcp.CallToolRequest, args In) (*mcp.CallToolResult, any, error) {
+		effectivePolicy := s.effectivePolicy(tool.Name)
+
+		switch effectivePolicy {
+		case domain.PolicyReadOnly:
+			if s.ctx.ReadOnly {
+				logger.Warning("MCP: blocked write tool '%s': agent is in read-only mode", tool.Name)
+				return textResult(readOnlyBlockedMessage), nil, nil
+			}
+			logger.Warning("MCP: blocked write tool '%s': set to read-only by tool access policy", tool.Name)
+			return textResult(fmt.Sprintf("Blocked by tool access policy: '%s' is set to read-only", tool.Name)), nil, nil
+
+		case domain.PolicyAsk:
+			var raw json.RawMessage
+			if req != nil && req.Params != nil {
+				raw = req.Params.Arguments
+			}
+			if !isConfirmed(raw, &args) {
+				return textResult(fmt.Sprintf("Confirmation required: tool '%s' has access policy 'ask'. Set confirm=true to execute.", tool.Name)), nil, nil
+			}
+			setConfirmField(&args, true)
+
+		case domain.PolicyAllow:
+			// Explicit operator choice: bypass confirm gate even if tool is destructive
+			setConfirmField(&args, true)
+
+		default:
+			// PolicyDefault: if destructive, handler checks args.Confirm; non-destructive tools proceed.
+		}
+
 		return handler(ctx, req, args)
 	})
 }
 
 // addReadTool registers a read-only monitoring tool that returns a cached
 // snapshot. The get closure returns the payload and whether it is available;
-// when unavailable, emptyMsg is returned as plain text. It concentrates the
-// ReadOnlyHint annotation, availability check, and JSON encoding shared by the
-// snapshot tools into one place. The In type parameter preserves each tool's
-// advertised input schema even though snapshot reads ignore their arguments.
+// when unavailable, emptyMsg is returned as plain text.
 func addReadTool[In, T any](s *Server, name, description, emptyMsg string, get func() (T, bool)) {
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        name,
 		Description: description,
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -3000,7 +3158,7 @@ func resourceResult(uri, text string) (*mcp.ReadResourceResult, error) {
 // registerFanControlTools registers MCP tools for fan monitoring and control.
 func (s *Server) registerFanControlTools() {
 	// Get fan control status (monitoring)
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_fan_status",
 		Description: "Get fan control status including all fan speeds, modes, profiles, and configuration",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -3013,7 +3171,7 @@ func (s *Server) registerFanControlTools() {
 	})
 
 	// Get available fan-curve temperature sources (monitoring)
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_fan_sensors",
 		Description: "List available hwmon temperature sensors and drives that can be used as fan-curve temperature sources",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -3029,10 +3187,13 @@ func (s *Server) registerFanControlTools() {
 		Name:        "set_fan_speed",
 		Description: "Set the PWM speed for a specific fan. Requires fan control to be enabled. Speed is clamped to safety minimums.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(true),
+			DestructiveHint: new(true),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPFanSpeedArgs) (*mcp.CallToolResult, any, error) {
+		if !args.Confirm {
+			return textResult("Setting fan speed requires confirm=true."), nil, nil
+		}
 		if s.fanController == nil {
 			return textResult("Fan controller not initialized"), nil, nil
 		}
@@ -3048,10 +3209,13 @@ func (s *Server) registerFanControlTools() {
 		Name:        "set_fan_mode",
 		Description: "Set the control mode for a specific fan (automatic = BIOS-controlled, manual = software-controlled)",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(true),
+			DestructiveHint: new(true),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPFanModeArgs) (*mcp.CallToolResult, any, error) {
+		if !args.Confirm {
+			return textResult("Setting fan mode requires confirm=true."), nil, nil
+		}
 		if s.fanController == nil {
 			return textResult("Fan controller not initialized"), nil, nil
 		}
@@ -3067,10 +3231,13 @@ func (s *Server) registerFanControlTools() {
 		Name:        "set_fan_profile",
 		Description: "Assign a temperature curve profile to a fan. Built-in profiles: quiet, balanced, performance. Set source_type='hwmon' with temp_sensor_path, OR source_type='drives' with drive_ids (+ optional fallback_sensor_path) to curve on the max temperature of selected drives.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(true),
+			DestructiveHint: new(true),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPFanProfileArgs) (*mcp.CallToolResult, any, error) {
+		if !args.Confirm {
+			return textResult("Setting fan profile requires confirm=true."), nil, nil
+		}
 		if s.fanController == nil {
 			return textResult("Fan controller not initialized"), nil, nil
 		}
@@ -3102,9 +3269,12 @@ func (s *Server) registerFanControlTools() {
 		Name:        "create_fan_profile",
 		Description: "Create a custom temperature curve profile. Provide curve_points as a JSON array of {\"temp_celsius\": N, \"speed_percent\": N} objects.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(true),
+			DestructiveHint: new(true),
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPCreateFanProfileArgs) (*mcp.CallToolResult, any, error) {
+		if !args.Confirm {
+			return textResult("Creating fan profile requires confirm=true."), nil, nil
+		}
 		if s.fanController == nil {
 			return textResult("Fan controller not initialized"), nil, nil
 		}
@@ -3132,10 +3302,13 @@ func (s *Server) registerFanControlTools() {
 		Name:        "restore_fan_defaults",
 		Description: "Restore all fans to automatic (BIOS-controlled) mode. Safe operation that returns control to hardware.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(true),
+			DestructiveHint: new(true),
 			IdempotentHint:  true,
 		},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPRestoreFanDefaultsArgs) (*mcp.CallToolResult, any, error) {
+		if !args.Confirm {
+			return textResult("Restoring fan defaults requires confirm=true. WARNING: This will reset all fans to automatic (BIOS-controlled) mode."), nil, nil
+		}
 		if s.fanController == nil {
 			return textResult("Fan controller not initialized"), nil, nil
 		}
@@ -3156,7 +3329,7 @@ func (s *Server) registerCPUControlTools() {
 		Name:        "set_cpu_governor",
 		Description: "Set the CPU scaling governor for all cores. Common governors: performance (max speed), powersave (power saving), ondemand/schedutil (dynamic). Equivalent to Unraid Tips & Tweaks CPU governor setting.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(true),
+			DestructiveHint: new(true),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPSetCPUGovernorArgs) (*mcp.CallToolResult, any, error) {
@@ -3171,7 +3344,7 @@ func (s *Server) registerCPUControlTools() {
 	})
 
 	// Get Docker aggregate stats (monitoring)
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_docker_stats",
 		Description: "Get aggregate CPU and memory statistics across all running Docker containers, including total CPU%, total memory usage (bytes and MB), and per-container breakdown",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -3201,7 +3374,7 @@ func (s *Server) registerCPUControlTools() {
 	})
 
 	// Get all temperature sensors (monitoring)
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_temperatures",
 		Description: "Get all detected temperature sensor readings including CPU, motherboard, chipset, and other sensors from hwmon",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -3222,7 +3395,7 @@ func (s *Server) registerCPUControlTools() {
 // registerTuningTools registers MCP tools for system tuning (turbo boost, disk cache, inotify).
 func (s *Server) registerTuningTools() {
 	// Get system tuning status (monitoring)
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
+	addToolDirect(s, &mcp.Tool{
 		Name:        "get_tuning_status",
 		Description: "Get system tuning parameters including turbo boost state, disk cache (vm.dirty_*), inotify limits, NIC offloads, and ring buffers. Equivalent to Unraid Tips & Tweaks overview.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
@@ -3239,7 +3412,7 @@ func (s *Server) registerTuningTools() {
 		Name:        "set_turbo_boost",
 		Description: "Enable or disable Intel Turbo Boost / AMD Performance Boost. Affects CPU maximum frequency.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(true),
+			DestructiveHint: new(true),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPSetTurboBoostArgs) (*mcp.CallToolResult, any, error) {
@@ -3265,7 +3438,7 @@ func (s *Server) registerTuningTools() {
 		Name:        "set_disk_cache",
 		Description: "Set Linux disk cache parameters (vm.dirty_*). Controls how aggressively dirty pages are written to disk. Higher ratios = more caching = better performance but more data at risk.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(true),
+			DestructiveHint: new(true),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPSetDiskCacheArgs) (*mcp.CallToolResult, any, error) {
@@ -3292,7 +3465,7 @@ func (s *Server) registerTuningTools() {
 		Name:        "set_inotify_limits",
 		Description: "Set Linux inotify kernel limits. Increase max_user_watches if applications report 'too many open files' or inotify watch limit errors.",
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: ptr(true),
+			DestructiveHint: new(true),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPSetInotifyLimitsArgs) (*mcp.CallToolResult, any, error) {

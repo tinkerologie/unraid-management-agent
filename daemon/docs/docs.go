@@ -2997,6 +2997,70 @@ const docTemplate = `{
                 }
             }
         },
+        "/mcp/tool-policy": {
+            "get": {
+                "description": "Get the catalog of MCP tools and their configured/effective access policies",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "MCP"
+                ],
+                "summary": "Get MCP tool access policy",
+                "responses": {
+                    "200": {
+                        "description": "MCP tool policy catalog and settings",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MCPToolPolicyResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "Update per-tool MCP access policies (hidden, read_only, allow, ask, default)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "MCP"
+                ],
+                "summary": "Update MCP tool access policy",
+                "parameters": [
+                    {
+                        "description": "Tool policy configuration",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.MCPToolPolicyUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Policy updated successfully",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid tool name or policy value",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Store not initialized or persistence failure",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/metrics": {
             "get": {
                 "description": "Returns metrics in Prometheus exposition format for Grafana integration",
@@ -8152,6 +8216,66 @@ const docTemplate = `{
                 },
                 "total_lines": {
                     "type": "integer"
+                }
+            }
+        },
+        "dto.MCPToolCatalogItem": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string"
+                },
+                "configured_policy": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "destructive": {
+                    "type": "boolean"
+                },
+                "effective_policy": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "read_only": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "dto.MCPToolPolicyResponse": {
+            "type": "object",
+            "properties": {
+                "global_read_only": {
+                    "type": "boolean"
+                },
+                "policies": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "tools": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.MCPToolCatalogItem"
+                    }
+                }
+            }
+        },
+        "dto.MCPToolPolicyUpdateRequest": {
+            "type": "object",
+            "required": [
+                "policies"
+            ],
+            "properties": {
+                "policies": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
                 }
             }
         },

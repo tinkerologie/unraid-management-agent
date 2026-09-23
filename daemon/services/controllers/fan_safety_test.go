@@ -52,7 +52,7 @@ func TestDetectFailuresReturnsAllFailedEachCall(t *testing.T) {
 		{ID: "a", Controllable: true, PWMPercent: 50, RPM: 0},
 		{ID: "b", Controllable: true, PWMPercent: 50, RPM: 1500}, // healthy
 	}
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		got := g.DetectFailures(fans)
 		if len(got) != 1 || got[0] != "a" {
 			t.Fatalf("call %d: expected [a], got %v", i, got)

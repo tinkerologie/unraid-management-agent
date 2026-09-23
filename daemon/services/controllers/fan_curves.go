@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"maps"
 	"sort"
 	"sync"
 	"time"
@@ -217,9 +218,7 @@ func (e *FanCurveEngine) loop(ctx context.Context, interval time.Duration) {
 func (e *FanCurveEngine) applyCurves() {
 	e.mu.RLock()
 	assignments := make(map[string]fanCurveAssignment, len(e.assignments))
-	for k, v := range e.assignments {
-		assignments[k] = v
-	}
+	maps.Copy(assignments, e.assignments)
 	e.mu.RUnlock()
 
 	for fanID, assignment := range assignments {

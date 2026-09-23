@@ -429,7 +429,7 @@ func TestGetCollectorsStatus_NilManager(t *testing.T) {
 }
 
 func TestGetCollectorsStatus_WithManager(t *testing.T) {
-	ctx := &domain.Context{Config: domain.Config{Port: 8080}}
+	ctx := &domain.Context{Port: 8080}
 	server := NewServerWithCollectorManager(ctx, newMockCollectorManager())
 	got := server.GetCollectorsStatus()
 	if got.Total != 3 {
@@ -446,7 +446,7 @@ func TestGetCollectorStatus_NilManager(t *testing.T) {
 }
 
 func TestGetCollectorStatus_WithManager(t *testing.T) {
-	ctx := &domain.Context{Config: domain.Config{Port: 8080}}
+	ctx := &domain.Context{Port: 8080}
 	server := NewServerWithCollectorManager(ctx, newMockCollectorManager())
 	status, err := server.GetCollectorStatus("system")
 	if err != nil {
@@ -458,7 +458,7 @@ func TestGetCollectorStatus_WithManager(t *testing.T) {
 }
 
 func TestGetCollectorStatus_NotFound(t *testing.T) {
-	ctx := &domain.Context{Config: domain.Config{Port: 8080}}
+	ctx := &domain.Context{Port: 8080}
 	server := NewServerWithCollectorManager(ctx, newMockCollectorManager())
 	_, err := server.GetCollectorStatus("nonexistent")
 	if err == nil {
@@ -475,7 +475,7 @@ func TestEnableCollector_NilManager(t *testing.T) {
 }
 
 func TestEnableCollector_Success(t *testing.T) {
-	ctx := &domain.Context{Config: domain.Config{Port: 8080}}
+	ctx := &domain.Context{Port: 8080}
 	server := NewServerWithCollectorManager(ctx, newMockCollectorManager())
 	err := server.EnableCollector("gpu")
 	if err != nil {
@@ -484,7 +484,7 @@ func TestEnableCollector_Success(t *testing.T) {
 }
 
 func TestEnableCollector_NotFound(t *testing.T) {
-	ctx := &domain.Context{Config: domain.Config{Port: 8080}}
+	ctx := &domain.Context{Port: 8080}
 	server := NewServerWithCollectorManager(ctx, newMockCollectorManager())
 	err := server.EnableCollector("nonexistent")
 	if err == nil {
@@ -501,7 +501,7 @@ func TestDisableCollector_NilManager(t *testing.T) {
 }
 
 func TestDisableCollector_Success(t *testing.T) {
-	ctx := &domain.Context{Config: domain.Config{Port: 8080}}
+	ctx := &domain.Context{Port: 8080}
 	server := NewServerWithCollectorManager(ctx, newMockCollectorManager())
 	err := server.DisableCollector("docker")
 	if err != nil {
@@ -518,7 +518,7 @@ func TestUpdateCollectorInterval_NilManager(t *testing.T) {
 }
 
 func TestUpdateCollectorInterval_Success(t *testing.T) {
-	ctx := &domain.Context{Config: domain.Config{Port: 8080}}
+	ctx := &domain.Context{Port: 8080}
 	server := NewServerWithCollectorManager(ctx, newMockCollectorManager())
 	err := server.UpdateCollectorInterval("system", 30)
 	if err != nil {
@@ -527,7 +527,7 @@ func TestUpdateCollectorInterval_Success(t *testing.T) {
 }
 
 func TestUpdateCollectorInterval_NotFound(t *testing.T) {
-	ctx := &domain.Context{Config: domain.Config{Port: 8080}}
+	ctx := &domain.Context{Port: 8080}
 	server := NewServerWithCollectorManager(ctx, newMockCollectorManager())
 	err := server.UpdateCollectorInterval("nonexistent", 30)
 	if err == nil {

@@ -14,9 +14,7 @@ import (
 func TestHandleMetrics(t *testing.T) {
 	// Create server with test context
 	ctx := &domain.Context{
-		Config: domain.Config{
-			Port: 8043,
-		},
+		Port: 8043,
 	}
 	server := NewServer(ctx)
 
@@ -192,7 +190,7 @@ func TestHandleMetrics(t *testing.T) {
 }
 
 func TestMetricsContentType(t *testing.T) {
-	ctx := &domain.Context{Config: domain.Config{Port: 8043}}
+	ctx := &domain.Context{Port: 8043}
 	server := NewServer(ctx)
 
 	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
@@ -207,7 +205,7 @@ func TestMetricsContentType(t *testing.T) {
 }
 
 func TestMetricsWithEmptyCache(t *testing.T) {
-	ctx := &domain.Context{Config: domain.Config{Port: 8043}}
+	ctx := &domain.Context{Port: 8043}
 	server := NewServer(ctx)
 
 	// Don't populate any cache - should not panic
@@ -222,7 +220,7 @@ func TestMetricsWithEmptyCache(t *testing.T) {
 }
 
 func TestMetricsArrayStateValues(t *testing.T) {
-	ctx := &domain.Context{Config: domain.Config{Port: 8043}}
+	ctx := &domain.Context{Port: 8043}
 	server := NewServer(ctx)
 
 	tests := []struct {
@@ -262,7 +260,7 @@ func TestMetricsArrayStateValues(t *testing.T) {
 // so go_goroutines and heap stats are scrapable for long-term leak monitoring.
 // (process_* metrics are Linux-only, so they are not asserted here.)
 func TestRuntimeMetricsExposed(t *testing.T) {
-	ctx := &domain.Context{Config: domain.Config{Port: 8043}}
+	ctx := &domain.Context{Port: 8043}
 	server := NewServer(ctx)
 
 	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)

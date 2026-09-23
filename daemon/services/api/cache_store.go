@@ -206,6 +206,11 @@ func (c *CacheStore) GetOSUpdateCache() *dto.OSUpdateStatus {
 	return c.osUpdateCache.Load()
 }
 
+// SetOSUpdateCache sets the cached OS update status.
+func (c *CacheStore) SetOSUpdateCache(status *dto.OSUpdateStatus) {
+	c.osUpdateCache.Store(status)
+}
+
 // GetMoverCache returns the cached mover status, or nil.
 func (c *CacheStore) GetMoverCache() *dto.MoverStatus {
 	return c.moverCache.Load()

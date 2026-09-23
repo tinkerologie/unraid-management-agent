@@ -46,7 +46,7 @@ func (dc *DockerController) initClient() error {
 		return nil
 	}
 
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation()) //nolint:staticcheck,govet // SA1019: Updating to new API in future version
+	dockerClient, err := client.New(client.FromEnv, client.WithAPIVersionNegotiation()) //nolint:staticcheck,govet // SA1019: Updating to new API in future version
 	if err != nil {
 		return fmt.Errorf("failed to create Docker client: %w", err)
 	}

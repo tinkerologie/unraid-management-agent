@@ -25,8 +25,33 @@ if (file_exists($config_file)) {
 // Default values
 $port = $config['PORT'] ?? '8043';
 $bind_address = $config['BIND_ADDRESS'] ?? '';
+$api_token = $config['API_TOKEN'] ?? '';
 $read_only = $config['READ_ONLY'] ?? 'false';
 $log_level = $config['LOG_LEVEL'] ?? 'info';
+
+// MCP Tool Policies
+$policy_file = "/boot/config/plugins/$plugin/tool_policy.json";
+$tool_policies = [];
+if (file_exists($policy_file)) {
+    $tool_policies = json_decode(file_get_contents($policy_file), true) ?: [];
+}
+$tool_policy_cfg = $config['TOOL_POLICY'] ?? '';
+if (!file_exists($policy_file) && !empty($tool_policy_cfg)) {
+    $pairs = explode(',', $tool_policy_cfg);
+    $allowed_policies = ['default', 'hidden', 'read_only', 'allow', 'ask'];
+    foreach ($pairs as $p) {
+        $kv = explode('=', trim($p), 2);
+        if (count($kv) === 2) {
+            $tool = trim($kv[0]);
+            $pol = trim($kv[1]);
+            if (preg_match('/^[a-zA-Z0-9_.-]+$/', $tool) && in_array($pol, $allowed_policies, true) && $pol !== 'default') {
+                $tool_policies[$tool] = $pol;
+            }
+        }
+    }
+}
+$tool_policy_json = json_encode((object)$tool_policies);
+
 
 // MQTT defaults
 $mqtt_enabled = $config['MQTT_ENABLED'] ?? 'false';
@@ -354,6 +379,51 @@ function intervalOptions($selected, $type = 'standard') {
     text-align: left !important;
     white-space: nowrap;
 }
+.uma-secondary-btn {
+    padding: 4px 10px;
+    font-size: 12px;
+    border-radius: 4px;
+    border: 1px solid var(--input-border-color, #ccc);
+    background-color: var(--button-bg, #f5f5f5);
+    color: var(--text-color, inherit);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.uma-secondary-btn:hover {
+    background-color: var(--button-hover-bg, #e5e5e5);
+}
+.uma-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: bold;
+    border-radius: 3px;
+    text-transform: uppercase;
+}
+.uma-badge-read {
+    background-color: rgba(76, 175, 80, 0.15);
+    color: #388E3C;
+}
+.uma-badge-write {
+    background-color: rgba(255, 152, 0, 0.15);
+    color: #F57C00;
+}
+.uma-badge-destructive {
+    background-color: rgba(244, 67, 54, 0.15);
+    color: #D32F2F;
+}
+.uma-policy-select {
+    padding: 3px 6px;
+    font-size: 12px;
+    border: 1px solid var(--input-border-color, #ccc);
+    border-radius: 3px;
+    background-color: var(--input-bg-color, transparent);
+    color: var(--text-color, inherit);
+}
+.uma-policy-select.is-custom {
+    border-color: #2196F3;
+    font-weight: bold;
+}
 </style>
 
 <div class="title"><span class="left"><i class="title fa fa-cogs"></i>Service Control</span></div>
@@ -421,6 +491,35 @@ interfaces. Loopback and container-bridge addresses are excluded because integra
 the agent. Changes apply after clicking Apply, which restarts the service automatically.
 </blockquote>
 
+<div class="title"><span class="left"><i class="title fa fa-key"></i>Authentication</span></div>
+
+<?php
+    $has_token = !empty($api_token);
+    // Security warning banner: shown when agent is exposed with no auth, on all interfaces, with write access
+    $show_sec_warning = (!$has_token && (empty($bind_address) || $bind_address === '0.0.0.0' || $bind_address === '::') && $read_only !== 'true');
+?>
+
+<div id="uma-security-warning" class="uma-power-warning" style="margin-bottom: 15px; display: <?= $show_sec_warning ? 'block' : 'none' ?>;">
+    <strong><i class="fa fa-exclamation-triangle" style="color: var(--orange-200, #ff9900);"></i> Security Notice:</strong>
+    The agent is listening on all network interfaces with no authentication and write access enabled. Anyone on your local network can execute actions (reboot, container control, etc.). Setting an API Token or binding to a specific interface is strongly recommended.
+</div>
+
+_(API Token)_:
+: <input type="password" name="API_TOKEN" id="api_token" value="" placeholder="<?= $has_token ? '••••••••' : 'No authentication (disabled)' ?>" autocomplete="off" style="width: 320px;" oninput="document.getElementById('api_token_clear').value = '0';">
+  <input type="hidden" name="API_TOKEN_CLEAR" id="api_token_clear" value="0">
+  <input type="button" id="uma-btn-token-toggle" value="Show" onclick="toggleTokenVisibility()">
+  <input type="button" id="uma-btn-token-generate" value="Generate" onclick="generateToken()">
+  <input type="button" id="uma-btn-token-copy" value="Copy" onclick="copyToken()">
+  <?php if ($has_token): ?>
+  <input type="button" id="uma-btn-token-clear" value="Clear" onclick="clearToken()">
+  <?php endif; ?>
+
+<blockquote class="inline_help">
+Bearer token required for all API and MCP requests (except <code>/api/v1/health</code> and <code>/swagger/</code>).
+Leave empty to preserve the existing token (or keep authentication disabled if none is set). When set, clients must pass
+<code>Authorization: Bearer &lt;token&gt;</code>.
+</blockquote>
+
 <div class="title"><span class="left"><i class="title fa fa-shield"></i>AI Agent Access (MCP)</span></div>
 
 _(Read-Only Mode)_:
@@ -435,6 +534,79 @@ When enabled, AI agents connected via MCP can only read data: every state-changi
 (container/VM/array actions, reboot, shutdown, updates, fan/CPU control, etc.) is blocked.
 The REST API and WebSocket are not affected.
 </blockquote>
+
+_(Tool Access Policies)_:
+: <div style="display:inline-flex; align-items:center; gap:8px;">
+    <button type="button" id="uma-btn-toggle-policies" onclick="toggleToolPolicyPanel()" class="uma-secondary-btn">
+      <i class="fa fa-sliders"></i> Configure Tool Policies (<span id="uma-custom-policy-count"><?= count($tool_policies) ?></span> customized)
+    </button>
+    <button type="button" id="uma-btn-save-policies" onclick="saveToolPoliciesViaAJAX()" class="uma-secondary-btn" style="display:none;">
+      <i class="fa fa-check"></i> Apply Policies Instantly
+    </button>
+    <span id="uma-policy-save-status" style="font-size:12px; display:none;"></span>
+  </div>
+  <input type="hidden" name="TOOL_POLICY_JSON" id="tool_policy_json" value="<?= htmlspecialchars($tool_policy_json) ?>">
+  <input type="hidden" name="TOOL_POLICY" id="tool_policy_val" value="<?= htmlspecialchars($tool_policy_cfg) ?>">
+
+<blockquote class="inline_help">
+Configure granular access policies for individual MCP tools. Available policies:
+<code>default</code> (standard behavior), <code>ask</code> (require confirmation), <code>allow</code> (execute immediately), <code>read_only</code> (block state changes), or <code>hidden</code> (hide from agent).
+</blockquote>
+
+<div id="uma-tool-policy-panel" style="display:none; margin: 15px 0 25px 0; border: 1px solid var(--input-border-color, #ccc); border-radius: 6px; padding: 15px; background: var(--body-alt-color, rgba(127,127,127,0.04)); max-width: 960px;">
+  <div id="uma-policy-ro-banner" class="uma-power-warning" style="display: <?= ($read_only === 'true') ? 'block' : 'none' ?>; margin-top:0; margin-bottom:12px;">
+    <i class="fa fa-exclamation-triangle"></i> <strong>Global Read-Only Mode is active:</strong> All state-changing tools are blocked regardless of per-tool allow/ask policies.
+  </div>
+
+  <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; margin-bottom:12px;">
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      <input type="text" id="uma-policy-search" placeholder="Search tools..." oninput="filterToolPolicyTable()" style="width:180px; padding:3px 6px; font-size:12px;">
+      <select id="uma-policy-category-filter" onchange="filterToolPolicyTable()" style="padding:3px 6px; font-size:12px;">
+        <option value="">All Categories</option>
+      </select>
+      <select id="uma-policy-type-filter" onchange="filterToolPolicyTable()" style="padding:3px 6px; font-size:12px;">
+        <option value="">All Types</option>
+        <option value="state_changing">State-Changing (Write/Destructive)</option>
+        <option value="read_only">Read-Only Tools</option>
+      </select>
+      <select id="uma-policy-state-filter" onchange="filterToolPolicyTable()" style="padding:3px 6px; font-size:12px;">
+        <option value="">All Policies</option>
+        <option value="custom">Customized Only</option>
+        <option value="default">Default</option>
+        <option value="hidden">Hidden</option>
+        <option value="read_only">Read-Only</option>
+        <option value="allow">Allow</option>
+        <option value="ask">Ask</option>
+      </select>
+    </div>
+    <div style="display:flex; gap:6px; align-items:center;">
+      <button type="button" class="uma-secondary-btn" style="font-size:11px; padding:3px 8px;" onclick="bulkSetPolicy('write', 'ask')">All Write &rarr; Ask</button>
+      <button type="button" class="uma-secondary-btn" style="font-size:11px; padding:3px 8px;" onclick="bulkSetPolicy('write', 'read_only')">All Write &rarr; Read-Only</button>
+      <button type="button" class="uma-secondary-btn" style="font-size:11px; padding:3px 8px;" onclick="bulkSetPolicy('all', 'default')">Reset All</button>
+    </div>
+  </div>
+
+  <div style="max-height: 420px; overflow-y: auto; border: 1px solid var(--input-border-color, #ccc); border-radius: 4px; background: var(--body-bg-color, #fff);">
+    <table id="uma-tool-policy-table" style="width:100%; border-collapse:collapse; font-size:12px;">
+      <thead>
+        <tr style="background:var(--table-header-bg, rgba(0,0,0,0.05)); text-align:left; border-bottom:1px solid var(--input-border-color, #ccc);">
+          <th style="padding:8px 10px; width:220px;">Tool Name</th>
+          <th style="padding:8px 10px; width:110px;">Category</th>
+          <th style="padding:8px 10px; width:110px;">Type</th>
+          <th style="padding:8px 10px;">Description</th>
+          <th style="padding:8px 10px; width:120px; text-align:right;">Policy</th>
+        </tr>
+      </thead>
+      <tbody id="uma-tool-policy-tbody">
+        <tr><td colspan="5" style="padding:20px; text-align:center; color:gray;">Click "Configure Tool Policies" to load tools.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div style="margin-top:8px; font-size:11px; color:gray; display:flex; justify-content:space-between;">
+    <span id="uma-tool-policy-stats">Showing 0 tools</span>
+    <span>Click "Apply Policies Instantly" or "Apply" to save.</span>
+  </div>
+</div>
 
 <div class="title"><span class="left"><i class="title fa fa-comments"></i>MQTT Integration</span></div>
 
@@ -746,6 +918,10 @@ function updateMQTTHA() {
 function updateReadOnly() {
     var enabled = document.getElementById('read_only').checked;
     document.getElementById('read_only_val').value = enabled ? 'true' : 'false';
+    var banner = document.getElementById('uma-policy-ro-banner');
+    if (banner) {
+        banner.style.display = enabled ? 'block' : 'none';
+    }
 }
 
 function updateDebugLogging() {
@@ -819,6 +995,83 @@ function renderSelfTest(out, data) {
     out.innerHTML = html;
 }
 
+function toggleTokenVisibility() {
+    var field = document.getElementById('api_token');
+    var btn = document.getElementById('uma-btn-token-toggle');
+    if (field.type === 'password') {
+        field.type = 'text';
+        btn.value = 'Hide';
+    } else {
+        field.type = 'password';
+        btn.value = 'Show';
+    }
+}
+
+function generateToken() {
+    var array = new Uint8Array(32);
+    window.crypto.getRandomValues(array);
+    var token = Array.from(array, function(b) {
+        return ('0' + b.toString(16)).slice(-2);
+    }).join('');
+    var field = document.getElementById('api_token');
+    field.type = 'text';
+    field.value = token;
+    document.getElementById('uma-btn-token-toggle').value = 'Hide';
+    document.getElementById('api_token_clear').value = '0';
+}
+
+function copyToken() {
+    var field = document.getElementById('api_token');
+    var val = field.value;
+    if (!val) {
+        return;
+    }
+    var markCopied = function() {
+        var btn = document.getElementById('uma-btn-token-copy');
+        if (!btn) return;
+        var orig = btn.value;
+        btn.value = 'Copied!';
+        btn.disabled = true;
+        setTimeout(function() {
+            btn.value = orig;
+            btn.disabled = false;
+        }, 2000);
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(val).then(markCopied).catch(function() {
+            fallbackCopy(field, markCopied);
+        });
+    } else {
+        fallbackCopy(field, markCopied);
+    }
+}
+
+function fallbackCopy(field, callback) {
+    var prevType = field.type;
+    field.type = 'text';
+    field.select();
+    field.setSelectionRange(0, 99999);
+    try {
+        var successful = document.execCommand('copy');
+        if (successful && callback) callback();
+    } catch (e) {
+        // ignore
+    }
+    field.type = prevType;
+}
+
+function clearToken() {
+    var field = document.getElementById('api_token');
+    field.value = '';
+    field.placeholder = 'No authentication (disabled)';
+    document.getElementById('api_token_clear').value = '1';
+    var clearBtn = document.getElementById('uma-btn-token-clear');
+    if (clearBtn) {
+        clearBtn.style.display = 'none';
+    }
+}
+
 // Highlight disabled interval selects
 function updateDisabledHighlighting() {
     document.querySelectorAll('.uma-interval-select').forEach(function(select) {
@@ -827,6 +1080,217 @@ function updateDisabledHighlighting() {
         } else {
             select.classList.remove('is-disabled');
         }
+    });
+}
+
+// MCP Tool Policy Management
+var umaToolCatalog = [];
+var umaActivePolicies = <?= $tool_policy_json ?: '{}' ?>;
+var umaToolCatalogLoaded = false;
+
+function toggleToolPolicyPanel() {
+    var panel = document.getElementById('uma-tool-policy-panel');
+    if (!panel) return;
+    if (panel.style.display === 'none') {
+        panel.style.display = 'block';
+        if (!umaToolCatalogLoaded) {
+            loadToolCatalog();
+        }
+    } else {
+        panel.style.display = 'none';
+    }
+}
+
+function loadToolCatalog() {
+    var tbody = document.getElementById('uma-tool-policy-tbody');
+    tbody.innerHTML = '<tr><td colspan="5" style="padding:20px; text-align:center; color:gray;"><i class="fa fa-spinner fa-spin"></i> Loading MCP tool catalog…</td></tr>';
+
+    $.getJSON('/plugins/<?=$plugin?>/include/diagnostics.php?action=get_tool_policy', function(data) {
+        umaToolCatalogLoaded = true;
+        if (data && Array.isArray(data.tools)) {
+            umaToolCatalog = data.tools;
+        }
+        if (data && data.policies && typeof data.policies === 'object') {
+            umaActivePolicies = Object.assign({}, data.policies);
+            syncToolPolicyFormInputs();
+        }
+        populateCategoryFilter();
+        renderToolPolicyTable();
+        updateCustomPolicyBadge();
+    }).fail(function() {
+        tbody.innerHTML = '<tr><td colspan="5" style="padding:20px; text-align:center; color:var(--red-500, red);"><i class="fa fa-exclamation-triangle"></i> Failed to load MCP tool catalog. Is the agent service running?</td></tr>';
+    });
+}
+
+function populateCategoryFilter() {
+    var select = document.getElementById('uma-policy-category-filter');
+    if (!select) return;
+    var categories = {};
+    umaToolCatalog.forEach(function(t) {
+        if (t.category) categories[t.category] = true;
+    });
+    var html = '<option value="">All Categories</option>';
+    Object.keys(categories).sort().forEach(function(cat) {
+        html += '<option value="' + umaEscapeHtml(cat) + '">' + umaEscapeHtml(cat) + '</option>';
+    });
+    select.innerHTML = html;
+}
+
+function renderToolPolicyTable() {
+    var tbody = document.getElementById('uma-tool-policy-tbody');
+    var search = (document.getElementById('uma-policy-search').value || '').toLowerCase().trim();
+    var category = document.getElementById('uma-policy-category-filter').value;
+    var typeFilter = document.getElementById('uma-policy-type-filter').value;
+    var stateFilter = document.getElementById('uma-policy-state-filter').value;
+
+    var filtered = umaToolCatalog.filter(function(t) {
+        if (search && t.name.toLowerCase().indexOf(search) === -1 && (t.description || '').toLowerCase().indexOf(search) === -1) {
+            return false;
+        }
+        if (category && t.category !== category) {
+            return false;
+        }
+        if (typeFilter === 'state_changing' && t.read_only) {
+            return false;
+        }
+        if (typeFilter === 'read_only' && !t.read_only) {
+            return false;
+        }
+        var curPolicy = umaActivePolicies[t.name] || 'default';
+        if (stateFilter === 'custom' && curPolicy === 'default') {
+            return false;
+        }
+        if (stateFilter && stateFilter !== 'custom' && curPolicy !== stateFilter) {
+            return false;
+        }
+        return true;
+    });
+
+    var stats = document.getElementById('uma-tool-policy-stats');
+    if (stats) {
+        stats.textContent = 'Showing ' + filtered.length + ' of ' + umaToolCatalog.length + ' tools';
+    }
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="padding:20px; text-align:center; color:gray;">No tools match the selected filters.</td></tr>';
+        return;
+    }
+
+    var html = '';
+    filtered.forEach(function(t) {
+        var curPolicy = umaActivePolicies[t.name] || 'default';
+        var isCustom = curPolicy !== 'default';
+        var typeBadge = t.read_only
+            ? '<span class="uma-badge uma-badge-read">Read-Only</span>'
+            : (t.destructive ? '<span class="uma-badge uma-badge-destructive">Destructive</span>' : '<span class="uma-badge uma-badge-write">Write</span>');
+
+        html += '<tr style="border-bottom:1px solid var(--input-border-color, #eee);">';
+        html += '<td style="padding:6px 10px; font-family:monospace; font-weight:bold;">' + umaEscapeHtml(t.name) + '</td>';
+        html += '<td style="padding:6px 10px; color:gray;">' + umaEscapeHtml(t.category || 'General') + '</td>';
+        html += '<td style="padding:6px 10px;">' + typeBadge + '</td>';
+        html += '<td style="padding:6px 10px; font-size:11px; color:inherit; max-width:300px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="' + umaEscapeHtml(t.description || '') + '">' + umaEscapeHtml(t.description || '') + '</td>';
+        html += '<td style="padding:6px 10px; text-align:right;">';
+        html += '<select class="uma-policy-select' + (isCustom ? ' is-custom' : '') + '" onchange="onToolPolicyChange(\'' + umaEscapeHtml(t.name) + '\', this.value)">';
+
+        var opts = [
+            {val: 'default', label: 'Default'},
+            {val: 'ask', label: 'Ask (Confirm)'},
+            {val: 'allow', label: 'Allow (Immediate)'},
+            {val: 'read_only', label: 'Read-Only (Blocked)'},
+            {val: 'hidden', label: 'Hidden'}
+        ];
+        opts.forEach(function(o) {
+            var sel = (curPolicy === o.val) ? ' selected' : '';
+            html += '<option value="' + o.val + '"' + sel + '>' + o.label + '</option>';
+        });
+        html += '</select>';
+        html += '</td>';
+        html += '</tr>';
+    });
+    tbody.innerHTML = html;
+}
+
+function filterToolPolicyTable() {
+    renderToolPolicyTable();
+}
+
+function onToolPolicyChange(toolName, newValue) {
+    if (!newValue || newValue === 'default') {
+        delete umaActivePolicies[toolName];
+    } else {
+        umaActivePolicies[toolName] = newValue;
+    }
+    syncToolPolicyFormInputs();
+    updateCustomPolicyBadge();
+    document.getElementById('uma-btn-save-policies').style.display = 'inline-block';
+    renderToolPolicyTable();
+}
+
+function bulkSetPolicy(scope, policy) {
+    umaToolCatalog.forEach(function(t) {
+        if (scope === 'write' && t.read_only) return;
+        if (!policy || policy === 'default') {
+            delete umaActivePolicies[t.name];
+        } else {
+            umaActivePolicies[t.name] = policy;
+        }
+    });
+    syncToolPolicyFormInputs();
+    updateCustomPolicyBadge();
+    document.getElementById('uma-btn-save-policies').style.display = 'inline-block';
+    renderToolPolicyTable();
+}
+
+function syncToolPolicyFormInputs() {
+    var jsonInput = document.getElementById('tool_policy_json');
+    var csvInput = document.getElementById('tool_policy_val');
+    if (jsonInput) jsonInput.value = JSON.stringify(umaActivePolicies);
+    if (csvInput) {
+        var pairs = [];
+        for (var k in umaActivePolicies) {
+            if (umaActivePolicies.hasOwnProperty(k) && umaActivePolicies[k] && umaActivePolicies[k] !== 'default') {
+                pairs.push(k + '=' + umaActivePolicies[k]);
+            }
+        }
+        csvInput.value = pairs.join(',');
+    }
+}
+
+function updateCustomPolicyBadge() {
+    var count = Object.keys(umaActivePolicies).length;
+    var badge = document.getElementById('uma-custom-policy-count');
+    if (badge) badge.textContent = count;
+}
+
+function saveToolPoliciesViaAJAX() {
+    var btn = document.getElementById('uma-btn-save-policies');
+    var status = document.getElementById('uma-policy-save-status');
+    var orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Applying…';
+    status.style.display = 'inline';
+    status.style.color = 'inherit';
+    status.textContent = 'Saving policies…';
+
+    $.ajax({
+        url: '/plugins/<?=$plugin?>/include/diagnostics.php?action=save_tool_policy',
+        type: 'POST',
+        data: JSON.stringify({policies: umaActivePolicies}),
+        contentType: 'application/json',
+        dataType: 'json'
+    }).done(function(resp) {
+        status.style.color = 'var(--green-500, green)';
+        status.textContent = resp.message || 'Applied successfully!';
+        setTimeout(function() {
+            status.style.display = 'none';
+        }, 4000);
+    }).fail(function(xhr) {
+        status.style.color = 'var(--red-500, red)';
+        var msg = (xhr.responseJSON && xhr.responseJSON.error) ? xhr.responseJSON.error : 'Failed to save policies';
+        status.textContent = msg;
+    }).always(function() {
+        btn.disabled = false;
+        btn.innerHTML = orig;
     });
 }
 

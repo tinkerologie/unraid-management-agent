@@ -13,8 +13,8 @@ import (
 func TestCreateOrchestrator(t *testing.T) {
 	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{
-		Hub:    hub,
-		Config: domain.Config{Version: "test", Port: 8080},
+		Hub:     hub,
+		Version: "test", Port: 8080,
 	}
 
 	o := CreateOrchestrator(ctx)
@@ -34,7 +34,7 @@ func TestCreateOrchestrator(t *testing.T) {
 
 func TestSubscribeMQTTEvents_NilClient(t *testing.T) {
 	hub := domain.NewEventBus(10)
-	ctx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
+	ctx := &domain.Context{Hub: hub, Version: "test"}
 	o := CreateOrchestrator(ctx)
 
 	// mqttClient is nil — subscribeMQTTEvents should return immediately without panic
@@ -56,7 +56,7 @@ func TestSubscribeMQTTEvents_NilClient(t *testing.T) {
 
 func TestSubscribeMQTTEvents_NotConnected(t *testing.T) {
 	hub := domain.NewEventBus(10)
-	ctx := &domain.Context{Hub: hub, Config: domain.Config{Version: "test"}}
+	ctx := &domain.Context{Hub: hub, Version: "test"}
 	o := CreateOrchestrator(ctx)
 
 	// Create an MQTT client that is NOT connected (disabled config)

@@ -656,7 +656,7 @@ func (c *SystemCollector) parseFanSpeeds(output string) map[string]int {
 					value := int(math.Round(floatVal))
 					// Use short chip model (first segment before "-") + fan number without "_input".
 					// e.g. "it8721-isa-0290" + "fan1_input" → "it8721_fan1"
-					chipShort := strings.Split(currentChip, "-")[0]
+					chipShort, _, _ := strings.Cut(currentChip, "-")
 					fanLabel := strings.TrimSuffix(key, "_input")
 					fanSpeeds[chipShort+"_"+fanLabel] = value
 				}

@@ -889,7 +889,7 @@ func (c *DiskCollector) getZFSPoolUsages() map[string]zfsPoolUsage {
 	}
 
 	usages := make(map[string]zfsPoolUsage)
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		name, usage, ok := parseZFSPoolUsageLine(line)
 		if ok {
 			usages[name] = usage

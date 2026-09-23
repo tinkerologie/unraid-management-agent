@@ -235,7 +235,7 @@ func TestRateLimitMiddleware(t *testing.T) {
 		const burst = 5
 		handler := rateLimitMiddleware(newPerClientRateLimiter(negligibleRefill, burst))(okHandler)
 
-		for i := 0; i < burst; i++ {
+		for i := range burst {
 			if code := requestFrom(handler, "192.168.0.10:5000"); code != http.StatusOK {
 				t.Fatalf("request %d within burst returned %d, want %d", i+1, code, http.StatusOK)
 			}
@@ -246,7 +246,7 @@ func TestRateLimitMiddleware(t *testing.T) {
 		const burst = 3
 		handler := rateLimitMiddleware(newPerClientRateLimiter(negligibleRefill, burst))(okHandler)
 
-		for i := 0; i < burst; i++ {
+		for i := range burst {
 			if code := requestFrom(handler, "192.168.0.10:5000"); code != http.StatusOK {
 				t.Fatalf("request %d within burst returned %d, want %d", i+1, code, http.StatusOK)
 			}
@@ -263,7 +263,7 @@ func TestRateLimitMiddleware(t *testing.T) {
 		handler := rateLimitMiddleware(newPerClientRateLimiter(negligibleRefill, burst))(okHandler)
 
 		// Exhaust client A's bucket entirely.
-		for i := 0; i < burst; i++ {
+		for range burst {
 			_ = requestFrom(handler, "192.168.0.10:5000")
 		}
 		if code := requestFrom(handler, "192.168.0.10:5000"); code != http.StatusTooManyRequests {

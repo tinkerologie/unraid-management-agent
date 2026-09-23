@@ -321,7 +321,7 @@ func TestEngineTrendFields(t *testing.T) {
 	provider := &mockDataProvider{}
 	e := NewEngine(NewStore(t.TempDir()), provider)
 	base := time.Unix(1_700_000_000, 0)
-	for i := 0; i < 30; i++ {
+	for i := range 30 {
 		e.history.Record("cpu_temp", "", 40+0.5*float64(i), base.Add(time.Duration(i)*15*time.Second))
 		e.history.Record("array_used_pct", "", 80+0.03*float64(i), base.Add(time.Duration(i)*15*time.Second))
 	}

@@ -8,7 +8,7 @@
 | Key          | Value                                                                  |
 | ------------ | ---------------------------------------------------------------------- |
 | **Name**     | Unraid Management Agent                                                |
-| **Language** | Go 1.26                                                                |
+| **Language** | Go 1.27                                                                |
 | **Target**   | Linux/amd64 (Unraid OS)                                                |
 | **Type**     | Third-party community plugin (not official Unraid)                     |
 | **Purpose**  | REST API + WebSocket + MCP interface for system monitoring and control |

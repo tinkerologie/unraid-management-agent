@@ -318,16 +318,29 @@ func (c *Client) execRemoteShareSwitch(shareID, payload string) error {
 		if err := ctrl.Mount(source); err != nil {
 			return fmt.Errorf("mounting remote share %s: %w", source, err)
 		}
+		go c.safePublishRemoteShareStates()
 		return nil
 	case "OFF":
 		logger.Info("MQTT: Unmounting remote share %s", source)
 		if err := ctrl.Unmount(source); err != nil {
 			return fmt.Errorf("unmounting remote share %s: %w", source, err)
 		}
+		go c.safePublishRemoteShareStates()
 		return nil
 	default:
 		return fmt.Errorf("invalid remote share switch payload: %s (expected ON/OFF)", payload)
 	}
+}
+
+func (c *Client) safePublishRemoteShareStates() {
+	defer func() {
+		if r := recover(); r != nil {
+			logger.LogPanicWithStack("MQTT publishRemoteShareStates", r)
+		}
+	}()
+	c.remoteSharePublishMu.Lock()
+	defer c.remoteSharePublishMu.Unlock()
+	c.publishRemoteShareStates()
 }
 
 // --- System ---

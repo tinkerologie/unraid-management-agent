@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 )
@@ -161,6 +162,86 @@ func TestHandleUpdateStatus(t *testing.T) {
 		if resp.Success {
 			t.Error("Expected Success to be false on error")
 		}
+	}
+}
+
+func TestHandleUpdateStatus_WithCachedOSUpdate(t *testing.T) {
+	testCases := []struct {
+		name                string
+		cache               *dto.OSUpdateStatus
+		wantUpdateAvailable bool
+		wantLatestVersion   string
+		wantCurrentVersion  string
+	}{
+		{
+			name: "update available",
+			cache: &dto.OSUpdateStatus{
+				CurrentVersion:  "7.2.3",
+				LatestVersion:   "7.3.2",
+				UpdateAvailable: true,
+				Status:          dto.OSUpdateStatusAvailable,
+				Timestamp:       time.Now(),
+			},
+			wantUpdateAvailable: true,
+			wantLatestVersion:   "7.3.2",
+			wantCurrentVersion:  "7.2.3",
+		},
+		{
+			name: "already up to date",
+			cache: &dto.OSUpdateStatus{
+				CurrentVersion:  "7.3.2",
+				LatestVersion:   "7.3.2",
+				UpdateAvailable: false,
+				Status:          dto.OSUpdateStatusUpToDate,
+				Timestamp:       time.Now(),
+			},
+			wantUpdateAvailable: false,
+			wantLatestVersion:   "7.3.2",
+			wantCurrentVersion:  "7.3.2",
+		},
+		{
+			name: "unknown status does not overwrite",
+			cache: &dto.OSUpdateStatus{
+				CurrentVersion:  "7.2.3",
+				LatestVersion:   "",
+				UpdateAvailable: false,
+				Status:          dto.OSUpdateStatusUnknown,
+				Timestamp:       time.Now(),
+			},
+			wantUpdateAvailable: false,
+			wantLatestVersion:   "",
+			wantCurrentVersion:  "7.2.3",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			server, _ := setupTestServer()
+			server.SetOSUpdateCache(tc.cache)
+
+			req := httptest.NewRequest("GET", "/api/v1/updates", nil)
+			rr := httptest.NewRecorder()
+			server.router.ServeHTTP(rr, req)
+
+			if rr.Code != http.StatusOK {
+				t.Fatalf("Expected status 200, got %d: %s", rr.Code, rr.Body.String())
+			}
+
+			var status dto.UpdateStatus
+			if err := json.Unmarshal(rr.Body.Bytes(), &status); err != nil {
+				t.Fatalf("Failed to parse update status: %v", err)
+			}
+
+			if status.OSUpdateAvailable != tc.wantUpdateAvailable {
+				t.Errorf("Expected OSUpdateAvailable to be %v, got %v", tc.wantUpdateAvailable, status.OSUpdateAvailable)
+			}
+			if tc.wantLatestVersion != "" && status.LatestVersion != tc.wantLatestVersion {
+				t.Errorf("Expected LatestVersion to be %s, got %s", tc.wantLatestVersion, status.LatestVersion)
+			}
+			if tc.wantCurrentVersion != "" && status.CurrentVersion != tc.wantCurrentVersion {
+				t.Errorf("Expected CurrentVersion to be %s, got %s", tc.wantCurrentVersion, status.CurrentVersion)
+			}
+		})
 	}
 }
 

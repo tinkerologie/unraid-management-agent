@@ -26,7 +26,7 @@ sanitize_int() { echo "$1" | tr -cd '0-9'; }
 # Strip anything that isn't alphanumeric, comma, or hyphen
 sanitize_csv() { echo "$1" | tr -cd 'a-zA-Z0-9,_-'; }
 # Strip shell metacharacters from freeform strings
-sanitize_str() { echo "$1" | tr -d "'\"\`\$\\"; }
+sanitize_str() { echo "$1" | tr -d "'\"\`\$\\\\"; }
 # Validate boolean: only "true" passes, everything else is "false"
 sanitize_bool() { [ "$1" = "true" ] && echo "true" || echo "false"; }
 
@@ -35,6 +35,7 @@ PORT="${PORT:-8043}"
 BIND_ADDRESS="${BIND_ADDRESS:-}"
 READ_ONLY="${READ_ONLY:-false}"
 API_TOKEN="${API_TOKEN:-}"
+TOOL_POLICY="${TOOL_POLICY:-}"
 LOG_LEVEL="${LOG_LEVEL:-info}"
 # Defaults follow industry standards (Zabbix, Prometheus, Datadog)
 INTERVAL_SYSTEM="${INTERVAL_SYSTEM:-15}"
@@ -69,6 +70,7 @@ PORT=$(sanitize_int "$PORT");                       PORT="${PORT:-8043}"
 # The daemon validates the value and falls back to all interfaces if invalid.
 BIND_ADDRESS=$(echo "$BIND_ADDRESS" | tr -cd '0-9a-fA-F.:')
 READ_ONLY=$(sanitize_bool "$READ_ONLY")
+TOOL_POLICY=$(echo "$TOOL_POLICY" | tr -cd 'a-zA-Z0-9,_=-')
 LOG_LEVEL=$(echo "$LOG_LEVEL" | grep -xE 'debug|info|warning|error' || echo "info")
 LOG_LEVEL="${LOG_LEVEL:-info}"
 
@@ -108,6 +110,7 @@ case "$raw_api_token" in
     "'"*"'")
         raw_api_token=${raw_api_token#\'}
         raw_api_token=${raw_api_token%\'}
+        raw_api_token=$(printf '%s' "$raw_api_token" | sed "s/'\\\\''/'/g")
         ;;
 esac
 if [ "$raw_api_token" != "$API_TOKEN" ]; then
@@ -133,6 +136,7 @@ nohup env \
   BIND_ADDRESS="$BIND_ADDRESS" \
   READ_ONLY="$READ_ONLY" \
   API_TOKEN="$API_TOKEN" \
+  TOOL_POLICY="$TOOL_POLICY" \
   INTERVAL_SYSTEM="$INTERVAL_SYSTEM" \
   INTERVAL_ARRAY="$INTERVAL_ARRAY" \
   INTERVAL_DISK="$INTERVAL_DISK" \

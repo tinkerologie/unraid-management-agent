@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Per-tool MCP access policy** — added granular per-tool access policies (`default`, `hidden`, `read_only`, `allow`, `ask`) to control tool visibility and execution for AI agents, complete with `GET`/`PUT` REST API endpoints at `/api/v1/mcp/tool-policy`, WebUI settings panel with search, category filtering, and bulk policy controls, and persistent storage in `/boot/config/plugins/unraid-management-agent/tool_policy.json` ([#156](https://github.com/ruaan-deysel/unraid-management-agent/issues/156)).
+- **WebUI API Token management** — added an Authentication section to the Unraid WebUI settings page with cryptographic token generation, clipboard copy, password show/hide toggle, security advisories for unauthenticated configurations, single-quoted persistence in `scripts/apply`, and authenticated server-side proxying in `include/diagnostics.php` ([#159](https://github.com/ruaan-deysel/unraid-management-agent/issues/159)).
+
+### Changed
+
+- **Go 1.27.1 toolchain upgrade & dependency update** — upgraded project toolchain to Go 1.27.1, adopted Go 1.27 language features (generic methods on `EventBus.Publish[T]`, native standard-library `uuid` package replacing `github.com/google/uuid`, iterator-based `strings.SplitSeq`, `slices.Contains`, embedded struct literal field selectors, and `new(...)` pointer literals), and updated all project dependencies (`modelcontextprotocol/go-sdk` v1.8.0, `moby/client` v0.6.0, `moby/api` v1.56.0, `shoutrrr` v0.21.1, and `golang.org/x/*`).
+
+### Fixed
+
+- **Start script character sanitization escaping** — corrected trailing backslash escaping in `meta/plugin/scripts/start` (``tr -d "'\"`\$\\";"``), eliminating the `tr: warning: an unescaped backslash at end of string is not portable` warning on Unraid Linux systems ([#155](https://github.com/ruaan-deysel/unraid-management-agent/issues/155)).
+- **Unraid OS update detection** — updated `OSUpdateCollector` to inspect `/tmp/unraidcheck/result.json` and dynamix unraidcheck fallback, wired `OSUpdateCache` directly into the `/api/v1/updates` REST handler, and used `isVersionNewer` semantic comparison in `SettingsCollector.GetUpdateStatus` so `os_update_available` and version details report accurately without false positives ([#162](https://github.com/ruaan-deysel/unraid-management-agent/issues/162)).
+- **Plugin settings apply script shell syntax** — fixed missing `esac` in `meta/plugin/scripts/apply` API token unquoting block.
+- **Confirmation gates on destructive MCP tools** — enforced required `confirm=true` safety gates on `run_runbook`, `delete_vm_snapshot`, `remote_share_action`, `restore_fan_defaults`, and fan speed/mode/profile modification tools, bringing implementation into exact alignment with tool documentation ([#158](https://github.com/ruaan-deysel/unraid-management-agent/issues/158)).
+- **Remote share mount stall & Home Assistant state sync** — cached `statfs` capacity calls with background probing so slow or unresponsive remote CIFS/NFS shares never stall mount status reporting, triggered immediate MQTT state publication following mount/unmount operations, and bounded MQTT client publish waits with a 5-second timeout ([#148](https://github.com/ruaan-deysel/unraid-management-agent/issues/148)).
+
 ## [2026.08.03] - 2026-08-26
 
 ### Fixed

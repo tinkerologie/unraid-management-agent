@@ -13,7 +13,7 @@ import (
 
 func newMetricsTestServer() *Server {
 	ctx := &domain.Context{
-		Config: domain.Config{Port: 8043},
+		Port: 8043,
 	}
 	return NewServer(ctx)
 }

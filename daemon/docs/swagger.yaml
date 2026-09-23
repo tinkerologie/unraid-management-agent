@@ -1751,6 +1751,45 @@ definitions:
       total_lines:
         type: integer
     type: object
+  dto.MCPToolCatalogItem:
+    properties:
+      category:
+        type: string
+      configured_policy:
+        type: string
+      description:
+        type: string
+      destructive:
+        type: boolean
+      effective_policy:
+        type: string
+      name:
+        type: string
+      read_only:
+        type: boolean
+    type: object
+  dto.MCPToolPolicyResponse:
+    properties:
+      global_read_only:
+        type: boolean
+      policies:
+        additionalProperties:
+          type: string
+        type: object
+      tools:
+        items:
+          $ref: '#/definitions/dto.MCPToolCatalogItem'
+        type: array
+    type: object
+  dto.MCPToolPolicyUpdateRequest:
+    properties:
+      policies:
+        additionalProperties:
+          type: string
+        type: object
+    required:
+    - policies
+    type: object
   dto.MQTTPublishRequest:
     properties:
       payload: {}
@@ -5996,6 +6035,50 @@ paths:
       summary: Get specific log file
       tags:
       - Logs
+  /mcp/tool-policy:
+    get:
+      description: Get the catalog of MCP tools and their configured/effective access
+        policies
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: MCP tool policy catalog and settings
+          schema:
+            $ref: '#/definitions/dto.MCPToolPolicyResponse'
+      summary: Get MCP tool access policy
+      tags:
+      - MCP
+    put:
+      consumes:
+      - application/json
+      description: Update per-tool MCP access policies (hidden, read_only, allow,
+        ask, default)
+      parameters:
+      - description: Tool policy configuration
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.MCPToolPolicyUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Policy updated successfully
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Invalid tool name or policy value
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Store not initialized or persistence failure
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Update MCP tool access policy
+      tags:
+      - MCP
   /metrics:
     get:
       description: Returns metrics in Prometheus exposition format for Grafana integration

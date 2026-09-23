@@ -897,3 +897,40 @@ func TestNetworkServicesStatus_EnabledRunningConsistency(t *testing.T) {
 		t.Errorf("Enabled services count should be non-negative: %d", status.EnabledServices)
 	}
 }
+
+func TestSettingsCollector_UpdateStatus_OSUpdateComparison(t *testing.T) {
+	testCases := []struct {
+		name          string
+		latestVer     string
+		currentVer    string
+		wantAvailable bool
+	}{
+		{
+			name:          "newer version available",
+			latestVer:     "7.2.5",
+			currentVer:    "7.2.0",
+			wantAvailable: true,
+		},
+		{
+			name:          "same version",
+			latestVer:     "7.2.0",
+			currentVer:    "7.2.0",
+			wantAvailable: false,
+		},
+		{
+			name:          "older version (no update)",
+			latestVer:     "7.1.0",
+			currentVer:    "7.2.0",
+			wantAvailable: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := isVersionNewer(tc.latestVer, tc.currentVer)
+			if got != tc.wantAvailable {
+				t.Errorf("isVersionNewer(%q, %q) = %v, want %v", tc.latestVer, tc.currentVer, got, tc.wantAvailable)
+			}
+		})
+	}
+}

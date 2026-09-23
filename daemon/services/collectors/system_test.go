@@ -13,10 +13,8 @@ import (
 func TestNewSystemCollector(t *testing.T) {
 	hub := domain.NewEventBus(10)
 	ctx := &domain.Context{
-		Hub: hub,
-		Config: domain.Config{
-			Version: "1.0.0",
-		},
+		Hub:     hub,
+		Version: "1.0.0",
 	}
 
 	collector := NewSystemCollector(ctx)
@@ -221,7 +219,7 @@ SwapTotal:       8388604 kB
 SwapFree:        7340028 kB
 `
 	var swapTotal, swapFree uint64
-	for _, line := range strings.Split(meminfo, "\n") {
+	for line := range strings.SplitSeq(meminfo, "\n") {
 		fields := strings.Fields(line)
 		if len(fields) < 2 {
 			continue

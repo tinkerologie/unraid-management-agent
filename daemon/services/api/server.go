@@ -69,6 +69,7 @@ type Server struct {
 	cpuController    *controllers.CPUController
 	tuningController *controllers.TuningController
 	agentSvc         *agent.Service
+	toolPolicyStore  *domain.ToolPolicyStore
 
 	// Embedded cache store for lock-free atomic access to collector data
 	*CacheStore
@@ -354,6 +355,10 @@ func (s *Server) setupRoutes() {
 
 	// Temperature sensors
 	api.HandleFunc("/temperatures", s.handleTemperatures).Methods("GET")
+
+	// MCP tool policy endpoints
+	api.HandleFunc("/mcp/tool-policy", s.handleGetMCPToolPolicy).Methods(http.MethodGet)
+	api.HandleFunc("/mcp/tool-policy", s.handleUpdateMCPToolPolicy).Methods(http.MethodPut)
 
 	// WebSocket endpoint
 	api.HandleFunc("/ws", s.handleWebSocket)
@@ -738,6 +743,11 @@ func (s *Server) SetTuningController(tc *controllers.TuningController) {
 // SetAgent wires the agent service into the API server.
 func (s *Server) SetAgent(svc *agent.Service) {
 	s.agentSvc = svc
+}
+
+// SetToolPolicyStore injects the tool policy store for per-tool access control.
+func (s *Server) SetToolPolicyStore(tps *domain.ToolPolicyStore) {
+	s.toolPolicyStore = tps
 }
 
 // BroadcastAgentEvent implements agent.Broadcaster: streams agent events to WS clients

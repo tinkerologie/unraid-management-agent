@@ -269,7 +269,7 @@ func TestServerMiddlewareChain(t *testing.T) {
 
 func TestCORSHeaders(t *testing.T) {
 	hub := domain.NewEventBus(10)
-	ctx := &domain.Context{Hub: hub, Config: domain.Config{CORSOrigin: "http://localhost:3000"}}
+	ctx := &domain.Context{Hub: hub, CORSOrigin: "http://localhost:3000"}
 
 	server := NewServer(ctx)
 

@@ -35,7 +35,7 @@ func TestMemoryRoundTripAndRecall(t *testing.T) {
 
 func TestMemoryMaxIncidents(t *testing.T) {
 	s := NewStore(t.TempDir(), 3)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		s.AddIncident(dto.AgentIncident{ID: string(rune('a' + i)), Signature: "x", At: time.Now().Add(time.Duration(i) * time.Second)})
 	}
 	if len(s.ListIncidents()) != 3 {

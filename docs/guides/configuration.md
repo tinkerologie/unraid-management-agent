@@ -21,6 +21,7 @@ This file is created automatically after the first installation and persists acr
 | `--port`                   | `8043`   | HTTP API port                                                                                      |
 | `--bind-address`           | -        | IP to bind the HTTP server to (empty = all). mDNS advertises it. Loopback rejected; invalid → all. |
 | `--read-only`              | `false`  | Block state-changing MCP tools (AI agents read-only; REST API unaffected)                          |
+| `--tool-policy`            | -        | Comma-separated per-tool MCP policies (`tool=policy`), e.g. `system_reboot=ask,container_action=read_only`. If `tool_policy.json` exists on disk, it takes precedence. |
 | `--api-token`              | -        | Require `Authorization: Bearer <token>` on the HTTP API and `/mcp` (empty = no authentication)     |
 | `--debug`                  | `false`  | Enable debug logging                                                                               |
 | `--mqtt-enabled`           | `false`  | Enable MQTT publishing                                                                             |
@@ -93,6 +94,10 @@ Future versions will include a web UI for configuration.
 
    # Block all state-changing MCP tools (AI agents can only read)
    READ_ONLY=false
+
+   # Per-tool MCP access policies (comma-separated tool=policy pairs)
+   # Options: default, hidden, read_only, allow, ask
+   TOOL_POLICY=""
 
    # Require "Authorization: Bearer <token>" on the API and /mcp.
    # Empty (the default) leaves the API unauthenticated.
@@ -432,6 +437,19 @@ Claude Desktop.
 Set an API token to require `Authorization: Bearer <token>`. When the token is
 empty (the default) the API stays unauthenticated, so upgrading an existing
 install changes nothing until you opt in.
+
+#### Plugin Settings Page (Recommended)
+
+The easiest way to configure authentication is through the Unraid WebGUI:
+1. Go to **Settings** $\rightarrow$ **Unraid Management Agent**.
+2. Scroll to the **Authentication** section.
+3. Click **Generate** to create a secure 64-character token via the browser's cryptographic API.
+4. Click **Copy** to copy the token to your clipboard.
+5. Click **Apply** at the bottom of the page. The plugin saves the token and restarts the service automatically.
+
+To disable authentication, click **Clear** and then **Apply**.
+
+#### Manual Configuration (SSH / config.cfg)
 
 Prefer the config key or the `API_TOKEN` environment variable over the
 `--api-token` flag: command-line arguments are visible to any user who can read

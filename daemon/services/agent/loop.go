@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
@@ -174,12 +175,7 @@ func (s *Service) invokeTool(ctx context.Context, tool tools.Tool, call llm.Tool
 
 // isForbidden reports whether a tool name is on the non-overridable forbid-list.
 func (s *Service) isForbidden(name string) bool {
-	for _, f := range s.cfg.ForbidList {
-		if f == name {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(s.cfg.ForbidList, name)
 }
 
 func (s *Service) finish(sess *dto.AgentSession, status dto.AgentSessionStatus, answer string) {

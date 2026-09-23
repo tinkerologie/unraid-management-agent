@@ -110,7 +110,15 @@ func (o *Orchestrator) Run() error {
 
 	// Initialize MCP server with Streamable HTTP transport (MCP spec 2025-06-18)
 	// Uses the official MCP Go SDK for protocol compliance with Claude, ChatGPT, Cursor, Copilot, etc.
+	toolPolicyStore := domain.NewToolPolicyStore("", o.ctx.ToolPolicy)
+	if err := toolPolicyStore.Load(); err != nil {
+		apiServer.Stop()
+		return fmt.Errorf("failed to load tool policy: %w", err)
+	}
+	apiServer.SetToolPolicyStore(toolPolicyStore)
+
 	mcpServer := mcp.NewServer(o.ctx, apiServer)
+	mcpServer.SetToolPolicyStore(toolPolicyStore)
 	if err := mcpServer.Initialize(); err != nil {
 		logger.Error("Failed to initialize MCP server: %v", err)
 	} else {
@@ -364,7 +372,18 @@ func (o *Orchestrator) RunMCPStdio() error {
 	logger.Success("%d collectors started for MCP STDIO", enabledCount)
 
 	// Initialize MCP server
+	toolPolicyStore := domain.NewToolPolicyStore("", o.ctx.ToolPolicy)
+	if err := toolPolicyStore.Load(); err != nil {
+		cancel()
+		o.collectorManager.StopAll()
+		apiServer.Stop()
+		wg.Wait()
+		return fmt.Errorf("failed to load tool policy: %w", err)
+	}
+	apiServer.SetToolPolicyStore(toolPolicyStore)
+
 	mcpServer := mcp.NewServer(o.ctx, apiServer)
+	mcpServer.SetToolPolicyStore(toolPolicyStore)
 	if err := mcpServer.Initialize(); err != nil {
 		cancel()
 		o.collectorManager.StopAll()

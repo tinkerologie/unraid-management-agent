@@ -2,8 +2,7 @@ package lib
 
 import (
 	"context"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )

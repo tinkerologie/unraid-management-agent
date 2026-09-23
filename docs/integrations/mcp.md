@@ -362,7 +362,7 @@ get_os_update, get_mover_status,
 list_alert_templates, query_metric_history, list_runbooks, find_root_cause
 ```
 
-### Destructive Tools (17 tools) — `destructiveHint: true`
+### Destructive Tools (23 tools) — `destructiveHint: true`
 
 These tools make changes that may be difficult or impossible to reverse:
 
@@ -385,6 +385,14 @@ These tools make changes that may be difficult or impossible to reverse:
 | `system_shutdown`       | —                      | Yes (`confirm: true`)                  |
 | `system_health_report`  | —                      | Yes (`confirm: true` + `actions` list) |
 | `run_runbook`           | `idempotentHint: true` | Yes (`confirm: true`)                  |
+| `set_fan_speed`         | `idempotentHint: true` | Yes (`confirm: true`)                  |
+| `set_fan_mode`          | `idempotentHint: true` | Yes (`confirm: true`)                  |
+| `set_fan_profile`       | `idempotentHint: true` | Yes (`confirm: true`)                  |
+| `create_fan_profile`    | —                      | Yes (`confirm: true`)                  |
+| `restore_fan_defaults`  | `idempotentHint: true` | Yes (`confirm: true`)                  |
+| `remote_share_action`   | `idempotentHint: true` | Yes (`confirm: true`)                  |
+
+> **Note:** `system_health_report` carries `destructiveHint: true` because it can execute remediation actions when `confirm=true` and an `actions` list are supplied. Without those arguments it operates as a read-only health check.
 
 ### Non-Destructive Control Tools (10 tools) — `destructiveHint: false`
 
@@ -834,6 +842,56 @@ client.close()
 3. **Input Validation**: All inputs are validated using the same security functions as the REST API to prevent command injection.
 
 4. **Logging**: All MCP control actions are logged with timestamps for audit purposes.
+
+## Tool Access Policy
+
+The agent supports fine-grained, per-tool access policy configuration to control exactly what connected AI agents can discover and execute.
+
+### Available Policies
+
+| Policy | Effect on `tools/list` | Effect on `tools/call` | Typical Use Case |
+| ------ | --------------------- | ---------------------- | ---------------- |
+| `default` | Visible | Standard plugin behavior: safe tools execute directly; destructive tools require `confirm: true` | Standard operations |
+| `hidden` | Omitted from catalog | Blocked as unknown tool (`"tool \"<name>\" not found"`) | Prevent AI agent from discovering or invoking high-risk tools |
+| `read_only` | Visible | Write/state-changing tools are blocked (`"Blocked by tool access policy"`); read-only tools execute normally | Allow agent to inspect state without making changes |
+| `allow` | Visible | Destructive tools execute immediately without requiring `confirm: true` | Trusted automated autonomous workflows |
+| `ask` | Visible | State-changing tools always require explicit `confirm: true` before execution (read-only tools execute normally) | Enforce human confirmation on state-changing actions |
+
+### Policy Precedence
+
+1. **`hidden`**: Takes precedence over all other settings. The tool is invisible to agents and cannot be called.
+2. **Read-Only Tools**: Pure read tools (`readOnlyHint: true`) are never blocked by `read_only` or `ask` policies (they run normally unless hidden).
+3. **Global Read-Only Mode (`--read-only` / `READ_ONLY=true`)**: Overrides all state-changing tools to `read_only`, acting as a global kill switch regardless of per-tool `allow`/`ask` settings.
+4. **Configured Per-Tool Policy**: Explicit policy configured for that tool (`read_only`, `allow`, `ask`).
+5. **Default**: Standard plugin behavior.
+
+### Configuration Methods
+
+#### 1. Unraid WebUI
+Navigate to **Settings → Unraid Management Agent → AI Agent Access (MCP)**. Click **Configure Tool Policies** to filter tools by category, search by name, or apply bulk policies. You can save changes immediately to the running daemon without restarting.
+
+#### 2. REST API
+- `GET /api/v1/mcp/tool-policy`: Retrieve the full tool catalog, metadata, and active policies.
+- `PUT /api/v1/mcp/tool-policy`: Update policies in real-time. Payload:
+  ```json
+  {
+    "policies": {
+      "system_reboot": "ask",
+      "system_shutdown": "hidden",
+      "container_action": "read_only"
+    }
+  }
+  ```
+
+#### 3. Persistent File Storage
+Saved in `/boot/config/plugins/unraid-management-agent/tool_policy.json` across reboots. When this file exists on disk, its policies take precedence over CLI flags and environment variables.
+
+#### 4. Environment Variable / CLI Flag
+Set `TOOL_POLICY` or `--tool-policy` as comma-separated `tool=policy` pairs:
+```bash
+TOOL_POLICY="system_reboot=ask,container_action=read_only,delete_vm_snapshot=hidden"
+```
+*Note: If `tool_policy.json` exists on disk, it takes precedence over `TOOL_POLICY`.*
 
 ## Limitations
 

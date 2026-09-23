@@ -284,10 +284,8 @@ func newMockCacheProvider() *MockCacheProvider {
 
 func setupTestMCPServer() (*Server, *MockCacheProvider) {
 	ctx := &domain.Context{
-		Config: domain.Config{
-			Version: "test-1.0.0",
-			Port:    8043,
-		},
+		Version: "test-1.0.0",
+		Port:    8043,
 	}
 
 	mock := newMockCacheProvider()
@@ -385,9 +383,7 @@ func TestMCPJSONResult(t *testing.T) {
 
 func TestMCPNilCacheResponses(t *testing.T) {
 	ctx := &domain.Context{
-		Config: domain.Config{
-			Version: "test-1.0.0",
-		},
+		Version: "test-1.0.0",
 	}
 
 	// Create mock with nil caches
@@ -574,10 +570,8 @@ func TestTextResult(t *testing.T) {
 
 func TestServerVersion(t *testing.T) {
 	ctx := &domain.Context{
-		Config: domain.Config{
-			Version: "2025.01.15",
-			Port:    8043,
-		},
+		Version: "2025.01.15",
+		Port:    8043,
 	}
 
 	mock := newMockCacheProvider()
@@ -590,10 +584,8 @@ func TestServerVersion(t *testing.T) {
 
 func TestServerPort(t *testing.T) {
 	ctx := &domain.Context{
-		Config: domain.Config{
-			Version: "test",
-			Port:    9999,
-		},
+		Version: "test",
+		Port:    9999,
 	}
 
 	mock := newMockCacheProvider()

@@ -78,6 +78,12 @@ Control tools (`ReadOnlyHint: false`) change the system. The high-risk ones
 | `execute_user_script` / `run_runbook` | Runs arbitrary user-defined actions |
 | `delete_vm_snapshot` / `restore_vm_snapshot` | Irreversible VM state change |
 | `delete_alert_rule` / `delete_health_check` | Removes configuration |
+| `set_fan_speed` / `set_fan_mode` | Changes fan speeds / control modes |
+| `set_fan_profile` / `create_fan_profile` | Changes temperature curves |
+| `restore_fan_defaults` | Resets all fan controls to BIOS defaults |
+| `remote_share_action` | Mounts / unmounts network storage |
+
+> **Note:** `container_action` (remove) and `vm_action` (reset) enforce `confirm=true` server-side for the destructive action only, so a client reading only the schema cannot see the requirement.
 
 Always state what will happen and wait for explicit user approval before sending
 `confirm=true`. See `references/mcp-tools.md` for the full read/write breakdown.

@@ -35,7 +35,7 @@ func TestStoreSavePrunesInMemory(t *testing.T) {
 	s := NewStore(t.TempDir())
 	base := time.Now()
 	total := MaxStoredSessions + 10
-	for i := 0; i < total; i++ {
+	for i := range total {
 		s.Put(dto.AgentSession{
 			ID:        fmt.Sprintf("sess-%d", i),
 			Goal:      "g",
