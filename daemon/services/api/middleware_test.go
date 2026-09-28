@@ -354,7 +354,7 @@ func TestAuthMiddleware(t *testing.T) {
 
 	// reached records whether the request made it past the middleware.
 	newHandler := func(configured string, reached *bool) http.Handler {
-		return authMiddleware(configured)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		return authMiddlewareWithMCPSecret(configured, "")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			*reached = true
 			w.WriteHeader(http.StatusOK)
 		}))
@@ -549,5 +549,179 @@ func TestBearerToken(t *testing.T) {
 				t.Errorf("bearerToken() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestStatusRecorderFlushAndUnwrap(t *testing.T) {
+	tests := []struct {
+		name        string
+		writeStatus int
+		wantStatus  int
+	}{
+		{name: "default status 200 preserved after flush without WriteHeader", writeStatus: 0, wantStatus: http.StatusOK},
+		{name: "explicit status preserved after flush", writeStatus: http.StatusAccepted, wantStatus: http.StatusAccepted},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rr := httptest.NewRecorder()
+			var capturedRec *statusRecorder
+
+			handler := loggingMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				rec, ok := w.(*statusRecorder)
+				if !ok {
+					t.Fatalf("expected *statusRecorder, got %T", w)
+				}
+				capturedRec = rec
+
+				if _, ok := w.(http.Flusher); !ok {
+					t.Fatal("statusRecorder does not implement http.Flusher")
+				}
+				if got := rec.Unwrap(); got != rr {
+					t.Errorf("Unwrap() = %v, want %v", got, rr)
+				}
+
+				if tt.writeStatus != 0 {
+					w.WriteHeader(tt.writeStatus)
+				}
+				_, _ = w.Write([]byte(": ok\n\n"))
+
+				if err := http.NewResponseController(w).Flush(); err != nil {
+					t.Fatalf("http.NewResponseController(w).Flush() failed: %v", err)
+				}
+			}))
+
+			req := httptest.NewRequest(http.MethodGet, "/mcp", nil)
+			handler.ServeHTTP(rr, req)
+
+			if !rr.Flushed {
+				t.Error("expected underlying ResponseRecorder.Flushed to be true")
+			}
+			if capturedRec == nil || capturedRec.status != tt.wantStatus {
+				t.Errorf("recorded status = %v, want %d", capturedRec, tt.wantStatus)
+			}
+			if rr.Code != tt.wantStatus {
+				t.Errorf("ResponseRecorder.Code = %d, want %d", rr.Code, tt.wantStatus)
+			}
+		})
+	}
+}
+
+func TestAuthMiddlewareWithMCPSecret(t *testing.T) {
+	const (
+		token  = "rest-api-token-1234567890"
+		secret = "mcp_secret_abcdefghijklmnopqrstuvwxyz123456"
+	)
+
+	tests := []struct {
+		name       string
+		apiToken   string
+		mcpSecret  string
+		path       string
+		authHeader string
+		wantStatus int
+		wantReach  bool
+	}{
+		{
+			name:       "exact secret path skips bearer auth",
+			apiToken:   token,
+			mcpSecret:  secret,
+			path:       "/mcp/" + secret,
+			wantStatus: http.StatusOK,
+			wantReach:  true,
+		},
+		{
+			name:       "wrong secret path is rejected with 404",
+			apiToken:   token,
+			mcpSecret:  secret,
+			path:       "/mcp/wrong_secret_abcdefghijklmnopqrstuvwxyz",
+			wantStatus: http.StatusNotFound,
+			wantReach:  false,
+		},
+		{
+			name:       "extra path segment after secret is rejected with 404",
+			apiToken:   token,
+			mcpSecret:  secret,
+			path:       "/mcp/" + secret + "/extra",
+			wantStatus: http.StatusNotFound,
+			wantReach:  false,
+		},
+		{
+			name:       "/mcp returns 401 with WWW-Authenticate when token is set",
+			apiToken:   token,
+			mcpSecret:  secret,
+			path:       "/mcp",
+			wantStatus: http.StatusUnauthorized,
+			wantReach:  false,
+		},
+		{
+			name:       "/mcp with valid bearer succeeds",
+			apiToken:   token,
+			mcpSecret:  secret,
+			path:       "/mcp",
+			authHeader: "Bearer " + token,
+			wantStatus: http.StatusOK,
+			wantReach:  true,
+		},
+		{
+			name:       "/mcp stays open without an API token",
+			apiToken:   "",
+			mcpSecret:  secret,
+			path:       "/mcp",
+			wantStatus: http.StatusOK,
+			wantReach:  true,
+		},
+		{
+			name:       "empty secret disables exemption on /mcp/",
+			apiToken:   token,
+			mcpSecret:  "",
+			path:       "/mcp/",
+			wantStatus: http.StatusUnauthorized,
+			wantReach:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reached := false
+			h := authMiddlewareWithMCPSecret(tt.apiToken, tt.mcpSecret)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				reached = true
+				w.WriteHeader(http.StatusOK)
+			}))
+
+			req := httptest.NewRequest(http.MethodPost, tt.path, nil)
+			if tt.authHeader != "" {
+				req.Header.Set("Authorization", tt.authHeader)
+			}
+			rr := httptest.NewRecorder()
+			h.ServeHTTP(rr, req)
+
+			if rr.Code != tt.wantStatus {
+				t.Errorf("status = %d, want %d", rr.Code, tt.wantStatus)
+			}
+			if reached != tt.wantReach {
+				t.Errorf("reached = %v, want %v", reached, tt.wantReach)
+			}
+			if tt.wantStatus == http.StatusUnauthorized && rr.Header().Get("WWW-Authenticate") == "" {
+				t.Error("expected WWW-Authenticate header on 401")
+			}
+		})
+	}
+}
+
+func TestRedactMCPPath(t *testing.T) {
+	tests := []struct {
+		in   string
+		want string
+	}{
+		{in: "/mcp", want: "/mcp"},
+		{in: "/mcp/", want: "/mcp/"},
+		{in: "/mcp/super-secret-value", want: "/mcp/<redacted>"},
+		{in: "/api/v1/system", want: "/api/v1/system"},
+	}
+	for _, tt := range tests {
+		if got := redactMCPPath(tt.in); got != tt.want {
+			t.Errorf("redactMCPPath(%q) = %q, want %q", tt.in, got, tt.want)
+		}
 	}
 }

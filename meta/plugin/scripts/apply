@@ -95,6 +95,23 @@ if [ -f "$CONFIG_FILE" ] && grep -q '^API_TOKEN=' "$CONFIG_FILE"; then
     sed -i "s|^API_TOKEN=.*|API_TOKEN='${escaped_token}'|" "$CONFIG_FILE"
 fi
 
+# ── Server-side MCP_CONNECT_SECRET quoting ────────────────────
+if [ -f "$CONFIG_FILE" ] && grep -q '^MCP_CONNECT_SECRET=' "$CONFIG_FILE"; then
+    raw_mcp_secret=$(sed -n 's/^[[:space:]]*MCP_CONNECT_SECRET=//p' "$CONFIG_FILE" | tail -n1)
+    case "$raw_mcp_secret" in
+        '"'*'"')
+            raw_mcp_secret=${raw_mcp_secret#\"}
+            raw_mcp_secret=${raw_mcp_secret%\"}
+            ;;
+        "'"*"'")
+            raw_mcp_secret=${raw_mcp_secret#\'}
+            raw_mcp_secret=${raw_mcp_secret%\'}
+            ;;
+    esac
+    clean_mcp_secret=$(printf '%s' "$raw_mcp_secret" | tr -cd 'A-Za-z0-9_-')
+    sed -i "s|^MCP_CONNECT_SECRET=.*|MCP_CONNECT_SECRET='${clean_mcp_secret}'|" "$CONFIG_FILE"
+fi
+
 # Only restart if the service is currently running
 if pidof "$PLUGIN" > /dev/null 2>&1; then
     "$SCRIPTS_DIR/stop"

@@ -34,20 +34,23 @@ Settings → Capabilities → Skills (see `skills/README.md`).
 
 ## 2. Connect Claude to your server (MCP)
 
-The agent serves a Streamable HTTP MCP endpoint at `/mcp`. How you connect
-depends on the client:
+The agent serves a Streamable HTTP MCP endpoint at `/mcp` (and optionally a private zero-header Connect URL at `/mcp/<connect-secret>` generated under **Settings → Utilities → Unraid Management Agent → AI Agent Access (MCP)**). How you connect depends on the client:
 
 ### Claude Code
 
-Claude Code accepts the URL directly:
+Claude Code accepts the URL directly (copy the ready-made snippet from the Unraid WebGUI):
 
 ```bash
+# Using a zero-header Connect URL (when MCP_CONNECT_SECRET is enabled):
+claude mcp add --transport http unraid "http://<unraid-ip>:8043/mcp/<connect-secret>"
+
+# Or using the base endpoint when authentication is disabled:
 claude mcp add --transport http unraid http://<unraid-ip>:8043/mcp
 ```
 
 If you've enabled native TLS (`--tls-cert-file`/`--tls-key-file`), use `https://`
 with the hostname the certificate is issued for (e.g.
-`https://<server>.myunraid.net:8043/mcp`) — a trusted cert validates against its
+`https://<server>.myunraid.net:8043/mcp/<connect-secret>`) — a trusted cert validates against its
 hostname, so a raw `https://<ip>` URL only works if the certificate includes
 that IP as a Subject Alternative Name.
 
@@ -68,12 +71,12 @@ trusted cert**, via either:
 - **Native HTTPS** — point the agent at a trusted certificate (e.g. Unraid's
   `myunraid.net` cert) with `--tls-cert-file` / `--tls-key-file` (see
   [configuration guide](../../guides/configuration.md#https--tls)), then
-  port-forward or tunnel `https://<public-host>:8043/mcp`.
+  port-forward or tunnel `https://<public-host>:8043/mcp/<connect-secret>`.
 - **A reverse proxy or tunnel** that terminates a trusted cert in front of the
   agent — e.g. SWAG/Nginx Proxy Manager, Cloudflare Tunnel, or Tailscale Funnel.
 
 Then in **Settings → Connectors → Add custom connector**, enter the public
-`https://…/mcp` URL.
+`https://<your-domain>/mcp/<connect-secret>` URL. Because the secret is embedded in the private URL path (`ha-mcp` style), no OAuth server or custom header setup is needed.
 
 ### Claude Desktop on a LAN (no public exposure) — `mcp-remote` bridge
 
@@ -89,15 +92,14 @@ Developer → Edit Config) and add:
   "mcpServers": {
     "unraid": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "http://<unraid-ip>:8043/mcp", "--allow-http", "--transport", "http-only"]
+      "args": ["-y", "mcp-remote", "http://<unraid-ip>:8043/mcp/<connect-secret>", "--allow-http"]
     }
   }
 }
 ```
 
 `--allow-http` permits the plain-HTTP LAN connection (use only on a trusted
-network) and `--transport http-only` matches the agent's Streamable HTTP
-endpoint (it has no SSE half, so this avoids a startup delay). Restart Claude
+network). Sessionless `GET /mcp` immediately returns `405 Method Not Allowed` (`Allow: POST, DELETE`) and session-bound `GET /mcp` flushes SSE frames immediately, so `mcp-remote` connects without any startup delay. Restart Claude
 Desktop after saving.
 
 ### Local, on the Unraid box itself

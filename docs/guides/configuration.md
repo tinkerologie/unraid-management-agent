@@ -23,6 +23,7 @@ This file is created automatically after the first installation and persists acr
 | `--read-only`              | `false`  | Block state-changing MCP tools (AI agents read-only; REST API unaffected)                          |
 | `--tool-policy`            | -        | Comma-separated per-tool MCP policies (`tool=policy`), e.g. `system_reboot=ask,container_action=read_only`. If `tool_policy.json` exists on disk, it takes precedence. |
 | `--api-token`              | -        | Require `Authorization: Bearer <token>` on the HTTP API and `/mcp` (empty = no authentication)     |
+| `--mcp-connect-secret`     | -        | Optional 32–256 char (`[A-Za-z0-9_-]`) secret enabling header-free MCP onboarding at `/mcp/<secret>` (`MCP_CONNECT_SECRET`) |
 | `--debug`                  | `false`  | Enable debug logging                                                                               |
 | `--mqtt-enabled`           | `false`  | Enable MQTT publishing                                                                             |
 | `--mqtt-broker`            | -        | MQTT broker address (e.g., `tcp://localhost:1883`)                                                 |

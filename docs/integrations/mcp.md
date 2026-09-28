@@ -1,14 +1,38 @@
 # Model Context Protocol (MCP) Integration
 
 > **Status: Production-Ready (GA)** — Built on the
-> [official MCP Go SDK](https://github.com/modelcontextprotocol/go-sdk) v1.2.0
-> with protocol version 2025-06-18.
+> [official MCP Go SDK](https://github.com/modelcontextprotocol/go-sdk) v1.8.0
+> with per-session protocol negotiation (`2026-07-28`, `2025-11-25`, `2025-06-18`, `2025-03-26`, `2024-11-05`).
 
-The Unraid Management Agent includes support for the
-[Model Context Protocol (MCP)](https://modelcontextprotocol.io/),
-enabling AI agents like Claude, Cursor, GitHub Copilot, Codex,
+The Unraid Management Agent includes an embedded
+[Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that starts automatically with the plugin,
+enabling AI agents like Claude Code, Claude Desktop, Cursor, GitHub Copilot, VS Code, OpenAI Codex,
 Windsurf, Gemini CLI, and other LLM-based systems to interact
-with your Unraid server programmatically.
+with your Unraid server with zero sidecar containers.
+
+## Quick Start (2-Step Zero-Config Onboarding)
+
+The Unraid Management Agent adopts the single-URL onboarding pattern popularized by `ha-mcp`:
+
+1. In the Unraid WebGUI, open **Settings → Utilities → Unraid Management Agent** and scroll to **AI Agent Access (MCP)**.
+2. Click **Generate** next to **MCP Connect Secret** (`MCP_CONNECT_SECRET`), click **Apply**, then select your AI client from **Client Configuration Snippet** and click **Copy Snippet**.
+
+Your personal Connect URL embeds a 256-bit secret path segment:
+
+```text
+http://<unraid-ip>:8043/mcp/<connect-secret>
+```
+
+Paste or run the copied snippet in your client:
+
+```bash
+# Claude Code (one command)
+claude mcp add --transport http unraid "http://<unraid-ip>:8043/mcp/<connect-secret>"
+```
+
+- **No custom headers required**: Works in clients that only accept a single server URL.
+- **Safe log redaction**: The secret value in `/mcp/<segment>` is never written to log files or diagnostic bundles; logs record the redacted path `/mcp/<redacted>`.
+- **Revocation**: Clicking **Regenerate** or **Clear** takes effect after clicking **Apply** and restarting the daemon. The old URL then returns `404 Not Found`.
 
 ## Overview
 
@@ -27,33 +51,35 @@ MCP is an open protocol that standardizes how AI applications can securely conne
 > - **ChatGPT:** ChatGPT consumes REST **Actions**, not MCP — see the
 >   [ChatGPT Custom GPT guide](chatgpt/README.md).
 > - See the [integrations index](README.md) for all options (MQTT, Home
->   Assistant, Grafana, …).
+>   Assistant, Grafana, …) and the [MCP Onboarding Design Doc](../design/mcp-onboarding.md).
 
 ## Transports
 
 The MCP server supports two transports — use the one that fits your deployment:
 
-| Transport              | Endpoint / Command                            | Best For                                               |
-| ---------------------- | --------------------------------------------- | ------------------------------------------------------ |
-| **Streamable HTTP** ⭐ | `POST/GET/DELETE http://<unraid-ip>:8043/mcp` | Remote connections from any machine on the network     |
-| **STDIO**              | `unraid-management-agent mcp-stdio`           | Local AI clients running directly on the Unraid server |
+| Transport              | Endpoint / Command                                               | Best For                                               |
+| ---------------------- | ---------------------------------------------------------------- | ------------------------------------------------------ |
+| **Streamable HTTP** ⭐ | `http(s)://<unraid-ip>:8043/mcp` or `/mcp/<connect-secret>`      | Remote connections from any machine on the network     |
+| **STDIO**              | `unraid-management-agent mcp-stdio`                              | Local AI clients running directly on the Unraid server |
 
 > **Which transport should I use?**
 >
-> - Use **Streamable HTTP** if the AI client (Cursor, VS Code, etc.) runs on a different machine than the Unraid server.
-> - Use **STDIO** if the AI client (Claude Desktop, Cursor) runs locally on the Unraid server itself — it has zero network overhead and requires no authentication.
+> - Use **Streamable HTTP** if the AI client (Claude Code, Cursor, VS Code, Codex, Gemini CLI) runs on your workstation or another machine on the LAN/Tailnet.
+> - Use **STDIO** if the AI client runs locally on the Unraid server itself — it has zero network overhead and requires no authentication.
 
-### Authentication
+### Authentication Options
 
-If the agent is configured with an API token (see
-[Configuration → Authentication](../guides/configuration.md#authentication)), the
-`/mcp` endpoint requires it on every request:
+When `API_TOKEN` is configured (see [Configuration → Authentication](../guides/configuration.md#authentication)), you can authenticate MCP clients using either:
 
-```
-Authorization: Bearer <token>
-```
+#### Option 1: Single-URL Connect Secret (`/mcp/<connect-secret>`) — Recommended
 
-Clients that accept custom headers can send it directly:
+Set `MCP_CONNECT_SECRET` (32–256 characters of `[A-Za-z0-9_-]`) in the Unraid WebGUI or environment. Requests to `http(s)://<unraid-ip>:8043/mcp/<connect-secret>` are authenticated in constant time without needing an `Authorization` header, while plain `/mcp` still enforces `Authorization: Bearer <API_TOKEN>` and any unknown `/mcp/<other>` path returns `404 Not Found`.
+
+> **Security Note:** `MCP_CONNECT_SECRET` authenticates `/mcp/<connect-secret>` only and is not equivalent to `API_TOKEN` (it never grants access to `/api/v1/*` REST routes). Because the secret is embedded in the URL path, it acts as a reusable credential that may be recorded by client configurations or intermediaries and transmitted in cleartext over plain HTTP. Use HTTPS (`TLS_CERT_FILE` / `TLS_KEY_FILE` or a TLS-terminating reverse proxy) for remote connections, and enable `READ_ONLY=true` (or per-tool policies) unless connected AI agents should be allowed to invoke state-changing tools.
+
+#### Option 2: Standard Bearer Token Header (`Authorization: Bearer <token>`)
+
+Clients that support custom HTTP headers can connect to `/mcp` with `Authorization: Bearer <API_TOKEN>`:
 
 ```json
 {
@@ -64,17 +90,16 @@ Clients that accept custom headers can send it directly:
 }
 ```
 
-For clients that cannot set headers, `mcp-remote` can pass one through:
+For stdio-only clients (such as Claude Desktop without native remote URL config), `mcp-remote` can connect to either `/mcp/<connect-secret>` or `/mcp` with `--header`:
 
 ```json
 {
   "command": "npx",
-  "args": ["mcp-remote", "http://your-unraid-ip:8043/mcp", "--header", "Authorization: Bearer your-generated-token"]
+  "args": ["-y", "mcp-remote", "http://your-unraid-ip:8043/mcp/<connect-secret>"]
 }
 ```
 
-The STDIO transport is unaffected — it does not go through the HTTP server, so no
-token is needed.
+The STDIO transport (`mcp-stdio`) does not go through the HTTP server, so no token is needed.
 
 ## Available Tools (126 total)
 
@@ -905,19 +930,32 @@ TOOL_POLICY="system_reboot=ask,container_action=read_only,delete_vm_snapshot=hid
 | **Streamable HTTP** ⭐ | Remote AI clients over the network | Request/response, SSE streaming, session management     |
 | **STDIO**              | Local AI clients on the server     | Newline-delimited JSON over stdin/stdout, zero overhead |
 
-### Streamable HTTP Transport Details (MCP Spec 2025-06-18)
+### Streamable HTTP Transport Details (`2026-07-28` / `2025-11-25` / `2025-06-18` / `2025-03-26` / `2024-11-05`)
 
-Built on the [official MCP Go SDK](https://github.com/modelcontextprotocol/go-sdk) v1.2.0,
-the Streamable HTTP transport at `/mcp` supports:
+Built on the [official MCP Go SDK](https://github.com/modelcontextprotocol/go-sdk) v1.8.0,
+the Streamable HTTP transport at `/mcp` (and `/mcp/<connect-secret>`) supports:
 
 - **POST**: Send JSON-RPC requests and notifications
-  - Requests return `Content-Type: application/json` responses
+  - Requests return `Content-Type: text/event-stream` (SSE-framed JSON-RPC) or `application/json`
   - Notifications return `202 Accepted` with no body
-- **GET**: Open an SSE stream for server-initiated messages (requires `Accept: text/event-stream` header)
+- **GET (without `Mcp-Session-Id`)**: Immediately returns `405 Method Not Allowed` with `Allow: POST, DELETE` and `Content-Length` (`< 5 ms`). Per the MCP Streamable HTTP specification, clients that probe `GET /mcp` for standalone SSE support before `initialize` receive an immediate `405` and fall back cleanly to `POST /mcp` without hanging.
+- **GET (with valid `Mcp-Session-Id`)**: Opens a long-lived server-to-client SSE stream (`Content-Type: text/event-stream`), immediately flushes the initial `: ok\n\n` frame, and clears per-request HTTP `ReadDeadline` / `WriteDeadline` so the stream stays open across the session lifetime.
 - **DELETE**: Terminate the session (requires `Mcp-Session-Id` header)
 - **OPTIONS**: CORS preflight handling
 
-**Session Management:** The server assigns an `Mcp-Session-Id` on initialization. Clients should include this header in subsequent requests.
+**Reverse Proxy / Nginx Configuration (Optional):**
+If you place Nginx, Traefik, or Cloudflare Tunnel in front of `/mcp`, disable response buffering on the `/mcp` location so SSE frames (`: ok` and server notifications) flush immediately:
+
+```nginx
+location /mcp {
+    proxy_pass http://127.0.0.1:8043;
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_buffering off;
+    proxy_cache off;
+    proxy_read_timeout 3600s;
+}
+```
 
 ### STDIO Transport Details
 
@@ -936,54 +974,35 @@ It is started via the `mcp-stdio` CLI subcommand:
 - **Graceful shutdown** — responds to SIGTERM/SIGINT with full collector cleanup
 - **Designed for process spawning** — MCP clients like Claude Desktop launch the process and manage its lifecycle
 
-**When to use STDIO:**
+## Client Compatibility Matrix
 
-- The AI client runs on the same machine as the Unraid server
-- You want zero network overhead and no port/firewall configuration
-- The MCP client supports STDIO spawning (Claude Desktop, Cursor local mode)
+| Client | Transport | URL-Only Auth (`/mcp/<secret>`) | Header Auth (`Bearer <API_TOKEN>`) | Plain LAN `http://` | Copy-Paste Config Snippet |
+| --- | --- | --- | --- | --- | --- |
+| **Claude Code (`claude`)** | Streamable HTTP | ✅ Supported | ✅ Supported (`--header`) | ✅ Yes | `claude mcp add --transport http unraid "http://<ip>:8043/mcp/<secret>"` |
+| **VS Code (GitHub Copilot)** | Streamable HTTP | ✅ Supported | ✅ Supported (`headers`) | ✅ Yes | `.vscode/mcp.json`: `{"servers":{"unraid":{"type":"http","url":"http://<ip>:8043/mcp/<secret>"}}}` |
+| **Cursor** | Streamable HTTP | ✅ Supported | ✅ Supported (`headers`) | ✅ Yes | `.cursor/mcp.json`: `{"mcpServers":{"unraid":{"url":"http://<ip>:8043/mcp/<secret>"}}}` |
+| **OpenAI Codex CLI** | Streamable HTTP | ✅ Supported | ✅ Supported (`bearer_token_env_var`) | ✅ Yes | `~/.codex/config.toml`: `[mcp_servers.unraid]` `url = "http://<ip>:8043/mcp/<secret>"` |
+| **Gemini CLI** | Streamable HTTP | ✅ Supported | ✅ Supported (`headers`) | ✅ Yes | `~/.gemini/settings.json`: `{"mcpServers":{"unraid":{"httpUrl":"http://<ip>:8043/mcp/<secret>"}}}` |
+| **Claude Desktop** | `mcp-remote` / STDIO | ✅ Supported | ✅ Supported (`--header`) | ✅ Yes | `claude_desktop_config.json`: `{"mcpServers":{"unraid":{"command":"npx","args":["-y","mcp-remote","http://<ip>:8043/mcp/<secret>"]}}}` |
+| **claude.ai (Web Connector)** | Streamable HTTP | ✅ Supported | — (URL-only or OAuth) | ❌ Requires public `https://` (Cloudflare Tunnel / Tailscale Funnel) | Enter `https://<your-tunnel-domain>/mcp/<secret>` in **Settings → Connectors** |
 
-**Client Compatibility:**
+## Troubleshooting & Connection Diagnostics
 
-| Client         | Streamable HTTP | STDIO        | Notes                                  |
-| -------------- | --------------- | ------------ | -------------------------------------- |
-| Cursor         | ✅ Supported    | ✅ Supported | Use HTTP for remote, STDIO for local   |
-| Claude Desktop | ✅ Supported    | ✅ Supported | STDIO via `claude_desktop_config.json` |
-| GitHub Copilot | ✅ Supported    | —            | HTTP only                              |
-| Codex          | ✅ Supported    | ✅ Supported | Supports both transports               |
-| Windsurf       | ✅ Supported    | ✅ Supported | Supports both transports               |
-| Gemini CLI     | ✅ Supported    | ✅ Supported | Supports both transports               |
-| VS Code MCP    | ✅ Supported    | ✅ Supported | HTTP for remote, STDIO for local       |
+UMA records connection lifecycle counters in Prometheus (`/metrics`) under `mcp_connection_events_total{event="..."}` and writes redacted diagnostic messages to `/var/log/unraid-management-agent.log`.
 
-## Troubleshooting
-
-**"Connection refused":**
-
-- Verify the agent is running: `ps aux | grep unraid-management-agent`
-- Check the port is accessible: `netstat -tlnp | grep 8043`
-
-**"Tool not found":**
-
-- List available tools with the `tools/list` method
-- Check tool name spelling (use underscores, not hyphens)
-
-**"Action not confirmed":**
-
-- For destructive actions, include `"confirm": true` in the arguments
-
-**VS Code "Waiting for server to respond to initialize request":**
-
-- Ensure the agent is running and accessible from your machine
-- Check firewall rules allow connections to port 8043
-- Restart the MCP server: Command Palette → "MCP: Restart Server"
-
-**Cursor "No server info found":**
-
-- Use the Streamable HTTP endpoint: `http://your-unraid-ip:8043/mcp`
-- Ensure your config uses `"type": "http"` (not `"sse"`)
-- Update to the latest version of the agent which supports the MCP 2025-06-18 spec
+| Symptom | HTTP Status | Metric (`mcp_connection_events_total`) | Log Pattern in `/var/log/unraid-management-agent.log` | Resolution |
+| --- | --- | --- | --- | --- |
+| Missing or invalid `Bearer` token on `/mcp` | `401 Unauthorized` | `event="auth_rejected"` | `MCP connection rejected: category=auth method=<METHOD> path=/mcp` | Pass `Authorization: Bearer <API_TOKEN>` or use your `/mcp/<connect-secret>` Connect URL |
+| Mistyped or rotated `/mcp/<secret>` URL | `404 Not Found` | `event="not_found"` | `MCP connection rejected: category=not_found method=<METHOD> path=/mcp/<redacted>` | Copy the current Connect URL from **Settings → Unraid Management Agent → AI Agent Access (MCP)** and click **Apply** |
+| Disallowed browser `Origin` header | `403 Forbidden` | `event="origin_rejected"` | `MCP connection rejected: category=origin method=<METHOD> path=/mcp` | Ensure `CORS_ORIGIN` includes your custom web UI origin (non-browser CLI/desktop MCP clients omit `Origin` and are allowed automatically) |
+| Client probes `GET /mcp` without `Mcp-Session-Id` | `405 Method Not Allowed` (`Allow: POST, DELETE`) | — (normal spec probe) | `GET /mcp 405` | Expected per MCP Streamable HTTP specification; compliant clients automatically proceed with `POST /mcp` |
+| `GET /mcp` with `Mcp-Session-Id` hangs behind reverse proxy | Connection timeout | `event="initialize_ok"` (no SSE frames received) | `GET /mcp 200` | Add `proxy_buffering off; proxy_cache off; proxy_read_timeout 3600s;` to your Nginx/Traefik `/mcp` location block |
+| Healthy client handshake | `200 OK` | `event="initialize_ok"` + `event="tools_list_ok"` | `MCP session initialized: client=<name> version=<ver> requested_protocol=<proto> negotiated_protocol=<proto> category=initialize_ok` followed by `MCP session tools/list completed: visible_tools=<N> category=tools_list_ok` | Connection is healthy and ready for tool invocations |
 
 ## Related Documentation
 
-- [REST API Reference](api/API_REFERENCE.md)
-- [WebSocket Events](websocket/WEBSOCKET_EVENTS_DOCUMENTATION.md)
+- [MCP Onboarding Design Proposal](../design/mcp-onboarding.md)
+- [Claude Agent Skill & Setup Guide](claude/README.md)
+- [REST API Reference](../api/API_REFERENCE.md)
+- [WebSocket Events](../websocket/WEBSOCKET_EVENTS_DOCUMENTATION.md)
 - [MCP Protocol Specification](https://modelcontextprotocol.io/docs)

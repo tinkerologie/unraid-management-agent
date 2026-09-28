@@ -122,9 +122,13 @@ func (o *Orchestrator) Run() error {
 	if err := mcpServer.Initialize(); err != nil {
 		logger.Error("Failed to initialize MCP server: %v", err)
 	} else {
-		// Mount as PathPrefix handler — the StreamableHTTPHandler manages all HTTP methods internally
-		apiServer.GetRouter().PathPrefix("/mcp").Handler(mcpServer.GetHTTPHandler())
-		logger.Success("MCP server initialized at /mcp endpoint (official SDK, protocol 2025-06-18)")
+		// Mount exact /mcp, /mcp/, and optional /mcp/<secret> routes on the stateful StreamableHTTPHandler
+		apiServer.RegisterMCPRoutes(mcpServer.GetHTTPHandler())
+		if o.ctx.MCPConnectSecret != "" {
+			logger.Success("MCP server initialized at /mcp and /mcp/<redacted> (official SDK, per-session protocol negotiation: 2026-07-28, 2025-11-25, 2025-06-18, 2025-03-26, 2024-11-05)")
+		} else {
+			logger.Success("MCP server initialized at /mcp endpoint (official SDK, per-session protocol negotiation: 2026-07-28, 2025-11-25, 2025-06-18, 2025-03-26, 2024-11-05)")
+		}
 	}
 
 	// Initialize alerting engine
@@ -487,6 +491,7 @@ func (o *Orchestrator) initializeDiscovery(ctx context.Context) {
 	}
 
 	svc := discovery.NewService(o.ctx.DiscoveryConfig, hostname, o.ctx.Port, o.ctx.Version, o.ctx.BindAddress, o.ctx.TLSEnabled())
+	svc.SetAuthEnabled(o.ctx.APIToken != "")
 	if err := svc.Start(ctx); err != nil {
 		logger.Warning("Discovery service disabled: %v", err)
 		return

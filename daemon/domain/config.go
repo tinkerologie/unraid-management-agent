@@ -49,6 +49,12 @@ type Config struct {
 	// The field name contains "token", so lib.RedactStruct masks it in
 	// diagnostics output automatically.
 	APIToken string `json:"api_token,omitempty"`
+	// MCPConnectSecret, when non-empty, enables a secret-bearing MCP connect URL
+	// (/mcp/<secret>) that bypasses the bearer token check on an exact constant-time
+	// match. This provides ha-mcp style zero-config onboarding for URL-only MCP clients
+	// without exposing full REST API access. The field name contains "secret", so
+	// lib.RedactStruct masks it in diagnostics output automatically.
+	MCPConnectSecret string `json:"mcp_connect_secret,omitempty"`
 	// ReadOnly blocks all state-changing MCP tools so AI agents can only
 	// consume data. The REST API is unaffected.
 	ReadOnly bool `json:"read_only,omitempty"`

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Zero-config MCP onboarding (`ha-mcp` style)** — added optional path-based Connect URL authentication (`/mcp/<connect-secret>` via `--mcp-connect-secret` / `MCP_CONNECT_SECRET` / `mcp_connect_secret` in `config.yml`, validated as 32–256 chars of `[A-Za-z0-9_-]`) using constant-time SHA-256 digest comparison and automatic `/mcp/<redacted>` log masking; extended `_unraid-agent._tcp` mDNS TXT announcements with `mcp_path=/mcp`, `mcp_transport=streamable-http`, and `mcp_auth=bearer|none`; added `mcp_connection_events_total` Prometheus metrics and rate-limited handshake diagnostics; and added an interactive Connect Secret & Client Configuration Snippet generator in the Unraid WebGUI settings page supporting Claude Code, VS Code, Cursor, OpenAI Codex CLI, Gemini CLI, and Claude Desktop ([#165](https://github.com/ruaan-deysel/unraid-management-agent/issues/165)).
+
+### Fixed
+
+- **Streamable HTTP `GET /mcp` hanging indefinitely** — implemented `Flush()` (`http.Flusher`) and `Unwrap()` on `statusRecorder` in `loggingMiddleware` so `http.NewResponseController(w).Flush()` inside the MCP Go SDK reaches the underlying HTTP response writer, returned an immediate framed `405 Method Not Allowed` (`Allow: POST, DELETE`, `Content-Length`) for sessionless `GET /mcp` probes instead of stalling until server timeouts, and cleared per-request read/write deadlines via `http.ResponseController` on session-bound `GET /mcp` SSE streams ([#166](https://github.com/ruaan-deysel/unraid-management-agent/issues/166)).
+
 ## [2026.09.00] - 2026-09-23
 
 ### Added

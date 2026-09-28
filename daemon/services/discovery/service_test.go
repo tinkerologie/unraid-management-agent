@@ -75,20 +75,31 @@ func TestInstanceName(t *testing.T) {
 
 func TestTxtRecords(t *testing.T) {
 	tests := []struct {
-		name       string
-		tlsEnabled bool
-		wantScheme string
+		name        string
+		tlsEnabled  bool
+		authEnabled bool
+		wantScheme  string
+		wantMCPAuth string
 	}{
-		{name: "plain HTTP advertises scheme=http", tlsEnabled: false, wantScheme: "scheme=http"},
-		{name: "TLS enabled advertises scheme=https", tlsEnabled: true, wantScheme: "scheme=https"},
+		{name: "plain HTTP without auth advertises scheme=http and mcp_auth=none", tlsEnabled: false, authEnabled: false, wantScheme: "scheme=http", wantMCPAuth: "mcp_auth=none"},
+		{name: "TLS enabled with auth advertises scheme=https and mcp_auth=bearer", tlsEnabled: true, authEnabled: true, wantScheme: "scheme=https", wantMCPAuth: "mcp_auth=bearer"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := NewService(domain.DiscoveryConfig{Enabled: true}, "tower", 8043, "2026.06.01", "", tt.tlsEnabled)
+			s.SetAuthEnabled(tt.authEnabled)
 			got := s.txtRecords()
 
-			want := []string{"version=2026.06.01", "path=/api/v1", "name=tower", tt.wantScheme}
+			want := []string{
+				"version=2026.06.01",
+				"path=/api/v1",
+				"name=tower",
+				tt.wantScheme,
+				"mcp_path=/mcp",
+				"mcp_transport=streamable-http",
+				tt.wantMCPAuth,
+			}
 			if len(got) != len(want) {
 				t.Errorf("txtRecords() returned %d records (%v), want %d (%v)", len(got), got, len(want), want)
 			}
@@ -104,6 +115,12 @@ func TestTxtRecords(t *testing.T) {
 			}
 			if slices.Contains(got, otherScheme) {
 				t.Errorf("txtRecords() = %v, must not contain %q", got, otherScheme)
+			}
+			// Ensure no secret or token keys appear in mDNS TXT records.
+			for _, rec := range got {
+				if strings.Contains(rec, "secret") || strings.Contains(rec, "token") {
+					t.Errorf("txtRecords() must never expose secret or token fields, got %q", rec)
+				}
 			}
 		})
 	}

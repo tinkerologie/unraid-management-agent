@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -109,8 +110,16 @@ func (s *Server) setupRoutes() {
 	// Rate limiting precedes authentication so that unauthenticated floods are
 	// throttled before any credential comparison is performed.
 	s.router.Use(rateLimitMiddleware(newPerClientRateLimiter(rate.Limit(rateLimitPerSecond), rateLimitBurst)))
-	s.router.Use(authMiddleware(s.ctx.APIToken))
+	s.router.Use(authMiddlewareWithMCPSecret(s.ctx.APIToken, s.ctx.MCPConnectSecret))
 	s.router.Use(loggingMiddleware)
+
+	s.router.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if isMCPPath(r.URL) {
+			RecordMCPConnectionEvent("not_found")
+			logMCPRejection("not_found", r.Method, r.URL.Path)
+		}
+		http.NotFound(w, r)
+	})
 
 	// Prometheus metrics endpoint (at root level, no /api/v1 prefix)
 	s.router.HandleFunc("/metrics", s.handleMetrics).Methods("GET")
@@ -362,6 +371,20 @@ func (s *Server) setupRoutes() {
 
 	// WebSocket endpoint
 	api.HandleFunc("/ws", s.handleWebSocket)
+}
+
+// RegisterMCPRoutes mounts the Streamable HTTP MCP handler at exact "/mcp",
+// "/mcp/", and (when MCPConnectSecret is configured) "/mcp/<secret>". Unmatched
+// paths such as "/mcpx" or "/mcp/<wrong>" fall through to NotFoundHandler (404).
+func (s *Server) RegisterMCPRoutes(handler http.Handler) {
+	if handler == nil {
+		return
+	}
+	s.router.Handle("/mcp", handler)
+	s.router.Handle("/mcp/", handler)
+	if secret := strings.TrimSpace(s.ctx.MCPConnectSecret); secret != "" {
+		s.router.Handle("/mcp/"+secret, handler)
+	}
 }
 
 // StartSubscriptions initializes event subscriptions and WebSocket hub.

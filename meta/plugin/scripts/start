@@ -35,6 +35,7 @@ PORT="${PORT:-8043}"
 BIND_ADDRESS="${BIND_ADDRESS:-}"
 READ_ONLY="${READ_ONLY:-false}"
 API_TOKEN="${API_TOKEN:-}"
+MCP_CONNECT_SECRET="${MCP_CONNECT_SECRET:-}"
 TOOL_POLICY="${TOOL_POLICY:-}"
 LOG_LEVEL="${LOG_LEVEL:-info}"
 # Defaults follow industry standards (Zabbix, Prometheus, Datadog)
@@ -70,6 +71,7 @@ PORT=$(sanitize_int "$PORT");                       PORT="${PORT:-8043}"
 # The daemon validates the value and falls back to all interfaces if invalid.
 BIND_ADDRESS=$(echo "$BIND_ADDRESS" | tr -cd '0-9a-fA-F.:')
 READ_ONLY=$(sanitize_bool "$READ_ONLY")
+MCP_CONNECT_SECRET=$(echo "$MCP_CONNECT_SECRET" | tr -cd 'A-Za-z0-9_-')
 TOOL_POLICY=$(echo "$TOOL_POLICY" | tr -cd 'a-zA-Z0-9,_=-')
 LOG_LEVEL=$(echo "$LOG_LEVEL" | grep -xE 'debug|info|warning|error' || echo "info")
 LOG_LEVEL="${LOG_LEVEL:-info}"
@@ -136,6 +138,7 @@ nohup env \
   BIND_ADDRESS="$BIND_ADDRESS" \
   READ_ONLY="$READ_ONLY" \
   API_TOKEN="$API_TOKEN" \
+  MCP_CONNECT_SECRET="$MCP_CONNECT_SECRET" \
   TOOL_POLICY="$TOOL_POLICY" \
   INTERVAL_SYSTEM="$INTERVAL_SYSTEM" \
   INTERVAL_ARRAY="$INTERVAL_ARRAY" \

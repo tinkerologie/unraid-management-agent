@@ -922,3 +922,28 @@ func TestValidateNotificationImportance(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateMCPConnectSecret(t *testing.T) {
+	tests := []struct {
+		name    string
+		secret  string
+		wantErr bool
+	}{
+		{name: "empty secret is valid (disabled)", secret: "", wantErr: false},
+		{name: "valid 64-char hex secret", secret: strings.Repeat("a1b2", 16), wantErr: false},
+		{name: "valid URL-safe base64-like secret", secret: "mcp_secret-0123456789_ABCDEFGHIJKLMNOPQRSTUVWXYZ", wantErr: false},
+		{name: "too short (<32 chars)", secret: "short_secret_123", wantErr: true},
+		{name: "too long (>256 chars)", secret: strings.Repeat("a", 257), wantErr: true},
+		{name: "leading/trailing whitespace", secret: " " + strings.Repeat("a", 32), wantErr: true},
+		{name: "contains slash (path traversal)", secret: strings.Repeat("a", 16) + "/" + strings.Repeat("b", 16), wantErr: true},
+		{name: "contains query char", secret: strings.Repeat("a", 16) + "?" + strings.Repeat("b", 16), wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := ValidateMCPConnectSecret(tt.secret); (err != nil) != tt.wantErr {
+				t.Errorf("ValidateMCPConnectSecret(%q) error = %v, wantErr %v", tt.secret, err, tt.wantErr)
+			}
+		})
+	}
+}

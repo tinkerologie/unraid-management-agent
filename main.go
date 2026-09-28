@@ -71,6 +71,10 @@ var cli struct {
 	// file over the flag: command-line arguments are visible in the process list.
 	APIToken string `default:"" env:"API_TOKEN" help:"require bearer-token auth on the HTTP API and /mcp; the health endpoint and Swagger UI stay open (empty = no authentication). Prefer the API_TOKEN env var or config file: flags are visible in the process list"`
 
+	// MCPConnectSecret enables an optional secret-bearing MCP path (/mcp/<secret>)
+	// for URL-only MCP clients (ha-mcp style onboarding) without exposing full REST API access.
+	MCPConnectSecret string `default:"" env:"MCP_CONNECT_SECRET" help:"optional URL-safe secret (>=32 chars) enabling the /mcp/<secret> connect URL without bearer headers"`
+
 	// TLS: serve HTTPS (incl. the /mcp endpoint) when both files are provided
 	TLSCertFile string `default:"" env:"TLS_CERT_FILE" help:"path to a PEM TLS certificate file (enables HTTPS when set with --tls-key-file)"`
 	TLSKeyFile  string `default:"" env:"TLS_KEY_FILE" help:"path to a PEM TLS private key file (enables HTTPS when set with --tls-cert-file)"`
@@ -250,6 +254,20 @@ func main() {
 		logger.Info("API authentication enabled: requests require a bearer token (health endpoint and Swagger UI remain open)")
 	}
 
+	// Validate the optional MCP connect secret. An invalid secret disables the
+	// secret connect URL and logs a warning without exposing the secret value,
+	// while keeping the agent and standard /mcp endpoint available.
+	if err := lib.ValidateMCPConnectSecret(cli.MCPConnectSecret); err != nil {
+		logger.Warning("Invalid MCP connect secret configuration (%v); disabling /mcp/<secret> connect URL", err)
+		cli.MCPConnectSecret = ""
+	} else if cli.MCPConnectSecret != "" {
+		if cli.APIToken == "" {
+			logger.Warning("MCP connect secret is configured, but API_TOKEN is empty: /mcp and REST endpoints remain open without authentication")
+		} else {
+			logger.Info("MCP connect URL enabled (/mcp/<redacted>)")
+		}
+	}
+
 	if cli.ReadOnly {
 		logger.Info("Read-only mode enabled: all state-changing MCP tools are blocked")
 	}
@@ -322,17 +340,18 @@ func main() {
 
 	// Create application context with intervals from CLI/env
 	appCtx := &domain.Context{
-		Version:     Version,
-		Port:        cli.Port,
-		BindAddress: cli.BindAddress,
-		CORSOrigin:  cli.CORSOrigin,
-		APIToken:    cli.APIToken,
-		ReadOnly:    cli.ReadOnly,
-		TLSCertFile: cli.TLSCertFile,
-		TLSKeyFile:  cli.TLSKeyFile,
-		ToolPolicy:  toolPolicy,
-		Hub:         domain.NewEventBus(1024), // Buffer size for event bus
-		Platform:    platform.NewRegistry(),
+		Version:          Version,
+		Port:             cli.Port,
+		BindAddress:      cli.BindAddress,
+		CORSOrigin:       cli.CORSOrigin,
+		APIToken:         cli.APIToken,
+		MCPConnectSecret: cli.MCPConnectSecret,
+		ReadOnly:         cli.ReadOnly,
+		TLSCertFile:      cli.TLSCertFile,
+		TLSKeyFile:       cli.TLSKeyFile,
+		ToolPolicy:       toolPolicy,
+		Hub:              domain.NewEventBus(1024), // Buffer size for event bus
+		Platform:         platform.NewRegistry(),
 		MQTTConfig: domain.MQTTConfig{
 			Enabled:             cli.MQTTEnabled,
 			Broker:              cli.MQTTBroker,
@@ -430,6 +449,7 @@ func applyFileConfig(cfg *domain.FileConfig) {
 	setStr(&cli.DisableCollectors, cfg.DisableCollectors)
 	setStr(&cli.CORSOrigin, cfg.CORSOrigin)
 	setStr(&cli.APIToken, cfg.APIToken)
+	setStr(&cli.MCPConnectSecret, cfg.MCPConnectSecret)
 	setStr(&cli.TLSCertFile, cfg.TLSCertFile)
 	setStr(&cli.TLSKeyFile, cfg.TLSKeyFile)
 

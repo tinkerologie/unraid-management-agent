@@ -28,6 +28,7 @@ type Service struct {
 	version     string
 	bindAddress string
 	tlsEnabled  bool
+	authEnabled bool
 
 	mu     sync.Mutex
 	server *zeroconf.Server
@@ -51,6 +52,13 @@ func NewService(config domain.DiscoveryConfig, hostname string, port int, versio
 	}
 }
 
+// SetAuthEnabled configures whether the agent requires bearer authentication
+// on HTTP and MCP endpoints so mDNS TXT metadata can advertise mcp_auth=bearer|none
+// without ever publishing any token or connect secret.
+func (s *Service) SetAuthEnabled(enabled bool) {
+	s.authEnabled = enabled
+}
+
 // instanceName returns the advertised mDNS instance name, preferring the
 // configured override and falling back to the system hostname.
 func (s *Service) instanceName() string {
@@ -61,18 +69,25 @@ func (s *Service) instanceName() string {
 }
 
 // txtRecords returns the TXT records published with the service. They give
-// integrations rich metadata (version + API path + friendly name) without an
-// extra HTTP round-trip during discovery.
+// integrations rich metadata (version + API path + friendly name + MCP metadata)
+// without an extra HTTP round-trip during discovery. Secrets are never included.
 func (s *Service) txtRecords() []string {
 	scheme := "http"
 	if s.tlsEnabled {
 		scheme = "https"
+	}
+	mcpAuth := "none"
+	if s.authEnabled {
+		mcpAuth = "bearer"
 	}
 	return []string{
 		"version=" + s.version,
 		"path=/api/v1",
 		"name=" + s.hostname,
 		"scheme=" + scheme,
+		"mcp_path=/mcp",
+		"mcp_transport=streamable-http",
+		"mcp_auth=" + mcpAuth,
 	}
 }
 

@@ -349,17 +349,24 @@ func TestMCPEndpointHandler(t *testing.T) {
 		t.Fatalf("failed to initialize server: %v", err)
 	}
 
-	// Test that handler responds to requests
+	// Sessionless GET must return a complete 405 with Allow and explicit Content-Length
 	req, _ := http.NewRequest("GET", "/mcp", nil)
 	rr := httptest.NewRecorder()
 
 	handler := server.GetHTTPHandler()
+	if handler == nil {
+		t.Fatal("expected handler to be returned")
+	}
 	handler.ServeHTTP(rr, req)
 
-	// The StreamableHTTPHandler handles all HTTP methods internally
-	// We're testing that the handler is functional
-	if handler == nil {
-		t.Error("expected handler to be returned")
+	if rr.Code != http.StatusMethodNotAllowed {
+		t.Errorf("GET /mcp without session status = %d, want %d", rr.Code, http.StatusMethodNotAllowed)
+	}
+	if got := rr.Header().Get("Allow"); got != "POST, DELETE" {
+		t.Errorf("Allow header = %q, want %q", got, "POST, DELETE")
+	}
+	if got := rr.Header().Get("Content-Length"); got == "" || got == "0" {
+		t.Errorf("Content-Length = %q, want non-zero explicit length", got)
 	}
 }
 

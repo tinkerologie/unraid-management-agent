@@ -2,6 +2,7 @@ package api
 
 import (
 	"bufio"
+	"crypto/sha256"
 	"crypto/subtle"
 	"fmt"
 	"net"
@@ -65,6 +66,57 @@ func isAuthExempt(u *url.URL) bool {
 	return u.Path == healthPath || strings.HasPrefix(u.Path, swaggerPathPrefix)
 }
 
+// isMCPPath reports whether the URL targets the MCP endpoint or a sub-path.
+func isMCPPath(u *url.URL) bool {
+	if u == nil {
+		return false
+	}
+	return u.Path == "/mcp" || strings.HasPrefix(u.Path, "/mcp/")
+}
+
+// isMCPConnectSecretExempt reports whether u.Path is the exact single-segment
+// path "/mcp/<secret>" matching expectedSecret in constant time without leaking
+// the configured secret's length.
+//
+// Security note: MCP_CONNECT_SECRET enables header-free access to the MCP
+// endpoint only (it is not equivalent to API_TOKEN and never grants access to
+// REST API routes). Because the secret is carried in the URL path, it acts as a
+// reusable bearer credential that may be stored in client configs or proxy logs
+// and exposed on the wire over plain HTTP; use HTTPS for remote connections and
+// enable read_only mode (or per-tool policies) if connected AI clients should
+// not invoke state-changing MCP tools.
+func isMCPConnectSecretExempt(u *url.URL, expectedSecret []byte) bool {
+	if u == nil || len(expectedSecret) == 0 || !strings.HasPrefix(u.Path, "/mcp/") {
+		return false
+	}
+	seg := strings.TrimPrefix(u.Path, "/mcp/")
+	if seg == "" || strings.Contains(seg, "/") {
+		return false
+	}
+	segHash := sha256.Sum256([]byte(seg))
+	expectedHash := sha256.Sum256(expectedSecret)
+	return subtle.ConstantTimeCompare(segHash[:], expectedHash[:]) == 1
+}
+
+// redactMCPPath replaces any credential segment after "/mcp/" with "/mcp/<redacted>"
+// so secret connect URLs (and near-miss typos) never appear in request or error logs.
+func redactMCPPath(path string) string {
+	if strings.HasPrefix(path, "/mcp/") && len(path) > len("/mcp/") {
+		return "/mcp/<redacted>"
+	}
+	return path
+}
+
+// mcpRejectionLogLimiter rate-limits info-level MCP rejection logs so a
+// misconfigured polling client cannot flood the log file.
+var mcpRejectionLogLimiter = rate.NewLimiter(rate.Every(5*time.Second), 5)
+
+func logMCPRejection(category, method, path string) {
+	if mcpRejectionLogLimiter.Allow() {
+		logger.Info("MCP connection rejected: category=%s method=%s path=%s", category, method, redactMCPPath(path))
+	}
+}
+
 // authMiddleware requires "Authorization: Bearer <token>" on every request when
 // an API token is configured, except for the health endpoint and the Swagger UI
 // (see isAuthExempt). When the token is empty the middleware is a no-op, so
@@ -74,11 +126,27 @@ func isAuthExempt(u *url.URL) bool {
 // short-circuits OPTIONS. That matters because browsers do not send
 // Authorization on a preflight, so requiring it here would break legitimate
 // cross-origin clients.
-func authMiddleware(token string) mux.MiddlewareFunc {
+// authMiddlewareWithMCPSecret enforces Bearer token authentication when token
+// is non-empty, with an optional MCP-only connect secret. When mcpConnectSecret
+// is non-empty, requests to the exact path "/mcp/<mcpConnectSecret>" bypass the
+// bearer check on a constant-time match.
+func authMiddlewareWithMCPSecret(token, mcpConnectSecret string) mux.MiddlewareFunc {
 	expected := []byte(strings.TrimSpace(token))
+	expectedSecret := []byte(strings.TrimSpace(mcpConnectSecret))
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL != nil && strings.HasPrefix(r.URL.Path, "/mcp/") && r.URL.Path != "/mcp/" {
+				if isMCPConnectSecretExempt(r.URL, expectedSecret) {
+					next.ServeHTTP(w, r)
+					return
+				}
+				RecordMCPConnectionEvent("not_found")
+				logMCPRejection("not_found", r.Method, r.URL.Path)
+				http.NotFound(w, r)
+				return
+			}
+
 			if len(expected) == 0 {
 				next.ServeHTTP(w, r)
 				return
@@ -94,7 +162,13 @@ func authMiddleware(token string) mux.MiddlewareFunc {
 			// mismatch is rejected without leaking timing information about
 			// the token's contents.
 			if subtle.ConstantTimeCompare([]byte(presented), expected) != 1 {
-				logger.Debug("Rejected unauthenticated request: %s %s", r.Method, r.URL.Path)
+				safePath := redactMCPPath(r.URL.Path)
+				if isMCPPath(r.URL) {
+					RecordMCPConnectionEvent("auth_rejected")
+					logMCPRejection("auth", r.Method, safePath)
+				} else {
+					logger.Debug("Rejected unauthenticated request: %s %s", r.Method, safePath)
+				}
 				w.Header().Set("WWW-Authenticate", `Bearer realm="unraid-management-agent"`)
 				respondJSON(w, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
 				return
@@ -118,7 +192,8 @@ func bearerToken(r *http.Request) string {
 }
 
 // statusRecorder wraps http.ResponseWriter to capture the response status code.
-// It preserves the http.Hijacker interface so that WebSocket upgrades still work.
+// It preserves the http.Hijacker and http.Flusher interfaces and supports
+// http.ResponseController unwrapping so WebSocket upgrades and MCP SSE streams work.
 type statusRecorder struct {
 	http.ResponseWriter
 	status int
@@ -127,6 +202,20 @@ type statusRecorder struct {
 func (sr *statusRecorder) WriteHeader(code int) {
 	sr.status = code
 	sr.ResponseWriter.WriteHeader(code)
+}
+
+// Flush delegates to the underlying ResponseWriter when it implements http.Flusher,
+// enabling immediate delivery of SSE headers and chunks for streaming endpoints.
+func (sr *statusRecorder) Flush() {
+	if f, ok := sr.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+// Unwrap returns the underlying ResponseWriter so http.ResponseController can
+// reach the connection for Flush, SetReadDeadline, and SetWriteDeadline.
+func (sr *statusRecorder) Unwrap() http.ResponseWriter {
+	return sr.ResponseWriter
 }
 
 // Hijack delegates to the underlying ResponseWriter's Hijack method
@@ -143,7 +232,7 @@ func loggingMiddleware(next http.Handler) http.Handler {
 		start := time.Now()
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rec, r)
-		logger.Debug("%s %s %d %v", r.Method, r.URL.Path, rec.status, time.Since(start))
+		logger.Debug("%s %s %d %v", r.Method, redactMCPPath(r.URL.Path), rec.status, time.Since(start))
 	})
 }
 
@@ -290,7 +379,7 @@ func rateLimitMiddleware(p *perClientRateLimiter) mux.MiddlewareFunc {
 			if !p.allow(key) {
 				// Log rejections so clients hitting the limit are diagnosable;
 				// rate-limited requests short-circuit before loggingMiddleware.
-				logger.Debug("Rate limit exceeded for client %s: %s %s", key, r.Method, r.URL.Path)
+				logger.Debug("Rate limit exceeded for client %s: %s %s", key, r.Method, redactMCPPath(r.URL.Path))
 				http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
 				return
 			}
@@ -326,6 +415,10 @@ func csrfMiddleware(allowedOrigin string) mux.MiddlewareFunc {
 			// Parse and validate origin
 			parsed, err := url.Parse(origin)
 			if err != nil {
+				if isMCPPath(r.URL) {
+					RecordMCPConnectionEvent("origin_rejected")
+					logMCPRejection("origin", r.Method, r.URL.Path)
+				}
 				respondJSON(w, http.StatusForbidden, map[string]string{"error": "Forbidden: invalid origin"})
 				return
 			}
@@ -335,6 +428,10 @@ func csrfMiddleware(allowedOrigin string) mux.MiddlewareFunc {
 				if origin == allowedOrigin {
 					next.ServeHTTP(w, r)
 					return
+				}
+				if isMCPPath(r.URL) {
+					RecordMCPConnectionEvent("origin_rejected")
+					logMCPRejection("origin", r.Method, r.URL.Path)
 				}
 				respondJSON(w, http.StatusForbidden, map[string]string{"error": "Forbidden: origin not allowed"})
 				return
@@ -388,6 +485,10 @@ func csrfMiddleware(allowedOrigin string) mux.MiddlewareFunc {
 				}
 			}
 
+			if isMCPPath(r.URL) {
+				RecordMCPConnectionEvent("origin_rejected")
+				logMCPRejection("origin", r.Method, r.URL.Path)
+			}
 			respondJSON(w, http.StatusForbidden, map[string]string{"error": "Forbidden: origin not allowed"})
 		})
 	}

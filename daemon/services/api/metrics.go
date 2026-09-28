@@ -294,7 +294,29 @@ var (
 		Name: "unraid_degraded_subsystem_count",
 		Help: "Number of subsystems whose data source is not healthy",
 	})
+	mcpConnectionEvents = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "mcp_connection_events_total",
+		Help: "Total MCP connection and handshake events by bounded category (initialize_ok, initialize_error, auth_rejected, origin_rejected, not_found, tools_list_ok)",
+	}, []string{"event"})
 )
+
+var allowedMCPConnectionEvents = map[string]bool{
+	"initialize_ok":    true,
+	"initialize_error": true,
+	"auth_rejected":    true,
+	"origin_rejected":  true,
+	"not_found":        true,
+	"tools_list_ok":    true,
+}
+
+// RecordMCPConnectionEvent increments the bounded MCP connection event counter.
+// Unknown event labels are ignored so cardinality stays strictly bounded.
+func RecordMCPConnectionEvent(event string) {
+	if !allowedMCPConnectionEvents[event] {
+		return
+	}
+	mcpConnectionEvents.WithLabelValues(event).Inc()
+}
 
 // metricsRegistry is a custom registry for Unraid metrics
 var metricsRegistry = prometheus.NewRegistry()
@@ -305,6 +327,7 @@ func init() {
 		// OS-resilience
 		subsystemStatus,
 		degradedSubsystemCount,
+		mcpConnectionEvents,
 		// System
 		systemInfo,
 		systemUptime,
@@ -370,6 +393,10 @@ func init() {
 		collectors.NewGoCollector(),
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
 	)
+
+	for ev := range allowedMCPConnectionEvents {
+		mcpConnectionEvents.WithLabelValues(ev).Add(0)
+	}
 }
 
 // updateMetrics updates all Prometheus metrics from the server's cache

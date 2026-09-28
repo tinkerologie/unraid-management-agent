@@ -36,9 +36,99 @@
   register: mcp_init_headers
   changed_when: false
 
-- name: "MCP: Parse session ID"
+- name: "MCP: Parse session ID and initialize result"
   ansible.builtin.set_fact:
-    mcp_session_id: "{{ mcp_init_headers.stdout | regex_search('Mcp-Session-Id:\\s*(.+)', '\\1') | first | default('') | trim }}"
+    mcp_session_id: "{{ mcp_init_headers.stdout | regex_search('(?i)Mcp-Session-Id:\\s*(.+)', '\\1') | first | default('') | trim }}"
+    mcp_init_data: "{{ mcp_init_headers.stdout | regex_search('data:\\s*({.*})', '\\1') | first | default('{}') | from_json }}"
+
+- name: "MCP: Verify session ID and negotiated protocol capabilities"
+  ansible.builtin.assert:
+    that:
+      - mcp_session_id | length > 0
+      - mcp_init_data.result is defined
+      - mcp_init_data.result.protocolVersion in ['2026-07-28', '2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05']
+      - mcp_init_data.result.capabilities.tools is defined
+    fail_msg: "MCP initialize missing Mcp-Session-Id or invalid protocol/capabilities"
+    success_msg: "MCP initialize negotiated protocol {{ mcp_init_data.result.protocolVersion }} (session {{ mcp_session_id }})"
+
+- name: "MCP: Verify sessionless GET /mcp returns 405 immediately without hanging (#166)"
+  delegate_to: localhost
+  ansible.builtin.command:
+    cmd: >
+      curl -s -D - --max-time 5
+      -H "Accept: text/event-stream"
+      {{ ('-H "Authorization: Bearer ' ~ api_token ~ '"') if (api_token is defined and (api_token | length > 0)) else '' }}
+      http://{{ ansible_host }}:{{ api_port }}/mcp
+  register: mcp_get_no_session
+  changed_when: false
+
+- name: "MCP: Assert sessionless GET /mcp returned 405 with Allow: POST, DELETE"
+  ansible.builtin.assert:
+    that:
+      - "'405' in mcp_get_no_session.stdout_lines[0]"
+      - "mcp_get_no_session.stdout is search('(?i)Allow:\\s*POST,\\s*DELETE')"
+    fail_msg: "Sessionless GET /mcp did not return 405 with Allow: POST, DELETE: {{ mcp_get_no_session.stdout_lines | first | default('') }}"
+    success_msg: "Sessionless GET /mcp returned HTTP 405 Method Not Allowed immediately"
+
+- name: "MCP: Verify GET /mcp with valid Mcp-Session-Id flushes SSE stream immediately (#166)"
+  delegate_to: localhost
+  ansible.builtin.command:
+    cmd: >
+      curl -s -N --max-time 2
+      -H "Accept: text/event-stream"
+      -H "Mcp-Session-Id: {{ mcp_session_id }}"
+      {{ ('-H "Authorization: Bearer ' ~ api_token ~ '"') if (api_token is defined and (api_token | length > 0)) else '' }}
+      http://{{ ansible_host }}:{{ api_port }}/mcp
+  register: mcp_get_sse
+  changed_when: false
+  failed_when: mcp_get_sse.rc not in [0, 28]
+
+- name: "MCP: Assert GET /mcp SSE stream flushed initial ': ok' frame"
+  ansible.builtin.assert:
+    that:
+      - "': ok' in mcp_get_sse.stdout"
+    fail_msg: "GET /mcp with valid session did not flush initial ': ok' SSE frame (stdout={{ mcp_get_sse.stdout }})"
+    success_msg: "GET /mcp SSE stream flushed ': ok' immediately"
+
+- name: "MCP: Verify unknown /mcp/<wrong> path returns 404 Not Found (#165)"
+  delegate_to: localhost
+  ansible.builtin.command:
+    cmd: >
+      curl -s -o /dev/null -w "%{http_code}" -X POST
+      -H "Content-Type: application/json"
+      -H "Accept: application/json, text/event-stream"
+      -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"wrong-secret-probe","version":"1.0"}}}'
+      http://{{ ansible_host }}:{{ api_port }}/mcp/invalid-secret-probe-0123456789abcdef
+  register: mcp_wrong_secret_code
+  changed_when: false
+
+- name: "MCP: Assert /mcp/<wrong> returned 404"
+  ansible.builtin.assert:
+    that:
+      - mcp_wrong_secret_code.stdout | trim == '404'
+    fail_msg: "Expected 404 for /mcp/<wrong>, got {{ mcp_wrong_secret_code.stdout }}"
+    success_msg: "/mcp/<wrong> returned HTTP 404 Not Found"
+
+- name: "MCP: Verify header-free Connect URL when mcp_connect_secret is defined (#165)"
+  delegate_to: localhost
+  ansible.builtin.command:
+    cmd: >
+      curl -s -o /dev/null -w "%{http_code}" -X POST
+      -H "Content-Type: application/json"
+      -H "Accept: application/json, text/event-stream"
+      -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"connect-secret-verify","version":"1.0"}}}'
+      http://{{ ansible_host }}:{{ api_port }}/mcp/{{ mcp_connect_secret }}
+  register: mcp_connect_secret_code
+  changed_when: false
+  when: mcp_connect_secret is defined and (mcp_connect_secret | length >= 32)
+
+- name: "MCP: Assert header-free Connect URL returned 200"
+  ansible.builtin.assert:
+    that:
+      - mcp_connect_secret_code.stdout | trim == '200'
+    fail_msg: "Expected 200 for /mcp/<connect-secret>, got {{ mcp_connect_secret_code.stdout }}"
+    success_msg: "Header-free /mcp/<connect-secret> initialize succeeded (HTTP 200)"
+  when: mcp_connect_secret is defined and (mcp_connect_secret | length >= 32)
 
 - name: "MCP: List tools"
   delegate_to: localhost
@@ -52,12 +142,10 @@
       http://{{ ansible_host }}:{{ api_port }}/mcp
   register: mcp_tools_raw
   changed_when: false
-  when: mcp_session_id | length > 0
 
 - name: "MCP: Parse tools response"
   ansible.builtin.set_fact:
     mcp_tools_data: "{{ mcp_tools_raw.stdout | regex_search('data:\\s*({.*})', '\\1') | first | default('{}') | from_json }}"
-  when: mcp_tools_raw is not skipped
 
 - name: "MCP: Verify tools count"
   vars:

@@ -37,6 +37,9 @@ type FileConfig struct {
 	// APIToken enables bearer-token authentication when non-empty.
 	APIToken *string `yaml:"api_token,omitempty"`
 
+	// MCPConnectSecret enables the secret-bearing MCP connect URL (/mcp/<secret>) when non-empty.
+	MCPConnectSecret *string `yaml:"mcp_connect_secret,omitempty"`
+
 	// TLS: serve HTTPS when both a certificate and key file are provided.
 	TLSCertFile *string `yaml:"tls_cert_file,omitempty"`
 	TLSKeyFile  *string `yaml:"tls_key_file,omitempty"`

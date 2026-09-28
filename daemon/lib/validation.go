@@ -495,6 +495,34 @@ func ValidateAPIToken(token string) error {
 	return nil
 }
 
+// mcpConnectSecretRegex allows URL-safe base64/hex/slug characters only so the
+// secret can be embedded in a single URL path segment (/mcp/<secret>) without
+// percent-encoding, query-string ambiguity, or path traversal.
+var mcpConnectSecretRegex = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+
+// ValidateMCPConnectSecret validates the optional MCP connect secret used for
+// the /mcp/<secret> onboarding URL. An empty secret is valid and means the
+// secret-path connect URL is disabled. When non-empty, the secret must be
+// 32 to 256 characters long and contain only URL-safe characters ([A-Za-z0-9_-]).
+func ValidateMCPConnectSecret(secret string) error {
+	if secret == "" {
+		return nil
+	}
+	if strings.TrimSpace(secret) != secret {
+		return errors.New("mcp connect secret has leading or trailing whitespace")
+	}
+	if len(secret) < 32 {
+		return fmt.Errorf("mcp connect secret must be at least 32 characters long (got %d)", len(secret))
+	}
+	if len(secret) > 256 {
+		return fmt.Errorf("mcp connect secret exceeds maximum length of 256 characters (got %d)", len(secret))
+	}
+	if !mcpConnectSecretRegex.MatchString(secret) {
+		return errors.New("mcp connect secret must contain only URL-safe alphanumeric characters, hyphens, and underscores ([A-Za-z0-9_-])")
+	}
+	return nil
+}
+
 // ValidateTLSConfig validates the optional HTTPS certificate/key configuration.
 // TLS is treated as enabled only when both paths are supplied; supplying just
 // one is a misconfiguration. Each path is checked defensively and the pair must

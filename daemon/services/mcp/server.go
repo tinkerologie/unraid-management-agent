@@ -9,6 +9,9 @@
 // StreamableHTTPOptions.Stateless = true: each request gets a temporary session, GET/DELETE return
 // 405, and server->client requests are rejected (in-request notifications still work). It is left
 // off here so existing session-based clients are unaffected.
+// GetHTTPHandler wraps the stateful SDK handler to return an explicitly framed 405 Method Not Allowed
+// (Allow: POST, DELETE) for sessionless GET probes and clears server read/write deadlines via
+// http.ResponseController for valid-session SSE GET streams so long-lived streams do not time out.
 // Supports two transports:
 //   - Streamable HTTP: for remote connections (Claude, ChatGPT, Cursor, Copilot, Codex, Windsurf, Gemini, etc.)
 //   - STDIO: for local connections on the Unraid server (newline-delimited JSON over stdin/stdout)
@@ -18,9 +21,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -93,20 +99,21 @@ type SystemControllerInterface interface {
 
 // Server represents the MCP server that exposes Unraid capabilities to AI agents.
 type Server struct {
-	ctx              *domain.Context
-	mcpServer        *mcp.Server
-	httpHandler      *mcp.StreamableHTTPHandler
-	cacheProvider    CacheProvider
-	alertEngine      *alerting.Engine
-	alertStore       *alerting.Store
-	watchdogRunner   *watchdog.Runner
-	watchdogStore    *watchdog.Store
-	systemController SystemControllerInterface
-	fanController    *controllers.FanController
-	cpuController    *controllers.CPUController
-	tuningController *controllers.TuningController
-	agentSvc         *agent.Service
-	toolPolicyStore  *ToolPolicyStore
+	ctx                     *domain.Context
+	mcpServer               *mcp.Server
+	httpHandler             *mcp.StreamableHTTPHandler
+	cacheProvider           CacheProvider
+	alertEngine             *alerting.Engine
+	alertStore              *alerting.Store
+	watchdogRunner          *watchdog.Runner
+	watchdogStore           *watchdog.Store
+	systemController        SystemControllerInterface
+	fanController           *controllers.FanController
+	cpuController           *controllers.CPUController
+	tuningController        *controllers.TuningController
+	agentSvc                *agent.Service
+	toolPolicyStore         *ToolPolicyStore
+	toolsListLoggedSessions sync.Map
 }
 
 // NewServer creates a new MCP server instance.
@@ -159,6 +166,7 @@ func (s *Server) Initialize() error {
 	)
 
 	// Add receiving middleware for hidden tools enforcement (protocol compliance)
+	// and secret-safe connection/handshake diagnostics.
 	s.mcpServer.AddReceivingMiddleware(func(next mcp.MethodHandler) mcp.MethodHandler {
 		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
 			if method == "tools/call" {
@@ -170,20 +178,101 @@ func (s *Server) Initialize() error {
 				}
 			}
 
+			var clientName, clientVersion, reqProto string
+			if method == "initialize" {
+				if initReq, ok := req.(*mcp.InitializeRequest); ok && initReq.Params != nil {
+					reqProto = initReq.Params.ProtocolVersion
+					if initReq.Params.ClientInfo != nil {
+						clientName = initReq.Params.ClientInfo.Name
+						clientVersion = initReq.Params.ClientInfo.Version
+					}
+				}
+				if clientName == "" {
+					clientName = "unknown"
+				}
+				if clientVersion == "" {
+					clientVersion = "unknown"
+				}
+			}
+
 			res, err := next(ctx, method, req)
 			if err != nil {
+				if method == "initialize" {
+					api.RecordMCPConnectionEvent("initialize_error")
+					logger.Info("MCP session initialize failed: client=%s version=%s requested_protocol=%s category=initialize_error",
+						clientName, clientVersion, reqProto)
+					if s.ctx != nil && s.ctx.DiagnosticLogger != nil {
+						s.ctx.DiagnosticLogger.Log(ctx, "INFO", "MCP session initialize failed", map[string]any{
+							"category":           "initialize_error",
+							"client_name":        clientName,
+							"client_version":     clientVersion,
+							"requested_protocol": reqProto,
+						})
+					}
+				}
 				return nil, err
 			}
 
+			if method == "initialize" {
+				negProto := ""
+				if initRes, ok := res.(*mcp.InitializeResult); ok && initRes != nil {
+					negProto = initRes.ProtocolVersion
+				}
+				api.RecordMCPConnectionEvent("initialize_ok")
+				logger.Info("MCP session initialized: client=%s version=%s requested_protocol=%s negotiated_protocol=%s category=initialize_ok",
+					clientName, clientVersion, reqProto, negProto)
+				if s.ctx != nil && s.ctx.DiagnosticLogger != nil {
+					s.ctx.DiagnosticLogger.Log(ctx, "INFO", "MCP session initialized", map[string]any{
+						"category":            "initialize_ok",
+						"client_name":         clientName,
+						"client_version":      clientVersion,
+						"requested_protocol":  reqProto,
+						"negotiated_protocol": negProto,
+					})
+				}
+			}
+
 			if method == "tools/list" {
-				if lr, ok := res.(*mcp.ListToolsResult); ok && lr.Tools != nil && s.toolPolicyStore != nil {
-					filtered := make([]*mcp.Tool, 0, len(lr.Tools))
-					for _, t := range lr.Tools {
-						if s.toolPolicyStore.GetEffectivePolicy(t.Name, s.ctx.ReadOnly) != domain.PolicyHidden {
-							filtered = append(filtered, t)
+				visibleCount := 0
+				if lr, ok := res.(*mcp.ListToolsResult); ok && lr.Tools != nil {
+					if s.toolPolicyStore != nil {
+						filtered := make([]*mcp.Tool, 0, len(lr.Tools))
+						for _, t := range lr.Tools {
+							if s.toolPolicyStore.GetEffectivePolicy(t.Name, s.ctx.ReadOnly) != domain.PolicyHidden {
+								filtered = append(filtered, t)
+							}
 						}
+						lr.Tools = filtered
 					}
-					lr.Tools = filtered
+					visibleCount = len(lr.Tools)
+				}
+				api.RecordMCPConnectionEvent("tools_list_ok")
+				var sess mcp.Session
+				var sessKey any = "default"
+				if req != nil && req.GetSession() != nil {
+					sess = req.GetSession()
+					if id := sess.ID(); id != "" {
+						sessKey = id
+					} else {
+						sessKey = sess
+					}
+				}
+				if _, loaded := s.toolsListLoggedSessions.LoadOrStore(sessKey, struct{}{}); !loaded {
+					if ss, ok := sess.(*mcp.ServerSession); ok {
+						go func(session *mcp.ServerSession, key any) {
+							_ = session.Wait()
+							s.toolsListLoggedSessions.Delete(key)
+						}(ss, sessKey)
+					} else {
+						s.toolsListLoggedSessions.Delete(sessKey)
+					}
+					logger.Info("MCP session tools/list completed: visible_tools=%d category=tools_list_ok", visibleCount)
+					if s.ctx != nil && s.ctx.DiagnosticLogger != nil {
+						s.ctx.DiagnosticLogger.Log(ctx, "INFO", "MCP session tools/list completed", map[string]any{
+							"category":      "tools_list_ok",
+							"visible_tools": visibleCount,
+						})
+					}
 				}
 			}
 
@@ -264,14 +353,46 @@ func (s *Server) SetTuningController(tc *controllers.TuningController) {
 
 // GetHTTPHandler returns the Streamable HTTP handler for the MCP endpoint.
 // This single handler supports POST, GET, DELETE, and OPTIONS on the MCP endpoint,
-// conforming to the MCP 2025-06-18 Streamable HTTP transport specification.
+// conforming to the MCP Streamable HTTP transport specification.
+//
+// For GET requests without an Mcp-Session-Id header, it immediately returns a framed
+// 405 Method Not Allowed (Allow: POST, DELETE) with an explicit Content-Length so
+// Streamable HTTP clients probing for a sessionless listen stream fall back to POST
+// without hanging. For GET requests carrying a session ID, it clears the HTTP server's
+// read and write deadlines via http.ResponseController before delegating to the SDK
+// so long-lived SSE streams are not terminated after 30 seconds.
 func (s *Server) GetHTTPHandler() http.Handler {
 	if s.httpHandler == nil {
 		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			http.Error(w, "MCP server not initialized", http.StatusInternalServerError)
 		})
 	}
-	return s.httpHandler
+	handler := s.httpHandler
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			if sessionID := strings.TrimSpace(r.Header.Get("Mcp-Session-Id")); sessionID != "" {
+				s.toolsListLoggedSessions.Delete(sessionID)
+			}
+		}
+		if r.Method == http.MethodGet {
+			if strings.TrimSpace(r.Header.Get("Mcp-Session-Id")) == "" {
+				const body = "Method Not Allowed: initialize a session with POST before opening a GET event stream\n"
+				w.Header().Set("Allow", "POST, DELETE")
+				w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+				w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+				if r.ProtoMajor == 1 {
+					w.Header().Set("Connection", "keep-alive")
+				}
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				_, _ = io.WriteString(w, body)
+				return
+			}
+			rc := http.NewResponseController(w)
+			_ = rc.SetReadDeadline(time.Time{})
+			_ = rc.SetWriteDeadline(time.Time{})
+		}
+		handler.ServeHTTP(w, r)
+	})
 }
 
 // GetMCPServer returns the underlying MCP server instance.
