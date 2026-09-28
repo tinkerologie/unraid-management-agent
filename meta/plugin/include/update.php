@@ -38,22 +38,28 @@ if (isset($_POST['API_TOKEN'])) {
 }
 
 // Preserve MCP connect secret: the form leaves the input empty when unchanged.
-// If the user explicitly cleared the secret (CLEAR_MCP_CONNECT_SECRET == "1"), set it to empty.
+// If the user explicitly cleared the secret (CLEAR_MCP_CONNECT_SECRET == "1"), set it to empty
+// and mark MCP_CONNECT_SECRET_DISABLED="true" so scripts/start does not regenerate it.
 // Otherwise, when empty, restore the existing secret from config.cfg.
 if (isset($_POST['MCP_CONNECT_SECRET'])) {
     $clear_secret = (!empty($_POST['CLEAR_MCP_CONNECT_SECRET']) && $_POST['CLEAR_MCP_CONNECT_SECRET'] === '1') ||
                     (!empty($_POST['MCP_CONNECT_SECRET_CLEAR']) && $_POST['MCP_CONNECT_SECRET_CLEAR'] === '1');
     if ($clear_secret) {
         $_POST['MCP_CONNECT_SECRET'] = '';
+        $_POST['MCP_CONNECT_SECRET_DISABLED'] = 'true';
     } elseif ($_POST['MCP_CONNECT_SECRET'] === '') {
         if (is_file($cfg_path)) {
             $existing = parse_ini_file($cfg_path, false, INI_SCANNER_RAW);
             if (!empty($existing['MCP_CONNECT_SECRET'])) {
                 $_POST['MCP_CONNECT_SECRET'] = $existing['MCP_CONNECT_SECRET'];
+                $_POST['MCP_CONNECT_SECRET_DISABLED'] = 'false';
+            } elseif (!empty($existing['MCP_CONNECT_SECRET_DISABLED'])) {
+                $_POST['MCP_CONNECT_SECRET_DISABLED'] = $existing['MCP_CONNECT_SECRET_DISABLED'];
             }
         }
     } else {
         $_POST['MCP_CONNECT_SECRET'] = preg_replace('/[^A-Za-z0-9_-]/', '', $_POST['MCP_CONNECT_SECRET']);
+        $_POST['MCP_CONNECT_SECRET_DISABLED'] = 'false';
     }
     unset($_POST['CLEAR_MCP_CONNECT_SECRET'], $_POST['MCP_CONNECT_SECRET_CLEAR']);
 }
