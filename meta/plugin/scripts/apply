@@ -109,7 +109,7 @@ if [ -f "$CONFIG_FILE" ] && grep -q '^MCP_CONNECT_SECRET=' "$CONFIG_FILE"; then
             ;;
     esac
     clean_mcp_secret=$(printf '%s' "$raw_mcp_secret" | tr -cd 'A-Za-z0-9_-')
-    sed -i "s|^MCP_CONNECT_SECRET=.*|MCP_CONNECT_SECRET='${clean_mcp_secret}'|" "$CONFIG_FILE"
+    sed -i "s|^MCP_CONNECT_SECRET=.*|MCP_CONNECT_SECRET=\"${clean_mcp_secret}\"|" "$CONFIG_FILE"
 fi
 
 # Only restart if the service is currently running

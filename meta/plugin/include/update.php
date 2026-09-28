@@ -30,7 +30,7 @@ if (isset($_POST['API_TOKEN'])) {
         if (is_file($cfg_path)) {
             $existing = parse_ini_file($cfg_path, false, INI_SCANNER_RAW);
             if (!empty($existing['API_TOKEN'])) {
-                $_POST['API_TOKEN'] = $existing['API_TOKEN'];
+                $_POST['API_TOKEN'] = trim((string)$existing['API_TOKEN'], "'\"");
             }
         }
     }
@@ -51,10 +51,10 @@ if (isset($_POST['MCP_CONNECT_SECRET'])) {
         if (is_file($cfg_path)) {
             $existing = parse_ini_file($cfg_path, false, INI_SCANNER_RAW);
             if (!empty($existing['MCP_CONNECT_SECRET'])) {
-                $_POST['MCP_CONNECT_SECRET'] = $existing['MCP_CONNECT_SECRET'];
+                $_POST['MCP_CONNECT_SECRET'] = preg_replace('/[^A-Za-z0-9_-]/', '', (string)$existing['MCP_CONNECT_SECRET']);
                 $_POST['MCP_CONNECT_SECRET_DISABLED'] = 'false';
             } elseif (!empty($existing['MCP_CONNECT_SECRET_DISABLED'])) {
-                $_POST['MCP_CONNECT_SECRET_DISABLED'] = $existing['MCP_CONNECT_SECRET_DISABLED'];
+                $_POST['MCP_CONNECT_SECRET_DISABLED'] = trim((string)$existing['MCP_CONNECT_SECRET_DISABLED'], "'\"");
             }
         }
     } else {

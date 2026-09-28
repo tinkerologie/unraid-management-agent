@@ -35,7 +35,7 @@ if ($bind === '' || $bind === '0.0.0.0' || $bind === '::') {
 }
 $base = "http://$host:$port";
 
-$token = trim((string)($config['API_TOKEN'] ?? ''));
+$token = trim((string)($config['API_TOKEN'] ?? ''), " \t\n\r\0\x0B'\"");
 $auth_header = $token !== '' ? '-H ' . escapeshellarg("Authorization: Bearer $token") : '';
 
 // action may arrive via GET (download navigation) or POST (self-test AJAX, policy AJAX).

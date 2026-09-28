@@ -25,8 +25,8 @@ if (file_exists($config_file)) {
 // Default values
 $port = $config['PORT'] ?? '8043';
 $bind_address = $config['BIND_ADDRESS'] ?? '';
-$api_token = $config['API_TOKEN'] ?? '';
-$mcp_connect_secret = $config['MCP_CONNECT_SECRET'] ?? '';
+$api_token = trim((string)($config['API_TOKEN'] ?? ''), " \t\n\r\0\x0B'\"");
+$mcp_connect_secret = preg_replace('/[^A-Za-z0-9_-]/', '', (string)($config['MCP_CONNECT_SECRET'] ?? ''));
 $tls_cert_file = $config['TLS_CERT_FILE'] ?? '';
 $tls_key_file = $config['TLS_KEY_FILE'] ?? '';
 $read_only = $config['READ_ONLY'] ?? 'false';
