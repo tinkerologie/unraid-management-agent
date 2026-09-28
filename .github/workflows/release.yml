@@ -36,6 +36,7 @@ concurrency:
 jobs:
   detect:
     name: Detect Release
+    # Track the newest supported Ubuntu GitHub-hosted runner image.
     runs-on: ubuntu-latest
     outputs:
       should_release: ${{ steps.decide.outputs.should_release }}
@@ -115,6 +116,7 @@ jobs:
 
   release:
     name: Build and Release
+    # Track the newest supported Ubuntu GitHub-hosted runner image.
     runs-on: ubuntu-latest
     needs: detect
     if: needs.detect.outputs.should_release == 'true'

@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **GitHub Actions Ubuntu runner policy** — set release workflow jobs to
+  `ubuntu-latest` so CI always tracks the latest supported Ubuntu GitHub-hosted
+  image.
+
 ## [2026.09.01] - 2026-09-28
 
 ### Added
