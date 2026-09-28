@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.09.01] - 2026-09-28
+
 ### Added
 
 - **Zero-config MCP onboarding (`ha-mcp` style)** — added path-based Connect URL authentication (`/mcp/<connect-secret>` via `--mcp-connect-secret` / `MCP_CONNECT_SECRET` / `mcp_connect_secret` in `config.yml`, validated as 32–256 chars of `[A-Za-z0-9_-]`) using constant-time SHA-256 digest comparison and automatic `/mcp/<redacted>` log masking; auto-generated a `private_<token>` secret on plugin startup (`scripts/start`) when not explicitly disabled; extended `_unraid-agent._tcp` mDNS TXT announcements with `mcp_path=/mcp`, `mcp_transport=streamable-http`, and `mcp_auth=bearer|none`; added `mcp_connection_events_total` Prometheus metrics and rate-limited handshake diagnostics; and displayed `Connect URL(s):` (`http(s)://<host>:<port>/mcp/private_<token> (direct access)` and `http(s)://<host>:<port>/mcp`) directly in the Unraid WebGUI settings page matching the HA-MCP Server integration ([#165](https://github.com/ruaan-deysel/unraid-management-agent/issues/165)).
