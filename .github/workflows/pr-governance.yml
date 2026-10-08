@@ -1,0 +1,165 @@
+name: PR Governance
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+      - ready_for_review
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  validate-template-and-issues:
+    name: Validate PR Template And Linked Issues
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Enforce PR template completion and issue linking
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.pull_request.body || "";
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const errors = [];
+
+            function escapeRegExp(value) {
+              return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            }
+
+            function getSection(sectionTitle) {
+              const pattern = new RegExp(
+                `##\\s*${escapeRegExp(sectionTitle)}\\s*\\n([\\s\\S]*?)(?=\\n##\\s|$)`,
+                "i",
+              );
+              const match = body.match(pattern);
+              return match ? match[1].trim() : "";
+            }
+
+            function getCheckedItems(sectionText) {
+              return [...sectionText.matchAll(/^\s*-\s*\[[xX]\]\s+(.+)$/gim)].map((m) => m[1].trim());
+            }
+
+            function getUncheckedItems(sectionText) {
+              return [...sectionText.matchAll(/^\s*-\s*\[\s\]\s+(.+)$/gim)].map((m) => m[1].trim());
+            }
+
+            const requiredSections = [
+              "Description",
+              "Type of Change",
+              "Related Issues",
+              "Changes Made",
+              "Testing Performed",
+              "Documentation",
+              "Checklist",
+            ];
+
+            const sections = Object.fromEntries(requiredSections.map((title) => [title, getSection(title)]));
+
+            for (const title of requiredSections) {
+              if (!sections[title]) {
+                errors.push(`Missing required section: \"${title}\".`);
+              }
+            }
+
+            if (sections["Type of Change"] && getCheckedItems(sections["Type of Change"]).length === 0) {
+              errors.push('At least one item must be checked in "Type of Change".');
+            }
+
+            if (sections["Testing Performed"] && getCheckedItems(sections["Testing Performed"]).length === 0) {
+              errors.push('At least one item must be checked in "Testing Performed".');
+            }
+
+            if (sections["Documentation"] && getCheckedItems(sections["Documentation"]).length === 0) {
+              errors.push('At least one item must be checked in "Documentation".');
+            }
+
+            if (sections["Checklist"]) {
+              const unchecked = getUncheckedItems(sections["Checklist"]);
+              if (unchecked.length > 0) {
+                errors.push(
+                  `All items in "Checklist" must be checked. Unchecked: ${unchecked.join("; ")}.`,
+                );
+              }
+            }
+
+            if (sections["Changes Made"]) {
+              const meaningfulBullets = sections["Changes Made"]
+                .split("\n")
+                .filter((line) => /^\s*-\s+\S+/.test(line));
+
+              if (meaningfulBullets.length === 0) {
+                errors.push('"Changes Made" must include at least one non-empty bullet item.');
+              }
+            }
+
+            if (sections["Related Issues"] && /#\(issue number\)/i.test(sections["Related Issues"])) {
+              errors.push('Replace the "#(issue number)" placeholders in "Related Issues" with real issue numbers.');
+            }
+
+            const issueRefRegex =
+              /\b(?:fix(?:e[sd])?|close[sd]?|resolve[sd]?|related to)\b\s+([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)?#(\d+)/gi;
+            const relatedIssuesSection = sections["Related Issues"] || "";
+            const issueMatches = [...relatedIssuesSection.matchAll(issueRefRegex)];
+
+            if (issueMatches.length === 0) {
+              errors.push(
+                'Add at least one linked issue in "Related Issues" using Fixes/Closes/Resolves/Related to #<number>.',
+              );
+            } else {
+              const repoSlug = `${owner}/${repo}`.toLowerCase();
+              const issueNumbers = new Set();
+
+              for (const match of issueMatches) {
+                const referencedRepo = (match[1] || repoSlug).toLowerCase();
+                const issueNumber = Number.parseInt(match[2], 10);
+
+                if (referencedRepo !== repoSlug || Number.isNaN(issueNumber)) {
+                  continue;
+                }
+
+                issueNumbers.add(issueNumber);
+              }
+
+              if (issueNumbers.size === 0) {
+                errors.push(`Link at least one issue from ${repoSlug} in "Related Issues".`);
+              } else {
+                let hasValidIssue = false;
+
+                for (const issueNumber of issueNumbers) {
+                  try {
+                    const { data } = await github.rest.issues.get({
+                      owner,
+                      repo,
+                      issue_number: issueNumber,
+                    });
+
+                    if (!data.pull_request) {
+                      hasValidIssue = true;
+                      break;
+                    }
+                  } catch (error) {
+                    core.info(`Skipping issue #${issueNumber}: ${error.message}`);
+                  }
+                }
+
+                if (!hasValidIssue) {
+                  errors.push(
+                    "At least one linked reference must point to an existing issue in this repository (not only PRs).",
+                  );
+                }
+              }
+            }
+
+            if (errors.length > 0) {
+              core.setFailed(`PR governance checks failed:\n- ${errors.join("\n- ")}`);
+              return;
+            }
+
+            core.info("PR governance checks passed.");

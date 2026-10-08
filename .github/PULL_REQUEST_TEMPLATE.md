@@ -18,9 +18,11 @@
 ## Related Issues
 
 <!-- Link to related issues -->
+<!-- At least one linked issue in this repository is required -->
 
 Fixes #(issue number)
 Closes #(issue number)
+Resolves #(issue number)
 Related to #(issue number)
 
 ## Hardware Configuration (if applicable)
@@ -54,6 +56,7 @@ Related to #(issue number)
 - [ ] Tested WebSocket events (if applicable)
 - [ ] Tested with debug logging enabled
 - [ ] Regression testing (ensured existing functionality still works)
+- [ ] Not applicable (documentation-only or metadata-only change)
 
 ### Test Results
 
@@ -100,6 +103,8 @@ Related to #(issue number)
 
 <!-- Ensure you've completed all items before submitting -->
 
+- [ ] I linked at least one existing issue in this repository in **Related Issues**
+- [ ] I completed all required sections in this template and removed placeholder-only content
 - [ ] My code follows the project's coding standards
 - [ ] I have performed a self-review of my own code
 - [ ] I have commented my code, particularly in hard-to-understand areas

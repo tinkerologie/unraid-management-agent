@@ -14,6 +14,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **GitHub Actions Ubuntu runner policy** — set release workflow jobs to
   `ubuntu-latest` so CI always tracks the latest supported Ubuntu GitHub-hosted
   image.
+- **Automated Codecov reporting in CI** — added a dedicated GitHub Actions
+  coverage workflow that runs `go test -covermode=atomic -coverprofile=coverage.out ./...`
+  on `push` to `main` and `pull_request` events, uploads coverage to Codecov
+  via `codecov/codecov-action@v5`, and added repository-level Codecov status
+  configuration in `.codecov.yml` for project and patch coverage thresholds;
+  fork pull requests skip the upload step so external contributors are not
+  blocked by unavailable repository secrets.
+
+### Fixed
+
+- **Sensors stderr contamination in fan/temperature parsing** — system collector now reads only
+  `sensors -u` stdout via `ExecCommandStdout`, preventing lm-sensors stderr warnings from
+  corrupting parsed values and restoring missing/garbled fan entries. ([#173](https://github.com/ruaan-deysel/unraid-management-agent/pull/173)).
+- **VM disk I/O counters from single-quoted libvirt XML** — disk target extraction now accepts
+  both single and double quotes and only scans `<disk>` elements, restoring
+  `disk_read_bytes`/`disk_write_bytes` collection for regular vdisk-backed VMs. ([#174](https://github.com/ruaan-deysel/unraid-management-agent/pull/174)).
+- **Plugin UI API token controls** — Generate/Clear now dispatch change events so Apply enables
+  correctly, and Show/Copy are disabled with guidance when a saved token is intentionally not
+  rendered back into the form. ([#176](https://github.com/ruaan-deysel/unraid-management-agent/pull/176)).
+- **Temperature metric filtering from lm-sensors** — `parseSensorsOutput` now reports only
+  `temp*_input` channels, excluding voltage/current/power/fan `_input` metrics that were
+  previously misreported as Celsius temperatures. ([#177](https://github.com/ruaan-deysel/unraid-management-agent/pull/177)).
 
 ## [2026.09.01] - 2026-09-28
 
