@@ -342,18 +342,40 @@ func (c *VMCollector) formatMemoryDisplay(used, allocated uint64) string {
 	return fmt.Sprintf("%.2f MB / %.2f MB", usedMB, allocMB)
 }
 
-// extractDiskTargets parses XML to find disk device targets
+// extractDiskTargets parses domain XML for the target device of each disk
+// (e.g. "vda", "hdc"). libvirt writes attributes with single quotes
+// (<target dev='hdc' bus='sata'/>), so both quote styles are accepted. Only
+// <disk> elements are considered, so interface targets (vnetN) are skipped.
 func extractDiskTargets(xml string) []string {
 	var targets []string
-	// Simple string parsing for <target dev="xxx"/> patterns
-	parts := strings.Split(xml, "<target dev=\"")
+	parts := strings.Split(xml, "<disk")
 	for i := 1; i < len(parts); i++ {
-		if idx := strings.Index(parts[i], "\""); idx > 0 {
-			target := parts[i][:idx]
-			targets = append(targets, target)
+		diskXML := parts[i]
+		// "<disk" must be the whole tag name (<disk ...> or <disk>)
+		if diskXML == "" || (diskXML[0] != ' ' && diskXML[0] != '>') {
+			continue
+		}
+		if endIdx := strings.Index(diskXML, "</disk>"); endIdx > 0 {
+			diskXML = diskXML[:endIdx]
+		}
+		if dev := targetDev(diskXML); dev != "" {
+			targets = append(targets, dev)
 		}
 	}
 	return targets
+}
+
+// targetDev returns the dev attribute of the first <target> element in an XML
+// fragment, accepting double or single quotes.
+func targetDev(fragment string) string {
+	for _, quote := range []string{`"`, "'"} {
+		if _, after, ok := strings.Cut(fragment, "<target dev="+quote); ok {
+			if idx := strings.Index(after, quote); idx > 0 {
+				return after[:idx]
+			}
+		}
+	}
+	return ""
 }
 
 // extractInterfaceTargets parses XML to find network interface targets
@@ -367,16 +389,8 @@ func extractInterfaceTargets(xml string) []string {
 		if endIdx := strings.Index(ifaceXML, "</interface>"); endIdx > 0 {
 			ifaceXML = ifaceXML[:endIdx]
 			// Find target dev within this interface
-			if _, after, ok := strings.Cut(ifaceXML, "<target dev=\""); ok {
-				devPart := after
-				if quoteIdx := strings.Index(devPart, "\""); quoteIdx > 0 {
-					targets = append(targets, devPart[:quoteIdx])
-				}
-			} else if _, after, ok := strings.Cut(ifaceXML, "<target dev='"); ok {
-				devPart := after
-				if quoteIdx := strings.Index(devPart, "'"); quoteIdx > 0 {
-					targets = append(targets, devPart[:quoteIdx])
-				}
+			if dev := targetDev(ifaceXML); dev != "" {
+				targets = append(targets, dev)
 			}
 		}
 	}

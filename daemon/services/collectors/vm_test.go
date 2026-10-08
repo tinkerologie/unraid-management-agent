@@ -131,6 +131,19 @@ func TestExtractDiskTargets(t *testing.T) {
 			xml:      `<disk><target dev="sda"/></disk><disk><target dev="sdb"/></disk>`,
 			expected: []string{"sda", "sdb"},
 		},
+		{
+			// libvirt's own XML uses single quotes
+			name: "libvirt single quotes",
+			xml: `<disk type='file' device='disk'><driver name='qemu' type='raw'/>` +
+				`<source file='/mnt/user/domains/vm/vdisk1.img'/><target dev='hdc' bus='sata'/></disk>`,
+			expected: []string{"hdc"},
+		},
+		{
+			name: "interface targets are not disks",
+			xml: `<disk type='block' device='disk'><target dev='vda' bus='virtio'/></disk>` +
+				`<interface type='bridge'><target dev='vnet0'/></interface>`,
+			expected: []string{"vda"},
+		},
 	}
 
 	for _, tt := range tests {
