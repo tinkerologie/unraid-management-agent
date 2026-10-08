@@ -539,11 +539,15 @@ func (c *SystemCollector) parseSensorsOutput(output string) map[string]float64 {
 			continue
 		}
 
-		// Temperature input line (indented with spaces)
+		// Temperature input line (indented with spaces). Only tempN_input: voltage (inN), current
+		// (currN), power (powerN) and fan inputs share the _input suffix but are not temperatures.
 		if strings.Contains(line, "_input:") && currentChip != "" {
 			parts := strings.Split(line, ":")
 			if len(parts) == 2 {
 				key := strings.TrimSpace(parts[0])
+				if !strings.HasPrefix(key, "temp") {
+					continue
+				}
 				valueStr := strings.TrimSpace(parts[1])
 				if value, err := strconv.ParseFloat(valueStr, 64); err == nil {
 					// Create a friendly name using label if available, otherwise use key

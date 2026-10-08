@@ -56,6 +56,33 @@ func TestParseSensorsOutput(t *testing.T) {
 	}
 }
 
+func TestParseSensorsOutputOnlyTemperatures(t *testing.T) {
+	hub := domain.NewEventBus(10)
+	ctx := &domain.Context{Hub: hub}
+	c := NewSystemCollector(ctx)
+
+	// Aquacomputer Octo and Nuvoton chips report voltage, current, power and fan inputs next to
+	// temperatures; values like 12.02 V would otherwise pass as plausible temperatures.
+	output := "octo-hid-3-3\nAdapter: HID adapter\nFan 1 voltage:\n  in0_input: 12.020\n" +
+		"Array Fan1:\n  fan1_input: 2916.000\nFan 1 power:\n  power1_input: 3.020\n" +
+		"Fan 1 current:\n  curr1_input: 0.252\nCoolant Temp:\n  temp1_input: 27.800\n\n" +
+		"nct6798-isa-02a0\nin0:\n  in0_input: 1.120\n  in0_min: 0.000\nMB Temp:\n  temp1_input: 44.000\n"
+
+	result := c.parseSensorsOutput(output)
+	want := map[string]float64{
+		"octo-hid-3-3_Coolant_Temp_temp1_input": 27.8,
+		"nct6798-isa-02a0_MB_Temp_temp1_input":  44,
+	}
+	if len(result) != len(want) {
+		t.Fatalf("Expected only temperature inputs %v, got %v", want, result)
+	}
+	for name, value := range want {
+		if result[name] != value {
+			t.Errorf("%s = %v, want %v", name, result[name], value)
+		}
+	}
+}
+
 // --- System Collector: parseFanSpeeds ---
 
 func TestParseFanSpeeds(t *testing.T) {
