@@ -82,12 +82,6 @@ PHASE_2_COMPLETION_SUMMARY.md
 # Pre-commit
 .pre-commit-cache/
 
-# Claude/AI Assistant local settings and locally-installed skills
-.claude/settings.json
-.claude/settings.local.json
-.claude/*.local.json
-.claude/skills/
-
 # Playwright local runtime artifacts (traces, reports, browser state) — not project code
 .playwright/
 .playwright-cli/
