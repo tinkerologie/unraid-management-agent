@@ -505,7 +505,7 @@ the agent. Changes apply after clicking Apply, which restarts the service automa
 </div>
 
 _(API Token)_:
-: <input type="password" name="API_TOKEN" id="api_token" value="" placeholder="<?= $has_token ? '••••••••' : 'No authentication (disabled)' ?>" autocomplete="off" style="width: 320px;" oninput="document.getElementById('api_token_clear').value = '0'; updateMcpOnboardingUI();">
+: <input type="password" name="API_TOKEN" id="api_token" value="" placeholder="<?= $has_token ? '••••••••' : 'No authentication (disabled)' ?>" autocomplete="off" style="width: 320px;" oninput="document.getElementById('api_token_clear').value = '0'; updateTokenButtons(); updateMcpOnboardingUI();">
   <input type="hidden" name="API_TOKEN_CLEAR" id="api_token_clear" value="0">
   <input type="button" id="uma-btn-token-toggle" value="Show" onclick="toggleTokenVisibility()">
   <input type="button" id="uma-btn-token-generate" value="Generate" onclick="generateToken()">
@@ -1028,6 +1028,31 @@ function renderSelfTest(out, data) {
     out.innerHTML = html;
 }
 
+// Unraid enables the form's Apply button on "input"/"change" events, which
+// browsers don't fire when a script sets a field's value. Fire one so changes
+// made by Generate/Clear can be applied.
+function markFieldChanged(field) {
+    if (field) {
+        field.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+}
+
+// The saved token is never sent back to the page, so Show/Copy only have
+// something to act on after a token was generated or typed in.
+function updateTokenButtons() {
+    var field = document.getElementById('api_token');
+    if (!field) return;
+    var empty = field.value === '';
+    var hint = empty ? 'The saved token is not displayed. Generate a new token (then Apply) to see or copy it.' : '';
+    ['uma-btn-token-toggle', 'uma-btn-token-copy'].forEach(function(id) {
+        var btn = document.getElementById(id);
+        if (btn) {
+            btn.disabled = empty;
+            btn.title = hint;
+        }
+    });
+}
+
 function toggleTokenVisibility() {
     var field = document.getElementById('api_token');
     var btn = document.getElementById('uma-btn-token-toggle');
@@ -1051,6 +1076,8 @@ function generateToken() {
     field.value = token;
     document.getElementById('uma-btn-token-toggle').value = 'Hide';
     document.getElementById('api_token_clear').value = '0';
+    markFieldChanged(field);
+    updateTokenButtons();
     updateMcpOnboardingUI();
 }
 
@@ -1104,6 +1131,8 @@ function clearToken() {
     if (clearBtn) {
         clearBtn.style.display = 'none';
     }
+    markFieldChanged(field);
+    updateTokenButtons();
     updateMcpOnboardingUI();
 }
 
@@ -1380,6 +1409,7 @@ function generateMcpConnectSecret() {
     if (clearFlag) clearFlag.value = '0';
     var clearBtn = document.getElementById('uma-btn-mcp-secret-clear');
     if (clearBtn) clearBtn.style.display = 'inline-block';
+    markFieldChanged(field);
     updateMcpOnboardingUI();
 }
 
@@ -1395,6 +1425,7 @@ function clearMcpConnectSecret() {
     if (clearFlag) clearFlag.value = '1';
     var clearBtn = document.getElementById('uma-btn-mcp-secret-clear');
     if (clearBtn) clearBtn.style.display = 'none';
+    markFieldChanged(field);
     updateMcpOnboardingUI();
 }
 
@@ -1487,6 +1518,7 @@ $(function() {
     document.querySelectorAll('.uma-interval-select').forEach(function(select) {
         select.addEventListener('change', updateDisabledHighlighting);
     });
+    updateTokenButtons();
     updateMcpOnboardingUI();
 });
 </script>
