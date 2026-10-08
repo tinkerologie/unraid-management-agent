@@ -493,7 +493,9 @@ func (c *SystemCollector) getSwappiness() int {
 
 func (c *SystemCollector) getTemperatures() (map[string]float64, error) {
 	// Try using sensors command first
-	output, err := lib.ExecCommandOutput("sensors", "-u")
+	// stdout only: stderr ("ERROR: Can't get value of subfeature ...") would
+	// interleave with the readings and corrupt the parse.
+	output, err := lib.ExecCommandStdout("sensors", "-u")
 	if err == nil {
 		temperatures := c.parseSensorsOutput(output)
 		if len(temperatures) > 0 {
@@ -604,7 +606,9 @@ func (c *SystemCollector) getFans() ([]dto.FanInfo, error) {
 	fanMap := make(map[string]int)
 
 	// Try using sensors command first
-	output, err := lib.ExecCommandOutput("sensors", "-u")
+	// stdout only: stderr ("ERROR: Can't get value of subfeature ...") would
+	// interleave with the readings and corrupt the parse.
+	output, err := lib.ExecCommandStdout("sensors", "-u")
 	if err == nil {
 		fanMap = c.parseFanSpeeds(output)
 	}
