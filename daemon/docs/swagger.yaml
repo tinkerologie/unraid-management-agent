@@ -4945,6 +4945,64 @@ paths:
       summary: Get specific disk
       tags:
       - Disks
+  /disks/{id}/spindown:
+    post:
+      description: |-
+        Spin down an array or pool disk to save power; it spins up again
+        when accessed. The disk is identified by its id, device or name.
+      parameters:
+      - description: Disk id, device or name
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Spin down requested
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Disk not found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Spin down failed
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Spin down a disk
+      tags:
+      - Disks
+  /disks/{id}/spinup:
+    post:
+      description: |-
+        Spin up an array or pool disk that is in standby. The disk is
+        identified by its id (e.g. disk1, parity, cache), device or name.
+      parameters:
+      - description: Disk id, device or name
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Spin up requested
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Disk not found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Spin up failed
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Spin up a disk
+      tags:
+      - Disks
   /docker:
     get:
       description: Retrieve information about all Docker containers including stats

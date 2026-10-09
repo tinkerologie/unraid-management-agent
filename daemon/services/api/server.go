@@ -72,6 +72,9 @@ type Server struct {
 	agentSvc         *agent.Service
 	toolPolicyStore  *domain.ToolPolicyStore
 
+	// diskSpinFn replaces the array controller's spin calls in tests.
+	diskSpinFn func(diskID string, up bool) error
+
 	// Embedded cache store for lock-free atomic access to collector data
 	*CacheStore
 }
@@ -219,6 +222,8 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/array/parity-check/history", s.handleParityCheckHistory).Methods("GET")
 	api.HandleFunc("/array/parity-check/schedule", s.handleParitySchedule).Methods("GET") // Issue #47
 	api.HandleFunc("/array/clear-disk-stats", s.handleClearDiskStats).Methods("POST")
+	api.HandleFunc("/disks/{id}/spinup", s.handleDiskSpinUp).Methods("POST")
+	api.HandleFunc("/disks/{id}/spindown", s.handleDiskSpinDown).Methods("POST")
 
 	// Configuration endpoints (read-only)
 	api.HandleFunc("/shares/{name}/config", s.handleShareConfig).Methods("GET")

@@ -1174,6 +1174,94 @@ func (s *Server) handleClearDiskStats(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
+// spinDisk spins a disk up (up=true) or down via the array controller, or via
+// s.diskSpinFn when a test has set one.
+func (s *Server) spinDisk(diskID string, up bool) error {
+	if s.diskSpinFn != nil {
+		return s.diskSpinFn(diskID, up)
+	}
+	ctrl := controllers.NewArrayController(s.ctx)
+	if up {
+		return ctrl.SpinUpDisk(diskID)
+	}
+	return ctrl.SpinDownDisk(diskID)
+}
+
+// handleDiskSpinUp godoc
+//
+//	@Summary		Spin up a disk
+//	@Description	Spin up an array or pool disk that is in standby. The disk is
+//	@Description	identified by its id (e.g. disk1, parity, cache), device or name.
+//	@Tags			Disks
+//	@Produce		json
+//	@Param			id	path		string			true	"Disk id, device or name"
+//	@Success		200	{object}	dto.Response	"Spin up requested"
+//	@Failure		404	{object}	dto.Response	"Disk not found"
+//	@Failure		500	{object}	dto.Response	"Spin up failed"
+//	@Router			/disks/{id}/spinup [post]
+func (s *Server) handleDiskSpinUp(w http.ResponseWriter, r *http.Request) {
+	s.handleDiskSpin(w, r, true)
+}
+
+// handleDiskSpinDown godoc
+//
+//	@Summary		Spin down a disk
+//	@Description	Spin down an array or pool disk to save power; it spins up again
+//	@Description	when accessed. The disk is identified by its id, device or name.
+//	@Tags			Disks
+//	@Produce		json
+//	@Param			id	path		string			true	"Disk id, device or name"
+//	@Success		200	{object}	dto.Response	"Spin down requested"
+//	@Failure		404	{object}	dto.Response	"Disk not found"
+//	@Failure		500	{object}	dto.Response	"Spin down failed"
+//	@Router			/disks/{id}/spindown [post]
+func (s *Server) handleDiskSpinDown(w http.ResponseWriter, r *http.Request) {
+	s.handleDiskSpin(w, r, false)
+}
+
+// handleDiskSpin resolves the disk from the collector cache, so only disks the
+// agent reports can be targeted, and passes its emhttpd id to the controller.
+func (s *Server) handleDiskSpin(w http.ResponseWriter, r *http.Request, up bool) {
+	requested := mux.Vars(r)["id"]
+	action := "down"
+	if up {
+		action = "up"
+	}
+
+	var diskID string
+	for _, disk := range s.GetDisksCache() {
+		if disk.ID == requested || disk.Device == requested || disk.Name == requested {
+			diskID = disk.ID
+			break
+		}
+	}
+	if diskID == "" {
+		respondJSON(w, http.StatusNotFound, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Disk not found: %s", requested),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	logger.Info("API: Spin %s requested for disk %s", action, diskID)
+	if err := s.spinDisk(diskID, up); err != nil {
+		logger.Error("API: Failed to spin %s disk %s: %v", action, diskID, err)
+		respondJSON(w, http.StatusInternalServerError, dto.Response{
+			Success:   false,
+			Message:   fmt.Sprintf("Failed to spin %s disk %s", action, diskID),
+			Timestamp: time.Now(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dto.Response{
+		Success:   true,
+		Message:   fmt.Sprintf("Disk %s spin %s requested", diskID, action),
+		Timestamp: time.Now(),
+	})
+}
+
 // handleShareConfig godoc
 //
 //	@Summary		Get share configuration

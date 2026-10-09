@@ -1362,6 +1362,88 @@ const docTemplate = `{
                 }
             }
         },
+        "/disks/{id}/spindown": {
+            "post": {
+                "description": "Spin down an array or pool disk to save power; it spins up again\nwhen accessed. The disk is identified by its id, device or name.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Disks"
+                ],
+                "summary": "Spin down a disk",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Disk id, device or name",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Spin down requested",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Disk not found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Spin down failed",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/disks/{id}/spinup": {
+            "post": {
+                "description": "Spin up an array or pool disk that is in standby. The disk is\nidentified by its id (e.g. disk1, parity, cache), device or name.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Disks"
+                ],
+                "summary": "Spin up a disk",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Disk id, device or name",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Spin up requested",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Disk not found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Spin up failed",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/docker": {
             "get": {
                 "description": "Retrieve information about all Docker containers including stats",
