@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests
+
+- **Coverage uplift toward 90% (issue #192)** — added deterministic, host-safe
+  regression tests for previously thin areas. The structured `DiagnosticLogger`
+  (JSONL output, correlation IDs, UTC timestamps, per-level helpers, nil-context
+  guard, concurrent writes, close) and goroutine stack helpers now have
+  `daemon/logger` coverage of ~85% (up from ~30%). Extended `daemon/lib`
+  redaction tests to cover the reflection-based typed map/slice paths, JSON tag
+  aliases, `json:"-"` omission, unexported-field skipping, input immutability and
+  nested mixed containers. Added diagnostics tests for `parseMemInfo`, the
+  `readLastNLines` log-tail helper (missing/empty files, exact last-N ordering,
+  no trailing newline, redaction) and ZIP archive error paths (failing writer,
+  unsupported JSON values, nonexistent output directory, partial-file removal and
+  empty-log omission). ([#192](https://github.com/ruaan-deysel/unraid-management-agent/issues/192)).
+
 ### Added
 
 - **Automated PR governance checks** — added GitHub Actions workflow enforcing

@@ -269,6 +269,218 @@ func TestRedactStruct(t *testing.T) {
 			t.Errorf("password = %v, want [REDACTED]", m["password"])
 		}
 	})
+
+	t.Run("nil pointer", func(t *testing.T) {
+		var cfg *Config
+		if result := RedactStruct(cfg); result != nil {
+			t.Errorf("expected nil, got %v", result)
+		}
+	})
+
+	t.Run("top-level string value", func(t *testing.T) {
+		result := RedactStruct("password=secret in log")
+		if result != "password=[REDACTED] in log" {
+			t.Errorf("got %v, want redacted string", result)
+		}
+	})
+
+	t.Run("non-container scalar", func(t *testing.T) {
+		if result := RedactStruct(42); result != 42 {
+			t.Errorf("got %v, want 42", result)
+		}
+	})
+
+	t.Run("json tag alias", func(t *testing.T) {
+		type Tagged struct {
+			Secret string `json:"my_secret_key"`
+			Keep   string `json:"keep,omitempty"`
+		}
+		result := RedactStruct(Tagged{Secret: "x", Keep: "y"})
+		m, ok := result.(map[string]any)
+		if !ok {
+			t.Fatal("expected map[string]any")
+		}
+		if m["my_secret_key"] != "[REDACTED]" {
+			t.Errorf("my_secret_key = %v, want [REDACTED]", m["my_secret_key"])
+		}
+		if m["keep"] != "y" {
+			t.Errorf("keep = %v, want y", m["keep"])
+		}
+	})
+
+	t.Run("json dash tag omitted", func(t *testing.T) {
+		type WithOmit struct {
+			Visible string `json:"visible"`
+			Hidden  string `json:"-"`
+		}
+		result := RedactStruct(WithOmit{Visible: "a", Hidden: "b"})
+		m, ok := result.(map[string]any)
+		if !ok {
+			t.Fatal("expected map[string]any")
+		}
+		if _, exists := m["Hidden"]; exists {
+			t.Error("json:\"-\" field should be omitted")
+		}
+		if _, exists := m["-"]; exists {
+			t.Error("json:\"-\" field should be omitted")
+		}
+		if m["visible"] != "a" {
+			t.Errorf("visible = %v, want a", m["visible"])
+		}
+	})
+
+	t.Run("unexported field skipped", func(t *testing.T) {
+		type Mixed struct {
+			Exported string `json:"exported"`
+			hidden   string //nolint:unused // present to verify it is skipped
+		}
+		result := RedactStruct(Mixed{Exported: "ok", hidden: "x"})
+		m, ok := result.(map[string]any)
+		if !ok {
+			t.Fatal("expected map[string]any")
+		}
+		if len(m) != 1 {
+			t.Errorf("expected only exported field, got %v", m)
+		}
+	})
+
+	// typed (non-any) map exercises redactMapValue via reflection.
+	t.Run("typed map value", func(t *testing.T) {
+		in := map[string]string{"password": "secret", "host": "localhost"}
+		result := RedactStruct(in)
+		m, ok := result.(map[string]any)
+		if !ok {
+			t.Fatalf("expected map[string]any, got %T", result)
+		}
+		if m["password"] != "[REDACTED]" {
+			t.Errorf("password = %v, want [REDACTED]", m["password"])
+		}
+		if m["host"] != "localhost" {
+			t.Errorf("host = %v, want localhost", m["host"])
+		}
+	})
+
+	// typed (non-any) slice exercises redactSliceValue via reflection.
+	t.Run("typed slice value", func(t *testing.T) {
+		in := []string{"ntfy://ntfy.example.com/topic", "plain"}
+		result := RedactStruct(in)
+		s, ok := result.([]any)
+		if !ok {
+			t.Fatalf("expected []any, got %T", result)
+		}
+		if len(s) != 2 {
+			t.Fatalf("expected 2 elements, got %d", len(s))
+		}
+		if s[0] != "ntfy://[REDACTED]" {
+			t.Errorf("s[0] = %v, want redacted", s[0])
+		}
+		if s[1] != "plain" {
+			t.Errorf("s[1] = %v, want plain", s[1])
+		}
+	})
+
+	// slice of structs exercises redactSliceValue recursing into structs.
+	t.Run("slice of structs", func(t *testing.T) {
+		in := []Config{
+			{Host: "a", Password: "p1", Port: 1},
+			{Host: "b", Password: "p2", Port: 2},
+		}
+		result := RedactStruct(in)
+		s, ok := result.([]any)
+		if !ok {
+			t.Fatalf("expected []any, got %T", result)
+		}
+		if len(s) != 2 {
+			t.Fatalf("expected 2 elements, got %d", len(s))
+		}
+		for i, item := range s {
+			m, ok := item.(map[string]any)
+			if !ok {
+				t.Fatalf("element %d not a map: %T", i, item)
+			}
+			if m["password"] != "[REDACTED]" {
+				t.Errorf("element %d password = %v, want [REDACTED]", i, m["password"])
+			}
+		}
+	})
+
+	// typed map with a sensitive key whose value is itself a nested container.
+	t.Run("nested mixed containers", func(t *testing.T) {
+		in := map[string]any{
+			"outer": []any{
+				map[string]any{"token": "abc", "ok": "yes"},
+			},
+		}
+		result := RedactStruct(in)
+		m, ok := result.(map[string]any)
+		if !ok {
+			t.Fatalf("expected map[string]any, got %T", result)
+		}
+		outer, ok := m["outer"].([]any)
+		if !ok {
+			t.Fatalf("outer not a slice: %T", m["outer"])
+		}
+		inner, ok := outer[0].(map[string]any)
+		if !ok {
+			t.Fatalf("inner not a map: %T", outer[0])
+		}
+		if inner["token"] != "[REDACTED]" {
+			t.Errorf("token = %v, want [REDACTED]", inner["token"])
+		}
+		if inner["ok"] != "yes" {
+			t.Errorf("ok = %v, want yes", inner["ok"])
+		}
+	})
+}
+
+func TestRedactStructDoesNotMutateInput(t *testing.T) {
+	in := map[string]any{
+		"password": "secret",
+		"nested":   map[string]any{"token": "abc"},
+	}
+	_ = RedactStruct(in)
+	if in["password"] != "secret" {
+		t.Errorf("input password mutated: %v", in["password"])
+	}
+	nested, ok := in["nested"].(map[string]any)
+	if !ok {
+		t.Fatal("nested map changed type")
+	}
+	if nested["token"] != "abc" {
+		t.Errorf("input nested token mutated: %v", nested["token"])
+	}
+}
+
+func TestRedactSliceNestedContainers(t *testing.T) {
+	in := map[string]any{
+		"items": []any{
+			map[string]any{"password": "p"},
+			[]any{"Bearer secrettoken"},
+			"plain",
+		},
+	}
+	got := RedactMap(in)
+	items, ok := got["items"].([]any)
+	if !ok {
+		t.Fatalf("items not a slice: %T", got["items"])
+	}
+	m, ok := items[0].(map[string]any)
+	if !ok {
+		t.Fatalf("items[0] not a map: %T", items[0])
+	}
+	if m["password"] != "[REDACTED]" {
+		t.Errorf("items[0].password = %v, want [REDACTED]", m["password"])
+	}
+	nested, ok := items[1].([]any)
+	if !ok {
+		t.Fatalf("items[1] not a slice: %T", items[1])
+	}
+	if nested[0] != "Bearer [REDACTED]" {
+		t.Errorf("items[1][0] = %v, want redacted bearer", nested[0])
+	}
+	if items[2] != "plain" {
+		t.Errorf("items[2] = %v, want plain", items[2])
+	}
 }
 
 func TestIsSensitiveField(t *testing.T) {
