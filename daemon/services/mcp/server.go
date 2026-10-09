@@ -1249,16 +1249,7 @@ func (s *Server) registerNewMonitoringTools() {
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
 		logger.Info("MCP: Listing all services")
-		serviceCtrl := controllers.NewServiceController()
-		serviceNames := controllers.ValidServiceNames()
-		services := make([]map[string]any, 0)
-		for _, name := range serviceNames {
-			running, _ := serviceCtrl.GetServiceStatus(name)
-			services = append(services, map[string]any{
-				"name":    name,
-				"running": running,
-			})
-		}
+		services := controllers.NewServiceController().ListServiceStatuses()
 		return jsonResult(map[string]any{
 			"services": services,
 			"count":    len(services),

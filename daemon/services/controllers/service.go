@@ -14,7 +14,7 @@ import (
 // It handles starting, stopping, and restarting services like Docker, libvirt, SMB, NFS, etc.
 type ServiceController struct {
 	// statusOutput runs an rc script with the "status" argument and returns its
-	// combined output. Nil means lib.ExecCommandOutput; tests inject a fake.
+	// combined output. Nil means runStatusScript; tests inject a fake.
 	statusOutput func(command string, args ...string) (string, error)
 	// readFile reads the /proc/net/tcp tables for the FTP status. Nil means
 	// os.ReadFile; tests inject a fake.
@@ -103,7 +103,7 @@ func (sc *ServiceController) GetServiceStatus(serviceName string) (bool, error) 
 
 	runStatus := sc.statusOutput
 	if runStatus == nil {
-		runStatus = lib.ExecCommandOutput
+		runStatus = runStatusScript
 	}
 	output, err := runStatus(rcScript, "status")
 

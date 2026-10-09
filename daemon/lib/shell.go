@@ -107,6 +107,24 @@ func ExecCommandOutput(command string, args ...string) (string, error) {
 	return string(output), nil
 }
 
+// ExecCommandOutputWithTimeout executes a command and returns its combined
+// output, killing it after timeout. WaitDelay keeps a child process that
+// inherited the output pipe (e.g. one started by a shell script) from
+// blocking the caller long after the deadline.
+func ExecCommandOutputWithTimeout(timeout time.Duration, command string, args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, command, args...) // #nosec G204 -- callers pass validated commands and arguments without shell interpolation
+	cmd.WaitDelay = time.Second
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return string(output), fmt.Errorf("command failed: %w", err)
+	}
+
+	return string(output), nil
+}
+
 // ExecCommandOutputWithContext executes a command and returns combined output,
 // honouring the caller's context for cancellation.
 func ExecCommandOutputWithContext(ctx context.Context, command string, args ...string) (string, error) {

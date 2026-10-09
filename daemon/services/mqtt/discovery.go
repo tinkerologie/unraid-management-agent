@@ -642,17 +642,10 @@ func (c *Client) publishServiceDiscovery() {
 // publishServiceStates queries all service running states and publishes
 // them to the services topic so HA switches reflect the actual state.
 func (c *Client) publishServiceStates() {
-	ctrl := controllers.NewServiceController()
-	services := controllers.ValidServiceNames()
-	states := make(map[string]bool, len(services))
-
-	for _, svc := range services {
-		running, err := ctrl.GetServiceStatus(svc)
-		if err != nil {
-			logger.Debug("MQTT: Failed to check service %s status: %v", svc, err)
-			continue
-		}
-		states[svc] = running
+	statuses := controllers.NewServiceController().ListServiceStatuses()
+	states := make(map[string]bool, len(statuses))
+	for _, svc := range statuses {
+		states[svc.Name] = svc.Running
 	}
 
 	topic := c.buildTopic("services")

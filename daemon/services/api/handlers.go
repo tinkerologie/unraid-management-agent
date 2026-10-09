@@ -3851,19 +3851,7 @@ func (s *Server) handleServiceAction(w http.ResponseWriter, r *http.Request) {
 //	@Success		200	{object}	map[string]interface{}	"Service list with status"
 //	@Router			/services [get]
 func (s *Server) handleServiceList(w http.ResponseWriter, _ *http.Request) {
-	serviceNames := controllers.ValidServiceNames()
-	controller := controllers.NewServiceController()
-
-	type serviceInfo struct {
-		Name    string `json:"name"`
-		Running bool   `json:"running"`
-	}
-
-	services := make([]serviceInfo, 0)
-	for _, name := range serviceNames {
-		running, _ := controller.GetServiceStatus(name)
-		services = append(services, serviceInfo{Name: name, Running: running})
-	}
+	services := controllers.NewServiceController().ListServiceStatuses()
 
 	respondJSON(w, http.StatusOK, map[string]any{
 		"services":  services,

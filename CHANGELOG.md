@@ -58,6 +58,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Faster `/services`** — the rc status checks behind `GET /api/v1/services`, the MCP
+  `list_services` tool and the MQTT service states now run up to 4 at a time instead of one
+  after another (about 2.7 s per request before), each with a 15 s timeout, and keep their
+  order. New `lib.ExecCommandOutputWithTimeout` stops a status script's child processes from
+  holding the call past its deadline.
+  ([#201](https://github.com/ruaan-deysel/unraid-management-agent/issues/201)).
 - **GitHub Actions Ubuntu runner policy** — set release workflow jobs to
   `ubuntu-latest` so CI always tracks the latest supported Ubuntu GitHub-hosted
   image.

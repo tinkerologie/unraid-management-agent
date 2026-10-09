@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/controllers"
 )
 
 // ===== Helper to populate all caches for testing =====
@@ -1041,5 +1042,25 @@ func TestHandleServicesList(t *testing.T) {
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+
+	var body struct {
+		Count    int `json:"count"`
+		Services []struct {
+			Name    string `json:"name"`
+			Running bool   `json:"running"`
+		} `json:"services"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	names := controllers.ValidServiceNames()
+	if body.Count != len(names) || len(body.Services) != len(names) {
+		t.Fatalf("count=%d, %d services, want %d", body.Count, len(body.Services), len(names))
+	}
+	for i, svc := range body.Services {
+		if svc.Name != names[i] {
+			t.Errorf("services[%d] = %q, want %q (stable order)", i, svc.Name, names[i])
+		}
 	}
 }
