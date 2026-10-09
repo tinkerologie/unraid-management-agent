@@ -2272,7 +2272,7 @@ func (s *Server) registerRemediationTools() {
 
 		// Array health: flag if not Started or parity check running.
 		if arrayStatus := s.cacheProvider.GetArrayCache(); arrayStatus != nil {
-			if arrayStatus.State != "Started" {
+			if !arrayStatus.IsStarted() {
 				causes = append(causes, rootCauseEntry{
 					Signal: "array_not_started",
 					Detail: fmt.Sprintf("array state is %q (expected Started)", arrayStatus.State),

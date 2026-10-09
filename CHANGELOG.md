@@ -49,6 +49,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Temperature metric filtering from lm-sensors** — `parseSensorsOutput` now reports only
   `temp*_input` channels, excluding voltage/current/power/fan `_input` metrics that were
   previously misreported as Celsius temperatures. ([#177](https://github.com/ruaan-deysel/unraid-management-agent/pull/177)).
+- **False "Array not started" findings** ([#180](https://github.com/ruaan-deysel/unraid-management-agent/issues/180)) —
+  the health report and the MCP `find_root_cause` tool compared the array state
+  with "Started", but Unraid reports `mdState` as "STARTED", so a running array
+  was always flagged critical. Added a case-insensitive `ArrayStatus.IsStarted()`,
+  used by the health report, `find_root_cause` and the Prometheus metrics.
 
 ## [2026.09.01] - 2026-09-28
 

@@ -451,7 +451,7 @@ func (s *Server) updateMetrics() {
 
 	// Update array metrics
 	if arrCache != nil {
-		if arrCache.State == "STARTED" || arrCache.State == "Started" {
+		if arrCache.IsStarted() {
 			arrayState.Set(1)
 		} else {
 			arrayState.Set(0)

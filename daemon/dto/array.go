@@ -1,7 +1,10 @@
 // Package dto provides data transfer objects for the Unraid Management Agent API.
 package dto
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // ArrayStatus contains Unraid array status information
 type ArrayStatus struct {
@@ -19,4 +22,10 @@ type ArrayStatus struct {
 
 	// SourceStatus is non-nil when the data source is degraded or unavailable.
 	SourceStatus *SourceStatus `json:"source_status,omitempty"`
+}
+
+// IsStarted reports whether the array is started. Unraid's mdState is upper
+// case ("STARTED"), so compare case-insensitively.
+func (a *ArrayStatus) IsStarted() bool {
+	return a != nil && strings.EqualFold(a.State, "STARTED")
 }

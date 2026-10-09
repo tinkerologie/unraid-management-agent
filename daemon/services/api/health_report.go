@@ -25,7 +25,7 @@ func BuildHealthReport(
 
 	// ── Array ─────────────────────────────────────────────────────────────────
 
-	if array != nil && array.State != "Started" {
+	if array != nil && !array.IsStarted() {
 		findings = append(findings, dto.HealthFinding{
 			Severity: "critical",
 			Title:    "Array not started",
