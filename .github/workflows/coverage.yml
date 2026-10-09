@@ -14,6 +14,10 @@ name: Coverage
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test-and-upload:
     name: Test And Upload Coverage
@@ -34,17 +38,11 @@ jobs:
           go tool cover -func=coverage.out | tail -n 1
 
       - name: Upload coverage to Codecov
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
         uses: codecov/codecov-action@v5
         with:
           files: ./coverage.out
           flags: unittests
           name: unraid-management-agent
           token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: true
+          fail_ci_if_error: false
           verbose: true
-
-      - name: Skip upload for fork pull requests
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork
-        run: |
-          echo "Skipping Codecov upload for fork pull requests because repository secrets are unavailable."

@@ -18,5 +18,9 @@ coverage:
         if_ci_failed: error
 
 comment:
-  layout: "reach,diff,flags,tree"
+  layout: "reach,diff,flags,files"
   require_changes: true
+
+ignore:
+  - "daemon/docs"
+  - "tests"

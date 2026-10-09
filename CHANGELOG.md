@@ -9,18 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Automated PR governance checks** — added GitHub Actions workflow enforcing
+  PR template completeness, exempting bots and draft PRs, stripping HTML comments
+  during section validation, and validating issue references (supporting issue
+  numbers, full URLs, and explicit "None" for self-contained changes).
+- **GitHub issue template configuration** — added `.github/ISSUE_TEMPLATE/config.yml`
+  with private security disclosure contact links.
+
 ### Changed
 
 - **GitHub Actions Ubuntu runner policy** — set release workflow jobs to
   `ubuntu-latest` so CI always tracks the latest supported Ubuntu GitHub-hosted
   image.
 - **Automated Codecov reporting in CI** — added a dedicated GitHub Actions
-  coverage workflow that runs `go test -covermode=atomic -coverprofile=coverage.out ./...`
-  on `push` to `main` and `pull_request` events, uploads coverage to Codecov
-  via `codecov/codecov-action@v5`, and added repository-level Codecov status
-  configuration in `.codecov.yml` for project and patch coverage thresholds;
-  fork pull requests skip the upload step so external contributors are not
-  blocked by unavailable repository secrets.
+  coverage workflow running `go test -covermode=atomic -coverprofile=coverage.out ./...`
+  on `push` to `main` and `pull_request` events with concurrency cancellation,
+  uploading to Codecov via `codecov/codecov-action@v5` (including tokenless uploads
+  for public repository fork pull requests), and configured repository status
+  thresholds in `.codecov.yml` with exclusions for generated Swagger docs and tests.
 
 ### Fixed
 

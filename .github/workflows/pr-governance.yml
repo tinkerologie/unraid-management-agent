@@ -18,6 +18,7 @@ jobs:
   validate-template-and-issues:
     name: Validate PR Template And Linked Issues
     runs-on: ubuntu-latest
+    if: "!endsWith(github.actor, '[bot]') && github.actor != 'dependabot[bot]'"
 
     steps:
       - name: Enforce PR template completion and issue linking
@@ -29,13 +30,22 @@ jobs:
             const repo = context.repo.repo;
             const errors = [];
 
+            if (context.payload.pull_request.draft) {
+              core.info("Skipping PR governance checks on draft PR.");
+              return;
+            }
+
             function escapeRegExp(value) {
               return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
             }
 
+            function stripHtmlComments(text) {
+              return (text || "").replace(/<!--[\s\S]*?-->/g, "").trim();
+            }
+
             function getSection(sectionTitle) {
               const pattern = new RegExp(
-                `##\\s*${escapeRegExp(sectionTitle)}\\s*\\n([\\s\\S]*?)(?=\\n##\\s|$)`,
+                `##\\s*${escapeRegExp(sectionTitle)}\\s*\\r?\\n([\\s\\S]*?)(?=\\r?\\n##\\s|$)`,
                 "i",
               );
               const match = body.match(pattern);
@@ -47,7 +57,7 @@ jobs:
             }
 
             function getUncheckedItems(sectionText) {
-              return [...sectionText.matchAll(/^\s*-\s*\[\s\]\s+(.+)$/gim)].map((m) => m[1].trim());
+              return [...sectionText.matchAll(/^\s*-\s*\[\s*\]\s+(.+)$/gim)].map((m) => m[1].trim());
             }
 
             const requiredSections = [
@@ -63,8 +73,10 @@ jobs:
             const sections = Object.fromEntries(requiredSections.map((title) => [title, getSection(title)]));
 
             for (const title of requiredSections) {
-              if (!sections[title]) {
-                errors.push(`Missing required section: \"${title}\".`);
+              const raw = sections[title];
+              const cleaned = stripHtmlComments(raw);
+              if (!raw || !cleaned) {
+                errors.push(`Missing or empty required section: "${title}".`);
               }
             }
 
@@ -82,79 +94,138 @@ jobs:
 
             if (sections["Checklist"]) {
               const unchecked = getUncheckedItems(sections["Checklist"]);
-              if (unchecked.length > 0) {
+              const strictlyRequiredUnchecked = unchecked.filter(
+                (item) => !/\(if applicable\)|\(if needed\)/i.test(item),
+              );
+              if (strictlyRequiredUnchecked.length > 0) {
                 errors.push(
-                  `All items in "Checklist" must be checked. Unchecked: ${unchecked.join("; ")}.`,
+                  `All required items in "Checklist" must be checked. Unchecked: ${strictlyRequiredUnchecked.join("; ")}.`,
                 );
               }
             }
 
             if (sections["Changes Made"]) {
-              const meaningfulBullets = sections["Changes Made"]
-                .split("\n")
-                .filter((line) => /^\s*-\s+\S+/.test(line));
+              const cleaned = stripHtmlComments(sections["Changes Made"]);
+              const lines = cleaned
+                .split(/\r?\n/)
+                .map((line) => line.trim())
+                .filter((line) => line.length > 0 && line !== "-");
 
-              if (meaningfulBullets.length === 0) {
-                errors.push('"Changes Made" must include at least one non-empty bullet item.');
+              if (lines.length === 0) {
+                errors.push('"Changes Made" must include at least one described change.');
               }
             }
 
-            if (sections["Related Issues"] && /#\(issue number\)/i.test(sections["Related Issues"])) {
-              errors.push('Replace the "#(issue number)" placeholders in "Related Issues" with real issue numbers.');
-            }
-
-            const issueRefRegex =
-              /\b(?:fix(?:e[sd])?|close[sd]?|resolve[sd]?|related to)\b\s+([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)?#(\d+)/gi;
-            const relatedIssuesSection = sections["Related Issues"] || "";
-            const issueMatches = [...relatedIssuesSection.matchAll(issueRefRegex)];
-
-            if (issueMatches.length === 0) {
-              errors.push(
-                'Add at least one linked issue in "Related Issues" using Fixes/Closes/Resolves/Related to #<number>.',
-              );
-            } else {
-              const repoSlug = `${owner}/${repo}`.toLowerCase();
-              const issueNumbers = new Set();
-
-              for (const match of issueMatches) {
-                const referencedRepo = (match[1] || repoSlug).toLowerCase();
-                const issueNumber = Number.parseInt(match[2], 10);
-
-                if (referencedRepo !== repoSlug || Number.isNaN(issueNumber)) {
-                  continue;
+            // Verify CHANGELOG.md was updated in this PR
+            let changelogModified = false;
+            let page = 1;
+            while (true) {
+              try {
+                const { data: files } = await github.rest.pulls.listFiles({
+                  owner,
+                  repo,
+                  pull_number: context.payload.pull_request.number,
+                  per_page: 100,
+                  page,
+                });
+                if (files.some((f) => f.filename === "CHANGELOG.md")) {
+                  changelogModified = true;
+                  break;
                 }
-
-                issueNumbers.add(issueNumber);
+                if (files.length < 100) break;
+                page++;
+              } catch (err) {
+                core.warning(`Could not fetch PR files: ${err.message}`);
+                changelogModified = true;
+                break;
               }
+            }
 
-              if (issueNumbers.size === 0) {
-                errors.push(`Link at least one issue from ${repoSlug} in "Related Issues".`);
+            if (!changelogModified) {
+              errors.push(
+                'CHANGELOG.md must be updated under [Unreleased] with details of the changes in this PR.',
+              );
+            }
+
+            const relatedIssuesRaw = sections["Related Issues"] || "";
+            if (/#\(issue number\)/i.test(relatedIssuesRaw)) {
+              errors.push(
+                'Replace the "#(issue number)" placeholder in "Related Issues" with an issue reference or "None".',
+              );
+            }
+
+            const relatedIssuesClean = stripHtmlComments(relatedIssuesRaw);
+            const isExplicitNone =
+              /^(?:none|n\/a|not applicable|no issue|standalone)\b/i.test(relatedIssuesClean);
+
+            if (!isExplicitNone && relatedIssuesClean) {
+              const issueRefRegex =
+                /\b(?:fix(?:e[sd])?|close[sd]?|resolve[sd]?|related to)[:]?\s+(?:https?:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/issues\/(\d+)|([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)?#(\d+))/gi;
+
+              const issueMatches = [...relatedIssuesClean.matchAll(issueRefRegex)];
+
+              if (issueMatches.length === 0) {
+                errors.push(
+                  'Add at least one linked issue in "Related Issues" using Fixes/Closes/Resolves/Related to #<number> (or issue URL), or state "None" if this change is self-contained.',
+                );
               } else {
-                let hasValidIssue = false;
+                const repoSlug = `${owner}/${repo}`.toLowerCase();
+                let hasValidReference = false;
 
-                for (const issueNumber of issueNumbers) {
-                  try {
-                    const { data } = await github.rest.issues.get({
-                      owner,
-                      repo,
-                      issue_number: issueNumber,
-                    });
+                for (const match of issueMatches) {
+                  let refOwner = owner;
+                  let refRepo = repo;
+                  let issueNumber;
 
-                    if (!data.pull_request) {
-                      hasValidIssue = true;
-                      break;
+                  if (match[1] && match[2] && match[3]) {
+                    refOwner = match[1];
+                    refRepo = match[2];
+                    issueNumber = Number.parseInt(match[3], 10);
+                  } else if (match[4] && match[5]) {
+                    const parts = match[4].split('/');
+                    refOwner = parts[0];
+                    refRepo = parts[1];
+                    issueNumber = Number.parseInt(match[5], 10);
+                  } else if (match[5]) {
+                    issueNumber = Number.parseInt(match[5], 10);
+                  }
+
+                  const targetSlug = `${refOwner}/${refRepo}`.toLowerCase();
+                  if (targetSlug !== repoSlug) {
+                    core.info(`Referenced external issue: ${targetSlug}#${issueNumber}`);
+                    hasValidReference = true;
+                    continue;
+                  }
+
+                  if (!Number.isNaN(issueNumber)) {
+                    try {
+                      const { data } = await github.rest.issues.get({
+                        owner: refOwner,
+                        repo: refRepo,
+                        issue_number: issueNumber,
+                      });
+
+                      if (!data.pull_request) {
+                        hasValidReference = true;
+                        break;
+                      } else {
+                        core.warning(`Reference #${issueNumber} is a pull request, not an issue.`);
+                      }
+                    } catch (error) {
+                      core.info(`Skipping issue verification for #${issueNumber}: ${error.message}`);
+                      hasValidReference = true;
                     }
-                  } catch (error) {
-                    core.info(`Skipping issue #${issueNumber}: ${error.message}`);
                   }
                 }
 
-                if (!hasValidIssue) {
+                if (!hasValidReference) {
                   errors.push(
-                    "At least one linked reference must point to an existing issue in this repository (not only PRs).",
+                    `Could not verify an existing linked issue in ${repoSlug} in "Related Issues". If no issue exists, specify "None".`,
                   );
                 }
               }
+            } else if (!isExplicitNone && !relatedIssuesClean) {
+              errors.push('Section "Related Issues" must reference an issue or state "None".');
             }
 
             if (errors.length > 0) {

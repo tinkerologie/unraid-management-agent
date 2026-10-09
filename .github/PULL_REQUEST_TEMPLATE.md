@@ -17,13 +17,10 @@
 
 ## Related Issues
 
-<!-- Link to related issues -->
-<!-- At least one linked issue in this repository is required -->
+<!-- Link to related issues, or specify "None" for self-contained changes -->
+<!-- Examples: Fixes #123, Closes https://github.com/..., Related to #456, or None -->
 
-Fixes #(issue number)
-Closes #(issue number)
-Resolves #(issue number)
-Related to #(issue number)
+Fixes #
 
 ## Hardware Configuration (if applicable)
 
@@ -82,7 +79,7 @@ Related to #(issue number)
 
 - [ ] Code comments added/updated
 - [ ] README.md updated (if needed)
-- [ ] CLAUDE.md updated (if architecture changed)
+- [ ] AGENTS.md / developer documentation updated (if architecture or guidelines changed)
 - [ ] CONTRIBUTING.md updated (if contribution process changed)
 - [ ] API documentation updated (if API changed)
 - [ ] No documentation needed
@@ -103,15 +100,16 @@ Related to #(issue number)
 
 <!-- Ensure you've completed all items before submitting -->
 
-- [ ] I linked at least one existing issue in this repository in **Related Issues**
+- [ ] I have updated CHANGELOG.md under [Unreleased] with details of this change
+- [ ] I linked related issues or noted "None" in **Related Issues**
 - [ ] I completed all required sections in this template and removed placeholder-only content
 - [ ] My code follows the project's coding standards
 - [ ] I have performed a self-review of my own code
-- [ ] I have commented my code, particularly in hard-to-understand areas
+- [ ] I have commented my code, particularly in hard-to-understand areas (if applicable)
 - [ ] My changes generate no new warnings
-- [ ] I have added tests that prove my fix is effective or that my feature works
+- [ ] I have added tests that prove my fix is effective or that my feature works (if applicable)
 - [ ] New and existing unit tests pass locally with my changes
-- [ ] Any dependent changes have been merged and published
+- [ ] Any dependent changes have been merged and published (if applicable)
 - [ ] I have read and followed the [CONTRIBUTING.md](../CONTRIBUTING.md) guidelines
 - [ ] No sensitive information (API keys, passwords, personal data) is included
 
