@@ -478,6 +478,30 @@ func TestHandleServiceAction_WrongMethod(t *testing.T) {
 	}
 }
 
+// TestHandleServiceAction_FTPUnsupported checks that FTP actions get a 400 with guidance instead of a 500.
+func TestHandleServiceAction_FTPUnsupported(t *testing.T) {
+	server, _ := setupTestServer()
+
+	req, err := http.NewRequest("POST", "/api/v1/services/ftp/start", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	server.router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+	var resp dto.Response
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Success || !strings.Contains(resp.Message, "Settings > FTP Server") {
+		t.Errorf("unexpected response: %+v", resp)
+	}
+}
+
 // ===== Process Handler Tests =====
 
 func TestHandleProcessList_DefaultParams(t *testing.T) {

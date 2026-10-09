@@ -45,6 +45,12 @@ const (
 	ProcUptime = "/proc/uptime"
 	// ProcStat is the path to the /proc/stat file.
 	ProcStat = "/proc/stat"
+	// ProcNetTCP is the path to the IPv4 TCP socket table.
+	ProcNetTCP = "/proc/net/tcp"
+	// ProcNetTCP6 is the path to the IPv6 TCP socket table.
+	ProcNetTCP6 = "/proc/net/tcp6"
+	// InetdConf is the path to the inetd configuration, which starts the FTP server.
+	InetdConf = "/etc/inetd.conf"
 	// SysHwmon is the path to the /sys/class/hwmon directory.
 	SysHwmon = "/sys/class/hwmon"
 	// SysPowercap is the path to the /sys/class/powercap directory (Intel RAPL).

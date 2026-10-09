@@ -1,7 +1,9 @@
 package controllers
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
@@ -14,7 +16,20 @@ type ServiceController struct {
 	// statusOutput runs an rc script with the "status" argument and returns its
 	// combined output. Nil means lib.ExecCommandOutput; tests inject a fake.
 	statusOutput func(command string, args ...string) (string, error)
+	// readFile reads the /proc/net/tcp tables for the FTP status. Nil means
+	// os.ReadFile; tests inject a fake.
+	readFile func(name string) ([]byte, error)
 }
+
+// ErrServiceActionUnsupported is returned when a service can be queried but
+// not started, stopped or restarted through the agent.
+var ErrServiceActionUnsupported = errors.New("service action not supported")
+
+// ftpService is the FTP server. Unraid has no rc script for it: vsftpd is
+// started by inetd, and Settings > FTP Server enables or disables it by
+// editing /etc/inetd.conf (webGui/scripts/ftpusers), so it is not in
+// serviceMap.
+const ftpService = "ftp"
 
 // NewServiceController creates a new service controller.
 func NewServiceController() *ServiceController {
@@ -28,7 +43,6 @@ var serviceMap = map[string]string{
 	"smb":       "/etc/rc.d/rc.samba",
 	"samba":     "/etc/rc.d/rc.samba",
 	"nfs":       "/etc/rc.d/rc.nfsd",
-	"ftp":       "/etc/rc.d/rc.proftpd",
 	"sshd":      "/etc/rc.d/rc.sshd",
 	"ssh":       "/etc/rc.d/rc.sshd",
 	"nginx":     "/etc/rc.d/rc.nginx",
@@ -73,6 +87,15 @@ func (sc *ServiceController) RestartService(serviceName string) error {
 
 // GetServiceStatus checks if a service is running.
 func (sc *ServiceController) GetServiceStatus(serviceName string) (bool, error) {
+	if strings.EqualFold(serviceName, ftpService) {
+		// Same check as the webGUI's FTP Server page: is port 21 listening?
+		readFile := sc.readFile
+		if readFile == nil {
+			readFile = os.ReadFile
+		}
+		return lib.FTPServerListening(readFile), nil
+	}
+
 	rcScript, ok := serviceMap[strings.ToLower(serviceName)]
 	if !ok {
 		return false, fmt.Errorf("unknown service: %s (valid: %s)", serviceName, strings.Join(ValidServiceNames(), ", "))
@@ -124,6 +147,11 @@ func (sc *ServiceController) executeAction(serviceName, action string) error {
 
 	if !validActions[action] {
 		return fmt.Errorf("invalid action: %s (valid: start, stop, restart)", action)
+	}
+
+	if serviceName == ftpService {
+		return fmt.Errorf("%w: cannot %s ftp: Unraid starts the FTP server from inetd, "+
+			"enable or disable it under Settings > FTP Server", ErrServiceActionUnsupported, action)
 	}
 
 	rcScript, ok := serviceMap[serviceName]

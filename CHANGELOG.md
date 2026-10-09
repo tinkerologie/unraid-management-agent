@@ -46,6 +46,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **FTP status and actions on Unraid 7** — Unraid starts vsftpd from inetd, but `/services`
+  checked a non-existent `/etc/rc.d/rc.proftpd` (always stopped, actions failed with an
+  opaque 500) and `/settings/network-services` read `ftp.enabled` from leftover Tips and
+  Tweaks keys. FTP is now enabled when `/etc/inetd.conf` has an active `ftp` line and
+  running when TCP port 21 is listening, as the webGUI reports it. FTP start/stop/restart
+  return a clear "not supported, use Settings > FTP Server" error (HTTP 400).
+  ([#199](https://github.com/ruaan-deysel/unraid-management-agent/issues/199)).
 - **CI coverage test on Linux** — allowed HTTP 200 in `TestLogFileEndpoint` when `/var/log/syslog` exists on Linux runners, unblocking coverage profile generation.
 - **Codecov PR comments** — configured `.codecov.yml` with `require_changes: false` so coverage reports are posted on all pull requests.
 

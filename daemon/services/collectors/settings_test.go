@@ -934,3 +934,60 @@ func TestSettingsCollector_UpdateStatus_OSUpdateComparison(t *testing.T) {
 		})
 	}
 }
+
+// TestSettingsCollector_NetworkServicesFTP checks FTP enabled/running come from inetd.conf and the port 21 listener.
+func TestSettingsCollector_NetworkServicesFTP(t *testing.T) {
+	const tcpHeader = "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n"
+	const listen21 = tcpHeader + "   1: 00000000:0015 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 52536051 1 0 100 0 0 10 0\n"
+	// The FTP lines of /etc/inetd.conf on Unraid 7.4, FTP server disabled
+	const inetdDisabled = "# limetech - disable ftp - new security policy\n#ftp     stream  tcp     nowait  root    /usr/sbin/tcpd  vsftpd\n"
+	const inetdEnabled = "# limetech - disable ftp - new security policy\nftp     stream  tcp     nowait  root    /usr/sbin/tcpd  vsftpd\n"
+
+	tests := []struct {
+		name        string
+		inetd       string
+		tcp         string
+		wantEnabled bool
+		wantRunning bool
+	}{
+		{"disabled", inetdDisabled, tcpHeader, false, false},
+		{"enabled and listening", inetdEnabled, listen21, true, true},
+		{"enabled, inetd not listening", inetdEnabled, tcpHeader, true, false},
+		{"inetd.conf unreadable", "", tcpHeader, false, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			files := map[string]string{"/proc/net/tcp": tt.tcp}
+			if tt.inetd != "" {
+				files["/etc/inetd.conf"] = tt.inetd
+			}
+			c := &SettingsCollector{readFile: func(name string) ([]byte, error) {
+				if data, ok := files[name]; ok {
+					return []byte(data), nil
+				}
+				return nil, os.ErrNotExist
+			}}
+			status, err := c.GetNetworkServicesStatus()
+			if err != nil {
+				t.Fatalf("GetNetworkServicesStatus: %v", err)
+			}
+			if status.FTP.Enabled != tt.wantEnabled || status.FTP.Running != tt.wantRunning {
+				t.Errorf("FTP enabled=%v running=%v, want enabled=%v running=%v",
+					status.FTP.Enabled, status.FTP.Running, tt.wantEnabled, tt.wantRunning)
+			}
+		})
+	}
+}
+
+// TestSettingsCollector_NetworkServicesDefaultReader runs the FTP check with the real file reader.
+func TestSettingsCollector_NetworkServicesDefaultReader(t *testing.T) {
+	// Reads the real /etc/inetd.conf and /proc/net/tcp tables (absent on
+	// macOS); only checks that the FTP entry is filled in without error.
+	status, err := NewSettingsCollector().GetNetworkServicesStatus()
+	if err != nil {
+		t.Fatalf("GetNetworkServicesStatus: %v", err)
+	}
+	if status.FTP.Name != "FTP" || status.FTP.Port != 21 {
+		t.Errorf("unexpected FTP entry: %+v", status.FTP)
+	}
+}

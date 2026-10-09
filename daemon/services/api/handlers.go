@@ -3,6 +3,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -3813,6 +3814,15 @@ func (s *Server) handleServiceAction(w http.ResponseWriter, r *http.Request) {
 		err = controller.StopService(serviceName)
 	case "restart":
 		err = controller.RestartService(serviceName)
+	}
+
+	if errors.Is(err, controllers.ErrServiceActionUnsupported) {
+		respondJSON(w, http.StatusBadRequest, dto.Response{
+			Success:   false,
+			Message:   err.Error(),
+			Timestamp: time.Now(),
+		})
+		return
 	}
 
 	if err != nil {

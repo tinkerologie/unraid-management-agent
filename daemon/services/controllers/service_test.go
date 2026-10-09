@@ -3,6 +3,7 @@ package controllers
 import (
 	"errors"
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -70,9 +71,16 @@ func TestValidServiceNames_Stability(t *testing.T) {
 }
 
 func TestServiceMap_AllValidNamesHaveScripts(t *testing.T) {
-	// Every service returned by ValidServiceNames should have a mapping in serviceMap
+	// Every service returned by ValidServiceNames should have a mapping in
+	// serviceMap, except ftp, which inetd starts (no rc script).
 	names := ValidServiceNames()
 	for _, name := range names {
+		if name == ftpService {
+			if _, ok := serviceMap[name]; ok {
+				t.Errorf("ftp must not map to an rc script")
+			}
+			continue
+		}
 		if _, ok := serviceMap[name]; !ok {
 			t.Errorf("service %q in ValidServiceNames but not in serviceMap", name)
 		}
@@ -198,6 +206,74 @@ func TestGetServiceStatus_RcScriptOutput(t *testing.T) {
 			}
 			if running != tt.want {
 				t.Errorf("running = %v, want %v", running, tt.want)
+			}
+		})
+	}
+}
+
+// TestGetServiceStatus_FTP checks FTP status comes from the port 21 listener, not an rc script.
+func TestGetServiceStatus_FTP(t *testing.T) {
+	const header = "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n"
+	listening := header + "   1: 00000000:0015 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 52536051 1 0 100 0 0 10 0\n"
+	tests := []struct {
+		name    string
+		service string
+		tcp     string
+		want    bool
+	}{
+		{"inetd listening on port 21", "ftp", listening, true},
+		{"upper case name", "FTP", listening, true},
+		{"nothing on port 21", "ftp", header, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sc := &ServiceController{
+				statusOutput: func(string, ...string) (string, error) {
+					t.Fatal("ftp status must not run an rc script")
+					return "", nil
+				},
+				readFile: func(name string) ([]byte, error) {
+					if name == "/proc/net/tcp" {
+						return []byte(tt.tcp), nil
+					}
+					return nil, errors.New("no such file")
+				},
+			}
+			running, err := sc.GetServiceStatus(tt.service)
+			if err != nil {
+				t.Fatalf("GetServiceStatus returned error: %v", err)
+			}
+			if running != tt.want {
+				t.Errorf("running = %v, want %v", running, tt.want)
+			}
+		})
+	}
+}
+
+// TestGetServiceStatus_FTPDefaultReader runs the FTP status check with the real file reader.
+func TestGetServiceStatus_FTPDefaultReader(t *testing.T) {
+	// Reads the real /proc/net/tcp tables (absent on macOS); only checks
+	// that no rc script is needed and no error is returned.
+	if _, err := NewServiceController().GetServiceStatus("ftp"); err != nil {
+		t.Fatalf("GetServiceStatus(ftp) returned error: %v", err)
+	}
+}
+
+// TestFTPActionsUnsupported checks FTP start/stop/restart return ErrServiceActionUnsupported.
+func TestFTPActionsUnsupported(t *testing.T) {
+	sc := NewServiceController()
+	for name, action := range map[string]func(string) error{
+		"start":   sc.StartService,
+		"stop":    sc.StopService,
+		"restart": sc.RestartService,
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := action("FTP")
+			if !errors.Is(err, ErrServiceActionUnsupported) {
+				t.Fatalf("err = %v, want ErrServiceActionUnsupported", err)
+			}
+			if !strings.Contains(err.Error(), "Settings > FTP Server") {
+				t.Errorf("error %q does not point to Settings > FTP Server", err)
 			}
 		})
 	}

@@ -15,11 +15,16 @@ import (
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 )
 
 // SettingsCollector collects extended settings information from Unraid configuration files
-type SettingsCollector struct{}
+type SettingsCollector struct {
+	// readFile reads /etc/inetd.conf and the /proc/net/tcp tables for the FTP
+	// status. Nil means os.ReadFile; tests inject a fake.
+	readFile func(name string) ([]byte, error)
+}
 
 // NewSettingsCollector creates a new settings collector
 func NewSettingsCollector() *SettingsCollector {
@@ -798,12 +803,19 @@ func (c *SettingsCollector) GetNetworkServicesStatus() (*dto.NetworkServicesStat
 		Description: "Apple Filing Protocol (legacy)",
 	}
 
-	// FTP
-	ftpEnabled := mergedSettings["FTP"] == "yes" || mergedSettings["FTP_TELNET"] == "yes"
+	// FTP: Unraid starts vsftpd from inetd, one process per session, and
+	// Settings > FTP Server enables it by uncommenting the "ftp" line in
+	// /etc/inetd.conf. Running means port 21 is listening, the check the
+	// webGUI uses.
+	readFile := c.readFile
+	if readFile == nil {
+		readFile = os.ReadFile
+	}
+	inetdConf, _ := readFile(constants.InetdConf) // unreadable: not enabled
 	status.FTP = dto.NetworkServiceInfo{
 		Name:        "FTP",
-		Enabled:     ftpEnabled,
-		Running:     c.isServiceRunning("vsftpd") || c.isServiceRunning("proftpd"),
+		Enabled:     lib.InetdServiceEnabled(inetdConf, "ftp"),
+		Running:     lib.FTPServerListening(readFile),
 		Port:        21,
 		Description: "FTP file transfer",
 	}
