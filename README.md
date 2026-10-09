@@ -297,6 +297,7 @@ Base URL: `http://localhost:8043/api/v1`
 - `GET /vm/{id}` - Get VM details
 - `GET /ups` - UPS status
 - `GET /gpu` - GPU metrics
+- `GET /storage/topology` - SAS storage topology: controllers, HBA ports, enclosures (PSUs, fans, sensors, I/O modules, cabling) and drive paths/link speeds (storcli and/or sg_ses)
 - `GET /logs` - List log files or get log content
 - `GET /logs/{filename}` - Get specific log file by name
 

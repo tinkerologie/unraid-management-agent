@@ -161,6 +161,10 @@ const (
 	// IntervalMover is the interval for collecting mover status in seconds.
 	// 30 seconds balances responsiveness with low overhead (reads two local files).
 	IntervalMover = 30
+	// IntervalStorageTopology is the interval for collecting the SAS storage topology
+	// (storcli + sg_ses) in seconds. Shelf hardware state changes rarely and storcli
+	// talks to controller firmware, so the default is deliberately long.
+	IntervalStorageTopology = 300
 
 	// WSPingInterval is the WebSocket ping interval in seconds.
 	WSPingInterval = 30

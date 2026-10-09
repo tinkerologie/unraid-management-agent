@@ -61,6 +61,8 @@ var (
 	TopicOSUpdateUpdate = domain.NewTopic[*dto.OSUpdateStatus]("os_update_update")
 	// TopicMoverUpdate is published by the mover collector with *dto.MoverStatus.
 	TopicMoverUpdate = domain.NewTopic[*dto.MoverStatus]("mover_update")
+	// TopicStorageTopologyUpdate is published by the storage_topology collector with *dto.StorageTopology.
+	TopicStorageTopologyUpdate = domain.NewTopic[*dto.StorageTopology]("storage_topology_update")
 	// TopicAgentWake is published by alerting/watchdog to wake the autonomous agent
 	// with a dto.AgentWakeEvent describing the triggering incident.
 	TopicAgentWake = domain.NewTopic[dto.AgentWakeEvent]("agent_wake")

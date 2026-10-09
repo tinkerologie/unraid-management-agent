@@ -289,7 +289,7 @@ func (cm *CollectorManager) GetAllStatus() dto.CollectorsStatusResponse {
 		"ups", "nut", "gpu", "shares", "network",
 		"hardware", "zfs", "notification", "registration", "unassigned",
 		"fancontrol", "tuning", "docker_update", "docker_networks", "plugin_update",
-		"os_update", "mover",
+		"os_update", "mover", "storage_topology",
 	}
 
 	for _, name := range collectorOrder {
@@ -387,6 +387,8 @@ func (cm *CollectorManager) getDefaultInterval(name string) int {
 		"plugin_update":   constants.IntervalPluginUpdate,
 		"os_update":       constants.IntervalOSUpdate,
 		"mover":           constants.IntervalMover,
+
+		"storage_topology": constants.IntervalStorageTopology,
 	}
 
 	if interval, ok := defaults[name]; ok {
@@ -582,4 +584,10 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 	cm.Register("mover", func(ctx *domain.Context) Collector {
 		return collectors.NewMoverCollector(ctx)
 	}, intervals.Mover, false)
+
+	// Storage topology collector — storcli (Broadcom/LSI) and sg_ses (SES enclosures).
+	// Read-only queries, run sequentially; a no-op on systems without either tool.
+	cm.Register("storage_topology", func(ctx *domain.Context) Collector {
+		return collectors.NewStorageTopologyCollector(ctx)
+	}, intervals.StorageTopology, false)
 }

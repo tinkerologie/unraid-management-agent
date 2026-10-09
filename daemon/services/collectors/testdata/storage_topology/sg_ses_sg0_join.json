@@ -1,0 +1,1067 @@
+{
+    "json_format_version": [
+        1,
+        0
+    ],
+    "utility_invoked": {
+        "name": "sg_ses",
+        "version_date": "2.88 20260526",
+        "argv": [
+            "sg_ses",
+            "--json",
+            "--join",
+            "/dev/sg0"
+        ]
+    },
+    "join_of_diagnostic_pages": {
+        "element_list": [
+            {
+                "element_type": {
+                    "i": 23,
+                    "meaning": "Array device slot"
+                },
+                "descriptor": "ArrayDevicesInSubEnclsr0",
+                "element_number": -1,
+                "overall": 1,
+                "individual": false,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 0,
+                        "meaning": "Unsupported"
+                    },
+                    "rqst_ok": 0,
+                    "rqst_rsvd_device": 0,
+                    "rqst_hot_spare": 0,
+                    "rqst_cons_check": 0,
+                    "rqst_in_crit_array": 0,
+                    "rqst_in_failed_array": 0,
+                    "rqst_rebuild_remap": 0,
+                    "rqst_r_r_abort": 0,
+                    "rqst_active": 0,
+                    "app_client_bypassed_a": 0,
+                    "do_not_remove": 0,
+                    "enclosure_bypassed_a": 0,
+                    "enclosure_bypassed_b": 0,
+                    "ready_to_insert": 0,
+                    "rmv": 0,
+                    "ident": 0,
+                    "report": 0,
+                    "app_client_bypassed_b": 0,
+                    "fault_sensed": 0,
+                    "fault_reqstd": 0,
+                    "device_off": 0,
+                    "bypassed_a": 0,
+                    "bypassed_b": 0,
+                    "device_bypassed_a": 0,
+                    "device_bypassed_b": 0
+                }
+            },
+            {
+                "element_type": {
+                    "i": 23,
+                    "meaning": "Array device slot"
+                },
+                "descriptor": "ArrayDevice00",
+                "element_number": 0,
+                "overall": 0,
+                "individual": true,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 1,
+                        "meaning": "OK"
+                    },
+                    "rqst_ok": 0,
+                    "rqst_rsvd_device": 0,
+                    "rqst_hot_spare": 0,
+                    "rqst_cons_check": 0,
+                    "rqst_in_crit_array": 0,
+                    "rqst_in_failed_array": 0,
+                    "rqst_rebuild_remap": 0,
+                    "rqst_r_r_abort": 0,
+                    "rqst_active": 0,
+                    "app_client_bypassed_a": 0,
+                    "do_not_remove": 0,
+                    "enclosure_bypassed_a": 0,
+                    "enclosure_bypassed_b": 0,
+                    "ready_to_insert": 0,
+                    "rmv": 0,
+                    "ident": 0,
+                    "report": 0,
+                    "app_client_bypassed_b": 0,
+                    "fault_sensed": 0,
+                    "fault_reqstd": 0,
+                    "device_off": 0,
+                    "bypassed_a": 0,
+                    "bypassed_b": 0,
+                    "device_bypassed_a": 0,
+                    "device_bypassed_b": 0
+                },
+                "additional_element_status_descriptor": {
+                    "pcie_protocol_type": {
+                        "i": 1,
+                        "meaning": "NVMe"
+                    },
+                    "number_of_ports": 1,
+                    "not_all_ports": 0,
+                    "device_slot_number": 0,
+                    "pcie_vendor_id": 4719,
+                    "serial_number": "                    ",
+                    "model_number": "                                        ",
+                    "physical_port_descriptor_list": [
+                        {
+                            "psn_valid": 1,
+                            "bdf_valid": {
+                                "i": 1,
+                                "meaning": "bus number, device number and function number field are valid"
+                            },
+                            "cid_valid": 1,
+                            "controller_id": 0,
+                            "bus_number": 35,
+                            "device_number": 0,
+                            "function_number": 0,
+                            "physical_slot_number": 0
+                        }
+                    ]
+                }
+            },
+            {
+                "element_type": {
+                    "i": 23,
+                    "meaning": "Array device slot"
+                },
+                "descriptor": "ArrayDevice01",
+                "element_number": 1,
+                "overall": 0,
+                "individual": true,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 1,
+                        "meaning": "OK"
+                    },
+                    "rqst_ok": 0,
+                    "rqst_rsvd_device": 0,
+                    "rqst_hot_spare": 0,
+                    "rqst_cons_check": 0,
+                    "rqst_in_crit_array": 0,
+                    "rqst_in_failed_array": 0,
+                    "rqst_rebuild_remap": 0,
+                    "rqst_r_r_abort": 0,
+                    "rqst_active": 0,
+                    "app_client_bypassed_a": 0,
+                    "do_not_remove": 0,
+                    "enclosure_bypassed_a": 0,
+                    "enclosure_bypassed_b": 0,
+                    "ready_to_insert": 0,
+                    "rmv": 0,
+                    "ident": 0,
+                    "report": 0,
+                    "app_client_bypassed_b": 0,
+                    "fault_sensed": 0,
+                    "fault_reqstd": 0,
+                    "device_off": 0,
+                    "bypassed_a": 0,
+                    "bypassed_b": 0,
+                    "device_bypassed_a": 0,
+                    "device_bypassed_b": 0
+                },
+                "additional_element_status_descriptor": {
+                    "pcie_protocol_type": {
+                        "i": 1,
+                        "meaning": "NVMe"
+                    },
+                    "number_of_ports": 1,
+                    "not_all_ports": 0,
+                    "device_slot_number": 2,
+                    "pcie_vendor_id": 6535,
+                    "serial_number": "                    ",
+                    "model_number": "                                        ",
+                    "physical_port_descriptor_list": [
+                        {
+                            "psn_valid": 1,
+                            "bdf_valid": {
+                                "i": 1,
+                                "meaning": "bus number, device number and function number field are valid"
+                            },
+                            "cid_valid": 1,
+                            "controller_id": 0,
+                            "bus_number": 37,
+                            "device_number": 0,
+                            "function_number": 0,
+                            "physical_slot_number": 2
+                        }
+                    ]
+                }
+            },
+            {
+                "element_type": {
+                    "i": 23,
+                    "meaning": "Array device slot"
+                },
+                "descriptor": "",
+                "element_number": 2,
+                "overall": 0,
+                "individual": true,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 5,
+                        "meaning": "Not installed"
+                    },
+                    "rqst_ok": 0,
+                    "rqst_rsvd_device": 0,
+                    "rqst_hot_spare": 0,
+                    "rqst_cons_check": 0,
+                    "rqst_in_crit_array": 0,
+                    "rqst_in_failed_array": 0,
+                    "rqst_rebuild_remap": 0,
+                    "rqst_r_r_abort": 0,
+                    "rqst_active": 0,
+                    "app_client_bypassed_a": 0,
+                    "do_not_remove": 0,
+                    "enclosure_bypassed_a": 0,
+                    "enclosure_bypassed_b": 0,
+                    "ready_to_insert": 0,
+                    "rmv": 0,
+                    "ident": 0,
+                    "report": 0,
+                    "app_client_bypassed_b": 0,
+                    "fault_sensed": 0,
+                    "fault_reqstd": 0,
+                    "device_off": 0,
+                    "bypassed_a": 0,
+                    "bypassed_b": 0,
+                    "device_bypassed_a": 0,
+                    "device_bypassed_b": 0
+                },
+                "additional_element_status_descriptor": {}
+            },
+            {
+                "element_type": {
+                    "i": 23,
+                    "meaning": "Array device slot"
+                },
+                "descriptor": "",
+                "element_number": 3,
+                "overall": 0,
+                "individual": true,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 5,
+                        "meaning": "Not installed"
+                    },
+                    "rqst_ok": 0,
+                    "rqst_rsvd_device": 0,
+                    "rqst_hot_spare": 0,
+                    "rqst_cons_check": 0,
+                    "rqst_in_crit_array": 0,
+                    "rqst_in_failed_array": 0,
+                    "rqst_rebuild_remap": 0,
+                    "rqst_r_r_abort": 0,
+                    "rqst_active": 0,
+                    "app_client_bypassed_a": 0,
+                    "do_not_remove": 0,
+                    "enclosure_bypassed_a": 0,
+                    "enclosure_bypassed_b": 0,
+                    "ready_to_insert": 0,
+                    "rmv": 0,
+                    "ident": 0,
+                    "report": 0,
+                    "app_client_bypassed_b": 0,
+                    "fault_sensed": 0,
+                    "fault_reqstd": 0,
+                    "device_off": 0,
+                    "bypassed_a": 0,
+                    "bypassed_b": 0,
+                    "device_bypassed_a": 0,
+                    "device_bypassed_b": 0
+                },
+                "additional_element_status_descriptor": {}
+            },
+            {
+                "element_type": {
+                    "i": 23,
+                    "meaning": "Array device slot"
+                },
+                "descriptor": "",
+                "element_number": 4,
+                "overall": 0,
+                "individual": true,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 5,
+                        "meaning": "Not installed"
+                    },
+                    "rqst_ok": 0,
+                    "rqst_rsvd_device": 0,
+                    "rqst_hot_spare": 0,
+                    "rqst_cons_check": 0,
+                    "rqst_in_crit_array": 0,
+                    "rqst_in_failed_array": 0,
+                    "rqst_rebuild_remap": 0,
+                    "rqst_r_r_abort": 0,
+                    "rqst_active": 0,
+                    "app_client_bypassed_a": 0,
+                    "do_not_remove": 0,
+                    "enclosure_bypassed_a": 0,
+                    "enclosure_bypassed_b": 0,
+                    "ready_to_insert": 0,
+                    "rmv": 0,
+                    "ident": 0,
+                    "report": 0,
+                    "app_client_bypassed_b": 0,
+                    "fault_sensed": 0,
+                    "fault_reqstd": 0,
+                    "device_off": 0,
+                    "bypassed_a": 0,
+                    "bypassed_b": 0,
+                    "device_bypassed_a": 0,
+                    "device_bypassed_b": 0
+                },
+                "additional_element_status_descriptor": {}
+            },
+            {
+                "element_type": {
+                    "i": 23,
+                    "meaning": "Array device slot"
+                },
+                "descriptor": "",
+                "element_number": 5,
+                "overall": 0,
+                "individual": true,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 5,
+                        "meaning": "Not installed"
+                    },
+                    "rqst_ok": 0,
+                    "rqst_rsvd_device": 0,
+                    "rqst_hot_spare": 0,
+                    "rqst_cons_check": 0,
+                    "rqst_in_crit_array": 0,
+                    "rqst_in_failed_array": 0,
+                    "rqst_rebuild_remap": 0,
+                    "rqst_r_r_abort": 0,
+                    "rqst_active": 0,
+                    "app_client_bypassed_a": 0,
+                    "do_not_remove": 0,
+                    "enclosure_bypassed_a": 0,
+                    "enclosure_bypassed_b": 0,
+                    "ready_to_insert": 0,
+                    "rmv": 0,
+                    "ident": 0,
+                    "report": 0,
+                    "app_client_bypassed_b": 0,
+                    "fault_sensed": 0,
+                    "fault_reqstd": 0,
+                    "device_off": 0,
+                    "bypassed_a": 0,
+                    "bypassed_b": 0,
+                    "device_bypassed_a": 0,
+                    "device_bypassed_b": 0
+                },
+                "additional_element_status_descriptor": {}
+            },
+            {
+                "element_type": {
+                    "i": 23,
+                    "meaning": "Array device slot"
+                },
+                "descriptor": "",
+                "element_number": 6,
+                "overall": 0,
+                "individual": true,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 5,
+                        "meaning": "Not installed"
+                    },
+                    "rqst_ok": 0,
+                    "rqst_rsvd_device": 0,
+                    "rqst_hot_spare": 0,
+                    "rqst_cons_check": 0,
+                    "rqst_in_crit_array": 0,
+                    "rqst_in_failed_array": 0,
+                    "rqst_rebuild_remap": 0,
+                    "rqst_r_r_abort": 0,
+                    "rqst_active": 0,
+                    "app_client_bypassed_a": 0,
+                    "do_not_remove": 0,
+                    "enclosure_bypassed_a": 0,
+                    "enclosure_bypassed_b": 0,
+                    "ready_to_insert": 0,
+                    "rmv": 0,
+                    "ident": 0,
+                    "report": 0,
+                    "app_client_bypassed_b": 0,
+                    "fault_sensed": 0,
+                    "fault_reqstd": 0,
+                    "device_off": 0,
+                    "bypassed_a": 0,
+                    "bypassed_b": 0,
+                    "device_bypassed_a": 0,
+                    "device_bypassed_b": 0
+                },
+                "additional_element_status_descriptor": {}
+            },
+            {
+                "element_type": {
+                    "i": 23,
+                    "meaning": "Array device slot"
+                },
+                "descriptor": "",
+                "element_number": 7,
+                "overall": 0,
+                "individual": true,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 5,
+                        "meaning": "Not installed"
+                    },
+                    "rqst_ok": 0,
+                    "rqst_rsvd_device": 0,
+                    "rqst_hot_spare": 0,
+                    "rqst_cons_check": 0,
+                    "rqst_in_crit_array": 0,
+                    "rqst_in_failed_array": 0,
+                    "rqst_rebuild_remap": 0,
+                    "rqst_r_r_abort": 0,
+                    "rqst_active": 0,
+                    "app_client_bypassed_a": 0,
+                    "do_not_remove": 0,
+                    "enclosure_bypassed_a": 0,
+                    "enclosure_bypassed_b": 0,
+                    "ready_to_insert": 0,
+                    "rmv": 0,
+                    "ident": 0,
+                    "report": 0,
+                    "app_client_bypassed_b": 0,
+                    "fault_sensed": 0,
+                    "fault_reqstd": 0,
+                    "device_off": 0,
+                    "bypassed_a": 0,
+                    "bypassed_b": 0,
+                    "device_bypassed_a": 0,
+                    "device_bypassed_b": 0
+                },
+                "additional_element_status_descriptor": {}
+            },
+            {
+                "element_type": {
+                    "i": 25,
+                    "meaning": "SAS connector"
+                },
+                "descriptor": "ConnectorsInSubEnclsr0",
+                "element_number": -1,
+                "overall": 1,
+                "individual": false,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 0,
+                        "meaning": "Unsupported"
+                    },
+                    "ident": 0,
+                    "connector_type": {
+                        "i": 0,
+                        "meaning": "No information"
+                    },
+                    "connector_physical_link": 0,
+                    "mated": 0,
+                    "fail": 0,
+                    "oc": 0
+                }
+            },
+            {
+                "element_type": {
+                    "i": 25,
+                    "meaning": "SAS connector"
+                },
+                "descriptor": "Connector00",
+                "element_number": 0,
+                "overall": 0,
+                "individual": true,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 1,
+                        "meaning": "OK"
+                    },
+                    "ident": 0,
+                    "connector_type": {
+                        "i": 5,
+                        "meaning": "Mini SAS HD 4x receptacle (SFF-8644) [max 4 phys]"
+                    },
+                    "connector_physical_link": 0,
+                    "mated": 0,
+                    "fail": 0,
+                    "oc": 0
+                }
+            },
+            {
+                "element_type": {
+                    "i": 25,
+                    "meaning": "SAS connector"
+                },
+                "descriptor": "Connector01",
+                "element_number": 1,
+                "overall": 0,
+                "individual": true,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 1,
+                        "meaning": "OK"
+                    },
+                    "ident": 0,
+                    "connector_type": {
+                        "i": 5,
+                        "meaning": "Mini SAS HD 4x receptacle (SFF-8644) [max 4 phys]"
+                    },
+                    "connector_physical_link": 0,
+                    "mated": 0,
+                    "fail": 0,
+                    "oc": 0
+                }
+            },
+            {
+                "element_type": {
+                    "i": 25,
+                    "meaning": "SAS connector"
+                },
+                "descriptor": "Connector02",
+                "element_number": 2,
+                "overall": 0,
+                "individual": true,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 1,
+                        "meaning": "OK"
+                    },
+                    "ident": 0,
+                    "connector_type": {
+                        "i": 5,
+                        "meaning": "Mini SAS HD 4x receptacle (SFF-8644) [max 4 phys]"
+                    },
+                    "connector_physical_link": 0,
+                    "mated": 0,
+                    "fail": 0,
+                    "oc": 0
+                }
+            },
+            {
+                "element_type": {
+                    "i": 25,
+                    "meaning": "SAS connector"
+                },
+                "descriptor": "Connector03",
+                "element_number": 3,
+                "overall": 0,
+                "individual": true,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 1,
+                        "meaning": "OK"
+                    },
+                    "ident": 0,
+                    "connector_type": {
+                        "i": 5,
+                        "meaning": "Mini SAS HD 4x receptacle (SFF-8644) [max 4 phys]"
+                    },
+                    "connector_physical_link": 0,
+                    "mated": 0,
+                    "fail": 0,
+                    "oc": 0
+                }
+            },
+            {
+                "element_type": {
+                    "i": 25,
+                    "meaning": "SAS connector"
+                },
+                "descriptor": "",
+                "element_number": 4,
+                "overall": 0,
+                "individual": true,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 5,
+                        "meaning": "Not installed"
+                    },
+                    "ident": 0,
+                    "connector_type": {
+                        "i": 0,
+                        "meaning": "No information"
+                    },
+                    "connector_physical_link": 0,
+                    "mated": 0,
+                    "fail": 0,
+                    "oc": 0
+                }
+            },
+            {
+                "element_type": {
+                    "i": 25,
+                    "meaning": "SAS connector"
+                },
+                "descriptor": "",
+                "element_number": 5,
+                "overall": 0,
+                "individual": true,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 5,
+                        "meaning": "Not installed"
+                    },
+                    "ident": 0,
+                    "connector_type": {
+                        "i": 0,
+                        "meaning": "No information"
+                    },
+                    "connector_physical_link": 0,
+                    "mated": 0,
+                    "fail": 0,
+                    "oc": 0
+                }
+            },
+            {
+                "element_type": {
+                    "i": 25,
+                    "meaning": "SAS connector"
+                },
+                "descriptor": "",
+                "element_number": 6,
+                "overall": 0,
+                "individual": true,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 5,
+                        "meaning": "Not installed"
+                    },
+                    "ident": 0,
+                    "connector_type": {
+                        "i": 0,
+                        "meaning": "No information"
+                    },
+                    "connector_physical_link": 0,
+                    "mated": 0,
+                    "fail": 0,
+                    "oc": 0
+                }
+            },
+            {
+                "element_type": {
+                    "i": 25,
+                    "meaning": "SAS connector"
+                },
+                "descriptor": "",
+                "element_number": 7,
+                "overall": 0,
+                "individual": true,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 5,
+                        "meaning": "Not installed"
+                    },
+                    "ident": 0,
+                    "connector_type": {
+                        "i": 0,
+                        "meaning": "No information"
+                    },
+                    "connector_physical_link": 0,
+                    "mated": 0,
+                    "fail": 0,
+                    "oc": 0
+                }
+            },
+            {
+                "element_type": {
+                    "i": 3,
+                    "meaning": "Cooling"
+                },
+                "descriptor": "CoolingElementInSubEnclsr0",
+                "element_number": -1,
+                "overall": 1,
+                "individual": false,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 0,
+                        "meaning": "Unsupported"
+                    },
+                    "ident": 0,
+                    "do_not_remove": 0,
+                    "fan_speed_factor": 0,
+                    "actual_fan_speed": 0,
+                    "calculated_fan_speed": 0,
+                    "hot_swap": 0,
+                    "fail": 0,
+                    "rqsted_on": 0,
+                    "off": 0,
+                    "actual_fan_code": {
+                        "i": 0,
+                        "meaning": "stopped"
+                    }
+                }
+            },
+            {
+                "element_type": {
+                    "i": 3,
+                    "meaning": "Cooling"
+                },
+                "descriptor": "CoolingElement00",
+                "element_number": 0,
+                "overall": 0,
+                "individual": true,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 1,
+                        "meaning": "OK"
+                    },
+                    "ident": 0,
+                    "do_not_remove": 0,
+                    "fan_speed_factor": 0,
+                    "actual_fan_speed": 0,
+                    "calculated_fan_speed": 0,
+                    "hot_swap": 0,
+                    "fail": 0,
+                    "rqsted_on": 0,
+                    "off": 1,
+                    "actual_fan_code": {
+                        "i": 0,
+                        "meaning": "stopped"
+                    }
+                }
+            },
+            {
+                "element_type": {
+                    "i": 4,
+                    "meaning": "Temperature sensor"
+                },
+                "descriptor": "TempSensorsInSubEnclsr0",
+                "element_number": -1,
+                "overall": 1,
+                "individual": false,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 0,
+                        "meaning": "Unsupported"
+                    },
+                    "ident": 0,
+                    "fail": 0,
+                    "offset_for_reference_temperature": 0,
+                    "temperature": {
+                        "i": 0,
+                        "meaning": "-20 C"
+                    },
+                    "rqsted_override": 0,
+                    "ot_failure": 0,
+                    "ot_warning": 0,
+                    "ut_failure": 0,
+                    "ut_warning": 0
+                }
+            },
+            {
+                "element_type": {
+                    "i": 4,
+                    "meaning": "Temperature sensor"
+                },
+                "descriptor": "TempSense01",
+                "element_number": 0,
+                "overall": 0,
+                "individual": true,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 2,
+                        "meaning": "Critical"
+                    },
+                    "ident": 0,
+                    "fail": 0,
+                    "offset_for_reference_temperature": 0,
+                    "temperature": {
+                        "i": 104,
+                        "meaning": "84 C"
+                    },
+                    "rqsted_override": 0,
+                    "ot_failure": 1,
+                    "ot_warning": 1,
+                    "ut_failure": 0,
+                    "ut_warning": 0
+                }
+            },
+            {
+                "element_type": {
+                    "i": 18,
+                    "meaning": "Voltage sensor"
+                },
+                "descriptor": "VoltageSensorsInSubEnclsr0",
+                "element_number": -1,
+                "overall": 1,
+                "individual": false,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 0,
+                        "meaning": "Unsupported"
+                    },
+                    "ident": 0,
+                    "fail": 0,
+                    "warn_over": 0,
+                    "warn_under": 0,
+                    "crit_over": 0,
+                    "crit_under": 0,
+                    "voltage": {
+                        "raw_value": 0,
+                        "value_in_volts": "0.00"
+                    }
+                }
+            },
+            {
+                "element_type": {
+                    "i": 18,
+                    "meaning": "Voltage sensor"
+                },
+                "descriptor": "VoltageSense01",
+                "element_number": 0,
+                "overall": 0,
+                "individual": true,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 2,
+                        "meaning": "Critical"
+                    },
+                    "ident": 0,
+                    "fail": 0,
+                    "warn_over": 1,
+                    "warn_under": 0,
+                    "crit_over": 1,
+                    "crit_under": 0,
+                    "voltage": {
+                        "raw_value": 65535,
+                        "value_in_volts": "655.35"
+                    }
+                }
+            },
+            {
+                "element_type": {
+                    "i": 18,
+                    "meaning": "Voltage sensor"
+                },
+                "descriptor": "VoltageSense02",
+                "element_number": 1,
+                "overall": 0,
+                "individual": true,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 2,
+                        "meaning": "Critical"
+                    },
+                    "ident": 0,
+                    "fail": 0,
+                    "warn_over": 1,
+                    "warn_under": 0,
+                    "crit_over": 1,
+                    "crit_under": 0,
+                    "voltage": {
+                        "raw_value": 65535,
+                        "value_in_volts": "655.35"
+                    }
+                }
+            },
+            {
+                "element_type": {
+                    "i": 18,
+                    "meaning": "Voltage sensor"
+                },
+                "descriptor": "VoltageSense03",
+                "element_number": 2,
+                "overall": 0,
+                "individual": true,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 2,
+                        "meaning": "Critical"
+                    },
+                    "ident": 0,
+                    "fail": 0,
+                    "warn_over": 1,
+                    "warn_under": 0,
+                    "crit_over": 1,
+                    "crit_under": 0,
+                    "voltage": {
+                        "raw_value": 65535,
+                        "value_in_volts": "655.35"
+                    }
+                }
+            },
+            {
+                "element_type": {
+                    "i": 18,
+                    "meaning": "Voltage sensor"
+                },
+                "descriptor": "VoltageSense04",
+                "element_number": 3,
+                "overall": 0,
+                "individual": true,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 2,
+                        "meaning": "Critical"
+                    },
+                    "ident": 0,
+                    "fail": 0,
+                    "warn_over": 1,
+                    "warn_under": 0,
+                    "crit_over": 1,
+                    "crit_under": 0,
+                    "voltage": {
+                        "raw_value": 65535,
+                        "value_in_volts": "655.35"
+                    }
+                }
+            },
+            {
+                "element_type": {
+                    "i": 14,
+                    "meaning": "Enclosure"
+                },
+                "descriptor": "EnclosureElementInSubEnclsr0",
+                "element_number": -1,
+                "overall": 1,
+                "individual": false,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 0,
+                        "meaning": "Unsupported"
+                    },
+                    "ident": 0,
+                    "time_to_power_cycle": {
+                        "i": 0,
+                        "meaning": "No power cycle scheduled"
+                    },
+                    "failure_indication": 0,
+                    "warning_indication": 0,
+                    "requested_power_off_duration": {
+                        "i": 0,
+                        "meaning": "No power cycle scheduled"
+                    },
+                    "failure_requested": 0,
+                    "warning_requested": 0
+                }
+            },
+            {
+                "element_type": {
+                    "i": 14,
+                    "meaning": "Enclosure"
+                },
+                "descriptor": "EnclosureElement01",
+                "element_number": 0,
+                "overall": 0,
+                "individual": true,
+                "status_descriptor": {
+                    "prdfail": 0,
+                    "disabled": 0,
+                    "swap": 0,
+                    "status": {
+                        "i": 1,
+                        "meaning": "OK"
+                    },
+                    "ident": 0,
+                    "time_to_power_cycle": {
+                        "i": 0,
+                        "meaning": "No power cycle scheduled"
+                    },
+                    "failure_indication": 0,
+                    "warning_indication": 0,
+                    "requested_power_off_duration": {
+                        "i": 0,
+                        "meaning": "No power cycle scheduled"
+                    },
+                    "failure_requested": 0,
+                    "warning_requested": 0
+                }
+            }
+        ]
+    },
+    "exit_status": {
+        "i": 0,
+        "meaning": "no errors"
+    }
+}

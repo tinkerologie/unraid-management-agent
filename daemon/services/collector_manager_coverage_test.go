@@ -5,8 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/collectors"
 )
 
 func TestGetDefaultInterval_AllNames(t *testing.T) {
@@ -125,6 +127,7 @@ func TestCollectorManager_RegisterAllCollectors(t *testing.T) {
 		"gpu", "shares", "network", "hardware", "zfs", "notification",
 		"registration", "unassigned", "fancontrol", "tuning", "docker_update",
 		"docker_networks", "plugin_update", "os_update", "mover",
+		"storage_topology",
 	}
 
 	if len(names) != len(expectedNames) {
@@ -199,4 +202,25 @@ func TestCollectorManager_UpdateIntervalRestartsRunning(t *testing.T) {
 	}
 
 	cm.StopAll()
+}
+
+func TestCollectorManager_StorageTopologyFactory(t *testing.T) {
+	ctx := createTestContext()
+	var wg sync.WaitGroup
+	cm := NewCollectorManager(ctx, &wg)
+	cm.RegisterAllCollectors()
+
+	mc, ok := cm.collectors["storage_topology"]
+	if !ok {
+		t.Fatal("storage_topology collector not registered")
+	}
+	if mc.Required {
+		t.Error("storage_topology must be optional")
+	}
+	if _, ok := mc.factory(ctx).(*collectors.StorageTopologyCollector); !ok {
+		t.Errorf("factory returned %T", mc.factory(ctx))
+	}
+	if got := cm.getDefaultInterval("storage_topology"); got != constants.IntervalStorageTopology {
+		t.Errorf("default interval = %d, want %d", got, constants.IntervalStorageTopology)
+	}
 }

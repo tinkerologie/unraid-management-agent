@@ -71,6 +71,7 @@ type CacheProvider interface {
 	GetPluginUpdatesCache() *dto.PluginList
 	GetOSUpdateCache() *dto.OSUpdateStatus
 	GetMoverCache() *dto.MoverStatus
+	GetStorageTopologyCache() *dto.StorageTopology
 	// Logs
 	ListLogFiles() []dto.LogFile
 	GetLogContent(path, lines, start string) (*dto.LogFileContent, error)
@@ -1155,6 +1156,19 @@ func (s *Server) registerNewMonitoringTools() {
 			return jsonResult(cached)
 		}
 		return jsonResult(&dto.MoverStatus{Timestamp: time.Now()})
+	})
+
+	// Get storage topology (cached storcli + sg_ses data)
+	addToolDirect(s, &mcp.Tool{
+		Name:        "get_storage_topology",
+		Description: "Return the cached SAS storage topology: RAID/HBA controllers (model, firmware, temperature, PCIe link, port link rates and widths), SES enclosures/disk shelves (power supplies, fans, temperature/voltage/current sensors, I/O modules and their firmware, cabling between controller and shelves, path redundancy, current problems) and drives (enclosure slot, Linux device, negotiated vs maximum link speed, active paths, media/other error counts, predictive failures). State is 'pending' until the storage_topology collector has run and 'unsupported' when neither storcli nor sg_ses with SES devices is available.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
+		logger.Info("MCP: Getting cached storage topology")
+		if cached := s.cacheProvider.GetStorageTopologyCache(); cached != nil {
+			return jsonResult(cached)
+		}
+		return jsonResult(dto.NewPendingStorageTopology(time.Now()))
 	})
 
 	// Check plugin updates (returns cached result)

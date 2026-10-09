@@ -34,6 +34,7 @@ Complete reference for all Unraid Management Agent API endpoints.
 - [Log Files](#log-files)
 - [Configuration](#configuration)
 - [OS & Mover](#os--mover)
+- [Storage Topology](#storage-topology)
 - [Alerting & Trend Analysis](#alerting--trend-analysis)
 - [AI Remediation Toolkit](#ai-remediation-toolkit)
 - [WebSocket](#websocket)
@@ -3233,6 +3234,119 @@ Refreshed by the `mover` background collector (`INTERVAL_MOVER`, default 5 min).
 
 ```bash
 curl http://192.168.20.21:8043/api/v1/mover
+```
+
+---
+
+## Storage Topology
+
+### GET /storage/topology
+
+Return the cached SAS storage topology. Collected by the `storage_topology` background
+collector (`INTERVAL_STORAGE_TOPOLOGY`, default 5 min) from two optional, read-only sources:
+
+- **storcli** (Broadcom/LSI MegaRAID controllers and HBAs; `/sbin/storcli` and other common
+  paths): controllers, PCIe link, HBA phys/ports, enclosures and per-drive paths, link
+  speeds and error counters. Calls are sequential, always use `J nolog`, and each is
+  bounded by a timeout; a storcli process that does not exit after being killed blocks
+  further storcli calls until it is reaped.
+- **sg_ses** (sg3_utils 1.48+ for `--json`) on every SCSI enclosure services device found in
+  `/sys/class/scsi_generic`: power supplies, fans (RPM), temperature/voltage/current sensors,
+  I/O modules (serial, firmware), SAS connectors with the attached SAS address (cable map),
+  and slot status. Works without storcli, e.g. with plain HBAs.
+
+`state` is `pending` until the first collection, `ok` afterwards, and `unsupported` when
+neither storcli (with at least one controller) nor sg_ses with SES devices is available.
+`errors` lists non-fatal collection problems (timeouts, parse errors).
+
+**Response** (trimmed; lists shortened with `...`):
+
+```json
+{
+  "state": "ok",
+  "sources": { "storcli": true, "storcli_path": "/sbin/storcli", "ses": true, "ses_devices": 4 },
+  "controllers": [
+    {
+      "id": "SPC0000000", "index": 0, "model": "MegaRAID 9580-8i8e",
+      "firmware_version": "5.310.02-4101", "driver_name": "megaraid_sas",
+      "personality": "JBOD-Mode", "status": "Optimal", "temperature_celsius": 63,
+      "pci_address": "0000:02:00.0", "pcie_link_speed": "16.0 GT/s PCIe", "pcie_link_width": 8,
+      "physical_drives": 43,
+      "ports": [
+        {
+          "port": 0, "phys": [0, 1, 2, 3], "width": 4, "link_rate_gbps": 12,
+          "attached_sas_address": "0x500a098000000c5d", "attached_device_type": "Edge Expander",
+          "attached_enclosure_id": "50050cc100000702", "attached_iom": 1
+        }
+      ],
+      "phys": [ { "phy": 0, "port": 0, "connected": true, "link_rate_gbps": 12, "enabled": true }, ... ]
+    }
+  ],
+  "enclosures": [
+    {
+      "id": "50050cc100000702", "vendor": "NETAPP", "product": "DS424IOM12A",
+      "enclosure_device_id": 242, "partner_device_id": 241, "connector_name": "C1 x4 & C2 x4",
+      "port_mode": "Multipath", "status": "OK", "slots": 24, "slots_populated": 22,
+      "ses_devices": [ { "device": "sg4", "revision": "0281", "reporting_iom": 1 }, ... ],
+      "power_supplies": [ { "index": 0, "status": "OK", "problem": false, "firmware": "0311", "rated_watts": 580, ... } ],
+      "fans": [ { "index": 0, "status": "OK", "problem": false, "rpm": 3370, "speed": "at lowest speed" }, ... ],
+      "temperature_sensors": [ { "index": 0, "status": "OK", "problem": false, "value": 25 }, ... ],
+      "voltage_sensors": [ { "index": 1, "status": "OK", "problem": false, "value": 12.22 }, ... ],
+      "current_sensors": [ ... ],
+      "ioms": [ { "index": 0, "status": "OK", "firmware": "0281", "host_visible": true, ... }, ... ],
+      "connectors": [
+        {
+          "index": 7, "status": "OK", "installed": true, "type": "Mini SAS HD 4x receptacle (SFF-8644) [max 4 phys]",
+          "attached_sas_address": "0x500062b200000000", "attached_phy": 0,
+          "attached_kind": "controller", "attached_id": "SPC0000000", "attached_port": 0,
+          "cable_vendor": "THE MATE COMPANY", "cable_part_number": "C5555-1M+00"
+        }, ...
+      ],
+      "slot_details": [ { "index": 0, "status": "OK", "occupied": true, "fault": false }, ... ],
+      "iom_firmware_mismatch": false,
+      "iom_firmware_differs_from_peers": true,
+      "redundancy": { "expected_paths": 2, "active_paths": 2, "single_path_drives": 0, "degraded": false, "reasons": [] },
+      "problems": []
+    }
+  ],
+  "drives": [
+    {
+      "controller_index": 0, "enclosure_device_id": 242, "enclosure_id": "50050cc100000702",
+      "slot": 0, "device": "sdy", "state": "Onln", "interface": "SAS", "model": "ST24000NM007H",
+      "temperature_celsius": 37, "max_link_rate_gbps": 12, "link_rate_gbps": 6, "below_max_link_rate": true,
+      "media_errors": 0, "other_errors": 0, "predictive_failures": 0, "smart_alert": false,
+      "multipath": true, "controller_ports": [1, 0], "active_paths": 2,
+      "ports": [ { "port": 0, "status": "Active", "link_rate_gbps": 6 }, ... ]
+    }
+  ],
+  "summary": {
+    "controllers": 1, "enclosures": 2, "drives": 43, "drives_below_max_link_rate": 26,
+    "drives_with_media_errors": 0, "drives_with_other_errors": 24,
+    "drives_with_predictive_failure": 0, "single_path_drives": 0, "enclosures_with_problems": 0
+  },
+  "collection_duration_ms": 180,
+  "timestamp": "2026-10-08T22:30:00Z"
+}
+```
+
+**Notes**:
+
+| Field                                          | Description                                                                                                                                                                         |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `enclosures[].id`                              | Enclosure logical identifier (stable across reboots and paths); `c<controller>-e<eid>` or the SES device name when unknown                                                          |
+| `enclosures[].*[].problem`                     | Element status is Noncritical/Critical/Unrecoverable, or a failure/warning flag is set                                                                                              |
+| `enclosures[].connectors[].attached_kind`      | `controller` or `enclosure` when the cable's far end (SES descriptor `AA=`) matches a controller or another enclosure's I/O module expander                                         |
+| `enclosures[].iom_firmware_mismatch`           | The enclosure's I/O modules run different firmware                                                                                                                                  |
+| `enclosures[].iom_firmware_differs_from_peers` | Another enclosure with the same vendor/product runs different I/O module firmware                                                                                                   |
+| `enclosures[].redundancy`                      | `expected_paths` = installed I/O modules; `active_paths` = distinct controller ports used by the enclosure's drives (else SES paths); `degraded` when a redundant shelf lost a path |
+| `enclosures[].problems`                        | Human-readable list of the enclosure's current problems                                                                                                                             |
+| `drives[].device`                              | Linux block device, matched by serial number (VPD page 0x80)                                                                                                                        |
+| `drives[].controller_ports`                    | Controller port used by each path, in path order                                                                                                                                    |
+
+**Example**:
+
+```bash
+curl http://192.168.20.21:8043/api/v1/storage/topology
 ```
 
 ---

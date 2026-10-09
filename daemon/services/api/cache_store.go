@@ -53,6 +53,8 @@ type CacheStore struct {
 	moverCache           atomic.Pointer[dto.MoverStatus]
 	parityHistoryCache   atomic.Pointer[dto.ParityCheckHistory]
 
+	storageTopologyCache atomic.Pointer[dto.StorageTopology]
+
 	// registry is the OS-resilience status registry (may be nil in tests).
 	registry *platform.Registry
 }
@@ -214,6 +216,11 @@ func (c *CacheStore) SetOSUpdateCache(status *dto.OSUpdateStatus) {
 // GetMoverCache returns the cached mover status, or nil.
 func (c *CacheStore) GetMoverCache() *dto.MoverStatus {
 	return c.moverCache.Load()
+}
+
+// GetStorageTopologyCache returns the cached storage topology, or nil.
+func (c *CacheStore) GetStorageTopologyCache() *dto.StorageTopology {
+	return c.storageTopologyCache.Load()
 }
 
 // GetVMsCache returns cached VM information.

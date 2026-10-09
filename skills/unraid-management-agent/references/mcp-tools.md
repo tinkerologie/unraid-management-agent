@@ -122,6 +122,7 @@ Tool names are exact. Do not invent or alias them.
 | R | `check_plugin_updates` | Cached plugin update status |
 | R | `refresh_plugin_updates` | Force a plugin update check (all) |
 | R | `get_mover_status` | Mover active state, schedule, last run |
+| R | `get_storage_topology` | SAS controllers, HBA ports, shelves (PSUs, fans, sensors, IOM firmware, cabling), drive paths |
 | R | `get_service_status` | Status of one system service |
 | R | `list_services` | All managed services + status |
 

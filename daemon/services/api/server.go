@@ -253,6 +253,9 @@ func (s *Server) setupRoutes() {
 	// Mover status (state + schedule + last-run stats from /var/log/mover.log)
 	api.HandleFunc("/mover", s.handleMover).Methods("GET")
 
+	// SAS storage topology (controllers, HBA ports, enclosures, drive paths)
+	api.HandleFunc("/storage/topology", s.handleStorageTopology).Methods("GET")
+
 	// Configuration endpoints (write)
 	api.HandleFunc("/shares/{name}/config", s.handleUpdateShareConfig).Methods("POST")
 	api.HandleFunc("/settings/system", s.handleUpdateSystemSettings).Methods("POST")

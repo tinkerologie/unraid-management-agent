@@ -114,6 +114,9 @@ func cacheBindings() []eventBinding {
 		bind(constants.TopicMoverUpdate, func(c *CacheStore, v *dto.MoverStatus) {
 			c.moverCache.Store(v)
 		}),
+		bind(constants.TopicStorageTopologyUpdate, func(c *CacheStore, v *dto.StorageTopology) {
+			c.storageTopologyCache.Store(v)
+		}),
 	}
 }
 

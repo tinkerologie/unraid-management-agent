@@ -5116,6 +5116,22 @@ func (s *Server) handleMover(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
+// handleStorageTopology godoc
+//
+//	@Summary		Get SAS storage topology
+//	@Description	Returns the cached SAS storage topology collected with storcli (Broadcom/LSI controllers) and sg_ses (SCSI Enclosure Services): controllers with PCIe link and HBA ports, enclosures with power supplies, fans, temperature/voltage/current sensors, I/O modules, firmware and cabling, and per-drive paths, link speeds and error counters. State is "pending" until the first collection, and "unsupported" when neither storcli nor SES devices with sg_ses are available.
+//	@Tags			Storage
+//	@Produce		json
+//	@Success		200	{object}	dto.StorageTopology	"Storage topology"
+//	@Router			/storage/topology [get]
+func (s *Server) handleStorageTopology(w http.ResponseWriter, _ *http.Request) {
+	if cached := s.GetStorageTopologyCache(); cached != nil {
+		respondJSON(w, http.StatusOK, cached)
+		return
+	}
+	respondJSON(w, http.StatusOK, dto.NewPendingStorageTopology(time.Now()))
+}
+
 // handleGetMCPToolPolicy godoc
 //
 //	@Summary		Get MCP tool access policy

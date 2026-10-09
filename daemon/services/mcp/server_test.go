@@ -38,6 +38,8 @@ type MockCacheProvider struct {
 	unassigned    *dto.UnassignedDeviceList
 	nutResponse   *dto.NUTResponse
 	parityHistory *dto.ParityCheckHistory
+	// storageTopology is returned by GetStorageTopologyCache.
+	storageTopology *dto.StorageTopology
 	// Log and collector mock data
 	logFiles           []dto.LogFile
 	collectorsStatus   dto.CollectorsStatusResponse
@@ -71,6 +73,9 @@ func (m *MockCacheProvider) GetDockerNetworksCache() *dto.DockerNetworkList { re
 func (m *MockCacheProvider) GetPluginUpdatesCache() *dto.PluginList         { return nil }
 func (m *MockCacheProvider) GetOSUpdateCache() *dto.OSUpdateStatus          { return nil }
 func (m *MockCacheProvider) GetMoverCache() *dto.MoverStatus                { return nil }
+func (m *MockCacheProvider) GetStorageTopologyCache() *dto.StorageTopology {
+	return m.storageTopology
+}
 
 // Log methods
 func (m *MockCacheProvider) ListLogFiles() []dto.LogFile { return m.logFiles }

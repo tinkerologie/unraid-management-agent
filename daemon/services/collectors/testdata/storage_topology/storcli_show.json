@@ -1,0 +1,38 @@
+{
+"Controllers":[
+{
+	"Command Status" : {
+		"CLI Version" : "007.3305.0000.0000 Jan 23, 2025",
+		"Operating system" : "Linux 6.18.52-Unraid",
+		"Status Code" : 0,
+		"Status" : "Success",
+		"Description" : "None"
+	},
+	"Response Data" : {
+		"Number of Controllers" : 1,
+		"Host Name" : "unraid",
+		"Operating System " : "Linux 6.18.52-Unraid",
+		"StoreLib IT Version" : "07.3303.0200.0000",
+		"StoreLib IR3 Version" : "16.16-0",
+		"System Overview" : [
+			{
+				"Ctl" : 0,
+				"Model" : "MegaRAID9580-8i8e",
+				"Ports" : 16,
+				"PDs" : 43,
+				"DGs" : 0,
+				"DNOpt" : 0,
+				"VDs" : 0,
+				"VNOpt" : 0,
+				"BBU" : "N/A",
+				"sPR" : "On",
+				"DS" : "1&2",
+				"EHS" : "Y",
+				"ASOs" : 2,
+				"Hlth" : "Opt"
+			}
+		]
+	}
+}
+]
+}

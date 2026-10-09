@@ -101,6 +101,9 @@ type FileConfigIntervals struct {
 	PluginUpdate   *int `yaml:"plugin_update,omitempty"`
 	OSUpdate       *int `yaml:"os_update,omitempty"`
 	Mover          *int `yaml:"mover,omitempty"`
+
+	// StorageTopology is the storage_topology collector interval in seconds.
+	StorageTopology *int `yaml:"storage_topology,omitempty"`
 }
 
 // LoadConfigFile reads and parses a YAML config file.

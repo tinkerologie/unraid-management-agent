@@ -17,6 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   numbers, full URLs, and explicit "None" for self-contained changes).
 - **GitHub issue template configuration** — added `.github/ISSUE_TEMPLATE/config.yml`
   with private security disclosure contact links.
+- **SAS storage topology** — new optional `storage_topology` collector (default every
+  300 s, `INTERVAL_STORAGE_TOPOLOGY`, listed on the plugin settings page), REST endpoint
+  `GET /api/v1/storage/topology`, WebSocket event `storage_topology_update` and read-only
+  MCP tool `get_storage_topology`. Combines storcli (controllers, PCIe link, HBA ports and
+  lanes, enclosures, per-drive paths/link speeds/error counters) with `sg_ses --json`
+  (PSUs, fan RPM, temperature/voltage/current sensors, I/O module status and firmware,
+  SAS connector cable map, slot status) and derives per-element problems, I/O module
+  firmware mismatches and path redundancy. Read-only and sequential: storcli always runs
+  with `J nolog`, never twice at once, with timeouts; works with sg_ses alone (plain HBAs)
+  and is a no-op (`state: "unsupported"`) without either tool.
+  ([#184](https://github.com/ruaan-deysel/unraid-management-agent/issues/184)).
 
 ### Fixed
 

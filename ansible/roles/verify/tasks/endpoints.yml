@@ -24,6 +24,7 @@
     - { path: "ups", name: "UPS" }
     - { path: "nut", name: "NUT" }
     - { path: "shares", name: "Shares" }
+    - { path: "storage/topology", name: "Storage topology" }
     - { path: "unassigned", name: "Unassigned devices" }
     - { path: "unassigned/devices", name: "Unassigned device list" }
     - { path: "unassigned/remote-shares", name: "Unassigned remote shares" }

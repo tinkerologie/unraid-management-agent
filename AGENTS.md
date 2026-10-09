@@ -128,6 +128,7 @@ Independent goroutines that collect data at fixed intervals (defined in `daemon/
 | ZFS          | 30s      | `zfs_*_update`              | Pools, datasets, snapshots               |
 | Hardware     | 300s     | `hardware_update`           | Rarely changes                           |
 | Registration | 300s     | `registration_update`       | License info                             |
+| Storage      | 300s     | `storage_topology_update`   | SAS topology via storcli + sg_ses        |
 
 **Intervals optimized for power efficiency** — lower intervals increase CPU usage.
 

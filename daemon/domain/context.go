@@ -29,6 +29,9 @@ type Intervals struct {
 	PluginUpdate   int
 	OSUpdate       int
 	Mover          int
+
+	// StorageTopology is the storage_topology collector interval in seconds.
+	StorageTopology int
 }
 
 // Context holds the application runtime context including the event hub and configuration.

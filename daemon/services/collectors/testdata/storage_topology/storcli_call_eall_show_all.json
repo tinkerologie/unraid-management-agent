@@ -1,0 +1,99 @@
+{
+"Controllers":[
+{
+	"Command Status" : {
+		"CLI Version" : "007.3305.0000.0000 Jan 23, 2025",
+		"Operating system" : "Linux 6.18.52-Unraid",
+		"Controller" : 0,
+		"Status" : "Success",
+		"Description" : "None"
+	},
+	"Response Data" : {
+		"Enclosure /c0/e242 " : {
+			"Information" : {
+				"Device ID" : 242,
+				"Position" : "2",
+				"Connector Name" : "C1 x4 & C2 x4",
+				"Enclosure Type" : "SES",
+				"Status" : "OK",
+				"FRU Part Number" : "N/A",
+				"Enclosure Serial Number" : "BSS2128537M0VLE",
+				"Enclosure Zoning Mode" : "N/A",
+				"Partner Device ID" : 241,
+				"Device Type" : "Enclosure",
+				"EnclLogicalID" : "0x50050CCB33CBCBA2"
+			},
+			"Inquiry Data" : {
+				"Vendor Identification" : "NETAPP",
+				"Product Identification" : "DS424IOM12A",
+				"Product Revision Level" : "0281"
+			},
+			"EnclSasAddress" : [
+				{
+					"Index" : 0,
+					"SAS address" : "0x500A098CD24EE6F0"
+				}
+			],
+			"Properties" : [
+				{
+					"EID" : 242,
+					"State" : "OK",
+					"Slots" : 24,
+					"PD" : 22,
+					"PS" : 4,
+					"Fans" : 8,
+					"TSs" : 12,
+					"Alms" : 0,
+					"SIM" : 2,
+					"Port#" : "Multipath",
+					"ProdID" : "DS424IOM12A",
+					"VendorSpecific" : "x48-0.10.10.0"
+				}
+			]
+		},
+		"Enclosure /c0/e245 " : {
+			"Information" : {
+				"Device ID" : 245,
+				"Position" : "1",
+				"Connector Name" : "C1 x4 & C2 x4",
+				"Enclosure Type" : "SES",
+				"Status" : "OK",
+				"FRU Part Number" : "N/A",
+				"Enclosure Serial Number" : "RCPTW03814621NO",
+				"Enclosure Zoning Mode" : "N/A",
+				"Partner Device ID" : 244,
+				"Device Type" : "Enclosure",
+				"EnclLogicalID" : "0x500A098AA6236E71"
+			},
+			"Inquiry Data" : {
+				"Vendor Identification" : "NETAPP",
+				"Product Identification" : "DS424IOM12A",
+				"Product Revision Level" : "0260"
+			},
+			"EnclSasAddress" : [
+				{
+					"Index" : 0,
+					"SAS address" : "0x500A098BE2D98D00"
+				}
+			],
+			"Properties" : [
+				{
+					"EID" : 245,
+					"State" : "OK",
+					"Slots" : 24,
+					"PD" : 21,
+					"PS" : 4,
+					"Fans" : 8,
+					"TSs" : 12,
+					"Alms" : 0,
+					"SIM" : 2,
+					"Port#" : "Multipath",
+					"ProdID" : "DS424IOM12A",
+					"VendorSpecific" : "x48-0.10.10.0"
+				}
+			]
+		}
+	}
+}
+]
+}

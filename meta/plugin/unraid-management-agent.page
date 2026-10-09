@@ -81,6 +81,7 @@ $interval_notification = $config['INTERVAL_NOTIFICATION'] ?? '30';
 $interval_hardware = $config['INTERVAL_HARDWARE'] ?? '600';
 $interval_registration = $config['INTERVAL_REGISTRATION'] ?? '600';
 $interval_unassigned = $config['INTERVAL_UNASSIGNED'] ?? '60';
+$interval_storage_topology = $config['INTERVAL_STORAGE_TOPOLOGY'] ?? '300';
 
 // Check if service is running
 exec("pidof $plugin 2>/dev/null", $pids, $pid_rc);
@@ -837,6 +838,12 @@ which subsystems are healthy. Both require the service to be running.
                 <span class="uma-interval-label">Unassigned Devices</span>
                 <select name="INTERVAL_UNASSIGNED" class="uma-interval-select">
                     <?= intervalOptions($interval_unassigned, 'standard') ?>
+                </select>
+            </div>
+            <div class="uma-interval-row">
+                <span class="uma-interval-label">Storage Topology (SAS/SES)</span>
+                <select name="INTERVAL_STORAGE_TOPOLOGY" class="uma-interval-select">
+                    <?= intervalOptions($interval_storage_topology, 'slow') ?>
                 </select>
             </div>
         </div>

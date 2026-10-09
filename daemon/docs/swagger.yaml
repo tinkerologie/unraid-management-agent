@@ -1161,6 +1161,252 @@ definitions:
       timestamp:
         type: string
     type: object
+  dto.EnclosureConnector:
+    properties:
+      attached_id:
+        description: AttachedID is the controller or enclosure ID at the far end.
+        type: string
+      attached_iom:
+        description: AttachedIOM is the I/O module index at the far end (enclosure
+          attachments).
+        type: integer
+      attached_kind:
+        description: AttachedKind is "controller" or "enclosure" when the far end
+          was resolved.
+        example: controller
+        type: string
+      attached_phy:
+        description: AttachedPhy is the phy number at the far end, when published.
+        example: 0
+        type: integer
+      attached_port:
+        description: AttachedPort is the controller port at the far end (controller
+          attachments).
+        example: 0
+        type: integer
+      attached_sas_address:
+        description: |-
+          AttachedSASAddress is the SAS address at the far end of the cable, when the
+          enclosure publishes it.
+        type: string
+      cable_part_number:
+        type: string
+      cable_serial_number:
+        type: string
+      cable_vendor:
+        type: string
+      description:
+        type: string
+      fail:
+        type: boolean
+      index:
+        example: 7
+        type: integer
+      installed:
+        description: Installed is false for connector positions that are not populated.
+        example: true
+        type: boolean
+      problem:
+        example: false
+        type: boolean
+      status:
+        example: OK
+        type: string
+      type:
+        description: Type is the connector type (e.g. "Mini SAS HD 4x receptacle (SFF-8644)
+          [max 4 phys]").
+        type: string
+    type: object
+  dto.EnclosureFan:
+    properties:
+      description:
+        type: string
+      fail:
+        type: boolean
+      index:
+        example: 0
+        type: integer
+      "off":
+        type: boolean
+      problem:
+        example: false
+        type: boolean
+      rpm:
+        description: RPM is the actual fan speed; nil when only a speed band is known
+          (storcli fallback).
+        example: 3300
+        type: integer
+      speed:
+        description: Speed describes the speed band (e.g. "at lowest speed", "Low
+          Speed").
+        example: at lowest speed
+        type: string
+      status:
+        example: OK
+        type: string
+    type: object
+  dto.EnclosureIOM:
+    properties:
+      description:
+        type: string
+      expander_sas_address:
+        description: ExpanderSASAddress is the SAS address of the module's expander,
+          when known.
+        type: string
+      fail:
+        type: boolean
+      firmware:
+        example: "0281"
+        type: string
+      host_visible:
+        description: HostVisible is true when the host reaches this module's SES service
+          directly.
+        example: true
+        type: boolean
+      index:
+        example: 0
+        type: integer
+      part_number:
+        type: string
+      problem:
+        example: false
+        type: boolean
+      serial_number:
+        description: |-
+          SerialNumber, Firmware and PartNumber come from the element descriptor when the
+          enclosure publishes them; Firmware falls back to the SES target's INQUIRY revision.
+        type: string
+      status:
+        example: OK
+        type: string
+    type: object
+  dto.EnclosurePowerSupply:
+    properties:
+      ac_fail:
+        type: boolean
+      dc_fail:
+        type: boolean
+      dc_over_current:
+        type: boolean
+      dc_over_voltage:
+        type: boolean
+      dc_under_voltage:
+        type: boolean
+      description:
+        type: string
+      fail:
+        type: boolean
+      firmware:
+        example: "0311"
+        type: string
+      index:
+        example: 0
+        type: integer
+      "off":
+        type: boolean
+      over_temp_fail:
+        type: boolean
+      part_number:
+        type: string
+      predicted_failure:
+        type: boolean
+      problem:
+        example: false
+        type: boolean
+      rated_watts:
+        description: RatedWatts is the rated output power, when the enclosure reports
+          it.
+        example: 580
+        type: integer
+      serial_number:
+        type: string
+      status:
+        example: OK
+        type: string
+      temp_warning:
+        type: boolean
+    type: object
+  dto.EnclosureRedundancy:
+    properties:
+      active_paths:
+        description: |-
+          ActivePaths is the number of distinct host paths currently in use: distinct
+          controller ports used by the enclosure's drives, else distinct SES paths.
+        example: 2
+        type: integer
+      degraded:
+        description: Degraded is true when the enclosure has redundant I/O modules
+          but lost a path.
+        example: false
+        type: boolean
+      expected_paths:
+        description: ExpectedPaths is the number of installed I/O modules (each can
+          provide a host path).
+        example: 2
+        type: integer
+      reasons:
+        description: Reasons explains why Degraded is true.
+        items:
+          type: string
+        type: array
+      single_path_drives:
+        description: SinglePathDrives is the number of dual-ported drives with fewer
+          than two active paths.
+        example: 0
+        type: integer
+    type: object
+  dto.EnclosureSensor:
+    properties:
+      crit_over:
+        type: boolean
+      crit_under:
+        type: boolean
+      description:
+        type: string
+      fail:
+        type: boolean
+      index:
+        example: 0
+        type: integer
+      problem:
+        example: false
+        type: boolean
+      status:
+        example: OK
+        type: string
+      value:
+        description: Value is the reading (°C, V or A); nil when the element reports
+          no valid reading.
+        example: 25
+        type: number
+      warn_over:
+        type: boolean
+      warn_under:
+        type: boolean
+    type: object
+  dto.EnclosureSlot:
+    properties:
+      fault:
+        description: Fault is true when the enclosure senses or was asked to show
+          a fault for the slot.
+        type: boolean
+      identify:
+        description: Identify is true when the identify (locate) indicator is on.
+        type: boolean
+      index:
+        example: 0
+        type: integer
+      occupied:
+        description: Occupied is true when the slot holds a device.
+        example: true
+        type: boolean
+      problem:
+        example: false
+        type: boolean
+      status:
+        example: OK
+        type: string
+    type: object
   dto.ExternalFanControl:
     properties:
       active:
@@ -3122,6 +3368,574 @@ definitions:
         $ref: '#/definitions/dto.SourceState'
       subsystem:
         type: string
+    type: object
+  dto.StorageController:
+    properties:
+      bbu_status:
+        description: BBUStatus is the battery/CacheVault status ("NA" when absent).
+        example: NA
+        type: string
+      bios_version:
+        description: BIOSVersion is the option ROM/BIOS version.
+        type: string
+      driver_name:
+        description: DriverName is the Linux driver bound to the controller.
+        example: megaraid_sas
+        type: string
+      driver_version:
+        description: DriverVersion is the Linux driver version.
+        type: string
+      firmware_package:
+        description: FirmwarePackage is the firmware package build.
+        example: 52.31.0-5827
+        type: string
+      firmware_version:
+        description: FirmwareVersion is the controller firmware version.
+        example: 5.310.02-4101
+        type: string
+      id:
+        description: 'ID is the stable controller identifier: the serial number when
+          known, else "c<index>".'
+        example: SPC1234567
+        type: string
+      index:
+        description: Index is the storcli controller index (/cN).
+        example: 0
+        type: integer
+      memory_correctable_errors:
+        description: MemoryCorrectableErrors is the controller memory correctable
+          error count.
+        example: 0
+        type: integer
+      memory_uncorrectable_errors:
+        description: MemoryUncorrectableErrors is the controller memory uncorrectable
+          error count.
+        example: 0
+        type: integer
+      model:
+        description: Model is the controller model.
+        example: MegaRAID 9580-8i8e
+        type: string
+      pci_address:
+        description: PCIAddress is the PCI address of the controller (domain:bus:device.function).
+        example: "0000:02:00.0"
+        type: string
+      pcie_link_speed:
+        description: PCIeLinkSpeed is the negotiated PCIe link speed from sysfs.
+        example: 16.0 GT/s PCIe
+        type: string
+      pcie_link_width:
+        description: PCIeLinkWidth is the negotiated PCIe link width (lanes).
+        example: 8
+        type: integer
+      pcie_max_link_speed:
+        description: PCIeMaxLinkSpeed is the maximum PCIe link speed supported by
+          the slot/device.
+        example: 16.0 GT/s PCIe
+        type: string
+      pcie_max_link_width:
+        description: PCIeMaxLinkWidth is the maximum PCIe link width.
+        example: 8
+        type: integer
+      personality:
+        description: Personality is the controller personality (e.g. "JBOD-Mode",
+          "RAID-Mode").
+        example: JBOD-Mode
+        type: string
+      phys:
+        description: Phys lists every controller phy, connected or not.
+        items:
+          $ref: '#/definitions/dto.StorageControllerPhy'
+        type: array
+      physical_drives:
+        description: PhysicalDrives is the number of physical drives attached to the
+          controller.
+        example: 43
+        type: integer
+      ports:
+        description: Ports lists the connected SAS ports (phys grouped by port number).
+        items:
+          $ref: '#/definitions/dto.StorageControllerPort'
+        type: array
+      sas_address:
+        description: SASAddress is the controller SAS address ("0x" + 16 lowercase
+          hex digits).
+        example: "0x500062b200000000"
+        type: string
+      serial_number:
+        description: SerialNumber is the controller serial number.
+        type: string
+      status:
+        description: Status is the controller status reported by storcli (e.g. "Optimal").
+        example: Optimal
+        type: string
+      temperature_celsius:
+        description: TemperatureCelsius is the ROC (RAID-on-chip) or controller temperature.
+        example: 62
+        type: number
+    type: object
+  dto.StorageControllerPhy:
+    properties:
+      attached_device_type:
+        description: AttachedDeviceType is the attached device type.
+        type: string
+      attached_phy:
+        description: AttachedPhy is the phy identifier on the attached device.
+        type: integer
+      attached_sas_address:
+        description: AttachedSASAddress is the SAS address of the attached device.
+        type: string
+      connected:
+        description: Connected is true when the phy has a link to a device.
+        example: true
+        type: boolean
+      enabled:
+        description: Enabled is false when the phy has been disabled on the controller.
+        example: true
+        type: boolean
+      link_rate_gbps:
+        description: LinkRateGbps is the negotiated link rate; nil when not linked.
+        example: 12
+        type: number
+      phy:
+        description: Phy is the phy number.
+        example: 0
+        type: integer
+      port:
+        description: Port is the port this phy belongs to; nil when the phy has no
+          valid port.
+        example: 0
+        type: integer
+    type: object
+  dto.StorageControllerPort:
+    properties:
+      attached_device_type:
+        description: AttachedDeviceType is the attached device type (e.g. "Edge Expander").
+        example: Edge Expander
+        type: string
+      attached_enclosure_id:
+        description: AttachedEnclosureID is the ID of the enclosure whose I/O module
+          is attached, when resolved.
+        type: string
+      attached_iom:
+        description: AttachedIOM is the index of the attached enclosure I/O module,
+          when resolved.
+        example: 1
+        type: integer
+      attached_sas_address:
+        description: AttachedSASAddress is the SAS address of the attached device.
+        example: "0x500a098000000000"
+        type: string
+      link_rate_gbps:
+        description: LinkRateGbps is the lowest negotiated link rate across the port's
+          phys.
+        example: 12
+        type: number
+      phys:
+        description: Phys lists the phys that form this port.
+        items:
+          type: integer
+        type: array
+      port:
+        description: Port is the storcli port number.
+        example: 0
+        type: integer
+      width:
+        description: Width is the number of linked phys (lanes) in the port.
+        example: 4
+        type: integer
+    type: object
+  dto.StorageDrive:
+    properties:
+      active_paths:
+        description: ActivePaths is the number of drive ports in the "Active" state.
+        example: 2
+        type: integer
+      below_max_link_rate:
+        description: BelowMaxLinkRate is true when the negotiated link speed is below
+          the drive's maximum.
+        example: true
+        type: boolean
+      controller_index:
+        description: ControllerIndex is the storcli controller index.
+        example: 0
+        type: integer
+      controller_ports:
+        description: ControllerPorts lists the controller port used by each path,
+          in path order.
+        items:
+          type: integer
+        type: array
+      device:
+        description: Device is the Linux block device name, matched by serial number.
+        example: sdy
+        type: string
+      device_id:
+        description: DeviceID is the storcli device ID (DID).
+        example: 97
+        type: integer
+      enclosure_device_id:
+        description: EnclosureDeviceID is the storcli enclosure device ID (EID); nil
+          for direct-attached drives.
+        example: 242
+        type: integer
+      enclosure_id:
+        description: EnclosureID is the ID of the enclosure in Enclosures, when known.
+        type: string
+      firmware:
+        example: EE05
+        type: string
+      interface:
+        description: Interface is the drive interface (SAS, SATA, NVMe).
+        example: SAS
+        type: string
+      link_rate_gbps:
+        description: LinkRateGbps is the negotiated link speed.
+        example: 6
+        type: number
+      max_link_rate_gbps:
+        description: MaxLinkRateGbps is the drive's maximum interface speed ("Device
+          Speed").
+        example: 12
+        type: number
+      media:
+        description: Media is the media type (HDD, SSD).
+        example: HDD
+        type: string
+      media_errors:
+        example: 0
+        type: integer
+      model:
+        example: ST24000NM007H
+        type: string
+      multipath:
+        description: Multipath is true when the controller sees the drive through
+          more than one path.
+        example: true
+        type: boolean
+      other_errors:
+        example: 0
+        type: integer
+      ports:
+        description: Ports lists the drive's own SAS ports.
+        items:
+          $ref: '#/definitions/dto.StorageDrivePort'
+        type: array
+      predictive_failures:
+        example: 0
+        type: integer
+      serial_number:
+        type: string
+      shield_counter:
+        example: 0
+        type: integer
+      size:
+        example: 21.828 TB
+        type: string
+      slot:
+        description: Slot is the slot number.
+        example: 0
+        type: integer
+      smart_alert:
+        description: SMARTAlert is true when the drive flagged a S.M.A.R.T. alert.
+        example: false
+        type: boolean
+      state:
+        description: State is the storcli drive state (e.g. "Onln", "JBOD", "UGood").
+        example: Onln
+        type: string
+      temperature_celsius:
+        description: TemperatureCelsius is the drive temperature reported through
+          the controller.
+        example: 37
+        type: number
+      unrecovered_medium_errors:
+        example: 0
+        type: integer
+      vendor:
+        example: SEAGATE
+        type: string
+      wwn:
+        type: string
+    type: object
+  dto.StorageDrivePort:
+    properties:
+      link_rate_gbps:
+        example: 6
+        type: number
+      port:
+        example: 0
+        type: integer
+      sas_address:
+        type: string
+      status:
+        example: Active
+        type: string
+    type: object
+  dto.StorageEnclosure:
+    properties:
+      connector_name:
+        description: ConnectorName is the storcli connector description (e.g. "C1
+          x4 & C2 x4").
+        example: C1 x4 & C2 x4
+        type: string
+      connectors:
+        description: Connectors lists the SAS connector elements with their cable/attachment
+          details.
+        items:
+          $ref: '#/definitions/dto.EnclosureConnector'
+        type: array
+      controller_index:
+        description: ControllerIndex is the storcli controller the enclosure is attached
+          to.
+        example: 0
+        type: integer
+      current_sensors:
+        description: CurrentSensors lists current sensor elements (amps).
+        items:
+          $ref: '#/definitions/dto.EnclosureSensor'
+        type: array
+      enclosure_device_id:
+        description: EnclosureDeviceID is the storcli enclosure device ID (EID).
+        example: 242
+        type: integer
+      fans:
+        description: Fans lists the cooling elements.
+        items:
+          $ref: '#/definitions/dto.EnclosureFan'
+        type: array
+      id:
+        description: |-
+          ID is the stable enclosure identifier: the enclosure logical identifier
+          (16 lowercase hex digits) when known, else "c<controller>-e<eid>" or the SES device name.
+        example: 50050cc100000000
+        type: string
+      iom_firmware_differs_from_peers:
+        description: |-
+          IOMFirmwareDiffersFromPeers is true when another enclosure of the same vendor and
+          product runs different I/O module firmware.
+        example: true
+        type: boolean
+      iom_firmware_mismatch:
+        description: IOMFirmwareMismatch is true when this enclosure's I/O modules
+          run different firmware.
+        example: false
+        type: boolean
+      ioms:
+        description: IOMs lists the enclosure services controller electronics (I/O
+          modules, "SIMs" in storcli).
+        items:
+          $ref: '#/definitions/dto.EnclosureIOM'
+        type: array
+      logical_id:
+        description: LogicalID is the SES enclosure logical identifier ("0x" + 16
+          hex digits).
+        example: "0x50050cc100000000"
+        type: string
+      partner_device_id:
+        description: PartnerDeviceID is the storcli device ID of the partner (second
+          I/O module) path.
+        example: 241
+        type: integer
+      port_mode:
+        description: PortMode is the storcli port mode (e.g. "Multipath").
+        example: Multipath
+        type: string
+      power_supplies:
+        description: PowerSupplies lists the power supply elements.
+        items:
+          $ref: '#/definitions/dto.EnclosurePowerSupply'
+        type: array
+      problems:
+        description: Problems lists the current problems detected in this enclosure.
+        items:
+          type: string
+        type: array
+      product:
+        description: Product is the enclosure product identification.
+        example: DS424IOM12A
+        type: string
+      redundancy:
+        allOf:
+        - $ref: '#/definitions/dto.EnclosureRedundancy'
+        description: Redundancy describes the host path redundancy of the enclosure.
+      serial_number:
+        description: SerialNumber is the enclosure (chassis) serial number.
+        type: string
+      ses_devices:
+        description: SESDevices lists the SES devices (one per I/O module path) used
+          for this enclosure.
+        items:
+          $ref: '#/definitions/dto.StorageSESDevice'
+        type: array
+      slot_details:
+        description: SlotDetails lists the device slot elements.
+        items:
+          $ref: '#/definitions/dto.EnclosureSlot'
+        type: array
+      slots:
+        description: Slots is the number of drive slots.
+        example: 24
+        type: integer
+      slots_populated:
+        description: SlotsPopulated is the number of occupied drive slots, when known.
+        example: 22
+        type: integer
+      status:
+        description: Status is the worst element status (OK, Noncritical, Critical,
+          Unrecoverable) or the storcli state.
+        example: OK
+        type: string
+      temperature_sensors:
+        description: TemperatureSensors lists temperature sensor elements (degrees
+          Celsius).
+        items:
+          $ref: '#/definitions/dto.EnclosureSensor'
+        type: array
+      vendor:
+        description: Vendor is the enclosure vendor.
+        example: NETAPP
+        type: string
+      voltage_sensors:
+        description: VoltageSensors lists voltage sensor elements (volts).
+        items:
+          $ref: '#/definitions/dto.EnclosureSensor'
+        type: array
+    type: object
+  dto.StorageSESDevice:
+    properties:
+      device:
+        description: Device is the SCSI generic device name.
+        example: sg4
+        type: string
+      expander_sas_address:
+        description: ExpanderSASAddress is the SAS address of that I/O module's expander.
+        type: string
+      reporting_iom:
+        description: ReportingIOM is the index of the I/O module that serves this
+          SES path.
+        example: 1
+        type: integer
+      revision:
+        description: Revision is the INQUIRY product revision of the SES target (I/O
+          module firmware).
+        example: "0281"
+        type: string
+    type: object
+  dto.StorageTopology:
+    description: SAS storage topology from storcli (Broadcom/LSI MegaRAID and HBAs)
+      and sg_ses (SCSI Enclosure Services).
+    properties:
+      collection_duration_ms:
+        description: CollectionDurationMs is how long the collection cycle took.
+        example: 230
+        type: integer
+      controllers:
+        description: Controllers lists the storcli-managed controllers (empty without
+          storcli).
+        items:
+          $ref: '#/definitions/dto.StorageController'
+        type: array
+      drives:
+        description: Drives lists the physical drives reported by storcli (empty without
+          storcli).
+        items:
+          $ref: '#/definitions/dto.StorageDrive'
+        type: array
+      enclosures:
+        description: Enclosures lists SES enclosures, merged across storcli and every
+          SES path.
+        items:
+          $ref: '#/definitions/dto.StorageEnclosure'
+        type: array
+      errors:
+        description: Errors lists non-fatal problems hit while collecting (timeouts,
+          parse errors).
+        items:
+          type: string
+        type: array
+      sources:
+        allOf:
+        - $ref: '#/definitions/dto.StorageTopologySources'
+        description: Sources reports which data sources were available for this collection.
+      state:
+        description: State is one of "pending", "ok" or "unsupported".
+        example: ok
+        type: string
+      summary:
+        allOf:
+        - $ref: '#/definitions/dto.StorageTopologySummary'
+        description: Summary holds topology-wide counts derived from the lists above.
+      timestamp:
+        description: Timestamp is when the data was collected.
+        type: string
+    type: object
+  dto.StorageTopologySources:
+    properties:
+      ses:
+        description: SES is true when sg_ses (with JSON output support) read at least
+          one SES device.
+        example: true
+        type: boolean
+      ses_devices:
+        description: SESDevices is the number of SES devices (one per enclosure I/O
+          module path) read.
+        example: 4
+        type: integer
+      storcli:
+        description: Storcli is true when storcli was found and reported at least
+          one controller.
+        example: true
+        type: boolean
+      storcli_path:
+        description: StorcliPath is the storcli binary that was used.
+        example: /sbin/storcli
+        type: string
+      storcli_version:
+        description: StorcliVersion is the storcli CLI version string.
+        example: 007.3305.0000.0000 Jan 23, 2025
+        type: string
+    type: object
+  dto.StorageTopologySummary:
+    properties:
+      controllers:
+        example: 1
+        type: integer
+      drives:
+        example: 43
+        type: integer
+      drives_below_max_link_rate:
+        description: DrivesBelowMaxLinkRate counts drives negotiated below their maximum
+          interface speed.
+        example: 26
+        type: integer
+      drives_with_media_errors:
+        description: DrivesWithMediaErrors counts drives with a non-zero media error
+          count.
+        example: 0
+        type: integer
+      drives_with_other_errors:
+        description: DrivesWithOtherErrors counts drives with a non-zero "other" (transport/link)
+          error count.
+        example: 0
+        type: integer
+      drives_with_predictive_failure:
+        description: DrivesWithPredictiveFailure counts drives with predictive failures
+          or a S.M.A.R.T. alert.
+        example: 0
+        type: integer
+      enclosures:
+        example: 2
+        type: integer
+      enclosures_with_problems:
+        description: EnclosuresWithProblems counts enclosures with at least one problem.
+        example: 0
+        type: integer
+      single_path_drives:
+        description: SinglePathDrives counts dual-ported drives in redundant enclosures
+          with one active path.
+        example: 0
+        type: integer
     type: object
   dto.SystemInfo:
     properties:
@@ -7020,6 +7834,24 @@ paths:
       summary: Update share configuration
       tags:
       - Configuration
+  /storage/topology:
+    get:
+      description: 'Returns the cached SAS storage topology collected with storcli
+        (Broadcom/LSI controllers) and sg_ses (SCSI Enclosure Services): controllers
+        with PCIe link and HBA ports, enclosures with power supplies, fans, temperature/voltage/current
+        sensors, I/O modules, firmware and cabling, and per-drive paths, link speeds
+        and error counters. State is "pending" until the first collection, and "unsupported"
+        when neither storcli nor SES devices with sg_ses are available.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Storage topology
+          schema:
+            $ref: '#/definitions/dto.StorageTopology'
+      summary: Get SAS storage topology
+      tags:
+      - Storage
   /system:
     get:
       description: Retrieve comprehensive system metrics including CPU, RAM, temperatures,

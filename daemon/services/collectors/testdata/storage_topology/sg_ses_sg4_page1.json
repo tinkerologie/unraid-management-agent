@@ -1,0 +1,181 @@
+{
+    "json_format_version": [
+        1,
+        0
+    ],
+    "utility_invoked": {
+        "name": "sg_ses",
+        "version_date": "2.88 20260526",
+        "argv": [
+            "sg_ses",
+            "--json",
+            "--page=1",
+            "/dev/sg4"
+        ]
+    },
+    "configuration_diagnostic_page": {
+        "page_code": {
+            "i": 1,
+            "meaning": "Configuration diagnostic page"
+        },
+        "number_of_secondary_subenclosures": 0,
+        "generation_code": 5,
+        "enclosure_descriptor_list": [
+            {
+                "subenclosure_identifier": {
+                    "i": 0,
+                    "meaning": "primary"
+                },
+                "relative_enclosure_services_process_identifier": 0,
+                "number_of_enclosure_services_processes": 0,
+                "number_of_type_descriptor_headers": 15,
+                "enclosure_logical_identifier": 5766028964804676514,
+                "enclosure_vendor_identification": "NETAPP  ",
+                "product_identification": "DS424IOM12A     ",
+                "product_revision_level": "0281",
+                "vendor_specific_enclosure_information": "53 50 41 52 45 20 20 20  20 20 20 20 00 00 00 00  01 00 00 00 42 53 53 32  31 32 38 35 33 37 4d 30  56 4c 45 20 20 20 20 20  20 20 20 20 20 20 20 20  20 20 20 20"
+            }
+        ],
+        "type_descriptor_header_and_text_list": [
+            {
+                "element_type": {
+                    "i": 1,
+                    "meaning": "Device slot"
+                },
+                "number_of_possible_elements": 24,
+                "subenclosure_identifier": 0,
+                "type_descriptor_text_length": 0
+            },
+            {
+                "element_type": {
+                    "i": 2,
+                    "meaning": "Power supply"
+                },
+                "number_of_possible_elements": 4,
+                "subenclosure_identifier": 0,
+                "type_descriptor_text_length": 0
+            },
+            {
+                "element_type": {
+                    "i": 3,
+                    "meaning": "Cooling"
+                },
+                "number_of_possible_elements": 8,
+                "subenclosure_identifier": 0,
+                "type_descriptor_text_length": 0
+            },
+            {
+                "element_type": {
+                    "i": 4,
+                    "meaning": "Temperature sensor"
+                },
+                "number_of_possible_elements": 12,
+                "subenclosure_identifier": 0,
+                "type_descriptor_text_length": 0
+            },
+            {
+                "element_type": {
+                    "i": 7,
+                    "meaning": "Enclosure services controller electronics"
+                },
+                "number_of_possible_elements": 2,
+                "subenclosure_identifier": 0,
+                "type_descriptor_text_length": 0
+            },
+            {
+                "element_type": {
+                    "i": 12,
+                    "meaning": "Display"
+                },
+                "number_of_possible_elements": 1,
+                "subenclosure_identifier": 0,
+                "type_descriptor_text_length": 0
+            },
+            {
+                "element_type": {
+                    "i": 14,
+                    "meaning": "Enclosure"
+                },
+                "number_of_possible_elements": 1,
+                "subenclosure_identifier": 0,
+                "type_descriptor_text_length": 0
+            },
+            {
+                "element_type": {
+                    "i": 18,
+                    "meaning": "Voltage sensor"
+                },
+                "number_of_possible_elements": 8,
+                "subenclosure_identifier": 0,
+                "type_descriptor_text_length": 0
+            },
+            {
+                "element_type": {
+                    "i": 19,
+                    "meaning": "Current sensor"
+                },
+                "number_of_possible_elements": 8,
+                "subenclosure_identifier": 0,
+                "type_descriptor_text_length": 0
+            },
+            {
+                "element_type": {
+                    "i": 25,
+                    "meaning": "SAS connector"
+                },
+                "number_of_possible_elements": 8,
+                "subenclosure_identifier": 0,
+                "type_descriptor_text_length": 0
+            },
+            {
+                "element_type": {
+                    "i": 131,
+                    "meaning": "Vendor specific [0x83]"
+                },
+                "number_of_possible_elements": 2,
+                "subenclosure_identifier": 0,
+                "type_descriptor_text_length": 0
+            },
+            {
+                "element_type": {
+                    "i": 133,
+                    "meaning": "Vendor specific [0x85]"
+                },
+                "number_of_possible_elements": 2,
+                "subenclosure_identifier": 0,
+                "type_descriptor_text_length": 0
+            },
+            {
+                "element_type": {
+                    "i": 140,
+                    "meaning": "Vendor specific [0x8c]"
+                },
+                "number_of_possible_elements": 1,
+                "subenclosure_identifier": 0,
+                "type_descriptor_text_length": 0
+            },
+            {
+                "element_type": {
+                    "i": 141,
+                    "meaning": "Vendor specific [0x8d]"
+                },
+                "number_of_possible_elements": 4,
+                "subenclosure_identifier": 0,
+                "type_descriptor_text_length": 0
+            },
+            {
+                "element_type": {
+                    "i": 142,
+                    "meaning": "Vendor specific [0x8e]"
+                },
+                "number_of_possible_elements": 4,
+                "subenclosure_identifier": 0,
+                "type_descriptor_text_length": 0
+            }
+        ]
+    },
+    "exit_status": {
+        "i": 0,
+        "meaning": "no errors"
+    }
+}

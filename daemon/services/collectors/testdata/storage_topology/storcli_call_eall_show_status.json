@@ -1,0 +1,491 @@
+{
+"Controllers":[
+{
+	"Command Status" : {
+		"CLI Version" : "007.3305.0000.0000 Jan 23, 2025",
+		"Operating system" : "Linux 6.18.52-Unraid",
+		"Controller" : 0,
+		"Status" : "Success",
+		"Description" : "None"
+	},
+	"Response Data" : {
+		"Enclosure /c0/e242 " : {
+			"Slot Info" : [
+				{
+					"Slot" : 0,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 1,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 2,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 3,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 4,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 5,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 6,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 7,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 8,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 9,
+					"Status" : "Missing"
+				},
+				{
+					"Slot" : 10,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 11,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 12,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 13,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 14,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 15,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 16,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 17,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 18,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 19,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 20,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 21,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 22,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 23,
+					"Status" : "Missing"
+				}
+			],
+			"Power Supply Info" : [
+				{
+					"Power Supply" : 0,
+					"State" : "OK",
+					"Status" : "OK"
+				},
+				{
+					"Power Supply" : 1,
+					"State" : "OK",
+					"Status" : "OK"
+				},
+				{
+					"Power Supply" : 2,
+					"State" : "OK",
+					"Status" : "OK"
+				},
+				{
+					"Power Supply" : 3,
+					"State" : "OK",
+					"Status" : "OK"
+				}
+			],
+			"Fan Info" : [
+				{
+					"Fan" : 0,
+					"Fan Speed" : "Low Speed",
+					"Status" : "OK"
+				},
+				{
+					"Fan" : 1,
+					"Fan Speed" : "Low Speed",
+					"Status" : "OK"
+				},
+				{
+					"Fan" : 2,
+					"Fan Speed" : "Low Speed",
+					"Status" : "OK"
+				},
+				{
+					"Fan" : 3,
+					"Fan Speed" : "Low Speed",
+					"Status" : "OK"
+				},
+				{
+					"Fan" : 4,
+					"Fan Speed" : "Low Speed",
+					"Status" : "OK"
+				},
+				{
+					"Fan" : 5,
+					"Fan Speed" : "Low Speed",
+					"Status" : "OK"
+				},
+				{
+					"Fan" : 6,
+					"Fan Speed" : "Low Speed",
+					"Status" : "OK"
+				},
+				{
+					"Fan" : 7,
+					"Fan Speed" : "Low Speed",
+					"Status" : "OK"
+				}
+			],
+			"Temperature Sensor Info" : [
+				{
+					"Temperature Sensor" : 0,
+					"Temperature" : 24,
+					"Status" : "OK"
+				},
+				{
+					"Temperature Sensor" : 1,
+					"Temperature" : 32,
+					"Status" : "OK"
+				},
+				{
+					"Temperature Sensor" : 2,
+					"Temperature" : 32,
+					"Status" : "OK"
+				},
+				{
+					"Temperature Sensor" : 3,
+					"Temperature" : 42,
+					"Status" : "OK"
+				},
+				{
+					"Temperature Sensor" : 4,
+					"Temperature" : 35,
+					"Status" : "OK"
+				},
+				{
+					"Temperature Sensor" : 5,
+					"Temperature" : 47,
+					"Status" : "OK"
+				},
+				{
+					"Temperature Sensor" : 6,
+					"Temperature" : 32,
+					"Status" : "OK"
+				},
+				{
+					"Temperature Sensor" : 7,
+					"Temperature" : 45,
+					"Status" : "OK"
+				},
+				{
+					"Temperature Sensor" : 8,
+					"Temperature" : 38,
+					"Status" : "OK"
+				},
+				{
+					"Temperature Sensor" : 9,
+					"Temperature" : 57,
+					"Status" : "OK"
+				},
+				{
+					"Temperature Sensor" : 10,
+					"Temperature" : 43,
+					"Status" : "OK"
+				},
+				{
+					"Temperature Sensor" : 11,
+					"Temperature" : 63,
+					"Status" : "OK"
+				}
+			],
+			"SIM Info" : [
+				{
+					"SIM Module" : 0,
+					"Status" : "OK",
+					"Report Set" : "Yes"
+				},
+				{
+					"SIM Module" : 1,
+					"Status" : "OK",
+					"Report Set" : "Yes"
+				}
+			]
+		},
+		"Enclosure /c0/e245 " : {
+			"Slot Info" : [
+				{
+					"Slot" : 0,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 1,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 2,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 3,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 4,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 5,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 6,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 7,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 8,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 9,
+					"Status" : "Missing"
+				},
+				{
+					"Slot" : 10,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 11,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 12,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 13,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 14,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 15,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 16,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 17,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 18,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 19,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 20,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 21,
+					"Status" : "OK"
+				},
+				{
+					"Slot" : 22,
+					"Status" : "Missing"
+				},
+				{
+					"Slot" : 23,
+					"Status" : "Missing"
+				}
+			],
+			"Power Supply Info" : [
+				{
+					"Power Supply" : 0,
+					"State" : "OK",
+					"Status" : "OK"
+				},
+				{
+					"Power Supply" : 1,
+					"State" : "OK",
+					"Status" : "OK"
+				},
+				{
+					"Power Supply" : 2,
+					"State" : "OK",
+					"Status" : "OK"
+				},
+				{
+					"Power Supply" : 3,
+					"State" : "OK",
+					"Status" : "OK"
+				}
+			],
+			"Fan Info" : [
+				{
+					"Fan" : 0,
+					"Fan Speed" : "Low Speed",
+					"Status" : "OK"
+				},
+				{
+					"Fan" : 1,
+					"Fan Speed" : "Low Speed",
+					"Status" : "OK"
+				},
+				{
+					"Fan" : 2,
+					"Fan Speed" : "Low Speed",
+					"Status" : "OK"
+				},
+				{
+					"Fan" : 3,
+					"Fan Speed" : "Low Speed",
+					"Status" : "OK"
+				},
+				{
+					"Fan" : 4,
+					"Fan Speed" : "Low Speed",
+					"Status" : "OK"
+				},
+				{
+					"Fan" : 5,
+					"Fan Speed" : "Low Speed",
+					"Status" : "OK"
+				},
+				{
+					"Fan" : 6,
+					"Fan Speed" : "Low Speed",
+					"Status" : "OK"
+				},
+				{
+					"Fan" : 7,
+					"Fan Speed" : "Low Speed",
+					"Status" : "OK"
+				}
+			],
+			"Temperature Sensor Info" : [
+				{
+					"Temperature Sensor" : 0,
+					"Temperature" : 20,
+					"Status" : "OK"
+				},
+				{
+					"Temperature Sensor" : 1,
+					"Temperature" : 33,
+					"Status" : "OK"
+				},
+				{
+					"Temperature Sensor" : 2,
+					"Temperature" : 33,
+					"Status" : "OK"
+				},
+				{
+					"Temperature Sensor" : 3,
+					"Temperature" : 42,
+					"Status" : "OK"
+				},
+				{
+					"Temperature Sensor" : 4,
+					"Temperature" : 36,
+					"Status" : "OK"
+				},
+				{
+					"Temperature Sensor" : 5,
+					"Temperature" : 50,
+					"Status" : "OK"
+				},
+				{
+					"Temperature Sensor" : 6,
+					"Temperature" : 29,
+					"Status" : "OK"
+				},
+				{
+					"Temperature Sensor" : 7,
+					"Temperature" : 39,
+					"Status" : "OK"
+				},
+				{
+					"Temperature Sensor" : 8,
+					"Temperature" : 34,
+					"Status" : "OK"
+				},
+				{
+					"Temperature Sensor" : 9,
+					"Temperature" : 44,
+					"Status" : "OK"
+				},
+				{
+					"Temperature Sensor" : 10,
+					"Temperature" : 48,
+					"Status" : "OK"
+				},
+				{
+					"Temperature Sensor" : 11,
+					"Temperature" : 41,
+					"Status" : "OK"
+				}
+			],
+			"SIM Info" : [
+				{
+					"SIM Module" : 0,
+					"Status" : "OK",
+					"Report Set" : "Yes"
+				},
+				{
+					"SIM Module" : 1,
+					"Status" : "OK",
+					"Report Set" : "Yes"
+				}
+			]
+		}
+	}
+}
+]
+}

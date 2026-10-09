@@ -2,6 +2,7 @@ package lib
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"os/exec"
@@ -130,6 +131,51 @@ func ExecCommandStdout(command string, args ...string) (string, error) {
 		return string(out), fmt.Errorf("command failed: %w", err)
 	}
 	return string(out), nil
+}
+
+// ExecCommandStdoutGuarded runs a command and returns only its stdout. The child
+// is killed when ctx is cancelled or timeout elapses, and the call returns
+// immediately in that case. The returned channel is closed once the child has
+// actually been reaped, which can be much later than the return when the child
+// is stuck in uninterruptible sleep (e.g. a storage tool waiting on stalled
+// controller firmware). Callers that must never run two instances of a tool at
+// once can poll that channel before starting the next invocation.
+func ExecCommandStdoutGuarded(ctx context.Context, timeout time.Duration, command string, args ...string) (string, <-chan struct{}, error) {
+	runCtx, cancel := context.WithTimeout(ctx, timeout)
+	done := make(chan struct{})
+
+	cmd := execCommand(runCtx, command, args...) // #nosec G204 -- callers pass validated commands and arguments without shell interpolation
+	cmd.WaitDelay = time.Second
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	if err := cmd.Start(); err != nil {
+		cancel()
+		close(done)
+		return "", done, fmt.Errorf("failed to start command: %w", err)
+	}
+
+	result := make(chan error, 1)
+	go func() {
+		result <- cmd.Wait()
+		close(done)
+	}()
+
+	var waitErr error
+	select {
+	case waitErr = <-result:
+	case <-runCtx.Done():
+	}
+	ctxErr := runCtx.Err()
+	cancel()
+	if ctxErr != nil {
+		// The context killed the child. stdout is not read: unless Wait has
+		// returned, the copy goroutine may still be writing to it.
+		return "", done, fmt.Errorf("command %s did not finish within %v: %w", command, timeout, ctxErr)
+	}
+	if waitErr != nil {
+		return stdout.String(), done, fmt.Errorf("command failed: %w", waitErr)
+	}
+	return stdout.String(), done, nil
 }
 
 // CommandExists checks if a command exists in PATH

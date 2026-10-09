@@ -257,3 +257,77 @@ func TestHelperProcess(t *testing.T) {
 	}
 	os.Exit(exitCode)
 }
+
+func TestExecCommandStdoutGuarded(t *testing.T) {
+	waitDone := func(t *testing.T, done <-chan struct{}) {
+		t.Helper()
+		select {
+		case <-done:
+		case <-time.After(10 * time.Second):
+			t.Fatal("done channel was not closed after the child exited")
+		}
+	}
+
+	t.Run("returns stdout only", func(t *testing.T) {
+		out, done, err := ExecCommandStdoutGuarded(context.Background(), 10*time.Second,
+			"sh", "-c", "echo stdout_only; echo stderr_noise >&2")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if out != "stdout_only\n" {
+			t.Errorf("stdout = %q, want %q", out, "stdout_only\n")
+		}
+		waitDone(t, done)
+	})
+
+	t.Run("non-zero exit keeps stdout and wraps error", func(t *testing.T) {
+		out, done, err := ExecCommandStdoutGuarded(context.Background(), 10*time.Second,
+			"sh", "-c", "echo partial; exit 3")
+		if err == nil || !strings.Contains(err.Error(), "command failed") {
+			t.Fatalf("expected command failed error, got %v", err)
+		}
+		if out != "partial\n" {
+			t.Errorf("stdout = %q, want %q", out, "partial\n")
+		}
+		waitDone(t, done)
+	})
+
+	t.Run("timeout kills the child and reports it", func(t *testing.T) {
+		start := time.Now()
+		out, done, err := ExecCommandStdoutGuarded(context.Background(), 100*time.Millisecond,
+			"sleep", "5")
+		if err == nil || !strings.Contains(err.Error(), "did not finish within") {
+			t.Fatalf("expected timeout error, got %v", err)
+		}
+		if out != "" {
+			t.Errorf("expected no stdout on timeout, got %q", out)
+		}
+		if elapsed := time.Since(start); elapsed > 4*time.Second {
+			t.Errorf("call returned after %v; the timeout was not honoured", elapsed)
+		}
+		waitDone(t, done)
+	})
+
+	t.Run("parent context cancellation stops the child", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		time.AfterFunc(50*time.Millisecond, cancel)
+		_, done, err := ExecCommandStdoutGuarded(ctx, 10*time.Second, "sleep", "5")
+		if err == nil || !strings.Contains(err.Error(), "context canceled") {
+			t.Fatalf("expected cancellation error, got %v", err)
+		}
+		waitDone(t, done)
+	})
+
+	t.Run("start failure closes done immediately", func(t *testing.T) {
+		_, done, err := ExecCommandStdoutGuarded(context.Background(), time.Second,
+			"command-that-does-not-exist-xyz")
+		if err == nil || !strings.Contains(err.Error(), "failed to start command") {
+			t.Fatalf("expected start error, got %v", err)
+		}
+		select {
+		case <-done:
+		default:
+			t.Fatal("done channel should be closed when the command never started")
+		}
+	})
+}

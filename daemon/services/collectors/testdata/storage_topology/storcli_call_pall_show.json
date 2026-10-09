@@ -1,0 +1,209 @@
+{
+"Controllers":[
+{
+	"Command Status" : {
+		"CLI Version" : "007.3305.0000.0000 Jan 23, 2025",
+		"Operating system" : "Linux 6.18.52-Unraid",
+		"Controller" : 0,
+		"Status" : "Success",
+		"Description" : "None"
+	},
+	"Response Data" : {
+		"PhyInfo" : [
+			{
+				"PhyNo" : 0,
+				"SAS_Addr" : "0x500A09809EF42C5D",
+				"Phy_Identifier" : 13,
+				"Link_Speed" : "12.0Gb/s ",
+				"Device_Type " : "Edge Expander",
+				"Port" : 0,
+				"Port_valid" : 1,
+				"Description" : "-",
+				"MaxSpeed" : "No limit ",
+				"Enbl" : "Y"
+			},
+			{
+				"PhyNo" : 1,
+				"SAS_Addr" : "0x500A09809EF42C5D",
+				"Phy_Identifier" : 12,
+				"Link_Speed" : "12.0Gb/s ",
+				"Device_Type " : "Edge Expander",
+				"Port" : 0,
+				"Port_valid" : 1,
+				"Description" : "-",
+				"MaxSpeed" : "No limit ",
+				"Enbl" : "Y"
+			},
+			{
+				"PhyNo" : 2,
+				"SAS_Addr" : "0x500A09809EF42C5D",
+				"Phy_Identifier" : 14,
+				"Link_Speed" : "12.0Gb/s ",
+				"Device_Type " : "Edge Expander",
+				"Port" : 0,
+				"Port_valid" : 1,
+				"Description" : "-",
+				"MaxSpeed" : "No limit ",
+				"Enbl" : "Y"
+			},
+			{
+				"PhyNo" : 3,
+				"SAS_Addr" : "0x500A09809EF42C5D",
+				"Phy_Identifier" : 15,
+				"Link_Speed" : "12.0Gb/s ",
+				"Device_Type " : "Edge Expander",
+				"Port" : 0,
+				"Port_valid" : 1,
+				"Description" : "-",
+				"MaxSpeed" : "No limit ",
+				"Enbl" : "Y"
+			},
+			{
+				"PhyNo" : 4,
+				"SAS_Addr" : "0x500A098BE2D98D01",
+				"Phy_Identifier" : 13,
+				"Link_Speed" : "12.0Gb/s ",
+				"Device_Type " : "Edge Expander",
+				"Port" : 1,
+				"Port_valid" : 1,
+				"Description" : "-",
+				"MaxSpeed" : "No limit ",
+				"Enbl" : "Y"
+			},
+			{
+				"PhyNo" : 5,
+				"SAS_Addr" : "0x500A098BE2D98D01",
+				"Phy_Identifier" : 12,
+				"Link_Speed" : "12.0Gb/s ",
+				"Device_Type " : "Edge Expander",
+				"Port" : 1,
+				"Port_valid" : 1,
+				"Description" : "-",
+				"MaxSpeed" : "No limit ",
+				"Enbl" : "Y"
+			},
+			{
+				"PhyNo" : 6,
+				"SAS_Addr" : "0x500A098BE2D98D01",
+				"Phy_Identifier" : 14,
+				"Link_Speed" : "12.0Gb/s ",
+				"Device_Type " : "Edge Expander",
+				"Port" : 1,
+				"Port_valid" : 1,
+				"Description" : "-",
+				"MaxSpeed" : "No limit ",
+				"Enbl" : "Y"
+			},
+			{
+				"PhyNo" : 7,
+				"SAS_Addr" : "0x500A098BE2D98D01",
+				"Phy_Identifier" : 15,
+				"Link_Speed" : "12.0Gb/s ",
+				"Device_Type " : "Edge Expander",
+				"Port" : 1,
+				"Port_valid" : 1,
+				"Description" : "-",
+				"MaxSpeed" : "No limit ",
+				"Enbl" : "Y"
+			},
+			{
+				"PhyNo" : 8,
+				"SAS_Addr" : "0x0000000000000000",
+				"Phy_Identifier" : 0,
+				"Link_Speed" : "No limit ",
+				"Device_Type " : "-",
+				"Port" : 0,
+				"Port_valid" : 0,
+				"Description" : "-",
+				"MaxSpeed" : "No limit ",
+				"Enbl" : "Y"
+			},
+			{
+				"PhyNo" : 9,
+				"SAS_Addr" : "0x0000000000000000",
+				"Phy_Identifier" : 0,
+				"Link_Speed" : "No limit ",
+				"Device_Type " : "-",
+				"Port" : 0,
+				"Port_valid" : 0,
+				"Description" : "-",
+				"MaxSpeed" : "No limit ",
+				"Enbl" : "Y"
+			},
+			{
+				"PhyNo" : 10,
+				"SAS_Addr" : "0x0000000000000000",
+				"Phy_Identifier" : 0,
+				"Link_Speed" : "No limit ",
+				"Device_Type " : "-",
+				"Port" : 0,
+				"Port_valid" : 0,
+				"Description" : "-",
+				"MaxSpeed" : "No limit ",
+				"Enbl" : "Y"
+			},
+			{
+				"PhyNo" : 11,
+				"SAS_Addr" : "0x0000000000000000",
+				"Phy_Identifier" : 0,
+				"Link_Speed" : "No limit ",
+				"Device_Type " : "-",
+				"Port" : 0,
+				"Port_valid" : 0,
+				"Description" : "-",
+				"MaxSpeed" : "No limit ",
+				"Enbl" : "Y"
+			},
+			{
+				"PhyNo" : 12,
+				"SAS_Addr" : "0x0000000000000000",
+				"Phy_Identifier" : 0,
+				"Link_Speed" : "No limit ",
+				"Device_Type " : "-",
+				"Port" : 0,
+				"Port_valid" : 0,
+				"Description" : "-",
+				"MaxSpeed" : "No limit ",
+				"Enbl" : "Y"
+			},
+			{
+				"PhyNo" : 13,
+				"SAS_Addr" : "0x0000000000000000",
+				"Phy_Identifier" : 0,
+				"Link_Speed" : "No limit ",
+				"Device_Type " : "-",
+				"Port" : 0,
+				"Port_valid" : 0,
+				"Description" : "-",
+				"MaxSpeed" : "No limit ",
+				"Enbl" : "Y"
+			},
+			{
+				"PhyNo" : 14,
+				"SAS_Addr" : "0x0000000000000000",
+				"Phy_Identifier" : 0,
+				"Link_Speed" : "No limit ",
+				"Device_Type " : "-",
+				"Port" : 0,
+				"Port_valid" : 0,
+				"Description" : "-",
+				"MaxSpeed" : "No limit ",
+				"Enbl" : "Y"
+			},
+			{
+				"PhyNo" : 15,
+				"SAS_Addr" : "0x0000000000000000",
+				"Phy_Identifier" : 0,
+				"Link_Speed" : "No limit ",
+				"Device_Type " : "-",
+				"Port" : 0,
+				"Port_valid" : 0,
+				"Description" : "-",
+				"MaxSpeed" : "No limit ",
+				"Enbl" : "Y"
+			}
+		]
+	}
+}
+]
+}
