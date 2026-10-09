@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **GitHub issue template configuration** — added `.github/ISSUE_TEMPLATE/config.yml`
   with private security disclosure contact links.
 
+### Fixed
+
+- **CI coverage test on Linux** — allowed HTTP 200 in `TestLogFileEndpoint` when `/var/log/syslog` exists on Linux runners, unblocking coverage profile generation.
+- **Codecov PR comments** — configured `.codecov.yml` with `require_changes: false` so coverage reports are posted on all pull requests.
+
 ### Changed
 
 - **GitHub Actions Ubuntu runner policy** — set release workflow jobs to

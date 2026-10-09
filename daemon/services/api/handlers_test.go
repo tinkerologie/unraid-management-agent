@@ -1034,8 +1034,8 @@ func TestLogFileEndpoint(t *testing.T) {
 	rr := httptest.NewRecorder()
 	server.router.ServeHTTP(rr, req)
 
-	// /var/log/syslog doesn't exist in test env
-	if status := rr.Code; status != http.StatusNotFound && status != http.StatusInternalServerError {
+	// /var/log/syslog may or may not exist in test env (e.g. exists on Ubuntu CI, absent on macOS)
+	if status := rr.Code; status != http.StatusOK && status != http.StatusNotFound && status != http.StatusInternalServerError {
 		t.Errorf("handler returned unexpected status code: got %v", status)
 	}
 }

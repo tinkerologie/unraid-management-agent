@@ -2,6 +2,7 @@
 [![GitHub Last Commit](https://img.shields.io/github/last-commit/ruaan-deysel/unraid-management-agent)](https://github.com/ruaan-deysel/unraid-management-agent/commits/main)
 [![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/ruaan-deysel/unraid-management-agent)](https://github.com/ruaan-deysel/unraid-management-agent)
 [![GitHub issues](https://img.shields.io/github/issues/ruaan-deysel/unraid-management-agent)](https://github.com/ruaan-deysel/unraid-management-agent/issues)
+[![Codecov](https://codecov.io/gh/ruaan-deysel/unraid-management-agent/branch/main/graph/badge.svg)](https://codecov.io/gh/ruaan-deysel/unraid-management-agent)
 [![License](https://img.shields.io/github/license/ruaan-deysel/unraid-management-agent)](./LICENSE)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ruaan-deysel/unraid-management-agent)
 
