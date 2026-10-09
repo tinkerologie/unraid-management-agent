@@ -171,3 +171,59 @@ func TestPluginUpdateNotify_NotifyFnNilIsSafe(t *testing.T) {
 	c.Collect(context.Background())
 	c.Collect(context.Background())
 }
+
+func TestPluginUpdateCollector_PublishesFirstEmptyResult(t *testing.T) {
+	hub := domain.NewEventBus(16)
+	sub := hub.Sub(constants.TopicPluginUpdatesUpdate.Name)
+	defer hub.Unsub(sub)
+
+	c := NewPluginUpdateCollector(&domain.Context{Hub: hub})
+	c.CheckFn = func(_ context.Context) (*dto.PluginList, error) {
+		return &dto.PluginList{}, nil // no plugin has an update
+	}
+
+	// An empty result has the same signature as the initial state; it must
+	// still be published so the cache records that the check ran.
+	c.Collect(context.Background())
+	select {
+	case msg := <-sub:
+		got, ok := msg.(*dto.PluginList)
+		if !ok {
+			t.Fatalf("unexpected publish payload: %#v", msg)
+		}
+		if got.Timestamp.IsZero() {
+			t.Error("expected published result to carry the check time")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("expected the first (empty) result to be published")
+	}
+
+	c.Collect(context.Background()) // unchanged → no re-publish
+	select {
+	case msg := <-sub:
+		t.Fatalf("expected no re-publish on unchanged empty result, got %#v", msg)
+	case <-time.After(200 * time.Millisecond):
+	}
+}
+
+func TestPluginUpdateCollector_KeepsProvidedTimestamp(t *testing.T) {
+	hub := domain.NewEventBus(16)
+	sub := hub.Sub(constants.TopicPluginUpdatesUpdate.Name)
+	defer hub.Unsub(sub)
+
+	checked := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
+	c := NewPluginUpdateCollector(&domain.Context{Hub: hub})
+	c.CheckFn = func(_ context.Context) (*dto.PluginList, error) {
+		return &dto.PluginList{Timestamp: checked}, nil
+	}
+
+	c.Collect(context.Background())
+	select {
+	case msg := <-sub:
+		if got := msg.(*dto.PluginList); !got.Timestamp.Equal(checked) {
+			t.Errorf("expected timestamp %v to be kept, got %v", checked, got.Timestamp)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("expected a publish")
+	}
+}

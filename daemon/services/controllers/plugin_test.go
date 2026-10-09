@@ -1,7 +1,10 @@
 package controllers
 
 import (
+	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -155,5 +158,108 @@ func TestPluginController_UpdatePlugin_Error(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "download failed") {
 		t.Errorf("expected error to include command output, got: %v", err)
+	}
+}
+
+func TestPluginController_CheckPluginUpdates_RunsCheckall(t *testing.T) {
+	original := pluginCheckExec
+	t.Cleanup(func() { pluginCheckExec = original })
+
+	var gotCmd string
+	var gotArgs []string
+	var gotDeadline bool
+	pluginCheckExec = func(ctx context.Context, cmd string, args ...string) (string, error) {
+		gotCmd = cmd
+		gotArgs = args
+		_, gotDeadline = ctx.Deadline()
+		return "", errors.New("exit status 1")
+	}
+
+	pc := NewPluginController()
+	if _, err := pc.CheckPluginUpdates(context.Background()); err != nil {
+		t.Fatalf("CheckPluginUpdates returned error: %v", err)
+	}
+
+	if gotCmd != constants.PluginBin {
+		t.Errorf("expected command %q, got %q", constants.PluginBin, gotCmd)
+	}
+	// "plugin check" without a plugin file only prints usage; "checkall"
+	// downloads update metadata for every installed plugin.
+	if len(gotArgs) != 1 || gotArgs[0] != "checkall" {
+		t.Errorf("expected args [checkall], got %v", gotArgs)
+	}
+	if !gotDeadline {
+		t.Error("expected the check command to run with a deadline")
+	}
+}
+
+// writePluginFiles creates .plg files (and a dangling symlink) in a temporary
+// plugin directory and points pluginsConfigDir at it for the test.
+func writePluginFiles(t *testing.T) {
+	t.Helper()
+	dir := t.TempDir()
+	files := map[string]string{
+		// File name matches the requested name; its entity name differs.
+		"exact.plg": "<!DOCTYPE PLUGIN [\n<!ENTITY name \"something-else\">\n]>\n",
+		// Installed under a file name that differs from its entity name.
+		"disklocation-master.plg": "<?xml version='1.0'?>\n<!DOCTYPE PLUGIN [\n" +
+			"<!ENTITY name      \"disklocation\">\n<!ENTITY branch \"master\">\n]>\n",
+		// Name entity only after the DOCTYPE section: must not be matched.
+		"late.plg": "<!DOCTYPE PLUGIN [\n<!ENTITY version \"1.0\">\n]>\n" +
+			"<!ENTITY name \"late-name\">\n",
+		// No DOCTYPE terminator and no name entity.
+		"attributes.plg": "<PLUGIN name=\"attributes-name\" version=\"1.0\">\n",
+	}
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink(filepath.Join(dir, "missing-target"), filepath.Join(dir, "broken.plg")); err != nil {
+		t.Fatal(err)
+	}
+
+	original := pluginsConfigDir
+	pluginsConfigDir = dir
+	t.Cleanup(func() { pluginsConfigDir = original })
+}
+
+func TestResolvePluginFile(t *testing.T) {
+	writePluginFiles(t)
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"file name match wins", "exact", "exact.plg"},
+		{"name entity differs from file name", "disklocation", "disklocation-master.plg"},
+		{"name entity after DOCTYPE is ignored", "late-name", "late-name.plg"},
+		{"PLUGIN attributes are not entities", "attributes-name", "attributes-name.plg"},
+		{"unknown plugin falls back to its name", "not-installed", "not-installed.plg"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := resolvePluginFile(tt.input); got != tt.expected {
+				t.Errorf("resolvePluginFile(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestPluginController_UpdatePlugin_UsesInstalledFileName(t *testing.T) {
+	writePluginFiles(t)
+
+	var recordedArgs []string
+	pc := NewPluginControllerWithExec(func(_ string, args ...string) (string, error) {
+		recordedArgs = args
+		return "plugin: updated", nil
+	})
+
+	if err := pc.UpdatePlugin("disklocation"); err != nil {
+		t.Fatalf("UpdatePlugin returned error: %v", err)
+	}
+	if len(recordedArgs) != 2 || recordedArgs[1] != "disklocation-master.plg" {
+		t.Errorf("expected update of disklocation-master.plg, got args %v", recordedArgs)
 	}
 }

@@ -38,6 +38,7 @@ type PluginUpdateCollector struct {
 	// package services to avoid a collectors→controllers import cycle.
 	NotifyFn      func(names []string)
 	lastSig       string
+	published     bool
 	prevAvailable map[string]bool
 	baselineSet   bool
 }
@@ -142,12 +143,20 @@ func (c *PluginUpdateCollector) Collect(parentCtx context.Context) {
 		}
 	}
 
+	// The first result is always published, even when it is empty: an empty
+	// signature equals the initial lastSig, so "no updates" would otherwise
+	// never reach the cache and /plugins/check-updates would keep returning
+	// an empty result with a zero timestamp.
 	sig := pluginUpdateSignature(result)
-	if sig == c.lastSig {
+	if c.published && sig == c.lastSig {
 		logger.Debug("PluginUpdate: no change (%d updates available), skipping publish", result.UpdatesAvailable)
 		return
 	}
 	c.lastSig = sig
+	c.published = true
+	if result.Timestamp.IsZero() {
+		result.Timestamp = time.Now()
+	}
 
 	domain.Publish(c.appCtx.Hub, constants.TopicPluginUpdatesUpdate, result)
 	logger.Info("PluginUpdate: published (%d/%d plugins have updates)", result.UpdatesAvailable, result.TotalCount)

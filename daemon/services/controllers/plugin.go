@@ -1,9 +1,12 @@
 package controllers
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -18,6 +21,18 @@ import (
 // access (issue #123) the command hangs, so it must fail fast; locally cached
 // update files are still read afterwards.
 const pluginCheckTimeout = 30 * time.Second
+
+// pluginCheckExec runs the bounded update-metadata download; a variable so
+// tests can stub it.
+var pluginCheckExec = lib.ExecCommandOutputWithContext
+
+// pluginsConfigDir holds the installed .plg files; a variable so tests can
+// point it at a temporary directory.
+var pluginsConfigDir = constants.PluginsConfigDir
+
+// pluginNameEntityRe matches the "name" entity in a .plg file header, which is
+// the name GET /plugins reports for the plugin.
+var pluginNameEntityRe = regexp.MustCompile(`<!ENTITY\s+name\s+"([^"]*)"`)
 
 // PluginController provides operations for managing Unraid plugins.
 type PluginController struct {
@@ -52,8 +67,10 @@ func (pc *PluginController) CheckPluginUpdates(parentCtx context.Context) ([]dto
 	ctx, cancel := context.WithTimeout(parentCtx, pluginCheckTimeout)
 	defer cancel()
 
-	// Run the plugin check command to download update info
-	_, err := lib.ExecCommandOutputWithContext(ctx, constants.PluginBin, "check")
+	// Download update info for every installed plugin into /tmp/plugins.
+	// "check" needs a plugin file argument (without one it only prints usage
+	// and exits 1); "checkall" checks all installed plugins.
+	_, err := pluginCheckExec(ctx, constants.PluginBin, "checkall")
 	if err != nil {
 		logger.Warning("Plugin: Check command returned error (may be normal): %v", err)
 	}
@@ -92,9 +109,7 @@ func (pc *PluginController) UpdatePlugin(pluginName string) error {
 	logger.Info("Plugin: Updating plugin %s", pluginName)
 
 	baseName := strings.TrimSuffix(filepath.Base(pluginName), ".plg")
-	fileName := baseName + ".plg"
-	pluginFile := filepath.Join(constants.PluginsConfigDir, fileName)
-	bareFile := filepath.Base(pluginFile)
+	bareFile := resolvePluginFile(baseName)
 
 	execFn := pc.execOutput
 	if execFn == nil {
@@ -150,6 +165,51 @@ func (pc *PluginController) UpdateAllPlugins() ([]dto.PluginUpdateResult, error)
 
 	logger.Info("Plugin: Update complete (%d plugins processed)", len(results))
 	return results, nil
+}
+
+// resolvePluginFile returns the bare .plg file name for a plugin. GET /plugins
+// names a plugin by the "name" entity in its .plg file, which can differ from
+// the file name (e.g. "disklocation" is installed as disklocation-master.plg),
+// so when no file has the given name, the file whose name entity matches is
+// used instead. Falls back to "<baseName>.plg".
+func resolvePluginFile(baseName string) string {
+	fileName := baseName + ".plg"
+	if _, err := os.Stat(filepath.Join(pluginsConfigDir, fileName)); err == nil {
+		return fileName
+	}
+	// Glob only fails on a malformed pattern, and this one is fixed.
+	files, _ := filepath.Glob(filepath.Join(pluginsConfigDir, "*.plg"))
+	for _, file := range files {
+		if pluginEntityName(file) == baseName {
+			logger.Info("Plugin: %s is installed as %s", baseName, filepath.Base(file))
+			return filepath.Base(file)
+		}
+	}
+	return fileName
+}
+
+// pluginEntityName returns the "name" entity declared in a .plg file header,
+// or "" when the file cannot be read or declares none. Like the plugin list
+// parser, it stops at the end of the DOCTYPE section.
+func pluginEntityName(path string) string {
+	// #nosec G304 -- path comes from globbing the trusted plugin directory.
+	file, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer file.Close() //nolint:errcheck // Error checking not needed for defer Close
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if matches := pluginNameEntityRe.FindStringSubmatch(line); matches != nil {
+			return matches[1]
+		}
+		if strings.Contains(line, "]>") {
+			break
+		}
+	}
+	return ""
 }
 
 // getPluginVersion extracts the version from a .plg file by parsing XML entities.

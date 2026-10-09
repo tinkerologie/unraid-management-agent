@@ -65,6 +65,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   404). `{id}` may be the disk id, device or name; it is resolved against the disk
   collector cache, so unknown disks return 404, and the existing array controller
   spins the disk via emhttpd.
+- **Plugin update check and plugin updates** — the hourly check and
+  `POST /plugins/updates/refresh` now run `plugin checkall` (the previous
+  `plugin check` without a plugin file only printed usage and exited 1, so no
+  update metadata was downloaded); the `plugin_update` collector publishes its
+  first result even when no plugin has an update and stamps results with the
+  check time, so `GET /plugins/check-updates` no longer stays empty with a zero
+  timestamp; and `POST /plugins/{name}/update` accepts the name `GET /plugins`
+  reports when it differs from the `.plg` file name (e.g. `disklocation` →
+  `disklocation-master.plg`). ([#182](https://github.com/ruaan-deysel/unraid-management-agent/issues/182)).
 
 ## [2026.09.01] - 2026-09-28
 
