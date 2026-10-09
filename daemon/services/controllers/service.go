@@ -10,7 +10,11 @@ import (
 
 // ServiceController provides control operations for Unraid system services.
 // It handles starting, stopping, and restarting services like Docker, libvirt, SMB, NFS, etc.
-type ServiceController struct{}
+type ServiceController struct {
+	// statusOutput runs an rc script with the "status" argument and returns its
+	// combined output. Nil means lib.ExecCommandOutput; tests inject a fake.
+	statusOutput func(command string, args ...string) (string, error)
+}
 
 // NewServiceController creates a new service controller.
 func NewServiceController() *ServiceController {
@@ -74,7 +78,19 @@ func (sc *ServiceController) GetServiceStatus(serviceName string) (bool, error) 
 		return false, fmt.Errorf("unknown service: %s (valid: %s)", serviceName, strings.Join(ValidServiceNames(), ", "))
 	}
 
-	output, err := lib.ExecCommandOutput(rcScript, "status")
+	runStatus := sc.statusOutput
+	if runStatus == nil {
+		runStatus = lib.ExecCommandOutput
+	}
+	output, err := runStatus(rcScript, "status")
+
+	// rc.wireguard's status action always exits 1 and prints
+	// "Active tunnels: wg0 wg1" or "Active tunnels: none", so the exit code
+	// and the generic keywords below cannot tell up from down.
+	if rcScript == serviceMap["wireguard"] {
+		return wireGuardTunnelsActive(output), nil
+	}
+
 	if err != nil {
 		// Most rc scripts return non-zero exit code when service is stopped
 		return false, nil
@@ -86,6 +102,20 @@ func (sc *ServiceController) GetServiceStatus(serviceName string) (bool, error) 
 		strings.Contains(outputLower, "is running") ||
 		strings.Contains(outputLower, "started") ||
 		strings.Contains(outputLower, "active"), nil
+}
+
+// wireGuardTunnelsActive reports whether rc.wireguard status output lists at
+// least one active tunnel.
+func wireGuardTunnelsActive(output string) bool {
+	for line := range strings.SplitSeq(output, "\n") {
+		tunnels, ok := strings.CutPrefix(strings.TrimSpace(line), "Active tunnels:")
+		if !ok {
+			continue
+		}
+		tunnels = strings.TrimSpace(tunnels)
+		return tunnels != "" && tunnels != "none"
+	}
+	return false
 }
 
 // executeAction executes a service action (start, stop, restart).

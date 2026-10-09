@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"errors"
 	"sort"
 	"testing"
 )
@@ -136,4 +137,68 @@ func TestServiceMap_ScriptsHaveValidPaths(t *testing.T) {
 // hasPrefix is a simple helper for string prefix checking.
 func hasPrefix(s, prefix string) bool {
 	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
+}
+
+func TestGetServiceStatus_WireGuard(t *testing.T) {
+	statusErr := errors.New("command failed: exit status 1")
+	tests := []struct {
+		name   string
+		output string
+		want   bool
+	}{
+		// rc.wireguard status exits 1 whether or not tunnels are up.
+		{"tunnels up", "Active tunnels: wg0 wg1 wg2\n", true},
+		{"single tunnel", "Active tunnels: wg0", true},
+		{"no tunnels", "Active tunnels: none\n", false},
+		{"empty tunnel list", "Active tunnels: \n", false},
+		{"script missing", "", false},
+		{"unexpected output", "Usage: rc.wireguard start|stop|status\n", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotCommand string
+			var gotArgs []string
+			sc := &ServiceController{statusOutput: func(command string, args ...string) (string, error) {
+				gotCommand, gotArgs = command, args
+				return tt.output, statusErr
+			}}
+			running, err := sc.GetServiceStatus("wireguard")
+			if err != nil {
+				t.Fatalf("GetServiceStatus returned error: %v", err)
+			}
+			if running != tt.want {
+				t.Errorf("running = %v, want %v", running, tt.want)
+			}
+			if gotCommand != "/etc/rc.d/rc.wireguard" || len(gotArgs) != 1 || gotArgs[0] != "status" {
+				t.Errorf("ran %q %v, want /etc/rc.d/rc.wireguard [status]", gotCommand, gotArgs)
+			}
+		})
+	}
+}
+
+func TestGetServiceStatus_RcScriptOutput(t *testing.T) {
+	tests := []struct {
+		name   string
+		output string
+		err    error
+		want   bool
+	}{
+		{"running", "Samba is currently running.\n", nil, true},
+		{"stopped exits non-zero", "Samba is not running.\n", errors.New("exit status 1"), false},
+		{"no status keyword", "something else\n", nil, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sc := &ServiceController{statusOutput: func(string, ...string) (string, error) {
+				return tt.output, tt.err
+			}}
+			running, err := sc.GetServiceStatus("smb")
+			if err != nil {
+				t.Fatalf("GetServiceStatus returned error: %v", err)
+			}
+			if running != tt.want {
+				t.Errorf("running = %v, want %v", running, tt.want)
+			}
+		})
+	}
 }

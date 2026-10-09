@@ -37,6 +37,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **WireGuard always reported as not running** — `/etc/rc.d/rc.wireguard status` exits 1 even
+  when tunnels are up, so `GET /api/v1/services`, the MCP `get_service_status`/`list_services`
+  tools and the MQTT WireGuard service switch always showed it stopped. The status check now
+  reads the script's `Active tunnels:` line instead of its exit code.
+  ([#188](https://github.com/ruaan-deysel/unraid-management-agent/issues/188)).
 - **Sensors stderr contamination in fan/temperature parsing** — system collector now reads only
   `sensors -u` stdout via `ExecCommandStdout`, preventing lm-sensors stderr warnings from
   corrupting parsed values and restoring missing/garbled fan entries. ([#173](https://github.com/ruaan-deysel/unraid-management-agent/pull/173)).
