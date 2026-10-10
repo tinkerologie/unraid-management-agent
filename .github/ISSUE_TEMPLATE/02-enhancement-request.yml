@@ -22,7 +22,7 @@ body:
         - Alerting and notifications
         - Unraid plugin interface
         - Documentation
-        - Deployment and CI
+        - CI and deployment
     validations:
       required: true
   - type: textarea
@@ -73,7 +73,7 @@ body:
     attributes:
       label: Pre-submission confirmations
       options:
-        - label: I searched existing open and closed issues and discussions before opening this request.
+        - label: I searched existing open and closed issues before opening this request.
           required: true
         - label: I confirm this request targets Unraid Management Agent.
           required: true
