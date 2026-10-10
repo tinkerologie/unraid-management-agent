@@ -50,6 +50,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `daemon/lib` tests for `ExecCommandOutputWithContext` (success, pre-cancelled
   context, nonexistent binary). No collector behavior changed.
   ([#192](https://github.com/ruaan-deysel/unraid-management-agent/issues/192)).
+- **Coverage uplift part 5 (issue #192)** — extracted the `network.cfg` and
+  `ident.cfg` parsing in `daemon/services/collectors/config.go` into pure
+  `io.Reader`-based helpers (`parseNetworkConfig`, `parseSystemSettings`) and
+  made the boot config directory injectable so the `GetNetworkConfig` and
+  `GetSystemSettings` wrappers are unit-testable. Added tests for interface
+  section matching, bond/bridge/VLAN parsing, missing-interface and
+  missing-file errors, and system settings fields. No collector behavior
+  changed. ([#192](https://github.com/ruaan-deysel/unraid-management-agent/issues/192)).
 
 ### Added
 

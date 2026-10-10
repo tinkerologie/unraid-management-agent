@@ -3,6 +3,7 @@ package collectors
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -14,11 +15,25 @@ import (
 )
 
 // ConfigCollector collects configuration data
-type ConfigCollector struct{}
+type ConfigCollector struct {
+	// bootConfigDir overrides the Unraid boot config directory. Empty means
+	// the production default (/boot/config); tests point it at a fixture dir.
+	bootConfigDir string
+}
 
 // NewConfigCollector creates a new config collector
 func NewConfigCollector() *ConfigCollector {
 	return &ConfigCollector{}
+}
+
+// bootConfigPath resolves a file under the boot config directory, honouring an
+// override set by tests and defaulting to /boot/config in production.
+func (c *ConfigCollector) bootConfigPath(name string) string {
+	dir := c.bootConfigDir
+	if dir == "" {
+		dir = "/boot/config"
+	}
+	return filepath.Join(dir, name)
 }
 
 // GetShareConfig reads share configuration from /boot/config/shares/{name}.cfg
@@ -102,10 +117,10 @@ func (c *ConfigCollector) GetShareConfig(shareName string) (*dto.ShareConfig, er
 
 // GetNetworkConfig reads network configuration from /boot/config/network.cfg
 func (c *ConfigCollector) GetNetworkConfig(interfaceName string) (*dto.NetworkConfig, error) {
-	configPath := "/boot/config/network.cfg"
+	configPath := c.bootConfigPath("network.cfg")
 	logger.Debug("Config: Reading network config from %s", configPath)
 
-	file, err := os.Open(configPath)
+	file, err := os.Open(configPath) // #nosec G304 -- path is the internal boot config dir, not user input
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("network config not found")
@@ -118,12 +133,19 @@ func (c *ConfigCollector) GetNetworkConfig(interfaceName string) (*dto.NetworkCo
 		}
 	}()
 
+	return parseNetworkConfig(file, interfaceName)
+}
+
+// parseNetworkConfig parses an Unraid network.cfg stream and returns the config
+// for the named interface. The file is sectioned by [iface] headers; only the
+// matching section is read. Returns an error if the interface is not present.
+func parseNetworkConfig(r io.Reader, interfaceName string) (*dto.NetworkConfig, error) {
 	config := &dto.NetworkConfig{
 		Interface: interfaceName,
 		Timestamp: time.Now(),
 	}
 
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(r)
 	inSection := false
 	currentInterface := ""
 
@@ -191,10 +213,10 @@ func (c *ConfigCollector) GetNetworkConfig(interfaceName string) (*dto.NetworkCo
 
 // GetSystemSettings reads system settings from /boot/config/ident.cfg
 func (c *ConfigCollector) GetSystemSettings() (*dto.SystemSettings, error) {
-	configPath := "/boot/config/ident.cfg"
+	configPath := c.bootConfigPath("ident.cfg")
 	logger.Debug("Config: Reading system settings from %s", configPath)
 
-	file, err := os.Open(configPath)
+	file, err := os.Open(configPath) // #nosec G304 -- path is the internal boot config dir, not user input
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("system config not found")
@@ -207,11 +229,16 @@ func (c *ConfigCollector) GetSystemSettings() (*dto.SystemSettings, error) {
 		}
 	}()
 
+	return parseSystemSettings(file)
+}
+
+// parseSystemSettings parses an Unraid ident.cfg stream into system settings.
+func parseSystemSettings(r io.Reader) (*dto.SystemSettings, error) {
 	settings := &dto.SystemSettings{
 		Timestamp: time.Now(),
 	}
 
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" || strings.HasPrefix(line, "#") {
