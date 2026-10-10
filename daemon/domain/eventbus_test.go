@@ -257,3 +257,39 @@ func TestEventBus_GenericMethodPublish(t *testing.T) {
 		t.Fatal("timed out waiting for message via bus.Publish generic method")
 	}
 }
+
+func TestTopic_TopicName(t *testing.T) {
+	topic := NewTopic[int]("my_topic")
+	if topic.TopicName() != "my_topic" {
+		t.Errorf("TopicName() = %q, want my_topic", topic.TopicName())
+	}
+}
+
+func TestEventBus_SubTopics(t *testing.T) {
+	bus := NewEventBus(10)
+	t1 := NewTopic[int]("alpha")
+	t2 := NewTopic[string]("beta")
+
+	ch := bus.SubTopics(t1, t2)
+
+	// A message on either topic arrives on the shared channel.
+	Publish(bus, t1, 7)
+	select {
+	case msg := <-ch:
+		if v, ok := msg.(int); !ok || v != 7 {
+			t.Errorf("got %v (%T), want int 7", msg, msg)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for alpha message")
+	}
+
+	Publish(bus, t2, "hi")
+	select {
+	case msg := <-ch:
+		if v, ok := msg.(string); !ok || v != "hi" {
+			t.Errorf("got %v (%T), want string hi", msg, msg)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for beta message")
+	}
+}

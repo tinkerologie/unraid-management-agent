@@ -59,6 +59,51 @@ func TestFormatBytes(t *testing.T) {
 	}
 }
 
+func TestShortDigest(t *testing.T) {
+	tests := []struct {
+		name   string
+		digest string
+		want   string
+	}{
+		{"sha256-prefixed long digest", "sha256:4f0dc085151100000000000000000000", "4f0dc0851511"},
+		{"unprefixed long digest", "4f0dc085151100000000000000000000", "4f0dc0851511"},
+		{"exactly 12 chars", "4f0dc0851511", "4f0dc0851511"},
+		{"shorter than 12", "abcdef", "abcdef"},
+		{"empty", "", ""},
+		{"prefix only", "sha256:", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := shortDigest(tt.digest); got != tt.want {
+				t.Errorf("shortDigest(%q) = %q, want %q", tt.digest, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSanitizeFanName(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"lowercases", "FAN1", "fan1"},
+		{"spaces to underscores", "CPU Fan", "cpu_fan"},
+		{"strips special chars", "Fan-#1!", "fan1"},
+		{"keeps underscores and digits", "sys_fan_2", "sys_fan_2"},
+		{"empty", "", ""},
+		{"only special chars", "!@#$%", ""},
+		{"mixed", "Rear Fan (B)", "rear_fan_b"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := sanitizeFanName(tt.in); got != tt.want {
+				t.Errorf("sanitizeFanName(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestNewDockerController_CloseWithoutInit(t *testing.T) {
 	dc := NewDockerController()
 	if dc == nil {

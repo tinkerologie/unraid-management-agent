@@ -62,3 +62,48 @@ func TestDriveSourceFallbackLogsOnce(t *testing.T) {
 		t.Errorf("expected fallback logged once across 3 calls, got %d", n)
 	}
 }
+
+func TestInterpolateSpeed(t *testing.T) {
+	curve := []dto.FanCurvePoint{
+		{TempCelsius: 30, SpeedPercent: 20},
+		{TempCelsius: 50, SpeedPercent: 60},
+		{TempCelsius: 70, SpeedPercent: 100},
+	}
+
+	tests := []struct {
+		name   string
+		points []dto.FanCurvePoint
+		temp   float64
+		want   int
+	}{
+		{"empty points defaults to full", nil, 40, 100},
+		{"below lowest clamps to first", curve, 10, 20},
+		{"exactly lowest", curve, 30, 20},
+		{"above highest clamps to last", curve, 90, 100},
+		{"exactly highest", curve, 70, 100},
+		{"midpoint first segment", curve, 40, 40},
+		{"midpoint second segment", curve, 60, 80},
+		{"quarter into first segment", curve, 35, 30},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := interpolateSpeed(tt.points, tt.temp); got != tt.want {
+				t.Errorf("interpolateSpeed(%v) = %d, want %d", tt.temp, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestInterpolateSpeedDuplicateLowestBoundary(t *testing.T) {
+	// When tempC equals the lowest point's temperature, interpolateSpeed hits
+	// the "at/below lowest" clamp and returns the first point's speed before any
+	// interpolation runs — even if the next point shares the same temperature.
+	points := []dto.FanCurvePoint{
+		{TempCelsius: 40, SpeedPercent: 30},
+		{TempCelsius: 40, SpeedPercent: 80},
+		{TempCelsius: 60, SpeedPercent: 100},
+	}
+	if got := interpolateSpeed(points, 40); got != 30 {
+		t.Errorf("at lowest boundary got %d, want 30", got)
+	}
+}

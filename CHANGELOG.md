@@ -23,9 +23,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   no trailing newline, redaction) and ZIP archive error paths (failing writer,
   unsupported JSON values, nonexistent output directory, partial-file removal and
   empty-log omission). ([#192](https://github.com/ruaan-deysel/unraid-management-agent/issues/192)).
+- **Coverage uplift part 2 (issue #192)** — added further host-safe unit tests
+  covering pure functions. `daemon/domain` rose to ~88% (from ~58%) via tests for
+  the tool-policy store (`IsValidTool`, `GetAll`, `GetCatalog`, `CategorizeMCPTool`),
+  the typed event bus (`Topic.TopicName`, `EventBus.SubTopics`) and file-config
+  loading (`LoadConfigFile` happy/missing/malformed paths, `DefaultDiscoveryConfig`).
+  Added `daemon/services/controllers` tests for the pure fan-safety PWM clamp
+  (`ValidatePWM` boundaries and default-minimum normalization), fan-curve
+  interpolation (`interpolateSpeed` below/above/midpoint and the duplicate
+  lowest-boundary clamp),
+  and the Docker/IPMI string helpers (`shortDigest`, `sanitizeFanName`).
+  ([#192](https://github.com/ruaan-deysel/unraid-management-agent/issues/192)).
 
 ### Added
 
+- **Enforced GitHub issue forms for triage quality** — replaced legacy markdown
+  issue templates with structured GitHub Issue Forms (`01-bug-report.yml` and
+  `02-enhancement-request.yml`) based on the `vault` repository setup, with
+  required fields and required confirmations to read `CONTRIBUTING.md` and
+  `AGENTS.md`. Updated `.github/ISSUE_TEMPLATE/config.yml` contact links for
+  Discussions, private security disclosure, and contribution rules.
 - **Automated PR governance checks** — added GitHub Actions workflow enforcing
   PR template completeness, exempting bots and draft PRs, stripping HTML comments
   during section validation, and validating issue references (supporting issue
