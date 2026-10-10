@@ -571,9 +571,16 @@ func (s *Server) updateMetrics() {
 		}
 		upsName := "ups"
 		upsStatus.WithLabelValues(upsName, upsVal.Model).Set(statusValue)
-		upsBatteryCharge.WithLabelValues(upsName).Set(upsVal.BatteryCharge)
-		upsLoad.WithLabelValues(upsName).Set(upsVal.LoadPercent)
-		upsRuntime.WithLabelValues(upsName).Set(float64(upsVal.RuntimeLeft))
+		// Readings the UPS does not report are left out rather than exported as 0.
+		if upsVal.BatteryCharge != nil {
+			upsBatteryCharge.WithLabelValues(upsName).Set(*upsVal.BatteryCharge)
+		}
+		if upsVal.LoadPercent != nil {
+			upsLoad.WithLabelValues(upsName).Set(*upsVal.LoadPercent)
+		}
+		if upsVal.RuntimeLeft != nil {
+			upsRuntime.WithLabelValues(upsName).Set(float64(*upsVal.RuntimeLeft))
+		}
 	}
 
 	// Update share metrics

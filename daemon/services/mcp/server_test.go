@@ -198,9 +198,9 @@ func newMockCacheProvider() *MockCacheProvider {
 		ups: &dto.UPSStatus{
 			Model:         "APC Back-UPS 1500",
 			Status:        "ONLINE",
-			BatteryCharge: 100,
-			RuntimeLeft:   1800,
-			LoadPercent:   25,
+			BatteryCharge: new(100.0),
+			RuntimeLeft:   new(1800),
+			LoadPercent:   new(25.0),
 		},
 		gpus: []*dto.GPUMetrics{
 			{Name: "NVIDIA RTX 3080", UtilizationGPU: 45, UtilizationMemory: 60, Temperature: 65, Vendor: "NVIDIA"},

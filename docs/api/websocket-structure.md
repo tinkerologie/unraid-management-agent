@@ -287,18 +287,19 @@ def identify_event_type(data):
 
 ### UPS Status Fields
 
-| Field                     | Type    | Unit    | Range | Nullable | Description     |
-| ------------------------- | ------- | ------- | ----- | -------- | --------------- |
-| `connected`               | bool    | -       | -     | No       | UPS connected   |
-| `model`                   | string  | -       | -     | No       | UPS model       |
-| `status`                  | string  | -       | enum  | No       | UPS status      |
-| `battery_charge_percent`  | float64 | percent | 0-100 | No       | Battery charge  |
-| `battery_runtime_seconds` | int     | seconds | ≥0    | No       | Runtime est.    |
-| `load_percent`            | float64 | percent | 0-100 | No       | Load percent    |
-| `input_voltage`           | float64 | volts   | ≥0    | No       | Input voltage   |
-| `output_voltage`          | float64 | volts   | ≥0    | No       | Output voltage  |
-| `power_watts`             | float64 | watts   | ≥0    | No       | Power draw      |
-| `timestamp`               | string  | -       | -     | No       | Event timestamp |
+| Field                    | Type    | Unit    | Range | Nullable | Description                       |
+| ------------------------ | ------- | ------- | ----- | -------- | --------------------------------- |
+| `connected`              | bool    | -       | -     | No       | UPS connected                     |
+| `status`                 | string  | -       | enum  | No       | UPS status                        |
+| `load_percent`           | float64 | percent | 0-100 | Yes      | Load percent                      |
+| `battery_charge_percent` | float64 | percent | 0-100 | Yes      | Battery charge                    |
+| `runtime_left_seconds`   | int     | seconds | ≥0    | Yes      | Runtime est.                      |
+| `power_watts`            | float64 | watts   | ≥0    | Yes      | Power draw (reported or derived)  |
+| `nominal_power_watts`    | float64 | watts   | ≥0    | Yes      | Nominal power                     |
+| `model`                  | string  | -       | -     | No       | UPS model                         |
+| `timestamp`              | string  | -       | -     | No       | Event timestamp                   |
+
+Nullable fields are `null` when the UPS does not report the value.
 
 ### GPU Metrics Fields
 

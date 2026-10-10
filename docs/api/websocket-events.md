@@ -267,14 +267,13 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 ```json
 {
   "connected": true,
-  "model": "Back-UPS RS 1500G",
-  "status": "ONLINE",
-  "battery_charge_percent": 100.0,
-  "battery_runtime_seconds": 3600,
+  "status": "OL",
   "load_percent": 25.0,
-  "input_voltage": 120.0,
-  "output_voltage": 120.0,
+  "battery_charge_percent": 100.0,
+  "runtime_left_seconds": 3600,
   "power_watts": 150.0,
+  "nominal_power_watts": 600.0,
+  "model": "Back-UPS RS 1500G",
   "timestamp": "2025-10-02T14:02:59.850035377+10:00"
 }
 ```
@@ -282,10 +281,14 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 **Key Fields**:
 
 - `connected` - Whether UPS is connected
-- `status` - UPS status: "ONLINE", "ONBATT", "LOWBATT"
+- `status` - UPS status as reported by apcupsd ("ONLINE", "ONBATT") or NUT ("OL", "OB LB")
 - `battery_charge_percent` - Battery charge (0-100)
-- `battery_runtime_seconds` - Estimated runtime
+- `runtime_left_seconds` - Estimated runtime
 - `load_percent` - Load percentage
+- `power_watts` - Power draw: NUT's `ups.realpower`, or nominal power × load when the UPS reports both
+
+The numeric fields are `null` when the UPS does not report the value (many
+UPSes have no load or power reading). They are never sent as a made-up `0`.
 
 ---
 

@@ -51,9 +51,9 @@ func populateTestCaches(server *Server) {
 	server.upsCache.Store(&dto.UPSStatus{
 		Model:         "APC Back-UPS 600",
 		Status:        "ONLINE",
-		BatteryCharge: 100.0,
-		NominalPower:  360.0,
-		LoadPercent:   25.0,
+		BatteryCharge: new(100.0),
+		NominalPower:  new(360.0),
+		LoadPercent:   new(25.0),
 	})
 
 	gpus := []*dto.GPUMetrics{

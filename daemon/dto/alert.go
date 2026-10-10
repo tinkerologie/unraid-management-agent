@@ -76,9 +76,15 @@ type AlertEnv struct {
 	MaxDiskUsedPct            float64 `expr:"MaxDiskUsedPct"`
 	TotalDiskErrors           int     `expr:"TotalDiskErrors"`
 	UPSStatus                 string  `expr:"UPSStatus"`
-	UPSBatteryCharge          float64 `expr:"UPSBatteryCharge"`
-	UPSLoadPercent            float64 `expr:"UPSLoadPercent"`
-	UPSRuntimeLeft            float64 `expr:"UPSRuntimeLeft"`
+	// UPS and NUT readings are nil when there is no UPS or it does not report
+	// the value. Guard them in expressions, e.g.
+	// "UPSLoadPercent != nil && UPSLoadPercent > 80". An unguarded comparison
+	// with nil fails to evaluate: the rule never fires on a fabricated 0, keeps
+	// its current state (a firing rule stays firing) and logs one warning until
+	// the reading is known again.
+	UPSBatteryCharge *float64 `expr:"UPSBatteryCharge"`
+	UPSLoadPercent   *float64 `expr:"UPSLoadPercent"`
+	UPSRuntimeLeft   *float64 `expr:"UPSRuntimeLeft"`
 
 	// GPU
 	GPUCount      int     `expr:"GPUCount"`
@@ -99,11 +105,12 @@ type AlertEnv struct {
 	NetworkErrors  uint64 `expr:"NetworkErrors"`
 	NetworkIFCount int    `expr:"NetworkIFCount"`
 
-	// NUT (Network UPS Tools)
-	NUTBatteryCharge  float64 `expr:"NUTBatteryCharge"`
-	NUTBatteryRuntime int     `expr:"NUTBatteryRuntime"`
-	NUTLoadPercent    float64 `expr:"NUTLoadPercent"`
-	NUTStatus         string  `expr:"NUTStatus"`
+	// NUT (Network UPS Tools). Readings are nil when not reported; see the UPS
+	// fields above.
+	NUTBatteryCharge  *float64 `expr:"NUTBatteryCharge"`
+	NUTBatteryRuntime *int     `expr:"NUTBatteryRuntime"`
+	NUTLoadPercent    *float64 `expr:"NUTLoadPercent"`
+	NUTStatus         string   `expr:"NUTStatus"`
 
 	// Notifications
 	UnreadNotifications  int `expr:"UnreadNotifications"`

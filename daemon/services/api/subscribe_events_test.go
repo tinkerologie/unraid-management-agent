@@ -163,7 +163,7 @@ func TestSubscribeToEvents_UPSStatusUpdate(t *testing.T) {
 	cancel := startSubscribeToEvents(t, server)
 	defer cancel()
 
-	ups := &dto.UPSStatus{Status: "OL", Model: "APC", BatteryCharge: 100}
+	ups := &dto.UPSStatus{Status: "OL", Model: "APC", BatteryCharge: new(100.0)}
 	hub.Pub(ups, "ups_status_update")
 	time.Sleep(100 * time.Millisecond)
 

@@ -18,6 +18,10 @@ type ruleState struct {
 	firingAt     time.Time // When the rule transitioned to firing
 	evalCount    int64
 	state        string // "ok", "pending", "firing"
+	// lastEvalError is the last evaluation error, so a rule that keeps
+	// failing (e.g. comparing a UPS reading that is nil) is logged once
+	// rather than on every cycle. Cleared when the rule evaluates again.
+	lastEvalError string
 }
 
 // Evaluator compiles and evaluates alert rule expressions against cached system data.
@@ -111,9 +115,14 @@ func (e *Evaluator) Evaluate(env dto.AlertEnv, rules []dto.AlertRule) []Evaluate
 		// Evaluate the expression
 		output, err := expr.Run(program, env)
 		if err != nil {
-			logger.Warning("Alerting: Error evaluating rule %s: %v", rule.ID, err)
+			// The rule keeps its state until it evaluates again.
+			if msg := err.Error(); msg != state.lastEvalError {
+				logger.Warning("Alerting: Error evaluating rule %s (state kept until it evaluates again): %v", rule.ID, err)
+				state.lastEvalError = msg
+			}
 			continue
 		}
+		state.lastEvalError = ""
 
 		triggered, ok := output.(bool)
 		if !ok {

@@ -2156,15 +2156,22 @@ Get UPS status and information.
 
 ```json
 {
-  "status": "ONLINE",
+  "connected": true,
+  "status": "OL",
+  "load_percent": null,
   "battery_charge_percent": 100,
-  "battery_runtime_seconds": 3600,
-  "load_percent": 25,
-  "input_voltage": 230,
-  "output_voltage": 230,
+  "runtime_left_seconds": 623,
+  "power_watts": null,
+  "nominal_power_watts": null,
+  "model": "Smart-UPS X 3000",
   "timestamp": "2025-10-03T13:41:13+10:00"
 }
 ```
+
+`load_percent`, `battery_charge_percent`, `runtime_left_seconds`, `power_watts`
+and `nominal_power_watts` are `null` when the UPS does not report them. The
+example above is a UPS that reports battery data but no load or power. The
+numeric readings in `GET /nut` (`status`) follow the same rule.
 
 ---
 

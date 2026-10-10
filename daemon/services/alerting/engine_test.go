@@ -106,9 +106,9 @@ func newMockProvider() *mockDataProvider {
 		},
 		ups: &dto.UPSStatus{
 			Status:        "OL",
-			BatteryCharge: 100.0,
-			LoadPercent:   25.0,
-			RuntimeLeft:   7200,
+			BatteryCharge: new(100.0),
+			LoadPercent:   new(25.0),
+			RuntimeLeft:   new(7200),
 		},
 	}
 }
@@ -174,11 +174,11 @@ func TestEngineBuildEnv(t *testing.T) {
 	if env.UPSStatus != "OL" {
 		t.Errorf("expected UPS status OL, got %s", env.UPSStatus)
 	}
-	if env.UPSBatteryCharge != 100.0 {
-		t.Errorf("expected UPS battery 100, got %f", env.UPSBatteryCharge)
+	if env.UPSBatteryCharge == nil || *env.UPSBatteryCharge != 100.0 {
+		t.Errorf("expected UPS battery 100, got %v", env.UPSBatteryCharge)
 	}
-	if env.UPSRuntimeLeft != 7200.0 {
-		t.Errorf("expected UPS runtime left 7200, got %f", env.UPSRuntimeLeft)
+	if env.UPSRuntimeLeft == nil || *env.UPSRuntimeLeft != 7200.0 {
+		t.Errorf("expected UPS runtime left 7200, got %v", env.UPSRuntimeLeft)
 	}
 }
 
@@ -370,5 +370,66 @@ func TestEngineEvaluateIntegration(t *testing.T) {
 	history := engine.GetHistory()
 	if len(history) < 1 {
 		t.Error("expected at least 1 history event")
+	}
+}
+
+// A UPS that does not report load or runtime must leave those variables nil,
+// so rules such as "UPSLoadPercent > 80" or "UPSRuntimeLeft < 300" never act on
+// a fabricated 0.
+func TestEngineBuildEnvUPSMissingReadings(t *testing.T) {
+	provider := newMockProvider()
+	provider.ups = &dto.UPSStatus{Status: "OL", BatteryCharge: new(100.0)}
+	engine := NewEngine(NewStore(t.TempDir()), provider)
+
+	env := engine.buildEnv()
+	if env.UPSLoadPercent != nil || env.UPSRuntimeLeft != nil {
+		t.Errorf("UPSLoadPercent = %v, UPSRuntimeLeft = %v, want nil", env.UPSLoadPercent, env.UPSRuntimeLeft)
+	}
+	if env.UPSBatteryCharge == nil || *env.UPSBatteryCharge != 100 {
+		t.Errorf("UPSBatteryCharge = %v, want 100", env.UPSBatteryCharge)
+	}
+
+	eval := NewEvaluator()
+	rules := []dto.AlertRule{
+		{ID: "runtime-low", Expression: "UPSRuntimeLeft < 300", Enabled: true},
+		{ID: "load-guarded", Expression: "UPSLoadPercent != nil && UPSLoadPercent > 80", Enabled: true},
+		{ID: "nut-load", Expression: "NUTLoadPercent > 80", Enabled: true},
+		{ID: "battery-low", Expression: "UPSBatteryCharge < 20", Enabled: true},
+	}
+	if errs := eval.CompileRules(rules); len(errs) != 0 {
+		t.Fatalf("CompileRules() errors = %v", errs)
+	}
+	if results := eval.Evaluate(env, rules); len(results) != 0 {
+		t.Errorf("Evaluate() fired %v with unknown readings, want nothing", results)
+	}
+	// The failing unguarded rule remembers its error, so it is logged once.
+	if eval.states["runtime-low"].lastEvalError == "" {
+		t.Error("runtime-low lastEvalError is empty after a nil comparison")
+	}
+	eval.Evaluate(env, rules)
+
+	// Once the UPS reports the value, the same rules work as before.
+	env.UPSRuntimeLeft = new(120.0)
+	env.UPSLoadPercent = new(90.0)
+	results := eval.Evaluate(env, rules)
+	fired := map[string]bool{}
+	for _, r := range results {
+		fired[r.Rule.ID] = r.NewState == "firing"
+	}
+	if !fired["runtime-low"] || !fired["load-guarded"] || fired["nut-load"] || fired["battery-low"] {
+		t.Errorf("fired = %v, want runtime-low and load-guarded only", fired)
+	}
+	if eval.states["runtime-low"].lastEvalError != "" {
+		t.Error("runtime-low lastEvalError not cleared after a successful evaluation")
+	}
+
+	// The reading becomes unknown again: the firing rule keeps its state
+	// instead of resolving on a value nobody measured.
+	env.UPSRuntimeLeft = nil
+	if results := eval.Evaluate(env, rules); len(results) != 0 {
+		t.Errorf("Evaluate() transitions %v after the reading went unknown, want none", results)
+	}
+	if got := eval.states["runtime-low"].state; got != "firing" {
+		t.Errorf("runtime-low state = %q, want firing", got)
 	}
 }

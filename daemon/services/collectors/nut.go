@@ -20,6 +20,9 @@ import (
 // This collector provides detailed UPS data when the NUT plugin is installed.
 type NUTCollector struct {
 	ctx *domain.Context
+	// execOutput runs upsc for a device. Nil means lib.ExecCommandOutput;
+	// tests inject a fake.
+	execOutput func(command string, args ...string) (string, error)
 }
 
 // NewNUTCollector creates a new NUT status collector with the given context.
@@ -239,7 +242,11 @@ func (c *NUTCollector) getHostFromConfig(config *dto.NUTConfig) string {
 // collectStatus collects detailed status for a specific UPS device
 func (c *NUTCollector) collectStatus(deviceName, host string) (*dto.NUTStatus, error) {
 	target := fmt.Sprintf("%s@%s", deviceName, host)
-	output, err := lib.ExecCommandOutput("upsc", target)
+	run := c.execOutput
+	if run == nil {
+		run = lib.ExecCommandOutput
+	}
+	output, err := run("upsc", target)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query UPS %s: %w", target, err)
 	}
@@ -250,6 +257,36 @@ func (c *NUTCollector) collectStatus(deviceName, host string) (*dto.NUTStatus, e
 		Host:         host,
 		RawVariables: make(map[string]string),
 		Timestamp:    time.Now(),
+	}
+
+	floatVars := map[string]**float64{
+		"battery.charge":          &status.BatteryCharge,
+		"battery.charge.low":      &status.BatteryChargeLow,
+		"battery.charge.warning":  &status.BatteryChargeWarning,
+		"battery.voltage":         &status.BatteryVoltage,
+		"battery.voltage.nominal": &status.BatteryVoltageNominal,
+		"input.voltage":           &status.InputVoltage,
+		"input.voltage.nominal":   &status.InputVoltageNominal,
+		"input.frequency":         &status.InputFrequency,
+		"input.transfer.high":     &status.InputTransferHigh,
+		"input.transfer.low":      &status.InputTransferLow,
+		"input.current":           &status.InputCurrent,
+		"output.voltage":          &status.OutputVoltage,
+		"output.frequency":        &status.OutputFrequency,
+		"output.current":          &status.OutputCurrent,
+		"ups.load":                &status.LoadPercent,
+		"ups.realpower":           &status.RealPower,
+		"ups.realpower.nominal":   &status.RealPowerNominal,
+		"ups.power":               &status.ApparentPower,
+		"ups.power.nominal":       &status.ApparentPowerNominal,
+	}
+	intVars := map[string]**int{
+		"battery.runtime":     &status.BatteryRuntime,
+		"battery.runtime.low": &status.BatteryRuntimeLow,
+		"ups.delay.shutdown":  &status.DelayShutdown,
+		"ups.delay.start":     &status.DelayStart,
+		"ups.timer.shutdown":  &status.TimerShutdown,
+		"ups.timer.start":     &status.TimerStart,
 	}
 
 	lines := strings.SplitSeq(output, "\n")
@@ -269,6 +306,16 @@ func (c *NUTCollector) collectStatus(deviceName, host string) (*dto.NUTStatus, e
 
 		// Store in raw variables
 		status.RawVariables[key] = value
+
+		// Numeric readings stay nil unless the device reports them.
+		if dst, ok := floatVars[key]; ok {
+			*dst = parseOptionalFloat(value)
+			continue
+		}
+		if dst, ok := intVars[key]; ok {
+			*dst = parseOptionalInt(value)
+			continue
+		}
 
 		// Parse specific fields
 		switch key {
@@ -307,132 +354,22 @@ func (c *NUTCollector) collectStatus(deviceName, host string) (*dto.NUTStatus, e
 		case "ups.test.result":
 			status.TestResult = value
 
-		// Battery info
-		case "battery.charge":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				status.BatteryCharge = v
-			}
-		case "battery.charge.low":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				status.BatteryChargeLow = v
-			}
-		case "battery.charge.warning":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				status.BatteryChargeWarning = v
-			}
-		case "battery.runtime":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				status.BatteryRuntime = int(v)
-			}
-		case "battery.runtime.low":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				status.BatteryRuntimeLow = int(v)
-			}
-		case "battery.voltage":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				status.BatteryVoltage = v
-			}
-		case "battery.voltage.nominal":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				status.BatteryVoltageNominal = v
-			}
 		case "battery.type":
 			status.BatteryType = value
 		case "battery.status":
 			status.BatteryStatus = value
 		case "battery.mfr.date":
 			status.BatteryMfrDate = value
-
-		// Input power
-		case "input.voltage":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				status.InputVoltage = v
-			}
-		case "input.voltage.nominal":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				status.InputVoltageNominal = v
-			}
-		case "input.frequency":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				status.InputFrequency = v
-			}
-		case "input.transfer.high":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				status.InputTransferHigh = v
-			}
-		case "input.transfer.low":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				status.InputTransferLow = v
-			}
-		case "input.current":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				status.InputCurrent = v
-			}
-
-		// Output power
-		case "output.voltage":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				status.OutputVoltage = v
-			}
-		case "output.frequency":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				status.OutputFrequency = v
-			}
-		case "output.current":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				status.OutputCurrent = v
-			}
-
-		// Load and power
-		case "ups.load":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				status.LoadPercent = v
-			}
-		case "ups.realpower":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				status.RealPower = v
-			}
-		case "ups.realpower.nominal":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				status.RealPowerNominal = v
-			}
-		case "ups.power":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				status.ApparentPower = v
-			}
-		case "ups.power.nominal":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				status.ApparentPowerNominal = v
-			}
-
-		// Timing
-		case "ups.delay.shutdown":
-			if v, err := strconv.Atoi(value); err == nil {
-				status.DelayShutdown = v
-			}
-		case "ups.delay.start":
-			if v, err := strconv.Atoi(value); err == nil {
-				status.DelayStart = v
-			}
-		case "ups.timer.shutdown":
-			if v, err := strconv.Atoi(value); err == nil {
-				status.TimerShutdown = v
-			}
-		case "ups.timer.start":
-			if v, err := strconv.Atoi(value); err == nil {
-				status.TimerStart = v
-			}
 		}
 	}
 
-	// Calculate real power if not directly available
-	if status.RealPower == 0 && status.RealPowerNominal > 0 && status.LoadPercent > 0 {
-		status.RealPower = status.RealPowerNominal * status.LoadPercent / 100.0
+	// Estimate real and apparent power from nominal × load only when the UPS
+	// does not report them itself and reports both inputs.
+	if status.RealPower == nil {
+		status.RealPower = derivePower(status.RealPowerNominal, status.LoadPercent)
 	}
-
-	// Calculate apparent power if not directly available
-	if status.ApparentPower == 0 && status.ApparentPowerNominal > 0 && status.LoadPercent > 0 {
-		status.ApparentPower = status.ApparentPowerNominal * status.LoadPercent / 100.0
+	if status.ApparentPower == nil {
+		status.ApparentPower = derivePower(status.ApparentPowerNominal, status.LoadPercent)
 	}
 
 	return status, nil

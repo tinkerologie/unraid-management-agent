@@ -516,7 +516,9 @@ func (e *Engine) buildEnv() dto.AlertEnv {
 		env.UPSStatus = ups.Status
 		env.UPSBatteryCharge = ups.BatteryCharge
 		env.UPSLoadPercent = ups.LoadPercent
-		env.UPSRuntimeLeft = float64(ups.RuntimeLeft)
+		if ups.RuntimeLeft != nil {
+			env.UPSRuntimeLeft = new(float64(*ups.RuntimeLeft))
+		}
 	}
 
 	// GPU

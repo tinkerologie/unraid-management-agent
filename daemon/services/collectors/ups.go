@@ -3,6 +3,7 @@ package collectors
 import (
 	"context"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -18,6 +19,9 @@ import (
 // It supports both apcupsd and NUT (Network UPS Tools) monitoring systems.
 type UPSCollector struct {
 	ctx *domain.Context
+	// execOutput runs apcaccess and upsc. Nil means lib.ExecCommandOutput;
+	// tests inject a fake.
+	execOutput func(command string, args ...string) (string, error)
 }
 
 // NewUPSCollector creates a new UPS status collector with the given context.
@@ -90,8 +94,16 @@ func (c *UPSCollector) Collect() {
 	logger.Debug("No UPS detected or configured")
 }
 
+// run executes a command through execOutput, defaulting to lib.ExecCommandOutput.
+func (c *UPSCollector) run(command string, args ...string) (string, error) {
+	if c.execOutput != nil {
+		return c.execOutput(command, args...)
+	}
+	return lib.ExecCommandOutput(command, args...)
+}
+
 func (c *UPSCollector) collectAPC() (*dto.UPSStatus, error) {
-	output, err := lib.ExecCommandOutput("apcaccess")
+	output, err := c.run("apcaccess")
 	if err != nil {
 		return nil, err
 	}
@@ -123,31 +135,25 @@ func (c *UPSCollector) collectAPC() (*dto.UPSStatus, error) {
 			if strings.HasSuffix(value, "Percent") {
 				value = strings.TrimSuffix(value, " Percent")
 			}
-			if load, err := strconv.ParseFloat(value, 64); err == nil {
-				status.LoadPercent = load
-			}
+			status.LoadPercent = parseOptionalFloat(value)
 		case "BCHARGE":
 			if strings.HasSuffix(value, "Percent") {
 				value = strings.TrimSuffix(value, " Percent")
 			}
-			if charge, err := strconv.ParseFloat(value, 64); err == nil {
-				status.BatteryCharge = charge
-			}
+			status.BatteryCharge = parseOptionalFloat(value)
 		case "TIMELEFT":
 			if strings.HasSuffix(value, "Minutes") {
 				value = strings.TrimSuffix(value, " Minutes")
 			}
-			if minutes, err := strconv.ParseFloat(value, 64); err == nil {
-				status.RuntimeLeft = int(minutes * 60) // Convert minutes to seconds
+			if minutes := parseOptionalFloat(value); minutes != nil {
+				status.RuntimeLeft = optionalInt(*minutes * 60) // Convert minutes to seconds
 			}
 		case "NOMPOWER":
 			// Parse nominal power (e.g., "800 Watts")
 			if strings.HasSuffix(value, "Watts") {
 				value = strings.TrimSuffix(value, " Watts")
 			}
-			if power, err := strconv.ParseFloat(value, 64); err == nil {
-				status.NominalPower = power
-			}
+			status.NominalPower = parseOptionalFloat(value)
 		case "LINEV":
 			if strings.HasSuffix(value, "Volts") {
 				value = strings.TrimSuffix(value, " Volts")
@@ -165,19 +171,18 @@ func (c *UPSCollector) collectAPC() (*dto.UPSStatus, error) {
 		}
 	}
 
-	// Calculate actual power consumption from load percentage and nominal power
-	if status.NominalPower > 0 && status.LoadPercent > 0 {
-		status.PowerWatts = status.NominalPower * status.LoadPercent / 100.0
-	}
+	// apcupsd has no real power reading; estimate it from nominal power and
+	// load, but only when the UPS reports both.
+	status.PowerWatts = derivePower(status.NominalPower, status.LoadPercent)
 
 	return status, nil
 }
 
 func (c *UPSCollector) collectNUT() (*dto.UPSStatus, error) {
 	// First, get list of UPS devices (try localhost first, then without host)
-	output, err := lib.ExecCommandOutput("upsc", "-l", "localhost")
+	output, err := c.run("upsc", "-l", "localhost")
 	if err != nil {
-		output, err = lib.ExecCommandOutput("upsc", "-l")
+		output, err = c.run("upsc", "-l")
 		if err != nil {
 			return nil, err
 		}
@@ -192,7 +197,7 @@ func (c *UPSCollector) collectNUT() (*dto.UPSStatus, error) {
 	device := devices[0] + "@localhost"
 
 	// Get device status
-	output, err = lib.ExecCommandOutput("upsc", device)
+	output, err = c.run("upsc", device)
 	if err != nil {
 		return nil, err
 	}
@@ -221,22 +226,17 @@ func (c *UPSCollector) collectNUT() (*dto.UPSStatus, error) {
 		case "ups.status":
 			status.Status = value
 		case "ups.load":
-			if load, err := strconv.ParseFloat(value, 64); err == nil {
-				status.LoadPercent = load
-			}
+			status.LoadPercent = parseOptionalFloat(value)
 		case "battery.charge":
-			if charge, err := strconv.ParseFloat(value, 64); err == nil {
-				status.BatteryCharge = charge
-			}
+			status.BatteryCharge = parseOptionalFloat(value)
 		case "battery.runtime":
-			if seconds, err := strconv.ParseFloat(value, 64); err == nil {
-				status.RuntimeLeft = int(seconds) // Already in seconds
-			}
-		case "ups.power.nominal", "ups.realpower.nominal":
-			// Parse nominal power (usually in Watts)
-			if power, err := strconv.ParseFloat(value, 64); err == nil {
-				status.NominalPower = power
-			}
+			status.RuntimeLeft = parseOptionalInt(value) // Already in seconds
+		case "ups.realpower":
+			status.PowerWatts = parseOptionalFloat(value)
+		case "ups.realpower.nominal":
+			// Nominal real power in watts. ups.power.nominal is in VA, so it
+			// is not used: VA × load would overstate the power draw.
+			status.NominalPower = parseOptionalFloat(value)
 		case "input.voltage":
 			// InputVoltage field not in DTO, parsing for potential future use
 			_, _ = strconv.ParseFloat(value, 64)
@@ -248,10 +248,51 @@ func (c *UPSCollector) collectNUT() (*dto.UPSStatus, error) {
 		}
 	}
 
-	// Calculate actual power consumption from load percentage and nominal power
-	if status.NominalPower > 0 && status.LoadPercent > 0 {
-		status.PowerWatts = status.NominalPower * status.LoadPercent / 100.0
+	// Prefer the UPS's own ups.realpower; otherwise estimate it from nominal
+	// power and load, but only when the UPS reports both.
+	if status.PowerWatts == nil {
+		status.PowerWatts = derivePower(status.NominalPower, status.LoadPercent)
 	}
 
 	return status, nil
+}
+
+// parseOptionalFloat parses a UPS reading. It returns nil when the value is not
+// a finite number, so a reading that is missing or garbled stays unknown
+// instead of becoming 0.
+func parseOptionalFloat(value string) *float64 {
+	v, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+	if err != nil || math.IsNaN(v) || math.IsInf(v, 0) {
+		return nil
+	}
+	return &v
+}
+
+// parseOptionalInt parses a whole-number UPS reading such as a runtime or delay
+// in seconds (NUT may print "623" or "623.0"). It returns nil when the value is
+// not a finite number.
+func parseOptionalInt(value string) *int {
+	v := parseOptionalFloat(value)
+	if v == nil {
+		return nil
+	}
+	return optionalInt(*v)
+}
+
+// optionalInt converts a finite reading to an int, or nil when it is outside
+// the int range (Go's conversion of such a value is implementation-defined).
+func optionalInt(v float64) *int {
+	if v < math.MinInt64 || v >= math.MaxInt64 {
+		return nil
+	}
+	return new(int(v))
+}
+
+// derivePower estimates power as nominal × load%. It returns nil unless both
+// inputs are known and the nominal rating is positive.
+func derivePower(nominal, loadPercent *float64) *float64 {
+	if nominal == nil || loadPercent == nil || *nominal <= 0 {
+		return nil
+	}
+	return new(*nominal * *loadPercent / 100.0)
 }

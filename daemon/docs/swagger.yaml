@@ -2375,21 +2375,28 @@ definitions:
         type: array
       apparent_power_nominal_va:
         type: number
+        x-nullable: true
       apparent_power_va:
         type: number
+        x-nullable: true
       battery_charge_low_percent:
         type: number
+        x-nullable: true
       battery_charge_percent:
         description: Battery info
         type: number
+        x-nullable: true
       battery_charge_warning_percent:
         type: number
+        x-nullable: true
       battery_mfr_date:
         type: string
       battery_runtime_low_seconds:
         type: integer
+        x-nullable: true
       battery_runtime_seconds:
         type: integer
+        x-nullable: true
       battery_status:
         type: string
       battery_type:
@@ -2397,8 +2404,10 @@ definitions:
         type: string
       battery_voltage:
         type: number
+        x-nullable: true
       battery_voltage_nominal:
         type: number
+        x-nullable: true
       beeper_status:
         description: e.g., "enabled", "disabled"
         type: string
@@ -2408,8 +2417,10 @@ definitions:
       delay_shutdown_seconds:
         description: Timing
         type: integer
+        x-nullable: true
       delay_start_seconds:
         type: integer
+        x-nullable: true
       device_name:
         description: e.g., "ups"
         type: string
@@ -2431,20 +2442,27 @@ definitions:
         type: string
       input_current:
         type: number
+        x-nullable: true
       input_frequency:
         type: number
+        x-nullable: true
       input_transfer_high:
         type: number
+        x-nullable: true
       input_transfer_low:
         type: number
+        x-nullable: true
       input_voltage:
         description: Input power
         type: number
+        x-nullable: true
       input_voltage_nominal:
         type: number
+        x-nullable: true
       load_percent:
         description: Load and power
         type: number
+        x-nullable: true
       manufacturer:
         description: UPS identification
         type: string
@@ -2452,11 +2470,14 @@ definitions:
         type: string
       output_current:
         type: number
+        x-nullable: true
       output_frequency:
         type: number
+        x-nullable: true
       output_voltage:
         description: Output power
         type: number
+        x-nullable: true
       product_id:
         type: string
       raw_variables:
@@ -2466,8 +2487,10 @@ definitions:
         type: object
       realpower_nominal_watts:
         type: number
+        x-nullable: true
       realpower_watts:
         type: number
+        x-nullable: true
       serial:
         type: string
       status:
@@ -2483,8 +2506,10 @@ definitions:
         type: string
       timer_shutdown:
         type: integer
+        x-nullable: true
       timer_start:
         type: integer
+        x-nullable: true
       timestamp:
         description: Metadata
         type: string
@@ -4180,26 +4205,39 @@ definitions:
   dto.UPSStatus:
     properties:
       battery_charge_percent:
+        description: Battery charge percentage; null when the UPS does not report
+          it
         example: 100
         type: number
+        x-nullable: true
       connected:
         example: true
         type: boolean
       load_percent:
+        description: Load percentage; null when the UPS does not report it
         example: 25.5
         type: number
+        x-nullable: true
       model:
         example: APC Smart-UPS 1500
         type: string
       nominal_power_watts:
+        description: Nominal power in watts; null when the UPS does not report it
         example: 1000
         type: number
+        x-nullable: true
       power_watts:
+        description: Real power draw in watts; null unless the UPS reports it or both
+          nominal power and load
         example: 250.5
         type: number
+        x-nullable: true
       runtime_left_seconds:
+        description: Battery runtime remaining in seconds; null when the UPS does
+          not report it
         example: 3600
         type: integer
+        x-nullable: true
       status:
         example: OL
         type: string

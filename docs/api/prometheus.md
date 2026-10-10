@@ -129,6 +129,9 @@ volumes:
 
 **Labels**: `hostname`, `ups_name`
 
+The battery, load and runtime gauges are not exported when the UPS does not
+report that value, rather than being exported as 0.
+
 ### Share Metrics
 
 | Metric                    | Type  | Description            |

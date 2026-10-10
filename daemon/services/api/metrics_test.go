@@ -89,9 +89,9 @@ func TestHandleMetrics(t *testing.T) {
 		Connected:     true,
 		Status:        "OL",
 		Model:         "APC Smart-UPS 1500",
-		BatteryCharge: 100,
-		LoadPercent:   25,
-		RuntimeLeft:   3600,
+		BatteryCharge: new(100.0),
+		LoadPercent:   new(25.0),
+		RuntimeLeft:   new(3600),
 		Timestamp:     time.Now(),
 	})
 

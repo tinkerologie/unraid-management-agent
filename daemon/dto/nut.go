@@ -4,6 +4,10 @@ import "time"
 
 // NUTStatus contains detailed NUT (Network UPS Tools) status information.
 // This provides more comprehensive UPS data than the basic UPSStatus struct.
+//
+// Numeric readings are pointers: a field is null in JSON when the device does
+// not report the matching NUT variable (many UPSes have no ups.load or
+// ups.realpower, and an ATS has no battery), instead of a fabricated 0.
 type NUTStatus struct {
 	// Connection and detection info
 	Connected   bool   `json:"connected"`
@@ -27,42 +31,42 @@ type NUTStatus struct {
 	TestResultDate string   `json:"test_result_date"`
 
 	// Battery info
-	BatteryCharge         float64 `json:"battery_charge_percent"`
-	BatteryChargeLow      float64 `json:"battery_charge_low_percent"`
-	BatteryChargeWarning  float64 `json:"battery_charge_warning_percent"`
-	BatteryRuntime        int     `json:"battery_runtime_seconds"`
-	BatteryRuntimeLow     int     `json:"battery_runtime_low_seconds"`
-	BatteryVoltage        float64 `json:"battery_voltage"`
-	BatteryVoltageNominal float64 `json:"battery_voltage_nominal"`
-	BatteryType           string  `json:"battery_type"` // e.g., "PbAcid"
-	BatteryStatus         string  `json:"battery_status"`
-	BatteryMfrDate        string  `json:"battery_mfr_date"`
+	BatteryCharge         *float64 `json:"battery_charge_percent" extensions:"x-nullable"`
+	BatteryChargeLow      *float64 `json:"battery_charge_low_percent" extensions:"x-nullable"`
+	BatteryChargeWarning  *float64 `json:"battery_charge_warning_percent" extensions:"x-nullable"`
+	BatteryRuntime        *int     `json:"battery_runtime_seconds" extensions:"x-nullable"`
+	BatteryRuntimeLow     *int     `json:"battery_runtime_low_seconds" extensions:"x-nullable"`
+	BatteryVoltage        *float64 `json:"battery_voltage" extensions:"x-nullable"`
+	BatteryVoltageNominal *float64 `json:"battery_voltage_nominal" extensions:"x-nullable"`
+	BatteryType           string   `json:"battery_type"` // e.g., "PbAcid"
+	BatteryStatus         string   `json:"battery_status"`
+	BatteryMfrDate        string   `json:"battery_mfr_date"`
 
 	// Input power
-	InputVoltage        float64 `json:"input_voltage"`
-	InputVoltageNominal float64 `json:"input_voltage_nominal"`
-	InputFrequency      float64 `json:"input_frequency"`
-	InputTransferHigh   float64 `json:"input_transfer_high"`
-	InputTransferLow    float64 `json:"input_transfer_low"`
-	InputCurrent        float64 `json:"input_current"`
+	InputVoltage        *float64 `json:"input_voltage" extensions:"x-nullable"`
+	InputVoltageNominal *float64 `json:"input_voltage_nominal" extensions:"x-nullable"`
+	InputFrequency      *float64 `json:"input_frequency" extensions:"x-nullable"`
+	InputTransferHigh   *float64 `json:"input_transfer_high" extensions:"x-nullable"`
+	InputTransferLow    *float64 `json:"input_transfer_low" extensions:"x-nullable"`
+	InputCurrent        *float64 `json:"input_current" extensions:"x-nullable"`
 
 	// Output power
-	OutputVoltage   float64 `json:"output_voltage"`
-	OutputFrequency float64 `json:"output_frequency"`
-	OutputCurrent   float64 `json:"output_current"`
+	OutputVoltage   *float64 `json:"output_voltage" extensions:"x-nullable"`
+	OutputFrequency *float64 `json:"output_frequency" extensions:"x-nullable"`
+	OutputCurrent   *float64 `json:"output_current" extensions:"x-nullable"`
 
 	// Load and power
-	LoadPercent          float64 `json:"load_percent"`
-	RealPower            float64 `json:"realpower_watts"`
-	RealPowerNominal     float64 `json:"realpower_nominal_watts"`
-	ApparentPower        float64 `json:"apparent_power_va"`
-	ApparentPowerNominal float64 `json:"apparent_power_nominal_va"`
+	LoadPercent          *float64 `json:"load_percent" extensions:"x-nullable"`
+	RealPower            *float64 `json:"realpower_watts" extensions:"x-nullable"`
+	RealPowerNominal     *float64 `json:"realpower_nominal_watts" extensions:"x-nullable"`
+	ApparentPower        *float64 `json:"apparent_power_va" extensions:"x-nullable"`
+	ApparentPowerNominal *float64 `json:"apparent_power_nominal_va" extensions:"x-nullable"`
 
 	// Timing
-	DelayShutdown int `json:"delay_shutdown_seconds"`
-	DelayStart    int `json:"delay_start_seconds"`
-	TimerShutdown int `json:"timer_shutdown"`
-	TimerStart    int `json:"timer_start"`
+	DelayShutdown *int `json:"delay_shutdown_seconds" extensions:"x-nullable"`
+	DelayStart    *int `json:"delay_start_seconds" extensions:"x-nullable"`
+	TimerShutdown *int `json:"timer_shutdown" extensions:"x-nullable"`
+	TimerStart    *int `json:"timer_start" extensions:"x-nullable"`
 
 	// Driver info
 	DriverVersion     string `json:"driver_version"`

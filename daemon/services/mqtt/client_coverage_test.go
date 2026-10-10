@@ -473,3 +473,23 @@ func TestPublishServiceStates_NotConnected(t *testing.T) {
 	client := NewClient(DefaultConfig(), "test-server", "1.0.0", nil)
 	client.publishServiceStates()
 }
+
+func TestOptionalNumberTemplate(t *testing.T) {
+	tests := []struct {
+		parent, field string
+		precision     int
+		want          string
+	}{
+		{"value_json", "load_percent", 1,
+			"{{ value_json.load_percent | round(1) if value_json.load_percent is number else None }}"},
+		{"value_json", "runtime_left_seconds", -1,
+			"{{ value_json.runtime_left_seconds if value_json.runtime_left_seconds is number else None }}"},
+		{"value_json.status", "realpower_watts", 0,
+			"{{ value_json.status.realpower_watts | round(0) if value_json.status is mapping and value_json.status.realpower_watts is number else None }}"},
+	}
+	for _, tt := range tests {
+		if got := optionalNumberTemplate(tt.parent, tt.field, tt.precision); got != tt.want {
+			t.Errorf("optionalNumberTemplate(%q, %q, %d) =\n%s\nwant\n%s", tt.parent, tt.field, tt.precision, got, tt.want)
+		}
+	}
+}

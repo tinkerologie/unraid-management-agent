@@ -67,8 +67,8 @@ func TestNUTStatusStructure(t *testing.T) {
 		Driver:        "usbhid-ups",
 		Status:        "OL",
 		StatusText:    "Online",
-		BatteryCharge: 100.0,
-		LoadPercent:   30.5,
+		BatteryCharge: new(100.0),
+		LoadPercent:   new(30.5),
 	}
 
 	if !status.Connected {
@@ -89,11 +89,11 @@ func TestNUTStatusStructure(t *testing.T) {
 	if status.StatusText != "Online" {
 		t.Errorf("Expected StatusText 'Online', got %q", status.StatusText)
 	}
-	if status.BatteryCharge != 100.0 {
-		t.Errorf("Expected BatteryCharge 100.0, got %f", status.BatteryCharge)
+	if status.BatteryCharge == nil || *status.BatteryCharge != 100.0 {
+		t.Errorf("Expected BatteryCharge 100.0, got %v", status.BatteryCharge)
 	}
-	if status.LoadPercent != 30.5 {
-		t.Errorf("Expected LoadPercent 30.5, got %f", status.LoadPercent)
+	if status.LoadPercent == nil || *status.LoadPercent != 30.5 {
+		t.Errorf("Expected LoadPercent 30.5, got %v", status.LoadPercent)
 	}
 }
 

@@ -205,9 +205,9 @@ func TestMetricsUPSOnBattery(t *testing.T) {
 	server.upsCache.Store(&dto.UPSStatus{
 		Status:        "OB",
 		Model:         "APC Back-UPS 600",
-		BatteryCharge: 85.0,
-		LoadPercent:   40.0,
-		RuntimeLeft:   1200,
+		BatteryCharge: new(85.0),
+		LoadPercent:   new(40.0),
+		RuntimeLeft:   new(1200),
 		Timestamp:     time.Now(),
 	})
 
@@ -284,5 +284,26 @@ func TestMetricsDiskStandby(t *testing.T) {
 	}
 	if !strings.Contains(body, `unraid_disk_standby{device="sdb",disk="disk2"} 0`) {
 		t.Error("Expected disk2 standby=0")
+	}
+}
+
+func TestMetricsUPSMissingReadingsNotExported(t *testing.T) {
+	server := newMetricsTestServer()
+	server.upsCache.Store(&dto.UPSStatus{
+		Status:        "OL",
+		Model:         "Smart-UPS X 3000",
+		BatteryCharge: new(100.0),
+		Timestamp:     time.Now(),
+	})
+
+	body := getMetricsBody(t, server)
+
+	if !strings.Contains(body, `unraid_ups_battery_charge_percent{name="ups"} 100`) {
+		t.Error("expected the reported battery charge to be exported")
+	}
+	for _, metric := range []string{"unraid_ups_load_percent{", "unraid_ups_runtime_seconds{"} {
+		if strings.Contains(body, metric) {
+			t.Errorf("%s exported for a reading the UPS does not report", metric)
+		}
 	}
 }

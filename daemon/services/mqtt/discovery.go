@@ -515,6 +515,25 @@ func (c *Client) publishArrayDiscovery() {
 // UPS
 // ──────────────────────────────────────────────────────────────────────────────
 
+// optionalNumberTemplate returns a value template for the numeric field of the
+// JSON object at parent ("value_json" or a nested path such as
+// "value_json.status"). The number is rounded to precision decimals (precision
+// < 0 leaves it as is). When the field is null or absent, or a nested parent is
+// missing, the template renders None, which Home Assistant's MQTT sensor treats
+// as unknown, so a reading the UPS does not report is never published as 0.
+func optionalNumberTemplate(parent, field string, precision int) string {
+	value := parent + "." + field
+	condition := value + " is number"
+	if parent != "value_json" {
+		condition = parent + " is mapping and " + condition
+	}
+	rendered := value
+	if precision >= 0 {
+		rendered = fmt.Sprintf("%s | round(%d)", value, precision)
+	}
+	return fmt.Sprintf("{{ %s if %s else None }}", rendered, condition)
+}
+
 // publishUPSDiscovery publishes HA discovery for UPS metrics.
 func (c *Client) publishUPSDiscovery() {
 	topic := c.buildTopic("ups")
@@ -533,25 +552,25 @@ func (c *Client) publishUPSDiscovery() {
 	c.publishHAEntity(haEntityOpts{
 		entityType: "sensor", stateTopic: topic,
 		id: "ups_load", name: "UPS: Load", unit: "%",
-		icon: "mdi:gauge", template: "{{ value_json.load_percent | round(1) }}",
+		icon: "mdi:gauge", template: optionalNumberTemplate("value_json", "load_percent", 1),
 		stateClass: "measurement",
 	})
 	c.publishHAEntity(haEntityOpts{
 		entityType: "sensor", stateTopic: topic,
 		id: "ups_battery", name: "UPS: Battery Level", unit: "%",
-		icon: "mdi:battery", template: "{{ value_json.battery_charge_percent | round(0) }}",
+		icon: "mdi:battery", template: optionalNumberTemplate("value_json", "battery_charge_percent", 0),
 		deviceClass: "battery", stateClass: "measurement",
 	})
 	c.publishHAEntity(haEntityOpts{
 		entityType: "sensor", stateTopic: topic,
 		id: "ups_runtime", name: "UPS: Runtime Remaining", unit: "s",
-		icon: "mdi:clock-outline", template: "{{ value_json.runtime_left_seconds }}",
+		icon: "mdi:clock-outline", template: optionalNumberTemplate("value_json", "runtime_left_seconds", -1),
 		deviceClass: "duration", stateClass: "measurement",
 	})
 	c.publishHAEntity(haEntityOpts{
 		entityType: "sensor", stateTopic: topic,
 		id: "ups_power", name: "UPS: Power Draw", unit: "W",
-		icon: "mdi:lightning-bolt", template: "{{ value_json.power_watts | default(0) | round(0) }}",
+		icon: "mdi:lightning-bolt", template: optionalNumberTemplate("value_json", "power_watts", 0),
 		deviceClass: "power", stateClass: "measurement",
 	})
 	c.publishHAEntity(haEntityOpts{
@@ -1495,7 +1514,8 @@ func (c *Client) publishZFSEntities(topic, prefix, displayName string) []string 
 // ──────────────────────────────────────────────────────────────────────────────
 
 // publishNUTDiscovery publishes HA discovery for NUT UPS metrics.
-// NUTResponse.Status is a pointer — templates use | default() guards for nil safety.
+// NUTResponse.Status is a pointer — templates use | default() guards for nil safety,
+// and numeric readings use optionalNumberTemplate, which also checks Status exists.
 func (c *Client) publishNUTDiscovery() {
 	topic := c.buildTopic("nut/status")
 	c.publishHAEntity(haEntityOpts{
@@ -1515,42 +1535,42 @@ func (c *Client) publishNUTDiscovery() {
 		entityType: "sensor", stateTopic: topic,
 		id: "nut_battery_charge", name: "NUT: Battery Charge", unit: "%",
 		icon:        "mdi:battery",
-		template:    "{{ value_json.status.battery_charge_percent | default(0) | round(0) }}",
+		template:    optionalNumberTemplate("value_json.status", "battery_charge_percent", 0),
 		deviceClass: "battery", stateClass: "measurement",
 	})
 	c.publishHAEntity(haEntityOpts{
 		entityType: "sensor", stateTopic: topic,
 		id: "nut_battery_runtime", name: "NUT: Battery Runtime", unit: "s",
 		icon:        "mdi:clock-outline",
-		template:    "{{ value_json.status.battery_runtime_seconds | default(0) }}",
+		template:    optionalNumberTemplate("value_json.status", "battery_runtime_seconds", -1),
 		deviceClass: "duration", stateClass: "measurement",
 	})
 	c.publishHAEntity(haEntityOpts{
 		entityType: "sensor", stateTopic: topic,
 		id: "nut_load", name: "NUT: Load", unit: "%",
 		icon:       "mdi:gauge",
-		template:   "{{ value_json.status.load_percent | default(0) | round(1) }}",
+		template:   optionalNumberTemplate("value_json.status", "load_percent", 1),
 		stateClass: "measurement",
 	})
 	c.publishHAEntity(haEntityOpts{
 		entityType: "sensor", stateTopic: topic,
 		id: "nut_realpower", name: "NUT: Real Power", unit: "W",
 		icon:        "mdi:lightning-bolt",
-		template:    "{{ value_json.status.realpower_watts | default(0) | round(0) }}",
+		template:    optionalNumberTemplate("value_json.status", "realpower_watts", 0),
 		deviceClass: "power", stateClass: "measurement",
 	})
 	c.publishHAEntity(haEntityOpts{
 		entityType: "sensor", stateTopic: topic,
 		id: "nut_input_voltage", name: "NUT: Input Voltage", unit: "V",
 		icon:        "mdi:sine-wave",
-		template:    "{{ value_json.status.input_voltage | default(0) | round(1) }}",
+		template:    optionalNumberTemplate("value_json.status", "input_voltage", 1),
 		deviceClass: "voltage", stateClass: "measurement",
 	})
 	c.publishHAEntity(haEntityOpts{
 		entityType: "sensor", stateTopic: topic,
 		id: "nut_output_voltage", name: "NUT: Output Voltage", unit: "V",
 		icon:        "mdi:sine-wave",
-		template:    "{{ value_json.status.output_voltage | default(0) | round(1) }}",
+		template:    optionalNumberTemplate("value_json.status", "output_voltage", 1),
 		deviceClass: "voltage", stateClass: "measurement",
 	})
 	c.publishHAEntity(haEntityOpts{
