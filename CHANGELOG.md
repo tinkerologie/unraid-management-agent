@@ -42,6 +42,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   malformed/short rows, non-numeric counters, content before the first section,
   and final-section capture. No collector behavior changed.
   ([#192](https://github.com/ruaan-deysel/unraid-management-agent/issues/192)).
+- **Coverage uplift part 4 (issue #192)** — extracted the `nvidia-smi` CSV
+  parsing in `daemon/services/collectors/gpu.go` into a pure
+  `parseNvidiaGPUCSV` helper (collector keeps querying the driver version),
+  with table-driven tests for single/multiple GPUs, short records, non-numeric
+  and `N/A` fields, zero total memory, and MiB-to-byte conversion. Also added
+  `daemon/lib` tests for `ExecCommandOutputWithContext` (success, pre-cancelled
+  context, nonexistent binary). No collector behavior changed.
+  ([#192](https://github.com/ruaan-deysel/unraid-management-agent/issues/192)).
 
 ### Added
 

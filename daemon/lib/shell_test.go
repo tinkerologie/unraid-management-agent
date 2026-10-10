@@ -47,6 +47,34 @@ func TestExecCommandOutput(t *testing.T) {
 	}
 }
 
+func TestExecCommandOutputWithContext(t *testing.T) {
+	t.Run("success returns combined output", func(t *testing.T) {
+		out, err := ExecCommandOutputWithContext(context.Background(), "echo", "hello ctx")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(out, "hello ctx") {
+			t.Errorf("output = %q, want it to contain 'hello ctx'", out)
+		}
+	})
+
+	t.Run("already-cancelled context fails fast", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		_, err := ExecCommandOutputWithContext(ctx, "sleep", "30")
+		if err == nil {
+			t.Fatal("expected error for cancelled context, got nil")
+		}
+	})
+
+	t.Run("nonexistent binary returns error", func(t *testing.T) {
+		_, err := ExecCommandOutputWithContext(context.Background(), "this-binary-does-not-exist-xyz")
+		if err == nil {
+			t.Fatal("expected error for nonexistent binary, got nil")
+		}
+	})
+}
+
 func TestCommandExists(t *testing.T) {
 	// Test for commands that should exist
 	if !CommandExists("echo") {
