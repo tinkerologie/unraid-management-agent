@@ -24,6 +24,9 @@ jobs:
   test-and-upload:
     name: Test And Upload Coverage
     runs-on: ubuntu-latest
+    # Skip the expensive coverage run on draft PRs to conserve runner capacity;
+    # it still runs on pushes to main, workflow_dispatch, and ready (non-draft) PRs.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
 
     steps:
       - name: Checkout code

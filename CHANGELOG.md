@@ -34,9 +34,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lowest-boundary clamp),
   and the Docker/IPMI string helpers (`shortDigest`, `sanitizeFanName`).
   ([#192](https://github.com/ruaan-deysel/unraid-management-agent/issues/192)).
+- **Coverage uplift part 3 (issue #192)** — extracted the `/proc/net/dev` and
+  `disks.ini` parsers in `daemon/services/collectors` into pure,
+  `io.Reader`-based helpers (`parseNetDevStats`, `parseDisksINIFrom`) with the
+  existing collector methods kept as thin file-opening wrappers, then added
+  table-driven fixture tests covering multi-record parsing, header skipping,
+  malformed/short rows, non-numeric counters, content before the first section,
+  and final-section capture. No collector behavior changed.
+  ([#192](https://github.com/ruaan-deysel/unraid-management-agent/issues/192)).
 
 ### Added
 
+- **Mandatory pre-submission governance for pull requests** — added a required
+  "Pre-Submission Governance" section to the PR template with mandatory
+  confirmation checkboxes (built and ran locally, `make test` passes,
+  `make pre-commit-run` passes, real verification output pasted, not a duplicate
+  or back-to-back spam PR, and human sign-off for AI-assisted PRs). The PR
+  Governance workflow now fails any PR that leaves these boxes unchecked, and
+  `CONTRIBUTING.md` documents the enforced rules. These apply to all authors,
+  including AI agents and automation.
+- **CI runner spam protection** — added a `concurrency` group with
+  `cancel-in-progress` to the PR Governance workflow and gated the Coverage
+  workflow to skip draft PRs, so rapid back-to-back pushes cancel superseded
+  runs instead of piling up and exhausting CI runners.
 - **Enforced GitHub issue forms for triage quality** — replaced legacy markdown
   issue templates with structured GitHub Issue Forms (`01-bug-report.yml` and
   `02-enhancement-request.yml`) based on the `vault` repository setup, with

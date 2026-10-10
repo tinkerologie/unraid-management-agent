@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"strconv"
@@ -207,8 +208,15 @@ func (c *NetworkCollector) parseNetDev() (map[string]netStats, error) {
 		}
 	}()
 
+	return parseNetDevStats(file)
+}
+
+// parseNetDevStats parses /proc/net/dev-formatted content into per-interface
+// counters. The first two header lines are skipped; malformed rows (missing the
+// "iface:" separator or fewer than 16 numeric fields) are ignored.
+func parseNetDevStats(r io.Reader) (map[string]netStats, error) {
 	stats := make(map[string]netStats)
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(r)
 
 	// Skip header lines
 	scanner.Scan()

@@ -14,6 +14,12 @@ permissions:
   issues: read
   pull-requests: read
 
+# Cancel superseded runs when a contributor pushes or edits a PR repeatedly,
+# so rapid back-to-back updates do not pile up and smash the CI runners.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate-template-and-issues:
     name: Validate PR Template And Linked Issues
@@ -63,6 +69,7 @@ jobs:
             const requiredSections = [
               "Description",
               "Type of Change",
+              "Pre-Submission Governance",
               "Related Issues",
               "Changes Made",
               "Testing Performed",
@@ -82,6 +89,21 @@ jobs:
 
             if (sections["Type of Change"] && getCheckedItems(sections["Type of Change"]).length === 0) {
               errors.push('At least one item must be checked in "Type of Change".');
+            }
+
+            // Every box in "Pre-Submission Governance" is mandatory for all
+            // authors, including AI agents. This is the anti-spam / tested-locally
+            // gate, so no "(if applicable)" exemptions are allowed here.
+            if (sections["Pre-Submission Governance"]) {
+              const governanceUnchecked = getUncheckedItems(sections["Pre-Submission Governance"]);
+              if (governanceUnchecked.length > 0) {
+                errors.push(
+                  `All items in "Pre-Submission Governance" must be checked to confirm the change was tested locally and is not spam. Unchecked: ${governanceUnchecked.join("; ")}.`,
+                );
+              }
+              if (getCheckedItems(sections["Pre-Submission Governance"]).length === 0) {
+                errors.push('"Pre-Submission Governance" must contain the required confirmation checkboxes.');
+              }
             }
 
             if (sections["Testing Performed"] && getCheckedItems(sections["Testing Performed"]).length === 0) {

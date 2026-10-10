@@ -3,6 +3,7 @@ package collectors
 import (
 	"bufio"
 	"context"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -203,8 +204,16 @@ func (c *DiskCollector) parseDisksINI() ([]dto.DiskInfo, error) {
 	}()
 	logger.Debug("Disk: File opened successfully")
 
+	return c.parseDisksINIFrom(file)
+}
+
+// parseDisksINIFrom parses disks.ini-formatted content into DiskInfo records.
+// Each ["name"] section header starts a new disk; key=value lines within a
+// section are applied via parseDiskKeyValue. Content before the first section
+// header is ignored.
+func (c *DiskCollector) parseDisksINIFrom(r io.Reader) ([]dto.DiskInfo, error) {
 	var disks []dto.DiskInfo
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(r)
 	var currentDisk *dto.DiskInfo
 
 	for scanner.Scan() {

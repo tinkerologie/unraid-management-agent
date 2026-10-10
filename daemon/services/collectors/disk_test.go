@@ -1,6 +1,7 @@
 package collectors
 
 import (
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -448,6 +449,95 @@ func TestParseDiskKeyValue(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParseDisksINIFrom(t *testing.T) {
+	ctx := &domain.Context{Hub: domain.NewEventBus(10)}
+	collector := NewDiskCollector(ctx)
+
+	t.Run("parses multiple disk sections", func(t *testing.T) {
+		const ini = `["parity"]
+name="parity"
+device="sdb"
+status="DISK_OK"
+size="3907018532"
+temp="34"
+format="xfs"
+
+["disk1"]
+name="disk1"
+device="sdc"
+status="DISK_OK"
+size="1000"
+temp="*"
+`
+		disks, err := collector.parseDisksINIFrom(strings.NewReader(ini))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(disks) != 2 {
+			t.Fatalf("expected 2 disks, got %d", len(disks))
+		}
+		if disks[0].Name != "parity" || disks[0].Device != "sdb" {
+			t.Errorf("disk[0] = %+v, want parity/sdb", disks[0])
+		}
+		if disks[0].Temperature != 34 {
+			t.Errorf("disk[0] temp = %v, want 34", disks[0].Temperature)
+		}
+		if disks[1].Name != "disk1" {
+			t.Errorf("disk[1].Name = %q, want disk1", disks[1].Name)
+		}
+		// size=1000 KiB -> 1024000 bytes
+		if disks[1].Size != 1024000 {
+			t.Errorf("disk[1].Size = %d, want 1024000", disks[1].Size)
+		}
+		// temp="*" means spun down -> temperature stays 0
+		if disks[1].Temperature != 0 {
+			t.Errorf("disk[1] temp = %v, want 0 (spun down)", disks[1].Temperature)
+		}
+	})
+
+	t.Run("empty input yields no disks", func(t *testing.T) {
+		disks, err := collector.parseDisksINIFrom(strings.NewReader(""))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(disks) != 0 {
+			t.Errorf("expected 0 disks, got %d", len(disks))
+		}
+	})
+
+	t.Run("key-value lines before any section are ignored", func(t *testing.T) {
+		const ini = `name="orphan"
+device="sdz"
+
+["disk1"]
+name="disk1"
+`
+		disks, err := collector.parseDisksINIFrom(strings.NewReader(ini))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(disks) != 1 {
+			t.Fatalf("expected 1 disk, got %d", len(disks))
+		}
+		if disks[0].Name != "disk1" {
+			t.Errorf("disk[0].Name = %q, want disk1", disks[0].Name)
+		}
+	})
+
+	t.Run("final section is captured", func(t *testing.T) {
+		const ini = `["only"]
+name="only"
+device="sda"`
+		disks, err := collector.parseDisksINIFrom(strings.NewReader(ini))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(disks) != 1 || disks[0].Name != "only" {
+			t.Fatalf("expected single disk 'only', got %+v", disks)
+		}
+	})
 }
 
 // TestIsNVMeDevice tests NVMe device detection

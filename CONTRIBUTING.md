@@ -203,6 +203,31 @@ See [CLAUDE.md](CLAUDE.md) for detailed architecture documentation.
 - ✅ No sensitive information (API keys, passwords, personal data) in code
 - ✅ Commit messages follow guidelines (see below)
 
+### Pull Request Governance (enforced)
+
+To keep the project maintainable and to protect CI capacity, every pull request
+is automatically validated by the **PR Governance** workflow. These rules apply
+to everyone, **including AI agents and automation**:
+
+- **Complete the mandatory "Pre-Submission Governance" checkboxes** in the PR
+  template. Every box is required and confirms you built and ran the change
+  locally, that `make test` and `make pre-commit-run` pass, and that you pasted
+  real local verification output. A PR with any box unchecked fails the check
+  and will not be reviewed.
+- **No spam or back-to-back PRs.** Batch related changes into a single PR. Do not
+  open multiple overlapping PRs for the same work. CI runs are automatically
+  cancelled and superseded when you push again (`concurrency` with
+  `cancel-in-progress`), and coverage does not run on **draft** PRs — open a PR
+  as a draft while iterating, then mark it ready for review when it is complete.
+- **AI-assisted PRs require a human sign-off.** If an agent created or helped
+  with the PR, a human must review and verify the changes before submission and
+  check the corresponding governance box.
+
+> Maintainer note: enabling **Settings → Actions → General → "Require approval
+> for all outside collaborators"** (or at minimum first-time contributors) stops
+> fork pull requests from running workflows until a maintainer approves them,
+> which is the most effective guard against runner abuse from new accounts.
+
 ### PR Description Template
 
 ```markdown
