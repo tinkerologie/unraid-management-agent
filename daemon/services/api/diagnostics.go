@@ -2,10 +2,12 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/diagnostics"
@@ -61,7 +63,19 @@ func (s *Server) handleSelfTest(w http.ResponseWriter, _ *http.Request) {
 //	@Failure		500	{object}	dto.Response	"Failed to build diagnostics bundle"
 //	@Router			/diagnostics/bundle [get]
 func (s *Server) handleDiagnosticsBundle(w http.ResponseWriter, r *http.Request) {
-	bundle, err := diagnostics.NewBundleService(s.ctx).CollectDiagnostics(r.Context())
+	collect := s.collectDiagnosticsFn
+	if collect == nil {
+		collect = func(ctx context.Context, appCtx *domain.Context) (*dto.DiagnosticBundle, error) {
+			return diagnostics.NewBundleService(appCtx).CollectDiagnostics(ctx)
+		}
+	}
+
+	write := s.writeArchiveFn
+	if write == nil {
+		write = diagnostics.WriteArchive
+	}
+
+	bundle, err := collect(r.Context(), s.ctx)
 	if err != nil {
 		// Full detail to the log; a generic message to the client (the raw error
 		// can contain internal paths).
@@ -77,7 +91,7 @@ func (s *Server) handleDiagnosticsBundle(w http.ResponseWriter, r *http.Request)
 	// Buffer the archive in memory so a write error surfaces as a 500 instead of
 	// a truncated download — the bundle is small (logs are capped to last-N lines).
 	var buf bytes.Buffer
-	if err := diagnostics.WriteArchive(&buf, bundle); err != nil {
+	if err := write(&buf, bundle); err != nil {
 		logger.Error("Diagnostics bundle archiving failed: %v", err)
 		respondJSON(w, http.StatusInternalServerError, dto.Response{
 			Success:   false,

@@ -13,6 +13,8 @@ import (
 // ServiceController provides control operations for Unraid system services.
 // It handles starting, stopping, and restarting services like Docker, libvirt, SMB, NFS, etc.
 type ServiceController struct {
+	// exec executes an rc script with an action. Nil means lib.ExecCommand; tests inject a fake.
+	exec func(command string, args ...string) ([]string, error)
 	// statusOutput runs an rc script with the "status" argument and returns its
 	// combined output. Nil means runStatusScript; tests inject a fake.
 	statusOutput func(command string, args ...string) (string, error)
@@ -161,7 +163,11 @@ func (sc *ServiceController) executeAction(serviceName, action string) error {
 
 	logger.Info("Service: Executing %s on %s (%s)", action, serviceName, rcScript)
 
-	_, err := lib.ExecCommand(rcScript, action)
+	exec := sc.exec
+	if exec == nil {
+		exec = lib.ExecCommand
+	}
+	_, err := exec(rcScript, action)
 	if err != nil {
 		return fmt.Errorf("failed to %s service %s: %w", action, serviceName, err)
 	}

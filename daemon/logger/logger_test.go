@@ -1,6 +1,9 @@
 package logger
 
 import (
+	"bytes"
+	"log"
+	"strings"
 	"testing"
 )
 
@@ -256,5 +259,64 @@ func TestSprintfFunction(t *testing.T) {
 	result2 := Sprintf("no format args")
 	if result2 != "no format args" {
 		t.Errorf("Sprintf() = %q, want %q", result2, "no format args")
+	}
+}
+
+func TestLogLevelFilteringWithCapture(t *testing.T) {
+	origLevel := GetLevel()
+	t.Cleanup(func() {
+		SetLevel(origLevel)
+	})
+
+	var buf bytes.Buffer
+	origWriter := log.Writer()
+	log.SetOutput(&buf)
+	t.Cleanup(func() {
+		log.SetOutput(origWriter)
+	})
+
+	// Case 1: Debug suppressed at Warning level
+	SetLevel(LevelWarning)
+	buf.Reset()
+	Debug("suppressed debug %s", "arg")
+	if buf.Len() != 0 {
+		t.Errorf("expected Debug to be suppressed at LevelWarning, got: %q", buf.String())
+	}
+
+	// Case 2: Info suppressed at Warning level
+	buf.Reset()
+	Info("suppressed info %s", "arg")
+	if buf.Len() != 0 {
+		t.Errorf("expected Info to be suppressed at LevelWarning, got: %q", buf.String())
+	}
+
+	// Case 3: Warning emitted at Warning level
+	buf.Reset()
+	Warning("visible warning %s", "arg")
+	if !strings.Contains(buf.String(), "visible warning arg") {
+		t.Errorf("expected Warning to be emitted, got: %q", buf.String())
+	}
+
+	// Case 4: Debug emitted at Debug level
+	SetLevel(LevelDebug)
+	buf.Reset()
+	Debug("visible debug %s", "arg")
+	if !strings.Contains(buf.String(), "visible debug arg") {
+		t.Errorf("expected Debug to be emitted, got: %q", buf.String())
+	}
+
+	// Case 5: Warning suppressed at Error level
+	SetLevel(LevelError)
+	buf.Reset()
+	Warning("suppressed warning")
+	if buf.Len() != 0 {
+		t.Errorf("expected Warning to be suppressed at LevelError, got: %q", buf.String())
+	}
+
+	// Case 6: Error emitted at Error level
+	buf.Reset()
+	Error("visible error")
+	if !strings.Contains(buf.String(), "visible error") {
+		t.Errorf("expected Error to be emitted, got: %q", buf.String())
 	}
 }

@@ -11,9 +11,18 @@ import (
 
 // mockCollector is a simple collector for testing
 type mockCollector struct {
-	started  bool
-	interval time.Duration
-	mu       sync.Mutex
+	started   bool
+	interval  time.Duration
+	startChan chan struct{}
+	doneChan  chan struct{}
+	mu        sync.Mutex
+}
+
+func newMockCollector() *mockCollector {
+	return &mockCollector{
+		startChan: make(chan struct{}, 1),
+		doneChan:  make(chan struct{}, 1),
+	}
 }
 
 func (m *mockCollector) Start(ctx context.Context, interval time.Duration) {
@@ -22,12 +31,40 @@ func (m *mockCollector) Start(ctx context.Context, interval time.Duration) {
 	m.interval = interval
 	m.mu.Unlock()
 
+	select {
+	case m.startChan <- struct{}{}:
+	default:
+	}
+
 	// Wait for context cancellation
 	<-ctx.Done()
 
 	m.mu.Lock()
 	m.started = false
 	m.mu.Unlock()
+
+	select {
+	case m.doneChan <- struct{}{}:
+	default:
+	}
+}
+
+func (m *mockCollector) waitStarted(t *testing.T) {
+	t.Helper()
+	select {
+	case <-m.startChan:
+	case <-time.After(1 * time.Second):
+		t.Fatal("timed out waiting for collector to start")
+	}
+}
+
+func (m *mockCollector) waitDone(t *testing.T) {
+	t.Helper()
+	select {
+	case <-m.doneChan:
+	case <-time.After(1 * time.Second):
+		t.Fatal("timed out waiting for collector to stop")
+	}
 }
 
 func createTestContext() *domain.Context {
@@ -129,9 +166,10 @@ func TestCollectorManager_EnableDisable(t *testing.T) {
 
 	cm := NewCollectorManager(ctx, &wg)
 
+	mock := newMockCollector()
 	// Register a collector that's initially disabled
 	cm.Register("test", func(ctx *domain.Context) Collector {
-		return &mockCollector{}
+		return mock
 	}, 0, false)
 
 	// Verify initially disabled
@@ -146,8 +184,7 @@ func TestCollectorManager_EnableDisable(t *testing.T) {
 		t.Fatalf("EnableCollector failed: %v", err)
 	}
 
-	// Give time for goroutine to start
-	time.Sleep(50 * time.Millisecond)
+	mock.waitStarted(t)
 
 	status, _ = cm.GetStatus("test")
 	if !status.Enabled {
@@ -163,8 +200,7 @@ func TestCollectorManager_EnableDisable(t *testing.T) {
 		t.Fatalf("DisableCollector failed: %v", err)
 	}
 
-	// Give time for context cancellation
-	time.Sleep(50 * time.Millisecond)
+	mock.waitDone(t)
 
 	status, _ = cm.GetStatus("test")
 	if status.Enabled {
@@ -329,17 +365,21 @@ func TestCollectorManager_StartAll(t *testing.T) {
 
 	cm := NewCollectorManager(ctx, &wg)
 
+	systemMock := newMockCollector()
+	dockerMock := newMockCollector()
+	gpuMock := newMockCollector()
+
 	// Register collectors with different states
 	cm.Register("system", func(ctx *domain.Context) Collector {
-		return &mockCollector{}
+		return systemMock
 	}, 5, true)
 
 	cm.Register("docker", func(ctx *domain.Context) Collector {
-		return &mockCollector{}
+		return dockerMock
 	}, 10, false)
 
 	cm.Register("gpu", func(ctx *domain.Context) Collector {
-		return &mockCollector{}
+		return gpuMock
 	}, 0, false) // Disabled
 
 	// Start all enabled collectors
@@ -349,8 +389,8 @@ func TestCollectorManager_StartAll(t *testing.T) {
 		t.Errorf("expected 2 collectors started, got %d", count)
 	}
 
-	// Give time for goroutines to start
-	time.Sleep(50 * time.Millisecond)
+	systemMock.waitStarted(t)
+	dockerMock.waitStarted(t)
 
 	// Verify status
 	systemStatus, _ := cm.GetStatus("system")
@@ -370,7 +410,8 @@ func TestCollectorManager_StartAll(t *testing.T) {
 
 	// Clean up
 	cm.StopAll()
-	time.Sleep(50 * time.Millisecond)
+	systemMock.waitDone(t)
+	dockerMock.waitDone(t)
 }
 
 func TestCollectorManager_StopAll(t *testing.T) {
@@ -379,21 +420,26 @@ func TestCollectorManager_StopAll(t *testing.T) {
 
 	cm := NewCollectorManager(ctx, &wg)
 
+	systemMock := newMockCollector()
+	dockerMock := newMockCollector()
+
 	// Register and start collectors
 	cm.Register("system", func(ctx *domain.Context) Collector {
-		return &mockCollector{}
+		return systemMock
 	}, 5, true)
 
 	cm.Register("docker", func(ctx *domain.Context) Collector {
-		return &mockCollector{}
+		return dockerMock
 	}, 10, false)
 
 	cm.StartAll()
-	time.Sleep(50 * time.Millisecond)
+	systemMock.waitStarted(t)
+	dockerMock.waitStarted(t)
 
 	// Stop all
 	cm.StopAll()
-	time.Sleep(50 * time.Millisecond)
+	systemMock.waitDone(t)
+	dockerMock.waitDone(t)
 
 	// Verify all stopped
 	systemStatus, _ := cm.GetStatus("system")
@@ -453,8 +499,9 @@ func TestCollectorManager_IdempotentEnable(t *testing.T) {
 
 	cm := NewCollectorManager(ctx, &wg)
 
+	mock := newMockCollector()
 	cm.Register("test", func(ctx *domain.Context) Collector {
-		return &mockCollector{}
+		return mock
 	}, 30, false)
 
 	// Enable twice - should be idempotent
@@ -463,7 +510,7 @@ func TestCollectorManager_IdempotentEnable(t *testing.T) {
 		t.Fatalf("First EnableCollector failed: %v", err)
 	}
 
-	time.Sleep(50 * time.Millisecond)
+	mock.waitStarted(t)
 
 	err = cm.EnableCollector("test")
 	if err != nil {
@@ -476,6 +523,7 @@ func TestCollectorManager_IdempotentEnable(t *testing.T) {
 	}
 
 	cm.StopAll()
+	mock.waitDone(t)
 }
 
 func TestCollectorManager_IdempotentDisable(t *testing.T) {
@@ -484,19 +532,23 @@ func TestCollectorManager_IdempotentDisable(t *testing.T) {
 
 	cm := NewCollectorManager(ctx, &wg)
 
+	mock := newMockCollector()
 	cm.Register("test", func(ctx *domain.Context) Collector {
-		return &mockCollector{}
+		return mock
 	}, 30, false)
 
 	// Start first
-	cm.EnableCollector("test")
-	time.Sleep(50 * time.Millisecond)
+	if err := cm.EnableCollector("test"); err != nil {
+		t.Fatalf("EnableCollector failed: %v", err)
+	}
+	mock.waitStarted(t)
 
 	// Disable twice - should be idempotent
 	err := cm.DisableCollector("test")
 	if err != nil {
 		t.Fatalf("First DisableCollector failed: %v", err)
 	}
+	mock.waitDone(t)
 
 	err = cm.DisableCollector("test")
 	if err != nil {
@@ -514,15 +566,16 @@ func TestCollectorManager_DisableCollectorClearsRuntimeState(t *testing.T) {
 	var wg sync.WaitGroup
 
 	cm := NewCollectorManager(ctx, &wg)
+	mock := newMockCollector()
 	cm.Register("test", func(ctx *domain.Context) Collector {
-		return &mockCollector{}
+		return mock
 	}, 30, false)
 
 	if err := cm.EnableCollector("test"); err != nil {
 		t.Fatalf("EnableCollector failed: %v", err)
 	}
 
-	time.Sleep(50 * time.Millisecond)
+	mock.waitStarted(t)
 
 	cm.mu.RLock()
 	mc := cm.collectors["test"]
@@ -538,7 +591,7 @@ func TestCollectorManager_DisableCollectorClearsRuntimeState(t *testing.T) {
 		t.Fatalf("DisableCollector failed: %v", err)
 	}
 
-	time.Sleep(50 * time.Millisecond)
+	mock.waitDone(t)
 
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
@@ -556,9 +609,10 @@ func TestCollectorManager_DefaultInterval(t *testing.T) {
 
 	cm := NewCollectorManager(ctx, &wg)
 
+	mock := newMockCollector()
 	// Register with 0 interval
 	cm.Register("gpu", func(ctx *domain.Context) Collector {
-		return &mockCollector{}
+		return mock
 	}, 0, false)
 
 	// Enable - should use default interval
@@ -567,7 +621,7 @@ func TestCollectorManager_DefaultInterval(t *testing.T) {
 		t.Fatalf("EnableCollector failed: %v", err)
 	}
 
-	time.Sleep(50 * time.Millisecond)
+	mock.waitStarted(t)
 
 	status, _ := cm.GetStatus("gpu")
 	if status.Interval <= 0 {
@@ -575,4 +629,5 @@ func TestCollectorManager_DefaultInterval(t *testing.T) {
 	}
 
 	cm.StopAll()
+	mock.waitDone(t)
 }

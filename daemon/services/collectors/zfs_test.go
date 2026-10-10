@@ -1,7 +1,6 @@
 package collectors
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
@@ -23,104 +22,307 @@ func TestNewZFSCollector(t *testing.T) {
 	}
 }
 
-func TestZpoolListOutputParsing(t *testing.T) {
-	// Test parsing of zpool list output
-	output := `NAME    SIZE  ALLOC   FREE  CKPOINT  EXPANDSZ   FRAG    CAP  DEDUP    HEALTH  ALTROOT
-pool1  3.62T  1.21T  2.41T        -         -     5%    33%  1.00x    ONLINE  -
-pool2  7.27T  3.50T  3.77T        -         -    10%    48%  1.00x    ONLINE  -
-`
-	lines := strings.Split(output, "\n")
+func TestParseZPoolListOutput(t *testing.T) {
+	tests := []struct {
+		name      string
+		output    string
+		wantCount int
+		wantErr   bool
+		check     func(t *testing.T, pools []dto.ZFSPool)
+	}{
+		{
+			name:      "empty output",
+			output:    "",
+			wantCount: 0,
+			wantErr:   false,
+		},
+		{
+			name: "valid multi-pool output",
+			output: "pool1\t3977237090304\t1330360827904\t2646876262400\t5.5\t33.2\t1.00x\tONLINE\t-\n" +
+				"pool2\t7993072746496\t3848290697216\t4144782049280\t-\t-\t1.25\tDEGRADED\t/mnt/alt",
+			wantCount: 2,
+			wantErr:   false,
+			check: func(t *testing.T, pools []dto.ZFSPool) {
+				if pools[0].Name != "pool1" {
+					t.Errorf("pool[0].Name = %q, want pool1", pools[0].Name)
+				}
+				if pools[0].SizeBytes != 3977237090304 {
+					t.Errorf("pool[0].SizeBytes = %d, want 3977237090304", pools[0].SizeBytes)
+				}
+				if pools[0].AllocatedBytes != 1330360827904 {
+					t.Errorf("pool[0].AllocatedBytes = %d, want 1330360827904", pools[0].AllocatedBytes)
+				}
+				if pools[0].FreeBytes != 2646876262400 {
+					t.Errorf("pool[0].FreeBytes = %d, want 2646876262400", pools[0].FreeBytes)
+				}
+				if pools[0].FragmentationPct != 5.5 {
+					t.Errorf("pool[0].FragmentationPct = %f, want 5.5", pools[0].FragmentationPct)
+				}
+				if pools[0].CapacityPct != 33.2 {
+					t.Errorf("pool[0].CapacityPct = %f, want 33.2", pools[0].CapacityPct)
+				}
+				if pools[0].DedupRatio != 1.0 {
+					t.Errorf("pool[0].DedupRatio = %f, want 1.0", pools[0].DedupRatio)
+				}
+				if pools[0].Health != "ONLINE" {
+					t.Errorf("pool[0].Health = %q, want ONLINE", pools[0].Health)
+				}
+				if pools[0].Altroot != "" {
+					t.Errorf("pool[0].Altroot = %q, want empty", pools[0].Altroot)
+				}
 
-	var pools []struct {
-		Name   string
-		Size   string
-		Alloc  string
-		Free   string
-		Health string
+				if pools[1].Name != "pool2" {
+					t.Errorf("pool[1].Name = %q, want pool2", pools[1].Name)
+				}
+				if pools[1].Health != "DEGRADED" {
+					t.Errorf("pool[1].Health = %q, want DEGRADED", pools[1].Health)
+				}
+				if pools[1].Altroot != "/mnt/alt" {
+					t.Errorf("pool[1].Altroot = %q, want /mnt/alt", pools[1].Altroot)
+				}
+				if pools[1].DedupRatio != 1.25 {
+					t.Errorf("pool[1].DedupRatio = %f, want 1.25", pools[1].DedupRatio)
+				}
+			},
+		},
+		{
+			name:    "invalid too few fields",
+			output:  "pool1\t1000\t2000",
+			wantErr: true,
+		},
 	}
 
-	for i, line := range lines {
-		// Skip header line
-		if i == 0 || strings.TrimSpace(line) == "" {
-			continue
-		}
-
-		fields := strings.Fields(line)
-		if len(fields) >= 10 {
-			pool := struct {
-				Name   string
-				Size   string
-				Alloc  string
-				Free   string
-				Health string
-			}{
-				Name:   fields[0],
-				Size:   fields[1],
-				Alloc:  fields[2],
-				Free:   fields[3],
-				Health: fields[9],
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pools, err := parseZPoolListOutput(tt.output)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("parseZPoolListOutput() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			pools = append(pools, pool)
-		}
-	}
-
-	if len(pools) != 2 {
-		t.Errorf("Expected 2 pools, got %d", len(pools))
-	}
-
-	if len(pools) > 0 && pools[0].Name != "pool1" {
-		t.Errorf("First pool name = %q, want %q", pools[0].Name, "pool1")
-	}
-
-	if len(pools) > 0 && pools[0].Health != "ONLINE" {
-		t.Errorf("First pool health = %q, want %q", pools[0].Health, "ONLINE")
+			if !tt.wantErr {
+				if len(pools) != tt.wantCount {
+					t.Errorf("got %d pools, want %d", len(pools), tt.wantCount)
+				}
+				if tt.check != nil {
+					tt.check(t, pools)
+				}
+			}
+		})
 	}
 }
 
-func TestZFSDatasetOutputParsing(t *testing.T) {
-	// Test parsing of zfs list output
-	output := `NAME                   USED  AVAIL     REFER  MOUNTPOINT
-pool1                 1.21T  2.30T       96K  /mnt/pool1
-pool1/data            500G  2.30T      500G  /mnt/pool1/data
-pool1/backup          720G  2.30T      720G  /mnt/pool1/backup
-`
-	lines := strings.Split(output, "\n")
+func TestParseZPoolStatusOutput(t *testing.T) {
+	tests := []struct {
+		name    string
+		output  string
+		check   func(t *testing.T, pool *dto.ZFSPool)
+		wantErr bool
+	}{
+		{
+			name: "healthy mirror pool with scrub complete",
+			output: `  pool: tank
+ state: ONLINE
+  scan: scrub repaired 0B in 00:00:01 with 0 errors on Sun Nov 10 02:39:43 2025
+config:
 
-	var datasets []struct {
-		Name       string
-		Used       string
-		Avail      string
-		Refer      string
-		Mountpoint string
+	NAME        STATE     READ WRITE CKSUM
+	tank        ONLINE       0     0     0
+	  mirror-0  ONLINE       0     0     0
+	    sda     ONLINE       0     0     0
+	    sdb     ONLINE       0     0     0
+
+errors: No known data errors
+`,
+			check: func(t *testing.T, pool *dto.ZFSPool) {
+				if pool.State != "ONLINE" {
+					t.Errorf("State = %q, want ONLINE", pool.State)
+				}
+				if pool.ScanStatus != "scrub completed" {
+					t.Errorf("ScanStatus = %q, want scrub completed", pool.ScanStatus)
+				}
+				if pool.ScanState != "finished" {
+					t.Errorf("ScanState = %q, want finished", pool.ScanState)
+				}
+				if pool.ScanErrors != 0 {
+					t.Errorf("ScanErrors = %d, want 0", pool.ScanErrors)
+				}
+				if len(pool.VDEVs) != 1 {
+					t.Fatalf("len(VDEVs) = %d, want 1", len(pool.VDEVs))
+				}
+				vdev := pool.VDEVs[0]
+				if vdev.Name != "mirror-0" || vdev.Type != "mirror" {
+					t.Errorf("VDEV = %s (%s), want mirror-0 (mirror)", vdev.Name, vdev.Type)
+				}
+				if len(vdev.Devices) != 2 {
+					t.Fatalf("len(vdev.Devices) = %d, want 2", len(vdev.Devices))
+				}
+				if vdev.Devices[0].Name != "sda" || vdev.Devices[1].Name != "sdb" {
+					t.Errorf("devices = %v, %v", vdev.Devices[0].Name, vdev.Devices[1].Name)
+				}
+			},
+		},
+		{
+			name: "degraded raidz pool with errors and corrupted files",
+			output: `  pool: tank
+ state: DEGRADED
+status: One or more devices has experienced an unrecoverable error.
+  scan: scrub in progress since Sun Nov 10 02:39:43 2025
+config:
+
+	NAME        STATE     READ WRITE CKSUM
+	tank        DEGRADED     1     2     3
+	  raidz1-0  DEGRADED     1     2     3
+	    sda     ONLINE       0     0     0
+	    sdb     FAULTED      5    10    15
+	    sdc     ONLINE       0     0     0
+
+errors: Permanent errors have been detected in the following files:
+
+        /mnt/tank/file1.bin
+        /mnt/tank/file2.bin
+`,
+			check: func(t *testing.T, pool *dto.ZFSPool) {
+				if pool.State != "DEGRADED" {
+					t.Errorf("State = %q, want DEGRADED", pool.State)
+				}
+				if pool.ScanStatus != "in progress" {
+					t.Errorf("ScanStatus = %q, want in progress", pool.ScanStatus)
+				}
+				if pool.ScanState != "scanning" {
+					t.Errorf("ScanState = %q, want scanning", pool.ScanState)
+				}
+				if pool.ReadErrors != 1 || pool.WriteErrors != 2 || pool.ChecksumErrors != 3 {
+					t.Errorf("Pool errors = %d/%d/%d, want 1/2/3", pool.ReadErrors, pool.WriteErrors, pool.ChecksumErrors)
+				}
+				if len(pool.VDEVs) != 1 {
+					t.Fatalf("len(VDEVs) = %d, want 1", len(pool.VDEVs))
+				}
+				if len(pool.VDEVs[0].Devices) != 3 {
+					t.Fatalf("len(Devices) = %d, want 3", len(pool.VDEVs[0].Devices))
+				}
+				sdb := pool.VDEVs[0].Devices[1]
+				if sdb.State != "FAULTED" || sdb.ReadErrors != 5 || sdb.WriteErrors != 10 || sdb.ChecksumErrors != 15 {
+					t.Errorf("sdb faulty stats = %+v", sdb)
+				}
+				if len(pool.CorruptedFiles) != 2 {
+					t.Fatalf("len(CorruptedFiles) = %d, want 2", len(pool.CorruptedFiles))
+				}
+				if pool.CorruptedFiles[0] != "/mnt/tank/file1.bin" || pool.CorruptedFiles[1] != "/mnt/tank/file2.bin" {
+					t.Errorf("CorruptedFiles = %v", pool.CorruptedFiles)
+				}
+			},
+		},
+		{
+			name: "resilver in progress",
+			output: `  pool: vault
+ state: ONLINE
+  scan: resilver in progress since Sun Nov 10 03:00:00 2025
+config:
+
+	NAME        STATE     READ WRITE CKSUM
+	vault       ONLINE       0     0     0
+	  sda       ONLINE       0     0     0
+
+errors: No known data errors
+`,
+			check: func(t *testing.T, pool *dto.ZFSPool) {
+				if pool.ScanStatus != "in progress" {
+					t.Errorf("ScanStatus = %q, want in progress", pool.ScanStatus)
+				}
+				if pool.ScanState != "scanning" {
+					t.Errorf("ScanState = %q, want scanning", pool.ScanState)
+				}
+			},
+		},
 	}
 
-	for i, line := range lines {
-		// Skip header line
-		if i == 0 || strings.TrimSpace(line) == "" {
-			continue
-		}
-
-		fields := strings.Fields(line)
-		if len(fields) >= 5 {
-			dataset := struct {
-				Name       string
-				Used       string
-				Avail      string
-				Refer      string
-				Mountpoint string
-			}{
-				Name:       fields[0],
-				Used:       fields[1],
-				Avail:      fields[2],
-				Refer:      fields[3],
-				Mountpoint: fields[4],
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pool := &dto.ZFSPool{Name: "test"}
+			err := parseZPoolStatusOutput(pool, tt.output)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("parseZPoolStatusOutput() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			datasets = append(datasets, dataset)
-		}
+			if !tt.wantErr && tt.check != nil {
+				tt.check(t, pool)
+			}
+		})
+	}
+}
+
+func TestParseZFSDatasetListOutput(t *testing.T) {
+	tests := []struct {
+		name      string
+		output    string
+		wantCount int
+		check     func(t *testing.T, datasets []dto.ZFSDataset)
+	}{
+		{
+			name:      "empty output",
+			output:    "",
+			wantCount: 0,
+		},
+		{
+			name: "valid dataset output",
+			output: "tank\tfilesystem\t1000000\t2000000\t500000\t1.50x\t/mnt/tank\t0\t0\tlz4\toff\n" +
+				"tank/data\tfilesystem\t500000\t2000000\t500000\t1.00\t/mnt/tank/data\t10000000\t5000\tzstd\ton",
+			wantCount: 2,
+			check: func(t *testing.T, datasets []dto.ZFSDataset) {
+				ds0 := datasets[0]
+				if ds0.Name != "tank" || ds0.Type != "filesystem" {
+					t.Errorf("ds0 = %s (%s)", ds0.Name, ds0.Type)
+				}
+				if ds0.UsedBytes != 1000000 || ds0.AvailableBytes != 2000000 || ds0.ReferencedBytes != 500000 {
+					t.Errorf("ds0 bytes error = %+v", ds0)
+				}
+				if ds0.CompressRatio != 1.5 || ds0.Mountpoint != "/mnt/tank" || ds0.Compression != "lz4" || ds0.Readonly {
+					t.Errorf("ds0 properties error = %+v", ds0)
+				}
+
+				ds1 := datasets[1]
+				if ds1.Name != "tank/data" || ds1.QuotaBytes != 10000000 || ds1.ReservationBytes != 5000 || !ds1.Readonly {
+					t.Errorf("ds1 properties error = %+v", ds1)
+				}
+			},
+		},
 	}
 
-	if len(datasets) != 3 {
-		t.Errorf("Expected 3 datasets, got %d", len(datasets))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			datasets, err := parseZFSDatasetListOutput(tt.output)
+			if err != nil {
+				t.Fatalf("parseZFSDatasetListOutput() unexpected error: %v", err)
+			}
+			if len(datasets) != tt.wantCount {
+				t.Errorf("got %d datasets, want %d", len(datasets), tt.wantCount)
+			}
+			if tt.check != nil {
+				tt.check(t, datasets)
+			}
+		})
+	}
+}
+
+func TestParseZFSSnapshotListOutput(t *testing.T) {
+	output := "tank@snap1\t1000\t500\t1700000000\n" +
+		"tank/data@snap2\t2000\t1000\t1700000500\n"
+
+	snapshots, err := parseZFSSnapshotListOutput(output)
+	if err != nil {
+		t.Fatalf("parseZFSSnapshotListOutput() error = %v", err)
+	}
+	if len(snapshots) != 2 {
+		t.Fatalf("got %d snapshots, want 2", len(snapshots))
+	}
+	if snapshots[0].Name != "tank@snap1" || snapshots[0].Dataset != "tank" || snapshots[0].UsedBytes != 1000 {
+		t.Errorf("snapshot[0] error = %+v", snapshots[0])
+	}
+	if snapshots[1].Name != "tank/data@snap2" || snapshots[1].Dataset != "tank/data" || snapshots[1].ReferencedBytes != 1000 {
+		t.Errorf("snapshot[1] error = %+v", snapshots[1])
+	}
+
+	empty, err := parseZFSSnapshotListOutput("")
+	if err != nil || len(empty) != 0 {
+		t.Errorf("empty snapshots error = %v, len = %d", err, len(empty))
 	}
 }
 
@@ -180,14 +382,10 @@ func TestZFSScanStatusParsing(t *testing.T) {
 		},
 	}
 
-	hub := domain.NewEventBus(10)
-	ctx := &domain.Context{Hub: hub}
-	collector := NewZFSCollector(ctx)
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pool := &dto.ZFSPool{}
-			collector.parseScanInfo(pool, tt.line)
+			parseScanInfo(pool, tt.line)
 
 			if pool.ScanStatus != tt.expectedStatus {
 				t.Errorf("ScanStatus = %q, want %q", pool.ScanStatus, tt.expectedStatus)
@@ -200,10 +398,6 @@ func TestZFSScanStatusParsing(t *testing.T) {
 }
 
 func TestZFSVdevLineParsing(t *testing.T) {
-	hub := domain.NewEventBus(10)
-	ctx := &domain.Context{Hub: hub}
-	collector := NewZFSCollector(ctx)
-
 	tests := []struct {
 		name         string
 		line         string
@@ -287,7 +481,7 @@ func TestZFSVdevLineParsing(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := collector.parseVdevLine(tt.line)
+			result := parseVdevLine(tt.line)
 			if tt.wantNil {
 				if result != nil {
 					t.Errorf("parseVdevLine(%q) = %v, want nil", tt.line, result)
@@ -338,10 +532,6 @@ func TestZFSPoolStates(t *testing.T) {
 
 // TestZFSVdevTypes tests parsing of different vdev types
 func TestZFSVdevTypes(t *testing.T) {
-	hub := domain.NewEventBus(10)
-	ctx := &domain.Context{Hub: hub}
-	collector := NewZFSCollector(ctx)
-
 	tests := []struct {
 		name     string
 		line     string
@@ -400,7 +590,7 @@ func TestZFSVdevTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := collector.parseVdevLine(tt.line)
+			result := parseVdevLine(tt.line)
 			if result == nil {
 				t.Fatalf("parseVdevLine(%q) = nil, want non-nil", tt.line)
 			}
@@ -413,3 +603,21 @@ func TestZFSVdevTypes(t *testing.T) {
 		})
 	}
 }
+
+func TestZFSParseOutput_EmptyLinesAndEdgeCases(t *testing.T) {
+	pools, err := parseZPoolListOutput("   \n\n   ")
+	if err != nil || len(pools) != 0 {
+		t.Errorf("expected 0 pools, got %v, err %v", pools, err)
+	}
+
+	datasets, err := parseZFSDatasetListOutput("   \n\n   ")
+	if err != nil || len(datasets) != 0 {
+		t.Errorf("expected 0 datasets, got %v, err %v", datasets, err)
+	}
+
+	snaps, err := parseZFSSnapshotListOutput("   \n\n   ")
+	if err != nil || len(snaps) != 0 {
+		t.Errorf("expected 0 snaps, got %v, err %v", snaps, err)
+	}
+}
+

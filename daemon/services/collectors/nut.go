@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -129,8 +130,13 @@ func (c *NUTCollector) loadNUTConfig() (*dto.NUTConfig, error) {
 	}
 	defer file.Close() //nolint:errcheck // Error checking not needed for defer Close
 
+	return parseNUTConfig(file)
+}
+
+// parseNUTConfig parses a NUT plugin configuration from an io.Reader.
+func parseNUTConfig(r io.Reader) (*dto.NUTConfig, error) {
 	config := &dto.NUTConfig{}
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(r)
 
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -251,6 +257,11 @@ func (c *NUTCollector) collectStatus(deviceName, host string) (*dto.NUTStatus, e
 		return nil, fmt.Errorf("failed to query UPS %s: %w", target, err)
 	}
 
+	return parseNUTStatusOutput(deviceName, host, output), nil
+}
+
+// parseNUTStatusOutput parses upsc output into a NUTStatus DTO.
+func parseNUTStatusOutput(deviceName, host, output string) *dto.NUTStatus {
 	status := &dto.NUTStatus{
 		Connected:    true,
 		DeviceName:   deviceName,
@@ -372,5 +383,5 @@ func (c *NUTCollector) collectStatus(deviceName, host string) (*dto.NUTStatus, e
 		status.ApparentPower = derivePower(status.ApparentPowerNominal, status.LoadPercent)
 	}
 
-	return status, nil
+	return status
 }

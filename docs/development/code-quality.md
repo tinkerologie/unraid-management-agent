@@ -392,11 +392,20 @@ linters-settings:
 
 ### Test Coverage
 
-Maintain test coverage above 70%:
+Test coverage is tracked via `go test` and reported through Codecov. Note that Go's coverage tool reports statement coverage, whereas Codecov calculates line coverage from uploaded profiles.
+
+Target milestones:
+- **Milestone**: 75%+ across all core service packages
+- **Stretch target**: toward 90% repository coverage (issue #192)
+
+Run coverage locally matching CI:
 
 ```bash
-# Generate coverage report
+# Generate coverage report using atomic covermode and view filtered summary
 make test-coverage
+
+# Or run the exact command used by CI:
+go test -covermode=atomic -coverprofile=coverage.out ./...
 
 # View coverage.html in browser
 open coverage.html

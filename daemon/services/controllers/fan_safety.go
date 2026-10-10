@@ -34,7 +34,8 @@ type FanSafetyGuard struct {
 	// stalled tracks fans currently in the stalled state so the warning is
 	// logged once per transition (not every poll cycle). Empty/unused fan
 	// headers that read 0 RPM otherwise spam the log every interval.
-	stalled map[string]bool
+	stalled     map[string]bool
+	readMaxTemp func() float64
 }
 
 // NewFanSafetyGuard creates a safety guard with the given configuration.
@@ -179,6 +180,9 @@ func (g *FanSafetyGuard) EmergencyFullSpeed() {
 
 // readMaxTemperature scans hwmon temp*_input files for the highest reading.
 func (g *FanSafetyGuard) readMaxTemperature() float64 {
+	if g.readMaxTemp != nil {
+		return g.readMaxTemp()
+	}
 	return lib.ReadMaxHwmonTemp()
 }
 

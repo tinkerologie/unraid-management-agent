@@ -278,3 +278,66 @@ func TestFTPActionsUnsupported(t *testing.T) {
 		})
 	}
 }
+
+func TestServiceControllerActionsWithMockExec(t *testing.T) {
+	var executedCmd string
+	var executedAction string
+	sc := &ServiceController{
+		exec: func(command string, args ...string) ([]string, error) {
+			executedCmd = command
+			if len(args) > 0 {
+				executedAction = args[0]
+			}
+			return nil, nil
+		},
+	}
+
+	t.Run("start service success", func(t *testing.T) {
+		err := sc.StartService("docker")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if executedCmd != "/etc/rc.d/rc.docker" || executedAction != "start" {
+			t.Errorf("exec = (%q, %q), want (/etc/rc.d/rc.docker, start)", executedCmd, executedAction)
+		}
+	})
+
+	t.Run("stop service success", func(t *testing.T) {
+		err := sc.StopService("samba")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if executedCmd != "/etc/rc.d/rc.samba" || executedAction != "stop" {
+			t.Errorf("exec = (%q, %q), want (/etc/rc.d/rc.samba, stop)", executedCmd, executedAction)
+		}
+	})
+
+	t.Run("restart service success", func(t *testing.T) {
+		err := sc.RestartService("wireguard")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if executedCmd != "/etc/rc.d/rc.wireguard" || executedAction != "restart" {
+			t.Errorf("exec = (%q, %q), want (/etc/rc.d/rc.wireguard, restart)", executedCmd, executedAction)
+		}
+	})
+
+	t.Run("unknown service error", func(t *testing.T) {
+		err := sc.StartService("nonexistent-service")
+		if err == nil || !strings.Contains(err.Error(), "unknown service") {
+			t.Errorf("expected unknown service error, got: %v", err)
+		}
+	})
+
+	t.Run("exec error propagation", func(t *testing.T) {
+		failSc := &ServiceController{
+			exec: func(command string, args ...string) ([]string, error) {
+				return nil, errors.New("exec crashed")
+			},
+		}
+		err := failSc.StartService("nginx")
+		if err == nil || !strings.Contains(err.Error(), "exec crashed") {
+			t.Errorf("expected exec error propagation, got: %v", err)
+		}
+	})
+}

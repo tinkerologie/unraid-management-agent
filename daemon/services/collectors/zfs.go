@@ -171,47 +171,22 @@ func (c *ZFSCollector) collectPools() ([]dto.ZFSPool, error) {
 
 // collectPoolDetails collects detailed information about a specific pool
 func (c *ZFSCollector) collectPoolDetails(name string) (dto.ZFSPool, error) {
-	pool := dto.ZFSPool{
-		Name:      name,
-		Timestamp: time.Now(),
-	}
-
 	// Get basic pool info (parseable format)
 	// Fields: name, size, allocated, free, fragmentation, capacity, dedupratio, health, altroot
 	output, err := lib.ExecCommandOutput(constants.ZpoolBin, "list", "-Hp", "-o",
 		"name,size,allocated,free,fragmentation,capacity,dedupratio,health,altroot", name)
 	if err != nil {
-		return pool, fmt.Errorf("failed to get pool info: %w", err)
+		return dto.ZFSPool{Name: name, Timestamp: time.Now()}, fmt.Errorf("failed to get pool info: %w", err)
 	}
 
-	// Parse tab-separated values
-	fields := strings.Split(strings.TrimSpace(output), "\t")
-	if len(fields) < 9 {
-		return pool, fmt.Errorf("unexpected pool info format: got %d fields", len(fields))
+	pools, err := parseZPoolListOutput(output)
+	if err != nil {
+		return dto.ZFSPool{Name: name, Timestamp: time.Now()}, err
 	}
-
-	pool.SizeBytes, _ = strconv.ParseUint(fields[1], 10, 64)
-	pool.AllocatedBytes, _ = strconv.ParseUint(fields[2], 10, 64)
-	pool.FreeBytes, _ = strconv.ParseUint(fields[3], 10, 64)
-
-	// Parse fragmentation and capacity (can be "-" if not available)
-	if fields[4] != "-" {
-		pool.FragmentationPct, _ = strconv.ParseFloat(fields[4], 64)
+	if len(pools) == 0 {
+		return dto.ZFSPool{Name: name, Timestamp: time.Now()}, fmt.Errorf("no pool found for %s", name)
 	}
-	if fields[5] != "-" {
-		pool.CapacityPct, _ = strconv.ParseFloat(fields[5], 64)
-	}
-
-	// Parse dedup ratio (format: "1.00x" or "1.00")
-	dedupStr := strings.TrimSuffix(fields[6], "x")
-	pool.DedupRatio, _ = strconv.ParseFloat(dedupStr, 64)
-
-	pool.Health = fields[7]
-
-	// Altroot (can be "-" if not set)
-	if fields[8] != "-" {
-		pool.Altroot = fields[8]
-	}
+	pool := pools[0]
 
 	// Get pool properties for additional details
 	if err := c.enrichPoolProperties(&pool); err != nil {
@@ -224,6 +199,58 @@ func (c *ZFSCollector) collectPoolDetails(name string) (dto.ZFSPool, error) {
 	}
 
 	return pool, nil
+}
+
+// parseZPoolListOutput parses tab-separated output from 'zpool list -Hp -o ...' into ZFSPool structs.
+func parseZPoolListOutput(output string) ([]dto.ZFSPool, error) {
+	trimmed := strings.TrimSpace(output)
+	if trimmed == "" {
+		return []dto.ZFSPool{}, nil
+	}
+
+	lines := strings.Split(trimmed, "\n")
+	pools := make([]dto.ZFSPool, 0, len(lines))
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		fields := strings.Split(line, "\t")
+		if len(fields) < 9 {
+			return nil, fmt.Errorf("unexpected pool info format: got %d fields", len(fields))
+		}
+
+		pool := dto.ZFSPool{
+			Name:      fields[0],
+			Timestamp: time.Now(),
+		}
+
+		pool.SizeBytes, _ = strconv.ParseUint(fields[1], 10, 64)
+		pool.AllocatedBytes, _ = strconv.ParseUint(fields[2], 10, 64)
+		pool.FreeBytes, _ = strconv.ParseUint(fields[3], 10, 64)
+
+		if fields[4] != "-" {
+			pool.FragmentationPct, _ = strconv.ParseFloat(fields[4], 64)
+		}
+		if fields[5] != "-" {
+			pool.CapacityPct, _ = strconv.ParseFloat(fields[5], 64)
+		}
+
+		dedupStr := strings.TrimSuffix(fields[6], "x")
+		pool.DedupRatio, _ = strconv.ParseFloat(dedupStr, 64)
+
+		pool.Health = fields[7]
+
+		if fields[8] != "-" {
+			pool.Altroot = fields[8]
+		}
+
+		pools = append(pools, pool)
+	}
+
+	return pools, nil
 }
 
 // enrichPoolProperties adds additional properties from 'zpool get all'
@@ -271,6 +298,11 @@ func (c *ZFSCollector) parsePoolStatus(pool *dto.ZFSPool) error {
 		return err
 	}
 
+	return parseZPoolStatusOutput(pool, output)
+}
+
+// parseZPoolStatusOutput parses 'zpool status -v' output for vdevs, errors, and scrub info into a ZFSPool.
+func parseZPoolStatusOutput(pool *dto.ZFSPool, output string) error {
 	scanner := bufio.NewScanner(strings.NewReader(output))
 	inConfig := false
 	inErrors := false
@@ -287,7 +319,7 @@ func (c *ZFSCollector) parsePoolStatus(pool *dto.ZFSPool) error {
 
 		// Parse scan/scrub info
 		if strings.HasPrefix(trimmed, "scan:") {
-			c.parseScanInfo(pool, trimmed)
+			parseScanInfo(pool, trimmed)
 		}
 
 		// Parse errors line. When permanent errors exist, `zpool status -v`
@@ -326,7 +358,7 @@ func (c *ZFSCollector) parsePoolStatus(pool *dto.ZFSPool) error {
 
 		if inConfig && trimmed != "" && !strings.HasPrefix(trimmed, "NAME") {
 			// Parse vdev line
-			vdev := c.parseVdevLine(line)
+			vdev := parseVdevLine(line)
 			if vdev != nil {
 				// Determine if this is a top-level vdev or a device
 				indent := len(line) - len(strings.TrimLeft(line, "\t "))
@@ -367,8 +399,8 @@ func (c *ZFSCollector) parsePoolStatus(pool *dto.ZFSPool) error {
 	return scanner.Err()
 }
 
-// parseScanInfo parses scrub/resilver information from status output
-func (c *ZFSCollector) parseScanInfo(pool *dto.ZFSPool, line string) {
+// parseScanInfo parses scrub/resilver information from status output line
+func parseScanInfo(pool *dto.ZFSPool, line string) {
 	// Example: "scan: scrub repaired 0B in 00:00:01 with 0 errors on Sun Nov 10 02:39:43 2025"
 	// Example: "scan: scrub in progress since Sun Nov 10 02:39:43 2025"
 	line = strings.TrimPrefix(line, "scan:")
@@ -401,7 +433,7 @@ func (c *ZFSCollector) parseScanInfo(pool *dto.ZFSPool, line string) {
 // parseVdevLine parses a single vdev line from zpool status output
 // Format: "NAME        STATE     READ WRITE CKSUM"
 // Example: "  sdg1      ONLINE       0     0     0"
-func (c *ZFSCollector) parseVdevLine(line string) *dto.ZFSVdev {
+func parseVdevLine(line string) *dto.ZFSVdev {
 	fields := strings.Fields(line)
 	if len(fields) < 5 {
 		return nil
@@ -448,7 +480,17 @@ func (c *ZFSCollector) collectDatasets() ([]dto.ZFSDataset, error) {
 		return nil, fmt.Errorf("failed to list datasets: %w", err)
 	}
 
-	lines := strings.Split(strings.TrimSpace(output), "\n")
+	return parseZFSDatasetListOutput(output)
+}
+
+// parseZFSDatasetListOutput parses tab-separated output from 'zfs list -Hp -o ...' into ZFSDataset structs.
+func parseZFSDatasetListOutput(output string) ([]dto.ZFSDataset, error) {
+	trimmed := strings.TrimSpace(output)
+	if trimmed == "" {
+		return []dto.ZFSDataset{}, nil
+	}
+
+	lines := strings.Split(trimmed, "\n")
 	datasets := make([]dto.ZFSDataset, 0, len(lines))
 
 	for _, line := range lines {
@@ -457,7 +499,7 @@ func (c *ZFSCollector) collectDatasets() ([]dto.ZFSDataset, error) {
 			continue
 		}
 
-		dataset := c.parseDatasetLine(line)
+		dataset := parseDatasetLine(line)
 		if dataset != nil {
 			datasets = append(datasets, *dataset)
 		}
@@ -467,7 +509,7 @@ func (c *ZFSCollector) collectDatasets() ([]dto.ZFSDataset, error) {
 }
 
 // parseDatasetLine parses a single dataset line from zfs list output
-func (c *ZFSCollector) parseDatasetLine(line string) *dto.ZFSDataset {
+func parseDatasetLine(line string) *dto.ZFSDataset {
 	fields := strings.Split(line, "\t")
 	if len(fields) < 11 {
 		return nil
@@ -513,7 +555,17 @@ func (c *ZFSCollector) collectSnapshots() ([]dto.ZFSSnapshot, error) {
 		return nil, fmt.Errorf("failed to list snapshots: %w", err)
 	}
 
-	lines := strings.Split(strings.TrimSpace(output), "\n")
+	return parseZFSSnapshotListOutput(output)
+}
+
+// parseZFSSnapshotListOutput parses tab-separated output from 'zfs list -t snapshot -Hp -o ...' into ZFSSnapshot structs.
+func parseZFSSnapshotListOutput(output string) ([]dto.ZFSSnapshot, error) {
+	trimmed := strings.TrimSpace(output)
+	if trimmed == "" {
+		return []dto.ZFSSnapshot{}, nil
+	}
+
+	lines := strings.Split(trimmed, "\n")
 	snapshots := make([]dto.ZFSSnapshot, 0, len(lines))
 
 	for _, line := range lines {
@@ -522,7 +574,7 @@ func (c *ZFSCollector) collectSnapshots() ([]dto.ZFSSnapshot, error) {
 			continue
 		}
 
-		snapshot := c.parseSnapshotLine(line)
+		snapshot := parseSnapshotLine(line)
 		if snapshot != nil {
 			snapshots = append(snapshots, *snapshot)
 		}
@@ -532,7 +584,7 @@ func (c *ZFSCollector) collectSnapshots() ([]dto.ZFSSnapshot, error) {
 }
 
 // parseSnapshotLine parses a single snapshot line from zfs list output
-func (c *ZFSCollector) parseSnapshotLine(line string) *dto.ZFSSnapshot {
+func parseSnapshotLine(line string) *dto.ZFSSnapshot {
 	fields := strings.Split(line, "\t")
 	if len(fields) < 4 {
 		return nil

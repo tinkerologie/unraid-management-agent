@@ -135,10 +135,6 @@ func TestParseFanSpeeds(t *testing.T) {
 // --- ZFS Collector: parseVdevLine ---
 
 func TestParseVdevLine(t *testing.T) {
-	hub := domain.NewEventBus(10)
-	ctx := &domain.Context{Hub: hub}
-	c := NewZFSCollector(ctx)
-
 	tests := []struct {
 		name      string
 		line      string
@@ -165,7 +161,7 @@ func TestParseVdevLine(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := c.parseVdevLine(tt.line)
+			result := parseVdevLine(tt.line)
 			if tt.wantNil {
 				if result != nil {
 					t.Errorf("Expected nil, got %+v", result)
@@ -200,10 +196,6 @@ func TestParseVdevLine(t *testing.T) {
 // --- ZFS Collector: parseScanInfo ---
 
 func TestParseScanInfo(t *testing.T) {
-	hub := domain.NewEventBus(10)
-	ctx := &domain.Context{Hub: hub}
-	c := NewZFSCollector(ctx)
-
 	tests := []struct {
 		name         string
 		line         string
@@ -248,7 +240,7 @@ func TestParseScanInfo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pool := &dto.ZFSPool{}
-			c.parseScanInfo(pool, tt.line)
+			parseScanInfo(pool, tt.line)
 			if pool.ScanStatus != tt.expectStatus {
 				t.Errorf("ScanStatus: got %q, want %q", pool.ScanStatus, tt.expectStatus)
 			}
@@ -265,10 +257,6 @@ func TestParseScanInfo(t *testing.T) {
 // --- ZFS Collector: parseDatasetLine ---
 
 func TestParseDatasetLine_Extended(t *testing.T) {
-	hub := domain.NewEventBus(10)
-	ctx := &domain.Context{Hub: hub}
-	c := NewZFSCollector(ctx)
-
 	tests := []struct {
 		name      string
 		line      string
@@ -323,7 +311,7 @@ func TestParseDatasetLine_Extended(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := c.parseDatasetLine(tt.line)
+			result := parseDatasetLine(tt.line)
 			if tt.wantNil {
 				if result != nil {
 					t.Errorf("Expected nil, got %+v", result)
@@ -361,10 +349,6 @@ func TestParseDatasetLine_Extended(t *testing.T) {
 // --- ZFS Collector: parseSnapshotLine ---
 
 func TestParseSnapshotLine_Extended(t *testing.T) {
-	hub := domain.NewEventBus(10)
-	ctx := &domain.Context{Hub: hub}
-	c := NewZFSCollector(ctx)
-
 	tests := []struct {
 		name        string
 		line        string
@@ -400,7 +384,7 @@ func TestParseSnapshotLine_Extended(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := c.parseSnapshotLine(tt.line)
+			result := parseSnapshotLine(tt.line)
 			if tt.wantNil {
 				if result != nil {
 					t.Errorf("Expected nil, got %+v", result)

@@ -14,9 +14,17 @@ import (
 
 // mdcmdExec writes a command to /proc/mdcmd directly for zero shell overhead.
 // Falls back to the mdcmd binary via ExecCommand if /proc/mdcmd is unavailable.
-func mdcmdExec(args ...string) error {
-	if lib.IsProcMdcmdAvailable() {
-		return lib.MdcmdWrite(args...)
+func (c *ArrayController) mdcmdExec(args ...string) error {
+	isAvailable := c.isProcMdcmdAvailable
+	if isAvailable == nil {
+		isAvailable = lib.IsProcMdcmdAvailable
+	}
+	if isAvailable() {
+		writeFn := c.mdcmdWrite
+		if writeFn == nil {
+			writeFn = lib.MdcmdWrite
+		}
+		return writeFn(args...)
 	}
 	// Capability gate: if neither /proc/mdcmd nor the mdcmd binary is present,
 	// return a clear "unavailable" error instead of a cryptic exec failure.
@@ -24,7 +32,11 @@ func mdcmdExec(args ...string) error {
 		return err
 	}
 	logger.Debug("Array: /proc/mdcmd not available, falling back to mdcmd binary")
-	_, err := lib.ExecCommand(constants.MdcmdBin, args...)
+	exec := c.execCommand
+	if exec == nil {
+		exec = lib.ExecCommand
+	}
+	_, err := exec(constants.MdcmdBin, args...)
 	return err
 }
 
@@ -33,34 +45,60 @@ func mdcmdExec(args ...string) error {
 // /proc/mdcmd path when the socket is unavailable so older environments keep working.
 // emhttpdKey is the HTTP parameter key (e.g. "cmdSpinup"), mdcmdCmd is the legacy
 // mdcmd argument (e.g. "spinup").
-func emcmdSpin(emhttpdKey, mdcmdCmd, diskName string) error {
+func (c *ArrayController) emcmdSpin(emhttpdKey, mdcmdCmd, diskName string) error {
 	if strings.IndexFunc(diskName, unicode.IsSpace) >= 0 {
 		return fmt.Errorf("invalid disk name %q: must not contain whitespace", diskName)
 	}
 
-	if lib.IsEmhttpdAvailable() {
+	isAvailable := c.isEmhttpdAvailable
+	if isAvailable == nil {
+		isAvailable = lib.IsEmhttpdAvailable
+	}
+	if isAvailable() {
 		params := map[string]string{emhttpdKey: diskName}
-		if state := lib.ReadStartState(); state != "" {
+		readState := c.readStartState
+		if readState == nil {
+			readState = lib.ReadStartState
+		}
+		if state := readState(); state != "" {
 			params["startState"] = state
 		} else {
 			logger.Warning("Array: could not read startState from var.ini; sending spin command without it")
 		}
-		return lib.EmhttpdRequest(params)
+		reqFn := c.emhttpdRequest
+		if reqFn == nil {
+			reqFn = lib.EmhttpdRequest
+		}
+		return reqFn(params)
 	}
 	// Fallback: write directly to /proc/mdcmd (may fail on Unraid 7.3.x)
 	logger.Debug("Array: emhttpd socket not available, falling back to /proc/mdcmd for %s %s", mdcmdCmd, diskName)
-	return mdcmdExec(mdcmdCmd, diskName)
+	return c.mdcmdExec(mdcmdCmd, diskName)
 }
 
 // ArrayController provides control operations for the Unraid array.
 // It handles array start/stop, parity check operations, and array management commands.
 type ArrayController struct {
-	ctx *domain.Context
+	ctx                  *domain.Context
+	isProcMdcmdAvailable func() bool
+	mdcmdWrite           func(...string) error
+	execCommand          func(string, ...string) ([]string, error)
+	isEmhttpdAvailable   func() bool
+	readStartState       func() string
+	emhttpdRequest       func(map[string]string) error
 }
 
 // NewArrayController creates a new array controller with the given context.
 func NewArrayController(ctx *domain.Context) *ArrayController {
-	return &ArrayController{ctx: ctx}
+	return &ArrayController{
+		ctx:                  ctx,
+		isProcMdcmdAvailable: lib.IsProcMdcmdAvailable,
+		mdcmdWrite:           lib.MdcmdWrite,
+		execCommand:          lib.ExecCommand,
+		isEmhttpdAvailable:   lib.IsEmhttpdAvailable,
+		readStartState:       lib.ReadStartState,
+		emhttpdRequest:       lib.EmhttpdRequest,
+	}
 }
 
 // StartArray starts the Unraid array.
@@ -68,7 +106,7 @@ func NewArrayController(ctx *domain.Context) *ArrayController {
 func (c *ArrayController) StartArray() error {
 	logger.Info("Array: Starting array...")
 
-	if err := mdcmdExec("start"); err != nil {
+	if err := c.mdcmdExec("start"); err != nil {
 		logger.Error("Array: Failed to start array: %v", err)
 		return fmt.Errorf("failed to start array: %w", err)
 	}
@@ -82,7 +120,7 @@ func (c *ArrayController) StartArray() error {
 func (c *ArrayController) StopArray() error {
 	logger.Info("Array: Stopping array...")
 
-	if err := mdcmdExec("stop"); err != nil {
+	if err := c.mdcmdExec("stop"); err != nil {
 		logger.Error("Array: Failed to stop array: %v", err)
 		return fmt.Errorf("failed to stop array: %w", err)
 	}
@@ -98,9 +136,9 @@ func (c *ArrayController) StartParityCheck(correcting bool) error {
 
 	var err error
 	if correcting {
-		err = mdcmdExec("check", "CORRECT")
+		err = c.mdcmdExec("check", "CORRECT")
 	} else {
-		err = mdcmdExec("check", "NOCORRECT")
+		err = c.mdcmdExec("check", "NOCORRECT")
 	}
 	if err != nil {
 		logger.Error("Array: Failed to start parity check: %v", err)
@@ -116,7 +154,7 @@ func (c *ArrayController) StartParityCheck(correcting bool) error {
 func (c *ArrayController) StopParityCheck() error {
 	logger.Info("Array: Stopping parity check...")
 
-	if err := mdcmdExec("nocheck"); err != nil {
+	if err := c.mdcmdExec("nocheck"); err != nil {
 		logger.Error("Array: Failed to stop parity check: %v", err)
 		return fmt.Errorf("failed to stop parity check: %w", err)
 	}
@@ -130,7 +168,7 @@ func (c *ArrayController) StopParityCheck() error {
 func (c *ArrayController) PauseParityCheck() error {
 	logger.Info("Array: Pausing parity check...")
 
-	if err := mdcmdExec("pause"); err != nil {
+	if err := c.mdcmdExec("pause"); err != nil {
 		logger.Error("Array: Failed to pause parity check: %v", err)
 		return fmt.Errorf("failed to pause parity check: %w", err)
 	}
@@ -144,7 +182,7 @@ func (c *ArrayController) PauseParityCheck() error {
 func (c *ArrayController) ResumeParityCheck() error {
 	logger.Info("Array: Resuming parity check...")
 
-	if err := mdcmdExec("resume"); err != nil {
+	if err := c.mdcmdExec("resume"); err != nil {
 		logger.Error("Array: Failed to resume parity check: %v", err)
 		return fmt.Errorf("failed to resume parity check: %w", err)
 	}
@@ -159,7 +197,7 @@ func (c *ArrayController) ResumeParityCheck() error {
 func (c *ArrayController) SpinDownDisk(diskName string) error {
 	logger.Info("Array: Spinning down disk %s...", diskName)
 
-	if err := emcmdSpin("cmdSpindown", "spindown", diskName); err != nil {
+	if err := c.emcmdSpin("cmdSpindown", "spindown", diskName); err != nil {
 		logger.Error("Array: Failed to spin down disk %s: %v", diskName, err)
 		return fmt.Errorf("failed to spin down disk: %w", err)
 	}
@@ -174,7 +212,7 @@ func (c *ArrayController) SpinDownDisk(diskName string) error {
 func (c *ArrayController) SpinUpDisk(diskName string) error {
 	logger.Info("Array: Spinning up disk %s...", diskName)
 
-	if err := emcmdSpin("cmdSpinup", "spinup", diskName); err != nil {
+	if err := c.emcmdSpin("cmdSpinup", "spinup", diskName); err != nil {
 		logger.Error("Array: Failed to spin up disk %s: %v", diskName, err)
 		return fmt.Errorf("failed to spin up disk: %w", err)
 	}
@@ -198,11 +236,19 @@ func (c *ArrayController) SpinUpDisk(diskName string) error {
 func (c *ArrayController) ClearDiskStats() error {
 	logger.Info("Array: Clearing disk statistics...")
 
-	if !lib.IsEmhttpdAvailable() {
+	isAvailable := c.isEmhttpdAvailable
+	if isAvailable == nil {
+		isAvailable = lib.IsEmhttpdAvailable
+	}
+	if !isAvailable() {
 		return fmt.Errorf("array control unavailable: emhttpd socket not found at %s", lib.EmhttpdSocket)
 	}
 
-	if err := lib.EmhttpdRequest(map[string]string{"clearStatistics": "true"}); err != nil {
+	reqFn := c.emhttpdRequest
+	if reqFn == nil {
+		reqFn = lib.EmhttpdRequest
+	}
+	if err := reqFn(map[string]string{"clearStatistics": "true"}); err != nil {
 		logger.Error("Array: Failed to clear disk statistics: %v", err)
 		return fmt.Errorf("failed to clear disk statistics: %w", err)
 	}

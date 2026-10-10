@@ -16,11 +16,19 @@ import (
 
 // VMController provides control operations for virtual machines using the libvirt Go API.
 // It handles VM lifecycle operations including start, stop, restart, pause, resume, hibernate, and force stop.
-type VMController struct{}
+type VMController struct {
+	// exec runs virsh shell commands. Nil means lib.ExecCommand; tests inject a fake.
+	exec func(command string, args ...string) ([]string, error)
+	// execOutput runs virt-clone. Nil means lib.ExecCommandOutput; tests inject a fake.
+	execOutput func(command string, args ...string) (string, error)
+}
 
 // NewVMController creates a new VM controller.
 func NewVMController() *VMController {
-	return &VMController{}
+	return &VMController{
+		exec:       lib.ExecCommand,
+		execOutput: lib.ExecCommandOutput,
+	}
 }
 
 // connect establishes a connection to libvirt and returns the connection and domain.
@@ -45,7 +53,11 @@ func (vc *VMController) connect(vmName string) (*libvirt.Libvirt, libvirt.Domain
 // pmWakeup wakes a VM from pmsuspended state (e.g. Windows sleep) using virsh dompmwakeup.
 // libvirt DomainResume and DomainCreate do not work for pmsuspended domains.
 func (vc *VMController) pmWakeup(vmName string) error {
-	_, err := lib.ExecCommand(constants.VirshBin, "dompmwakeup", vmName)
+	exec := vc.exec
+	if exec == nil {
+		exec = lib.ExecCommand
+	}
+	_, err := exec(constants.VirshBin, "dompmwakeup", vmName)
 	if err != nil {
 		return fmt.Errorf("failed to wake VM from pmsuspended: %w", err)
 	}
@@ -263,8 +275,13 @@ func (vc *VMController) ListSnapshots(vmName string) (*dto.VMSnapshotList, error
 		return nil, err
 	}
 
+	exec := vc.exec
+	if exec == nil {
+		exec = lib.ExecCommand
+	}
+
 	// Use virsh snapshot-list to get snapshot details
-	lines, err := lib.ExecCommand(constants.VirshBin, "snapshot-list", vmName, "--name")
+	lines, err := exec(constants.VirshBin, "snapshot-list", vmName, "--name")
 	if err != nil {
 		return nil, fmt.Errorf("failed to list snapshots for VM %s: %w", vmName, err)
 	}
@@ -276,7 +293,7 @@ func (vc *VMController) ListSnapshots(vmName string) (*dto.VMSnapshotList, error
 	}
 
 	// Get current snapshot name
-	currentLines, _ := lib.ExecCommand(constants.VirshBin, "snapshot-current", vmName, "--name")
+	currentLines, _ := exec(constants.VirshBin, "snapshot-current", vmName, "--name")
 	currentSnapshot := ""
 	if len(currentLines) > 0 {
 		currentSnapshot = strings.TrimSpace(currentLines[0])
@@ -295,7 +312,7 @@ func (vc *VMController) ListSnapshots(vmName string) (*dto.VMSnapshotList, error
 		}
 
 		// Get snapshot details via virsh snapshot-info
-		infoLines, err := lib.ExecCommand(constants.VirshBin, "snapshot-info", vmName, name)
+		infoLines, err := exec(constants.VirshBin, "snapshot-info", vmName, name)
 		if err == nil {
 			for _, infoLine := range infoLines {
 				parts := strings.SplitN(infoLine, ":", 2)
@@ -388,8 +405,13 @@ func (vc *VMController) CloneVM(vmName, cloneName string) error {
 		return err
 	}
 
+	execOut := vc.execOutput
+	if execOut == nil {
+		execOut = lib.ExecCommandOutput
+	}
+
 	// virt-clone handles copying disk images and generating new UUIDs/MACs
-	output, err := lib.ExecCommandOutput(
+	output, err := execOut(
 		constants.VirtCloneBin,
 		"--original", vmName,
 		"--name", cloneName,

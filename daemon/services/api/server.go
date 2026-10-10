@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"reflect"
@@ -74,6 +75,10 @@ type Server struct {
 
 	// diskSpinFn replaces the array controller's spin calls in tests.
 	diskSpinFn func(diskID string, up bool) error
+
+	// collectDiagnosticsFn and writeArchiveFn replace bundle collection and archive creation in tests.
+	collectDiagnosticsFn func(ctx context.Context, appCtx *domain.Context) (*dto.DiagnosticBundle, error)
+	writeArchiveFn       func(w io.Writer, b *dto.DiagnosticBundle) error
 
 	// Embedded cache store for lock-free atomic access to collector data
 	*CacheStore

@@ -238,8 +238,6 @@ func TestDetermineMoverAction_Additional(t *testing.T) {
 // ===== ZFSCollector: parseDatasetLine, parseSnapshotLine =====
 
 func TestParseDatasetLine(t *testing.T) {
-	c := &ZFSCollector{}
-
 	tests := []struct {
 		name    string
 		line    string
@@ -314,7 +312,7 @@ func TestParseDatasetLine(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := c.parseDatasetLine(tt.line)
+			got := parseDatasetLine(tt.line)
 			if tt.wantNil {
 				if got != nil {
 					t.Error("expected nil result")
@@ -332,8 +330,6 @@ func TestParseDatasetLine(t *testing.T) {
 }
 
 func TestParseSnapshotLine(t *testing.T) {
-	c := &ZFSCollector{}
-
 	tests := []struct {
 		name    string
 		line    string
@@ -389,7 +385,7 @@ func TestParseSnapshotLine(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := c.parseSnapshotLine(tt.line)
+			got := parseSnapshotLine(tt.line)
 			if tt.wantNil {
 				if got != nil {
 					t.Error("expected nil result")

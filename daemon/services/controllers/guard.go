@@ -12,8 +12,10 @@ import (
 // the OS-resilience capability gate for control paths that shell out to a binary
 // (e.g. virsh, mdcmd). Native-API control paths (Docker SDK, libvirt API)
 // already surface clear connection errors and do not need this gate.
+var binaryExists = platform.BinaryExists
+
 func requireBinary(subsystem, binaryPath string) error {
-	if !platform.BinaryExists(binaryPath) {
+	if !binaryExists(binaryPath) {
 		return fmt.Errorf("%s control unavailable: required binary %s not found", subsystem, binaryPath)
 	}
 	return nil

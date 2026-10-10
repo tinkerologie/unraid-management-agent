@@ -22,8 +22,7 @@ func TestNewUPSCollector(t *testing.T) {
 	}
 }
 
-func TestAPCOutputParsing(t *testing.T) {
-	// Test parsing of apcaccess output format
+func TestParseAPCOutput(t *testing.T) {
 	output := `APC      : 001,034,0856
 DATE     : 2024-01-01 00:00:00 +0000
 HOSTNAME : tower
@@ -34,38 +33,63 @@ LINEV    : 120.0 Volts
 LOADPCT  : 25.0 Percent
 BCHARGE  : 100.0 Percent
 TIMELEFT : 45.0 Minutes
+NOMPOWER : 800 Watts
 BATTV    : 27.1 Volts
+MODEL    : Back-UPS RS 1500
 `
-	lines := strings.Split(output, "\n")
-
-	data := make(map[string]string)
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-
-		parts := strings.SplitN(line, ":", 2)
-		if len(parts) != 2 {
-			continue
-		}
-
-		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
-		data[key] = value
+	status, err := parseAPCOutput(output)
+	if err != nil {
+		t.Fatalf("parseAPCOutput failed: %v", err)
 	}
-
-	// Verify parsing
-	if data["STATUS"] != "ONLINE" {
-		t.Errorf("STATUS = %q, want %q", data["STATUS"], "ONLINE")
+	if status.Status != "ONLINE" {
+		t.Errorf("Status = %q, want ONLINE", status.Status)
 	}
-
-	if data["BCHARGE"] != "100.0 Percent" {
-		t.Errorf("BCHARGE = %q, want %q", data["BCHARGE"], "100.0 Percent")
+	if status.LoadPercent == nil || *status.LoadPercent != 25.0 {
+		t.Errorf("LoadPercent = %v, want 25.0", status.LoadPercent)
 	}
+	if status.BatteryCharge == nil || *status.BatteryCharge != 100.0 {
+		t.Errorf("BatteryCharge = %v, want 100.0", status.BatteryCharge)
+	}
+	if status.RuntimeLeft == nil || *status.RuntimeLeft != 2700 {
+		t.Errorf("RuntimeLeft = %v, want 2700", status.RuntimeLeft)
+	}
+	if status.NominalPower == nil || *status.NominalPower != 800.0 {
+		t.Errorf("NominalPower = %v, want 800.0", status.NominalPower)
+	}
+	if status.PowerWatts == nil || *status.PowerWatts != 200.0 {
+		t.Errorf("PowerWatts = %v, want 200.0", status.PowerWatts)
+	}
+	if status.Model != "Back-UPS RS 1500" {
+		t.Errorf("Model = %q, want Back-UPS RS 1500", status.Model)
+	}
+}
 
-	if data["TIMELEFT"] != "45.0 Minutes" {
-		t.Errorf("TIMELEFT = %q, want %q", data["TIMELEFT"], "45.0 Minutes")
+func TestParseNUTUpscOutput(t *testing.T) {
+	output := `battery.charge: 95.5
+battery.runtime: 1800
+device.model: Smart-UPS 1500
+ups.load: 30.0
+ups.realpower: 300.0
+ups.status: OL
+`
+	status, err := parseNUTUpscOutput(output)
+	if err != nil {
+		t.Fatalf("parseNUTUpscOutput failed: %v", err)
+	}
+	if status.Status != "OL" {
+		t.Errorf("Status = %q, want OL", status.Status)
+	}
+	if status.BatteryCharge == nil || *status.BatteryCharge != 95.5 {
+		t.Errorf("BatteryCharge = %v, want 95.5", status.BatteryCharge)
+	}
+	if status.RuntimeLeft == nil || *status.RuntimeLeft != 1800 {
+		t.Errorf("RuntimeLeft = %v, want 1800", status.RuntimeLeft)
+	}
+	if status.PowerWatts == nil || *status.PowerWatts != 300.0 {
+		t.Errorf("PowerWatts = %v, want 300.0", status.PowerWatts)
+	}
+	if status.Model != "Smart-UPS 1500" {
+		t.Errorf("Model = %q, want Smart-UPS 1500", status.Model)
 	}
 }
 

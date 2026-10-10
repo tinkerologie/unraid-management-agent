@@ -67,6 +67,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `docker.cfg`/`domain.cfg` are absent, and the required-file error for
   `disk.cfg`. No collector behavior changed.
   ([#192](https://github.com/ruaan-deysel/unraid-management-agent/issues/192)).
+- **Coverage uplift phases 1–5 completion (issue #192)** — completed all five phases
+  from the test coverage plan:
+  - *Phase 1 (Reporting Alignment)*: aligned `Makefile` `test-coverage` target
+    (`-covermode=atomic`, filtering out `daemon/docs` and `tests`), documented line
+    vs statement coverage in `docs/development/code-quality.md`, and gated host-dependent
+    Docker SDK and `virt-clone` tests with `//go:build integration`.
+  - *Phase 2 (Collectors & Device Parsing)*: extracted pure parsing functions in
+    `ups.go` (`parseAPCOutput`, `parseNUTUpscOutput`), `nut.go` (`parseNUTConfig`,
+    `parseNUTStatusOutput`), and `zfs.go` (`parseZPoolListOutput`, `parseZPoolStatusOutput`,
+    `parseZFSDatasetListOutput`, `parseZFSSnapshotListOutput`), adding thorough table-driven
+    unit tests for pool states, vdev trees, and datasets.
+  - *Phase 3 (Controllers & Execution Seams)*: added injected execution seams and unit
+    tests for `array.go` (start/stop, parity checks, spin modes), `service.go` (start/stop/restart),
+    `vm.go` (`pmWakeup`, snapshot lists, clone), `guard.go` (`binaryExists`), and
+    `fan_safety.go` (temperature probes and PWM safety bounds).
+  - *Phase 4 (Deterministic Lifecycle & Subscriptions)*: eliminated arbitrary `time.Sleep`
+    calls in `collector_manager_test.go` and `subscribe_events_test.go` using channel waits,
+    bounded polling helpers, and `WSHub.ClientCount()`; refactored `Orchestrator.Run` with
+    an isolated, tested `shutdown()` helper.
+  - *Phase 5 (Logger & Diagnostics)*: added log capture tests in `logger_test.go`,
+    injected bundle/archive seams with comprehensive unit tests for `handleDiagnosticsBundle`
+    in `diagnostics_test.go`, and documented redacted ZIP vs unredacted shell diagnostics in
+    `docs/troubleshooting/diagnostics.md` and `docs/api/diagnostics.md`.
+  ([#192](https://github.com/ruaan-deysel/unraid-management-agent/issues/192)).
 
 ### Added
 

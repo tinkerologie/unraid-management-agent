@@ -24,7 +24,6 @@ func TestNewNUTCollector(t *testing.T) {
 }
 
 func TestNUTConfigParsing(t *testing.T) {
-	// Test parsing of NUT configuration file format
 	configContent := `SERVICE="enable"
 POWER="auto"
 POWERVA="0"
@@ -43,51 +42,11 @@ RTVALUE="240"
 TIMEOUT="240"
 POLL="15"
 `
-
-	lines := strings.Split(configContent, "\n")
-	config := &dto.NUTConfig{}
-
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 {
-			continue
-		}
-
-		key := strings.TrimSpace(parts[0])
-		value := strings.Trim(strings.TrimSpace(parts[1]), "\"")
-
-		switch key {
-		case "SERVICE":
-			config.ServiceEnabled = value == "enable"
-		case "MODE":
-			config.Mode = value
-		case "NAME":
-			config.UPSName = value
-		case "DRIVER":
-			config.Driver = value
-		case "PORT":
-			config.Port = value
-		case "IPADDR":
-			config.IPAddress = value
-		case "BATTERYLEVEL":
-			config.BatteryLevel = 20 // Using the parsed value
-		case "POLL":
-			config.PollInterval = 15
-		case "SHUTDOWN":
-			config.ShutdownMode = value
-		case "RTVALUE":
-			config.RuntimeValue = 240
-		case "TIMEOUT":
-			config.Timeout = 240
-		}
+	config, err := parseNUTConfig(strings.NewReader(configContent))
+	if err != nil {
+		t.Fatalf("parseNUTConfig failed: %v", err)
 	}
 
-	// Verify parsing
 	if !config.ServiceEnabled {
 		t.Error("ServiceEnabled should be true")
 	}
@@ -112,11 +71,11 @@ POLL="15"
 	if config.IPAddress != "127.0.0.1" {
 		t.Errorf("IPAddress = %q, want %q", config.IPAddress, "127.0.0.1")
 	}
-	if config.PollInterval != 15 {
-		t.Errorf("PollInterval = %d, want %d", config.PollInterval, 15)
-	}
 	if config.BatteryLevel != 20 {
-		t.Errorf("BatteryLevel = %d, want %d", config.BatteryLevel, 20)
+		t.Errorf("BatteryLevel = %d, want 20", config.BatteryLevel)
+	}
+	if config.PollInterval != 15 {
+		t.Errorf("PollInterval = %d, want 15", config.PollInterval)
 	}
 	if config.ShutdownMode != "sec_timer" {
 		t.Errorf("ShutdownMode = %q, want %q", config.ShutdownMode, "sec_timer")
@@ -155,46 +114,35 @@ ups.status: OL
 ups.test.result: No test initiated
 `
 
-	lines := strings.Split(output, "\n")
-	rawVars := make(map[string]string)
-
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-
-		parts := strings.SplitN(line, ":", 2)
-		if len(parts) != 2 {
-			continue
-		}
-
-		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
-		rawVars[key] = value
+	status := parseNUTStatusOutput("ups", "localhost", output)
+	if status == nil {
+		t.Fatal("parseNUTStatusOutput returned nil")
 	}
 
 	// Verify parsing
-	if rawVars["battery.charge"] != "100" {
-		t.Errorf("battery.charge = %q, want %q", rawVars["battery.charge"], "100")
+	if status.RawVariables["battery.charge"] != "100" {
+		t.Errorf("battery.charge = %q, want %q", status.RawVariables["battery.charge"], "100")
 	}
-	if rawVars["ups.status"] != "OL" {
-		t.Errorf("ups.status = %q, want %q", rawVars["ups.status"], "OL")
+	if status.BatteryCharge == nil || *status.BatteryCharge != 100 {
+		t.Errorf("BatteryCharge = %v, want 100", status.BatteryCharge)
 	}
-	if rawVars["ups.load"] != "13" {
-		t.Errorf("ups.load = %q, want %q", rawVars["ups.load"], "13")
+	if status.Status != "OL" {
+		t.Errorf("Status = %q, want %q", status.Status, "OL")
 	}
-	if rawVars["device.model"] != "PR1000ELCDRT1U" {
-		t.Errorf("device.model = %q, want %q", rawVars["device.model"], "PR1000ELCDRT1U")
+	if status.LoadPercent == nil || *status.LoadPercent != 13 {
+		t.Errorf("LoadPercent = %v, want 13", status.LoadPercent)
 	}
-	if rawVars["driver.name"] != "usbhid-ups" {
-		t.Errorf("driver.name = %q, want %q", rawVars["driver.name"], "usbhid-ups")
+	if status.Model != "PR1000ELCDRT1U" {
+		t.Errorf("Model = %q, want %q", status.Model, "PR1000ELCDRT1U")
 	}
-	if rawVars["input.voltage"] != "238.0" {
-		t.Errorf("input.voltage = %q, want %q", rawVars["input.voltage"], "238.0")
+	if status.Driver != "usbhid-ups" {
+		t.Errorf("Driver = %q, want %q", status.Driver, "usbhid-ups")
 	}
-	if rawVars["ups.realpower.nominal"] != "800" {
-		t.Errorf("ups.realpower.nominal = %q, want %q", rawVars["ups.realpower.nominal"], "800")
+	if status.InputVoltage == nil || *status.InputVoltage != 238.0 {
+		t.Errorf("InputVoltage = %v, want 238.0", status.InputVoltage)
+	}
+	if status.RealPowerNominal == nil || *status.RealPowerNominal != 800 {
+		t.Errorf("RealPowerNominal = %v, want 800", status.RealPowerNominal)
 	}
 }
 

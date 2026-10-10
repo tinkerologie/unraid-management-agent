@@ -2,11 +2,13 @@ package services
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/api"
 	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/mqtt"
 )
 
@@ -83,4 +85,28 @@ func TestSubscribeMQTTEvents_NotConnected(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Error("subscribeMQTTEvents did not return for disconnected client")
 	}
+}
+
+func TestOrchestrator_Shutdown(t *testing.T) {
+	hub := domain.NewEventBus(10)
+	ctx := &domain.Context{Hub: hub, Version: "test", Port: 8080}
+	o := CreateOrchestrator(ctx)
+
+	// Case 1: Nil components should not panic
+	t.Run("nil_components", func(t *testing.T) {
+		o.shutdown(nil, nil)
+	})
+
+	// Case 2: Configured collector manager, API server, and wait group
+	t.Run("with_subsystems", func(t *testing.T) {
+		var wg sync.WaitGroup
+		o.collectorManager = NewCollectorManager(ctx, &wg)
+		apiServer := api.NewServer(ctx)
+
+		o.shutdown(apiServer, &wg)
+
+		if o.collectorManager == nil {
+			t.Error("collectorManager was unexpectedly cleared")
+		}
+	})
 }

@@ -274,6 +274,13 @@ func (o *Orchestrator) Run() error {
 	logger.Warning("Received shutdown signal, shutting down...")
 
 	// Graceful shutdown
+	o.shutdown(apiServer, &wg)
+
+	return nil
+}
+
+// shutdown performs graceful shutdown of all running subsystems and waits for background goroutines.
+func (o *Orchestrator) shutdown(apiServer *api.Server, wg *sync.WaitGroup) {
 	// 1. Stop fan controller (restores fans to automatic mode)
 	if o.fanController != nil {
 		o.fanController.Shutdown()
@@ -318,18 +325,22 @@ func (o *Orchestrator) Run() error {
 	}
 
 	// 7. Stop all collectors via manager
-	o.collectorManager.StopAll()
+	if o.collectorManager != nil {
+		o.collectorManager.StopAll()
+	}
 
 	// 8. Stop API server (which also cancels its internal goroutines)
-	apiServer.Stop()
+	if apiServer != nil {
+		apiServer.Stop()
+	}
 
 	// 9. Wait for all goroutines to complete
-	logger.Info("Waiting for all goroutines to complete...")
-	wg.Wait()
+	if wg != nil {
+		logger.Info("Waiting for all goroutines to complete...")
+		wg.Wait()
+	}
 
 	logger.Success("Shutdown complete")
-
-	return nil
 }
 
 // RunMCPStdio starts the agent with MCP over STDIO transport for local AI client integration.

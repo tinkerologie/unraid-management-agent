@@ -355,14 +355,42 @@ cat /usr/local/emhttp/plugins/unraid-management-agent/VERSION
 
 ## Export Diagnostics
 
-### Create Diagnostic Bundle
+There are two primary ways to export diagnostics depending on whether you are sharing information externally or inspecting the host locally:
+
+### 1. Redacted Diagnostics Bundle (Recommended for Bug Reports)
+
+The agent provides a built-in diagnostic bundling service that exports a ZIP archive with known sensitive values (API tokens, MCP connect secret, MQTT credentials, and passwords) redacted. Review the archive for sensitive data before attaching it to GitHub issues and bug reports.
+
+**Via HTTP API:**
+```bash
+# Download redacted bundle directly from the agent
+curl -OJ http://localhost:8043/api/v1/diagnostics/bundle
+```
+
+**Via WebGUI:**
+Navigate to the Unraid Management Agent settings page in the Unraid WebGUI and click **Download Diagnostics**.
+
+**Via CLI:**
+```bash
+# Generate the redacted ZIP archive locally into the current or specified directory
+/usr/local/emhttp/plugins/unraid-management-agent/unraid-management-agent diagnostics --output-dir=/tmp
+```
+
+For API endpoint details and response format, see the [Diagnostics API Reference](../api/diagnostics.md).
+
+### 2. Local Unredacted Shell Diagnostic Bundle (Host Admin Analysis)
+
+For immediate, deep debugging by the system administrator directly on the Unraid server, you can generate an unredacted diagnostic text dump (`uma-diagnostics` shell script).
+
+> [!WARNING]
+> The shell diagnostic script captures raw configuration files (including `config.cfg`), which may contain unmasked passwords or API tokens. **This shell dump is unredacted** and intended strictly for local administrator inspection. Do **not** post this file to public forums or GitHub without manual redaction.
 
 ```bash
-# Create comprehensive diagnostic output
+# Create comprehensive unredacted local diagnostic output
 cat << 'EOF' > /tmp/diagnostic-bundle.sh
 #!/bin/bash
 OUTPUT="/tmp/unraid-agent-diagnostics.txt"
-echo "Unraid Management Agent Diagnostics" > $OUTPUT
+echo "Unraid Management Agent Diagnostics (UNREDACTED - LOCAL ADMIN ONLY)" > $OUTPUT
 echo "Generated: $(date)" >> $OUTPUT
 echo "=================================" >> $OUTPUT
 

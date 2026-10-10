@@ -14,6 +14,7 @@ Welcome to the Unraid Management Agent documentation. This directory contains co
 ### API Documentation
 
 - [REST API Reference](api/rest-api.md) - Complete REST API endpoint documentation
+- [Diagnostics API Reference](api/diagnostics.md) - Diagnostic bundles and self-test endpoints
 - [WebSocket Events](api/websocket-events.md) - Real-time event streaming documentation
 - [WebSocket Event Structure](api/websocket-structure.md) - Technical event structure details
 - [Prometheus Metrics](api/prometheus.md) - Metrics endpoint documentation

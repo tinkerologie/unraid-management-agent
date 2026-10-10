@@ -25,6 +25,19 @@ func startSubscribeToEvents(t *testing.T, server *Server) context.CancelFunc {
 	return cancel
 }
 
+// eventually polls check until it returns true or timeout expires.
+func eventually(t *testing.T, check func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(1 * time.Second)
+	for time.Now().Before(deadline) {
+		if check() {
+			return
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+	t.Fatal("condition not met within timeout")
+}
+
 func TestSubscribeToEvents_SystemUpdate(t *testing.T) {
 	hub := domain.NewEventBus(10)
 	appCtx := &domain.Context{Hub: hub, Version: "test"}
@@ -35,7 +48,9 @@ func TestSubscribeToEvents_SystemUpdate(t *testing.T) {
 
 	sysInfo := &dto.SystemInfo{Hostname: "test-sub", Uptime: 999}
 	hub.Pub(sysInfo, "system_update")
-	time.Sleep(100 * time.Millisecond)
+	eventually(t, func() bool {
+		return server.systemCache.Load() != nil
+	})
 
 	cached := server.systemCache.Load()
 
@@ -57,7 +72,9 @@ func TestSubscribeToEvents_ArrayStatusUpdate(t *testing.T) {
 
 	arrayStatus := &dto.ArrayStatus{State: "Started", NumDisks: 5}
 	hub.Pub(arrayStatus, "array_status_update")
-	time.Sleep(100 * time.Millisecond)
+	eventually(t, func() bool {
+		return server.arrayCache.Load() != nil
+	})
 
 	cached := server.arrayCache.Load()
 
@@ -79,7 +96,9 @@ func TestSubscribeToEvents_DiskListUpdate(t *testing.T) {
 
 	disks := []dto.DiskInfo{{Name: "disk1", Device: "sda"}, {Name: "disk2", Device: "sdb"}}
 	hub.Pub(disks, "disk_list_update")
-	time.Sleep(100 * time.Millisecond)
+	eventually(t, func() bool {
+		return len(server.GetDisksCache()) == 2
+	})
 
 	cached := server.GetDisksCache()
 
@@ -98,7 +117,9 @@ func TestSubscribeToEvents_ShareListUpdate(t *testing.T) {
 
 	shares := []dto.ShareInfo{{Name: "appdata"}, {Name: "media"}}
 	hub.Pub(shares, "share_list_update")
-	time.Sleep(100 * time.Millisecond)
+	eventually(t, func() bool {
+		return len(server.GetSharesCache()) == 2
+	})
 
 	cached := server.GetSharesCache()
 
@@ -121,7 +142,9 @@ func TestSubscribeToEvents_ContainerListUpdate(t *testing.T) {
 		{ID: "def", Name: "nginx", State: "exited"},
 	}
 	hub.Pub(containers, "container_list_update")
-	time.Sleep(100 * time.Millisecond)
+	eventually(t, func() bool {
+		return len(server.GetDockerCache()) == 2
+	})
 
 	cached := server.GetDockerCache()
 
@@ -146,7 +169,9 @@ func TestSubscribeToEvents_VMListUpdate(t *testing.T) {
 		{ID: "1", Name: "Windows10", State: "running"},
 	}
 	hub.Pub(vms, "vm_list_update")
-	time.Sleep(100 * time.Millisecond)
+	eventually(t, func() bool {
+		return len(server.GetVMsCache()) == 1
+	})
 
 	cached := server.GetVMsCache()
 
@@ -165,7 +190,9 @@ func TestSubscribeToEvents_UPSStatusUpdate(t *testing.T) {
 
 	ups := &dto.UPSStatus{Status: "OL", Model: "APC", BatteryCharge: new(100.0)}
 	hub.Pub(ups, "ups_status_update")
-	time.Sleep(100 * time.Millisecond)
+	eventually(t, func() bool {
+		return server.upsCache.Load() != nil
+	})
 
 	cached := server.upsCache.Load()
 
@@ -187,7 +214,9 @@ func TestSubscribeToEvents_NUTStatusUpdate(t *testing.T) {
 
 	nut := &dto.NUTResponse{Installed: true, Running: true}
 	hub.Pub(nut, "nut_status_update")
-	time.Sleep(100 * time.Millisecond)
+	eventually(t, func() bool {
+		return server.nutCache.Load() != nil
+	})
 
 	cached := server.nutCache.Load()
 
@@ -209,7 +238,9 @@ func TestSubscribeToEvents_GPUMetricsUpdate(t *testing.T) {
 
 	gpus := []*dto.GPUMetrics{{Name: "RTX 3080", Temperature: 65}}
 	hub.Pub(gpus, "gpu_metrics_update")
-	time.Sleep(100 * time.Millisecond)
+	eventually(t, func() bool {
+		return len(server.GetGPUCache()) == 1
+	})
 
 	cached := server.GetGPUCache()
 
@@ -228,7 +259,9 @@ func TestSubscribeToEvents_NetworkListUpdate(t *testing.T) {
 
 	networks := []dto.NetworkInfo{{Name: "eth0", Speed: 1000, State: "up"}}
 	hub.Pub(networks, "network_list_update")
-	time.Sleep(100 * time.Millisecond)
+	eventually(t, func() bool {
+		return len(server.GetNetworkCache()) == 1
+	})
 
 	cached := server.GetNetworkCache()
 
@@ -247,7 +280,9 @@ func TestSubscribeToEvents_HardwareUpdate(t *testing.T) {
 
 	hw := &dto.HardwareInfo{BIOS: &dto.BIOSInfo{Vendor: "AMI"}}
 	hub.Pub(hw, "hardware_update")
-	time.Sleep(100 * time.Millisecond)
+	eventually(t, func() bool {
+		return server.hardwareCache.Load() != nil
+	})
 
 	cached := server.hardwareCache.Load()
 
@@ -269,7 +304,9 @@ func TestSubscribeToEvents_RegistrationUpdate(t *testing.T) {
 
 	reg := &dto.Registration{Type: "Pro", State: "valid"}
 	hub.Pub(reg, "registration_update")
-	time.Sleep(100 * time.Millisecond)
+	eventually(t, func() bool {
+		return server.registrationCache.Load() != nil
+	})
 
 	cached := server.registrationCache.Load()
 
@@ -295,7 +332,9 @@ func TestSubscribeToEvents_NotificationsUpdate(t *testing.T) {
 		},
 	}
 	hub.Pub(notifs, "notifications_update")
-	time.Sleep(100 * time.Millisecond)
+	eventually(t, func() bool {
+		return server.notificationsCache.Load() != nil
+	})
 
 	cached := server.notificationsCache.Load()
 
@@ -319,7 +358,9 @@ func TestSubscribeToEvents_UnassignedDevicesUpdate(t *testing.T) {
 		Devices: []dto.UnassignedDevice{{Device: "sdd"}},
 	}
 	hub.Pub(devices, "unassigned_devices_update")
-	time.Sleep(100 * time.Millisecond)
+	eventually(t, func() bool {
+		return server.unassignedCache.Load() != nil
+	})
 
 	cached := server.unassignedCache.Load()
 
@@ -341,7 +382,9 @@ func TestSubscribeToEvents_ZFSPoolsUpdate(t *testing.T) {
 
 	pools := []dto.ZFSPool{{Name: "tank", Health: "ONLINE"}}
 	hub.Pub(pools, "zfs_pools_update")
-	time.Sleep(100 * time.Millisecond)
+	eventually(t, func() bool {
+		return len(server.GetZFSPoolsCache()) == 1
+	})
 
 	cached := server.GetZFSPoolsCache()
 
@@ -360,7 +403,9 @@ func TestSubscribeToEvents_ZFSDatasetsUpdate(t *testing.T) {
 
 	datasets := []dto.ZFSDataset{{Name: "tank/data", Type: "filesystem"}}
 	hub.Pub(datasets, "zfs_datasets_update")
-	time.Sleep(100 * time.Millisecond)
+	eventually(t, func() bool {
+		return len(server.GetZFSDatasetsCache()) == 1
+	})
 
 	cached := server.GetZFSDatasetsCache()
 
@@ -379,7 +424,9 @@ func TestSubscribeToEvents_ZFSSnapshotsUpdate(t *testing.T) {
 
 	snapshots := []dto.ZFSSnapshot{{Name: "tank/data@snap1", Dataset: "tank/data"}}
 	hub.Pub(snapshots, "zfs_snapshots_update")
-	time.Sleep(100 * time.Millisecond)
+	eventually(t, func() bool {
+		return len(server.GetZFSSnapshotsCache()) == 1
+	})
 
 	cached := server.GetZFSSnapshotsCache()
 
@@ -399,7 +446,9 @@ func TestSubscribeToEvents_ZFSARCStatsUpdate(t *testing.T) {
 	// ZFSARCStats is a value type (not pointer)
 	arcStats := dto.ZFSARCStats{SizeBytes: 8589934592, HitRatioPct: 95.5}
 	hub.Pub(arcStats, "zfs_arc_stats_update")
-	time.Sleep(100 * time.Millisecond)
+	eventually(t, func() bool {
+		return server.zfsARCStatsCache.Load() != nil
+	})
 
 	cached := server.zfsARCStatsCache.Load()
 
@@ -444,13 +493,16 @@ func TestSubscribeToEvents_UnknownType(t *testing.T) {
 	cancel := startSubscribeToEvents(t, server)
 	defer cancel()
 
-	// Publish an unknown type — should not panic, just logs a warning
+	// Publish an unknown type followed by a known sentinel to verify ordering
 	hub.Pub("unknown string type", "system_update")
-	time.Sleep(100 * time.Millisecond)
+	hub.Pub(&dto.SystemInfo{Hostname: "sentinel-after-unknown"}, "system_update")
+	eventually(t, func() bool {
+		return server.systemCache.Load() != nil
+	})
 
-	// Verify no caches were changed
-	if server.systemCache.Load() != nil {
-		t.Error("systemCache should still be nil after unknown type")
+	// Verify sentinel arrived safely after unknown type was handled
+	if server.systemCache.Load().Hostname != "sentinel-after-unknown" {
+		t.Errorf("Hostname = %q, want sentinel-after-unknown", server.systemCache.Load().Hostname)
 	}
 }
 
@@ -507,7 +559,11 @@ func TestBroadcastEvents_ForwardsToWSHub(t *testing.T) {
 		resp.Body.Close()
 	}
 	defer ws.Close()
-	time.Sleep(50 * time.Millisecond)
+
+	// Wait deterministically for client registration
+	eventually(t, func() bool {
+		return server.wsHub.ClientCount() > 0
+	})
 
 	// Publish event — broadcastEvents should forward it to WSHub
 	hub.Pub(&dto.SystemInfo{Hostname: "broadcast-test"}, "system_update")

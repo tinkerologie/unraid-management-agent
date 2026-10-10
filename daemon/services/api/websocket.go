@@ -55,6 +55,13 @@ func NewWSHub() *WSHub {
 	}
 }
 
+// ClientCount returns the number of currently connected WebSocket clients.
+func (h *WSHub) ClientCount() int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return len(h.clients)
+}
+
 // Run starts the WebSocket hub's main event loop.
 // It handles client registration, unregistration, and message broadcasting until the context is cancelled.
 func (h *WSHub) Run(ctx context.Context) {
