@@ -4708,6 +4708,7 @@ definitions:
         description: |-
           CorruptedFiles lists files with permanent (checksum) errors, as reported
           by `zpool status -v`. Unraid 7.3 (ZFS 2.4.1) surfaces these without a scrub.
+          Always present: [] when the pool has none, null only if `zpool status` failed.
         items:
           type: string
         type: array

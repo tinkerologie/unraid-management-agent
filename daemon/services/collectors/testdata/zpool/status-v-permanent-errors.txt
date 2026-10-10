@@ -1,0 +1,23 @@
+  pool: tank
+ state: ONLINE
+status: One or more devices has experienced an error resulting in data
+	corruption.  Applications may be affected.
+action: Restore the file in question if possible.  Otherwise restore the
+	entire pool from backup.
+   see: https://openzfs.github.io/openzfs-docs/msg/ZFS-8000-8A
+  scan: scrub repaired 0B in 00:12:31 with 5 errors on Sun Oct  4 05:12:32 2026
+config:
+
+	NAME        STATE     READ WRITE CKSUM
+	tank        ONLINE       0     0     0
+	  mirror-0  ONLINE       0     0     0
+	    sdb1    ONLINE       0     0    10
+	    sdc1    ONLINE       0     0    10
+
+errors: Permanent errors have been detected in the following files:
+
+        /mnt/tank/media/movie: part 1.mkv
+        <metadata>:<0x1a>
+        tank/appdata:<0x2f1>
+        tank/backups:/2026/09/db.dump
+        <0x5f>:<0x3>

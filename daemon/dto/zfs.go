@@ -49,7 +49,8 @@ type ZFSPool struct {
 
 	// CorruptedFiles lists files with permanent (checksum) errors, as reported
 	// by `zpool status -v`. Unraid 7.3 (ZFS 2.4.1) surfaces these without a scrub.
-	CorruptedFiles []string `json:"corrupted_files,omitempty"`
+	// Always present: [] when the pool has none, null only if `zpool status` failed.
+	CorruptedFiles []string `json:"corrupted_files"`
 
 	// IsBootPool flags the ZFS-mirrored/dedicated boot pool (Unraid 7.3 internal boot).
 	IsBootPool bool `json:"is_boot_pool" example:"false"`

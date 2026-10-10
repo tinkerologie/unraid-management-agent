@@ -12299,7 +12299,7 @@
                     "example": 1.5
                 },
                 "corrupted_files": {
-                    "description": "CorruptedFiles lists files with permanent (checksum) errors, as reported\nby `zpool status -v`. Unraid 7.3 (ZFS 2.4.1) surfaces these without a scrub.",
+                    "description": "CorruptedFiles lists files with permanent (checksum) errors, as reported\nby `zpool status -v`. Unraid 7.3 (ZFS 2.4.1) surfaces these without a scrub.\nAlways present: [] when the pool has none, null only if `zpool status` failed.",
                     "type": "array",
                     "items": {
                         "type": "string"

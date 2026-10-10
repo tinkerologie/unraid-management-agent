@@ -1483,7 +1483,7 @@ func (c *Client) publishZFSEntities(topic, prefix, displayName string) []string 
 		entityType: "sensor", stateTopic: topic,
 		id: prefix + "_corrupted_files", name: fmt.Sprintf("ZFS: %s Corrupted Files", displayName),
 		icon:       "mdi:file-alert",
-		template:   "{{ value_json.corrupted_files | default([]) | count }}",
+		template:   "{{ (value_json.corrupted_files or []) | count }}",
 		stateClass: "measurement",
 	})
 
