@@ -182,13 +182,13 @@ jobs:
 
             if (!isExplicitNone && relatedIssuesClean) {
               const issueRefRegex =
-                /\b(?:fix(?:e[sd])?|close[sd]?|resolve[sd]?|related to)[:]?\s+(?:https?:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/issues\/(\d+)|([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)?#(\d+))/gi;
+                /\b(?:part of|fix(?:e[sd])?|close[sd]?|resolve[sd]?|related to|addresses?|implements?)[:]??\s+(?:https?:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/issues\/(\d+)|([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)?#(\d+))/gi;
 
               const issueMatches = [...relatedIssuesClean.matchAll(issueRefRegex)];
 
               if (issueMatches.length === 0) {
                 errors.push(
-                  'Add at least one linked issue in "Related Issues" using Fixes/Closes/Resolves/Related to #<number> (or issue URL), or state "None" if this change is self-contained.',
+                  'Add at least one linked issue in "Related Issues" using Fixes/Closes/Resolves/Related to/Part of #<number> (or issue URL), or state "None" if this change is self-contained.',
                 );
               } else {
                 const repoSlug = `${owner}/${repo}`.toLowerCase();
