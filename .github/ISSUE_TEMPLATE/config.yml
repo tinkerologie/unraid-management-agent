@@ -1,11 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Ask a question in Discussions
-    url: https://github.com/ruaan-deysel/unraid-management-agent/discussions/categories/q-a
-    about: Use Discussions for setup help, troubleshooting questions, and general usage support.
-  - name: Security Disclosure
-    url: https://github.com/ruaan-deysel/unraid-management-agent/security/advisories/new
-    about: Report sensitive security issues privately.
-  - name: Contribution and agent rules
-    url: https://github.com/ruaan-deysel/unraid-management-agent/blob/main/CONTRIBUTING.md
-    about: Read contribution requirements and project rules before filing issues or opening pull requests.
+  - name: Ask a question in GitHub Discussions
+    url: https://github.com/ruaan-deysel/unraid-management-agent/discussions
+    about: Use Discussions for setup questions, troubleshooting, and general ideas.
