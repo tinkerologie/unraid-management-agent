@@ -58,6 +58,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   section matching, bond/bridge/VLAN parsing, missing-interface and
   missing-file errors, and system settings fields. No collector behavior
   changed. ([#192](https://github.com/ruaan-deysel/unraid-management-agent/issues/192)).
+- **Coverage uplift part 6 (issue #192)** — extracted the remaining
+  `daemon/services/collectors/config.go` settings parsers (`docker.cfg`,
+  `domain.cfg`, `disk.cfg`) into pure `io.Reader` helpers
+  (`parseDockerSettings`, `parseVMSettings`, `parseDiskSettings`) routed
+  through the injectable boot config directory, with tests covering field
+  parsing, device/network list splitting, the disabled-default fallback when
+  `docker.cfg`/`domain.cfg` are absent, and the required-file error for
+  `disk.cfg`. No collector behavior changed.
+  ([#192](https://github.com/ruaan-deysel/unraid-management-agent/issues/192)).
 
 ### Added
 

@@ -280,10 +280,10 @@ func parseSystemSettings(r io.Reader) (*dto.SystemSettings, error) {
 
 // GetDockerSettings reads Docker settings from /boot/config/docker.cfg
 func (c *ConfigCollector) GetDockerSettings() (*dto.DockerSettings, error) {
-	configPath := "/boot/config/docker.cfg"
+	configPath := c.bootConfigPath("docker.cfg")
 	logger.Debug("Config: Reading Docker settings from %s", configPath)
 
-	file, err := os.Open(configPath)
+	file, err := os.Open(configPath) // #nosec G304 -- path is the internal boot config dir, not user input
 	if err != nil {
 		if os.IsNotExist(err) {
 			return &dto.DockerSettings{
@@ -299,11 +299,16 @@ func (c *ConfigCollector) GetDockerSettings() (*dto.DockerSettings, error) {
 		}
 	}()
 
+	return parseDockerSettings(file)
+}
+
+// parseDockerSettings parses an Unraid docker.cfg stream into Docker settings.
+func parseDockerSettings(r io.Reader) (*dto.DockerSettings, error) {
 	settings := &dto.DockerSettings{
 		Timestamp: time.Now(),
 	}
 
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" || strings.HasPrefix(line, "#") {
@@ -341,10 +346,10 @@ func (c *ConfigCollector) GetDockerSettings() (*dto.DockerSettings, error) {
 
 // GetVMSettings reads VM settings from /boot/config/domain.cfg
 func (c *ConfigCollector) GetVMSettings() (*dto.VMSettings, error) {
-	configPath := "/boot/config/domain.cfg"
+	configPath := c.bootConfigPath("domain.cfg")
 	logger.Debug("Config: Reading VM settings from %s", configPath)
 
-	file, err := os.Open(configPath)
+	file, err := os.Open(configPath) // #nosec G304 -- path is the internal boot config dir, not user input
 	if err != nil {
 		if os.IsNotExist(err) {
 			return &dto.VMSettings{
@@ -360,12 +365,17 @@ func (c *ConfigCollector) GetVMSettings() (*dto.VMSettings, error) {
 		}
 	}()
 
+	return parseVMSettings(file)
+}
+
+// parseVMSettings parses an Unraid domain.cfg stream into VM settings.
+func parseVMSettings(r io.Reader) (*dto.VMSettings, error) {
 	settings := &dto.VMSettings{
 		DefaultSettings: make(map[string]string),
 		Timestamp:       time.Now(),
 	}
 
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" || strings.HasPrefix(line, "#") {
@@ -550,10 +560,10 @@ func (c *ConfigCollector) UpdateSystemSettings(settings *dto.SystemSettings) err
 
 // GetDiskSettings reads disk settings from /boot/config/disk.cfg
 func (c *ConfigCollector) GetDiskSettings() (*dto.DiskSettings, error) {
-	configPath := "/boot/config/disk.cfg"
+	configPath := c.bootConfigPath("disk.cfg")
 	logger.Debug("Config: Reading disk settings from %s", configPath)
 
-	file, err := os.Open(configPath)
+	file, err := os.Open(configPath) // #nosec G304 -- path is the internal boot config dir, not user input
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("disk config not found")
@@ -566,11 +576,16 @@ func (c *ConfigCollector) GetDiskSettings() (*dto.DiskSettings, error) {
 		}
 	}()
 
+	return parseDiskSettings(file)
+}
+
+// parseDiskSettings parses an Unraid disk.cfg stream into disk settings.
+func parseDiskSettings(r io.Reader) (*dto.DiskSettings, error) {
 	settings := &dto.DiskSettings{
 		Timestamp: time.Now(),
 	}
 
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" || strings.HasPrefix(line, "#") {

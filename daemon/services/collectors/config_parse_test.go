@@ -166,3 +166,125 @@ func TestConfigCollectorGetSystemSettings(t *testing.T) {
 		t.Error("expected error when ident.cfg is absent")
 	}
 }
+
+func TestParseDockerSettings(t *testing.T) {
+	const cfg = `DOCKER_ENABLED="yes"
+DOCKER_IMAGE_FILE="/mnt/user/system/docker/docker.img"
+DOCKER_DEFAULT_NETWORK="bridge"
+DOCKER_CUSTOM_NETWORKS="br0,br1"
+`
+	got, err := parseDockerSettings(strings.NewReader(cfg))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !got.Enabled {
+		t.Error("Enabled = false, want true")
+	}
+	if got.ImagePath != "/mnt/user/system/docker/docker.img" {
+		t.Errorf("ImagePath = %q", got.ImagePath)
+	}
+	if got.DefaultNetwork != "bridge" {
+		t.Errorf("DefaultNetwork = %q", got.DefaultNetwork)
+	}
+	if len(got.CustomNetworks) != 2 || got.CustomNetworks[1] != "br1" {
+		t.Errorf("CustomNetworks = %v", got.CustomNetworks)
+	}
+}
+
+func TestConfigCollectorGetDockerSettingsMissingFileDefaults(t *testing.T) {
+	// A missing docker.cfg must return a disabled default, not an error.
+	c := &ConfigCollector{bootConfigDir: t.TempDir()}
+	got, err := c.GetDockerSettings()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got == nil || got.Enabled {
+		t.Errorf("expected disabled default, got %+v", got)
+	}
+}
+
+func TestParseVMSettings(t *testing.T) {
+	const cfg = `SERVICE="enable"
+PCI_DEVICES="0000:01:00.0,0000:01:00.1"
+USB_DEVICES="1-1"
+SOMETHING_ELSE="stored"
+`
+	got, err := parseVMSettings(strings.NewReader(cfg))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !got.Enabled {
+		t.Error("Enabled = false, want true")
+	}
+	if len(got.PCIDevices) != 2 || got.PCIDevices[0] != "0000:01:00.0" {
+		t.Errorf("PCIDevices = %v", got.PCIDevices)
+	}
+	if len(got.USBDevices) != 1 || got.USBDevices[0] != "1-1" {
+		t.Errorf("USBDevices = %v", got.USBDevices)
+	}
+	if got.DefaultSettings["SOMETHING_ELSE"] != "stored" {
+		t.Errorf("DefaultSettings[SOMETHING_ELSE] = %q, want stored", got.DefaultSettings["SOMETHING_ELSE"])
+	}
+}
+
+func TestConfigCollectorGetVMSettingsMissingFileDefaults(t *testing.T) {
+	c := &ConfigCollector{bootConfigDir: t.TempDir()}
+	got, err := c.GetVMSettings()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got == nil || got.Enabled {
+		t.Errorf("expected disabled default, got %+v", got)
+	}
+}
+
+func TestParseDiskSettings(t *testing.T) {
+	const cfg = `spindownDelay="30"
+startArray="yes"
+spinupGroups="no"
+shutdownTimeout="90"
+defaultFsType="xfs"
+`
+	got, err := parseDiskSettings(strings.NewReader(cfg))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.SpindownDelay != 30 {
+		t.Errorf("SpindownDelay = %d, want 30", got.SpindownDelay)
+	}
+	if !got.StartArray {
+		t.Error("StartArray = false, want true")
+	}
+	if got.SpinupGroups {
+		t.Error("SpinupGroups = true, want false")
+	}
+	if got.ShutdownTimeout != 90 {
+		t.Errorf("ShutdownTimeout = %d, want 90", got.ShutdownTimeout)
+	}
+	if got.DefaultFsType != "xfs" {
+		t.Errorf("DefaultFsType = %q, want xfs", got.DefaultFsType)
+	}
+}
+
+func TestConfigCollectorGetDiskSettings(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "disk.cfg"),
+		[]byte("defaultFsType=\"zfs\"\nstartArray=\"yes\"\n"), 0o600); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	c := &ConfigCollector{bootConfigDir: dir}
+
+	got, err := c.GetDiskSettings()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.DefaultFsType != "zfs" || !got.StartArray {
+		t.Errorf("parsed wrong: %+v", got)
+	}
+
+	// Disk config is required: a missing file is an error (unlike docker/vm).
+	missing := &ConfigCollector{bootConfigDir: t.TempDir()}
+	if _, err := missing.GetDiskSettings(); err == nil {
+		t.Error("expected error when disk.cfg is absent")
+	}
+}
