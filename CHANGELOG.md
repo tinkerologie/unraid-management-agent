@@ -97,6 +97,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Every NUT device, not only the first** — `GET /nut` and `nut_status_update` have a new
+  `statuses` list with the detailed status of every device `upsc -l` lists (a second UPS,
+  an ATS, a PDU …), in the same order. `status` stays the first device's, and `GET /ups`
+  stays the first NUT device (or apcupsd) and now says which one in `device_name`. A device
+  whose query fails is logged and left out. The NUT collector's command runner, `upsc`
+  lookup and file checks are injectable for tests.
+  ([#206](https://github.com/tinkerologie/unraid-management-agent/issues/206)).
 - **Stable `device_id` for USB HID hwmon chips, and same-model fans kept apart** —
   `temperatures[]` and `fans[]` entries of `GET /api/v1/system` have a new `device_id`
   for chips on a USB HID device (fan/pump controllers such as Aquacomputer Octo/Quadro,

@@ -110,8 +110,14 @@ type NUTResponse struct {
 	Running   bool        `json:"running"`   // Is NUT service running?
 	Config    *NUTConfig  `json:"config,omitempty"`
 	Devices   []NUTDevice `json:"devices,omitempty"`
-	Status    *NUTStatus  `json:"status,omitempty"`
-	Timestamp time.Time   `json:"timestamp"`
+	// Status of the first device in Devices (the primary UPS), kept for
+	// clients that only know one device. It is also the first entry of
+	// Statuses when that device answered.
+	Status *NUTStatus `json:"status,omitempty"`
+	// Statuses has the detailed status of every device in Devices that
+	// answered, in the same order (e.g. a second UPS or an ATS).
+	Statuses  []*NUTStatus `json:"statuses,omitempty"`
+	Timestamp time.Time    `json:"timestamp"`
 }
 
 // NUTStatusText converts NUT status codes to human-readable text

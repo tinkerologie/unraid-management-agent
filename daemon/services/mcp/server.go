@@ -705,7 +705,7 @@ func (s *Server) registerMonitoringTools() {
 	// NUT (Network UPS Tools) status tool
 	addReadTool[dto.MCPEmptyArgs](s,
 		"get_nut_status",
-		"Get detailed NUT (Network UPS Tools) status including all UPS variables and metrics",
+		"Get detailed NUT (Network UPS Tools) status including all UPS variables and metrics. status is the first NUT device; statuses lists every device (e.g. several UPSes or an ATS)",
 		"NUT not configured or NUT information not available",
 		func() (*dto.NUTResponse, bool) { v := s.cacheProvider.GetNUTCache(); return v, v != nil },
 	)

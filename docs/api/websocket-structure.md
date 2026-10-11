@@ -290,6 +290,7 @@ def identify_event_type(data):
 | Field                    | Type    | Unit    | Range | Nullable | Description                       |
 | ------------------------ | ------- | ------- | ----- | -------- | --------------------------------- |
 | `connected`              | bool    | -       | -     | No       | UPS connected                     |
+| `device_name`            | string  | -       | -     | No       | NUT device (omitted for apcupsd)  |
 | `status`                 | string  | -       | enum  | No       | UPS status                        |
 | `load_percent`           | float64 | percent | 0-100 | Yes      | Load percent                      |
 | `battery_charge_percent` | float64 | percent | 0-100 | Yes      | Battery charge                    |

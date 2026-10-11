@@ -2184,6 +2184,7 @@ Get UPS status and information.
 ```json
 {
   "connected": true,
+  "device_name": "ups",
   "status": "OL",
   "load_percent": null,
   "battery_charge_percent": 100,
@@ -2199,6 +2200,42 @@ Get UPS status and information.
 and `nominal_power_watts` are `null` when the UPS does not report them. The
 example above is a UPS that reports battery data but no load or power. The
 numeric readings in `GET /nut` (`status`) follow the same rule.
+
+With NUT, `device_name` is the NUT device the data comes from: the first one
+`upsc -l` lists. It is absent for apcupsd.
+
+---
+
+### GET /nut
+
+Get Network UPS Tools (NUT) status for every NUT device.
+
+**Response** (abridged):
+
+```json
+{
+  "installed": true,
+  "running": true,
+  "devices": [
+    { "name": "ups", "description": "UPS device: ups", "available": true },
+    { "name": "ats", "description": "UPS device: ats", "available": true }
+  ],
+  "status": { "device_name": "ups", "type": "ups", "status": "OL", "battery_charge_percent": 100, "load_percent": null },
+  "statuses": [
+    { "device_name": "ups", "type": "ups", "status": "OL", "battery_charge_percent": 100, "load_percent": null },
+    { "device_name": "ats", "type": "ats", "status": "OL", "battery_charge_percent": null, "output_frequency": 60 }
+  ],
+  "timestamp": "2025-10-03T13:41:13+10:00"
+}
+```
+
+- `statuses` has the detailed status of every device in `devices` that
+  answered, in the same order. A device whose query fails is left out.
+- `status` is the first device's status, kept for clients that only handle
+  one UPS. It is the same object as the first entry of `statuses` (or absent
+  if the first device did not answer).
+- Numeric readings a device does not report are `null`. An ATS, for example,
+  has no battery.
 
 ---
 

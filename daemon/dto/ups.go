@@ -8,8 +8,11 @@ import "time"
 // apcupsd/NUT) does not report that value, so clients can show "unknown"
 // instead of a reading of 0 that was never taken.
 type UPSStatus struct {
-	Connected bool   `json:"connected" example:"true"`
-	Status    string `json:"status" example:"OL"`
+	Connected bool `json:"connected" example:"true"`
+	// NUT device name (upsc -l) when the data comes from NUT; empty for apcupsd.
+	// GET /nut lists every NUT device; this is the first one.
+	DeviceName string `json:"device_name,omitempty" example:"ups"`
+	Status     string `json:"status" example:"OL"`
 	// Load percentage; null when the UPS does not report it
 	LoadPercent *float64 `json:"load_percent" example:"25.5" extensions:"x-nullable"`
 	// Battery charge percentage; null when the UPS does not report it

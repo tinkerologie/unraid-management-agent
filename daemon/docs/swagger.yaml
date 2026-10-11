@@ -2374,7 +2374,19 @@ definitions:
         description: Is NUT service running?
         type: boolean
       status:
-        $ref: '#/definitions/dto.NUTStatus'
+        allOf:
+        - $ref: '#/definitions/dto.NUTStatus'
+        description: |-
+          Status of the first device in Devices (the primary UPS), kept for
+          clients that only know one device. It is also the first entry of
+          Statuses when that device answered.
+      statuses:
+        description: |-
+          Statuses has the detailed status of every device in Devices that
+          answered, in the same order (e.g. a second UPS or an ATS).
+        items:
+          $ref: '#/definitions/dto.NUTStatus'
+        type: array
       timestamp:
         type: string
     type: object
@@ -4284,6 +4296,12 @@ definitions:
       connected:
         example: true
         type: boolean
+      device_name:
+        description: |-
+          NUT device name (upsc -l) when the data comes from NUT; empty for apcupsd.
+          GET /nut lists every NUT device; this is the first one.
+        example: ups
+        type: string
       load_percent:
         description: Load percentage; null when the UPS does not report it
         example: 25.5

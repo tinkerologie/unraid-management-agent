@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
@@ -21,9 +22,37 @@ import (
 // This collector provides detailed UPS data when the NUT plugin is installed.
 type NUTCollector struct {
 	ctx *domain.Context
-	// execOutput runs upsc for a device. Nil means lib.ExecCommandOutput;
+	// execOutput runs upsc and pgrep. Nil means lib.ExecCommandOutput;
 	// tests inject a fake.
 	execOutput func(command string, args ...string) (string, error)
+	// commandExists checks for upsc. Nil means lib.CommandExists.
+	commandExists func(command string) bool
+	// stat checks the NUT plugin directory and PID file. Nil means os.Stat.
+	stat func(name string) (os.FileInfo, error)
+}
+
+// run executes a command through execOutput, defaulting to lib.ExecCommandOutput.
+func (c *NUTCollector) run(command string, args ...string) (string, error) {
+	if c.execOutput != nil {
+		return c.execOutput(command, args...)
+	}
+	return lib.ExecCommandOutput(command, args...)
+}
+
+// hasCommand reports whether command is installed, through commandExists.
+func (c *NUTCollector) hasCommand(command string) bool {
+	if c.commandExists != nil {
+		return c.commandExists(command)
+	}
+	return lib.CommandExists(command)
+}
+
+// statPath calls stat, defaulting to os.Stat.
+func (c *NUTCollector) statPath(name string) (os.FileInfo, error) {
+	if c.stat != nil {
+		return c.stat(name)
+	}
+	return os.Stat(name)
 }
 
 // NewNUTCollector creates a new NUT status collector with the given context.
@@ -75,7 +104,7 @@ func (c *NUTCollector) Collect() {
 	}
 
 	// Check if NUT plugin is installed
-	if _, err := os.Stat(constants.NutPluginDir); os.IsNotExist(err) {
+	if _, err := c.statPath(constants.NutPluginDir); os.IsNotExist(err) {
 		response.Installed = false
 		domain.Publish(c.ctx.Hub, constants.TopicNUTStatusUpdate, response)
 		logger.Debug("NUT plugin not installed")
@@ -108,18 +137,51 @@ func (c *NUTCollector) Collect() {
 		response.Devices = devices
 	}
 
-	// Get detailed status for the first available device
-	if len(devices) > 0 {
-		status, err := c.collectStatus(devices[0].Name, c.getHostFromConfig(config))
-		if err != nil {
-			logger.Warning("Failed to collect NUT status: %v", err)
-		} else {
-			response.Status = status
-		}
-	}
+	// Get detailed status for every device. Status stays the first device's,
+	// as before, for clients that only know one UPS.
+	response.Status, response.Statuses = c.collectStatuses(devices, c.getHostFromConfig(config))
 
 	domain.Publish(c.ctx.Hub, constants.TopicNUTStatusUpdate, response)
 	logger.Debug("Published %s event", constants.TopicNUTStatusUpdate.Name)
+}
+
+// collectStatuses queries every device. It returns the first device's status
+// (nil if that query failed) and the statuses of all devices that answered, in
+// device order. A device that fails is logged and left out. Devices are queried
+// concurrently, so a slow or unreachable device delays the cycle by at most
+// one query timeout rather than one per device.
+func (c *NUTCollector) collectStatuses(devices []dto.NUTDevice, host string) (*dto.NUTStatus, []*dto.NUTStatus) {
+	results := make([]*dto.NUTStatus, len(devices))
+	var wg sync.WaitGroup
+	for i, device := range devices {
+		wg.Go(func() {
+			// A panic here is outside Start's recover, so contain it per device.
+			defer func() {
+				if r := recover(); r != nil {
+					logger.LogPanicWithStack("NUT collector ("+device.Name+")", r)
+				}
+			}()
+			status, err := c.collectStatus(device.Name, host)
+			if err != nil {
+				logger.Warning("Failed to collect NUT status for %s: %v", device.Name, err)
+				return
+			}
+			results[i] = status
+		})
+	}
+	wg.Wait()
+
+	var first *dto.NUTStatus
+	if len(results) > 0 {
+		first = results[0]
+	}
+	var statuses []*dto.NUTStatus
+	for _, status := range results {
+		if status != nil {
+			statuses = append(statuses, status)
+		}
+	}
+	return first, statuses
 }
 
 // loadNUTConfig reads the NUT plugin configuration file
@@ -192,12 +254,12 @@ func parseNUTConfig(r io.Reader) (*dto.NUTConfig, error) {
 // isNUTRunning checks if the NUT service is running
 func (c *NUTCollector) isNUTRunning() bool {
 	// Check for PID file
-	if _, err := os.Stat(constants.NutPidFile); err == nil {
+	if _, err := c.statPath(constants.NutPidFile); err == nil {
 		return true
 	}
 
 	// Also check if upsd process is running
-	output, err := lib.ExecCommandOutput("pgrep", "-x", "upsd")
+	output, err := c.run("pgrep", "-x", "upsd")
 	if err == nil && strings.TrimSpace(output) != "" {
 		return true
 	}
@@ -207,14 +269,14 @@ func (c *NUTCollector) isNUTRunning() bool {
 
 // listDevices returns a list of available NUT UPS devices
 func (c *NUTCollector) listDevices() ([]dto.NUTDevice, error) {
-	if !lib.CommandExists("upsc") {
+	if !c.hasCommand("upsc") {
 		return nil, fmt.Errorf("upsc command not found")
 	}
 
-	output, err := lib.ExecCommandOutput("upsc", "-l", "localhost")
+	output, err := c.run("upsc", "-l", "localhost")
 	if err != nil {
 		// Try without host
-		output, err = lib.ExecCommandOutput("upsc", "-l")
+		output, err = c.run("upsc", "-l")
 		if err != nil {
 			return nil, err
 		}
@@ -248,11 +310,7 @@ func (c *NUTCollector) getHostFromConfig(config *dto.NUTConfig) string {
 // collectStatus collects detailed status for a specific UPS device
 func (c *NUTCollector) collectStatus(deviceName, host string) (*dto.NUTStatus, error) {
 	target := fmt.Sprintf("%s@%s", deviceName, host)
-	run := c.execOutput
-	if run == nil {
-		run = lib.ExecCommandOutput
-	}
-	output, err := run("upsc", target)
+	output, err := c.run("upsc", target)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query UPS %s: %w", target, err)
 	}
