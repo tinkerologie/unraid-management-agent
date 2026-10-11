@@ -51,11 +51,10 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
+          slug: ${{ github.repository }}
           files: ./coverage.out
           flags: unittests
           name: unraid-management-agent
-          token: ${{ secrets.CODECOV_TOKEN }}
-          use_oidc: ${{ !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork) }}
           fail_ci_if_error: false
           verbose: true
 
@@ -63,6 +62,6 @@ jobs:
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1
         with:
+          slug: ${{ github.repository }}
           files: ./junit.xml
-          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false

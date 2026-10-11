@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Configured Codecov GitHub Actions workflow for tokenless coverage uploads
+
 ### Tests
 
 - **Coverage uplift toward 90% (issue #192)** — added deterministic, host-safe
