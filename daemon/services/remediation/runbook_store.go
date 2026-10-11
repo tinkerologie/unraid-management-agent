@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
 )
 
 const (

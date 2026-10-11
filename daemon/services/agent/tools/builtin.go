@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/lib"
 )
 
 // StateProvider supplies read-only cache snapshots. Satisfied by the API server.

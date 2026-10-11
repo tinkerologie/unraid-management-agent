@@ -3,7 +3,7 @@ package api
 import (
 	"testing"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 )
 
 func hasFinding(report dto.HealthReport, title string) bool {

@@ -4,9 +4,9 @@ package controllers
 import (
 	"fmt"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
+	"github.com/tinkerologie/unraid-management-agent/daemon/lib"
+	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
 )
 
 // SystemController provides control operations for the Unraid system.

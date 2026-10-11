@@ -16,15 +16,15 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 	"golang.org/x/time/rate"
 
-	_ "github.com/ruaan-deysel/unraid-management-agent/daemon/docs" // Swagger docs
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/alerting"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/collectors"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/controllers"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/watchdog"
+	_ "github.com/tinkerologie/unraid-management-agent/daemon/docs" // Swagger docs
+	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/agent"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/alerting"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/collectors"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/controllers"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/watchdog"
 )
 
 // CollectorManagerInterface defines the methods required from CollectorManager

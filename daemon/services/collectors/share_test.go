@@ -3,7 +3,7 @@ package collectors
 import (
 	"testing"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
+	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
 )
 
 func TestNewShareCollector(t *testing.T) {

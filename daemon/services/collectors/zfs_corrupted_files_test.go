@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 )
 
 // zpoolStatusNoErrors is the tail of `zpool status -v` for a healthy pool.

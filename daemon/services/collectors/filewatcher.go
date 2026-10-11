@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
 )
 
 // FileWatcher watches files for changes using fsnotify and triggers callbacks.

@@ -37,10 +37,10 @@ The Unraid Management Agent is installed as a **Community Applications** plugin 
 
 ### Method 2: Manual Installation
 
-1. **Download the .plg file** from GitHub releases:
+1. **Download the .plg file** from the repository:
 
    ```bash
-   wget https://github.com/ruaan-deysel/unraid-management-agent/releases/latest/download/unraid-management-agent.plg
+   wget https://raw.githubusercontent.com/tinkerologie/unraid-management-agent/main/unraid-management-agent.plg
    ```
 
 2. **Install via command line**:
@@ -61,7 +61,7 @@ For developers or testing:
 
 ```bash
 # Clone repository
-git clone https://github.com/ruaan-deysel/unraid-management-agent.git
+git clone https://github.com/tinkerologie/unraid-management-agent.git
 cd unraid-management-agent
 
 # Build for Unraid (Linux/amd64)
@@ -173,7 +173,7 @@ wscat -c ws://localhost:8043/api/v1/ws
 
 ```bash
 # Download latest .plg
-wget https://github.com/ruaan-deysel/unraid-management-agent/releases/latest/download/unraid-management-agent.plg -O /boot/config/plugins/unraid-management-agent.plg
+wget https://raw.githubusercontent.com/tinkerologie/unraid-management-agent/main/unraid-management-agent.plg -O /boot/config/plugins/unraid-management-agent.plg
 
 # Remove old version
 /usr/local/emhttp/plugins/dynamix.plugin.manager/scripts/plugin remove unraid-management-agent
@@ -257,8 +257,8 @@ ls -la /var/log/unraid-management-agent.log
 
 ## Support
 
-- **GitHub Issues**: <https://github.com/ruaan-deysel/unraid-management-agent/issues>
-- **Documentation**: <https://github.com/ruaan-deysel/unraid-management-agent/tree/main/docs>
+- **GitHub Issues**: <https://github.com/tinkerologie/unraid-management-agent/issues>
+- **Documentation**: <https://github.com/tinkerologie/unraid-management-agent/tree/main/docs>
 - **Community**: Unraid Forums
 
 ---

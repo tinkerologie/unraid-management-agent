@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 )
 
 // Detection roots. var (not const) so tests can point them at temp dirs.

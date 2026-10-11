@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 )
 
 // TestFindRootCauseArrayState verifies the array_not_started signal follows

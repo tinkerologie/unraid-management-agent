@@ -10,7 +10,7 @@ import (
 
 	"gopkg.in/natefinch/lumberjack.v2"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 )
 
 // correlationKeyType is the context key type for storing correlation IDs.

@@ -1,8 +1,8 @@
 package constants
 
 import (
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 )
 
 // Typed event bus topics. Each Topic[T] enforces at compile time that publishers

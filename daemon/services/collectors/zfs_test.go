@@ -3,8 +3,8 @@ package collectors
 import (
 	"testing"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 )
 
 func TestNewZFSCollector(t *testing.T) {

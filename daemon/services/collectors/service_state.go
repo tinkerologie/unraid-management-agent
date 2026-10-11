@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
+	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
 )
 
 // readFlatCfg parses an Unraid-style flat key="value" config file (e.g.

@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/tools"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/remediation"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/agent/tools"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/remediation"
 )
 
 // RegisterLearningTools adds suggest-not-mutate learning tools to the registry.

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Plugin>
-    <PluginURL>https://raw.githubusercontent.com/ruaan-deysel/unraid-management-agent/main/unraid-management-agent.plg</PluginURL>
+    <PluginURL>https://raw.githubusercontent.com/tinkerologie/unraid-management-agent/main/unraid-management-agent.plg</PluginURL>
     <PluginAuthor>ruaan-deysel</PluginAuthor>
     <Category>Tools:System</Category>
     <Date>2026-05-16</Date>
@@ -12,8 +12,8 @@
         **No external plugin dependencies** - All data is collected directly from system sources.
     </Requires>
     <MinVer>7.2.0</MinVer>
-    <Project>https://github.com/ruaan-deysel/unraid-management-agent</Project>
+    <Project>https://github.com/tinkerologie/unraid-management-agent</Project>
     <Support>https://forums.unraid.net/topic/196675-plugin-unraid-management-agent</Support>
-    <Icon>https://raw.githubusercontent.com/ruaan-deysel/unraid-management-agent/main/icon.png</Icon>
+    <Icon>https://raw.githubusercontent.com/tinkerologie/unraid-management-agent/main/icon.png</Icon>
     <License>MIT License - Copyright 2026 Ruaan Deysel</License>
 </Plugin>

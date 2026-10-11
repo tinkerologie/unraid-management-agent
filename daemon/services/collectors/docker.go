@@ -15,10 +15,10 @@ import (
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
+	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
 )
 
 // cpuSnapshot holds a point-in-time cgroup CPU usage reading for delta calculation.

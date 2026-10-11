@@ -4,7 +4,7 @@ import (
 	"os"
 	"regexp"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 )
 
 // ProbeKind distinguishes a path probe from a binary probe.

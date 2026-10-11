@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
+	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 )
 
 const storcliNoControllers = `{"Controllers":[{"Command Status":{"CLI Version":"007.3305","Status Code":0,"Status":"Success"},` +

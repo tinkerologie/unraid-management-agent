@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 )
 
 // newTempFan creates pwm + pwm_enable sysfs-style files for one fan and returns

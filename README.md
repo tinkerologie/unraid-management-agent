@@ -1,10 +1,10 @@
-[![GitHub Release](https://img.shields.io/github/v/release/ruaan-deysel/unraid-management-agent?label=latest%20release)](https://github.com/ruaan-deysel/unraid-management-agent/releases/latest)
-[![GitHub Last Commit](https://img.shields.io/github/last-commit/ruaan-deysel/unraid-management-agent)](https://github.com/ruaan-deysel/unraid-management-agent/commits/main)
-[![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/ruaan-deysel/unraid-management-agent)](https://github.com/ruaan-deysel/unraid-management-agent)
-[![GitHub issues](https://img.shields.io/github/issues/ruaan-deysel/unraid-management-agent)](https://github.com/ruaan-deysel/unraid-management-agent/issues)
-[![Codecov](https://codecov.io/gh/ruaan-deysel/unraid-management-agent/branch/main/graph/badge.svg)](https://codecov.io/gh/ruaan-deysel/unraid-management-agent)
-[![License](https://img.shields.io/github/license/ruaan-deysel/unraid-management-agent)](./LICENSE)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ruaan-deysel/unraid-management-agent)
+[![GitHub Release](https://img.shields.io/github/v/release/tinkerologie/unraid-management-agent?label=latest%20release)](https://github.com/tinkerologie/unraid-management-agent/releases/latest)
+[![GitHub Last Commit](https://img.shields.io/github/last-commit/tinkerologie/unraid-management-agent)](https://github.com/tinkerologie/unraid-management-agent/commits/main)
+[![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/tinkerologie/unraid-management-agent)](https://github.com/tinkerologie/unraid-management-agent)
+[![GitHub issues](https://img.shields.io/github/issues/tinkerologie/unraid-management-agent)](https://github.com/tinkerologie/unraid-management-agent/issues)
+[![Codecov](https://codecov.io/gh/tinkerologie/unraid-management-agent/branch/main/graph/badge.svg)](https://codecov.io/gh/tinkerologie/unraid-management-agent)
+[![License](https://img.shields.io/github/license/tinkerologie/unraid-management-agent)](./LICENSE)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/tinkerologie/unraid-management-agent)
 
 # Unraid Management Agent
 
@@ -209,7 +209,7 @@ For now, you can install manually using the plugin URL:
 3. Enter the plugin URL:
 
    ```
-   https://raw.githubusercontent.com/ruaan-deysel/unraid-management-agent/main/unraid-management-agent.plg
+   https://raw.githubusercontent.com/tinkerologie/unraid-management-agent/main/unraid-management-agent.plg
    ```
 
 4. Click **Install**
@@ -222,7 +222,7 @@ For now, you can install manually using the plugin URL:
 
 ```bash
 # Clone the repository
-git clone https://github.com/ruaan-deysel/unraid-management-agent.git
+git clone https://github.com/tinkerologie/unraid-management-agent.git
 cd unraid-management-agent
 
 # Install dependencies

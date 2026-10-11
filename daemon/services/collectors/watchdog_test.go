@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
 )
 
 // syncBuffer is a concurrency-safe log sink. The watchdog logs its stall warning

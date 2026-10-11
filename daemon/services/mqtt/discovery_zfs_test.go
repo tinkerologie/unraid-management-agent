@@ -8,7 +8,7 @@ import (
 
 	pahomqtt "github.com/eclipse/paho.mqtt.golang"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 )
 
 // doneToken is a completed, successful publish token.

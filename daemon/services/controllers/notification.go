@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/collectors"
+	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
+	"github.com/tinkerologie/unraid-management-agent/daemon/lib"
+	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/collectors"
 )
 
 // Package-level variables for notification directories (overridable in tests)

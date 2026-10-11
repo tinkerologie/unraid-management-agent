@@ -1,8 +1,8 @@
 package domain
 
 import (
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/platform"
+	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
+	"github.com/tinkerologie/unraid-management-agent/daemon/platform"
 )
 
 // Intervals holds collection interval settings in seconds.

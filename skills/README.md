@@ -31,7 +31,7 @@ request → tool workflows.
 Requires [Node.js 18+](https://nodejs.org/).
 
 ```bash
-npx skills add ruaan-deysel/unraid-management-agent
+npx skills add tinkerologie/unraid-management-agent
 ```
 
 To update later: `npx skills update`
@@ -41,7 +41,7 @@ To update later: `npx skills update`
 Run each command separately inside Claude Code:
 
 ```text
-/plugin marketplace add ruaan-deysel/unraid-management-agent
+/plugin marketplace add tinkerologie/unraid-management-agent
 ```
 
 ```text

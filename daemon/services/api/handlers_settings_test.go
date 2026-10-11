@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 )
 
 // Tests for settings/config handler endpoints that are at 0% coverage.

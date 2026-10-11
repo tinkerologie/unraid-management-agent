@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/lib"
+	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
 )
 
 type fakeDriveTemps struct{ m map[string]lib.DiskTemp }

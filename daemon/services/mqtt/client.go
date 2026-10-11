@@ -14,9 +14,9 @@ import (
 
 	pahomqtt "github.com/eclipse/paho.mqtt.golang"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
 )
 
 // Client represents an MQTT client that publishes Unraid metrics and events.

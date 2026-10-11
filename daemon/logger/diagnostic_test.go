@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 )
 
 // readEntries reads and decodes every JSONL entry from the given diagnostic log file.

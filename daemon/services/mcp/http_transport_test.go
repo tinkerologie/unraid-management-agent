@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/api"
+	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/api"
 )
 
 func newMountedMCPTestServer(t *testing.T, apiToken, mcpSecret string) (*httptest.Server, *api.Server) {

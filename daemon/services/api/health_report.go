@@ -6,7 +6,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 )
 
 // diskTempWarning is the temperature threshold (°C) above which a disk finding is emitted as a warning.

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 )
 
 var hostnameCleanRe = regexp.MustCompile(`[^a-zA-Z0-9._-]+`)

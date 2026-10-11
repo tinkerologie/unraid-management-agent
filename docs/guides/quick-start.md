@@ -11,7 +11,7 @@ Get up and running with the Unraid Management Agent in under 5 minutes.
 3. Paste plugin URL:
 
    ```
-   https://raw.githubusercontent.com/ruaan-deysel/unraid-management-agent/main/unraid-management-agent.plg
+   https://raw.githubusercontent.com/tinkerologie/unraid-management-agent/main/unraid-management-agent.plg
    ```
 
 4. Click **Install**
@@ -226,7 +226,7 @@ netstat -tulpn | grep 8043
 
 ## Need Help?
 
-- **Issues**: [GitHub Issues](https://github.com/ruaan-deysel/unraid-management-agent/issues)
+- **Issues**: [GitHub Issues](https://github.com/tinkerologie/unraid-management-agent/issues)
 - **Documentation**: [Full Documentation](../README.md)
 - **Community**: Unraid Community Forums
 

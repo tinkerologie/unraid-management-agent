@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
 )
 
 // EmhttpdSocket is the path to the emhttpd Unix domain socket.

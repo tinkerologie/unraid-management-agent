@@ -1,6 +1,6 @@
 package mcp
 
-import "github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
+import "github.com/tinkerologie/unraid-management-agent/daemon/domain"
 
 // ToolPolicyStore aliases domain.ToolPolicyStore.
 type ToolPolicyStore = domain.ToolPolicyStore

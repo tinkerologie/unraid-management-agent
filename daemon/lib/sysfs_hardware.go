@@ -4,7 +4,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 )
 
 // SysfsDMIPath is the path to DMI information in sysfs.

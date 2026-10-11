@@ -31,17 +31,17 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/alerting"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/api"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/controllers"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/remediation"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/watchdog"
+	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
+	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/lib"
+	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/agent"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/alerting"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/api"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/controllers"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/remediation"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/watchdog"
 )
 
 // CacheProvider defines the interface for accessing cached data from the API server.

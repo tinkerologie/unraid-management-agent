@@ -3,8 +3,8 @@ package controllers
 import (
 	"fmt"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/lib"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/tinkerologie/unraid-management-agent/daemon/lib"
+	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
 )
 
 // CPUController manages CPU scaling governor settings.

@@ -9,10 +9,10 @@ package docs
 //	@description				This is a third-party community plugin providing an alternative/complement to the official Unraid GraphQL API.
 //
 //	@contact.name				GitHub Issues
-//	@contact.url				https://github.com/ruaan-deysel/unraid-management-agent/issues
+//	@contact.url				https://github.com/tinkerologie/unraid-management-agent/issues
 //
 //	@license.name				MIT
-//	@license.url				https://github.com/ruaan-deysel/unraid-management-agent/blob/main/LICENSE
+//	@license.url				https://github.com/tinkerologie/unraid-management-agent/blob/main/LICENSE
 //
 //	@host						localhost:8043
 //	@BasePath					/api/v1

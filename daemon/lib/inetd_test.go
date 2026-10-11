@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
+	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
 )
 
 // inetdConfDisabled is the FTP part of /etc/inetd.conf on Unraid 7.4 with

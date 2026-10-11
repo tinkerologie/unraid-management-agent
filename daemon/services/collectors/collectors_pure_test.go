@@ -6,7 +6,7 @@ import (
 	"github.com/digitalocean/go-libvirt"
 	mobycontainer "github.com/moby/moby/api/types/container"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 )
 
 // ===== DiskCollector: enrichWithRole =====

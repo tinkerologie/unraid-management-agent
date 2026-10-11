@@ -29,7 +29,7 @@ All AI coding assistants (Claude Code, Gemini, GitHub Copilot, Cursor, Roo, Devi
 | **Target**   | Linux/amd64 (Unraid OS)                                                |
 | **Type**     | Third-party community plugin (not official Unraid)                     |
 | **Purpose**  | REST API + WebSocket + MCP interface for system monitoring and control |
-| **Repo**     | `github.com/ruaan-deysel/unraid-management-agent`                      |
+| **Repo**     | `github.com/tinkerologie/unraid-management-agent`                      |
 
 ## Project Structure
 

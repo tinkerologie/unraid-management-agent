@@ -1,4 +1,4 @@
-module github.com/ruaan-deysel/unraid-management-agent
+module github.com/tinkerologie/unraid-management-agent
 
 go 1.27.1
 

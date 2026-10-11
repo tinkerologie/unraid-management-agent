@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 )
 
 // sysClassTPM is the sysfs TPM class directory. var (not const) so tests can override.

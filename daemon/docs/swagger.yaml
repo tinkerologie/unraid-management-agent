@@ -4965,13 +4965,13 @@ host: localhost:8043
 info:
   contact:
     name: GitHub Issues
-    url: https://github.com/ruaan-deysel/unraid-management-agent/issues
+    url: https://github.com/tinkerologie/unraid-management-agent/issues
   description: |-
     REST API and WebSocket interface for comprehensive Unraid system monitoring and control.
     This is a third-party community plugin providing an alternative/complement to the official Unraid GraphQL API.
   license:
     name: MIT
-    url: https://github.com/ruaan-deysel/unraid-management-agent/blob/main/LICENSE
+    url: https://github.com/tinkerologie/unraid-management-agent/blob/main/LICENSE
   title: Unraid Management Agent API
   version: 2025.12.1
 paths:

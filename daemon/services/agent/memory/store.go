@@ -12,8 +12,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
 )
 
 // DefaultConfigDir matches the other agent/watchdog stores.

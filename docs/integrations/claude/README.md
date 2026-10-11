@@ -20,12 +20,12 @@ Quick reference:
 
 ```bash
 # Claude Code / Cursor / Copilot / Gemini CLI
-npx skills add ruaan-deysel/unraid-management-agent
+npx skills add tinkerologie/unraid-management-agent
 ```
 
 ```text
 # Claude Code plugin
-/plugin marketplace add ruaan-deysel/unraid-management-agent
+/plugin marketplace add tinkerologie/unraid-management-agent
 /plugin install unraid-management-agent-skills@unraid-management-agent-skills
 ```
 
@@ -63,7 +63,7 @@ that IP as a Subject Alternative Name.
 > A LAN address such as `http://<unraid-ip>:8043/mcp` (or even `https://` with a
 > self-signed cert) is rejected — you'll see _"URL must start with https"_ or
 > _"our servers cannot reach your local machine."_ This is the cause of
-> [#131](https://github.com/ruaan-deysel/unraid-management-agent/issues/131).
+> [#131](https://github.com/tinkerologie/unraid-management-agent/issues/131).
 
 To use a custom connector you must expose the agent over **public HTTPS with a
 trusted cert**, via either:

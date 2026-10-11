@@ -3,7 +3,7 @@ package collectors
 import (
 	"fmt"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/platform"
+	"github.com/tinkerologie/unraid-management-agent/daemon/platform"
 )
 
 // validateRequiredKeys returns (ok, reason) for a parsed INI map. ok=false with a

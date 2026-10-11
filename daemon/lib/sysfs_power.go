@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
 )
 
 // SysPowercapPath is the default path to the powercap sysfs interface.

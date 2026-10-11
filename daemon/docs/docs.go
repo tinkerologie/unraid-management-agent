@@ -11,11 +11,11 @@ const docTemplate = `{
         "title": "{{.Title}}",
         "contact": {
             "name": "GitHub Issues",
-            "url": "https://github.com/ruaan-deysel/unraid-management-agent/issues"
+            "url": "https://github.com/tinkerologie/unraid-management-agent/issues"
         },
         "license": {
             "name": "MIT",
-            "url": "https://github.com/ruaan-deysel/unraid-management-agent/blob/main/LICENSE"
+            "url": "https://github.com/tinkerologie/unraid-management-agent/blob/main/LICENSE"
         },
         "version": "{{.Version}}"
     },

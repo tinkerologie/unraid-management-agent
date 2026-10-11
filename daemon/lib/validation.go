@@ -9,8 +9,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/domain"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 )
 
 // maxTLSPathLen caps TLS file paths defensively. Filesystem paths are well under

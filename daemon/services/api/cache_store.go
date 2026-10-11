@@ -4,11 +4,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/platform"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/alerting"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/collectors"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
+	"github.com/tinkerologie/unraid-management-agent/daemon/platform"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/alerting"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/collectors"
 )
 
 // networkServicesCacheTTL controls how often network services status is refreshed.

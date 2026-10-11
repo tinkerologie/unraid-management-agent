@@ -1,6 +1,6 @@
 package alerting
 
-import "github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+import "github.com/tinkerologie/unraid-management-agent/daemon/dto"
 
 // BuiltinRules returns rules that ship ENABLED by default. They are seeded once
 // (idempotent by ID) on engine start, so a user may later disable or delete them

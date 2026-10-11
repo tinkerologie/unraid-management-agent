@@ -97,8 +97,8 @@ All documentation follows these standards:
 
 ## 💬 Need Help?
 
-- **Issues**: [GitHub Issues](https://github.com/ruaan-deysel/unraid-management-agent/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/ruaan-deysel/unraid-management-agent/discussions)
+- **Issues**: [GitHub Issues](https://github.com/tinkerologie/unraid-management-agent/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/tinkerologie/unraid-management-agent/discussions)
 - **Community**: Unraid Community Forums
 
 ---

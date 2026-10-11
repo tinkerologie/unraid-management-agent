@@ -7,10 +7,10 @@ import (
 	"slices"
 	"time"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/llm"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/tools"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/agent/llm"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/agent/tools"
 )
 
 const systemPrompt = `You are the Unraid Management Agent's autonomous operator. ` +

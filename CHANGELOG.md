@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `readLastNLines` log-tail helper (missing/empty files, exact last-N ordering,
   no trailing newline, redaction) and ZIP archive error paths (failing writer,
   unsupported JSON values, nonexistent output directory, partial-file removal and
-  empty-log omission). ([#192](https://github.com/ruaan-deysel/unraid-management-agent/issues/192)).
+  empty-log omission). ([#192](https://github.com/tinkerologie/unraid-management-agent/issues/192)).
 - **Coverage uplift part 2 (issue #192)** — added further host-safe unit tests
   covering pure functions. `daemon/domain` rose to ~88% (from ~58%) via tests for
   the tool-policy store (`IsValidTool`, `GetAll`, `GetCatalog`, `CategorizeMCPTool`),
@@ -36,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   interpolation (`interpolateSpeed` below/above/midpoint and the duplicate
   lowest-boundary clamp),
   and the Docker/IPMI string helpers (`shortDigest`, `sanitizeFanName`).
-  ([#192](https://github.com/ruaan-deysel/unraid-management-agent/issues/192)).
+  ([#192](https://github.com/tinkerologie/unraid-management-agent/issues/192)).
 - **Coverage uplift part 3 (issue #192)** — extracted the `/proc/net/dev` and
   `disks.ini` parsers in `daemon/services/collectors` into pure,
   `io.Reader`-based helpers (`parseNetDevStats`, `parseDisksINIFrom`) with the
@@ -44,7 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   table-driven fixture tests covering multi-record parsing, header skipping,
   malformed/short rows, non-numeric counters, content before the first section,
   and final-section capture. No collector behavior changed.
-  ([#192](https://github.com/ruaan-deysel/unraid-management-agent/issues/192)).
+  ([#192](https://github.com/tinkerologie/unraid-management-agent/issues/192)).
 - **Coverage uplift part 4 (issue #192)** — extracted the `nvidia-smi` CSV
   parsing in `daemon/services/collectors/gpu.go` into a pure
   `parseNvidiaGPUCSV` helper (collector keeps querying the driver version),
@@ -52,7 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `N/A` fields, zero total memory, and MiB-to-byte conversion. Also added
   `daemon/lib` tests for `ExecCommandOutputWithContext` (success, pre-cancelled
   context, nonexistent binary). No collector behavior changed.
-  ([#192](https://github.com/ruaan-deysel/unraid-management-agent/issues/192)).
+  ([#192](https://github.com/tinkerologie/unraid-management-agent/issues/192)).
 - **Coverage uplift part 5 (issue #192)** — extracted the `network.cfg` and
   `ident.cfg` parsing in `daemon/services/collectors/config.go` into pure
   `io.Reader`-based helpers (`parseNetworkConfig`, `parseSystemSettings`) and
@@ -60,7 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `GetSystemSettings` wrappers are unit-testable. Added tests for interface
   section matching, bond/bridge/VLAN parsing, missing-interface and
   missing-file errors, and system settings fields. No collector behavior
-  changed. ([#192](https://github.com/ruaan-deysel/unraid-management-agent/issues/192)).
+  changed. ([#192](https://github.com/tinkerologie/unraid-management-agent/issues/192)).
 - **Coverage uplift part 6 (issue #192)** — extracted the remaining
   `daemon/services/collectors/config.go` settings parsers (`docker.cfg`,
   `domain.cfg`, `disk.cfg`) into pure `io.Reader` helpers
@@ -69,7 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   parsing, device/network list splitting, the disabled-default fallback when
   `docker.cfg`/`domain.cfg` are absent, and the required-file error for
   `disk.cfg`. No collector behavior changed.
-  ([#192](https://github.com/ruaan-deysel/unraid-management-agent/issues/192)).
+  ([#192](https://github.com/tinkerologie/unraid-management-agent/issues/192)).
 - **Coverage uplift phases 1–5 completion (issue #192)** — completed all five phases
   from the test coverage plan:
   - *Phase 1 (Reporting Alignment)*: aligned `Makefile` `test-coverage` target
@@ -93,7 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     injected bundle/archive seams with comprehensive unit tests for `handleDiagnosticsBundle`
     in `diagnostics_test.go`, and documented redacted ZIP vs unredacted shell diagnostics in
     `docs/troubleshooting/diagnostics.md` and `docs/api/diagnostics.md`.
-  ([#192](https://github.com/ruaan-deysel/unraid-management-agent/issues/192)).
+  ([#192](https://github.com/tinkerologie/unraid-management-agent/issues/192)).
 
 ### Added
 
@@ -143,7 +143,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   firmware mismatches and path redundancy. Read-only and sequential: storcli always runs
   with `J nolog`, never twice at once, with timeouts; works with sg_ses alone (plain HBAs)
   and is a no-op (`state: "unsupported"`) without either tool.
-  ([#184](https://github.com/ruaan-deysel/unraid-management-agent/issues/184)).
+  ([#184](https://github.com/tinkerologie/unraid-management-agent/issues/184)).
 - **Storage topology throughput and link utilization** — `GET /api/v1/storage/topology`
   controllers and enclosures now carry a `throughput` object (`read_bytes_per_sec`,
   `write_bytes_per_sec`, `total_bytes_per_sec`, `capacity_bytes_per_sec`,
@@ -168,14 +168,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `NUTLoadPercent` are nil when unknown, so rules never fire on a fabricated 0 (guard them,
   e.g. `UPSLoadPercent != nil && UPSLoadPercent > 80`). A rule that fails to evaluate keeps
   its state and is logged once until it evaluates again, instead of on every cycle.
-  ([#204](https://github.com/ruaan-deysel/unraid-management-agent/issues/204)).
+  ([#204](https://github.com/tinkerologie/unraid-management-agent/issues/204)).
 - **FTP status and actions on Unraid 7** — Unraid starts vsftpd from inetd, but `/services`
   checked a non-existent `/etc/rc.d/rc.proftpd` (always stopped, actions failed with an
   opaque 500) and `/settings/network-services` read `ftp.enabled` from leftover Tips and
   Tweaks keys. FTP is now enabled when `/etc/inetd.conf` has an active `ftp` line and
   running when TCP port 21 is listening, as the webGUI reports it. FTP start/stop/restart
   return a clear "not supported, use Settings > FTP Server" error (HTTP 400).
-  ([#199](https://github.com/ruaan-deysel/unraid-management-agent/issues/199)).
+  ([#199](https://github.com/tinkerologie/unraid-management-agent/issues/199)).
 - **CI coverage test on Linux** — allowed HTTP 200 in `TestLogFileEndpoint` when `/var/log/syslog` exists on Linux runners, unblocking coverage profile generation.
 - **Codecov PR comments** — configured `.codecov.yml` with `require_changes: false` so coverage reports are posted on all pull requests.
 
@@ -186,7 +186,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   after another (about 2.7 s per request before), each with a 15 s timeout, and keep their
   order. New `lib.ExecCommandOutputWithTimeout` stops a status script's child processes from
   holding the call past its deadline.
-  ([#201](https://github.com/ruaan-deysel/unraid-management-agent/issues/201)).
+  ([#201](https://github.com/tinkerologie/unraid-management-agent/issues/201)).
 - **GitHub Actions Ubuntu runner policy** — set release workflow jobs to
   `ubuntu-latest` so CI always tracks the latest supported Ubuntu GitHub-hosted
   image.
@@ -203,25 +203,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when tunnels are up, so `GET /api/v1/services`, the MCP `get_service_status`/`list_services`
   tools and the MQTT WireGuard service switch always showed it stopped. The status check now
   reads the script's `Active tunnels:` line instead of its exit code.
-  ([#188](https://github.com/ruaan-deysel/unraid-management-agent/issues/188)).
+  ([#188](https://github.com/tinkerologie/unraid-management-agent/issues/188)).
 - **Sensors stderr contamination in fan/temperature parsing** — system collector now reads only
   `sensors -u` stdout via `ExecCommandStdout`, preventing lm-sensors stderr warnings from
-  corrupting parsed values and restoring missing/garbled fan entries. ([#173](https://github.com/ruaan-deysel/unraid-management-agent/pull/173)).
+  corrupting parsed values and restoring missing/garbled fan entries. ([#173](https://github.com/tinkerologie/unraid-management-agent/pull/173)).
 - **VM disk I/O counters from single-quoted libvirt XML** — disk target extraction now accepts
   both single and double quotes and only scans `<disk>` elements, restoring
-  `disk_read_bytes`/`disk_write_bytes` collection for regular vdisk-backed VMs. ([#174](https://github.com/ruaan-deysel/unraid-management-agent/pull/174)).
+  `disk_read_bytes`/`disk_write_bytes` collection for regular vdisk-backed VMs. ([#174](https://github.com/tinkerologie/unraid-management-agent/pull/174)).
 - **Plugin UI API token controls** — Generate/Clear now dispatch change events so Apply enables
   correctly, and Show/Copy are disabled with guidance when a saved token is intentionally not
-  rendered back into the form. ([#176](https://github.com/ruaan-deysel/unraid-management-agent/pull/176)).
+  rendered back into the form. ([#176](https://github.com/tinkerologie/unraid-management-agent/pull/176)).
 - **Temperature metric filtering from lm-sensors** — `parseSensorsOutput` now reports only
   `temp*_input` channels, excluding voltage/current/power/fan `_input` metrics that were
-  previously misreported as Celsius temperatures. ([#177](https://github.com/ruaan-deysel/unraid-management-agent/pull/177)).
-- **False "Array not started" findings** ([#180](https://github.com/ruaan-deysel/unraid-management-agent/issues/180)) —
+  previously misreported as Celsius temperatures. ([#177](https://github.com/tinkerologie/unraid-management-agent/pull/177)).
+- **False "Array not started" findings** ([#180](https://github.com/tinkerologie/unraid-management-agent/issues/180)) —
   the health report and the MCP `find_root_cause` tool compared the array state
   with "Started", but Unraid reports `mdState` as "STARTED", so a running array
   was always flagged critical. Added a case-insensitive `ArrayStatus.IsStarted()`,
   used by the health report, `find_root_cause` and the Prometheus metrics.
-- **Disk spin up/down REST endpoints** ([#178](https://github.com/ruaan-deysel/unraid-management-agent/issues/178)) —
+- **Disk spin up/down REST endpoints** ([#178](https://github.com/tinkerologie/unraid-management-agent/issues/178)) —
   added `POST /api/v1/disks/{id}/spinup` and `POST /api/v1/disks/{id}/spindown`,
   which the Home Assistant integration's disk spin switches already call (they got
   404). `{id}` may be the disk id, device or name; it is resolved against the disk
@@ -235,7 +235,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   check time, so `GET /plugins/check-updates` no longer stays empty with a zero
   timestamp; and `POST /plugins/{name}/update` accepts the name `GET /plugins`
   reports when it differs from the `.plg` file name (e.g. `disklocation` →
-  `disklocation-master.plg`). ([#182](https://github.com/ruaan-deysel/unraid-management-agent/issues/182)).
+  `disklocation-master.plg`). ([#182](https://github.com/tinkerologie/unraid-management-agent/issues/182)).
 - **ZFS corrupted files never reported** — `parsePoolStatus` ended the `zpool status -v`
   errors section at the blank line that OpenZFS prints after "Permanent errors have been
   detected in the following files:", so `corrupted_files` was always empty and the alerting
@@ -243,24 +243,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   8-space-indented path after the header. `corrupted_files` is also always present (no longer
   `omitempty`): `[]` for a pool without permanent errors, so clients can tell "none" from "not
   reported", and `null` only if `zpool status` could not be read. The MQTT sensor template counts
-  `null` or a missing field as 0. ([#190](https://github.com/ruaan-deysel/unraid-management-agent/issues/190)).
+  `null` or a missing field as 0. ([#190](https://github.com/tinkerologie/unraid-management-agent/issues/190)).
 
 ## [2026.09.01] - 2026-09-28
 
 ### Added
 
-- **Zero-config MCP onboarding** — added path-based Connect URL authentication (`/mcp/<connect-secret>` via `--mcp-connect-secret` / `MCP_CONNECT_SECRET` / `mcp_connect_secret` in `config.yml`, validated as 32–256 chars of `[A-Za-z0-9_-]`) using constant-time SHA-256 digest comparison and automatic `/mcp/<redacted>` log masking; auto-generated a `private_<token>` secret on plugin startup (`scripts/start`) when not explicitly disabled; extended `_unraid-agent._tcp` mDNS TXT announcements with `mcp_path=/mcp`, `mcp_transport=streamable-http`, and `mcp_auth=bearer|none`; added `mcp_connection_events_total` Prometheus metrics and rate-limited handshake diagnostics; and displayed `Connect URL(s):` (`http(s)://<host>:<port>/mcp/private_<token> (direct access)` and `http(s)://<host>:<port>/mcp`) directly in the Unraid WebGUI settings page. ([#165](https://github.com/ruaan-deysel/unraid-management-agent/issues/165)).
+- **Zero-config MCP onboarding** — added path-based Connect URL authentication (`/mcp/<connect-secret>` via `--mcp-connect-secret` / `MCP_CONNECT_SECRET` / `mcp_connect_secret` in `config.yml`, validated as 32–256 chars of `[A-Za-z0-9_-]`) using constant-time SHA-256 digest comparison and automatic `/mcp/<redacted>` log masking; auto-generated a `private_<token>` secret on plugin startup (`scripts/start`) when not explicitly disabled; extended `_unraid-agent._tcp` mDNS TXT announcements with `mcp_path=/mcp`, `mcp_transport=streamable-http`, and `mcp_auth=bearer|none`; added `mcp_connection_events_total` Prometheus metrics and rate-limited handshake diagnostics; and displayed `Connect URL(s):` (`http(s)://<host>:<port>/mcp/private_<token> (direct access)` and `http(s)://<host>:<port>/mcp`) directly in the Unraid WebGUI settings page. ([#165](https://github.com/tinkerologie/unraid-management-agent/issues/165)).
 
 ### Fixed
 
-- **Streamable HTTP `GET /mcp` hanging indefinitely** — implemented `Flush()` (`http.Flusher`) and `Unwrap()` on `statusRecorder` in `loggingMiddleware` so `http.NewResponseController(w).Flush()` inside the MCP Go SDK reaches the underlying HTTP response writer, returned an immediate framed `405 Method Not Allowed` (`Allow: POST, DELETE`, `Content-Length`) for sessionless `GET /mcp` probes instead of stalling until server timeouts, and cleared per-request read/write deadlines via `http.ResponseController` on session-bound `GET /mcp` SSE streams ([#166](https://github.com/ruaan-deysel/unraid-management-agent/issues/166)).
+- **Streamable HTTP `GET /mcp` hanging indefinitely** — implemented `Flush()` (`http.Flusher`) and `Unwrap()` on `statusRecorder` in `loggingMiddleware` so `http.NewResponseController(w).Flush()` inside the MCP Go SDK reaches the underlying HTTP response writer, returned an immediate framed `405 Method Not Allowed` (`Allow: POST, DELETE`, `Content-Length`) for sessionless `GET /mcp` probes instead of stalling until server timeouts, and cleared per-request read/write deadlines via `http.ResponseController` on session-bound `GET /mcp` SSE streams ([#166](https://github.com/tinkerologie/unraid-management-agent/issues/166)).
 
 ## [2026.09.00] - 2026-09-23
 
 ### Added
 
-- **Per-tool MCP access policy** — added granular per-tool access policies (`default`, `hidden`, `read_only`, `allow`, `ask`) to control tool visibility and execution for AI agents, complete with `GET`/`PUT` REST API endpoints at `/api/v1/mcp/tool-policy`, WebUI settings panel with search, category filtering, and bulk policy controls, and persistent storage in `/boot/config/plugins/unraid-management-agent/tool_policy.json` ([#156](https://github.com/ruaan-deysel/unraid-management-agent/issues/156)).
-- **WebUI API Token management** — added an Authentication section to the Unraid WebUI settings page with cryptographic token generation, clipboard copy, password show/hide toggle, security advisories for unauthenticated configurations, single-quoted persistence in `scripts/apply`, and authenticated server-side proxying in `include/diagnostics.php` ([#159](https://github.com/ruaan-deysel/unraid-management-agent/issues/159)).
+- **Per-tool MCP access policy** — added granular per-tool access policies (`default`, `hidden`, `read_only`, `allow`, `ask`) to control tool visibility and execution for AI agents, complete with `GET`/`PUT` REST API endpoints at `/api/v1/mcp/tool-policy`, WebUI settings panel with search, category filtering, and bulk policy controls, and persistent storage in `/boot/config/plugins/unraid-management-agent/tool_policy.json` ([#156](https://github.com/tinkerologie/unraid-management-agent/issues/156)).
+- **WebUI API Token management** — added an Authentication section to the Unraid WebUI settings page with cryptographic token generation, clipboard copy, password show/hide toggle, security advisories for unauthenticated configurations, single-quoted persistence in `scripts/apply`, and authenticated server-side proxying in `include/diagnostics.php` ([#159](https://github.com/tinkerologie/unraid-management-agent/issues/159)).
 
 ### Changed
 
@@ -268,19 +268,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Start script character sanitization escaping** — corrected trailing backslash escaping in `meta/plugin/scripts/start` (``tr -d "'\"`\$\\";"``), eliminating the `tr: warning: an unescaped backslash at end of string is not portable` warning on Unraid Linux systems ([#155](https://github.com/ruaan-deysel/unraid-management-agent/issues/155)).
-- **Unraid OS update detection** — updated `OSUpdateCollector` to inspect `/tmp/unraidcheck/result.json` and dynamix unraidcheck fallback, wired `OSUpdateCache` directly into the `/api/v1/updates` REST handler, and used `isVersionNewer` semantic comparison in `SettingsCollector.GetUpdateStatus` so `os_update_available` and version details report accurately without false positives ([#162](https://github.com/ruaan-deysel/unraid-management-agent/issues/162)).
+- **Start script character sanitization escaping** — corrected trailing backslash escaping in `meta/plugin/scripts/start` (``tr -d "'\"`\$\\";"``), eliminating the `tr: warning: an unescaped backslash at end of string is not portable` warning on Unraid Linux systems ([#155](https://github.com/tinkerologie/unraid-management-agent/issues/155)).
+- **Unraid OS update detection** — updated `OSUpdateCollector` to inspect `/tmp/unraidcheck/result.json` and dynamix unraidcheck fallback, wired `OSUpdateCache` directly into the `/api/v1/updates` REST handler, and used `isVersionNewer` semantic comparison in `SettingsCollector.GetUpdateStatus` so `os_update_available` and version details report accurately without false positives ([#162](https://github.com/tinkerologie/unraid-management-agent/issues/162)).
 - **Plugin settings apply script shell syntax** — fixed missing `esac` in `meta/plugin/scripts/apply` API token unquoting block.
-- **Confirmation gates on destructive MCP tools** — enforced required `confirm=true` safety gates on `run_runbook`, `delete_vm_snapshot`, `remote_share_action`, `restore_fan_defaults`, and fan speed/mode/profile modification tools, bringing implementation into exact alignment with tool documentation ([#158](https://github.com/ruaan-deysel/unraid-management-agent/issues/158)).
-- **Remote share mount stall & Home Assistant state sync** — cached `statfs` capacity calls with background probing so slow or unresponsive remote CIFS/NFS shares never stall mount status reporting, triggered immediate MQTT state publication following mount/unmount operations, and bounded MQTT client publish waits with a 5-second timeout ([#148](https://github.com/ruaan-deysel/unraid-management-agent/issues/148)).
+- **Confirmation gates on destructive MCP tools** — enforced required `confirm=true` safety gates on `run_runbook`, `delete_vm_snapshot`, `remote_share_action`, `restore_fan_defaults`, and fan speed/mode/profile modification tools, bringing implementation into exact alignment with tool documentation ([#158](https://github.com/tinkerologie/unraid-management-agent/issues/158)).
+- **Remote share mount stall & Home Assistant state sync** — cached `statfs` capacity calls with background probing so slow or unresponsive remote CIFS/NFS shares never stall mount status reporting, triggered immediate MQTT state publication following mount/unmount operations, and bounded MQTT client publish waits with a 5-second timeout ([#148](https://github.com/tinkerologie/unraid-management-agent/issues/148)).
 
 ## [2026.08.03] - 2026-08-26
 
 ### Fixed
 
-- **Plugin update CLI argument format** — normalised plugin names in `PluginController.UpdatePlugin` to pass bare `.plg` filenames instead of absolute filesystem paths to the Unraid `plugin update` CLI command, which rejects arguments containing path separators, added input validation to the MCP `update_plugin` tool, and introduced an injectable command execution seam on `PluginController` with comprehensive regression test coverage ([#153](https://github.com/ruaan-deysel/unraid-management-agent/issues/153)).
-- **Developer tooling and pre-commit checks** — added gosec G115 annotation for `syscall.Statfs_t` block size conversion in `unassigned.go` so `golangci-lint run` passes cleanly on Linux targets, regenerated `.secrets.baseline` with active plugins to restore `detect-secrets` scanning, and pinned `swag` CLI to `v1.16.6` in `Makefile` and CI release workflow to preserve Swagger 2.0 format reproducibility ([#150](https://github.com/ruaan-deysel/unraid-management-agent/issues/150)).
-- **Test safety against accidental machine reboot or shutdown** — made `SystemController` command execution injectable with safe defaults and wired `SystemControllerInterface` into API and MCP servers with test mocks, preventing test runs on systemd Linux hosts from inadvertently issuing destructive `/sbin/shutdown` commands during `make test` ([#149](https://github.com/ruaan-deysel/unraid-management-agent/issues/149)).
+- **Plugin update CLI argument format** — normalised plugin names in `PluginController.UpdatePlugin` to pass bare `.plg` filenames instead of absolute filesystem paths to the Unraid `plugin update` CLI command, which rejects arguments containing path separators, added input validation to the MCP `update_plugin` tool, and introduced an injectable command execution seam on `PluginController` with comprehensive regression test coverage ([#153](https://github.com/tinkerologie/unraid-management-agent/issues/153)).
+- **Developer tooling and pre-commit checks** — added gosec G115 annotation for `syscall.Statfs_t` block size conversion in `unassigned.go` so `golangci-lint run` passes cleanly on Linux targets, regenerated `.secrets.baseline` with active plugins to restore `detect-secrets` scanning, and pinned `swag` CLI to `v1.16.6` in `Makefile` and CI release workflow to preserve Swagger 2.0 format reproducibility ([#150](https://github.com/tinkerologie/unraid-management-agent/issues/150)).
+- **Test safety against accidental machine reboot or shutdown** — made `SystemController` command execution injectable with safe defaults and wired `SystemControllerInterface` into API and MCP servers with test mocks, preventing test runs on systemd Linux hosts from inadvertently issuing destructive `/sbin/shutdown` commands during `make test` ([#149](https://github.com/tinkerologie/unraid-management-agent/issues/149)).
 
 ## [2026.08.02] - 2026-08-24
 
@@ -750,7 +750,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Zeroconf/mDNS auto-discovery** (#120) — the agent now advertises itself
   on the local network via mDNS/DNS-SD as `_unraid-mgmt-agent._tcp.local.`, so
   integrations such as the
-  [Home Assistant integration](https://github.com/ruaan-deysel/ha-unraid-management-agent)
+  [Home Assistant integration](https://github.com/tinkerologie/ha-unraid-management-agent)
   can auto-discover the server instead of requiring a manually entered host/port.
   The advertised TXT records expose the agent version, REST API base path
   (`/api/v1`), and server name. Enabled by default; controllable via
@@ -770,7 +770,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [Agent Skills standard](https://agentskills.io), teaching agents how to monitor
   and control Unraid through the agent's MCP server (121 tools, 5 resources,
   6 diagnostic prompts) and REST API. Installable via `npx skills add
-ruaan-deysel/unraid-management-agent`, as a Claude Code plugin
+tinkerologie/unraid-management-agent`, as a Claude Code plugin
   (`.claude-plugin/marketplace.json`), or as a claude.ai/Claude Desktop skill zip.
   The skill bundles the full tool catalog (with read/write + destructive flags),
   connection setup for every MCP client, the diagnostic prompts/resources, the
@@ -797,7 +797,7 @@ ruaan-deysel/unraid-management-agent`, as a Claude Code plugin
 ### Added
 
 - **Remote share mount/unmount control** (issue #115; resolves the mount/unmount toggle
-  ask in ruaan-deysel/ha-unraid-management-agent#79) — SMB/NFS remote shares can now be mounted and
+  ask in tinkerologie/ha-unraid-management-agent#79) — SMB/NFS remote shares can now be mounted and
   unmounted by source. Added the REST endpoints
   `POST /api/v1/unassigned/remote-shares/mount` and `.../unmount`
   (body `{"source": "//server/share"}`), the MCP `remote_share_action` tool, and an MQTT
@@ -807,7 +807,7 @@ ruaan-deysel/unraid-management-agent`, as a Claude Code plugin
   as discrete exec arguments (never via a shell). Verified live on Unraid: mount via REST
   and unmount via MCP both toggled a real CIFS mount, with the API reflecting the change.
 - **Configured-but-unmounted remote shares are now reported** (issue #115; resolves
-  ruaan-deysel/ha-unraid-management-agent#79) — the collector parses the plugin's `samba_mount.cfg`
+  tinkerologie/ha-unraid-management-agent#79) — the collector parses the plugin's `samba_mount.cfg`
   and merges it with `/proc/mounts`, so shares that are configured but not currently
   mounted appear with `status: "unmounted"` (plus their `auto_mount`/`read_only`
   metadata), enabling mount/unmount toggles in Home Assistant for offline shares.
@@ -1008,7 +1008,7 @@ ruaan-deysel/unraid-management-agent`, as a Claude Code plugin
 ### Fixed
 
 - **Remote shares (SMB/NFS) never reported** (issue #115; resolves
-  ruaan-deysel/ha-unraid-management-agent#83 and ruaan-deysel/ha-unraid-management-agent#79) — the unassigned-devices collector's
+  tinkerologie/ha-unraid-management-agent#83 and tinkerologie/ha-unraid-management-agent#79) — the unassigned-devices collector's
   `parseSMBMounts()` was a stub that always returned an empty list, and NFS mounts were
   not parsed at all, so `remote_shares` was permanently empty across the REST API
   (`/api/v1/unassigned`, `/api/v1/unassigned/remote-shares`), MQTT, and MCP. As a result
@@ -1197,7 +1197,7 @@ ruaan-deysel/unraid-management-agent`, as a Claude Code plugin
 
 - **Log action handler in exec.php** — new `log` action returns last 20 log lines for display in settings UI
 - **Default config additions** — added `LOG_LEVEL` and `MQTT_CLIENT_ID` defaults to `default.cfg`
-- **Diagnostic Logging System** ([#102](https://github.com/ruaan-deysel/unraid-management-agent/issues/102)):
+- **Diagnostic Logging System** ([#102](https://github.com/tinkerologie/unraid-management-agent/issues/102)):
   - **Structured diagnostic logger** — JSON Lines format with lumberjack rotation (5 MB max, 1 backup)
   - **Correlation IDs** — UUID-based request/operation correlation via context propagation
   - **Sensitive data redaction** — regex-based redaction for passwords, bearer tokens, Shoutrrr URLs, webhooks, CSRF tokens; reflection-based struct/map redaction for sensitive field names
@@ -1207,7 +1207,7 @@ ruaan-deysel/unraid-management-agent`, as a Claude Code plugin
 
 ### Fixed
 
-- **Concurrent map access in DiskCollector** ([#100](https://github.com/ruaan-deysel/unraid-management-agent/pull/100)):
+- **Concurrent map access in DiskCollector** ([#100](https://github.com/tinkerologie/unraid-management-agent/pull/100)):
   - Added `sync.Mutex` to protect shared map access during disk data collection
 
 ## [2026.03.06] - 2026-03-30
@@ -1227,7 +1227,7 @@ ruaan-deysel/unraid-management-agent`, as a Claude Code plugin
 
 ### Fixed
 
-- **Agent keeps entering stopped state due to unrecovered panics** ([#99](https://github.com/ruaan-deysel/unraid-management-agent/issues/99)):
+- **Agent keeps entering stopped state due to unrecovered panics** ([#99](https://github.com/tinkerologie/unraid-management-agent/issues/99)):
   - Added `LogPanicWithStack` helper for stack-trace-enriched panic logging across all recovery blocks
   - Added missing panic recovery to Docker, GPU, and VM collectors (previously had none)
   - Fixed Notification collector: restructured from top-level-only recovery to per-iteration recovery
@@ -1240,12 +1240,12 @@ ruaan-deysel/unraid-management-agent`, as a Claude Code plugin
 
 ### Fixed
 
-- **`parity_valid` returns false on Unraid 7.2.4 when parity is actually valid** ([#98](https://github.com/ruaan-deysel/unraid-management-agent/issues/98)):
+- **`parity_valid` returns false on Unraid 7.2.4 when parity is actually valid** ([#98](https://github.com/tinkerologie/unraid-management-agent/issues/98)):
   - Added `mdNumInvalid` fallback for parity validity when `sbSynced` is missing or zero
   - A started array with parity disks and zero invalid disks is now correctly reported as parity-valid
   - Fixes false "Parity Invalid" repair notifications in the Home Assistant integration
   - Added debug logging of `sbSynced`, `mdNumInvalid`, and `sbSyncErrs` values during array collection
-- **CPU temperature sensor returns incorrect/stuck value (127.5°C) on some hardware** ([#97](https://github.com/ruaan-deysel/unraid-management-agent/issues/97)):
+- **CPU temperature sensor returns incorrect/stuck value (127.5°C) on some hardware** ([#97](https://github.com/tinkerologie/unraid-management-agent/issues/97)):
   - CPU and motherboard temperature extraction now uses `IsPlausibleTempC()` to reject readings outside the -40°C to 125°C range
   - Filters out stuck 127.5°C TjMax sentinel values reported by some hwmon sensors on Intel systems
   - Motherboard temp check unified to use the same plausibility function instead of a hardcoded 0–100°C range
@@ -1273,45 +1273,45 @@ ruaan-deysel/unraid-management-agent`, as a Claude Code plugin
   - 10 Prometheus gauges: `unraid_fan_rpm`, `unraid_fan_pwm_percent` per fan
   - MQTT Home Assistant discovery for per-fan sensor entities
   - Input validation for fan IDs, speed percentages, mode values, and profile names
-- **MQTT Home Assistant sensor coverage for network throughput rates** ([#96](https://github.com/ruaan-deysel/unraid-management-agent/pull/96)):
+- **MQTT Home Assistant sensor coverage for network throughput rates** ([#96](https://github.com/tinkerologie/unraid-management-agent/pull/96)):
   - New `RxBytesPerSec` and `TxBytesPerSec` fields in `NetworkInfo` DTO for per-interface throughput
   - Delta-based rate calculation with mutex-protected previous sample state
   - Stale interface entries pruned automatically when interfaces disappear
-- **MQTT Home Assistant discovery for fan sensors** ([#96](https://github.com/ruaan-deysel/unraid-management-agent/pull/96)):
+- **MQTT Home Assistant discovery for fan sensors** ([#96](https://github.com/tinkerologie/unraid-management-agent/pull/96)):
   - Dynamic per-fan HA sensor entities discovered from system fan data
   - Fan discovery goroutine publishes entities on first `PublishSystemInfo` call
-- **MQTT Home Assistant discovery for NUT UPS, hardware, registration, unassigned devices, and ZFS** ([#96](https://github.com/ruaan-deysel/unraid-management-agent/pull/96)):
+- **MQTT Home Assistant discovery for NUT UPS, hardware, registration, unassigned devices, and ZFS** ([#96](https://github.com/tinkerologie/unraid-management-agent/pull/96)):
   - 7 new MQTT Publish methods: NUT, Hardware, Registration, Unassigned, ZFS Datasets, ZFS Snapshots, ZFS ARC Stats
   - 7 new `mqttBind` entries in orchestrator for new event topics
   - HA discovery entities for NUT UPS sensors, hardware info, registration/license, per-unassigned-device sensors, per-ZFS-dataset sensors, ZFS snapshot aggregates, and ZFS ARC stats
-- **Context-aware shell command execution** ([#93](https://github.com/ruaan-deysel/unraid-management-agent/pull/93)):
+- **Context-aware shell command execution** ([#93](https://github.com/tinkerologie/unraid-management-agent/pull/93)):
   - New `ExecCommandOutputWithContext()` in `daemon/lib/shell.go` for commands that need timeout/cancellation support
-- **ZFS per-share sizing** ([#93](https://github.com/ruaan-deysel/unraid-management-agent/pull/93)):
+- **ZFS per-share sizing** ([#93](https://github.com/tinkerologie/unraid-management-agent/pull/93)):
   - Share collector now queries ZFS dataset sizes via `zfs list` for `useCache=only` shares
   - 60-second timeout prevents a hung `zfs list` from blocking the share collector goroutine
 
 ### Fixed
 
-- **Share sizes reported at ~50% of actual size** ([#93](https://github.com/ruaan-deysel/unraid-management-agent/pull/93)):
+- **Share sizes reported at ~50% of actual size** ([#93](https://github.com/tinkerologie/unraid-management-agent/pull/93)):
   - Unraid's share `.ini` files store sizes in KiB, but the share collector multiplied by 1 (treating as bytes)
   - Changed to multiply by 1024 so `free_bytes` and `used_bytes` report correct values
-- **Notification collector reads paths from dynamix.cfg** ([#93](https://github.com/ruaan-deysel/unraid-management-agent/pull/93)):
+- **Notification collector reads paths from dynamix.cfg** ([#93](https://github.com/tinkerologie/unraid-management-agent/pull/93)):
   - `ResolveNotificationDirs()` now reads the Dynamix notification directory from `dynamix.cfg` at startup
   - Notification controller resolves paths via `collectors.ResolveNotificationDirs` at `init()` so create/archive/delete target the correct directories
   - Dynamix `"normal"` importance now correctly maps to `"info"` in notification counts
-- **Dark mode UI fixes for plugin settings page** ([#93](https://github.com/ruaan-deysel/unraid-management-agent/pull/93)):
+- **Dark mode UI fixes for plugin settings page** ([#93](https://github.com/tinkerologie/unraid-management-agent/pull/93)):
   - Plugin page now uses proper Unraid CSS variables for dark theme compatibility
-- **Log spammed with UPS and fan warnings** ([#95](https://github.com/ruaan-deysel/unraid-management-agent/issues/95)):
+- **Log spammed with UPS and fan warnings** ([#95](https://github.com/tinkerologie/unraid-management-agent/issues/95)):
   - Fan speed "no fan sensors found" downgraded from `Warning` to `Debug` — no longer spams logs every 15 seconds on systems without fan sensors
   - NUT UPS fallback failure downgraded from `Warning` to `Debug`
   - Fixed broken printf format strings in 19 logger calls across system, ZFS, and UPS collectors
     that used structured-logging style args (`"msg", "key", value`) instead of printf verbs
     (`"msg: %v", value`), causing `%!(EXTRA ...)` garbage in log output
-- **UPS collector panic recovery** ([#93](https://github.com/ruaan-deysel/unraid-management-agent/pull/93)):
+- **UPS collector panic recovery** ([#93](https://github.com/tinkerologie/unraid-management-agent/pull/93)):
   - Periodic `Collect()` call now wrapped in defer/recover to prevent a panic from killing the goroutine
-- **MQTT nil dereference guard** ([#96](https://github.com/ruaan-deysel/unraid-management-agent/pull/96)):
+- **MQTT nil dereference guard** ([#96](https://github.com/tinkerologie/unraid-management-agent/pull/96)):
   - `PublishSystemInfo` now guards against nil `SystemInfo` to prevent panic on first publish before data is available
-- **Fan speed parsing improved for `sensors -u` format** ([#96](https://github.com/ruaan-deysel/unraid-management-agent/pull/96)):
+- **Fan speed parsing improved for `sensors -u` format** ([#96](https://github.com/tinkerologie/unraid-management-agent/pull/96)):
   - Fan RPM parsing now uses `ParseFloat` for the raw `sensors -u` output format
   - Hwmon fan labels simplified to `"Fan %d"` format
   - Zero RPM fan channels (no fan connected) are skipped
@@ -1325,17 +1325,17 @@ ruaan-deysel/unraid-management-agent`, as a Claude Code plugin
 
 ### Changed
 
-- **APC UPS fallback log level** ([#93](https://github.com/ruaan-deysel/unraid-management-agent/pull/93)):
+- **APC UPS fallback log level** ([#93](https://github.com/tinkerologie/unraid-management-agent/pull/93)):
   - `apcaccess` failure message downgraded from `Warning` to `Debug` to reduce log noise on systems without APC UPS
 
 ## [2026.03.03] - 2026-03-18
 
 ### Fixed
 
-- **FileWatcher race condition causing silent agent exits every 1–4 hours** ([#84](https://github.com/ruaan-deysel/unraid-management-agent/issues/84)):
+- **FileWatcher race condition causing silent agent exits every 1–4 hours** ([#84](https://github.com/tinkerologie/unraid-management-agent/issues/84)):
   - Moved `fw.Close()` inside the goroutine running `fw.Run()` in array, disk, and share collectors so the fsnotify channels are no longer closed while the watcher loop is still selecting on them
   - Added warning-level logging in `filewatcher.go` when the events or errors channel closes unexpectedly, making any future silent exits visible in the log
-- **Removed dead `ENABLE_UPS` and `ENABLE_GPU` config flags from PLG template** ([#83](https://github.com/ruaan-deysel/unraid-management-agent/issues/83)):
+- **Removed dead `ENABLE_UPS` and `ENABLE_GPU` config flags from PLG template** ([#83](https://github.com/tinkerologie/unraid-management-agent/issues/83)):
   - The flags had no effect — collectors always started regardless of their value
   - Setting `INTERVAL_UPS=0` or `INTERVAL_GPU=0` (or any collector interval to `0`) is the supported way to disable collectors, now documented in the config template comment
 
@@ -1353,7 +1353,7 @@ ruaan-deysel/unraid-management-agent`, as a Claude Code plugin
   - Invalid QoS values now fall back safely to `0` instead of flowing through unchecked conversions
 - **Alert message formatting avoids unnecessary temporary strings**:
   - Dispatcher now writes formatted content directly to the builder
-- **Parity check history endpoint no longer returns invalid JSON on systems without parity** ([#82](https://github.com/ruaan-deysel/unraid-management-agent/issues/82)):
+- **Parity check history endpoint no longer returns invalid JSON on systems without parity** ([#82](https://github.com/tinkerologie/unraid-management-agent/issues/82)):
 - `parseSpeed()` now guards against `NaN` and `Inf` float64 values that `strconv.ParseFloat` accepts but `encoding/json` cannot serialize
 - Systems that have never run a parity check (e.g., full ZFS setups) no longer trigger `json: unsupported value: NaN` errors every 30 seconds
 
@@ -3033,10 +3033,10 @@ This is the initial release. No migration required.
 
 ## Links
 
-- **GitHub Repository**: <https://github.com/ruaan-deysel/unraid-management-agent>
+- **GitHub Repository**: <https://github.com/tinkerologie/unraid-management-agent>
 - **Documentation**: [docs/README.md](docs/README.md)
 - **API Reference**: [docs/api/API_REFERENCE.md](docs/api/API_REFERENCE.md)
-- **Issues**: <https://github.com/ruaan-deysel/unraid-management-agent/issues>
+- **Issues**: <https://github.com/tinkerologie/unraid-management-agent/issues>
 
 ---
 

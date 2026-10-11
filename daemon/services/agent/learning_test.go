@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/llm"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/memory"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/tools"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/agent/llm"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/agent/memory"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/agent/tools"
 )
 
 func TestProposePreferenceIsPending(t *testing.T) {

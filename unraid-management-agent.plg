@@ -4,7 +4,7 @@
     <!ENTITY name        "unraid-management-agent">
     <!ENTITY author      "Ruaan Deysel">
     <!ENTITY version     "2026.09.01">
-    <!ENTITY gitURL      "https://github.com/ruaan-deysel/&name;">
+    <!ENTITY gitURL      "https://github.com/tinkerologie/&name;">
     <!ENTITY pluginURL   "&gitURL;/raw/main/&name;.plg">
     <!ENTITY supportURL  "https://forums.unraid.net/topic/196675-plugin-unraid-management-agent">
     <!ENTITY launch      "Settings/unraid-management-agent">
@@ -21,7 +21,7 @@ Monitor and control your Unraid system via REST API, WebSocket, MCP, Prometheus,
 
 <CHANGES>
 See CHANGELOG.md for full release notes and change history:
-https://github.com/ruaan-deysel/unraid-management-agent/blob/main/CHANGELOG.md
+https://github.com/tinkerologie/unraid-management-agent/blob/main/CHANGELOG.md
 </CHANGES>
 
 <!--
@@ -46,8 +46,8 @@ Requirements:
 - Port 8043 available (configurable)
 
 Support:
-- GitHub Issues: https://github.com/ruaan-deysel/unraid-management-agent/issues
-- Documentation: https://github.com/ruaan-deysel/unraid-management-agent/blob/main/README.md
+- GitHub Issues: https://github.com/tinkerologie/unraid-management-agent/issues
+- Documentation: https://github.com/tinkerologie/unraid-management-agent/blob/main/README.md
 -->
 
 <!-- Verify Unraid version compatibility -->
@@ -235,7 +235,7 @@ echo "Configuration: ${CONFIG_DIR}/config.cfg"
 echo "Logs: /var/log/${PLUGIN_NAME}.log"
 echo ""
 echo "For documentation and support:"
-echo "  https://github.com/ruaan-deysel/unraid-management-agent"
+echo "  https://github.com/tinkerologie/unraid-management-agent"
 echo ""
 ]]>
 </INLINE>

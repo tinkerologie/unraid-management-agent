@@ -270,7 +270,7 @@ MQTT_BROKER=ssl://mqtt.example.com:8883
 ## Auto-Discovery (zeroconf/mDNS)
 
 The agent advertises itself on the local network using zeroconf (mDNS/DNS-SD),
-so integrations such as the [Home Assistant integration](https://github.com/ruaan-deysel/ha-unraid-management-agent)
+so integrations such as the [Home Assistant integration](https://github.com/tinkerologie/ha-unraid-management-agent)
 can auto-discover the server instead of requiring a manually entered IP and port.
 
 This is **enabled by default** and requires no configuration. The agent

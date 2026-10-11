@@ -6,8 +6,8 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/services/agent/llm"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/agent/llm"
 )
 
 // Tool is one risk-tiered action the agent can take.

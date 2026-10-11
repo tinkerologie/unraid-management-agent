@@ -1,6 +1,6 @@
 # Design Proposal: Zero-Config MCP Onboarding (`ha-mcp` Style) & Streamable HTTP `GET /mcp` Fix
 
-- **Tracking Issues:** [#165](https://github.com/ruaan-deysel/unraid-management-agent/issues/165), [#166](https://github.com/ruaan-deysel/unraid-management-agent/issues/166)
+- **Tracking Issues:** [#165](https://github.com/tinkerologie/unraid-management-agent/issues/165), [#166](https://github.com/tinkerologie/unraid-management-agent/issues/166)
 - **Status:** Implemented
 
 ---

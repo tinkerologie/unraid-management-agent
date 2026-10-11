@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
+	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
 )
 
 // DiskTempsPath is the default Unraid disks.ini location (the live emhttpd

@@ -1,8 +1,8 @@
 package services
 
 import (
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/platform"
+	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
+	"github.com/tinkerologie/unraid-management-agent/daemon/platform"
 )
 
 // resilienceProbes lists the OS capabilities the hot-path subsystems depend on.

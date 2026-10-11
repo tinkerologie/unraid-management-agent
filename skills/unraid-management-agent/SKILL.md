@@ -14,7 +14,7 @@ description: >
   instead of search_/get_ tools; and assuming auth the agent lacks by default.
 metadata:
   version: 1
-  homepage: https://github.com/ruaan-deysel/unraid-management-agent
+  homepage: https://github.com/tinkerologie/unraid-management-agent
 ---
 
 # Unraid Management Agent

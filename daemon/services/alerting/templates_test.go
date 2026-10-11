@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/expr-lang/expr"
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 )
 
 func TestAlertRuleTemplates(t *testing.T) {

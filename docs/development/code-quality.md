@@ -12,7 +12,7 @@ This project uses automated code quality checks via **pre-commit hooks** to ensu
 
 ```bash
 # Clone the repository
-git clone https://github.com/ruaan-deysel/unraid-management-agent.git
+git clone https://github.com/tinkerologie/unraid-management-agent.git
 cd unraid-management-agent
 
 # Run the setup script

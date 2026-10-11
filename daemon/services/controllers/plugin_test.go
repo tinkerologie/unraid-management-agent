@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/constants"
+	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
 )
 
 func TestNewPluginController(t *testing.T) {

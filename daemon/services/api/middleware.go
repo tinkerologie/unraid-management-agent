@@ -15,7 +15,7 @@ import (
 	"github.com/gorilla/mux"
 	"golang.org/x/time/rate"
 
-	"github.com/ruaan-deysel/unraid-management-agent/daemon/logger"
+	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
 )
 
 func corsMiddleware(allowedOrigin string) mux.MiddlewareFunc {
