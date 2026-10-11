@@ -103,6 +103,34 @@ type StorageController struct {
 	Ports []StorageControllerPort `json:"ports"`
 	// Phys lists every controller phy, connected or not.
 	Phys []StorageControllerPhy `json:"phys"`
+	// Throughput is the combined I/O of the controller's drives (enclosure and
+	// direct-attached) over the last collection interval; omitted on the first
+	// collection and when none of its drives maps to a block device.
+	Throughput *StorageThroughput `json:"throughput,omitempty"`
+}
+
+// StorageThroughput is the I/O rate of a group of drives between two
+// collections, measured from /proc/diskstats, and its utilization of the
+// group's SAS link capacity.
+type StorageThroughput struct {
+	// ReadBytesPerSec is the combined read rate.
+	ReadBytesPerSec float64 `json:"read_bytes_per_sec" example:"524288000"`
+	// WriteBytesPerSec is the combined write rate.
+	WriteBytesPerSec float64 `json:"write_bytes_per_sec" example:"104857600"`
+	// TotalBytesPerSec is ReadBytesPerSec + WriteBytesPerSec.
+	TotalBytesPerSec float64 `json:"total_bytes_per_sec" example:"629145600"`
+	// CapacityBytesPerSec is the payload capacity of the SAS links (8b/10b:
+	// link rate in Gbps x 1e8 bytes/s per lane); 0 when unknown. For a controller
+	// it covers its connected phys; for an enclosure, the controller ports cabled
+	// directly to it (0 for an enclosure only reached through another enclosure).
+	CapacityBytesPerSec float64 `json:"capacity_bytes_per_sec" example:"9600000000"`
+	// UtilizationPercent is TotalBytesPerSec / CapacityBytesPerSec x 100, rounded
+	// to 0.1; omitted when the capacity is unknown.
+	UtilizationPercent *float64 `json:"utilization_percent,omitempty" example:"6.6"`
+	// Drives is the number of drives whose I/O is counted.
+	Drives int `json:"drives" example:"43"`
+	// IntervalSeconds is the measurement window (time between the two samples).
+	IntervalSeconds float64 `json:"interval_seconds" example:"300"`
 }
 
 // StorageControllerPort is a connected (possibly wide) SAS port of a controller.
@@ -201,6 +229,10 @@ type StorageEnclosure struct {
 	Redundancy EnclosureRedundancy `json:"redundancy"`
 	// Problems lists the current problems detected in this enclosure.
 	Problems []string `json:"problems"`
+	// Throughput is the combined I/O of the drives in this enclosure over the
+	// last collection interval; omitted on the first collection and when none of
+	// its drives maps to a block device.
+	Throughput *StorageThroughput `json:"throughput,omitempty"`
 }
 
 // StorageSESDevice is one SES access path (one I/O module) to an enclosure.

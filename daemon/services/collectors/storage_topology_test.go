@@ -102,6 +102,7 @@ func newFixtureCollector(t *testing.T, runner *fakeRunner, binaries ...string) *
 		exists[b] = true
 	}
 	c.IsExecutable = func(p string) bool { return exists[p] }
+	c.DiskstatsPath = filepath.Join(t.TempDir(), "diskstats") // absent unless a test writes it
 	return c
 }
 

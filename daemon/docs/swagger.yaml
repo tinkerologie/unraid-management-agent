@@ -3510,6 +3510,13 @@ definitions:
         description: TemperatureCelsius is the ROC (RAID-on-chip) or controller temperature.
         example: 62
         type: number
+      throughput:
+        allOf:
+        - $ref: '#/definitions/dto.StorageThroughput'
+        description: |-
+          Throughput is the combined I/O of the controller's drives (enclosure and
+          direct-attached) over the last collection interval; omitted on the first
+          collection and when none of its drives maps to a block device.
     type: object
   dto.StorageControllerPhy:
     properties:
@@ -3829,6 +3836,13 @@ definitions:
         items:
           $ref: '#/definitions/dto.EnclosureSensor'
         type: array
+      throughput:
+        allOf:
+        - $ref: '#/definitions/dto.StorageThroughput'
+        description: |-
+          Throughput is the combined I/O of the drives in this enclosure over the
+          last collection interval; omitted on the first collection and when none of
+          its drives maps to a block device.
       vendor:
         description: Vendor is the enclosure vendor.
         example: NETAPP
@@ -3858,6 +3872,44 @@ definitions:
           module firmware).
         example: "0281"
         type: string
+    type: object
+  dto.StorageThroughput:
+    properties:
+      capacity_bytes_per_sec:
+        description: |-
+          CapacityBytesPerSec is the payload capacity of the SAS links (8b/10b:
+          link rate in Gbps x 1e8 bytes/s per lane); 0 when unknown. For a controller
+          it covers its connected phys; for an enclosure, the controller ports cabled
+          directly to it (0 for an enclosure only reached through another enclosure).
+        example: 9600000000
+        type: number
+      drives:
+        description: Drives is the number of drives whose I/O is counted.
+        example: 43
+        type: integer
+      interval_seconds:
+        description: IntervalSeconds is the measurement window (time between the two
+          samples).
+        example: 300
+        type: number
+      read_bytes_per_sec:
+        description: ReadBytesPerSec is the combined read rate.
+        example: 524288000
+        type: number
+      total_bytes_per_sec:
+        description: TotalBytesPerSec is ReadBytesPerSec + WriteBytesPerSec.
+        example: 629145600
+        type: number
+      utilization_percent:
+        description: |-
+          UtilizationPercent is TotalBytesPerSec / CapacityBytesPerSec x 100, rounded
+          to 0.1; omitted when the capacity is unknown.
+        example: 6.6
+        type: number
+      write_bytes_per_sec:
+        description: WriteBytesPerSec is the combined write rate.
+        example: 104857600
+        type: number
     type: object
   dto.StorageTopology:
     description: SAS storage topology from storcli (Broadcom/LSI MegaRAID and HBAs)

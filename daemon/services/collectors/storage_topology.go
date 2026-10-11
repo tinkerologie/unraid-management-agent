@@ -56,11 +56,17 @@ type StorageTopologyCollector struct {
 	SgSesCandidates   []string
 	// IsExecutable reports whether a candidate binary can be run; replaceable for tests.
 	IsExecutable func(path string) bool
+	// DiskstatsPath is the block device I/O statistics file ("/proc/diskstats"); replaceable for tests.
+	DiskstatsPath string
+	// Now returns the current time; replaceable for tests.
+	Now func() time.Time
 	// Stagger delays the first collection after Start.
 	Stagger time.Duration
 
 	inflight map[string]<-chan struct{}
 	lastErrs string
+	// prevDisk is the previous cycle's diskstats sample, used to compute throughput.
+	prevDisk *diskSample
 }
 
 // NewStorageTopologyCollector creates a collector with production defaults.
@@ -75,6 +81,8 @@ func NewStorageTopologyCollector(ctx *domain.Context) *StorageTopologyCollector 
 		},
 		SgSesCandidates: []string{"/usr/bin/sg_ses", "/usr/sbin/sg_ses", "/bin/sg_ses", "/sbin/sg_ses"},
 		IsExecutable:    isExecutableFile,
+		DiskstatsPath:   "/proc/diskstats",
+		Now:             time.Now,
 		Stagger:         storageTopologyStartupStagger,
 		inflight:        map[string]<-chan struct{}{},
 	}
@@ -144,6 +152,7 @@ func (c *StorageTopologyCollector) Gather(ctx context.Context) *dto.StorageTopol
 		Drives:      []dto.StorageDrive{},
 	}
 	var errs []string
+	disk := c.sampleDiskstats()
 
 	// storcli: no binary, or a binary that reports no controllers, means "no storcli data".
 	var sc *storcliResult
@@ -182,6 +191,8 @@ func (c *StorageTopologyCollector) Gather(ctx context.Context) *dto.StorageTopol
 	for i := range topo.Controllers {
 		c.applyPCIeLink(&topo.Controllers[i])
 	}
+	applyThroughput(topo, c.prevDisk, disk)
+	c.prevDisk = disk
 
 	topo.Errors = errs
 	topo.CollectionDurationMs = time.Since(start).Milliseconds()

@@ -144,6 +144,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with `J nolog`, never twice at once, with timeouts; works with sg_ses alone (plain HBAs)
   and is a no-op (`state: "unsupported"`) without either tool.
   ([#184](https://github.com/ruaan-deysel/unraid-management-agent/issues/184)).
+- **Storage topology throughput and link utilization** — `GET /api/v1/storage/topology`
+  controllers and enclosures now carry a `throughput` object (`read_bytes_per_sec`,
+  `write_bytes_per_sec`, `total_bytes_per_sec`, `capacity_bytes_per_sec`,
+  `utilization_percent`, `drives`, `interval_seconds`). Rates are the sector deltas of
+  each drive's block device in `/proc/diskstats` between two collections (kernel
+  counters only, nothing is sent to the drives); counter resets count as zero and the
+  object is omitted on the first collection. Capacity is the SAS payload rate of the
+  links (8b/10b: link rate in Gbps x 100 MB/s per lane): the controller's connected
+  phys, and for an enclosure the controller ports cabled directly to it (0, with no
+  `utilization_percent`, for an enclosure only reached through another enclosure).
 
 ### Fixed
 
