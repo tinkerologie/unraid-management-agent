@@ -94,6 +94,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Stable `device_id` for USB HID hwmon chips, and same-model fans kept apart** —
+  `temperatures[]` and `fans[]` entries of `GET /api/v1/system` have a new `device_id`
+  for chips on a USB HID device (fan/pump controllers such as Aquacomputer Octo/Quadro,
+  Corsair Commander): the USB serial number, or `usb-<busnum>-<devpath>` when the
+  device has none. lm-sensors names these chips `<driver>-hid-<bus>-<hid id>`, and the
+  HID id changes whenever the device re-enumerates, so the chip name cannot be used as
+  an identity. It is read from `/sys/class/hwmon` once per collection and is omitted
+  for every other chip. `fans[]` entries also report their lm-sensors chip in `source`.
+  Fans keep their `<chip model>_<fanN>` names, except when two or more chips of the
+  same model report fans (two Octos): their fans are then named
+  `<chip model>-<device_id>_<fanN>` (or `<full chip name>_<fanN>` without a device ID)
+  instead of silently overwriting each other.
 - **Mandatory pre-submission governance for pull requests** — added a required
   "Pre-Submission Governance" section to the PR template with mandatory
   confirmation checkboxes (built and ran locally, `make test` passes,

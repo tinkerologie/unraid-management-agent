@@ -7993,6 +7993,11 @@ const docTemplate = `{
         "dto.FanInfo": {
             "type": "object",
             "properties": {
+                "device_id": {
+                    "description": "DeviceID is a stable identity of the chip's physical device, set only for\nUSB HID chips (whose lm-sensors name changes on every re-enumeration):\nthe USB serial number, or \"usb-\u003cbusnum\u003e-\u003cdevpath\u003e\" when it has none.",
+                    "type": "string",
+                    "example": "07274-50017"
+                },
                 "name": {
                     "type": "string",
                     "example": "CPU Fan"
@@ -8000,6 +8005,11 @@ const docTemplate = `{
                 "rpm": {
                     "type": "integer",
                     "example": 1200
+                },
+                "source": {
+                    "description": "Source is the lm-sensors chip the fan belongs to (empty for the sysfs fallback).",
+                    "type": "string",
+                    "example": "octo-hid-3-13"
                 }
             }
         },
@@ -11504,6 +11514,11 @@ const docTemplate = `{
         "dto.TemperatureReading": {
             "type": "object",
             "properties": {
+                "device_id": {
+                    "description": "DeviceID is a stable identity of the chip's physical device, set only for\nUSB HID chips (whose lm-sensors name changes on every re-enumeration):\nthe USB serial number, or \"usb-\u003cbusnum\u003e-\u003cdevpath\u003e\" when it has none.",
+                    "type": "string",
+                    "example": "07274-50017"
+                },
                 "name": {
                     "type": "string",
                     "example": "coretemp_Core_0"

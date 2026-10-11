@@ -124,7 +124,7 @@ func TestParseFanSpeeds(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := c.parseFanSpeeds(tt.output)
+			result := c.parseFanSpeeds(tt.output, nil)
 			if len(result) < tt.minCount {
 				t.Errorf("Expected at least %d fan speeds, got %d: %v", tt.minCount, len(result), result)
 			}

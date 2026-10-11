@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -23,11 +24,14 @@ import (
 type SystemCollector struct {
 	ctx      *domain.Context
 	prevRAPL *lib.RAPLReading // Previous RAPL reading for power delta calculation
+
+	// sysfsRoot is the sysfs mount point ("/sys"); replaceable for tests.
+	sysfsRoot string
 }
 
 // NewSystemCollector creates a new system information collector with the given context.
 func NewSystemCollector(ctx *domain.Context) *SystemCollector {
-	return &SystemCollector{ctx: ctx}
+	return &SystemCollector{ctx: ctx, sysfsRoot: defaultSysfsRoot}
 }
 
 // Start begins the system collector's periodic data collection.
@@ -187,6 +191,9 @@ func (c *SystemCollector) collectSystemInfo() (*dto.SystemInfo, error) {
 	info.BIOSVersion = biosVersion
 	info.BIOSDate = biosDate
 
+	// Stable identities of USB HID hwmon chips, keyed by lm-sensors chip name.
+	chipDeviceIDs := hwmonChipDeviceIDs(c.sysfsRoot)
+
 	// Get temperatures
 	temperatures, err := c.getTemperatures()
 	if err != nil {
@@ -227,13 +234,14 @@ func (c *SystemCollector) collectSystemInfo() (*dto.SystemInfo, error) {
 				Value:      temp,
 				SensorType: sensorType,
 				Source:     source,
+				DeviceID:   chipDeviceIDs[source],
 			})
 		}
 		info.Temperatures = tempReadings
 	}
 
 	// Get fan speeds
-	fans, err := c.getFans()
+	fans, err := c.getFans(chipDeviceIDs)
 	if err != nil {
 		logger.Debug("Failed to get fan speeds: %v", err)
 	} else {
@@ -606,23 +614,21 @@ func (c *SystemCollector) readHwmonTemperatures() (map[string]float64, error) {
 	return temperatures, nil
 }
 
-func (c *SystemCollector) getFans() ([]dto.FanInfo, error) {
-	fanMap := make(map[string]int)
-
+func (c *SystemCollector) getFans(chipDeviceIDs map[string]string) ([]dto.FanInfo, error) {
 	// Try using sensors command first
 	// stdout only: stderr ("ERROR: Can't get value of subfeature ...") would
 	// interleave with the readings and corrupt the parse.
 	output, err := lib.ExecCommandStdout("sensors", "-u")
 	if err == nil {
-		fanMap = c.parseFanSpeeds(output)
+		if fans := c.parseFanSpeeds(output, chipDeviceIDs); len(fans) > 0 {
+			return fans, nil
+		}
 	}
 
 	// If no fans found, try fallback
-	if len(fanMap) == 0 {
-		fanMap, err = c.readHwmonFanSpeeds()
-		if err != nil {
-			return nil, err
-		}
+	fanMap, err := c.readHwmonFanSpeeds()
+	if err != nil {
+		return nil, err
 	}
 
 	// Convert map to slice
@@ -637,8 +643,84 @@ func (c *SystemCollector) getFans() ([]dto.FanInfo, error) {
 	return fans, nil
 }
 
-func (c *SystemCollector) parseFanSpeeds(output string) map[string]int {
-	fanSpeeds := make(map[string]int)
+// sensorsFanReading is one fanN_input value from `sensors -u`.
+type sensorsFanReading struct {
+	chip  string // lm-sensors chip name, e.g. "nct6798-isa-0290"
+	label string // fan channel, e.g. "fan1"
+	rpm   int
+}
+
+// parseFanSpeeds parses fan inputs from `sensors -u` output.
+//
+// Fans are named "<chip model>_<fanN>" (e.g. "it8721-isa-0290" + "fan1_input"
+// -> "it8721_fan1"). When several chips in the output share a chip model (two
+// identical USB fan controllers, for example), every fan of those chips is
+// named "<chip model>-<suffix>_<fanN>" instead so none overwrites another; the
+// suffix is the chip's stable device ID when it has one (see
+// hwmonChipDeviceIDs), otherwise the rest of the chip name.
+func (c *SystemCollector) parseFanSpeeds(output string, chipDeviceIDs map[string]string) []dto.FanInfo {
+	readings := parseSensorsFanReadings(output)
+	if len(readings) == 0 {
+		return nil
+	}
+
+	// Distinct chips (with at least one fan) per chip model.
+	chipsByModel := make(map[string][]string)
+	for _, r := range readings {
+		model := chipModel(r.chip)
+		if !slices.Contains(chipsByModel[model], r.chip) {
+			chipsByModel[model] = append(chipsByModel[model], r.chip)
+		}
+	}
+
+	// Name prefix per chip.
+	prefixes := make(map[string]string)
+	for model, chips := range chipsByModel {
+		if len(chips) == 1 {
+			prefixes[chips[0]] = model
+			continue
+		}
+		// Device IDs are only usable as a suffix if they tell the chips apart.
+		idCount := make(map[string]int)
+		for _, chip := range chips {
+			if id := chipDeviceIDs[chip]; id != "" {
+				idCount[id]++
+			}
+		}
+		for _, chip := range chips {
+			if id := chipDeviceIDs[chip]; id != "" && idCount[id] == 1 {
+				prefixes[chip] = model + "-" + id
+			} else {
+				prefixes[chip] = chip
+			}
+		}
+	}
+
+	fans := make([]dto.FanInfo, 0, len(readings))
+	index := make(map[string]int, len(readings))
+	for _, r := range readings {
+		info := dto.FanInfo{
+			Name:     prefixes[r.chip] + "_" + r.label,
+			RPM:      r.rpm,
+			Source:   r.chip,
+			DeviceID: chipDeviceIDs[r.chip],
+		}
+		if i, ok := index[info.Name]; ok {
+			// Same chip and channel listed twice: keep the latest value.
+			fans[i] = info
+			continue
+		}
+		index[info.Name] = len(fans)
+		fans = append(fans, info)
+	}
+
+	return fans
+}
+
+// parseSensorsFanReadings extracts every fanN_input value from `sensors -u`
+// output, in output order.
+func parseSensorsFanReadings(output string) []sensorsFanReading {
+	var readings []sensorsFanReading
 	lines := strings.Split(output, "\n")
 
 	var currentChip string
@@ -661,18 +743,24 @@ func (c *SystemCollector) parseFanSpeeds(output string) map[string]int {
 				key := strings.TrimSpace(parts[0])
 				valueStr := strings.TrimSpace(parts[1])
 				if floatVal, err := strconv.ParseFloat(valueStr, 64); err == nil {
-					value := int(math.Round(floatVal))
-					// Use short chip model (first segment before "-") + fan number without "_input".
-					// e.g. "it8721-isa-0290" + "fan1_input" → "it8721_fan1"
-					chipShort, _, _ := strings.Cut(currentChip, "-")
-					fanLabel := strings.TrimSuffix(key, "_input")
-					fanSpeeds[chipShort+"_"+fanLabel] = value
+					readings = append(readings, sensorsFanReading{
+						chip:  currentChip,
+						label: strings.TrimSuffix(key, "_input"),
+						rpm:   int(math.Round(floatVal)),
+					})
 				}
 			}
 		}
 	}
 
-	return fanSpeeds
+	return readings
+}
+
+// chipModel returns the chip model part of an lm-sensors chip name
+// (everything before the first "-"), e.g. "octo-hid-3-13" -> "octo".
+func chipModel(chip string) string {
+	model, _, _ := strings.Cut(chip, "-")
+	return model
 }
 
 func (c *SystemCollector) readHwmonFanSpeeds() (map[string]int, error) {

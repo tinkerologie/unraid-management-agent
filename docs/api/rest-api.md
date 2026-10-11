@@ -820,10 +820,26 @@ Get system information including CPU, memory, temperatures, and uptime.
   "iommu_enabled": true,
   "openssl_version": "OpenSSL 3.0.0",
   "kernel_version": "6.1.0-unRAID",
+  "temperatures": [
+    {
+      "name": "octo-hid-3-13_Coolant_temp_temp1_input",
+      "value_celsius": 31.2,
+      "sensor_type": "other",
+      "source": "octo-hid-3-13",
+      "device_id": "07274-50017"
+    }
+  ],
   "fans": [
     {
-      "name": "CPU Fan",
-      "rpm": 1200
+      "name": "nct6798_fan2",
+      "rpm": 1200,
+      "source": "nct6798-isa-0290"
+    },
+    {
+      "name": "octo_fan1",
+      "rpm": 850,
+      "source": "octo-hid-3-13",
+      "device_id": "07274-50017"
     }
   ],
   "timestamp": "2025-11-17T14:39:17+10:00"
@@ -862,7 +878,18 @@ Get system information including CPU, memory, temperatures, and uptime.
 - `iommu_enabled`: IOMMU enabled for PCIe passthrough
 - `openssl_version`: OpenSSL version (optional)
 - `kernel_version`: Linux kernel version (optional)
-- `fans`: Array of fan information (optional)
+- `temperatures`: Array of hwmon temperature readings (optional): `name`, `value_celsius`,
+  `sensor_type` (`cpu`, `motherboard`, `chipset`, `other`), `source` (lm-sensors chip name)
+  and `device_id` (see below)
+- `fans`: Array of fan information (optional): `name`, `rpm`, `source` (lm-sensors chip
+  name; omitted for the sysfs fallback) and `device_id`. Fans are named
+  `<chip model>_<fanN>` (e.g. `nct6798_fan2`); when two or more chips of the same model
+  report fans, all their fans are named `<chip model>-<device_id>_<fanN>`, or
+  `<full chip name>_<fanN>` for chips without a `device_id`, so none overwrites another
+- `device_id` (temperatures and fans): stable identity of the physical device of a USB
+  HID chip, whose lm-sensors name (`<driver>-hid-<bus>-<hid id>`) changes whenever the
+  device re-enumerates: the USB serial number, or `usb-<busnum>-<devpath>` (USB port
+  path) when the device has none. Omitted for all other chips, whose name is stable
 
 **Example**:
 

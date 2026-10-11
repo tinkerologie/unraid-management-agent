@@ -86,7 +86,7 @@ fan1:
 fan2:
   fan2_input: 800.000
 `
-		fans := collector.parseFanSpeeds(output)
+		fans := collector.parseFanSpeeds(output, nil)
 
 		if len(fans) == 0 {
 			t.Error("Expected fan speeds to be parsed")
@@ -94,7 +94,7 @@ fan2:
 	})
 
 	t.Run("parse empty output", func(t *testing.T) {
-		fans := collector.parseFanSpeeds("")
+		fans := collector.parseFanSpeeds("", nil)
 
 		if len(fans) != 0 {
 			t.Errorf("Expected 0 fan speeds, got %d", len(fans))

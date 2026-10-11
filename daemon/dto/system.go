@@ -73,6 +73,12 @@ type SystemInfo struct {
 type FanInfo struct {
 	Name string `json:"name" example:"CPU Fan"`
 	RPM  int    `json:"rpm" example:"1200"`
+	// Source is the lm-sensors chip the fan belongs to (empty for the sysfs fallback).
+	Source string `json:"source,omitempty" example:"octo-hid-3-13"`
+	// DeviceID is a stable identity of the chip's physical device, set only for
+	// USB HID chips (whose lm-sensors name changes on every re-enumeration):
+	// the USB serial number, or "usb-<busnum>-<devpath>" when it has none.
+	DeviceID string `json:"device_id,omitempty" example:"07274-50017"`
 }
 
 // TemperatureReading represents a single temperature sensor reading
@@ -81,6 +87,10 @@ type TemperatureReading struct {
 	Value      float64 `json:"value_celsius" example:"45.0"`
 	SensorType string  `json:"sensor_type" example:"cpu"` // cpu, motherboard, chipset, other
 	Source     string  `json:"source" example:"coretemp"` // hwmon chip name
+	// DeviceID is a stable identity of the chip's physical device, set only for
+	// USB HID chips (whose lm-sensors name changes on every re-enumeration):
+	// the USB serial number, or "usb-<busnum>-<devpath>" when it has none.
+	DeviceID string `json:"device_id,omitempty" example:"07274-50017"`
 }
 
 // CPUPowerState represents the current CPU scaling governor configuration
