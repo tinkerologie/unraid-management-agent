@@ -180,7 +180,8 @@ rm -f $(ls ${CONFIG_DIR}/${PLUGIN_NAME}*.tgz 2>/dev/null | grep -v "${VERSION}.t
 # Extract the bundle
 echo "Extracting plugin bundle..."
 if [ -f "${BUNDLE}" ]; then
-    tar -xzf ${BUNDLE} -C / 2>&1
+    # Never take owners from the archive or rewrite existing system directories (#242)
+    tar --no-same-owner --no-overwrite-dir -xzf "${BUNDLE}" -C / 2>&1
     TAR_EXIT=$?
     if [ $TAR_EXIT -eq 0 ]; then
         echo "✓ Bundle extracted successfully"
@@ -192,6 +193,17 @@ else
     echo "✗ Bundle not found: ${BUNDLE}"
     exit 1
 fi
+
+# Restore root ownership that earlier bundles set on shared directories (#242)
+for DIR in /usr /usr/local /usr/local/emhttp /usr/local/emhttp/plugins "${INSTALL_DIR}"; do
+    if [ -d "$DIR" ] && [ "$(stat -c '%u:%g' "$DIR")" != "0:0" ]; then
+        if chown root:root "$DIR"; then
+            echo "✓ Restored root ownership of ${DIR}"
+        else
+            echo "⚠ Could not restore root ownership of ${DIR}"
+        fi
+    fi
+done
 
 # Set executable permissions
 echo "Setting permissions..."

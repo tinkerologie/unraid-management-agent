@@ -25,6 +25,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and cycle. Vendor serial numbers are never reported.
   ([#225](https://github.com/tinkerologie/unraid-management-agent/issues/225))
 
+### Security
+
+- **Bundle extraction no longer changes system directory owners** — release bundles
+  stored every entry with the GitHub Actions runner owner (uid/gid 1001), and the
+  installer's root `tar -xzf` applied it to `/usr`, `/usr/local`, `/usr/local/emhttp`
+  and `/usr/local/emhttp/plugins` on every install and boot. The installer now extracts
+  with `--no-same-owner --no-overwrite-dir`, restores `root:root` (non-recursive) on
+  those directories and the plugin directory when an earlier install changed them, and
+  `make package` builds the archive with numeric owner `0/0` on GNU tar and bsdtar. The
+  release workflow refuses to publish a bundle with any other owner, and a new
+  `Bundle Ownership` CI job (`make test-packaging`) runs the `.plg` extraction command and
+  repair loop as root against a uid-1001 archive and checks tar flag selection. Reported in #239.
+  ([#242](https://github.com/tinkerologie/unraid-management-agent/issues/242)).
+
 ### Changed
 - Pull requests get path labels and at most one type label, `bug` or `enhancement`, from the shared tinkerologie PR labeler. Dependabot pull requests whose largest update is a patch or minor version merge automatically once the checks and commit statuses on their head commit have finished without a failure (a Codecov check that is still pending is not waited for; a Codecov failure blocks); majors, and pull requests with open review threads, stay for review.
 - Release workflows hardened (least-privilege job permissions, no expressions in shell scripts, no persisted checkout credentials, no dependency caches); scheduled workflows run on Australia/Brisbane time.

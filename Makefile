@@ -5,7 +5,7 @@ PLUGIN_DIR := meta/plugin
 DATE := $(shell date '+%Y.%m.%d')
 HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo "dev")
 
-.PHONY: all local release package clean test test-coverage deps swagger pre-commit-install pre-commit-run lint security-check
+.PHONY: all local release package clean test test-packaging test-coverage deps swagger pre-commit-install pre-commit-run lint security-check
 
 all: test local
 
@@ -42,12 +42,20 @@ package: release
 	cp VERSION $(BUILD_DIR)/usr/local/emhttp/plugins/$(BINARY)/
 	COPYFILE_DISABLE=1 cp -r $(PLUGIN_DIR)/. $(BUILD_DIR)/usr/local/emhttp/plugins/$(BINARY)/
 	find $(BUILD_DIR)/usr/local/emhttp/plugins/$(BINARY) -name '._*' -delete 2>/dev/null || true
-	cd $(BUILD_DIR) && COPYFILE_DISABLE=1 tar -czf $(BINARY)-$(VERSION).tgz usr/
+	@# Archive entries must be owned by root so extraction never chowns system dirs (#242)
+	OWNER_FLAGS=$$(sh scripts/tar-owner-flags.sh) && \
+		cd $(BUILD_DIR) && COPYFILE_DISABLE=1 tar $$OWNER_FLAGS -czf $(BINARY)-$(VERSION).tgz usr/
 	@echo "Package created: $(BUILD_DIR)/$(BINARY)-$(VERSION).tgz"
 
 test:
 	@echo "Running tests..."
 	go test -v ./...
+
+test-packaging: package
+	@echo "Running bundle packaging tests..."
+	bash scripts/test-bundle-extraction.sh check-tar-flags
+	bash scripts/test-bundle-extraction.sh check-owners $(BUILD_DIR)/$(BINARY)-$(VERSION).tgz
+	sudo bash scripts/test-bundle-extraction.sh
 
 test-coverage:
 	@echo "Running tests with coverage..."

@@ -70,3 +70,26 @@ jobs:
           files: ./junit.xml
           use_oidc: ${{ env.CODECOV_OIDC == 'true' }}
           fail_ci_if_error: ${{ env.CODECOV_OIDC == 'true' }}
+
+  bundle-ownership:
+    name: Bundle Ownership
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # check out the repository
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      # Builds the bundle, checks every entry is 0/0, then runs the .plg
+      # extraction command as root against a uid-1001 archive (#242)
+      - name: Run packaging tests
+        run: make test-packaging

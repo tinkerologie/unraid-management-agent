@@ -181,6 +181,14 @@ jobs:
           echo "✅ Package created: $PACKAGE_FILE"
           ls -lh "$PACKAGE_FILE"
 
+      # Block publishing a bundle that would chown system directories on install (#242)
+      - name: Verify package entries are owned by root
+        env:
+          DETECT_VERSION: ${{ needs.detect.outputs.version }}
+        run: |
+          bash scripts/test-bundle-extraction.sh check-owners \
+            "build/unraid-management-agent-${DETECT_VERSION}.tgz"
+
       - name: Calculate MD5 checksum
         id: checksum
         env:
