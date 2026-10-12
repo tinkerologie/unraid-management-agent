@@ -8,8 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  id-token: write
+  contents: read # jobs request only what they need
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -24,6 +23,9 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
 
     runs-on: ubuntu-latest
+    permissions:
+      contents: read # check out the repository
+      id-token: write # Codecov OIDC upload
     # Skip the expensive coverage run on draft PRs to conserve runner capacity;
     # it still runs on pushes to main, workflow_dispatch, and ready (non-draft) PRs.
     steps:
@@ -31,6 +33,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
@@ -41,7 +44,7 @@ jobs:
 
       - name: Run tests with coverage and JUnit output
         run: |
-          $(go env GOPATH)/bin/gotestsum \
+          "$(go env GOPATH)/bin/gotestsum" \
             --junitfile junit.xml \
             --format standard-quiet \
             -- -covermode=atomic -coverprofile=coverage.out ./...

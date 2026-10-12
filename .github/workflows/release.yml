@@ -26,7 +26,7 @@ on:
         default: ''
 
 permissions:
-  contents: write
+  contents: read # jobs request only what they need
 
 # Never run two releases at once (e.g. a tag push racing the auto-detection).
 concurrency:
@@ -45,30 +45,35 @@ jobs:
       prerelease: ${{ steps.decide.outputs.prerelease }}
       checkout_ref: ${{ steps.decide.outputs.checkout_ref }}
 
+    permissions:
+      contents: read # check out the repository
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Decide whether to release
         id: decide
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
           SHOULD_RELEASE="false"
           TAG=""
           VERSION=""
           CHECKOUT_REF="${GITHUB_SHA}"
 
-          if [ "${{ github.event_name }}" == "push" ] && [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+          if [ "${GITHUB_EVENT_NAME}" == "push" ] && [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             # Classic flow: a v* tag was pushed manually.
             TAG=${GITHUB_REF#refs/tags/}
             VERSION=${TAG#v}
             CHECKOUT_REF="${GITHUB_REF}"
             SHOULD_RELEASE="true"
             echo "Trigger: tag push ($TAG)"
-          elif [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -n "${{ github.event.inputs.tag }}" ]; then
+          elif [ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ] && [ -n "${INPUT_TAG}" ]; then
             # Manual dispatch with an explicit tag.
-            TAG="${{ github.event.inputs.tag }}"
+            TAG="${INPUT_TAG}"
             VERSION=${TAG#v}
             CHECKOUT_REF="$TAG"
             SHOULD_RELEASE="true"
@@ -121,22 +126,29 @@ jobs:
     if: needs.detect.outputs.should_release == 'true'
 
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the GitHub release and tag
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.detect.outputs.checkout_ref }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
 
+          cache: false
+
       - name: Verify VERSION file matches tag
+        env:
+          DETECT_VERSION: ${{ needs.detect.outputs.version }}
         run: |
           FILE_VERSION=$(tr -d '[:space:]' < VERSION)
-          TAG_VERSION="${{ needs.detect.outputs.version }}"
+          TAG_VERSION="${DETECT_VERSION}"
 
           if [ "$FILE_VERSION" != "$TAG_VERSION" ]; then
             echo "ERROR: VERSION file ($FILE_VERSION) does not match tag ($TAG_VERSION)"
@@ -152,12 +164,14 @@ jobs:
           echo "✅ swag installed"
 
       - name: Build release package
+        env:
+          DETECT_VERSION: ${{ needs.detect.outputs.version }}
         run: |
           echo "Building release package..."
           make package
 
           # Verify the package was created
-          PACKAGE_FILE="build/unraid-management-agent-${{ needs.detect.outputs.version }}.tgz"
+          PACKAGE_FILE="build/unraid-management-agent-${DETECT_VERSION}.tgz"
           if [ ! -f "$PACKAGE_FILE" ]; then
             echo "ERROR: Package file not found: $PACKAGE_FILE"
             ls -la build/
@@ -169,8 +183,10 @@ jobs:
 
       - name: Calculate MD5 checksum
         id: checksum
+        env:
+          DETECT_VERSION: ${{ needs.detect.outputs.version }}
         run: |
-          PACKAGE_FILE="build/unraid-management-agent-${{ needs.detect.outputs.version }}.tgz"
+          PACKAGE_FILE="build/unraid-management-agent-${DETECT_VERSION}.tgz"
 
           # Calculate MD5 checksum (Linux uses md5sum, macOS uses md5)
           if command -v md5sum &> /dev/null; then
@@ -187,8 +203,11 @@ jobs:
 
       - name: Extract release notes from CHANGELOG
         id: changelog
+        env:
+          DETECT_VERSION: ${{ needs.detect.outputs.version }}
+          CHECKSUM_MD5: ${{ steps.checksum.outputs.md5 }}
         run: |
-          VERSION="${{ needs.detect.outputs.version }}"
+          VERSION="${DETECT_VERSION}"
 
           # Extract this version's section body: everything between the
           # "## [VERSION]" heading and the next "## [" heading (or EOF when it
@@ -210,11 +229,11 @@ jobs:
             printf '%s\n' "$NOTES" > build/RELEASE_NOTES.md
             {
               echo ""
-              echo "See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for the full history."
+              echo "See [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md) for the full history."
             } >> build/RELEASE_NOTES.md
           else
             echo "::warning::No release notes found for version $VERSION in CHANGELOG.md"
-            echo "See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details." > build/RELEASE_NOTES.md
+            echo "See [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md) for details." > build/RELEASE_NOTES.md
           fi
 
           # Add MD5 checksum to release notes
@@ -224,7 +243,7 @@ jobs:
             echo ""
             echo "**MD5 Checksum:**"
             echo '```'
-            echo "${{ steps.checksum.outputs.md5 }}  unraid-management-agent-$VERSION.tgz"
+            echo "${CHECKSUM_MD5}  unraid-management-agent-$VERSION.tgz"
             echo '```'
           } >> build/RELEASE_NOTES.md
 
@@ -248,9 +267,12 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update PLG files with MD5 hash
+        env:
+          CHECKSUM_MD5: ${{ steps.checksum.outputs.md5 }}
+          DETECT_VERSION: ${{ needs.detect.outputs.version }}
         run: |
-          MD5="${{ steps.checksum.outputs.md5 }}"
-          VERSION="${{ needs.detect.outputs.version }}"
+          MD5="${CHECKSUM_MD5}"
+          VERSION="${DETECT_VERSION}"
 
           echo "Updating PLG file with MD5: $MD5"
 
@@ -263,7 +285,23 @@ jobs:
           echo "Root PLG MD5:"
           grep "ENTITY md5" unraid-management-agent.plg
 
+      # main requires pull requests; the Unraid plugin manager and Community Applications read
+      # the .plg from main, so its new hash is pushed with the Tinkerologie-Release app, the
+      # only actor the ruleset lets bypass that rule (GITHUB_TOKEN cannot be a bypass actor).
+      - name: Mint Tinkerologie-Release token
+        id: release-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.TINKER_RELEASE_CLIENT_ID }}
+          private-key: ${{ secrets.TINKER_RELEASE_PRIVATE_KEY }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write # push the PLG hash commit to main
+
       - name: Commit and push PLG updates
+        env:
+          CHECKSUM_MD5: ${{ steps.checksum.outputs.md5 }}
+          DETECT_VERSION: ${{ needs.detect.outputs.version }}
+          PLG_PUSH_TOKEN: ${{ steps.release-token.outputs.token }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -278,27 +316,31 @@ jobs:
             git pull origin main
 
             # Refresh the root PLG file with the final release MD5
-            MD5="${{ steps.checksum.outputs.md5 }}"
+            MD5="${CHECKSUM_MD5}"
             sed -i "s/<!ENTITY md5.*\".*\">/<!ENTITY md5         \"$MD5\">/" unraid-management-agent.plg
 
             git add unraid-management-agent.plg
-            git commit -m "chore: update PLG MD5 hash for v${{ needs.detect.outputs.version }} [skip ci]"
-            git push origin main
+            git commit -m "chore: update PLG MD5 hash for v${DETECT_VERSION} [skip ci]"
+            git push "https://x-access-token:${PLG_PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" main
             echo "✅ Committed and pushed PLG update"
           fi
 
       - name: Release Summary
+        env:
+          DETECT_VERSION: ${{ needs.detect.outputs.version }}
+          CHECKSUM_MD5: ${{ steps.checksum.outputs.md5 }}
+          DETECT_PRERELEASE: ${{ needs.detect.outputs.prerelease }}
         run: |
-          echo "## 🎉 v${{ needs.detect.outputs.version }} Created Successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "## 🎉 v${DETECT_VERSION} Created Successfully!" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Package:** \`unraid-management-agent-${{ needs.detect.outputs.version }}.tgz\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Package:** \`unraid-management-agent-${DETECT_VERSION}.tgz\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**MD5 Checksum:** \`${{ steps.checksum.outputs.md5 }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**MD5 Checksum:** \`${CHECKSUM_MD5}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Release URL:** https://github.com/${{ github.repository }}/releases/tag/v${{ needs.detect.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Release URL:** https://github.com/${GITHUB_REPOSITORY}/releases/tag/v${DETECT_VERSION}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          if [ "${{ needs.detect.outputs.prerelease }}" == "true" ]; then
+          if [ "${DETECT_PRERELEASE}" == "true" ]; then
             echo "**Type:** Pre-release" >> $GITHUB_STEP_SUMMARY
           else
             echo "**Type:** Stable release" >> $GITHUB_STEP_SUMMARY
