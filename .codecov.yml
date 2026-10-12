@@ -13,8 +13,10 @@ coverage:
         if_ci_failed: error
     patch:
       default:
-        target: auto
-        threshold: 2%
+        # At least 90% of added or changed lines must be covered by tests.
+        target: 90%
+        threshold: 0%
+        informational: false
         if_ci_failed: error
 
 comment:
