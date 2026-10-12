@@ -1,0 +1,121 @@
+	Identifier                                : 0x11 (QSFP28)
+	Extended identifier                       : 0x8c
+	Extended identifier description           : 2.5W max. Power consumption
+	Extended identifier description           : CDR present in TX, CDR present in RX
+	Extended identifier description           :  High Power Class (> 3.5 W) not enabled
+	Power set                                 : Off
+	Power override                            : On
+	Connector                                 : 0x23 (No separable connector)
+	Transceiver codes                         : 0x80 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+	Transceiver type                          : 100G Ethernet: 100G AOC or 25GAUI C2M AOC with worst BER of 5x10^(-5)
+	Encoding                                  : 0x05 (64B/66B)
+	BR Nominal                                : 25500Mbps
+	Rate identifier                           : 0x02
+	Length (SMF)                              : 0km
+	Length (OM3)                              : 0m
+	Length (OM2)                              : 0m
+	Length (OM1)                              : 0m
+	Length (Copper or Active cable)           : 3m
+	Transmitter technology                    : 0x00 (850 nm VCSEL)
+	Laser wavelength                          : 850.0000nm
+	Laser wavelength tolerance                : 100.0000nm
+	Vendor name                               : CISCO-PROLINE
+	Vendor OUI                                : 00:00:00
+	Vendor PN                                 : QSFP-100G-AOC-3M
+	Vendor rev                                : D1
+	Revision Compliance                       : Unallocated
+	Rx loss of signal                         : None
+	Tx loss of signal                         : None
+	Rx loss of lock                           : None
+	Tx loss of lock                           : None
+	Module temperature                        : 52.18 degrees C / 125.93 degrees F
+	Module voltage                            : 3.1860 V
+	Alarm/warning flags implemented           : Yes
+	Laser tx bias current (Channel 1)         : 7.266 mA
+	Laser tx bias current (Channel 2)         : 7.518 mA
+	Laser tx bias current (Channel 3)         : 7.014 mA
+	Laser tx bias current (Channel 4)         : 6.426 mA
+	Transmit avg optical power (Channel 1)    : 1.4532 mW / 1.62 dBm
+	Transmit avg optical power (Channel 2)    : 1.5036 mW / 1.77 dBm
+	Transmit avg optical power (Channel 3)    : 1.4028 mW / 1.47 dBm
+	Transmit avg optical power (Channel 4)    : 1.2852 mW / 1.09 dBm
+	Rcvr signal avg optical power (Channel 1) : 2.1264 mW / 3.28 dBm
+	Rcvr signal avg optical power (Channel 2) : 2.2392 mW / 3.50 dBm
+	Rcvr signal avg optical power (Channel 3) : 2.3512 mW / 3.71 dBm
+	Rcvr signal avg optical power (Channel 4) : 2.2816 mW / 3.58 dBm
+	Laser bias current high alarm (Chan 1)    : Off
+	Laser bias current high alarm (Chan 2)    : Off
+	Laser bias current high alarm (Chan 3)    : Off
+	Laser bias current high alarm (Chan 4)    : Off
+	Laser bias current low alarm (Chan 1)     : Off
+	Laser bias current low alarm (Chan 2)     : Off
+	Laser bias current low alarm (Chan 3)     : Off
+	Laser bias current low alarm (Chan 4)     : Off
+	Laser bias current high warning (Chan 1)  : Off
+	Laser bias current high warning (Chan 2)  : Off
+	Laser bias current high warning (Chan 3)  : Off
+	Laser bias current high warning (Chan 4)  : Off
+	Laser bias current low warning (Chan 1)   : Off
+	Laser bias current low warning (Chan 2)   : Off
+	Laser bias current low warning (Chan 3)   : Off
+	Laser bias current low warning (Chan 4)   : Off
+	Laser tx power high alarm (Chan 1)        : Off
+	Laser tx power high alarm (Chan 2)        : Off
+	Laser tx power high alarm (Chan 3)        : Off
+	Laser tx power high alarm (Chan 4)        : Off
+	Laser tx power low alarm (Chan 1)         : Off
+	Laser tx power low alarm (Chan 2)         : Off
+	Laser tx power low alarm (Chan 3)         : Off
+	Laser tx power low alarm (Chan 4)         : Off
+	Laser tx power high warning (Chan 1)      : Off
+	Laser tx power high warning (Chan 2)      : Off
+	Laser tx power high warning (Chan 3)      : Off
+	Laser tx power high warning (Chan 4)      : Off
+	Laser tx power low warning (Chan 1)       : Off
+	Laser tx power low warning (Chan 2)       : Off
+	Laser tx power low warning (Chan 3)       : Off
+	Laser tx power low warning (Chan 4)       : Off
+	Laser rx power high alarm (Chan 1)        : Off
+	Laser rx power high alarm (Chan 2)        : Off
+	Laser rx power high alarm (Chan 3)        : Off
+	Laser rx power high alarm (Chan 4)        : Off
+	Laser rx power low alarm (Chan 1)         : Off
+	Laser rx power low alarm (Chan 2)         : Off
+	Laser rx power low alarm (Chan 3)         : Off
+	Laser rx power low alarm (Chan 4)         : Off
+	Laser rx power high warning (Chan 1)      : Off
+	Laser rx power high warning (Chan 2)      : Off
+	Laser rx power high warning (Chan 3)      : Off
+	Laser rx power high warning (Chan 4)      : Off
+	Laser rx power low warning (Chan 1)       : Off
+	Laser rx power low warning (Chan 2)       : Off
+	Laser rx power low warning (Chan 3)       : Off
+	Laser rx power low warning (Chan 4)       : Off
+	Module temperature high alarm             : Off
+	Module temperature low alarm              : Off
+	Module temperature high warning           : Off
+	Module temperature low warning            : Off
+	Module voltage high alarm                 : Off
+	Module voltage low alarm                  : Off
+	Module voltage high warning               : Off
+	Module voltage low warning                : Off
+	Laser bias current high alarm threshold   : 14.000 mA
+	Laser bias current low alarm threshold    : 1.000 mA
+	Laser bias current high warning threshold : 12.000 mA
+	Laser bias current low warning threshold  : 1.500 mA
+	Laser output power high alarm threshold   : 6.5000 mW / 8.13 dBm
+	Laser output power low alarm threshold    : 0.1000 mW / -10.00 dBm
+	Laser output power high warning threshold : 6.3000 mW / 7.99 dBm
+	Laser output power low warning threshold  : 0.2000 mW / -6.99 dBm
+	Module temperature high alarm threshold   : 90.00 degrees C / 194.00 degrees F
+	Module temperature low alarm threshold    : -20.00 degrees C / -4.00 degrees F
+	Module temperature high warning threshold : 80.00 degrees C / 176.00 degrees F
+	Module temperature low warning threshold  : -10.00 degrees C / 14.00 degrees F
+	Module voltage high alarm threshold       : 3.6200 V
+	Module voltage low alarm threshold        : 2.9500 V
+	Module voltage high warning threshold     : 3.6000 V
+	Module voltage low warning threshold      : 3.0000 V
+	Laser rx power high alarm threshold       : 6.5000 mW / 8.13 dBm
+	Laser rx power low alarm threshold        : 0.0500 mW / -13.01 dBm
+	Laser rx power high warning threshold     : 6.3000 mW / 7.99 dBm
+	Laser rx power low warning threshold      : 0.1000 mW / -10.00 dBm

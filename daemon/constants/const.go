@@ -171,6 +171,9 @@ const (
 	// (storcli + sg_ses) in seconds. Shelf hardware state changes rarely and storcli
 	// talks to controller firmware, so the default is deliberately long.
 	IntervalStorageTopology = 300
+	// IntervalNIC is the interval for collecting network cards (hwmon temperatures
+	// and optic diagnostics) in seconds. Sysfs reads plus one ioctl per port.
+	IntervalNIC = 60
 
 	// WSPingInterval is the WebSocket ping interval in seconds.
 	WSPingInterval = 30

@@ -5130,6 +5130,22 @@ func (s *Server) handleStorageTopology(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, dto.NewPendingStorageTopology(time.Now()))
 }
 
+// handleNetworkCards godoc
+//
+//	@Summary		Get network cards
+//	@Description	Returns the cached physical (PCI) network cards collected by the nic collector: one entry per PCI slot with vendor, model, driver, firmware and hwmon temperatures (ASIC, PHY, MAC, module cages), and per port the link state and the plugged optic's identity and digital diagnostics (SFF-8472/SFF-8636: module temperature and voltage, per-lane laser bias and TX/RX power, alarm/warning flags and thresholds). Vendor serial numbers are never reported. State is "pending" until the first collection.
+//	@Tags			Network
+//	@Produce		json
+//	@Success		200	{object}	dto.NICList	"Network cards"
+//	@Router			/network/cards [get]
+func (s *Server) handleNetworkCards(w http.ResponseWriter, _ *http.Request) {
+	if cached := s.GetNICCache(); cached != nil {
+		respondJSON(w, http.StatusOK, cached)
+		return
+	}
+	respondJSON(w, http.StatusOK, dto.NewPendingNICList(time.Now()))
+}
+
 // handleGetMCPToolPolicy godoc
 //
 //	@Summary		Get MCP tool access policy

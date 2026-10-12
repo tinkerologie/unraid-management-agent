@@ -2270,6 +2270,223 @@ definitions:
         description: Timestamp is when this status was collected.
         type: string
     type: object
+  dto.NICCard:
+    properties:
+      device_id:
+        example: 101d
+        type: string
+      device_name:
+        description: DeviceName is the full PCI device name (lspci).
+        example: MT2892 Family [ConnectX-6 Dx]
+        type: string
+      driver:
+        description: Driver is the kernel driver bound to the card's first function.
+        example: mlx5_core
+        type: string
+      firmware_version:
+        description: FirmwareVersion is the firmware version the driver reports (ethtool
+          -i).
+        example: 22.47.3576 (MT_0000000359)
+        type: string
+      id:
+        description: ID is the PCI slot without the function (domain:bus:device),
+          the stable card identifier.
+        example: "0000:41:00"
+        type: string
+      model:
+        description: Model is a short product name derived from DeviceName.
+        example: ConnectX-6 Dx
+        type: string
+      ports:
+        description: Ports lists the card's network interfaces, ordered by PCI function
+          and port.
+        items:
+          $ref: '#/definitions/dto.NICPort'
+        type: array
+      subsystem_device_id:
+        example: "0016"
+        type: string
+      subsystem_name:
+        description: SubsystemName is the PCI subsystem name (lspci), when known.
+        example: Device 0016
+        type: string
+      subsystem_vendor_id:
+        example: 15b3
+        type: string
+      temperatures:
+        description: Temperatures lists the card's hwmon temperature sensors.
+        items:
+          $ref: '#/definitions/dto.NICTemperature'
+        type: array
+      vendor:
+        description: Vendor is the PCI vendor name (lspci), or the vendor ID when
+          unknown.
+        example: Mellanox Technologies
+        type: string
+      vendor_id:
+        description: VendorID, DeviceID, SubsystemVendorID and SubsystemDeviceID are
+          the PCI IDs (hex, no prefix).
+        example: 15b3
+        type: string
+    type: object
+  dto.NICList:
+    description: Physical network cards with hwmon temperatures, port link state and
+      SFP/QSFP optic diagnostics (DDM).
+    properties:
+      cards:
+        description: Cards lists one entry per PCI slot (ports of a multi-function
+          card are grouped).
+        items:
+          $ref: '#/definitions/dto.NICCard'
+        type: array
+      collection_duration_ms:
+        description: CollectionDurationMs is how long the collection cycle took.
+        example: 12
+        type: integer
+      errors:
+        description: Errors lists non-fatal problems hit while collecting.
+        items:
+          type: string
+        type: array
+      state:
+        description: State is "pending" or "ok".
+        example: ok
+        type: string
+      timestamp:
+        description: Timestamp is when the data was collected.
+        type: string
+    type: object
+  dto.NICModule:
+    properties:
+      alarms:
+        description: |-
+          Alarms and Warnings list the alarm and warning flags that are set, e.g.
+          "temperature_high" or "lane2_rx_power_low". SFF-8636 flags are latched:
+          they report events since the previous read.
+        items:
+          type: string
+        type: array
+      compliance:
+        description: Compliance is the Ethernet compliance code (e.g. "100GBASE-SR4
+          or 25GBASE-SR").
+        example: 100G AOC or 25GAUI C2M AOC (BER 5e-5)
+        type: string
+      connector:
+        description: Connector is the SFF-8024 connector type.
+        example: No separable connector
+        type: string
+      data_not_ready:
+        description: |-
+          DataNotReady is true while the module flags its monitors as not ready
+          (powering up or resetting); readings and flags are omitted then.
+        type: boolean
+      ddm_supported:
+        description: DDMSupported is true when the module reports digital diagnostics.
+        example: true
+        type: boolean
+      error:
+        description: Error explains why the module could not be read or decoded, if
+          it could not.
+        type: string
+      identifier:
+        description: Identifier is the SFF-8024 module type (e.g. "SFP/SFP+/SFP28",
+          "QSFP28").
+        example: QSFP28
+        type: string
+      lanes:
+        description: Lanes holds per-lane laser bias and optical power (1 lane for
+          SFP, 4 for QSFP).
+        items:
+          $ref: '#/definitions/dto.NICModuleLane'
+        type: array
+      rx_power_type:
+        description: RxPowerType is "average" or "oma" (optical modulation amplitude).
+        example: average
+        type: string
+      standard:
+        description: |-
+          Standard is the management interface decoded: "SFF-8472", "SFF-8636" or "SFF-8436"
+          (empty when the module type is not decoded, e.g. CMIS).
+        example: SFF-8636
+        type: string
+      temperature_celsius:
+        description: TemperatureCelsius is the module's internal temperature.
+        example: 50.43
+        type: number
+      thresholds:
+        allOf:
+        - $ref: '#/definitions/dto.NICModuleThresholds'
+        description: Thresholds are the module's alarm and warning limits, when it
+          reports them.
+      vendor_name:
+        description: VendorName, VendorPN and VendorRev identify the module.
+        example: CISCO-PROLINE
+        type: string
+      vendor_oui:
+        description: VendorOUI is the vendor's IEEE company ID (empty when all zero).
+        example: 00:02:c9
+        type: string
+      vendor_pn:
+        example: QSFP-100G-AOC-3M
+        type: string
+      vendor_rev:
+        example: D1
+        type: string
+      voltage_volts:
+        description: VoltageVolts is the module's supply voltage.
+        example: 3.2676
+        type: number
+      warnings:
+        items:
+          type: string
+        type: array
+      wavelength_nm:
+        description: WavelengthNm is the nominal laser wavelength (optical modules
+          only).
+        example: 850
+        type: number
+    type: object
+  dto.NICModuleLane:
+    properties:
+      lane:
+        description: Lane is the lane number, starting at 1.
+        example: 1
+        type: integer
+      rx_power_dbm:
+        example: 3.64
+        type: number
+      rx_power_mw:
+        description: |-
+          RxPowerMW and RxPowerDBm are the received optical power. dBm is floored at
+          -40 (the 0.1 µW resolution of the measurement) when no light is received.
+        example: 2.3136
+        type: number
+      tx_bias_ma:
+        description: TxBiasMA is the laser bias current in mA.
+        example: 6.846
+        type: number
+      tx_power_dbm:
+        example: 1.36
+        type: number
+      tx_power_mw:
+        description: TxPowerMW and TxPowerDBm are the transmitted optical power (absent
+          when not measured).
+        example: 1.3692
+        type: number
+    type: object
+  dto.NICModuleThresholds:
+    properties:
+      rx_power_dbm:
+        $ref: '#/definitions/dto.NICThreshold'
+      temperature_celsius:
+        $ref: '#/definitions/dto.NICThreshold'
+      tx_bias_ma:
+        $ref: '#/definitions/dto.NICThreshold'
+      tx_power_dbm:
+        $ref: '#/definitions/dto.NICThreshold'
+      voltage_volts:
+        $ref: '#/definitions/dto.NICThreshold'
+    type: object
   dto.NICOffloadInfo:
     properties:
       generic_receive_offload:
@@ -2300,6 +2517,58 @@ definitions:
         example: "on"
         type: string
     type: object
+  dto.NICPort:
+    properties:
+      carrier:
+        description: Carrier is true when the link is up.
+        example: true
+        type: boolean
+      dev_port:
+        description: DevPort is the port number within the PCI function (sysfs dev_port).
+        example: 0
+        type: integer
+      duplex:
+        description: Duplex is "full" or "half", when the link is up.
+        example: full
+        type: string
+      id:
+        description: |-
+          ID is the stable port identifier: the PCI function address, with "-<dev_port>"
+          appended for the second and later ports of a single function (e.g. mlx4).
+        example: "0000:41:00.0"
+        type: string
+      interface:
+        description: Interface is the kernel interface name.
+        example: eth0
+        type: string
+      master:
+        description: Master is the bond or bridge the interface is enslaved to, if
+          any.
+        example: bond0
+        type: string
+      module:
+        allOf:
+        - $ref: '#/definitions/dto.NICModule'
+        description: Module describes the plugged transceiver (absent for BASE-T ports
+          and empty cages).
+      mtu:
+        description: MTU is the interface MTU.
+        example: 1500
+        type: integer
+      operstate:
+        description: OperState is the RFC 2863 operational state (up, down, dormant,
+          ...).
+        example: up
+        type: string
+      pci_address:
+        description: PCIAddress is the PCI function address.
+        example: "0000:41:00.0"
+        type: string
+      speed_mbps:
+        description: SpeedMbps is the negotiated link speed, when the link is up.
+        example: 100000
+        type: integer
+    type: object
   dto.NICRingBufferInfo:
     properties:
       rx_current:
@@ -2314,6 +2583,61 @@ definitions:
       tx_max:
         example: 4096
         type: integer
+    type: object
+  dto.NICTemperature:
+    properties:
+      celsius:
+        description: Celsius is the current reading.
+        example: 88
+        type: number
+      crit_celsius:
+        description: CritCelsius is the critical limit (temp*_crit), when reported.
+        example: 105
+        type: number
+      highest_celsius:
+        description: HighestCelsius is the highest reading since the driver loaded
+          (temp*_highest), when reported.
+        example: 90
+        type: number
+      interface:
+        description: |-
+          Interface is the first port of the sensor's PCI function (every sensor but
+          the card-wide ASIC).
+        example: eth0
+        type: string
+      label:
+        description: Label is the hwmon label (temp*_label), or "temp<N>" when the
+          driver sets none.
+        example: asic
+        type: string
+      max_celsius:
+        description: MaxCelsius is the high limit (temp*_max), when reported.
+        type: number
+      pci_address:
+        description: PCIAddress is the PCI function whose hwmon chip reported the
+          sensor.
+        example: "0000:41:00.0"
+        type: string
+      sensor:
+        description: 'Sensor is the sensor kind: "asic", "phy", "mac", "module" or
+          "other".'
+        example: asic
+        type: string
+    type: object
+  dto.NICThreshold:
+    properties:
+      high_alarm:
+        example: 90
+        type: number
+      high_warning:
+        example: 80
+        type: number
+      low_alarm:
+        example: -20
+        type: number
+      low_warning:
+        example: -10
+        type: number
     type: object
   dto.NUTConfig:
     properties:
@@ -7297,6 +7621,25 @@ paths:
           schema:
             $ref: '#/definitions/dto.NetworkAccessURLs'
       summary: Get network access URLs
+      tags:
+      - Network
+  /network/cards:
+    get:
+      description: 'Returns the cached physical (PCI) network cards collected by the
+        nic collector: one entry per PCI slot with vendor, model, driver, firmware
+        and hwmon temperatures (ASIC, PHY, MAC, module cages), and per port the link
+        state and the plugged optic''s identity and digital diagnostics (SFF-8472/SFF-8636:
+        module temperature and voltage, per-lane laser bias and TX/RX power, alarm/warning
+        flags and thresholds). Vendor serial numbers are never reported. State is
+        "pending" until the first collection.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Network cards
+          schema:
+            $ref: '#/definitions/dto.NICList'
+      summary: Get network cards
       tags:
       - Network
   /notifications:

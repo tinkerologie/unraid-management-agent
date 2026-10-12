@@ -416,6 +416,7 @@ UPSes have no load or power reading). They are never sent as a made-up `0`.
 | network_list_update     | 15s      | NetworkCollector         |
 | share_list_update       | 60s      | ShareCollector           |
 | storage_topology_update | 300s     | StorageTopologyCollector |
+| nic_update              | 60s      | NICCollector             |
 
 ---
 

@@ -19,3 +19,17 @@ func TestApplyFileConfigStorageTopologyInterval(t *testing.T) {
 		t.Error("storage_topology must be a valid collector name for --disable-collectors")
 	}
 }
+
+func TestApplyFileConfigNICInterval(t *testing.T) {
+	orig := cli.IntervalNIC
+	t.Cleanup(func() { cli.IntervalNIC = orig })
+
+	interval := 120
+	applyFileConfig(&domain.FileConfig{Intervals: &domain.FileConfigIntervals{NIC: &interval}})
+	if cli.IntervalNIC != 120 {
+		t.Errorf("IntervalNIC = %d, want 120", cli.IntervalNIC)
+	}
+	if !validCollectorNames["nic"] {
+		t.Error("nic must be a valid collector name for --disable-collectors")
+	}
+}

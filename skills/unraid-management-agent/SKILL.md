@@ -2,7 +2,7 @@
 name: unraid-management-agent
 description: >
   Monitor and control an Unraid server via the Unraid Management Agent's MCP
-  server (125 tools, 5 resources, 6 diagnostic prompts) and REST API. Use when:
+  server (126 tools, 5 resources, 6 diagnostic prompts) and REST API. Use when:
   connecting an AI client (Claude, ChatGPT, Cursor, Copilot, Gemini CLI) to
   Unraid; checking system, array, disk, Docker, VM, GPU, UPS, ZFS, or network
   status; starting/stopping containers, VMs, the array, or parity checks;
@@ -24,7 +24,7 @@ exposes its full state and control surface over three interfaces:
 
 | Interface | Endpoint | Use for |
 | --- | --- | --- |
-| **MCP** (Model Context Protocol) | `http://<unraid-ip>:8043/mcp` | AI agents — 125 tools, 5 resources, 6 prompts |
+| **MCP** (Model Context Protocol) | `http://<unraid-ip>:8043/mcp` | AI agents — 126 tools, 5 resources, 6 prompts |
 | **REST API** | `http://<unraid-ip>:8043/api/v1` | Scripts, Custom GPT Actions, integrations |
 | **WebSocket** | `ws://<unraid-ip>:8043/api/v1/ws` | Live event streaming (near real-time) |
 

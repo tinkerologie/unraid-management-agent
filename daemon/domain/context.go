@@ -32,6 +32,8 @@ type Intervals struct {
 
 	// StorageTopology is the storage_topology collector interval in seconds.
 	StorageTopology int
+	// NIC is the nic collector interval in seconds.
+	NIC int
 }
 
 // Context holds the application runtime context including the event hub and configuration.

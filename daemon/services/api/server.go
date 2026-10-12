@@ -177,6 +177,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/system/flash", s.handleFlashHealth).Methods("GET") // Issue #51
 	api.HandleFunc("/network", s.handleNetwork).Methods("GET")
 	api.HandleFunc("/network/access-urls", s.handleNetworkAccessURLs).Methods("GET")
+	api.HandleFunc("/network/cards", s.handleNetworkCards).Methods("GET")
 
 	// ZFS endpoints
 	api.HandleFunc("/zfs/pools", s.handleZFSPools).Methods("GET")

@@ -127,7 +127,7 @@ func TestCollectorManager_RegisterAllCollectors(t *testing.T) {
 		"gpu", "shares", "network", "hardware", "zfs", "notification",
 		"registration", "unassigned", "fancontrol", "tuning", "docker_update",
 		"docker_networks", "plugin_update", "os_update", "mover",
-		"storage_topology",
+		"storage_topology", "nic",
 	}
 
 	if len(names) != len(expectedNames) {
@@ -222,5 +222,26 @@ func TestCollectorManager_StorageTopologyFactory(t *testing.T) {
 	}
 	if got := cm.getDefaultInterval("storage_topology"); got != constants.IntervalStorageTopology {
 		t.Errorf("default interval = %d, want %d", got, constants.IntervalStorageTopology)
+	}
+}
+
+func TestCollectorManager_NICFactory(t *testing.T) {
+	ctx := createTestContext()
+	var wg sync.WaitGroup
+	cm := NewCollectorManager(ctx, &wg)
+	cm.RegisterAllCollectors()
+
+	mc, ok := cm.collectors["nic"]
+	if !ok {
+		t.Fatal("nic collector not registered")
+	}
+	if mc.Required {
+		t.Error("nic must be optional")
+	}
+	if _, ok := mc.factory(ctx).(*collectors.NICCollector); !ok {
+		t.Errorf("factory returned %T", mc.factory(ctx))
+	}
+	if got := cm.getDefaultInterval("nic"); got != constants.IntervalNIC {
+		t.Errorf("default interval = %d, want %d", got, constants.IntervalNIC)
 	}
 }

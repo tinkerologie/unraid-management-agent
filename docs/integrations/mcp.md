@@ -233,6 +233,12 @@ The STDIO transport (`mcp-stdio`) does not go through the HTTP server, so no tok
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `get_storage_topology` | Return the cached SAS storage topology from storcli and sg_ses: controllers (firmware, temperature, PCIe link, port link rates/widths), enclosures (PSUs, fans, sensors, I/O module firmware, cabling, path redundancy, problems) and drive paths/link speeds/error counters (read-only) |
 
+### Network Card Tools
+
+| Tool                | Description                                                                                                                                                                                                                                                                                   |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_network_cards` | Return the cached PCI network cards: model, driver, firmware and hwmon temperatures (ASIC, PHY, MAC, module cages) per card; link state and the plugged SFP/QSFP optic's identity and diagnostics (module temperature/voltage, per-lane bias and TX/RX power, alarm/warning flags, thresholds) per port (read-only) |
+
 ### Alerting & Trend Analysis Tools
 
 | Tool                    | Description                                                                                                                                                                                                                                   |
@@ -389,7 +395,7 @@ check_plugin_updates, get_service_status, list_services, list_processes,
 get_notifications, get_notifications_overview, list_log_files, get_log_content,
 get_syslog, get_docker_log, get_parity_history, list_user_scripts,
 list_collectors, get_collector_status, get_system_settings,
-get_os_update, get_mover_status, get_storage_topology,
+get_os_update, get_mover_status, get_storage_topology, get_network_cards,
 list_alert_templates, query_metric_history, list_runbooks, find_root_cause
 ```
 

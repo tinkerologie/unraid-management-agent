@@ -3363,6 +3363,26 @@
                 }
             }
         },
+        "/network/cards": {
+            "get": {
+                "description": "Returns the cached physical (PCI) network cards collected by the nic collector: one entry per PCI slot with vendor, model, driver, firmware and hwmon temperatures (ASIC, PHY, MAC, module cages), and per port the link state and the plugged optic's identity and digital diagnostics (SFF-8472/SFF-8636: module temperature and voltage, per-lane laser bias and TX/RX power, alarm/warning flags and thresholds). Vendor serial numbers are never reported. State is \"pending\" until the first collection.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Network"
+                ],
+                "summary": "Get network cards",
+                "responses": {
+                    "200": {
+                        "description": "Network cards",
+                        "schema": {
+                            "$ref": "#/definitions/dto.NICList"
+                        }
+                    }
+                }
+            }
+        },
         "/network/{interface}/config": {
             "get": {
                 "description": "Retrieve configuration for a specific network interface",
@@ -9006,6 +9026,268 @@
                 }
             }
         },
+        "dto.NICCard": {
+            "type": "object",
+            "properties": {
+                "device_id": {
+                    "type": "string",
+                    "example": "101d"
+                },
+                "device_name": {
+                    "description": "DeviceName is the full PCI device name (lspci).",
+                    "type": "string",
+                    "example": "MT2892 Family [ConnectX-6 Dx]"
+                },
+                "driver": {
+                    "description": "Driver is the kernel driver bound to the card's first function.",
+                    "type": "string",
+                    "example": "mlx5_core"
+                },
+                "firmware_version": {
+                    "description": "FirmwareVersion is the firmware version the driver reports (ethtool -i).",
+                    "type": "string",
+                    "example": "22.47.3576 (MT_0000000359)"
+                },
+                "id": {
+                    "description": "ID is the PCI slot without the function (domain:bus:device), the stable card identifier.",
+                    "type": "string",
+                    "example": "0000:41:00"
+                },
+                "model": {
+                    "description": "Model is a short product name derived from DeviceName.",
+                    "type": "string",
+                    "example": "ConnectX-6 Dx"
+                },
+                "ports": {
+                    "description": "Ports lists the card's network interfaces, ordered by PCI function and port.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.NICPort"
+                    }
+                },
+                "subsystem_device_id": {
+                    "type": "string",
+                    "example": "0016"
+                },
+                "subsystem_name": {
+                    "description": "SubsystemName is the PCI subsystem name (lspci), when known.",
+                    "type": "string",
+                    "example": "Device 0016"
+                },
+                "subsystem_vendor_id": {
+                    "type": "string",
+                    "example": "15b3"
+                },
+                "temperatures": {
+                    "description": "Temperatures lists the card's hwmon temperature sensors.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.NICTemperature"
+                    }
+                },
+                "vendor": {
+                    "description": "Vendor is the PCI vendor name (lspci), or the vendor ID when unknown.",
+                    "type": "string",
+                    "example": "Mellanox Technologies"
+                },
+                "vendor_id": {
+                    "description": "VendorID, DeviceID, SubsystemVendorID and SubsystemDeviceID are the PCI IDs (hex, no prefix).",
+                    "type": "string",
+                    "example": "15b3"
+                }
+            }
+        },
+        "dto.NICList": {
+            "description": "Physical network cards with hwmon temperatures, port link state and SFP/QSFP optic diagnostics (DDM).",
+            "type": "object",
+            "properties": {
+                "cards": {
+                    "description": "Cards lists one entry per PCI slot (ports of a multi-function card are grouped).",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.NICCard"
+                    }
+                },
+                "collection_duration_ms": {
+                    "description": "CollectionDurationMs is how long the collection cycle took.",
+                    "type": "integer",
+                    "example": 12
+                },
+                "errors": {
+                    "description": "Errors lists non-fatal problems hit while collecting.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "state": {
+                    "description": "State is \"pending\" or \"ok\".",
+                    "type": "string",
+                    "example": "ok"
+                },
+                "timestamp": {
+                    "description": "Timestamp is when the data was collected.",
+                    "type": "string"
+                }
+            }
+        },
+        "dto.NICModule": {
+            "type": "object",
+            "properties": {
+                "alarms": {
+                    "description": "Alarms and Warnings list the alarm and warning flags that are set, e.g.\n\"temperature_high\" or \"lane2_rx_power_low\". SFF-8636 flags are latched:\nthey report events since the previous read.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "compliance": {
+                    "description": "Compliance is the Ethernet compliance code (e.g. \"100GBASE-SR4 or 25GBASE-SR\").",
+                    "type": "string",
+                    "example": "100G AOC or 25GAUI C2M AOC (BER 5e-5)"
+                },
+                "connector": {
+                    "description": "Connector is the SFF-8024 connector type.",
+                    "type": "string",
+                    "example": "No separable connector"
+                },
+                "data_not_ready": {
+                    "description": "DataNotReady is true while the module flags its monitors as not ready\n(powering up or resetting); readings and flags are omitted then.",
+                    "type": "boolean"
+                },
+                "ddm_supported": {
+                    "description": "DDMSupported is true when the module reports digital diagnostics.",
+                    "type": "boolean",
+                    "example": true
+                },
+                "error": {
+                    "description": "Error explains why the module could not be read or decoded, if it could not.",
+                    "type": "string"
+                },
+                "identifier": {
+                    "description": "Identifier is the SFF-8024 module type (e.g. \"SFP/SFP+/SFP28\", \"QSFP28\").",
+                    "type": "string",
+                    "example": "QSFP28"
+                },
+                "lanes": {
+                    "description": "Lanes holds per-lane laser bias and optical power (1 lane for SFP, 4 for QSFP).",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.NICModuleLane"
+                    }
+                },
+                "rx_power_type": {
+                    "description": "RxPowerType is \"average\" or \"oma\" (optical modulation amplitude).",
+                    "type": "string",
+                    "example": "average"
+                },
+                "standard": {
+                    "description": "Standard is the management interface decoded: \"SFF-8472\", \"SFF-8636\" or \"SFF-8436\"\n(empty when the module type is not decoded, e.g. CMIS).",
+                    "type": "string",
+                    "example": "SFF-8636"
+                },
+                "temperature_celsius": {
+                    "description": "TemperatureCelsius is the module's internal temperature.",
+                    "type": "number",
+                    "example": 50.43
+                },
+                "thresholds": {
+                    "description": "Thresholds are the module's alarm and warning limits, when it reports them.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.NICModuleThresholds"
+                        }
+                    ]
+                },
+                "vendor_name": {
+                    "description": "VendorName, VendorPN and VendorRev identify the module.",
+                    "type": "string",
+                    "example": "CISCO-PROLINE"
+                },
+                "vendor_oui": {
+                    "description": "VendorOUI is the vendor's IEEE company ID (empty when all zero).",
+                    "type": "string",
+                    "example": "00:02:c9"
+                },
+                "vendor_pn": {
+                    "type": "string",
+                    "example": "QSFP-100G-AOC-3M"
+                },
+                "vendor_rev": {
+                    "type": "string",
+                    "example": "D1"
+                },
+                "voltage_volts": {
+                    "description": "VoltageVolts is the module's supply voltage.",
+                    "type": "number",
+                    "example": 3.2676
+                },
+                "warnings": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "wavelength_nm": {
+                    "description": "WavelengthNm is the nominal laser wavelength (optical modules only).",
+                    "type": "number",
+                    "example": 850
+                }
+            }
+        },
+        "dto.NICModuleLane": {
+            "type": "object",
+            "properties": {
+                "lane": {
+                    "description": "Lane is the lane number, starting at 1.",
+                    "type": "integer",
+                    "example": 1
+                },
+                "rx_power_dbm": {
+                    "type": "number",
+                    "example": 3.64
+                },
+                "rx_power_mw": {
+                    "description": "RxPowerMW and RxPowerDBm are the received optical power. dBm is floored at\n-40 (the 0.1 µW resolution of the measurement) when no light is received.",
+                    "type": "number",
+                    "example": 2.3136
+                },
+                "tx_bias_ma": {
+                    "description": "TxBiasMA is the laser bias current in mA.",
+                    "type": "number",
+                    "example": 6.846
+                },
+                "tx_power_dbm": {
+                    "type": "number",
+                    "example": 1.36
+                },
+                "tx_power_mw": {
+                    "description": "TxPowerMW and TxPowerDBm are the transmitted optical power (absent when not measured).",
+                    "type": "number",
+                    "example": 1.3692
+                }
+            }
+        },
+        "dto.NICModuleThresholds": {
+            "type": "object",
+            "properties": {
+                "rx_power_dbm": {
+                    "$ref": "#/definitions/dto.NICThreshold"
+                },
+                "temperature_celsius": {
+                    "$ref": "#/definitions/dto.NICThreshold"
+                },
+                "tx_bias_ma": {
+                    "$ref": "#/definitions/dto.NICThreshold"
+                },
+                "tx_power_dbm": {
+                    "$ref": "#/definitions/dto.NICThreshold"
+                },
+                "voltage_volts": {
+                    "$ref": "#/definitions/dto.NICThreshold"
+                }
+            }
+        },
         "dto.NICOffloadInfo": {
             "type": "object",
             "properties": {
@@ -9047,6 +9329,69 @@
                 }
             }
         },
+        "dto.NICPort": {
+            "type": "object",
+            "properties": {
+                "carrier": {
+                    "description": "Carrier is true when the link is up.",
+                    "type": "boolean",
+                    "example": true
+                },
+                "dev_port": {
+                    "description": "DevPort is the port number within the PCI function (sysfs dev_port).",
+                    "type": "integer",
+                    "example": 0
+                },
+                "duplex": {
+                    "description": "Duplex is \"full\" or \"half\", when the link is up.",
+                    "type": "string",
+                    "example": "full"
+                },
+                "id": {
+                    "description": "ID is the stable port identifier: the PCI function address, with \"-\u003cdev_port\u003e\"\nappended for the second and later ports of a single function (e.g. mlx4).",
+                    "type": "string",
+                    "example": "0000:41:00.0"
+                },
+                "interface": {
+                    "description": "Interface is the kernel interface name.",
+                    "type": "string",
+                    "example": "eth0"
+                },
+                "master": {
+                    "description": "Master is the bond or bridge the interface is enslaved to, if any.",
+                    "type": "string",
+                    "example": "bond0"
+                },
+                "module": {
+                    "description": "Module describes the plugged transceiver (absent for BASE-T ports and empty cages).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.NICModule"
+                        }
+                    ]
+                },
+                "mtu": {
+                    "description": "MTU is the interface MTU.",
+                    "type": "integer",
+                    "example": 1500
+                },
+                "operstate": {
+                    "description": "OperState is the RFC 2863 operational state (up, down, dormant, ...).",
+                    "type": "string",
+                    "example": "up"
+                },
+                "pci_address": {
+                    "description": "PCIAddress is the PCI function address.",
+                    "type": "string",
+                    "example": "0000:41:00.0"
+                },
+                "speed_mbps": {
+                    "description": "SpeedMbps is the negotiated link speed, when the link is up.",
+                    "type": "integer",
+                    "example": 100000
+                }
+            }
+        },
         "dto.NICRingBufferInfo": {
             "type": "object",
             "properties": {
@@ -9065,6 +9410,71 @@
                 "tx_max": {
                     "type": "integer",
                     "example": 4096
+                }
+            }
+        },
+        "dto.NICTemperature": {
+            "type": "object",
+            "properties": {
+                "celsius": {
+                    "description": "Celsius is the current reading.",
+                    "type": "number",
+                    "example": 88
+                },
+                "crit_celsius": {
+                    "description": "CritCelsius is the critical limit (temp*_crit), when reported.",
+                    "type": "number",
+                    "example": 105
+                },
+                "highest_celsius": {
+                    "description": "HighestCelsius is the highest reading since the driver loaded (temp*_highest), when reported.",
+                    "type": "number",
+                    "example": 90
+                },
+                "interface": {
+                    "description": "Interface is the first port of the sensor's PCI function (every sensor but\nthe card-wide ASIC).",
+                    "type": "string",
+                    "example": "eth0"
+                },
+                "label": {
+                    "description": "Label is the hwmon label (temp*_label), or \"temp\u003cN\u003e\" when the driver sets none.",
+                    "type": "string",
+                    "example": "asic"
+                },
+                "max_celsius": {
+                    "description": "MaxCelsius is the high limit (temp*_max), when reported.",
+                    "type": "number"
+                },
+                "pci_address": {
+                    "description": "PCIAddress is the PCI function whose hwmon chip reported the sensor.",
+                    "type": "string",
+                    "example": "0000:41:00.0"
+                },
+                "sensor": {
+                    "description": "Sensor is the sensor kind: \"asic\", \"phy\", \"mac\", \"module\" or \"other\".",
+                    "type": "string",
+                    "example": "asic"
+                }
+            }
+        },
+        "dto.NICThreshold": {
+            "type": "object",
+            "properties": {
+                "high_alarm": {
+                    "type": "number",
+                    "example": 90
+                },
+                "high_warning": {
+                    "type": "number",
+                    "example": 80
+                },
+                "low_alarm": {
+                    "type": "number",
+                    "example": -20
+                },
+                "low_warning": {
+                    "type": "number",
+                    "example": -10
                 }
             }
         },

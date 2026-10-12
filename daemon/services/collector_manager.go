@@ -289,7 +289,7 @@ func (cm *CollectorManager) GetAllStatus() dto.CollectorsStatusResponse {
 		"ups", "nut", "gpu", "shares", "network",
 		"hardware", "zfs", "notification", "registration", "unassigned",
 		"fancontrol", "tuning", "docker_update", "docker_networks", "plugin_update",
-		"os_update", "mover", "storage_topology",
+		"os_update", "mover", "storage_topology", "nic",
 	}
 
 	for _, name := range collectorOrder {
@@ -389,6 +389,7 @@ func (cm *CollectorManager) getDefaultInterval(name string) int {
 		"mover":           constants.IntervalMover,
 
 		"storage_topology": constants.IntervalStorageTopology,
+		"nic":              constants.IntervalNIC,
 	}
 
 	if interval, ok := defaults[name]; ok {
@@ -590,4 +591,10 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 	cm.Register("storage_topology", func(ctx *domain.Context) Collector {
 		return collectors.NewStorageTopologyCollector(ctx)
 	}, intervals.StorageTopology, false)
+
+	// NIC collector — PCI network cards: hwmon temperatures, port link state and
+	// optic diagnostics (SFF-8472/SFF-8636 via the SIOCETHTOOL ioctl).
+	cm.Register("nic", func(ctx *domain.Context) Collector {
+		return collectors.NewNICCollector(ctx)
+	}, intervals.NIC, false)
 }

@@ -40,6 +40,8 @@ type MockCacheProvider struct {
 	parityHistory *dto.ParityCheckHistory
 	// storageTopology is returned by GetStorageTopologyCache.
 	storageTopology *dto.StorageTopology
+	// nicList is returned by GetNICCache.
+	nicList *dto.NICList
 	// Log and collector mock data
 	logFiles           []dto.LogFile
 	collectorsStatus   dto.CollectorsStatusResponse
@@ -76,6 +78,7 @@ func (m *MockCacheProvider) GetMoverCache() *dto.MoverStatus                { re
 func (m *MockCacheProvider) GetStorageTopologyCache() *dto.StorageTopology {
 	return m.storageTopology
 }
+func (m *MockCacheProvider) GetNICCache() *dto.NICList { return m.nicList }
 
 // Log methods
 func (m *MockCacheProvider) ListLogFiles() []dto.LogFile { return m.logFiles }

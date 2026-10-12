@@ -82,6 +82,7 @@ $interval_hardware = $config['INTERVAL_HARDWARE'] ?? '600';
 $interval_registration = $config['INTERVAL_REGISTRATION'] ?? '600';
 $interval_unassigned = $config['INTERVAL_UNASSIGNED'] ?? '60';
 $interval_storage_topology = $config['INTERVAL_STORAGE_TOPOLOGY'] ?? '300';
+$interval_nic = $config['INTERVAL_NIC'] ?? '60';
 
 // Check if service is running
 exec("pidof $plugin 2>/dev/null", $pids, $pid_rc);
@@ -796,6 +797,12 @@ which subsystems are healthy. Both require the service to be running.
                 <span class="uma-interval-label">GPU Metrics</span>
                 <select name="INTERVAL_GPU" class="uma-interval-select">
                     <?= intervalOptions($interval_gpu, 'standard') ?>
+                </select>
+            </div>
+            <div class="uma-interval-row">
+                <span class="uma-interval-label">Network Cards &amp; Optics</span>
+                <select name="INTERVAL_NIC" class="uma-interval-select">
+                    <?= intervalOptions($interval_nic, 'standard') ?>
                 </select>
             </div>
             <div class="uma-interval-row">

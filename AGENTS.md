@@ -146,6 +146,7 @@ Independent goroutines that collect data at fixed intervals (defined in `daemon/
 | Hardware     | 300s     | `hardware_update`           | Rarely changes                           |
 | Registration | 300s     | `registration_update`       | License info                             |
 | Storage      | 300s     | `storage_topology_update`   | SAS topology via storcli + sg_ses        |
+| NIC          | 60s      | `nic_update`                | NIC temperatures + optic DDM (ioctl)     |
 
 **Intervals optimized for power efficiency** — lower intervals increase CPU usage.
 
@@ -166,7 +167,7 @@ Each collector:
 
 Model Context Protocol endpoint at `POST /mcp` (Streamable HTTP, spec 2025-06-18):
 
-- **server.go**: MCP server with 125 tools, 5 resources, and 6 prompts for monitoring and control
+- **server.go**: MCP server with 126 tools, 5 resources, and 6 prompts for monitoring and control
 - **transport.go**: HTTP transport for JSON-RPC requests
 - Tools expose system info, Docker/VM control, notifications, etc.
 

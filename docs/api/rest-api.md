@@ -2376,6 +2376,114 @@ Get all methods to access the Unraid server, including LAN IP, mDNS hostname, Wi
 | `ipv6`      | IPv6 global unicast addresses                              |
 | `other`     | Other access methods                                       |
 
+---
+
+### GET /network/cards
+
+Return the cached physical (PCI) network cards. Collected by the `nic` background
+collector (`INTERVAL_NIC`, default 60 s) from sysfs and the `SIOCETHTOOL` ioctl; reading
+the module EEPROMs through the ioctl spawns no process per module (`lspci -Dmm` and
+`ethtool -i` are still used for card identity and firmware).
+
+- **Cards:** every `/sys/class/net` interface whose `device` resolves to a PCI function,
+  grouped per PCI slot (domain:bus:device without the function), so a dual-port card is one
+  entry. Virtual interfaces (bridges, bonds, VLANs, veth, tunnels), USB NICs, SR-IOV virtual
+  functions and switchdev representors are skipped. Vendor, device and subsystem names come
+  from `lspci -Dmm` (once per card); `model` is a short product name derived from the device
+  name. `firmware_version` is what `ethtool -i` shows.
+- **Temperatures:** the hwmon chips of the card's PCI functions (or of devices below them,
+  such as PHYs): `sensor` is `asic`, `phy`, `mac`, `module` (transceiver cage) or `other`.
+  The ASIC sensor every function of a multi-function card exposes is the one shared die and
+  is reported once, with the highest reading; every other sensor is kept per PCI function
+  and names its port in `interface`.
+- **Optics:** each port's module EEPROM is read with `ETHTOOL_GMODULEINFO` and
+  `ETHTOOL_GMODULEEEPROM` (the driver hooks `ethtool -m` uses) and decoded per SFF-8472
+  (SFP/SFP+/SFP28, including external calibration) or SFF-8636/SFF-8436 (QSFP+/QSFP28).
+  Other module types (CMIS) report the identifier only, with no `standard` and no `error`. Ports whose driver has no
+  module support (BASE-T NICs) and empty cages have no `module`. `alarms`/`warnings` name
+  the set flags (`temperature_high`, `voltage_low`, `lane<N>_rx_power_low`,
+  `lane<N>_tx_bias_high`, `lane<N>_tx_power_high`, ...); SFF-8636 flags are latched (events
+  since the previous read). Optical power is reported in mW and dBm, with dBm floored at -40
+  for no light. While a module flags its monitors as not ready (powering up or resetting),
+  `data_not_ready` is `true`, and readings and flags are omitted. Vendor serial numbers are
+  never decoded or reported.
+
+`state` is `pending` until the first collection and `ok` afterwards. `errors` lists
+unexpected module read failures.
+
+**Response** (ConnectX-6 Dx with two 100G AOCs and an Aquantia AQC113CS; trimmed):
+
+```json
+{
+  "state": "ok",
+  "cards": [
+    {
+      "id": "0000:41:00",
+      "vendor": "Mellanox Technologies",
+      "model": "ConnectX-6 Dx",
+      "device_name": "MT2892 Family [ConnectX-6 Dx]",
+      "subsystem_name": "Device 0016",
+      "vendor_id": "15b3", "device_id": "101d", "subsystem_vendor_id": "15b3", "subsystem_device_id": "0016",
+      "driver": "mlx5_core",
+      "firmware_version": "22.47.3576 (MT_0000000359)",
+      "temperatures": [
+        { "sensor": "asic", "label": "asic", "pci_address": "0000:41:00.0", "celsius": 89, "highest_celsius": 90, "crit_celsius": 105 },
+        { "sensor": "module", "label": "Module0", "interface": "eth0", "pci_address": "0000:41:00.0", "celsius": 51, "highest_celsius": 55.875, "crit_celsius": 80 }
+      ],
+      "ports": [
+        {
+          "id": "0000:41:00.0", "interface": "eth0", "pci_address": "0000:41:00.0", "dev_port": 0,
+          "operstate": "up", "carrier": true, "speed_mbps": 100000, "duplex": "full", "mtu": 1500, "master": "bond0",
+          "module": {
+            "identifier": "QSFP28", "standard": "SFF-8636", "connector": "No separable connector",
+            "compliance": "100G AOC or 25GAUI C2M AOC (BER 5e-5)",
+            "vendor_name": "CISCO-PROLINE", "vendor_pn": "QSFP-100G-AOC-3M", "vendor_rev": "D1",
+            "wavelength_nm": 850, "ddm_supported": true,
+            "temperature_celsius": 51.01, "voltage_volts": 3.2688, "rx_power_type": "average",
+            "lanes": [
+              { "lane": 1, "tx_bias_ma": 6.216, "tx_power_mw": 1.2432, "tx_power_dbm": 0.95, "rx_power_mw": 2.3192, "rx_power_dbm": 3.65 },
+              ...
+            ],
+            "alarms": [], "warnings": [],
+            "thresholds": {
+              "temperature_celsius": { "high_alarm": 90, "high_warning": 80, "low_warning": -10, "low_alarm": -20 },
+              "voltage_volts": { "high_alarm": 3.62, "high_warning": 3.6, "low_warning": 3, "low_alarm": 2.95 },
+              "tx_bias_ma": { "high_alarm": 14, "high_warning": 12, "low_warning": 1.5, "low_alarm": 1 },
+              "tx_power_dbm": { "high_alarm": 8.13, "high_warning": 7.99, "low_warning": -6.99, "low_alarm": -10 },
+              "rx_power_dbm": { "high_alarm": 8.13, "high_warning": 7.99, "low_warning": -10, "low_alarm": -13.01 }
+            }
+          }
+        },
+        ...
+      ]
+    },
+    {
+      "id": "0000:d5:00",
+      "vendor": "Aquantia Corp.",
+      "model": "AQC113CS",
+      "device_name": "AQtion AQC113CS NBase-T/IEEE 802.3an Ethernet Controller [Antigua 10G]",
+      "driver": "atlantic",
+      "firmware_version": "1.3.24",
+      "temperatures": [
+        { "sensor": "phy", "label": "PHY Temperature", "interface": "eth2", "pci_address": "0000:d5:00.0", "celsius": 42 },
+        { "sensor": "mac", "label": "MAC Temperature", "interface": "eth2", "pci_address": "0000:d5:00.0", "celsius": 42 }
+      ],
+      "ports": [
+        { "id": "0000:d5:00.0", "interface": "eth2", "pci_address": "0000:d5:00.0", "dev_port": 0, "operstate": "down", "carrier": false, "mtu": 1500 }
+      ]
+    }
+  ],
+  "collection_duration_ms": 217,
+  "timestamp": "2026-10-11T13:48:02-04:00"
+}
+```
+
+**Example**:
+
+```bash
+curl http://192.168.20.21:8043/api/v1/network/cards
+```
+
 **Use Cases**:
 
 - Display all connection methods in a dashboard
