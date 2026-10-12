@@ -112,6 +112,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   whose query fails is logged and left out. The NUT collector's command runner, `upsc`
   lookup and file checks are injectable for tests.
   ([#206](https://github.com/tinkerologie/unraid-management-agent/issues/206)).
+
+- **Exclusive share state** — `GET /shares` (and the share WebSocket/MQTT
+  payloads) now report Unraid 6.12+ exclusive share status per share:
+  `exclusive` (`/mnt/user/<share>` is a symlink that bypasses FUSE),
+  `exclusive_eligible` (exclusive shares are enabled and the share is
+  pool-only and, before Unraid 7.2, not NFS-exported), `exclusive_pool` (the share's pool) and,
+  when an eligible share has fallen back to FUSE, `locations` listing every
+  pool or array disk that holds a top-level folder for it, so the stray copy
+  can be found (`locations_unchecked` names disks and pools that were skipped
+  because they are spun down, their spin state is unknown or the check
+  failed, so they are never woken). `exclusive` comes from emhttp's
+  `shares.ini`, so nothing is read through FUSE; the fields are omitted on
+  older releases and while the array is stopped.
+
 - **Stable `device_id` for USB HID hwmon chips, and same-model fans kept apart** —
   `temperatures[]` and `fans[]` entries of `GET /api/v1/system` have a new `device_id`
   for chips on a USB HID device (fan/pump controllers such as Aquacomputer Octo/Quadro,

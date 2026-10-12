@@ -10476,9 +10476,45 @@
                     "type": "string",
                     "example": "Media storage share"
                 },
+                "exclusive": {
+                    "description": "Exclusive is true when /mnt/user/\u003cname\u003e is a symlink to the pool, so\nshare I/O bypasses the FUSE user share layer (shfs). Taken from the\nexclusive flag emhttp records in shares.ini.",
+                    "type": "boolean",
+                    "example": true
+                },
+                "exclusive_eligible": {
+                    "description": "ExclusiveEligible is true when exclusive shares are enabled globally and\nthe share lives on a single pool (primary pool only, no secondary storage\n— on servers without array slots any primary pool with no secondary pool;\nbefore Unraid 7.2 also not exported over NFS) and that pool exists.\nOmitted when this cannot be determined (share config or disk list\nunreadable).",
+                    "type": "boolean",
+                    "example": true
+                },
+                "exclusive_pool": {
+                    "description": "ExclusivePool is the share's pool for exclusive access: the symlink\ntarget when exclusive, otherwise the pool a pool-only share would be\nexclusive on (on pools-only servers this can be the implicit first pool).",
+                    "type": "string",
+                    "example": "cache"
+                },
                 "free_bytes": {
                     "type": "integer",
                     "example": 5368709120000
+                },
+                "locations": {
+                    "description": "Locations lists the pools and array disks holding a top-level folder for\nthe share. Reported only when the share is eligible but not exclusive\n(an empty list when none was found): any entry other than the share's\npool is what keeps it on FUSE.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "cache",
+                        "disk1"
+                    ]
+                },
+                "locations_unchecked": {
+                    "description": "LocationsUnchecked lists the disks and pools that were not checked for a\nfolder because a device is spun down, its spin state is unknown or the\ncheck failed, so they are never woken. Reported alongside Locations;\nboth are omitted when the disk list cannot be read.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "disk3"
+                    ]
                 },
                 "mover_action": {
                     "description": "Mover action: \"cache-\u003earray\", \"array-\u003ecache\", or empty",

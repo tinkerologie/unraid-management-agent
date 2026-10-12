@@ -2,6 +2,7 @@ package collectors
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -13,6 +14,10 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
 )
+
+// errShareConfigNotFound means a share has no .cfg file, so Unraid's
+// defaults apply to it.
+var errShareConfigNotFound = errors.New("share config not found")
 
 // ConfigCollector collects configuration data
 type ConfigCollector struct {
@@ -50,7 +55,7 @@ func (c *ConfigCollector) GetShareConfig(shareName string) (*dto.ShareConfig, er
 	file, err := os.Open(configPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("share config not found: %s", shareName)
+			return nil, fmt.Errorf("%w: %s", errShareConfigNotFound, shareName)
 		}
 		return nil, fmt.Errorf("failed to open share config: %w", err)
 	}

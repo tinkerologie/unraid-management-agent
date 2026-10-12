@@ -1437,10 +1437,51 @@ List all user shares.
     "used_bytes": 50000000000,
     "free_bytes": 50000000000,
     "usage_percent": 50.0,
+    "use_cache": "only",
+    "cache_pool": "cache",
+    "exclusive": true,
+    "exclusive_eligible": true,
+    "exclusive_pool": "cache",
+    "timestamp": "2025-10-03T13:41:13+10:00"
+  },
+  {
+    "name": "media",
+    "used_bytes": 2000000000000,
+    "free_bytes": 1000000000000,
+    "usage_percent": 66.7,
+    "use_cache": "only",
+    "cache_pool": "fast",
+    "exclusive": false,
+    "exclusive_eligible": true,
+    "exclusive_pool": "fast",
+    "locations": ["disk1", "fast"],
     "timestamp": "2025-10-03T13:41:13+10:00"
   }
 ]
 ```
+
+**Exclusive shares (Unraid 6.12+)**: with _Permit exclusive shares_ enabled,
+Unraid makes `/mnt/user/<share>` a symlink to `/mnt/<pool>/<share>` for shares
+that live on a single pool, so their I/O bypasses the FUSE user share layer.
+If a top-level folder for the share also exists on another pool or array disk,
+the share silently stays on FUSE.
+
+| Field                 | Description                                                                                                                                                                                                                                                                                                          |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `exclusive`           | `true` when `/mnt/user/<share>` is a symlink (exclusive access)                                                                                                                                                                                                                                                      |
+| `exclusive_eligible`  | `true` when exclusive shares are enabled and the share is pool-only (an existing primary pool, no secondary storage; on servers without array slots any primary pool with no secondary pool; before Unraid 7.2 also not NFS-exported). Omitted when this cannot be determined (share config or disk list unreadable) |
+| `exclusive_pool`      | The share's pool: the symlink target when exclusive, otherwise the pool a pool-only share would be exclusive on                                                                                                                                                                                                      |
+| `locations`           | Pools and array disks holding a top-level folder for the share; only when eligible but not exclusive (`[]` when none was found). Entries other than `exclusive_pool` keep the share on FUSE                                                                                                                          |
+| `locations_unchecked` | Disks and pools not checked because a device is spun down, its spin state is unknown or the check failed, so the check never wakes a disk                                                                                                                                                                            |
+
+`exclusive` is the flag emhttp records in `shares.ini` when it sets up the
+symlink, so nothing under `/mnt/user` (FUSE) is accessed. The fields are
+omitted on releases without the setting, while the array is stopped and when
+user shares are disabled. `locations` comes from one `lstat` of
+`/mnt/<disk or pool>/<share>` per branch; both lists are omitted if the
+disk list (`disks.ini`) cannot be read. Only disks and pools that take part in user shares are checked: array disks
+allowed by the global included/excluded disk settings and pools whose user
+share participation is not disabled.
 
 ---
 
