@@ -1,15 +1,10 @@
-name: Coverage
+name: CI
 
-"on":
+on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
-      - ready_for_review
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:
@@ -21,23 +16,24 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  # OIDC is unavailable to fork and Dependabot PRs; those fall back to tokenless uploads.
   CODECOV_OIDC: ${{ !(github.event_name == 'pull_request' && (github.event.pull_request.head.repo.fork || github.event.pull_request.user.login == 'dependabot[bot]')) }}
 
 jobs:
   test-and-upload:
-    name: Test And Upload Coverage
+    name: Test
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+
     runs-on: ubuntu-latest
     # Skip the expensive coverage run on draft PRs to conserve runner capacity;
     # it still runs on pushes to main, workflow_dispatch, and ready (non-draft) PRs.
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+        with:
+          persist-credentials: false
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
 
