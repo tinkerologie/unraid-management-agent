@@ -1,0 +1,113 @@
+{
+  "json_format_version": [1, 0],
+  "smartctl": {
+    "version": [7, 5],
+    "exit_status": 0
+  },
+  "device": {
+    "name": "/dev/nvme2n1",
+    "info_name": "/dev/nvme2n1",
+    "type": "nvme",
+    "protocol": "NVMe"
+  },
+  "model_name": "MKNSSDPE2TB-D8",
+  "firmware_version": "42A2S8MA",
+  "nvme_controller_id": 1,
+  "nvme_version": {
+    "string": "1.3",
+    "value": 66304
+  },
+  "nvme_number_of_namespaces": 1,
+  "nvme_namespaces": [
+    {
+      "id": 1,
+      "size": {
+        "blocks": 3907029168,
+        "bytes": 2000398934016
+      },
+      "capacity": {
+        "blocks": 3907029168,
+        "bytes": 2000398934016
+      },
+      "utilization": {
+        "blocks": 589717992,
+        "bytes": 301935611904
+      },
+      "formatted_lba_size": 512,
+      "features": {
+        "value": 0,
+        "thin_provisioning": false,
+        "na_fields": false,
+        "dealloc_or_unwritten_block_error": false,
+        "uid_reuse": false,
+        "np_fields": false,
+        "other": 0
+      },
+      "lba_formats": [
+        {
+          "formatted": true,
+          "data_bytes": 512,
+          "metadata_bytes": 0,
+          "relative_performance": 0
+        }
+      ]
+    }
+  ],
+  "user_capacity": {
+    "blocks": 3907029168,
+    "bytes": 2000398934016
+  },
+  "logical_block_size": 512,
+  "smart_support": {
+    "available": true,
+    "enabled": true
+  },
+  "nvme_maximum_data_transfer_pages": 64,
+  "nvme_composite_temperature_threshold": {
+    "warning": 75,
+    "critical": 80
+  },
+  "temperature": {
+    "op_limit_max": 75,
+    "critical_limit_max": 80,
+    "current": 35
+  },
+  "smart_status": {
+    "passed": true,
+    "nvme": {
+      "value": 0
+    }
+  },
+  "nvme_smart_health_information_log": {
+    "nsid": 1,
+    "critical_warning": 0,
+    "temperature": 35,
+    "available_spare": 100,
+    "available_spare_threshold": 10,
+    "percentage_used": 89,
+    "data_units_read": 443617633,
+    "data_units_written": 1330936413,
+    "host_reads": 2554905576,
+    "host_writes": 16580550995,
+    "controller_busy_time": 218464,
+    "power_cycles": 681,
+    "power_on_hours": 31520,
+    "unsafe_shutdowns": 366,
+    "media_errors": 0,
+    "num_err_log_entries": 0,
+    "warning_temp_time": 0,
+    "critical_comp_time": 0,
+    "temperature_sensors": [null, 35, 44, 35, 35, 33]
+  },
+  "spare_available": {
+    "current_percent": 100,
+    "threshold_percent": 10
+  },
+  "endurance_used": {
+    "current_percent": 89
+  },
+  "power_cycle_count": 681,
+  "power_on_time": {
+    "hours": 31520
+  }
+}

@@ -11,6 +11,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **ZFS pool member drives with SMART health** — each pool in `/api/v1/zfs/pools`
+  (and the `zfs_pools_update` event) now has a `drives` list: every leaf member
+  with the whole disk it lives on (resolved through sysfs, including
+  device-mapper and by-id names), its vdev and state, and a `health` summary
+  from `smartctl -j -a -n standby`: model, protocol, media type, SMART status,
+  temperature, power-on hours, NVMe percentage used / available spare / critical
+  warning, and media errors (NVMe media errors, SCSI uncorrected errors or ATA
+  attribute 187). smartctl gets an explicit device type from sysfs (`nvme`,
+  `sat` or `scsi`) so it does not probe the drive, and USB-attached disks are
+  not read. Drives are never woken: a disk Unraid reports spun down
+  (`disks.ini`) is not read and keeps its last reading, flagged `standby`; ATA
+  drives use a fail-closed power check (`-n standby,2,3`, so a drive whose
+  power mode can't be read is not read either); and rotational SCSI drives,
+  (or with an unknown rotational flag), whose power check can't fail closed,
+  are read only when Unraid manages them
+  and reports them spinning. The spin state is checked again right before each
+  smartctl run. Readings are cached per disk for
+  5 minutes and dropped when the kernel's `diskseq` shows a different disk
+  under the same name. At most 4 smartctl processes exist at once (a timed-out
+  one keeps its slot until it exits; 15 s timeout). Serial numbers are never
+  reported.
+  ([#227](https://github.com/tinkerologie/unraid-management-agent/issues/227))
 - **Fan channel labels** — each fan in `/api/v1/system` (`fans[]`) now has an
   optional `label`: the channel's lm-sensors label (the driver's `fanN_label`
   or a `sensors.conf` `label` override, e.g. `"Coolant Flow (rpm)"`), so

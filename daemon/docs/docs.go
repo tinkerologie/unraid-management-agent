@@ -7442,6 +7442,64 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.DriveHealth": {
+            "type": "object",
+            "properties": {
+                "available_spare_percent": {
+                    "type": "integer",
+                    "example": 100
+                },
+                "collected_at": {
+                    "description": "When these values were read; omitted until a read succeeds",
+                    "type": "string"
+                },
+                "critical_warning": {
+                    "description": "NVMe critical warning bitmask; 0 = none",
+                    "type": "integer",
+                    "example": 0
+                },
+                "media_errors": {
+                    "description": "MediaErrors counts unrecovered data-integrity errors: NVMe media_errors,\nSCSI total uncorrected read+write+verify errors, or ATA attribute 187\n(Reported_Uncorrect) raw value.",
+                    "type": "integer",
+                    "example": 0
+                },
+                "media_type": {
+                    "description": "\"nvme\", \"ssd\" or \"hdd\"",
+                    "type": "string",
+                    "example": "nvme"
+                },
+                "model": {
+                    "type": "string",
+                    "example": "WD_BLACK SN850X 4000GB"
+                },
+                "percentage_used": {
+                    "description": "NVMe health log fields.",
+                    "type": "integer",
+                    "example": 3
+                },
+                "power_on_hours": {
+                    "type": "integer",
+                    "example": 8760
+                },
+                "protocol": {
+                    "description": "\"NVMe\", \"ATA\" or \"SCSI\"",
+                    "type": "string",
+                    "example": "NVMe"
+                },
+                "smart_passed": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "standby": {
+                    "description": "Standby is true when the disk was asleep at the last check. It is not\nwoken; the other fields then keep the values of the last successful read.",
+                    "type": "boolean"
+                },
+                "temperature_celsius": {
+                    "type": "integer",
+                    "example": 41
+                }
+            }
+        },
         "dto.EnclosureConnector": {
             "type": "object",
             "properties": {
@@ -12720,6 +12778,38 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.ZFSDrive": {
+            "type": "object",
+            "properties": {
+                "disk": {
+                    "description": "Whole-disk kernel name; empty when it could not be resolved",
+                    "type": "string",
+                    "example": "nvme0n1"
+                },
+                "health": {
+                    "description": "Health is the disk's SMART data from the last successful read. It is\nnil when the disk cannot be read at all (smartctl missing, disk\nunresolved, or no readable SMART transport such as USB). A disk that was\nasleep at every attempt has a Health with only Standby set.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.DriveHealth"
+                        }
+                    ]
+                },
+                "name": {
+                    "description": "Member name as ` + "`" + `zpool status` + "`" + ` prints it",
+                    "type": "string",
+                    "example": "nvme0n1p1"
+                },
+                "state": {
+                    "type": "string",
+                    "example": "ONLINE"
+                },
+                "vdev": {
+                    "description": "Parent vdev; empty for a single-disk vdev",
+                    "type": "string",
+                    "example": "raidz2-0"
+                }
+            }
+        },
         "dto.ZFSPool": {
             "type": "object",
             "properties": {
@@ -12768,6 +12858,13 @@ const docTemplate = `{
                     "description": "Deduplication and Compression",
                     "type": "number",
                     "example": 1
+                },
+                "drives": {
+                    "description": "Drives lists every leaf member of the pool (the devices under each\nvdev, or the vdev itself for a single-disk vdev) with the whole disk it\nlives on and that disk's SMART health. Omitted when the pool status\ncould not be read.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.ZFSDrive"
+                    }
                 },
                 "fragmentation_percent": {
                     "description": "Fragmentation %",

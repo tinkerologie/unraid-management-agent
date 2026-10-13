@@ -1,0 +1,13 @@
+{
+  "json_format_version": [1, 0],
+  "smartctl": {
+    "version": [7, 5],
+    "messages": [
+      {
+        "string": "Smartctl open device: /dev/sdzz failed: No such device",
+        "severity": "error"
+      }
+    ],
+    "exit_status": 2
+  }
+}

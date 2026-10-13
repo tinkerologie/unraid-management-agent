@@ -1161,6 +1161,55 @@ definitions:
       timestamp:
         type: string
     type: object
+  dto.DriveHealth:
+    properties:
+      available_spare_percent:
+        example: 100
+        type: integer
+      collected_at:
+        description: When these values were read; omitted until a read succeeds
+        type: string
+      critical_warning:
+        description: NVMe critical warning bitmask; 0 = none
+        example: 0
+        type: integer
+      media_errors:
+        description: |-
+          MediaErrors counts unrecovered data-integrity errors: NVMe media_errors,
+          SCSI total uncorrected read+write+verify errors, or ATA attribute 187
+          (Reported_Uncorrect) raw value.
+        example: 0
+        type: integer
+      media_type:
+        description: '"nvme", "ssd" or "hdd"'
+        example: nvme
+        type: string
+      model:
+        example: WD_BLACK SN850X 4000GB
+        type: string
+      percentage_used:
+        description: NVMe health log fields.
+        example: 3
+        type: integer
+      power_on_hours:
+        example: 8760
+        type: integer
+      protocol:
+        description: '"NVMe", "ATA" or "SCSI"'
+        example: NVMe
+        type: string
+      smart_passed:
+        example: true
+        type: boolean
+      standby:
+        description: |-
+          Standby is true when the disk was asleep at the last check. It is not
+          woken; the other fields then keep the values of the last successful read.
+        type: boolean
+      temperature_celsius:
+        example: 41
+        type: integer
+    type: object
   dto.EnclosureConnector:
     properties:
       attached_id:
@@ -5145,6 +5194,32 @@ definitions:
         example: 0
         type: integer
     type: object
+  dto.ZFSDrive:
+    properties:
+      disk:
+        description: Whole-disk kernel name; empty when it could not be resolved
+        example: nvme0n1
+        type: string
+      health:
+        allOf:
+        - $ref: '#/definitions/dto.DriveHealth'
+        description: |-
+          Health is the disk's SMART data from the last successful read. It is
+          nil when the disk cannot be read at all (smartctl missing, disk
+          unresolved, or no readable SMART transport such as USB). A disk that was
+          asleep at every attempt has a Health with only Standby set.
+      name:
+        description: Member name as `zpool status` prints it
+        example: nvme0n1p1
+        type: string
+      state:
+        example: ONLINE
+        type: string
+      vdev:
+        description: Parent vdev; empty for a single-disk vdev
+        example: raidz2-0
+        type: string
+    type: object
   dto.ZFSPool:
     properties:
       allocated_bytes:
@@ -5186,6 +5261,15 @@ definitions:
         description: Deduplication and Compression
         example: 1
         type: number
+      drives:
+        description: |-
+          Drives lists every leaf member of the pool (the devices under each
+          vdev, or the vdev itself for a single-disk vdev) with the whole disk it
+          lives on and that disk's SMART health. Omitted when the pool status
+          could not be read.
+        items:
+          $ref: '#/definitions/dto.ZFSDrive'
+        type: array
       fragmentation_percent:
         description: Fragmentation %
         example: 5

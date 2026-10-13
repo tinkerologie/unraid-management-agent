@@ -33,6 +33,12 @@ type ZFSPool struct {
 	// VDEVs (Virtual Devices)
 	VDEVs []ZFSVdev `json:"vdevs"` // Pool virtual devices
 
+	// Drives lists every leaf member of the pool (the devices under each
+	// vdev, or the vdev itself for a single-disk vdev) with the whole disk it
+	// lives on and that disk's SMART health. Omitted when the pool status
+	// could not be read.
+	Drives []ZFSDrive `json:"drives,omitempty"`
+
 	// Scrub Information
 	ScanStatus        string    `json:"scan_status,omitempty" example:"scrub completed"` // "scrub in progress", "scrub completed", "resilver in progress"
 	ScanState         string    `json:"scan_state,omitempty" example:"finished"`         // "scanning", "finished", "canceled"
@@ -77,6 +83,48 @@ type ZFSDevice struct {
 	WriteErrors    uint64 `json:"write_errors" example:"0"`
 	ChecksumErrors uint64 `json:"checksum_errors" example:"0"`
 	PhysicalPath   string `json:"physical_path,omitempty" example:"/dev/disk/by-id/ata-WDC_WD120EFBX-68B0EN0_WD-WMC4N0123456"` // Physical device path
+}
+
+// ZFSDrive is one leaf member of a ZFS pool and the health of the disk it is on.
+type ZFSDrive struct {
+	Name  string `json:"name" example:"nvme0n1p1"`          // Member name as `zpool status` prints it
+	Disk  string `json:"disk,omitempty" example:"nvme0n1"`  // Whole-disk kernel name; empty when it could not be resolved
+	Vdev  string `json:"vdev,omitempty" example:"raidz2-0"` // Parent vdev; empty for a single-disk vdev
+	State string `json:"state" example:"ONLINE"`
+
+	// Health is the disk's SMART data from the last successful read. It is
+	// nil when the disk cannot be read at all (smartctl missing, disk
+	// unresolved, or no readable SMART transport such as USB). A disk that was
+	// asleep at every attempt has a Health with only Standby set.
+	Health *DriveHealth `json:"health,omitempty"`
+}
+
+// DriveHealth is the SMART summary of one disk. Pointer fields are nil when
+// the drive does not report the value. Serial numbers are deliberately left out.
+type DriveHealth struct {
+	Model     string `json:"model,omitempty" example:"WD_BLACK SN850X 4000GB"`
+	Protocol  string `json:"protocol,omitempty" example:"NVMe"`   // "NVMe", "ATA" or "SCSI"
+	MediaType string `json:"media_type,omitempty" example:"nvme"` // "nvme", "ssd" or "hdd"
+
+	// Standby is true when the disk was asleep at the last check. It is not
+	// woken; the other fields then keep the values of the last successful read.
+	Standby bool `json:"standby,omitempty"`
+
+	SmartPassed        *bool `json:"smart_passed,omitempty" example:"true"`
+	TemperatureCelsius *int  `json:"temperature_celsius,omitempty" example:"41"`
+
+	// NVMe health log fields.
+	PercentageUsed  *int `json:"percentage_used,omitempty" example:"3"` // Vendor estimate of endurance used; may exceed 100
+	AvailableSpare  *int `json:"available_spare_percent,omitempty" example:"100"`
+	CriticalWarning *int `json:"critical_warning,omitempty" example:"0"` // NVMe critical warning bitmask; 0 = none
+
+	// MediaErrors counts unrecovered data-integrity errors: NVMe media_errors,
+	// SCSI total uncorrected read+write+verify errors, or ATA attribute 187
+	// (Reported_Uncorrect) raw value.
+	MediaErrors  *uint64 `json:"media_errors,omitempty" example:"0"`
+	PowerOnHours *uint64 `json:"power_on_hours,omitempty" example:"8760"`
+
+	CollectedAt time.Time `json:"collected_at,omitzero"` // When these values were read; omitted until a read succeeds
 }
 
 // ZFSDataset represents a ZFS dataset (filesystem or volume)
