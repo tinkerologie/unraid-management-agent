@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
@@ -27,6 +29,32 @@ type SystemCollector struct {
 
 	// sysfsRoot is the sysfs mount point ("/sys"); replaceable for tests.
 	sysfsRoot string
+
+	// droppedFans records fan channels whose implausible reading was already
+	// logged, so each is logged once rather than on every collection (#262).
+	droppedFansMu sync.Mutex
+	droppedFans   map[string]bool
+}
+
+// plausibleFanRPM reports whether v is a real fan speed: finite, not negative
+// and no higher than lib.MaxPlausibleRPM. Super I/O chips report values such as
+// 56784 for floating or noisy tach lines (#262).
+func plausibleFanRPM(v float64) bool {
+	return !math.IsNaN(v) && !math.IsInf(v, 0) && v >= 0 && v <= lib.MaxPlausibleRPM
+}
+
+// logDroppedFan logs an implausible fan reading once per channel.
+func (c *SystemCollector) logDroppedFan(name string, value float64) {
+	c.droppedFansMu.Lock()
+	defer c.droppedFansMu.Unlock()
+	if c.droppedFans == nil {
+		c.droppedFans = make(map[string]bool)
+	}
+	if c.droppedFans[name] {
+		return
+	}
+	c.droppedFans[name] = true
+	logger.Debug("System: ignoring implausible fan reading %s=%v RPM (limit %d)", name, value, lib.MaxPlausibleRPM)
 }
 
 // NewSystemCollector creates a new system information collector with the given context.
@@ -645,10 +673,10 @@ func (c *SystemCollector) getFans(chipDeviceIDs map[string]string) ([]dto.FanInf
 
 // sensorsFanReading is one fanN_input value from `sensors -u`.
 type sensorsFanReading struct {
-	chip    string // lm-sensors chip name, e.g. "nct6798-isa-0290"
-	label   string // fan channel, e.g. "fan1"
-	feature string // the channel's lm-sensors label, e.g. "CPU Fan"; "" if none
-	rpm     int
+	chip    string  // lm-sensors chip name, e.g. "nct6798-isa-0290"
+	label   string  // fan channel, e.g. "fan1"
+	feature string  // the channel's lm-sensors label, e.g. "CPU Fan"; "" if none
+	value   float64 // raw fanN_input value, checked with plausibleFanRPM
 }
 
 // parseFanSpeeds parses fan inputs from `sensors -u` output.
@@ -700,9 +728,16 @@ func (c *SystemCollector) parseFanSpeeds(output string, chipDeviceIDs map[string
 	fans := make([]dto.FanInfo, 0, len(readings))
 	index := make(map[string]int, len(readings))
 	for _, r := range readings {
+		name := prefixes[r.chip] + "_" + r.label
+		// Filter after naming, so a dropped reading does not change the
+		// names of the chip's other fans.
+		if !plausibleFanRPM(r.value) {
+			c.logDroppedFan(name, r.value)
+			continue
+		}
 		info := dto.FanInfo{
-			Name:     prefixes[r.chip] + "_" + r.label,
-			RPM:      r.rpm,
+			Name:     name,
+			RPM:      int(math.Round(r.value)),
 			Source:   r.chip,
 			DeviceID: chipDeviceIDs[r.chip],
 			Label:    r.feature,
@@ -769,7 +804,7 @@ func parseSensorsFanReadings(output string) []sensorsFanReading {
 						chip:    currentChip,
 						label:   channel,
 						feature: feature,
-						rpm:     int(math.Round(floatVal)),
+						value:   floatVal,
 					})
 				}
 			}
@@ -788,12 +823,13 @@ func chipModel(chip string) string {
 
 func (c *SystemCollector) readHwmonFanSpeeds() (map[string]int, error) {
 	fanSpeeds := make(map[string]int)
+	hwmonDir := filepath.Join(c.sysfsRoot, "class", "hwmon")
 
-	// Read from /sys/class/hwmon/hwmon*/fan*_input
+	// Read from <sysfs>/class/hwmon/hwmon*/fan*_input
 	for i := range 10 {
 		for j := 1; j < 20; j++ {
-			path := fmt.Sprintf("/sys/class/hwmon/hwmon%d/fan%d_input", i, j)
-			// #nosec G304 -- path is constructed from /sys/class/hwmon using bounded numeric indices.
+			path := filepath.Join(hwmonDir, fmt.Sprintf("hwmon%d", i), fmt.Sprintf("fan%d_input", j))
+			// #nosec G304 -- path is constructed from the hwmon class directory using bounded numeric indices.
 			data, err := os.ReadFile(path)
 			if err != nil {
 				continue
@@ -810,14 +846,18 @@ func (c *SystemCollector) readHwmonFanSpeeds() (map[string]int, error) {
 			}
 
 			// Try to get label
-			labelPath := fmt.Sprintf("/sys/class/hwmon/hwmon%d/fan%d_label", i, j)
-			// #nosec G304 -- labelPath is constructed from /sys/class/hwmon using bounded numeric indices.
+			labelPath := filepath.Join(hwmonDir, fmt.Sprintf("hwmon%d", i), fmt.Sprintf("fan%d_label", j))
+			// #nosec G304 -- labelPath is constructed from the hwmon class directory using bounded numeric indices.
 			labelData, err := os.ReadFile(labelPath)
 			label := fmt.Sprintf("Fan %d", j)
 			if err == nil {
 				label = strings.TrimSpace(string(labelData))
 			}
 
+			if !plausibleFanRPM(float64(value)) {
+				c.logDroppedFan(label, float64(value))
+				continue
+			}
 			fanSpeeds[label] = value
 		}
 	}
