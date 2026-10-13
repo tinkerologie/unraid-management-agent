@@ -453,12 +453,14 @@ Uses date-based versioning: `YYYY.MM.DD` (e.g., `2025.12.01`).
 2. **Update `VERSION` file** with new version number
 3. **Update `unraid-management-agent.plg`**:
    - Set `<!ENTITY version "YYYY.MM.DD">`
-   - Set `<!ENTITY md5 "...">` with checksum **from GitHub release** (not local build)
-   - MD5 must match the GitHub release artifact
+   - Leave the `md5` and `sha256` entities alone: the release workflow writes both from the built
+     artifact with `scripts/update-plg-checksums.sh`, before publishing and again on `main`
+   - Keep the `<!-- pragma: allowlist secret -->` comments on both checksum lines (detect-secrets)
 4. **Update `unraid-management-agent.xml`** as needed for listing metadata changes
 5. **Tag and push:** `git tag vYYYY.MM.DD && git push origin vYYYY.MM.DD`
 6. GitHub Actions builds and releases automatically
-7. Verify MD5 matches published release artifact
+7. Verify the `.plg` on `main` pins the release: `sha256sum` of the published `.tgz` equals the `sha256` entity
+   (the plugin manager verifies SHA256 first and also checks MD5)
 
 ## Hardware Compatibility
 

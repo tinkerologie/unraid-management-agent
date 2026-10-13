@@ -39,6 +39,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Release bundle pinned with SHA256** — the `.plg` now carries a `sha256` entity and a
+  `<SHA256>` element next to `<MD5>`; Unraid's plugin manager verifies SHA256 first. Each release
+  computes both checksums, publishes `SHA256SUM` and the SHA256 in the release notes, and writes
+  both into the `.plg` with `scripts/update-plg-checksums.sh`, which checks their format, refuses
+  a `.plg` whose `version` differs from the release, and asserts the written values. The rewrite
+  now runs before the GitHub release is created, so a failure blocks publication. The checksum
+  lines carry `pragma: allowlist secret`, so detect-secrets no longer needs a baseline entry that
+  goes stale every release. Seeded with the SHA256 of the published v2026.09.01 bundle. Reported
+  in the Community Applications review (#239).
+  ([#247](https://github.com/tinkerologie/unraid-management-agent/issues/247)).
 - **BREAKING: no unauthenticated network writes by default** — with no `API_TOKEN`, the REST
   API now answers `POST`, `PUT`, `PATCH` and `DELETE` with `403 Forbidden` and a message on
   how to set a token, and HTTP MCP (`/mcp`, `/mcp/<connect-secret>`) treats every write tool

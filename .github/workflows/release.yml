@@ -189,31 +189,49 @@ jobs:
           bash scripts/test-bundle-extraction.sh check-owners \
             "build/unraid-management-agent-${DETECT_VERSION}.tgz"
 
-      - name: Calculate MD5 checksum
+      - name: Calculate checksums
         id: checksum
         env:
           DETECT_VERSION: ${{ needs.detect.outputs.version }}
         run: |
           PACKAGE_FILE="build/unraid-management-agent-${DETECT_VERSION}.tgz"
 
-          # Calculate MD5 checksum (Linux uses md5sum, macOS uses md5)
+          # Calculate checksums (Linux uses md5sum/sha256sum, macOS uses md5/shasum)
           if command -v md5sum &> /dev/null; then
             MD5=$(md5sum "$PACKAGE_FILE" | awk '{print $1}')
           else
             MD5=$(md5 -q "$PACKAGE_FILE")
           fi
+          if command -v sha256sum &> /dev/null; then
+            SHA256=$(sha256sum "$PACKAGE_FILE" | awk '{print $1}')
+          else
+            SHA256=$(shasum -a 256 "$PACKAGE_FILE" | awk '{print $1}')
+          fi
 
-          echo "md5=$MD5" >> $GITHUB_OUTPUT
+          echo "md5=$MD5" >> "$GITHUB_OUTPUT"
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
           echo "✅ MD5 checksum: $MD5"
+          echo "✅ SHA256 checksum: $SHA256"
 
-          # Save checksum to file for release notes
+          # Save checksums to files for the release assets
           echo "$MD5" > build/MD5SUM
+          echo "$SHA256" > build/SHA256SUM
+
+      # Write both checksums into the .plg and assert them before anything is
+      # published, so a failed rewrite blocks the release (#247).
+      - name: Update PLG checksums
+        env:
+          CHECKSUM_MD5: ${{ steps.checksum.outputs.md5 }}
+          CHECKSUM_SHA256: ${{ steps.checksum.outputs.sha256 }}
+          DETECT_VERSION: ${{ needs.detect.outputs.version }}
+        run: bash scripts/update-plg-checksums.sh "$CHECKSUM_MD5" "$CHECKSUM_SHA256" "$DETECT_VERSION"
 
       - name: Extract release notes from CHANGELOG
         id: changelog
         env:
           DETECT_VERSION: ${{ needs.detect.outputs.version }}
           CHECKSUM_MD5: ${{ steps.checksum.outputs.md5 }}
+          CHECKSUM_SHA256: ${{ steps.checksum.outputs.sha256 }}
         run: |
           VERSION="${DETECT_VERSION}"
 
@@ -244,10 +262,15 @@ jobs:
             echo "See [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md) for details." > build/RELEASE_NOTES.md
           fi
 
-          # Add MD5 checksum to release notes
+          # Add checksums to release notes
           {
             echo ""
             echo "---"
+            echo ""
+            echo "**SHA256 Checksum:**"
+            echo '```'
+            echo "${CHECKSUM_SHA256}  unraid-management-agent-$VERSION.tgz"
+            echo '```'
             echo ""
             echo "**MD5 Checksum:**"
             echo '```'
@@ -270,28 +293,10 @@ jobs:
           files: |
             build/unraid-management-agent-${{ needs.detect.outputs.version }}.tgz
             build/MD5SUM
+            build/SHA256SUM
           prerelease: ${{ needs.detect.outputs.prerelease }}
           draft: false
           token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Update PLG files with MD5 hash
-        env:
-          CHECKSUM_MD5: ${{ steps.checksum.outputs.md5 }}
-          DETECT_VERSION: ${{ needs.detect.outputs.version }}
-        run: |
-          MD5="${CHECKSUM_MD5}"
-          VERSION="${DETECT_VERSION}"
-
-          echo "Updating PLG file with MD5: $MD5"
-
-          # Update root PLG file
-          sed -i "s/<!ENTITY md5.*\".*\">/<!ENTITY md5         \"$MD5\">/" unraid-management-agent.plg
-
-          echo "✅ Updated PLG file"
-
-          # Verify updates
-          echo "Root PLG MD5:"
-          grep "ENTITY md5" unraid-management-agent.plg
 
       # main requires pull requests; the Unraid plugin manager and Community Applications read
       # the .plg from main, so its new hash is pushed with the Tinkerologie-Release app, the
@@ -308,27 +313,26 @@ jobs:
       - name: Commit and push PLG updates
         env:
           CHECKSUM_MD5: ${{ steps.checksum.outputs.md5 }}
+          CHECKSUM_SHA256: ${{ steps.checksum.outputs.sha256 }}
           DETECT_VERSION: ${{ needs.detect.outputs.version }}
           PLG_PUSH_TOKEN: ${{ steps.release-token.outputs.token }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Check if there are changes
+          # Drop the release-checkout edit, then apply the checksums to main's
+          # .plg. The script refuses if main's .plg pins a different version.
+          git checkout -- unraid-management-agent.plg
+          git fetch origin main
+          git checkout main
+          git pull origin main
+          bash scripts/update-plg-checksums.sh "$CHECKSUM_MD5" "$CHECKSUM_SHA256" "$DETECT_VERSION"
+
           if git diff --quiet unraid-management-agent.plg; then
-            echo "No changes to PLG file"
+            echo "PLG on main already pins these checksums"
           else
-            # Fetch and rebase on main to ensure we're up to date
-            git fetch origin main
-            git checkout main
-            git pull origin main
-
-            # Refresh the root PLG file with the final release MD5
-            MD5="${CHECKSUM_MD5}"
-            sed -i "s/<!ENTITY md5.*\".*\">/<!ENTITY md5         \"$MD5\">/" unraid-management-agent.plg
-
             git add unraid-management-agent.plg
-            git commit -m "chore: update PLG MD5 hash for v${DETECT_VERSION} [skip ci]"
+            git commit -m "chore: update PLG checksums for v${DETECT_VERSION} [skip ci]"
             git push "https://x-access-token:${PLG_PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" main
             echo "✅ Committed and pushed PLG update"
           fi
@@ -337,12 +341,15 @@ jobs:
         env:
           DETECT_VERSION: ${{ needs.detect.outputs.version }}
           CHECKSUM_MD5: ${{ steps.checksum.outputs.md5 }}
+          CHECKSUM_SHA256: ${{ steps.checksum.outputs.sha256 }}
           DETECT_PRERELEASE: ${{ needs.detect.outputs.prerelease }}
         run: |
           echo "## 🎉 v${DETECT_VERSION} Created Successfully!" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Package:** \`unraid-management-agent-${DETECT_VERSION}.tgz\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**SHA256 Checksum:** \`${CHECKSUM_SHA256}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "**MD5 Checksum:** \`${CHECKSUM_MD5}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Release URL:** https://github.com/${GITHUB_REPOSITORY}/releases/tag/v${DETECT_VERSION}" >> $GITHUB_STEP_SUMMARY
