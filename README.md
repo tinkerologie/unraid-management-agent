@@ -125,6 +125,26 @@ For information about the official Unraid GraphQL API, please refer to:
 - **MQTT**: Event publishing to MQTT brokers for IoT integration and Home Assistant
 - **MCP (Model Context Protocol)**: AI agent integration for LLM-powered monitoring and control (126 tools)
 
+## Security and Privacy
+
+- **Authentication default**: the API listens on all network interfaces on port 8043 over plain HTTP. Without an
+  API token, anyone on your network can read monitoring data, and every control action (REST and MCP) is refused.
+  Installs upgraded from an earlier version without a token keep control actions working through
+  `ALLOW_UNAUTHENTICATED_WRITES` until you set a token (once a token is set, every request must send it). See
+  [Authentication](#authentication) and [Configuration → Authentication](docs/guides/configuration.md#authentication).
+- **Control scope**: with access, the REST API and MCP can reboot or shut down the server, start, stop, update and
+  remove Docker containers, control VMs (including snapshots and clones), start and stop the array, control parity
+  checks, spin disks up and down, and run User Scripts as `/bin/bash` without a sandbox. REST reboot, shutdown and
+  User Scripts need no confirmation. MCP read-only mode and tool policies apply to MCP only; they do not restrict the
+  REST API. See [Core Settings](docs/guides/configuration.md#core-settings) and
+  [Network Security](docs/guides/configuration.md#network-security).
+- **External WAN IP lookups**: when you request network access URLs (`GET /api/v1/network/access-urls` or the MCP
+  tool `get_network_access_urls`), the agent asks `api.ipify.org`, `ifconfig.me` and `icanhazip.com`, in that order,
+  for your WAN IP, and stops at the first answer. Those services see your server's public IP address. Nothing runs
+  at startup or on a schedule, and the result is not cached. No setting disables the lookup yet (tracked in
+  [#252](https://github.com/tinkerologie/unraid-management-agent/issues/252)); a `WANIP=` value in Unraid's
+  `network.cfg` is used only if all three services fail. See [Security](docs/guides/configuration.md#security).
+
 ## Architecture
 
 ### Event-Driven Design
@@ -558,8 +578,9 @@ Changes require a service restart:
 
 ### Authentication
 
-The API is unauthenticated by default. Set an API token to require
-`Authorization: Bearer <token>`:
+Without an API token, network clients can read data, but control actions are
+refused (see [Security and Privacy](#security-and-privacy)). Set an API token to
+require `Authorization: Bearer <token>` and enable control actions:
 
 ```bash
 # In /boot/config/plugins/unraid-management-agent/config.cfg
