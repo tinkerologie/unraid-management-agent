@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	"github.com/alecthomas/kong"
@@ -165,7 +166,8 @@ func cleanupOldLogs(logsDir, baseName string) {
 }
 
 func main() {
-	ctx := kong.Parse(&cli)
+	parser, ctx, err := parseCLI(os.Args[1:])
+	parser.FatalIfErrorf(err)
 
 	// Detect STDIO mode — stdout is reserved for MCP JSON-RPC
 	isStdio := ctx.Command() == "mcp-stdio"
@@ -460,6 +462,69 @@ func writeAccessWarning(apiToken string, allowUnauthenticatedWrites bool) string
 	return "API_TOKEN is empty: network write access is disabled (REST and HTTP MCP are read-only) until an API token is set"
 }
 
+// explicitFlags holds the addresses of CLI fields set on the command line or
+// through a non-empty environment variable. applyFileConfig leaves them alone,
+// so precedence is CLI flag > env var > config file > default (#257).
+var explicitFlags map[uintptr]bool
+
+// recordExplicitFlags fills explicitFlags from a parse. An empty environment
+// variable does not count: the plugin's start script exports empty values
+// (e.g. API_TOKEN=""), which must not discard a config file setting.
+func recordExplicitFlags(ctx *kong.Context) {
+	explicitFlags = make(map[uintptr]bool)
+	onCommandLine := make(map[*kong.Flag]bool)
+	for _, p := range ctx.Path {
+		if p.Flag != nil {
+			onCommandLine[p.Flag] = true
+		}
+	}
+	for _, f := range ctx.Flags() {
+		explicit := onCommandLine[f]
+		for _, env := range f.Envs {
+			if v, ok := os.LookupEnv(env); ok && v != "" {
+				explicit = true
+			}
+		}
+		if explicit {
+			// Kong binds flags to fields of the struct it was given a
+			// pointer to, so every target is addressable.
+			explicitFlags[f.Target.Addr().Pointer()] = true
+		}
+	}
+}
+
+// parseCLI parses args into cli, treating empty environment variables as unset
+// and recording which flags were set explicitly (#257).
+func parseCLI(args []string, options ...kong.Option) (*kong.Kong, *kong.Context, error) {
+	parser := kong.Must(&cli, options...)
+	dropEmptyFlagEnv(parser.Model)
+	ctx, err := parser.Parse(args)
+	if err == nil {
+		recordExplicitFlags(ctx)
+	}
+	return parser, ctx, err
+}
+
+// dropEmptyFlagEnv unsets environment variables bound to flags that are set
+// but empty, so an empty value means "not set": Kong would otherwise reject
+// e.g. READ_ONLY="" as an invalid bool and the agent would not start (#257).
+func dropEmptyFlagEnv(app *kong.Application) {
+	for _, group := range app.AllFlags(true) {
+		for _, f := range group {
+			for _, env := range f.Envs {
+				if v, ok := os.LookupEnv(env); ok && v == "" {
+					_ = os.Unsetenv(env)
+				}
+			}
+		}
+	}
+}
+
+// isExplicitFlag reports whether the CLI field dst was set explicitly.
+func isExplicitFlag(dst any) bool {
+	return explicitFlags[reflect.ValueOf(dst).Pointer()]
+}
+
 // applyFileConfig merges config file values into the CLI struct.
 // Only fields not explicitly set via CLI/env are overridden.
 // Kong sets fields to their declared defaults before parsing, so file config
@@ -472,17 +537,17 @@ func applyFileConfig(cfg *domain.FileConfig) {
 	}
 
 	setInt := func(dst *int, src *int) {
-		if src != nil {
+		if src != nil && !isExplicitFlag(dst) {
 			*dst = *src
 		}
 	}
 	setStr := func(dst *string, src *string) {
-		if src != nil {
+		if src != nil && !isExplicitFlag(dst) {
 			*dst = *src
 		}
 	}
 	setBool := func(dst *bool, src *bool) {
-		if src != nil {
+		if src != nil && !isExplicitFlag(dst) {
 			*dst = *src
 		}
 	}

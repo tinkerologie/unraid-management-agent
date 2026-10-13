@@ -151,6 +151,137 @@ func TestApplyWANIPLookup(t *testing.T) {
 	}
 }
 
+// TestConfigFilePrecedence guards #257: a config file fills only settings not
+// set on the command line or through a non-empty environment variable.
+func TestConfigFilePrecedence(t *testing.T) {
+	yes, no := true, false
+	yamlToken := "yaml-token-1234567890"
+	fileInterval := 300
+	envs := []string{"READ_ONLY", "API_TOKEN", "ALLOW_UNAUTHENTICATED_WRITES", "WAN_IP_LOOKUP", "INTERVAL_NIC"}
+
+	tests := []struct {
+		name  string
+		args  []string
+		env   map[string]string
+		file  domain.FileConfig
+		check func(t *testing.T)
+	}{
+		{
+			name: "file overrides default", file: domain.FileConfig{ReadOnly: &yes, AllowUnauthenticatedWrites: &yes},
+			check: func(t *testing.T) {
+				if !cli.ReadOnly || !cli.AllowUnauthenticatedWrites {
+					t.Errorf("ReadOnly=%v AllowUnauthenticatedWrites=%v, want both true from the file", cli.ReadOnly, cli.AllowUnauthenticatedWrites)
+				}
+			},
+		},
+		{
+			name: "env beats file", env: map[string]string{"READ_ONLY": "true", "WAN_IP_LOOKUP": "false"},
+			file: domain.FileConfig{ReadOnly: &no, WANIPLookup: &yes},
+			check: func(t *testing.T) {
+				if !cli.ReadOnly || cli.WANIPLookup {
+					t.Errorf("ReadOnly=%v WANIPLookup=%v, want the env values true/false", cli.ReadOnly, cli.WANIPLookup)
+				}
+			},
+		},
+		{
+			name: "flag beats file", args: []string{"--read-only=false"}, file: domain.FileConfig{ReadOnly: &yes},
+			check: func(t *testing.T) {
+				if cli.ReadOnly {
+					t.Error("ReadOnly=true, want the --read-only=false flag to win over the file")
+				}
+			},
+		},
+		{
+			name: "non-empty env token beats file", env: map[string]string{"API_TOKEN": "env-token-1234567890"},
+			file: domain.FileConfig{APIToken: &yamlToken},
+			check: func(t *testing.T) {
+				if cli.APIToken != "env-token-1234567890" {
+					t.Errorf("APIToken=%q, want the env token", cli.APIToken)
+				}
+			},
+		},
+		{
+			name: "int flag beats file", args: []string{"--interval-nic=120"},
+			file: domain.FileConfig{Intervals: &domain.FileConfigIntervals{NIC: &fileInterval}},
+			check: func(t *testing.T) {
+				if cli.IntervalNIC != 120 {
+					t.Errorf("IntervalNIC=%d, want the --interval-nic=120 flag", cli.IntervalNIC)
+				}
+			},
+		},
+		{
+			name: "int env beats file", env: map[string]string{"INTERVAL_NIC": "90"},
+			file: domain.FileConfig{Intervals: &domain.FileConfigIntervals{NIC: &fileInterval}},
+			check: func(t *testing.T) {
+				if cli.IntervalNIC != 90 {
+					t.Errorf("IntervalNIC=%d, want the INTERVAL_NIC=90 env value", cli.IntervalNIC)
+				}
+			},
+		},
+		{
+			name: "int file overrides default",
+			file: domain.FileConfig{Intervals: &domain.FileConfigIntervals{NIC: &fileInterval}},
+			check: func(t *testing.T) {
+				if cli.IntervalNIC != fileInterval {
+					t.Errorf("IntervalNIC=%d, want the file value %d", cli.IntervalNIC, fileInterval)
+				}
+			},
+		},
+		{
+			name: "empty env token does not discard the file token", env: map[string]string{"API_TOKEN": ""},
+			file: domain.FileConfig{APIToken: &yamlToken},
+			check: func(t *testing.T) {
+				if cli.APIToken != yamlToken {
+					t.Errorf("APIToken=%q, want the file token (an empty env var is not an explicit setting)", cli.APIToken)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			saved, savedExplicit := cli, explicitFlags
+			t.Cleanup(func() { cli, explicitFlags = saved, savedExplicit })
+			for _, e := range envs {
+				t.Setenv(e, "")
+				if err := os.Unsetenv(e); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
+
+			// The same startup path as main: parseCLI, then the config file.
+			if _, _, err := parseCLI(append(tt.args, "boot"), kong.Exit(func(int) { t.Fatal("kong exited") })); err != nil {
+				t.Fatal(err)
+			}
+			applyFileConfig(&tt.file)
+			tt.check(t)
+		})
+	}
+}
+
+// TestEmptyBoolEnvDoesNotBlockStartup checks an empty boolean env var is
+// treated as unset instead of failing Kong's parse (#257).
+func TestEmptyBoolEnvDoesNotBlockStartup(t *testing.T) {
+	saved, savedExplicit := cli, explicitFlags
+	t.Cleanup(func() { cli, explicitFlags = saved, savedExplicit })
+	t.Setenv("READ_ONLY", "")
+
+	if _, _, err := parseCLI([]string{"boot"}, kong.Exit(func(int) { t.Fatal("kong exited") })); err != nil {
+		t.Fatalf("parse with empty READ_ONLY failed: %v", err)
+	}
+	if _, ok := os.LookupEnv("READ_ONLY"); ok {
+		t.Error("empty READ_ONLY was not unset")
+	}
+	yes := true
+	applyFileConfig(&domain.FileConfig{ReadOnly: &yes})
+	if !cli.ReadOnly {
+		t.Error("read_only from the config file must apply when READ_ONLY is empty")
+	}
+}
+
 // TestHardwareSpecificCollectorsDisabledByDefault guards #260: the network
 // card and SAS storage topology collectors need hardware most servers lack.
 func TestHardwareSpecificCollectorsDisabledByDefault(t *testing.T) {
@@ -185,5 +316,21 @@ func TestHardwareSpecificCollectorsDisabledByDefault(t *testing.T) {
 	}
 	if c.IntervalNIC != 60 || c.IntervalStorageTopology != 300 {
 		t.Errorf("enabled via env: got %d/%d, want 60/300", c.IntervalNIC, c.IntervalStorageTopology)
+	}
+}
+
+// TestParseCLIRejectsInvalidValue checks parse errors are returned (main
+// reports them with FatalIfErrorf) and no explicit flags are recorded.
+func TestParseCLIRejectsInvalidValue(t *testing.T) {
+	saved, savedExplicit := cli, explicitFlags
+	t.Cleanup(func() { cli, explicitFlags = saved, savedExplicit })
+	explicitFlags = nil
+
+	_, _, err := parseCLI([]string{"--interval-nic=abc", "boot"}, kong.Exit(func(int) { t.Fatal("kong exited") }))
+	if err == nil {
+		t.Fatal("parseCLI accepted --interval-nic=abc")
+	}
+	if explicitFlags != nil {
+		t.Error("explicit flags were recorded for a failed parse")
 	}
 }
