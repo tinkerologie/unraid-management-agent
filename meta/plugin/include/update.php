@@ -70,6 +70,12 @@ if (isset($_POST['ALLOW_UNAUTHENTICATED_WRITES'])) {
 }
 unset($_POST['ALLOW_UNAUTHENTICATED_WRITES_CB']);
 
+// Normalise the WAN IP lookup setting to exactly "true" or "false" (#252).
+if (isset($_POST['WAN_IP_LOOKUP'])) {
+    $_POST['WAN_IP_LOOKUP'] = ($_POST['WAN_IP_LOOKUP'] === 'false') ? 'false' : 'true';
+}
+unset($_POST['WAN_IP_LOOKUP_CB']);
+
 // Save tool policy JSON if submitted
 $policy_file = "/boot/config/plugins/$plugin/tool_policy.json";
 if (isset($_POST['TOOL_POLICY_JSON'])) {

@@ -24,6 +24,7 @@ port: 9090
 log_level: debug
 read_only: true
 allow_unauthenticated_writes: true
+wan_ip_lookup: false
 tool_policy:
   container_start: ask
 mqtt:
@@ -58,6 +59,9 @@ intervals:
 		}
 		if cfg.AllowUnauthenticatedWrites == nil || !*cfg.AllowUnauthenticatedWrites {
 			t.Errorf("AllowUnauthenticatedWrites = %v, want true", cfg.AllowUnauthenticatedWrites)
+		}
+		if cfg.WANIPLookup == nil || *cfg.WANIPLookup {
+			t.Errorf("WANIPLookup = %v, want explicit false", cfg.WANIPLookup)
 		}
 		if got := cfg.ToolPolicy["container_start"]; got != "ask" {
 			t.Errorf("ToolPolicy[container_start] = %q, want ask", got)

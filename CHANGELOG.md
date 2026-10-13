@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **WAN IP lookup setting** — `WAN_IP_LOOKUP` (`--wan-ip-lookup`, `wan_ip_lookup` in YAML, and a
+  **WAN IP Lookup** toggle on the plugin settings page) controls whether requesting network access URLs
+  asks `api.ipify.org`, `ifconfig.me` and `icanhazip.com` for the public IP. It defaults to on, so nothing
+  changes for existing installs; when off, no external request is made and the WAN entry uses only the
+  `WANIP=` value from Unraid's `network.cfg`. WAN discovery is now an injectable
+  `NetworkAccessDiscovery`, with tests for service order, first-answer short-circuit, invalid answers,
+  the `network.cfg` fallback, the disabled path and the request-only boundary; the existing access-URL
+  tests no longer contact the real services. Follow-up to the Community Applications review (#239).
+  ([#252](https://github.com/tinkerologie/unraid-management-agent/issues/252)).
 - **Network cards: NIC temperatures and optic diagnostics** — new optional `nic` collector
   (default every 60 s, `INTERVAL_NIC`, listed on the plugin settings page), REST endpoint
   `GET /api/v1/network/cards`, WebSocket event `nic_update` and read-only MCP tool

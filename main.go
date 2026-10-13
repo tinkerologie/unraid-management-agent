@@ -78,6 +78,10 @@ var cli struct {
 	// it, an empty API token leaves REST and HTTP MCP read-only (#245).
 	AllowUnauthenticatedWrites bool `default:"false" env:"ALLOW_UNAUTHENTICATED_WRITES" help:"allow state-changing REST requests and MCP tools over the network when API_TOKEN is empty (not recommended)"`
 
+	// WANIPLookup asks external IP services for the WAN IP when network access
+	// URLs are requested (#252).
+	WANIPLookup bool `name:"wan-ip-lookup" default:"true" env:"WAN_IP_LOOKUP" help:"ask api.ipify.org, ifconfig.me and icanhazip.com for the WAN IP when network access URLs are requested (false: use only Unraid's configured WANIP)"`
+
 	// MCPConnectSecret enables an optional secret-bearing MCP path (/mcp/<secret>)
 	// for URL-only MCP clients (ha-mcp style onboarding) without exposing full REST API access.
 	MCPConnectSecret string `default:"" env:"MCP_CONNECT_SECRET" help:"optional URL-safe secret (>=32 chars) enabling the /mcp/<secret> connect URL without bearer headers"`
@@ -414,6 +418,7 @@ func main() {
 		},
 	}
 	applyWriteAccess(appCtx, cli.APIToken, cli.AllowUnauthenticatedWrites)
+	applyWANIPLookup(appCtx, cli.WANIPLookup)
 
 	// Warn about insecure MQTT TLS configuration
 	if appCtx.MQTTConfig.InsecureSkipVerify && appCtx.MQTTConfig.Enabled {
@@ -431,6 +436,15 @@ func applyWriteAccess(appCtx *domain.Context, apiToken string, allowUnauthentica
 	appCtx.AllowUnauthenticatedWrites = allowUnauthenticatedWrites
 	if msg := writeAccessWarning(apiToken, allowUnauthenticatedWrites); msg != "" {
 		logger.Warning("%s", msg)
+	}
+}
+
+// applyWANIPLookup copies the WAN IP lookup setting into the application
+// context and logs when the external lookup is off (#252).
+func applyWANIPLookup(appCtx *domain.Context, enabled bool) {
+	appCtx.WANIPLookup = enabled
+	if !enabled {
+		logger.Info("WAN IP lookup disabled: network access URLs use only Unraid's configured WANIP")
 	}
 }
 
@@ -486,6 +500,7 @@ func applyFileConfig(cfg *domain.FileConfig) {
 	setStr(&cli.APIToken, cfg.APIToken)
 	setStr(&cli.MCPConnectSecret, cfg.MCPConnectSecret)
 	setBool(&cli.AllowUnauthenticatedWrites, cfg.AllowUnauthenticatedWrites)
+	setBool(&cli.WANIPLookup, cfg.WANIPLookup)
 	setStr(&cli.TLSCertFile, cfg.TLSCertFile)
 	setStr(&cli.TLSKeyFile, cfg.TLSKeyFile)
 

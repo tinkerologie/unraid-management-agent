@@ -9,11 +9,11 @@ import (
 )
 
 func TestCollectNetworkAccessURLs(t *testing.T) {
-	// Test that the function returns a valid structure
-	result := CollectNetworkAccessURLs()
+	// Lookup off: the test must not contact the real WAN IP services.
+	result := NewNetworkAccessDiscovery(false).Collect()
 
 	if result == nil {
-		t.Fatal("CollectNetworkAccessURLs returned nil")
+		t.Fatal("Collect returned nil")
 	}
 
 	if result.Timestamp.IsZero() {

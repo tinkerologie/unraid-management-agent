@@ -12,6 +12,5 @@ This plugin provides comprehensive system monitoring and control capabilities th
   ([Core Settings](../../docs/guides/configuration.md#core-settings),
   [Network Security](../../docs/guides/configuration.md#network-security)).
 - When you request network access URLs, the agent looks up your WAN IP from `api.ipify.org`, `ifconfig.me` and
-  `icanhazip.com`. No setting disables this yet
-  ([#252](https://github.com/tinkerologie/unraid-management-agent/issues/252),
-  [Security](../../docs/guides/configuration.md#security)).
+  `icanhazip.com`. Turn **WAN IP Lookup** off in the settings to make no such requests
+  ([WAN IP lookup](../../docs/guides/configuration.md#wan-ip-lookup)).

@@ -61,6 +61,10 @@ type Config struct {
 	// AllowUnauthenticatedWrites restores tokenless network write access. When
 	// it is false and APIToken is empty, REST and HTTP MCP are read-only.
 	AllowUnauthenticatedWrites bool `json:"allow_unauthenticated_writes,omitempty"`
+	// WANIPLookup lets network access discovery ask api.ipify.org,
+	// ifconfig.me and icanhazip.com for the public IP. When false only
+	// Unraid's configured WANIP is used (#252).
+	WANIPLookup bool `json:"wan_ip_lookup,omitempty"`
 	// TLSCertFile and TLSKeyFile point at a PEM certificate/key pair. When both
 	// are set the HTTP server (including the /mcp endpoint) is served over HTTPS;
 	// when either is empty the server stays on plain HTTP.

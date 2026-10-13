@@ -15,9 +15,52 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
 )
 
-// CollectNetworkAccessURLs gathers all methods to access the Unraid server
-// including LAN IP, mDNS hostname, WireGuard VPN IPs, WAN IP, and IPv6 addresses
-func CollectNetworkAccessURLs() *dto.NetworkAccessURLs {
+// defaultWANServices are asked for the server's public IP, in order, when WAN
+// IP lookup is enabled.
+var defaultWANServices = []string{
+	"https://api.ipify.org",
+	"https://ifconfig.me/ip",
+	"https://icanhazip.com",
+}
+
+// httpDoer is the HTTP client surface WAN discovery needs; *http.Client
+// implements it, and tests inject a stub.
+type httpDoer interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+// NetworkAccessDiscovery gathers the URLs the server can be reached at. The
+// WAN entry asks external IP services, which see the server's public IP; that
+// lookup can be turned off (#252), leaving only Unraid's configured WANIP.
+type NetworkAccessDiscovery struct {
+	wanLookup      bool
+	client         httpDoer
+	wanServices    []string
+	networkCfgPath string
+}
+
+// NewNetworkAccessDiscovery returns a discovery that contacts the external
+// WAN IP services only when wanLookup is true. Construction makes no requests.
+func NewNetworkAccessDiscovery(wanLookup bool) *NetworkAccessDiscovery {
+	return &NetworkAccessDiscovery{
+		wanLookup: wanLookup,
+		// 2s per service keeps worst-case discovery under ~6s on networks
+		// without outbound internet access (issue #123); a reachable IP
+		// service answers in well under a second.
+		client:         &http.Client{Timeout: 2 * time.Second},
+		wanServices:    defaultWANServices,
+		networkCfgPath: "/boot/config/network.cfg",
+	}
+}
+
+// WANLookupEnabled reports whether the external WAN IP lookup is enabled.
+func (d *NetworkAccessDiscovery) WANLookupEnabled() bool {
+	return d.wanLookup
+}
+
+// Collect gathers all methods to access the Unraid server including LAN IP,
+// mDNS hostname, WireGuard VPN IPs, WAN IP, and IPv6 addresses.
+func (d *NetworkAccessDiscovery) Collect() *dto.NetworkAccessURLs {
 	var urls []dto.AccessURL
 
 	// Get primary LAN IP
@@ -36,7 +79,7 @@ func CollectNetworkAccessURLs() *dto.NetworkAccessURLs {
 	}
 
 	// Get WAN IP (public IP) if accessible
-	if wanURL := getWANAccessURL(); wanURL != nil {
+	if wanURL := d.wanAccessURL(); wanURL != nil {
 		urls = append(urls, *wanURL)
 	}
 
@@ -186,71 +229,68 @@ func getWireGuardAccessURLs() []dto.AccessURL {
 	return urls
 }
 
-// getWANAccessURL returns the public WAN IP if accessible
-func getWANAccessURL() *dto.AccessURL {
-	// Try multiple services to get public IP
-	services := []string{
-		"https://api.ipify.org",
-		"https://ifconfig.me/ip",
-		"https://icanhazip.com",
-	}
-
-	// 2s per service keeps worst-case discovery under ~6s on networks without
-	// outbound internet access (issue #123); a reachable IP service answers in
-	// well under a second. The first successful response wins.
-	client := &http.Client{
-		Timeout: 2 * time.Second,
-	}
-
-	for _, service := range services {
-		//nolint:gosec // G107: URL is from a trusted constant list of IP services
-		resp, err := client.Get(service)
-		if err != nil {
-			continue
-		}
-		defer func() {
-			if err := resp.Body.Close(); err != nil {
-				logger.Debug("Error closing response body: %v", err)
-			}
-		}()
-
-		if resp.StatusCode != http.StatusOK {
-			continue
-		}
-
-		body, err := io.ReadAll(io.LimitReader(resp.Body, 64))
-		if err != nil {
-			continue
-		}
-
-		ip := strings.TrimSpace(string(body))
-		if net.ParseIP(ip) != nil {
-			return &dto.AccessURL{
-				Type: dto.URLTypeWAN,
-				Name: "Remote Access (WAN)",
-				IPv4: fmt.Sprintf("http://%s", ip),
+// wanAccessURL returns the WAN entry. With lookup enabled it asks the WAN
+// services in order, first answer wins, and falls back to Unraid's configured
+// WANIP; with lookup disabled it only reads the configured WANIP.
+func (d *NetworkAccessDiscovery) wanAccessURL() *dto.AccessURL {
+	if d.wanLookup {
+		for _, service := range d.wanServices {
+			if ip := d.queryWANService(service); ip != "" {
+				return wanAccessURL(ip)
 			}
 		}
 	}
-
-	// Try getting WAN IP from Unraid's network.ini if available
-	if wanIP := getWANIPFromUnraid(); wanIP != "" {
-		return &dto.AccessURL{
-			Type: dto.URLTypeWAN,
-			Name: "Remote Access (WAN)",
-			IPv4: fmt.Sprintf("http://%s", wanIP),
-		}
+	if ip := d.configuredWANIP(); ip != "" {
+		return wanAccessURL(ip)
 	}
-
 	return nil
 }
 
-// getWANIPFromUnraid tries to get the WAN IP from Unraid's network configuration
-func getWANIPFromUnraid() string {
-	// Check if there's a WAN IP stored in Unraid config
-	networkCfgPath := "/boot/config/network.cfg"
-	//nolint:gosec // G304: Path is a constant Unraid configuration file
-	file, err := os.Open(networkCfgPath)
+// queryWANService asks one IP service for the public IP and returns it, or ""
+// on any failure. The response body is closed before returning.
+func (d *NetworkAccessDiscovery) queryWANService(service string) string {
+	req, err := http.NewRequest(http.MethodGet, service, nil)
+	if err != nil {
+		return ""
+	}
+	//nolint:gosec // G107/G704: URL is from the trusted list of IP services
+	resp, err := d.client.Do(req)
+	if err != nil {
+		return ""
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logger.Debug("Error closing response body: %v", err)
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		return ""
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 64))
+	if err != nil {
+		return ""
+	}
+	ip := strings.TrimSpace(string(body))
+	if net.ParseIP(ip) == nil {
+		return ""
+	}
+	return ip
+}
+
+// wanAccessURL builds the WAN access entry for ip.
+func wanAccessURL(ip string) *dto.AccessURL {
+	return &dto.AccessURL{
+		Type: dto.URLTypeWAN,
+		Name: "Remote Access (WAN)",
+		IPv4: fmt.Sprintf("http://%s", ip),
+	}
+}
+
+// configuredWANIP returns the WANIP value from Unraid's network.cfg, or "" if
+// it is missing or not a valid IP.
+func (d *NetworkAccessDiscovery) configuredWANIP() string {
+	file, err := os.Open(d.networkCfgPath)
 	if err != nil {
 		return ""
 	}
@@ -262,16 +302,13 @@ func getWANIPFromUnraid() string {
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		line := scanner.Text()
-		if after, ok := strings.CutPrefix(line, "WANIP="); ok {
-			ip := after
-			ip = strings.Trim(ip, "\"")
+		if after, ok := strings.CutPrefix(scanner.Text(), "WANIP="); ok {
+			ip := strings.Trim(after, "\"")
 			if net.ParseIP(ip) != nil {
 				return ip
 			}
 		}
 	}
-
 	return ""
 }
 

@@ -30,6 +30,7 @@ $mcp_connect_secret = preg_replace('/[^A-Za-z0-9_-]/', '', (string)($config['MCP
 $tls_cert_file = $config['TLS_CERT_FILE'] ?? '';
 $tls_key_file = $config['TLS_KEY_FILE'] ?? '';
 $read_only = $config['READ_ONLY'] ?? 'false';
+$wan_ip_lookup = (trim((string)($config['WAN_IP_LOOKUP'] ?? 'true'), "'\"") === 'false') ? 'false' : 'true';
 $allow_unauth_writes = (trim((string)($config['ALLOW_UNAUTHENTICATED_WRITES'] ?? 'false'), "'\"") === 'true') ? 'true' : 'false';
 $log_level = $config['LOG_LEVEL'] ?? 'info';
 
@@ -492,6 +493,19 @@ interfaces and VLANs. Pick a specific address on multi-VLAN systems so integrati
 connect via the right network; mDNS discovery advertises the selected address. The default listens on all
 interfaces. Loopback and container-bridge addresses are excluded because integrations must be able to reach
 the agent. Changes apply after clicking Apply, which restarts the service automatically.
+</blockquote>
+
+_(WAN IP Lookup)_:
+: <label class="uma-toggle-switch">
+    <input type="checkbox" name="WAN_IP_LOOKUP_CB" id="wan_ip_lookup" <?= ($wan_ip_lookup === 'true') ? 'checked' : '' ?> onchange="updateWanIpLookup()">
+    <span class="uma-toggle-slider"></span>
+  </label>
+  <input type="hidden" name="WAN_IP_LOOKUP" id="wan_ip_lookup_val" value="<?= $wan_ip_lookup ?>">
+
+<blockquote class="inline_help">
+When network access URLs are requested, the agent asks api.ipify.org, ifconfig.me and icanhazip.com, in that order,
+for this server's public (WAN) IP; those services see the server's public IP address. Turn this off to make no
+such requests: the WAN entry then uses the <code>WANIP</code> value from Unraid's network settings, if one is set.
 </blockquote>
 
 <div class="title"><span class="left"><i class="title fa fa-key"></i>Authentication</span></div>
@@ -992,6 +1006,11 @@ function updateMQTTHA() {
 function noTokenPlaceholder() {
     var allow = document.getElementById('allow_unauth_writes');
     return (allow && allow.checked) ? 'Not set (network writes allowed without a token)' : 'Not set (network access is read-only)';
+}
+
+function updateWanIpLookup() {
+    var enabled = document.getElementById('wan_ip_lookup').checked;
+    document.getElementById('wan_ip_lookup_val').value = enabled ? 'true' : 'false';
 }
 
 function updateAllowUnauthWrites() {

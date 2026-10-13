@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
 	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 )
 
@@ -21,7 +22,8 @@ func TestHandleNetworkAccessURLs(t *testing.T) {
 	rr := httptest.NewRecorder()
 	server.router.ServeHTTP(rr, req)
 
-	// CollectNetworkAccessURLs always returns a result (uses net.Interfaces)
+	// Collect always returns a result (uses net.Interfaces); WAN IP lookup is off
+	// in the zero-value test context, so no external service is contacted.
 	if rr.Code != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", rr.Code)
 	}
@@ -369,10 +371,21 @@ func TestServerGetShareConfig(t *testing.T) {
 	_ = result
 }
 
+// TestNewServerWANIPLookup checks the server passes WAN_IP_LOOKUP to network
+// access discovery (#252); the no-request behaviour is tested in collectors.
+func TestNewServerWANIPLookup(t *testing.T) {
+	for _, enabled := range []bool{true, false} {
+		ctx := &domain.Context{Config: domain.Config{WANIPLookup: enabled}}
+		if got := NewServer(ctx).networkAccess.WANLookupEnabled(); got != enabled {
+			t.Errorf("WANIPLookup %v: discovery lookup enabled = %v", enabled, got)
+		}
+	}
+}
+
 func TestServerGetNetworkAccessURLs(t *testing.T) {
 	server, _ := setupTestServer()
 	result := server.GetNetworkAccessURLs()
-	// CollectNetworkAccessURLs always returns a non-nil result
+	// Collect always returns a non-nil result
 	if result == nil {
 		t.Error("Expected non-nil NetworkAccessURLs")
 	}

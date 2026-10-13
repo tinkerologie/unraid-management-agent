@@ -41,6 +41,9 @@ type FileConfig struct {
 	// token (not recommended).
 	AllowUnauthenticatedWrites *bool `yaml:"allow_unauthenticated_writes,omitempty"`
 
+	// WANIPLookup enables the external WAN IP lookup (default true).
+	WANIPLookup *bool `yaml:"wan_ip_lookup,omitempty"`
+
 	// MCPConnectSecret enables the secret-bearing MCP connect URL (/mcp/<secret>) when non-empty.
 	MCPConnectSecret *string `yaml:"mcp_connect_secret,omitempty"`
 

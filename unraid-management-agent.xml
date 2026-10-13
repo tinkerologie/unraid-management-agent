@@ -7,7 +7,7 @@
     <Name>Unraid Management Agent</Name>
     <Description>
         Monitor and control your Unraid system via REST API, WebSocket, MCP, Prometheus, and MQTT. Supports Docker/VM control, real-time metrics, Home Assistant integration, and AI agent tooling.
-        Security and privacy: the API listens on all network interfaces on port 8043 over plain HTTP. Until you set an API token, anyone on your network can read its data, and control actions are refused (upgrades from earlier versions keep them allowed until you set a token). With access, the API and MCP can reboot or shut down the server, control containers, VMs and the array, and run User Scripts. When you request network access URLs, the agent looks up your WAN IP from api.ipify.org, ifconfig.me and icanhazip.com.
+        Security and privacy: the API listens on all network interfaces on port 8043 over plain HTTP. Until you set an API token, anyone on your network can read its data, and control actions are refused (upgrades from earlier versions keep them allowed until you set a token). With access, the API and MCP can reboot or shut down the server, control containers, VMs and the array, and run User Scripts. When you request network access URLs, the agent looks up your WAN IP from api.ipify.org, ifconfig.me and icanhazip.com; you can turn this off in the settings.
     </Description>
     <Requires>
         **No external plugin dependencies** - All data is collected directly from system sources.

@@ -24,6 +24,7 @@ This file is created automatically after the first installation and persists acr
 | `--tool-policy`                  | -        | Comma-separated per-tool MCP policies (`tool=policy`), e.g. `system_reboot=ask,container_action=read_only`. If `tool_policy.json` exists on disk, it takes precedence. |
 | `--api-token`                    | -        | Require `Authorization: Bearer <token>` on the HTTP API and `/mcp` (empty = unauthenticated reads, network writes refused)                                             |
 | `--allow-unauthenticated-writes` | `false`  | Allow network writes without an API token (not recommended; `ALLOW_UNAUTHENTICATED_WRITES`)                                                                            |
+| `--wan-ip-lookup`                | `true`   | Ask api.ipify.org, ifconfig.me and icanhazip.com for the WAN IP on request (`WAN_IP_LOOKUP`; `false` uses only Unraid's `WANIP`)                                       |
 | `--mcp-connect-secret`           | -        | Optional 32–256 char (`[A-Za-z0-9_-]`) secret enabling header-free MCP onboarding at `/mcp/<secret>` (`MCP_CONNECT_SECRET`)                                            |
 | `--debug`                        | `false`  | Enable debug logging                                                                                                                                                   |
 | `--mqtt-enabled`                 | `false`  | Enable MQTT publishing                                                                                                                                                 |
@@ -388,6 +389,24 @@ grep DEBUG /var/log/unraid-management-agent.log
 ## Security
 
 ### Network Security
+
+#### WAN IP lookup
+
+When network access URLs are requested (`GET /api/v1/network/access-urls` or the MCP tool
+`get_network_access_urls`), the agent asks `api.ipify.org`, `ifconfig.me` and `icanhazip.com`, in that order,
+for the server's public (WAN) IP and stops at the first answer. Those services see the server's public IP
+address. Nothing is looked up at startup or on a schedule, and the result is not cached. If all three fail,
+the `WANIP=` value from Unraid's `/boot/config/network.cfg` is used.
+
+To make no external requests, turn the lookup off. The WAN entry then uses only the `WANIP=` value, or is
+left out if none is set.
+
+| Method                     | Setting                                         |
+| -------------------------- | ----------------------------------------------- |
+| Plugin settings page       | **WAN IP Lookup** (off)                         |
+| Config file (`config.cfg`) | `WAN_IP_LOOKUP="false"`                         |
+| YAML config (`config.yml`) | `wan_ip_lookup: false`                          |
+| CLI flag / env var         | `--wan-ip-lookup=false` / `WAN_IP_LOOKUP=false` |
 
 **Recommendations**:
 

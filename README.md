@@ -141,9 +141,9 @@ For information about the official Unraid GraphQL API, please refer to:
 - **External WAN IP lookups**: when you request network access URLs (`GET /api/v1/network/access-urls` or the MCP
   tool `get_network_access_urls`), the agent asks `api.ipify.org`, `ifconfig.me` and `icanhazip.com`, in that order,
   for your WAN IP, and stops at the first answer. Those services see your server's public IP address. Nothing runs
-  at startup or on a schedule, and the result is not cached. No setting disables the lookup yet (tracked in
-  [#252](https://github.com/tinkerologie/unraid-management-agent/issues/252)); a `WANIP=` value in Unraid's
-  `network.cfg` is used only if all three services fail. See [Security](docs/guides/configuration.md#security).
+  at startup or on a schedule, and the result is not cached. If all three fail, the `WANIP=` value in Unraid's
+  `network.cfg` is used. Turn **WAN IP Lookup** off (`WAN_IP_LOOKUP=false`) to make no external requests; the WAN
+  entry then uses only `WANIP=`. See [WAN IP lookup](docs/guides/configuration.md#wan-ip-lookup).
 
 ## Architecture
 

@@ -54,6 +54,7 @@ type SystemControllerInterface interface {
 // It maintains an in-memory cache of data from collectors and broadcasts updates to WebSocket clients.
 type Server struct {
 	ctx              *domain.Context
+	networkAccess    *collectors.NetworkAccessDiscovery
 	httpServer       *http.Server
 	router           *mux.Router
 	wsHub            *WSHub
@@ -102,6 +103,7 @@ func NewServerWithCollectorManager(ctx *domain.Context, cm CollectorManagerInter
 		ready:            make(chan struct{}),
 		collectorManager: cm,
 		CacheStore:       &CacheStore{registry: ctx.Platform},
+		networkAccess:    collectors.NewNetworkAccessDiscovery(ctx.WANIPLookup),
 	}
 
 	s.setupRoutes()
@@ -674,7 +676,7 @@ func (s *Server) GetShareConfig(name string) *dto.ShareConfig {
 // agent serves HTTPS the URLs are rewritten to https:// with the configured
 // port, so clients are pointed at the scheme the server actually listens on.
 func (s *Server) GetNetworkAccessURLs() *dto.NetworkAccessURLs {
-	accessURLs := collectors.CollectNetworkAccessURLs()
+	accessURLs := s.networkAccess.Collect()
 	if s.ctx.TLSEnabled() {
 		accessURLs.URLs = collectors.GetHTTPSURLs(accessURLs.URLs, s.ctx.Port)
 	}

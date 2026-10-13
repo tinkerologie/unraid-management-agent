@@ -1,8 +1,11 @@
 package main
 
 import (
+	"os"
 	"strings"
 	"testing"
+
+	"github.com/alecthomas/kong"
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
 )
@@ -90,6 +93,60 @@ func TestApplyWriteAccess(t *testing.T) {
 		}
 		if appCtx.WritesLocked() == allow {
 			t.Errorf("WritesLocked() = %v with no token and opt-out %v", appCtx.WritesLocked(), allow)
+		}
+	}
+}
+
+func TestWANIPLookupSetting(t *testing.T) {
+	parse := func(t *testing.T, args ...string) bool {
+		t.Helper()
+		c := cli
+		parser, err := kong.New(&c, kong.Exit(func(int) { t.Fatal("kong exited") }))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := parser.Parse(append(args, "boot")); err != nil {
+			t.Fatalf("parse %v: %v", args, err)
+		}
+		return c.WANIPLookup
+	}
+
+	// Unset WAN_IP_LOOKUP for the default case; t.Setenv restores it afterwards.
+	t.Setenv("WAN_IP_LOOKUP", "")
+	if err := os.Unsetenv("WAN_IP_LOOKUP"); err != nil {
+		t.Fatal(err)
+	}
+	if !parse(t) {
+		t.Error("WAN IP lookup must default to enabled")
+	}
+	if parse(t, "--wan-ip-lookup=false") {
+		t.Error("--wan-ip-lookup=false must disable the lookup")
+	}
+	t.Setenv("WAN_IP_LOOKUP", "false")
+	if parse(t) {
+		t.Error("WAN_IP_LOOKUP=false must disable the lookup")
+	}
+
+	orig := cli.WANIPLookup
+	t.Cleanup(func() { cli.WANIPLookup = orig })
+	cli.WANIPLookup = true
+	applyFileConfig(&domain.FileConfig{})
+	if !cli.WANIPLookup {
+		t.Error("an omitted wan_ip_lookup must keep the parsed value")
+	}
+	off := false
+	applyFileConfig(&domain.FileConfig{WANIPLookup: &off})
+	if cli.WANIPLookup {
+		t.Error("wan_ip_lookup: false in the config file must disable the lookup")
+	}
+}
+
+func TestApplyWANIPLookup(t *testing.T) {
+	for _, enabled := range []bool{true, false} {
+		appCtx := &domain.Context{}
+		applyWANIPLookup(appCtx, enabled)
+		if appCtx.WANIPLookup != enabled {
+			t.Errorf("WANIPLookup = %v, want %v", appCtx.WANIPLookup, enabled)
 		}
 	}
 }
