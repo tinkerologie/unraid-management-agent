@@ -7951,6 +7951,11 @@ const docTemplate = `{
                     "type": "string",
                     "example": "07274-50017"
                 },
+                "label": {
+                    "description": "Label is the channel's label from lm-sensors (the driver's fanN_label\nor a sensors.conf ` + "`" + `label` + "`" + ` override), e.g. \"Coolant Flow (rpm)\". Empty\nwhen the channel has no label beyond its name (e.g. \"fan1\").",
+                    "type": "string",
+                    "example": "Coolant Flow (rpm)"
+                },
                 "name": {
                     "type": "string",
                     "example": "CPU Fan"

@@ -645,9 +645,10 @@ func (c *SystemCollector) getFans(chipDeviceIDs map[string]string) ([]dto.FanInf
 
 // sensorsFanReading is one fanN_input value from `sensors -u`.
 type sensorsFanReading struct {
-	chip  string // lm-sensors chip name, e.g. "nct6798-isa-0290"
-	label string // fan channel, e.g. "fan1"
-	rpm   int
+	chip    string // lm-sensors chip name, e.g. "nct6798-isa-0290"
+	label   string // fan channel, e.g. "fan1"
+	feature string // the channel's lm-sensors label, e.g. "CPU Fan"; "" if none
+	rpm     int
 }
 
 // parseFanSpeeds parses fan inputs from `sensors -u` output.
@@ -704,6 +705,7 @@ func (c *SystemCollector) parseFanSpeeds(output string, chipDeviceIDs map[string
 			RPM:      r.rpm,
 			Source:   r.chip,
 			DeviceID: chipDeviceIDs[r.chip],
+			Label:    r.feature,
 		}
 		if i, ok := index[info.Name]; ok {
 			// Same chip and channel listed twice: keep the latest value.
@@ -718,12 +720,14 @@ func (c *SystemCollector) parseFanSpeeds(output string, chipDeviceIDs map[string
 }
 
 // parseSensorsFanReadings extracts every fanN_input value from `sensors -u`
-// output, in output order.
+// output, in output order, with the label of the feature it belongs to.
+// `sensors -u` prints each feature's label on its own line ending in ":"
+// ("Coolant Flow (rpm):"), followed by its subfeatures ("fan8_input: 742.000").
 func parseSensorsFanReadings(output string) []sensorsFanReading {
 	var readings []sensorsFanReading
 	lines := strings.Split(output, "\n")
 
-	var currentChip string
+	var currentChip, currentFeature string
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -733,7 +737,20 @@ func parseSensorsFanReadings(output string) []sensorsFanReading {
 		// New chip/adapter
 		if !strings.Contains(line, ":") && !strings.HasPrefix(line, " ") {
 			currentChip = line
+			currentFeature = ""
 			continue
+		}
+
+		// Feature label line
+		if label, ok := strings.CutSuffix(line, ":"); ok {
+			currentFeature = strings.TrimSpace(label)
+			continue
+		}
+
+		// A feature's label belongs to its first input only.
+		feature := currentFeature
+		if strings.Contains(line, "_input:") {
+			currentFeature = ""
 		}
 
 		// Fan input line
@@ -743,10 +760,16 @@ func parseSensorsFanReadings(output string) []sensorsFanReading {
 				key := strings.TrimSpace(parts[0])
 				valueStr := strings.TrimSpace(parts[1])
 				if floatVal, err := strconv.ParseFloat(valueStr, 64); err == nil {
+					channel := strings.TrimSuffix(key, "_input")
+					if feature == channel {
+						// Unlabelled channel: sensors prints its name ("fan1:").
+						feature = ""
+					}
 					readings = append(readings, sensorsFanReading{
-						chip:  currentChip,
-						label: strings.TrimSuffix(key, "_input"),
-						rpm:   int(math.Round(floatVal)),
+						chip:    currentChip,
+						label:   channel,
+						feature: feature,
+						rpm:     int(math.Round(floatVal)),
 					})
 				}
 			}

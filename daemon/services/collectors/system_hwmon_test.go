@@ -193,8 +193,8 @@ func TestParseFanSpeedsChipIdentity(t *testing.T) {
 			output:    octoA + "\n" + nct,
 			deviceIDs: map[string]string{"octo-hid-3-13": "07274-50017"},
 			want: []dto.FanInfo{
-				{Name: "octo_fan1", RPM: 1200, Source: "octo-hid-3-13", DeviceID: "07274-50017"},
-				{Name: "octo_fan2", RPM: 800, Source: "octo-hid-3-13", DeviceID: "07274-50017"},
+				{Name: "octo_fan1", RPM: 1200, Source: "octo-hid-3-13", DeviceID: "07274-50017", Label: "Fan 1"},
+				{Name: "octo_fan2", RPM: 800, Source: "octo-hid-3-13", DeviceID: "07274-50017", Label: "Fan 2"},
 				{Name: "nct6798_fan1", RPM: 700, Source: "nct6798-isa-0290"},
 			},
 		},
@@ -203,20 +203,20 @@ func TestParseFanSpeedsChipIdentity(t *testing.T) {
 			output:    octoA + "\n" + octoB,
 			deviceIDs: map[string]string{"octo-hid-3-13": "07274-50017", "octo-hid-3-14": "usb-3-7"},
 			want: []dto.FanInfo{
-				{Name: "octo-07274-50017_fan1", RPM: 1200, Source: "octo-hid-3-13", DeviceID: "07274-50017"},
-				{Name: "octo-07274-50017_fan2", RPM: 800, Source: "octo-hid-3-13", DeviceID: "07274-50017"},
-				{Name: "octo-usb-3-7_fan1", RPM: 950, Source: "octo-hid-3-14", DeviceID: "usb-3-7"},
-				{Name: "octo-usb-3-7_fan2", RPM: 600, Source: "octo-hid-3-14", DeviceID: "usb-3-7"},
+				{Name: "octo-07274-50017_fan1", RPM: 1200, Source: "octo-hid-3-13", DeviceID: "07274-50017", Label: "Fan 1"},
+				{Name: "octo-07274-50017_fan2", RPM: 800, Source: "octo-hid-3-13", DeviceID: "07274-50017", Label: "Fan 2"},
+				{Name: "octo-usb-3-7_fan1", RPM: 950, Source: "octo-hid-3-14", DeviceID: "usb-3-7", Label: "Fan 1"},
+				{Name: "octo-usb-3-7_fan2", RPM: 600, Source: "octo-hid-3-14", DeviceID: "usb-3-7", Label: "Fan 2"},
 			},
 		},
 		{
 			name:   "two octos without device IDs use the full chip name",
 			output: octoA + "\n" + octoB,
 			want: []dto.FanInfo{
-				{Name: "octo-hid-3-13_fan1", RPM: 1200, Source: "octo-hid-3-13"},
-				{Name: "octo-hid-3-13_fan2", RPM: 800, Source: "octo-hid-3-13"},
-				{Name: "octo-hid-3-14_fan1", RPM: 950, Source: "octo-hid-3-14"},
-				{Name: "octo-hid-3-14_fan2", RPM: 600, Source: "octo-hid-3-14"},
+				{Name: "octo-hid-3-13_fan1", RPM: 1200, Source: "octo-hid-3-13", Label: "Fan 1"},
+				{Name: "octo-hid-3-13_fan2", RPM: 800, Source: "octo-hid-3-13", Label: "Fan 2"},
+				{Name: "octo-hid-3-14_fan1", RPM: 950, Source: "octo-hid-3-14", Label: "Fan 1"},
+				{Name: "octo-hid-3-14_fan2", RPM: 600, Source: "octo-hid-3-14", Label: "Fan 2"},
 			},
 		},
 		{
@@ -224,10 +224,10 @@ func TestParseFanSpeedsChipIdentity(t *testing.T) {
 			output:    octoA + "\n" + octoB,
 			deviceIDs: map[string]string{"octo-hid-3-13": "07274-50017", "octo-hid-3-14": "07274-50017"},
 			want: []dto.FanInfo{
-				{Name: "octo-hid-3-13_fan1", RPM: 1200, Source: "octo-hid-3-13", DeviceID: "07274-50017"},
-				{Name: "octo-hid-3-13_fan2", RPM: 800, Source: "octo-hid-3-13", DeviceID: "07274-50017"},
-				{Name: "octo-hid-3-14_fan1", RPM: 950, Source: "octo-hid-3-14", DeviceID: "07274-50017"},
-				{Name: "octo-hid-3-14_fan2", RPM: 600, Source: "octo-hid-3-14", DeviceID: "07274-50017"},
+				{Name: "octo-hid-3-13_fan1", RPM: 1200, Source: "octo-hid-3-13", DeviceID: "07274-50017", Label: "Fan 1"},
+				{Name: "octo-hid-3-13_fan2", RPM: 800, Source: "octo-hid-3-13", DeviceID: "07274-50017", Label: "Fan 2"},
+				{Name: "octo-hid-3-14_fan1", RPM: 950, Source: "octo-hid-3-14", DeviceID: "07274-50017", Label: "Fan 1"},
+				{Name: "octo-hid-3-14_fan2", RPM: 600, Source: "octo-hid-3-14", DeviceID: "07274-50017", Label: "Fan 2"},
 			},
 		},
 		{
@@ -257,5 +257,45 @@ func TestParseFanSpeedsChipIdentity(t *testing.T) {
 				t.Errorf("parseFanSpeeds() =\n  %+v\nwant\n  %+v", got, tt.want)
 			}
 		})
+	}
+}
+
+// TestParseFanSpeedsLabels checks that each fan carries its lm-sensors label
+// (a sensors.conf override or the driver's fanN_label), taken from the
+// feature line that precedes the fanN_input line, and that the labels of
+// other features (voltages, temperatures) are not attached to fans.
+func TestParseFanSpeedsLabels(t *testing.T) {
+	c := NewSystemCollector(&domain.Context{Hub: domain.NewEventBus(10)})
+	// Layout of `sensors -u` for an Aquacomputer Octo with sensors.conf labels.
+	const output = `octo-hid-3-13
+Adapter: HID adapter
+Fan 1 voltage:
+  in0_input: 12.020
+Array Fan1:
+  fan1_input: 2889.000
+  fan1_min: 0.000
+Coolant Flow (rpm):
+  fan8_input: 742.000
+Coolant Temp:
+  temp1_input: 35.830
+
+nct6798-isa-0290
+Adapter: ISA adapter
+fan1:
+  fan1_input: 700.000
+in0:
+  in0_input: 1.000
+  fan2_input: 650.000
+`
+	got := c.parseFanSpeeds(output, map[string]string{"octo-hid-3-13": "00000-00001"})
+	want := []dto.FanInfo{
+		{Name: "octo_fan1", RPM: 2889, Source: "octo-hid-3-13", DeviceID: "00000-00001", Label: "Array Fan1"},
+		{Name: "octo_fan8", RPM: 742, Source: "octo-hid-3-13", DeviceID: "00000-00001", Label: "Coolant Flow (rpm)"},
+		{Name: "nct6798_fan1", RPM: 700, Source: "nct6798-isa-0290"},
+		// An input without its own feature line gets no label.
+		{Name: "nct6798_fan2", RPM: 650, Source: "nct6798-isa-0290"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("parseFanSpeeds() =\n  %+v\nwant\n  %+v", got, want)
 	}
 }

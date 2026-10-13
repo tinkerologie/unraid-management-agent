@@ -79,6 +79,10 @@ type FanInfo struct {
 	// USB HID chips (whose lm-sensors name changes on every re-enumeration):
 	// the USB serial number, or "usb-<busnum>-<devpath>" when it has none.
 	DeviceID string `json:"device_id,omitempty" example:"07274-50017"`
+	// Label is the channel's label from lm-sensors (the driver's fanN_label
+	// or a sensors.conf `label` override), e.g. "Coolant Flow (rpm)". Empty
+	// when the channel has no label beyond its name (e.g. "fan1").
+	Label string `json:"label,omitempty" example:"Coolant Flow (rpm)"`
 }
 
 // TemperatureReading represents a single temperature sensor reading
