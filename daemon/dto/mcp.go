@@ -185,12 +185,6 @@ type MCPServiceActionArgs struct {
 	Confirm     bool   `json:"confirm" jsonschema:"Must be set to true to confirm the action"`
 }
 
-// MCPPluginUpdateArgs represents arguments for plugin update operations.
-type MCPPluginUpdateArgs struct {
-	PluginName string `json:"plugin_name,omitempty" jsonschema:"Specific plugin name to update (omit to update all with available updates)"`
-	Confirm    bool   `json:"confirm" jsonschema:"Must be set to true to confirm the update"`
-}
-
 // MCPProcessListArgs represents arguments for listing processes.
 type MCPProcessListArgs struct {
 	SortBy string `json:"sort_by,omitempty" jsonschema:"Sort by: cpu, memory, pid, or name (default: cpu)"`

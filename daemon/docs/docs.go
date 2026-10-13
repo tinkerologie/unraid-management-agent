@@ -3863,32 +3863,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/plugins/update-all": {
-            "post": {
-                "description": "Update all plugins that have updates available",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Plugins"
-                ],
-                "summary": "Update all plugins",
-                "responses": {
-                    "200": {
-                        "description": "Plugin update results",
-                        "schema": {
-                            "$ref": "#/definitions/dto.PluginBulkUpdateResult"
-                        }
-                    },
-                    "500": {
-                        "description": "Failed to update plugins",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    }
-                }
-            }
-        },
         "/plugins/updates/refresh": {
             "post": {
                 "description": "Runs an immediate plugin update check and publishes the result.",
@@ -3908,47 +3882,6 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Check failed",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/plugins/{name}/update": {
-            "post": {
-                "description": "Update a specific plugin by name",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Plugins"
-                ],
-                "summary": "Update a specific plugin",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Plugin name",
-                        "name": "name",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Plugin updated",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid plugin name",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "500": {
-                        "description": "Failed to update plugin",
                         "schema": {
                             "$ref": "#/definitions/dto.Response"
                         }
@@ -10418,28 +10351,6 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.PluginBulkUpdateResult": {
-            "type": "object",
-            "properties": {
-                "failed": {
-                    "type": "integer",
-                    "example": 0
-                },
-                "results": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/dto.PluginUpdateResult"
-                    }
-                },
-                "succeeded": {
-                    "type": "integer",
-                    "example": 3
-                },
-                "timestamp": {
-                    "type": "string"
-                }
-            }
-        },
         "dto.PluginInfo": {
             "description": "Information about an installed Unraid plugin",
             "type": "object",
@@ -10510,34 +10421,6 @@ const docTemplate = `{
                 "updates_available": {
                     "type": "integer",
                     "example": 2
-                }
-            }
-        },
-        "dto.PluginUpdateResult": {
-            "type": "object",
-            "properties": {
-                "message": {
-                    "type": "string",
-                    "example": "Updated successfully"
-                },
-                "new_version": {
-                    "type": "string",
-                    "example": "2025.10.28"
-                },
-                "plugin_name": {
-                    "type": "string",
-                    "example": "community.applications"
-                },
-                "previous_version": {
-                    "type": "string",
-                    "example": "2025.10.27"
-                },
-                "success": {
-                    "type": "boolean",
-                    "example": true
-                },
-                "timestamp": {
-                    "type": "string"
                 }
             }
         },

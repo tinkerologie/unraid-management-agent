@@ -7,7 +7,7 @@ platforms. Pick by client.
 
 | Method                                                      | Best for                            | Provides                    | Setup                          |
 | ----------------------------------------------------------- | ----------------------------------- | --------------------------- | ------------------------------ |
-| **MCP** ([mcp.md](mcp.md))                                  | Claude, Cursor, Copilot, Gemini CLI | 121 tools, 5 res, 6 prompts | `http://<ip>:8043/mcp`         |
+| **MCP** ([mcp.md](mcp.md))                                  | Claude, Cursor, Copilot, Gemini CLI | 126 tools, 5 res, 6 prompts | `http://<ip>:8043/mcp`         |
 | **Agent Skill** ([claude/](claude/))                        | Claude, Cursor, Copilot, Gemini     | How-to knowledge pack       | `npx skills add …` / `/plugin` |
 | **ChatGPT Actions** ([chatgpt/](chatgpt/))                  | ChatGPT Custom GPTs                 | ~30 REST endpoints          | Import `openapi-actions.yaml`  |
 | **MQTT** ([mqtt.md](mqtt.md))                               | Home Assistant entities             | State topics + discovery    | Enable MQTT → broker           |

@@ -126,7 +126,7 @@ references on demand.
 | File | When to read |
 | --- | --- |
 | `references/connection.md` | Connecting any client (Claude Code/Desktop, claude.ai, Cursor, Copilot, Gemini CLI, ChatGPT) via MCP HTTP/STDIO; troubleshooting connectivity |
-| `references/mcp-tools.md` | The full catalog of all 125 MCP tools grouped by category, with read/write (destructive) flags and arguments |
+| `references/mcp-tools.md` | The full catalog of all 126 MCP tools grouped by category, with read/write (destructive) flags and arguments |
 | `references/diagnostics.md` | The 6 diagnostic prompts and 5 real-time resources — what each analyses and when to use it |
 | `references/rest-api.md` | REST API surface for non-MCP clients (Custom GPT Actions, scripts): base path, key endpoints, path/body conventions |
 | `references/workflows.md` | Natural-language request → tool/endpoint mappings and end-to-end examples (monitoring, container/VM/array control, maintenance) |
@@ -139,9 +139,10 @@ references on demand.
   notifications, parity history, logs, collectors, settings, unassigned devices,
   remote SMB/NFS shares.
 - **Control:** container & VM lifecycle, array start/stop, parity check
-  start/stop/pause/resume, disk spin up/down, container & plugin updates, VM
-  snapshot create/delete/restore, VM clone, service start/stop/restart, user
-  scripts, collector enable/disable + intervals, reboot/shutdown.
+  start/stop/pause/resume, disk spin up/down, container updates, plugin update
+  checks (read-only), VM snapshot create/delete/restore, VM clone, service
+  start/stop/restart, user scripts, collector enable/disable + intervals,
+  reboot/shutdown.
 - **Observability & automation:** alert rules (expr-lang) + templates, health
   checks (HTTP/TCP/container), remediation runbooks, an optional autonomous
   agent, fan control (profiles/curves), CPU governor, and system tuning (turbo

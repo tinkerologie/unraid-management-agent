@@ -57,45 +57,6 @@ func TestValidateContainerRef(t *testing.T) {
 	}
 }
 
-func TestValidatePluginName(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   string
-		wantErr bool
-		errMsg  string
-	}{
-		// Valid names
-		{"simple name", "my-plugin", false, ""},
-		{"dots and hyphens", "unraid-management-agent.plg", false, ""},
-		{"underscores", "my_plugin", false, ""},
-		{"alphanumeric", "plugin123", false, ""},
-		{"single char", "a", false, ""},
-		// Invalid
-		{"empty string", "", true, "cannot be empty"},
-		{"path traversal", "../etc/passwd", true, "path separators or directory traversal"},
-		{"slash", "plugin/name", true, "path separators or directory traversal"},
-		{"backslash", "plugin\\name", true, "path separators or directory traversal"},
-		{"spaces", "my plugin", true, "invalid plugin name"},
-		{"special chars", "plugin@name", true, "invalid plugin name"},
-		// Security edge cases
-		{"command injection", "$(id)", true, ""},
-		{"null byte", "plugin\x00", true, ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidatePluginName(tt.input)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidatePluginName(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
-				return
-			}
-			if err != nil && tt.errMsg != "" && !strings.Contains(err.Error(), tt.errMsg) {
-				t.Errorf("ValidatePluginName(%q) error = %q, want containing %q", tt.input, err.Error(), tt.errMsg)
-			}
-		})
-	}
-}
-
 func TestValidateServiceName(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -205,33 +166,6 @@ func TestContainerNameRegex(t *testing.T) {
 			got := containerNameRegex.MatchString(tt.input)
 			if got != tt.match {
 				t.Errorf("containerNameRegex.MatchString(%q) = %v, want %v", tt.input, got, tt.match)
-			}
-		})
-	}
-}
-
-func TestPluginNameRegex(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-		match bool
-	}{
-		{"simple", "myplugin", true},
-		{"with hyphens", "my-plugin", true},
-		{"with dots", "my.plugin.plg", true},
-		{"with underscores", "my_plugin", true},
-		{"single char", "a", true},
-		{"max length", strings.Repeat("a", 255), true},
-		{"over max length", strings.Repeat("a", 256), false},
-		{"empty", "", false},
-		{"spaces", "my plugin", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := pluginNameRegex.MatchString(tt.input)
-			if got != tt.match {
-				t.Errorf("pluginNameRegex.MatchString(%q) = %v, want %v", tt.input, got, tt.match)
 			}
 		})
 	}

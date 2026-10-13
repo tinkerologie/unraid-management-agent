@@ -41,9 +41,6 @@ var (
 	// Container references: either hex IDs (12/64 chars) or names (alphanumeric, hyphens, underscores, dots, slashes)
 	containerNameRegex = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,254}$`)
 
-	// Plugin names: alphanumeric, hyphens, underscores, dots (max 255 chars)
-	pluginNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_.-]{1,255}$`)
-
 	// Service names: lowercase alphanumeric and hyphens
 	serviceNameRegex = regexp.MustCompile(`^[a-z][a-z0-9-]{0,63}$`)
 
@@ -290,28 +287,6 @@ func ValidateContainerRef(ref string) error {
 	}
 
 	return errors.New("invalid container reference: must be a 12/64 hex ID or a valid container name")
-}
-
-// ValidatePluginName validates an Unraid plugin name.
-func ValidatePluginName(name string) error {
-	if name == "" {
-		return errors.New("plugin name cannot be empty")
-	}
-
-	if strings.Contains(name, "..") || strings.Contains(name, "/") || strings.Contains(name, "\\") {
-		return errors.New("invalid plugin name: cannot contain path separators or directory traversal")
-	}
-
-	// Check for null bytes (CWE-158)
-	if strings.Contains(name, "\x00") {
-		return errors.New("invalid plugin name: cannot contain null bytes")
-	}
-
-	if !pluginNameRegex.MatchString(name) {
-		return errors.New("invalid plugin name format: must contain only alphanumeric characters, hyphens, underscores, and dots")
-	}
-
-	return nil
 }
 
 // ValidateServiceName validates an Unraid service name.

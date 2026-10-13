@@ -171,20 +171,3 @@ func TestPluginControllerCheckUpdates(t *testing.T) {
 	}
 	_ = updates
 }
-
-func TestPluginControllerUpdatePlugin(t *testing.T) {
-	pc := NewPluginController()
-	err := pc.UpdatePlugin("test-plugin.plg")
-	if err == nil {
-		t.Log("UpdatePlugin succeeded (unexpected on macOS)")
-	}
-}
-
-func TestPluginControllerUpdateAllPlugins(t *testing.T) {
-	pc := NewPluginController()
-	results, err := pc.UpdateAllPlugins()
-	if err != nil {
-		t.Logf("UpdateAllPlugins error (expected on macOS): %v", err)
-	}
-	_ = results
-}

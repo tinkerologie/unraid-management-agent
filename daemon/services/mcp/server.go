@@ -1908,53 +1908,6 @@ func (s *Server) registerNewControlTools() {
 		return jsonResult(result)
 	})
 
-	// Update single plugin
-	addWriteTool(s, &mcp.Tool{
-		Name:        "update_plugin",
-		Description: "Update a specific Unraid plugin to the latest version.",
-		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: new(true),
-			IdempotentHint:  true,
-		},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPPluginUpdateArgs) (*mcp.CallToolResult, any, error) {
-		if !args.Confirm {
-			return textResult("Plugin update requires confirm=true."), nil, nil
-		}
-		if args.PluginName == "" {
-			return textResult("plugin_name is required for single plugin updates"), nil, nil
-		}
-		if err := lib.ValidatePluginName(args.PluginName); err != nil {
-			return textResult(fmt.Sprintf("Invalid plugin name: %v", err)), nil, nil
-		}
-		logger.Info("MCP: Updating plugin '%s'", args.PluginName)
-		pluginCtrl := controllers.NewPluginController()
-		err := pluginCtrl.UpdatePlugin(args.PluginName)
-		if err != nil {
-			return textResult(fmt.Sprintf("Failed to update plugin: %v", err)), nil, nil
-		}
-		return textResult(fmt.Sprintf("Plugin '%s' updated successfully", args.PluginName)), nil, nil
-	})
-
-	// Update all plugins
-	addWriteTool(s, &mcp.Tool{
-		Name:        "update_all_plugins",
-		Description: "Update all installed Unraid plugins that have available updates.",
-		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: new(true),
-		},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPPluginUpdateArgs) (*mcp.CallToolResult, any, error) {
-		if !args.Confirm {
-			return textResult("Bulk plugin update requires confirm=true."), nil, nil
-		}
-		logger.Info("MCP: Updating all plugins")
-		pluginCtrl := controllers.NewPluginController()
-		results, err := pluginCtrl.UpdateAllPlugins()
-		if err != nil {
-			return textResult(fmt.Sprintf("Failed to update plugins: %v", err)), nil, nil
-		}
-		return jsonResult(results)
-	})
-
 	// Create VM snapshot
 	addWriteTool(s, &mcp.Tool{
 		Name:        "create_vm_snapshot",

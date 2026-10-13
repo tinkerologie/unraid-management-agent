@@ -25,6 +25,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and cycle. Vendor serial numbers are never reported.
   ([#225](https://github.com/tinkerologie/unraid-management-agent/issues/225))
 
+### Removed
+
+- **BREAKING: plugin update actions** — the agent no longer installs or updates other
+  Unraid plugins. `POST /api/v1/plugins/{name}/update` and `POST /api/v1/plugins/update-all`
+  now return 404, and the MCP tools `update_plugin` and `update_all_plugins` are no longer
+  registered (a stored tool-policy override for either name has no effect). Apply plugin
+  updates from Unraid's **Plugins** page. Update availability checks are unchanged: the
+  plugin update collector, `GET /api/v1/plugins/check-updates`,
+  `POST /api/v1/plugins/updates/refresh`, and the `check_plugin_updates` and
+  `refresh_plugin_updates` MCP tools. Required for Community Applications approval (#239).
+  ([#244](https://github.com/tinkerologie/unraid-management-agent/issues/244)).
+
 ### Security
 
 - **Bundle extraction no longer changes system directory owners** — release bundles

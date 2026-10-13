@@ -113,21 +113,14 @@ func TestHandleDockerUpdate_WrongMethod(t *testing.T) {
 
 // ===== Plugin Handler Tests =====
 
-func TestHandlePluginUpdate_InvalidName(t *testing.T) {
+// TestRemovedPluginUpdateRoutes_NotFound guards #244: the agent must not
+// install or update other plugins, so the update routes no longer exist.
+func TestRemovedPluginUpdateRoutes_NotFound(t *testing.T) {
 	server, _ := setupTestServer()
 
-	tests := []struct {
-		name       string
-		pluginName string
-	}{
-		{"special chars", "plugin@name"},
-		{"semicolon", "plugin;hack"},
-		{"spaces", "my plugin"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req, err := http.NewRequest("POST", "/api/v1/plugins/"+tt.pluginName+"/update", nil)
+	for _, path := range []string{"/api/v1/plugins/update-all", "/api/v1/plugins/my-plugin/update"} {
+		t.Run(path, func(t *testing.T) {
+			req, err := http.NewRequest("POST", path, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -135,17 +128,8 @@ func TestHandlePluginUpdate_InvalidName(t *testing.T) {
 			rr := httptest.NewRecorder()
 			server.router.ServeHTTP(rr, req)
 
-			if rr.Code != http.StatusBadRequest {
-				t.Errorf("expected status 400, got %d", rr.Code)
-			}
-
-			var resp dto.Response
-			if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
-				t.Fatalf("failed to parse response: %v", err)
-			}
-
-			if resp.Success {
-				t.Error("expected Success=false")
+			if rr.Code != http.StatusNotFound {
+				t.Errorf("expected status 404, got %d", rr.Code)
 			}
 		})
 	}
@@ -589,8 +573,6 @@ func TestNewRoutes_Exist(t *testing.T) {
 		{"GET", "/api/v1/docker/abc123/size"},
 		{"POST", "/api/v1/docker/abc123/update"},
 		{"GET", "/api/v1/plugins/check-updates"},
-		{"POST", "/api/v1/plugins/my-plugin/update"},
-		{"POST", "/api/v1/plugins/update-all"},
 		{"POST", "/api/v1/vm/myvm/clone"},
 		{"POST", "/api/v1/vm/myvm/snapshot"},
 		{"GET", "/api/v1/vm/myvm/snapshots"},

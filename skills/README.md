@@ -6,7 +6,7 @@ agents best practices for a specific technology, following the open
 
 This directory provides a skill for the **Unraid Management Agent** — teaching
 agents how to monitor and control an Unraid server through the agent's MCP
-server (121 tools, 5 resources, 6 diagnostic prompts) and REST API.
+server (126 tools, 5 resources, 6 diagnostic prompts) and REST API.
 
 ## Included Skill
 
@@ -19,7 +19,7 @@ request → tool workflows.
 | ---------------------------------- | ---------------------------------------------------------- |
 | `unraid-management-agent/SKILL.md` | Decision workflow, anti-patterns, routing                  |
 | `references/connection.md`         | Connect any client via MCP HTTP/STDIO; troubleshooting     |
-| `references/mcp-tools.md`          | All 121 MCP tools by category (R/W + ⚠️ destructive flags) |
+| `references/mcp-tools.md`          | All 126 MCP tools by category (R/W + ⚠️ destructive flags) |
 | `references/diagnostics.md`        | 6 diagnostic prompts + 5 real-time resources               |
 | `references/rest-api.md`           | REST API surface for non-MCP clients                       |
 | `references/workflows.md`          | Natural-language request → tool/endpoint mappings          |

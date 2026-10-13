@@ -247,8 +247,6 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/plugins", s.handlePluginList).Methods("GET")
 	api.HandleFunc("/plugins/check-updates", s.handlePluginCheckUpdates).Methods("GET")
 	api.HandleFunc("/plugins/updates/refresh", s.handlePluginUpdatesRefresh).Methods("POST")
-	api.HandleFunc("/plugins/update-all", s.handlePluginUpdateAll).Methods("POST")
-	api.HandleFunc("/plugins/{name}/update", s.handlePluginUpdate).Methods("POST")
 
 	// Update status endpoint (Issue #50)
 	api.HandleFunc("/updates", s.handleUpdateStatus).Methods("GET")

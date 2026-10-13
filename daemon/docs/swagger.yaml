@@ -3312,21 +3312,6 @@ definitions:
       tool:
         type: string
     type: object
-  dto.PluginBulkUpdateResult:
-    properties:
-      failed:
-        example: 0
-        type: integer
-      results:
-        items:
-          $ref: '#/definitions/dto.PluginUpdateResult'
-        type: array
-      succeeded:
-        example: 3
-        type: integer
-      timestamp:
-        type: string
-    type: object
   dto.PluginInfo:
     description: Information about an installed Unraid plugin
     properties:
@@ -3381,26 +3366,6 @@ definitions:
       updates_available:
         example: 2
         type: integer
-    type: object
-  dto.PluginUpdateResult:
-    properties:
-      message:
-        example: Updated successfully
-        type: string
-      new_version:
-        example: 2025.10.28
-        type: string
-      plugin_name:
-        example: community.applications
-        type: string
-      previous_version:
-        example: 2025.10.27
-        type: string
-      success:
-        example: true
-        type: boolean
-      timestamp:
-        type: string
     type: object
   dto.PortConflict:
     properties:
@@ -7924,33 +7889,6 @@ paths:
       summary: Get installed plugins list
       tags:
       - Plugins
-  /plugins/{name}/update:
-    post:
-      description: Update a specific plugin by name
-      parameters:
-      - description: Plugin name
-        in: path
-        name: name
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Plugin updated
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "400":
-          description: Invalid plugin name
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "500":
-          description: Failed to update plugin
-          schema:
-            $ref: '#/definitions/dto.Response'
-      summary: Update a specific plugin
-      tags:
-      - Plugins
   /plugins/check-updates:
     get:
       description: Serves the cached plugin update result. Returns an empty result
@@ -7963,23 +7901,6 @@ paths:
           schema:
             $ref: '#/definitions/dto.PluginList'
       summary: Get cached plugin update status
-      tags:
-      - Plugins
-  /plugins/update-all:
-    post:
-      description: Update all plugins that have updates available
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Plugin update results
-          schema:
-            $ref: '#/definitions/dto.PluginBulkUpdateResult'
-        "500":
-          description: Failed to update plugins
-          schema:
-            $ref: '#/definitions/dto.Response'
-      summary: Update all plugins
       tags:
       - Plugins
   /plugins/updates/refresh:

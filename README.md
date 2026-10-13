@@ -73,7 +73,7 @@ For information about the official Unraid GraphQL API, please refer to:
 
 - **Integrations**
 
-  - [MCP (AI Agents)](docs/integrations/mcp.md) - Model Context Protocol (54 tools)
+  - [MCP (AI Agents)](docs/integrations/mcp.md) - Model Context Protocol (126 tools)
   - [MQTT](docs/integrations/mqtt.md) - MQTT publishing for IoT
   - [Grafana Dashboards](docs/integrations/grafana.md) - Monitoring dashboards
   - [Home Assistant](docs/integrations/home-assistant.md) - Smart home integration
@@ -123,7 +123,7 @@ For information about the official Unraid GraphQL API, please refer to:
 - **WebSocket**: Real-time event streaming for live updates
 - **Prometheus**: Native `/metrics` endpoint for Grafana/monitoring integration (41 metrics)
 - **MQTT**: Event publishing to MQTT brokers for IoT integration and Home Assistant
-- **MCP (Model Context Protocol)**: AI agent integration for LLM-powered monitoring and control (54 tools)
+- **MCP (Model Context Protocol)**: AI agent integration for LLM-powered monitoring and control (126 tools)
 
 ## Architecture
 
@@ -438,7 +438,7 @@ curl -X POST http://localhost:8043/mcp \
   -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_system_info","arguments":{}},"id":1}'
 ```
 
-For full MCP documentation including all 54 tools, 5 resources, and 3 prompts, see [docs/integrations/mcp.md](docs/integrations/mcp.md).
+For full MCP documentation including all 126 tools, 5 resources, and 6 prompts, see [docs/integrations/mcp.md](docs/integrations/mcp.md).
 
 ### Example API Usage
 

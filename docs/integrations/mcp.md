@@ -330,8 +330,6 @@ Supported actions: `start_container`, `stop_container`, `restart_container`, `st
 | `parity_check_resume`       | Resume a paused parity check                      | -                                                          |
 | `disk_spin_down`            | Spin down a specific disk                         | -                                                          |
 | `disk_spin_up`              | Spin up a specific disk                           | -                                                          |
-| `update_plugin`             | Update a specific plugin to latest version        | Requires `confirm: true`                                   |
-| `update_all_plugins`        | Update all plugins with available updates         | Requires `confirm: true`                                   |
 | `service_action`            | Start, stop, or restart a system service          | start, stop, restart — requires `confirm: true`            |
 | `execute_user_script`       | Execute a user script (**requires confirmation**) | -                                                          |
 | `collector_action`          | Enable or disable a data collector                | enable, disable                                            |
@@ -399,7 +397,7 @@ get_os_update, get_mover_status, get_storage_topology, get_network_cards,
 list_alert_templates, query_metric_history, list_runbooks, find_root_cause
 ```
 
-### Destructive Tools (23 tools) — `destructiveHint: true`
+### Destructive Tools (21 tools) — `destructiveHint: true`
 
 These tools make changes that may be difficult or impossible to reverse:
 
@@ -414,8 +412,6 @@ These tools make changes that may be difficult or impossible to reverse:
 | `restore_vm_snapshot`   | —                      | Yes (`confirm: true`)                  |
 | `clone_vm`              | —                      | Yes (`confirm: true`)                  |
 | `array_action`          | `idempotentHint: true` | Yes (`confirm: true`)                  |
-| `update_plugin`         | —                      | Yes (`confirm: true`)                  |
-| `update_all_plugins`    | —                      | Yes (`confirm: true`)                  |
 | `service_action`        | `idempotentHint: true` | Yes (`confirm: true`)                  |
 | `execute_user_script`   | —                      | Yes (`confirm: true`)                  |
 | `system_reboot`         | —                      | Yes (`confirm: true`)                  |

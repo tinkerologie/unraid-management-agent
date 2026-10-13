@@ -1,6 +1,6 @@
 # MCP Tool Catalog
 
-All **125 MCP tools** exposed by the Unraid Management Agent, grouped by purpose.
+All **126 MCP tools** exposed by the Unraid Management Agent, grouped by purpose.
 
 - **R** = read-only (`ReadOnlyHint: true`) — safe to call freely.
 - **W** = write/control — changes the system.
@@ -184,8 +184,6 @@ Tool names are exact. Do not invent or alias them.
 
 | R/W | Tool | Purpose |
 | --- | --- | --- |
-| W | `update_plugin` | Update one plugin |
-| W ⚠️ | `update_all_plugins` | Update all plugins with available updates |
 | W ⚠️ | `remote_share_action` | Mount/unmount an SMB/NFS remote share by source (confirm=true) |
 
 ---

@@ -53,7 +53,7 @@ To protect a VM before risky changes: `create_vm_snapshot` → make changes →
 | Find why it's slow | `diagnose_performance_issue` prompt |
 | Maintenance checklist | `suggest_maintenance` prompt |
 | Update containers | `check_container_updates` → `update_container` (one) or `update_all_containers` ⚠️ |
-| Update plugins | `check_plugin_updates` → `update_plugin` / `update_all_plugins` ⚠️ |
+| Update plugins | `check_plugin_updates` or `refresh_plugin_updates`, then tell the user to apply updates from the Unraid **Plugins** page (the agent cannot update plugins) |
 | Reboot/shutdown | `system_reboot` / `system_shutdown` (⚠️ confirm) |
 
 ## Observability setup

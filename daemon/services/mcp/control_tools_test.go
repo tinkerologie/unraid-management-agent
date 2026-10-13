@@ -504,76 +504,6 @@ func TestToolUpdateAllContainers_Unconfirmed(t *testing.T) {
 	}
 }
 
-func TestToolUpdatePlugin_Unconfirmed(t *testing.T) {
-	server, _ := setupInitializedServer(t)
-	cs, cleanup := connectClientToServer(t, server)
-	defer cleanup()
-
-	_, text := callToolJSON(t, cs, "update_plugin", map[string]any{
-		"plugin_name": "my-plugin",
-		"confirm":     false,
-	})
-	if !strings.Contains(text, "confirm=true") {
-		t.Errorf("Expected confirmation message, got: %s", text)
-	}
-}
-
-func TestToolUpdatePlugin_EmptyName(t *testing.T) {
-	server, _ := setupInitializedServer(t)
-	cs, cleanup := connectClientToServer(t, server)
-	defer cleanup()
-
-	_, text := callToolJSON(t, cs, "update_plugin", map[string]any{
-		"plugin_name": "",
-		"confirm":     true,
-	})
-	if !strings.Contains(text, "plugin_name is required") {
-		t.Errorf("Expected 'plugin_name is required' message, got: %s", text)
-	}
-}
-
-func TestToolUpdatePlugin_InvalidName(t *testing.T) {
-	server, _ := setupInitializedServer(t)
-	cs, cleanup := connectClientToServer(t, server)
-	defer cleanup()
-
-	tests := []struct {
-		name       string
-		pluginName string
-	}{
-		{"path traversal parent", "../evil-plugin"},
-		{"absolute path", "/boot/config/plugins/plugin.plg"},
-		{"semicolon injection", "plugin;id.plg"},
-		{"command substitution", "$(id).plg"},
-		{"null byte", "plugin\x00.plg"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, text := callToolJSON(t, cs, "update_plugin", map[string]any{
-				"plugin_name": tt.pluginName,
-				"confirm":     true,
-			})
-			if !strings.Contains(text, "Invalid plugin name") {
-				t.Errorf("Expected 'Invalid plugin name' message for %q, got: %s", tt.pluginName, text)
-			}
-		})
-	}
-}
-
-func TestToolUpdateAllPlugins_Unconfirmed(t *testing.T) {
-	server, _ := setupInitializedServer(t)
-	cs, cleanup := connectClientToServer(t, server)
-	defer cleanup()
-
-	_, text := callToolJSON(t, cs, "update_all_plugins", map[string]any{
-		"confirm": false,
-	})
-	if !strings.Contains(text, "confirm=true") {
-		t.Errorf("Expected confirmation message, got: %s", text)
-	}
-}
-
 func TestToolCreateVMSnapshot(t *testing.T) {
 	server, _ := setupInitializedServer(t)
 	cs, cleanup := connectClientToServer(t, server)
@@ -812,35 +742,6 @@ func TestToolUpdateContainer_Confirmed(t *testing.T) {
 		"force":        false,
 	})
 	// Will fail on non-Docker but covers confirmed path
-	if text == "" {
-		t.Error("Expected non-empty response")
-	}
-}
-
-func TestToolUpdateAllPlugins_Confirmed(t *testing.T) {
-	server, _ := setupInitializedServer(t)
-	cs, cleanup := connectClientToServer(t, server)
-	defer cleanup()
-
-	_, text := callToolJSON(t, cs, "update_all_plugins", map[string]any{
-		"confirm": true,
-	})
-	// Will fail on non-Unraid
-	if text == "" {
-		t.Error("Expected non-empty response")
-	}
-}
-
-func TestToolUpdatePlugin_Confirmed(t *testing.T) {
-	server, _ := setupInitializedServer(t)
-	cs, cleanup := connectClientToServer(t, server)
-	defer cleanup()
-
-	_, text := callToolJSON(t, cs, "update_plugin", map[string]any{
-		"plugin_name": "test-plugin.plg",
-		"confirm":     true,
-	})
-	// Will fail on non-Unraid
 	if text == "" {
 		t.Error("Expected non-empty response")
 	}

@@ -66,6 +66,54 @@ func TestToolPolicyHiddenHidesFromListAndCall(t *testing.T) {
 	}
 }
 
+// TestPluginUpdateToolsRemoved guards #244: the agent must not install or
+// update other plugins. The update tools stay unregistered even when a stored
+// policy still allows them, while the read-only update checks remain.
+func TestPluginUpdateToolsRemoved(t *testing.T) {
+	removed := []string{"update_plugin", "update_all_plugins"}
+	policies := map[string]domain.ToolPolicyValue{}
+	for _, name := range removed {
+		policies[name] = domain.PolicyAllow
+	}
+	server, _, store := setupPolicyServer(t, policies, false)
+	cs, cleanup := connectClientToServer(t, server)
+	defer cleanup()
+
+	ctx := context.Background()
+	toolsRes, err := cs.ListTools(ctx, nil)
+	if err != nil {
+		t.Fatalf("ListTools failed: %v", err)
+	}
+	listed := make(map[string]bool, len(toolsRes.Tools))
+	for _, tool := range toolsRes.Tools {
+		listed[tool.Name] = true
+	}
+	for _, name := range []string{"check_plugin_updates", "refresh_plugin_updates"} {
+		if !listed[name] {
+			t.Errorf("expected tool %q to be registered", name)
+		}
+	}
+
+	catalog := make(map[string]bool)
+	for _, item := range store.GetCatalog(false) {
+		catalog[item.Name] = true
+	}
+	for _, name := range removed {
+		if listed[name] {
+			t.Errorf("expected tool %q to be removed from ListTools", name)
+		}
+		if catalog[name] {
+			t.Errorf("expected tool %q to be absent from the policy catalog", name)
+		}
+		if _, err := cs.CallTool(ctx, &mcp.CallToolParams{
+			Name:      name,
+			Arguments: map[string]any{"plugin_name": "example", "confirm": true},
+		}); err == nil {
+			t.Errorf("expected CallTool for removed tool %q to fail", name)
+		}
+	}
+}
+
 func TestToolPolicyReadOnlyBlocksWrite(t *testing.T) {
 	policies := map[string]domain.ToolPolicyValue{
 		"container_action": domain.PolicyReadOnly,
