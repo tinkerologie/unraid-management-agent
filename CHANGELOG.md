@@ -126,6 +126,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Go 1.27.2 and `golang.org/x/net` v0.60.0** — release builds read the Go version from `go.mod`,
+  which pinned 1.27.1; built with it, the agent reached standard-library `net/http` and HTTP/2
+  vulnerabilities (GO-2026-6617, 6613, 6612, 6611, 6610, 6609) through its API server and its Docker
+  and LLM clients. `go.mod` now requires Go 1.27.2, and `golang.org/x/net` is updated to v0.60.0
+  (GO-2026-6617, 6612, 6611, 6610, 6603). `govulncheck` reports no vulnerabilities.
+  ([#258](https://github.com/tinkerologie/unraid-management-agent/issues/258)).
 - **Release bundle pinned with SHA256** — the `.plg` now carries a `sha256` entity and a
   `<SHA256>` element next to `<MD5>`; Unraid's plugin manager verifies SHA256 first. Each release
   computes both checksums, publishes `SHA256SUM` and the SHA256 in the release notes, and writes
