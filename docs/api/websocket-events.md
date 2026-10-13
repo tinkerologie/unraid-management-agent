@@ -404,19 +404,19 @@ UPSes have no load or power reading). They are never sent as a made-up `0`.
 
 ## Event Frequency Summary
 
-| Event Type              | Interval | Collector                |
-| ----------------------- | -------- | ------------------------ |
-| system_update           | 5s       | SystemCollector          |
-| array_status_update     | 10s      | ArrayCollector           |
-| disk_list_update        | 30s      | DiskCollector            |
-| container_list_update   | 10s      | DockerCollector          |
-| vm_list_update          | 10s      | VMCollector              |
-| ups_status_update       | 10s      | UPSCollector             |
-| gpu_update              | 10s      | GPUCollector             |
-| network_list_update     | 15s      | NetworkCollector         |
-| share_list_update       | 60s      | ShareCollector           |
-| storage_topology_update | 300s     | StorageTopologyCollector |
-| nic_update              | 60s      | NICCollector             |
+| Event Type              | Interval                               | Collector                |
+| ----------------------- | -------------------------------------- | ------------------------ |
+| system_update           | 5s                                     | SystemCollector          |
+| array_status_update     | 10s                                    | ArrayCollector           |
+| disk_list_update        | 30s                                    | DiskCollector            |
+| container_list_update   | 10s                                    | DockerCollector          |
+| vm_list_update          | 10s                                    | VMCollector              |
+| ups_status_update       | 10s                                    | UPSCollector             |
+| gpu_update              | 10s                                    | GPUCollector             |
+| network_list_update     | 15s                                    | NetworkCollector         |
+| share_list_update       | 60s                                    | ShareCollector           |
+| storage_topology_update | Disabled by default; 300s when enabled | StorageTopologyCollector |
+| nic_update              | Disabled by default; 60s when enabled  | NICCollector             |
 
 ---
 

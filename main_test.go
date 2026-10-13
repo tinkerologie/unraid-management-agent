@@ -150,3 +150,40 @@ func TestApplyWANIPLookup(t *testing.T) {
 		}
 	}
 }
+
+// TestHardwareSpecificCollectorsDisabledByDefault guards #260: the network
+// card and SAS storage topology collectors need hardware most servers lack.
+func TestHardwareSpecificCollectorsDisabledByDefault(t *testing.T) {
+	for _, env := range []string{"INTERVAL_NIC", "INTERVAL_STORAGE_TOPOLOGY"} {
+		t.Setenv(env, "")
+		if err := os.Unsetenv(env); err != nil {
+			t.Fatal(err)
+		}
+	}
+	c := cli
+	parser, err := kong.New(&c, kong.Exit(func(int) { t.Fatal("kong exited") }))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := parser.Parse([]string{"boot"}); err != nil {
+		t.Fatal(err)
+	}
+	if c.IntervalNIC != 0 || c.IntervalStorageTopology != 0 {
+		t.Errorf("defaults: INTERVAL_NIC=%d INTERVAL_STORAGE_TOPOLOGY=%d, want both 0 (disabled)",
+			c.IntervalNIC, c.IntervalStorageTopology)
+	}
+
+	t.Setenv("INTERVAL_NIC", "60")
+	t.Setenv("INTERVAL_STORAGE_TOPOLOGY", "300")
+	c = cli
+	parser, err = kong.New(&c, kong.Exit(func(int) { t.Fatal("kong exited") }))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := parser.Parse([]string{"boot"}); err != nil {
+		t.Fatal(err)
+	}
+	if c.IntervalNIC != 60 || c.IntervalStorageTopology != 300 {
+		t.Errorf("enabled via env: got %d/%d, want 60/300", c.IntervalNIC, c.IntervalStorageTopology)
+	}
+}

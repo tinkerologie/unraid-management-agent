@@ -199,6 +199,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Network Cards & Optics and Storage Topology collectors off by default** — most servers have no
+  SFP/QSFP optics or SAS HBAs/enclosures, so the `nic` and `storage_topology` collectors now default
+  to disabled (`INTERVAL_NIC=0`, `INTERVAL_STORAGE_TOPOLOGY=0`) in the daemon, `default.cfg`, the
+  start script and the settings page. Enable them on the settings page (60 s and 5 min recommended)
+  or with the environment variables. Installs that already saved an interval keep it. The
+  security and privacy notes are no longer shown on the Unraid Plugins page (the plugin README);
+  they remain in the Community Applications listing and the project README.
+  ([#260](https://github.com/tinkerologie/unraid-management-agent/issues/260)).
 - **`make pre-commit-run` passes on a clean checkout** — the storage-topology hardware fixtures
   are excluded from the whitespace, end-of-file, line-ending, Prettier and detect-secrets hooks
   and marked byte-exact in `.gitattributes` and `.editorconfig`; generated Swagger keeps its
@@ -210,7 +218,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a 0 ms connection latency, which an immediate failure can report.
   ([#249](https://github.com/tinkerologie/unraid-management-agent/issues/249)).
 - **Disclosed security and privacy behaviour** — the Community Applications listing
-  (`unraid-management-agent.xml`), `README.md` and the plugin README now state the authentication
+  (`unraid-management-agent.xml`) and `README.md` now state the authentication
   default (reads without a token, control actions refused until one is set), the REST/MCP control
   scope including User Scripts, and the on-request WAN IP lookups to `api.ipify.org`,
   `ifconfig.me` and `icanhazip.com`. Documentation only; an opt-out for the lookups is tracked in

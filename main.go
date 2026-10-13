@@ -142,8 +142,8 @@ var cli struct {
 	IntervalMover          int  `default:"30" env:"INTERVAL_MOVER" help:"mover status collection interval (seconds, 0=disabled, max 86400)"`
 	DockerUpdateNotify     bool `default:"false" env:"DOCKER_UPDATE_NOTIFY" help:"raise an Unraid notification when new container updates become available"`
 
-	IntervalStorageTopology int `default:"300" env:"INTERVAL_STORAGE_TOPOLOGY" help:"SAS storage topology (storcli/sg_ses) collection interval (seconds, 0=disabled, max 86400)"`
-	IntervalNIC             int `default:"60" env:"INTERVAL_NIC" help:"Network card (temperatures, optic diagnostics) collection interval (seconds, 0=disabled, max 86400)"`
+	IntervalStorageTopology int `default:"0" env:"INTERVAL_STORAGE_TOPOLOGY" help:"SAS storage topology (storcli/sg_ses) collection interval (seconds, 0=disabled (default), max 86400; 300 recommended when enabled)"`
+	IntervalNIC             int `default:"0" env:"INTERVAL_NIC" help:"Network card (temperatures, optic diagnostics) collection interval (seconds, 0=disabled (default), max 86400; 60 recommended when enabled)"`
 
 	Boot        cmd.Boot        `cmd:"" default:"1" help:"start the management agent"`
 	MCPStdio    cmd.MCPStdio    `cmd:"mcp-stdio" help:"run MCP server over stdin/stdout for local AI clients"`

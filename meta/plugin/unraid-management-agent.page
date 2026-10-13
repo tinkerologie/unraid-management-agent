@@ -83,8 +83,8 @@ $interval_notification = $config['INTERVAL_NOTIFICATION'] ?? '30';
 $interval_hardware = $config['INTERVAL_HARDWARE'] ?? '600';
 $interval_registration = $config['INTERVAL_REGISTRATION'] ?? '600';
 $interval_unassigned = $config['INTERVAL_UNASSIGNED'] ?? '60';
-$interval_storage_topology = $config['INTERVAL_STORAGE_TOPOLOGY'] ?? '300';
-$interval_nic = $config['INTERVAL_NIC'] ?? '60';
+$interval_storage_topology = $config['INTERVAL_STORAGE_TOPOLOGY'] ?? '0';
+$interval_nic = $config['INTERVAL_NIC'] ?? '0';
 
 // Check if service is running
 exec("pidof $plugin 2>/dev/null", $pids, $pid_rc);

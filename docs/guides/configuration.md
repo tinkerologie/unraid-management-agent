@@ -39,23 +39,25 @@ This file is created automatically after the first installation and persists acr
 
 Control how often data is collected (in seconds):
 
-| Collector          | Flag                      | Default | Min | Max   |
-| ------------------ | ------------------------- | ------- | --- | ----- |
-| System             | `--interval-system`       | 5s      | 1s  | 3600s |
-| Array              | `--interval-array`        | 10s     | 5s  | 3600s |
-| Disks              | `--interval-disk`         | 30s     | 10s | 3600s |
-| Docker             | `--interval-docker`       | 10s     | 5s  | 3600s |
-| VMs                | `--interval-vm`           | 10s     | 5s  | 3600s |
-| UPS                | `--interval-ups`          | 10s     | 5s  | 3600s |
-| NUT                | `--interval-nut`          | 10s     | 5s  | 3600s |
-| GPU                | `--interval-gpu`          | 10s     | 5s  | 3600s |
-| Shares             | `--interval-shares`       | 60s     | 30s | 3600s |
-| Network            | `--interval-network`      | 15s     | 5s  | 3600s |
-| Hardware           | `--interval-hardware`     | 60s     | 30s | 3600s |
-| ZFS                | `--interval-zfs`          | 30s     | 10s | 3600s |
-| Notifications      | `--interval-notification` | 30s     | 10s | 3600s |
-| Registration       | `--interval-registration` | 300s    | 60s | 3600s |
-| Unassigned Devices | `--interval-unassigned`   | 60s     | 30s | 3600s |
+| Collector          | Flag                          | Default                         | Min | Max    |
+| ------------------ | ----------------------------- | ------------------------------- | --- | ------ |
+| System             | `--interval-system`           | 5s                              | 1s  | 3600s  |
+| Array              | `--interval-array`            | 10s                             | 5s  | 3600s  |
+| Disks              | `--interval-disk`             | 30s                             | 10s | 3600s  |
+| Docker             | `--interval-docker`           | 10s                             | 5s  | 3600s  |
+| VMs                | `--interval-vm`               | 10s                             | 5s  | 3600s  |
+| UPS                | `--interval-ups`              | 10s                             | 5s  | 3600s  |
+| NUT                | `--interval-nut`              | 10s                             | 5s  | 3600s  |
+| GPU                | `--interval-gpu`              | 10s                             | 5s  | 3600s  |
+| Shares             | `--interval-shares`           | 60s                             | 30s | 3600s  |
+| Network            | `--interval-network`          | 15s                             | 5s  | 3600s  |
+| Hardware           | `--interval-hardware`         | 60s                             | 30s | 3600s  |
+| ZFS                | `--interval-zfs`              | 30s                             | 10s | 3600s  |
+| Notifications      | `--interval-notification`     | 30s                             | 10s | 3600s  |
+| Registration       | `--interval-registration`     | 300s                            | 60s | 3600s  |
+| Unassigned Devices | `--interval-unassigned`       | 60s                             | 30s | 3600s  |
+| Storage Topology   | `--interval-storage-topology` | 0s (disabled; 300s recommended) | 0s  | 86400s |
+| Network Cards      | `--interval-nic`              | 0s (disabled; 60s recommended)  | 0s  | 86400s |
 
 **Disable a collector**: Set interval to `0`
 

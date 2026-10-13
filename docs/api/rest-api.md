@@ -2387,7 +2387,7 @@ Get all methods to access the Unraid server, including LAN IP, mDNS hostname, Wi
 ### GET /network/cards
 
 Return the cached physical (PCI) network cards. Collected by the `nic` background
-collector (`INTERVAL_NIC`, default 60 s) from sysfs and the `SIOCETHTOOL` ioctl; reading
+collector (`INTERVAL_NIC`; disabled by default, 60 s recommended when enabled) from sysfs and the `SIOCETHTOOL` ioctl; reading
 the module EEPROMs through the ioctl spawns no process per module (`lspci -Dmm` and
 `ethtool -i` are still used for card identity and firmware).
 
@@ -3469,7 +3469,7 @@ curl http://192.168.20.21:8043/api/v1/mover
 ### GET /storage/topology
 
 Return the cached SAS storage topology. Collected by the `storage_topology` background
-collector (`INTERVAL_STORAGE_TOPOLOGY`, default 5 min) from two optional, read-only sources:
+collector (`INTERVAL_STORAGE_TOPOLOGY`; disabled by default, 5 min recommended when enabled) from two optional, read-only sources:
 
 - **storcli** (Broadcom/LSI MegaRAID controllers and HBAs; `/sbin/storcli` and other common
   paths): controllers, PCIe link, HBA phys/ports, enclosures and per-drive paths, link
