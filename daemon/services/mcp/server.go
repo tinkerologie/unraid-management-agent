@@ -116,6 +116,9 @@ type Server struct {
 	agentSvc                *agent.Service
 	toolPolicyStore         *ToolPolicyStore
 	toolsListLoggedSessions sync.Map
+	// networkWriteLock makes every write tool read-only for network (HTTP)
+	// clients while no API token is configured (#245). STDIO never sets it.
+	networkWriteLock bool
 }
 
 // NewServer creates a new MCP server instance.
@@ -143,12 +146,37 @@ func (s *Server) GetToolPolicyStore() *ToolPolicyStore {
 	return s.toolPolicyStore
 }
 
+// SetNetworkWriteLock locks all write tools for network clients. The HTTP boot
+// path calls it with ctx.WritesLocked(); the STDIO path does not.
+func (s *Server) SetNetworkWriteLock(locked bool) {
+	s.networkWriteLock = locked
+}
+
+// globalReadOnly reports whether every write tool is blocked, either by
+// read-only mode or by the network write lock.
+func (s *Server) globalReadOnly() bool {
+	return s.ctx.ReadOnly || s.networkWriteLock
+}
+
+// blockedMessage explains why a write tool with an effective read-only policy
+// was blocked, naming the cause so the user knows what to change.
+func (s *Server) blockedMessage(toolName string) string {
+	switch {
+	case s.networkWriteLock && !s.ctx.ReadOnly:
+		return writesLockedBlockedMessage
+	case s.ctx.ReadOnly:
+		return readOnlyBlockedMessage
+	default:
+		return fmt.Sprintf("Blocked by tool access policy: '%s' is set to read-only", toolName)
+	}
+}
+
 // effectivePolicy returns the calculated policy for a tool, taking global ReadOnly mode into account.
 func (s *Server) effectivePolicy(toolName string) domain.ToolPolicyValue {
 	if s.toolPolicyStore != nil {
-		return s.toolPolicyStore.GetEffectivePolicy(toolName, s.ctx.ReadOnly)
+		return s.toolPolicyStore.GetEffectivePolicy(toolName, s.globalReadOnly())
 	}
-	if s.ctx.ReadOnly {
+	if s.globalReadOnly() {
 		return domain.PolicyReadOnly
 	}
 	return domain.PolicyDefault
@@ -174,7 +202,7 @@ func (s *Server) Initialize() error {
 			if method == "tools/call" {
 				if callReq, ok := req.(*mcp.CallToolRequest); ok && callReq.Params != nil {
 					toolName := callReq.Params.Name
-					if s.toolPolicyStore != nil && s.toolPolicyStore.GetEffectivePolicy(toolName, s.ctx.ReadOnly) == domain.PolicyHidden {
+					if s.toolPolicyStore != nil && s.toolPolicyStore.GetEffectivePolicy(toolName, s.globalReadOnly()) == domain.PolicyHidden {
 						return nil, fmt.Errorf("unknown tool %q", toolName)
 					}
 				}
@@ -240,7 +268,7 @@ func (s *Server) Initialize() error {
 					if s.toolPolicyStore != nil {
 						filtered := make([]*mcp.Tool, 0, len(lr.Tools))
 						for _, t := range lr.Tools {
-							if s.toolPolicyStore.GetEffectivePolicy(t.Name, s.ctx.ReadOnly) != domain.PolicyHidden {
+							if s.toolPolicyStore.GetEffectivePolicy(t.Name, s.globalReadOnly()) != domain.PolicyHidden {
 								filtered = append(filtered, t)
 							}
 						}
@@ -2080,16 +2108,12 @@ func (s *Server) registerRemediationTools() {
 		}
 
 		// Read-only mode: return the report but never execute actions.
-		if s.ctx.ReadOnly || effectivePolicy == domain.PolicyReadOnly {
+		if s.globalReadOnly() || effectivePolicy == domain.PolicyReadOnly {
 			logger.Warning("MCP: blocked system_health_report action execution: read-only mode")
-			note := readOnlyBlockedMessage
-			if effectivePolicy == domain.PolicyReadOnly && !s.ctx.ReadOnly {
-				note = "Blocked by tool access policy: 'system_health_report' is set to read-only"
-			}
 			return jsonResult(map[string]any{
 				"report":   report,
 				"executed": false,
-				"note":     note,
+				"note":     s.blockedMessage("system_health_report"),
 			})
 		}
 
@@ -2161,7 +2185,7 @@ func (s *Server) registerRemediationTools() {
 
 		// Read-only mode: always behave as a dry-run, even with confirm=true.
 		confirm := args.Confirm
-		if effectivePolicy == domain.PolicyReadOnly || s.ctx.ReadOnly {
+		if effectivePolicy == domain.PolicyReadOnly || s.globalReadOnly() {
 			if confirm {
 				logger.Warning("MCP: blocked run_runbook execution: read-only mode")
 			}
@@ -2184,11 +2208,7 @@ func (s *Server) registerRemediationTools() {
 				"steps":    steps,
 			}
 			if args.Confirm {
-				note := readOnlyBlockedMessage
-				if effectivePolicy == domain.PolicyReadOnly && !s.ctx.ReadOnly {
-					note = "Blocked by tool access policy: 'run_runbook' is set to read-only"
-				}
-				resp["note"] = note
+				resp["note"] = s.blockedMessage("run_runbook")
 			}
 			return jsonResult(resp)
 		}
@@ -3106,6 +3126,11 @@ Please describe your issue and I'll gather the relevant system information to he
 // agent runs in read-only mode.
 const readOnlyBlockedMessage = "This operation is blocked: the agent is running in read-only mode"
 
+// writesLockedBlockedMessage is returned for every write tool call from a
+// network client while no API token is configured (#245).
+const writesLockedBlockedMessage = "This operation is blocked: write access is disabled because no API token is configured. " +
+	"Set API_TOKEN in the plugin settings (or the API_TOKEN environment variable) and connect with 'Authorization: Bearer <token>'"
+
 // setConfirmField attempts to set a "Confirm" boolean field to val on args if present.
 func setConfirmField(args any, val bool) {
 	if args == nil {
@@ -3170,12 +3195,9 @@ func addWriteTool[In any](s *Server, tool *mcp.Tool, handler mcp.ToolHandlerFor[
 
 		switch effectivePolicy {
 		case domain.PolicyReadOnly:
-			if s.ctx.ReadOnly {
-				logger.Warning("MCP: blocked write tool '%s': agent is in read-only mode", tool.Name)
-				return textResult(readOnlyBlockedMessage), nil, nil
-			}
-			logger.Warning("MCP: blocked write tool '%s': set to read-only by tool access policy", tool.Name)
-			return textResult(fmt.Sprintf("Blocked by tool access policy: '%s' is set to read-only", tool.Name)), nil, nil
+			msg := s.blockedMessage(tool.Name)
+			logger.Warning("MCP: blocked write tool '%s': %s", tool.Name, msg)
+			return textResult(msg), nil, nil
 
 		case domain.PolicyAsk:
 			var raw json.RawMessage

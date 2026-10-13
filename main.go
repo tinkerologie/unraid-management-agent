@@ -72,7 +72,11 @@ var cli struct {
 	// API token - when set, requests must present "Authorization: Bearer <token>",
 	// except the health endpoint and the Swagger UI. Prefer API_TOKEN or the config
 	// file over the flag: command-line arguments are visible in the process list.
-	APIToken string `default:"" env:"API_TOKEN" help:"require bearer-token auth on the HTTP API and /mcp; the health endpoint and Swagger UI stay open (empty = no authentication). Prefer the API_TOKEN env var or config file: flags are visible in the process list"`
+	APIToken string `default:"" env:"API_TOKEN" help:"require bearer-token auth on the HTTP API and /mcp; the health endpoint and Swagger UI stay open (empty = unauthenticated reads, network writes refused). Prefer the API_TOKEN env var or config file: flags are visible in the process list"`
+
+	// AllowUnauthenticatedWrites restores tokenless network write access. Without
+	// it, an empty API token leaves REST and HTTP MCP read-only (#245).
+	AllowUnauthenticatedWrites bool `default:"false" env:"ALLOW_UNAUTHENTICATED_WRITES" help:"allow state-changing REST requests and MCP tools over the network when API_TOKEN is empty (not recommended)"`
 
 	// MCPConnectSecret enables an optional secret-bearing MCP path (/mcp/<secret>)
 	// for URL-only MCP clients (ha-mcp style onboarding) without exposing full REST API access.
@@ -268,7 +272,7 @@ func main() {
 		cli.MCPConnectSecret = ""
 	} else if cli.MCPConnectSecret != "" {
 		if cli.APIToken == "" {
-			logger.Warning("MCP connect secret is configured, but API_TOKEN is empty: /mcp and REST endpoints remain open without authentication")
+			logger.Warning("MCP connect secret is configured, but API_TOKEN is empty: /mcp and REST endpoints remain readable without authentication")
 		} else {
 			logger.Info("MCP connect URL enabled (/mcp/<redacted>)")
 		}
@@ -409,6 +413,7 @@ func main() {
 			NIC:             getInterval("nic", cli.IntervalNIC),
 		},
 	}
+	applyWriteAccess(appCtx, cli.APIToken, cli.AllowUnauthenticatedWrites)
 
 	// Warn about insecure MQTT TLS configuration
 	if appCtx.MQTTConfig.InsecureSkipVerify && appCtx.MQTTConfig.Enabled {
@@ -418,6 +423,27 @@ func main() {
 	// Run the boot command
 	err = ctx.Run(appCtx)
 	ctx.FatalIfErrorf(err)
+}
+
+// applyWriteAccess copies the write opt-out into the application context and
+// logs the warning for an empty API token (#245).
+func applyWriteAccess(appCtx *domain.Context, apiToken string, allowUnauthenticatedWrites bool) {
+	appCtx.AllowUnauthenticatedWrites = allowUnauthenticatedWrites
+	if msg := writeAccessWarning(apiToken, allowUnauthenticatedWrites); msg != "" {
+		logger.Warning("%s", msg)
+	}
+}
+
+// writeAccessWarning returns the startup warning for an empty API token, or ""
+// when a token is set (#245).
+func writeAccessWarning(apiToken string, allowUnauthenticatedWrites bool) string {
+	if strings.TrimSpace(apiToken) != "" {
+		return ""
+	}
+	if allowUnauthenticatedWrites {
+		return "API_TOKEN is empty and ALLOW_UNAUTHENTICATED_WRITES is enabled: anyone on the network can control this server. Set an API token and disable this option"
+	}
+	return "API_TOKEN is empty: network write access is disabled (REST and HTTP MCP are read-only) until an API token is set"
 }
 
 // applyFileConfig merges config file values into the CLI struct.
@@ -459,6 +485,7 @@ func applyFileConfig(cfg *domain.FileConfig) {
 	setStr(&cli.CORSOrigin, cfg.CORSOrigin)
 	setStr(&cli.APIToken, cfg.APIToken)
 	setStr(&cli.MCPConnectSecret, cfg.MCPConnectSecret)
+	setBool(&cli.AllowUnauthenticatedWrites, cfg.AllowUnauthenticatedWrites)
 	setStr(&cli.TLSCertFile, cfg.TLSCertFile)
 	setStr(&cli.TLSKeyFile, cfg.TLSKeyFile)
 

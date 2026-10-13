@@ -388,6 +388,30 @@ func rateLimitMiddleware(p *perClientRateLimiter) mux.MiddlewareFunc {
 	}
 }
 
+// writesLockedMessage explains why a write was refused and how to unlock it.
+const writesLockedMessage = "Write access is disabled because no API token is configured. " +
+	"Set API_TOKEN in the plugin settings (or the API_TOKEN environment variable) " +
+	"and send it as 'Authorization: Bearer <token>'."
+
+// writeLockMiddleware refuses state-changing requests while writesLocked is
+// true, i.e. no API token is configured and the opt-out is off (#245). Safe
+// methods pass, so monitoring clients keep working. MCP paths pass because
+// every MCP message is a POST; the MCP server locks its write tools instead.
+func writeLockMiddleware(writesLocked bool) mux.MiddlewareFunc {
+	return func(next http.Handler) http.Handler {
+		if !writesLocked {
+			return next
+		}
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions || isMCPPath(r.URL) {
+				next.ServeHTTP(w, r)
+				return
+			}
+			respondJSON(w, http.StatusForbidden, map[string]string{"error": writesLockedMessage})
+		})
+	}
+}
+
 // csrfMiddleware validates the Origin header on state-changing requests to
 // prevent cross-site request forgery. Non-browser clients that don't send
 // an Origin header are allowed through.

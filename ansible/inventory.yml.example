@@ -15,3 +15,7 @@ all:
         -o PubkeyAuthentication=no
         -o PreferredAuthentications=password
       api_port: 8043
+      # API token the deploy role writes to config.cfg and the verify role sends.
+      # Required for the write tests: without a token the agent refuses network
+      # writes. Generate one with: openssl rand -hex 32
+      api_token: "your-64-hex-char-token"

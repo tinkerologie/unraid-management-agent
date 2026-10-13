@@ -54,6 +54,7 @@
   ansible.builtin.command:
     cmd: >
       curl -s -o /dev/null -w '%{http_code}' -X POST
+      {{ curl_auth }}
       -H 'Content-Type: application/json'
       -d 'this is not valid json'
       http://{{ ansible_host }}:{{ api_port }}/api/v1/alerts/rules
@@ -72,6 +73,7 @@
   ansible.builtin.command:
     cmd: >
       curl -s -o /dev/null -w '%{http_code}' -X POST
+      {{ curl_auth }}
       -H 'Content-Type: application/json'
       -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
       http://{{ ansible_host }}:{{ api_port }}/mcp

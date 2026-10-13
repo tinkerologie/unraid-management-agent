@@ -230,14 +230,26 @@ mqtt:
 
 ## REST API Control (Recommended)
 
-Instead of MQTT commands, use Home Assistant's RESTful switches for better control:
+Instead of MQTT commands, use Home Assistant's RESTful switches for better control.
+
+> **Note:** control requests (the switches below and the [RESTful Commands](#restful-commands))
+> need an API token, unless `ALLOW_UNAUTHENTICATED_WRITES` is on (not recommended), which lets
+> them through without one. Otherwise, without a token the agent answers them with
+> `403 Forbidden`, and with a token set, a request without it gets `401 Unauthorized` (see
+> [Configuration → Authentication](../guides/configuration.md#authentication)). Keep the token in
+> Home Assistant's `secrets.yaml` (`unraid_api_auth: "Bearer <your-token>"`) and send it as the
+> `Authorization` header, as the examples do. The token is a credential: use `https://` with TLS
+> enabled on the agent (see [HTTPS / TLS](../guides/configuration.md#https--tls)); only use
+> `http://` on a network you trust.
 
 ```yaml
 switch:
   # Docker Container Control
   - platform: rest
     name: "Plex Container"
-    resource: "http://unraid-server:8043/api/v1/docker/plex/start"
+    resource: "https://unraid-server:8043/api/v1/docker/plex/start"
+    headers:
+      Authorization: !secret unraid_api_auth
     body_on: ""
     body_off: ""
     is_on_template: >
@@ -246,7 +258,9 @@ switch:
   # VM Control
   - platform: rest
     name: "Windows VM"
-    resource: "http://unraid-server:8043/api/v1/vm/Windows10/start"
+    resource: "https://unraid-server:8043/api/v1/vm/Windows10/start"
+    headers:
+      Authorization: !secret unraid_api_auth
     body_on: ""
     body_off: ""
     is_on_template: >
@@ -261,34 +275,48 @@ Add to `configuration.yaml`:
 rest_command:
   # Container Control
   plex_start:
-    url: "http://unraid-server:8043/api/v1/docker/plex/start"
+    url: "https://unraid-server:8043/api/v1/docker/plex/start"
     method: POST
+    headers:
+      Authorization: !secret unraid_api_auth
 
   plex_stop:
-    url: "http://unraid-server:8043/api/v1/docker/plex/stop"
+    url: "https://unraid-server:8043/api/v1/docker/plex/stop"
     method: POST
+    headers:
+      Authorization: !secret unraid_api_auth
 
   plex_restart:
-    url: "http://unraid-server:8043/api/v1/docker/plex/restart"
+    url: "https://unraid-server:8043/api/v1/docker/plex/restart"
     method: POST
+    headers:
+      Authorization: !secret unraid_api_auth
 
   # VM Control
   windows_start:
-    url: "http://unraid-server:8043/api/v1/vm/Windows10/start"
+    url: "https://unraid-server:8043/api/v1/vm/Windows10/start"
     method: POST
+    headers:
+      Authorization: !secret unraid_api_auth
 
   windows_stop:
-    url: "http://unraid-server:8043/api/v1/vm/Windows10/stop"
+    url: "https://unraid-server:8043/api/v1/vm/Windows10/stop"
     method: POST
+    headers:
+      Authorization: !secret unraid_api_auth
 
   # Array Control
   array_start:
-    url: "http://unraid-server:8043/api/v1/array/start"
+    url: "https://unraid-server:8043/api/v1/array/start"
     method: POST
+    headers:
+      Authorization: !secret unraid_api_auth
 
   array_stop:
-    url: "http://unraid-server:8043/api/v1/array/stop"
+    url: "https://unraid-server:8043/api/v1/array/stop"
     method: POST
+    headers:
+      Authorization: !secret unraid_api_auth
 ```
 
 ## Automations

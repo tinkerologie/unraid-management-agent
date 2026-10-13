@@ -11,3 +11,6 @@ plugin_bundle: "{{ build_dir }}/{{ plugin_name }}-{{ version }}.tgz"
 plugin_dir: "/usr/local/emhttp/plugins/{{ plugin_name }}"
 config_dir: "/boot/config/plugins/{{ plugin_name }}"
 api_port: "{{ hostvars[inventory_hostname].api_port | default(8043) }}"
+
+# curl argument that sends the API token when one is configured (#245).
+curl_auth: "{{ ('-H \"Authorization: Bearer ' ~ api_token ~ '\"') if (api_token | default('') | length > 0) else '' }}"

@@ -119,6 +119,7 @@ func (o *Orchestrator) Run() error {
 
 	mcpServer := mcp.NewServer(o.ctx, apiServer)
 	mcpServer.SetToolPolicyStore(toolPolicyStore)
+	mcpServer.SetNetworkWriteLock(o.ctx.WritesLocked())
 	if err := mcpServer.Initialize(); err != nil {
 		logger.Error("Failed to initialize MCP server: %v", err)
 	} else {

@@ -34,6 +34,7 @@ sanitize_bool() { [ "$1" = "true" ] && echo "true" || echo "false"; }
 PORT="${PORT:-8043}"
 BIND_ADDRESS="${BIND_ADDRESS:-}"
 READ_ONLY="${READ_ONLY:-false}"
+ALLOW_UNAUTHENTICATED_WRITES="${ALLOW_UNAUTHENTICATED_WRITES:-false}"
 API_TOKEN="${API_TOKEN:-}"
 MCP_CONNECT_SECRET="${MCP_CONNECT_SECRET:-}"
 MCP_CONNECT_SECRET_DISABLED="${MCP_CONNECT_SECRET_DISABLED:-false}"
@@ -74,6 +75,7 @@ PORT=$(sanitize_int "$PORT");                       PORT="${PORT:-8043}"
 # The daemon validates the value and falls back to all interfaces if invalid.
 BIND_ADDRESS=$(echo "$BIND_ADDRESS" | tr -cd '0-9a-fA-F.:')
 READ_ONLY=$(sanitize_bool "$READ_ONLY")
+ALLOW_UNAUTHENTICATED_WRITES=$(sanitize_bool "$ALLOW_UNAUTHENTICATED_WRITES")
 MCP_CONNECT_SECRET=$(echo "$MCP_CONNECT_SECRET" | tr -cd 'A-Za-z0-9_-')
 MCP_CONNECT_SECRET_DISABLED=$(sanitize_bool "$MCP_CONNECT_SECRET_DISABLED")
 if [ "$MCP_CONNECT_SECRET_DISABLED" != "true" ] && [ "${#MCP_CONNECT_SECRET}" -lt 32 ]; then
@@ -151,6 +153,7 @@ MQTT_PORT=$(sanitize_int "$MQTT_PORT");             MQTT_PORT="${MQTT_PORT:-1883
 nohup env \
   BIND_ADDRESS="$BIND_ADDRESS" \
   READ_ONLY="$READ_ONLY" \
+  ALLOW_UNAUTHENTICATED_WRITES="$ALLOW_UNAUTHENTICATED_WRITES" \
   API_TOKEN="$API_TOKEN" \
   MCP_CONNECT_SECRET="$MCP_CONNECT_SECRET" \
   TOOL_POLICY="$TOOL_POLICY" \

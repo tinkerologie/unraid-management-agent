@@ -1,0 +1,48 @@
+#!/bin/bash
+# One-time migration for the secure API default (#245).
+#
+# Fresh installs refuse network writes until an API token is set. Installs that
+# were already running without a token keep working: on their first upgrade to
+# this release, ALLOW_UNAUTHENTICATED_WRITES="true" is written to config.cfg and
+# the settings page asks the user to set a token and turn it off.
+#
+# Runs only when the plugin was installed before (.installed exists) and this
+# migration has not run yet (.secure-defaults-migrated is absent). The installer
+# creates that marker on every install, so a later upgrade of a fresh install
+# never gets the opt-out. Exits non-zero if config.cfg cannot be updated; the
+# install then stays on the secure default.
+
+PLUGIN="unraid-management-agent"
+CONFIG_DIR="${CONFIG_DIR:-/boot/config/plugins/$PLUGIN}"
+CONFIG_FILE="${CONFIG_DIR}/config.cfg"
+
+if [ ! -f "${CONFIG_DIR}/.installed" ] || [ -f "${CONFIG_DIR}/.secure-defaults-migrated" ]; then
+    exit 0
+fi
+
+# An explicit choice already exists; leave it alone.
+if [ -f "$CONFIG_FILE" ] && grep -q '^[[:space:]]*ALLOW_UNAUTHENTICATED_WRITES=' "$CONFIG_FILE"; then
+    exit 0
+fi
+
+# Read the token value without sourcing the file, then drop surrounding quotes.
+token=""
+if [ -f "$CONFIG_FILE" ]; then
+    token=$(sed -n 's/^[[:space:]]*API_TOKEN=//p' "$CONFIG_FILE" | tail -n1)
+    token="${token#\"}"
+    token="${token%\"}"
+    token="${token#\'}"
+    token="${token%\'}"
+    token=$(printf '%s' "$token" | tr -d '[:space:]')
+fi
+if [ -n "$token" ]; then
+    exit 0
+fi
+
+# Append only the key: config.cfg is also read by PHP's parse_ini_file, which
+# rejects "#" comment lines containing characters such as "(" or quotes.
+if ! printf '\nALLOW_UNAUTHENTICATED_WRITES="true"\n' >>"$CONFIG_FILE" 2>/dev/null; then
+    echo "✗ Could not update ${CONFIG_FILE}; network write access stays disabled until an API token is set" >&2
+    exit 1
+fi
+echo "✓ Kept network write access for this existing install (no API token set). Set an API token in Settings and turn off 'Allow Write Access Without a Token'."

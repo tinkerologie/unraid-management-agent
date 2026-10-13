@@ -203,3 +203,27 @@ func TestContextFields(t *testing.T) {
 		t.Errorf("Expected system interval 15, got %d", ctx.Intervals.System)
 	}
 }
+
+func TestConfigWritesLocked(t *testing.T) {
+	tests := []struct {
+		name     string
+		token    string
+		optOut   bool
+		wantLock bool
+	}{
+		{name: "no token locks writes", token: "", wantLock: true},
+		{name: "whitespace-only token locks writes", token: " \t", wantLock: true},
+		{name: "opt-out unlocks writes without a token", token: "", optOut: true, wantLock: false},
+		{name: "token unlocks writes", token: "secret-token", wantLock: false},
+		{name: "token with opt-out unlocks writes", token: "secret-token", optOut: true, wantLock: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := Config{APIToken: tt.token, AllowUnauthenticatedWrites: tt.optOut}
+			if got := c.WritesLocked(); got != tt.wantLock {
+				t.Errorf("WritesLocked() = %v, want %v", got, tt.wantLock)
+			}
+		})
+	}
+}

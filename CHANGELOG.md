@@ -39,6 +39,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **BREAKING: no unauthenticated network writes by default** — with no `API_TOKEN`, the REST
+  API now answers `POST`, `PUT`, `PATCH` and `DELETE` with `403 Forbidden` and a message on
+  how to set a token, and HTTP MCP (`/mcp`, `/mcp/<connect-secret>`) treats every write tool
+  as read-only. Reads, WebSocket subscriptions and MCP read tools still work without a
+  token, and STDIO MCP is unaffected. `ALLOW_UNAUTHENTICATED_WRITES`
+  (`--allow-unauthenticated-writes`, `allow_unauthenticated_writes` in YAML) restores the old
+  behaviour and has no effect once a token is set. **Existing plugin installs without a
+  token** get `ALLOW_UNAUTHENTICATED_WRITES="true"` once on upgrade, so their clients keep
+  working, and the settings page shows a warning: set a token, add it to your clients, then
+  turn the option off. **Daemons started directly** (CLI, environment or YAML) are not
+  migrated and lose tokenless write access until `API_TOKEN` or the opt-out is set. The
+  settings page gains the opt-out toggle and a read-only notice, and saving tool policies
+  without a token stores them for the next start instead of failing. Reported in the
+  Community Applications review (#239).
+  ([#245](https://github.com/tinkerologie/unraid-management-agent/issues/245)).
 - **Bundle extraction no longer changes system directory owners** — release bundles
   stored every entry with the GitHub Actions runner owner (uid/gid 1001), and the
   installer's root `tar -xzf` applied it to `/usr`, `/usr/local`, `/usr/local/emhttp`

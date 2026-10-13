@@ -13,8 +13,11 @@ import (
 )
 
 func setupTestServer() (*Server, *domain.Context) {
+	// Handler tests exercise handlers, not the #245 write lock, which has its
+	// own tests; opt out so state-changing requests reach the handlers.
 	ctx := &domain.Context{
-		Port: 8080,
+		Port:                       8080,
+		AllowUnauthenticatedWrites: true,
 	}
 
 	server := NewServer(ctx)

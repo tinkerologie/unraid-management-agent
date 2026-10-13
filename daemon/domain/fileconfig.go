@@ -37,6 +37,10 @@ type FileConfig struct {
 	// APIToken enables bearer-token authentication when non-empty.
 	APIToken *string `yaml:"api_token,omitempty"`
 
+	// AllowUnauthenticatedWrites restores network write access without an API
+	// token (not recommended).
+	AllowUnauthenticatedWrites *bool `yaml:"allow_unauthenticated_writes,omitempty"`
+
 	// MCPConnectSecret enables the secret-bearing MCP connect URL (/mcp/<secret>) when non-empty.
 	MCPConnectSecret *string `yaml:"mcp_connect_secret,omitempty"`
 

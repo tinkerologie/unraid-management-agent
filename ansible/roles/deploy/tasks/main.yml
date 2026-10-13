@@ -78,6 +78,16 @@
       ansible.builtin.raw: "test -f {{ config_dir }}/config.cfg || echo 'PORT={{ api_port }}' > {{ config_dir }}/config.cfg"
       changed_when: true
 
+    # Without a token the agent refuses network writes (#245), so the verify
+    # role's write tests need one. The hex token needs no quoting.
+    - name: Configure API token for verification
+      when: api_token | default('') | length > 0
+      ansible.builtin.raw: >-
+        sed -i '/^API_TOKEN=/d' {{ config_dir }}/config.cfg &&
+        echo "API_TOKEN='{{ api_token }}'" >> {{ config_dir }}/config.cfg
+      changed_when: true
+      no_log: true
+
     - name: Start service
       ansible.builtin.raw: "nohup {{ plugin_dir }}/scripts/start > /dev/null 2>&1; sleep 2; echo started"
       changed_when: true

@@ -69,7 +69,9 @@ The MCP server supports two transports — use the one that fits your deployment
 
 ### Authentication Options
 
-When `API_TOKEN` is configured (see [Configuration → Authentication](../guides/configuration.md#authentication)), you can authenticate MCP clients using either:
+Over HTTP, MCP write tools need an API token. While `API_TOKEN` is empty (and `ALLOW_UNAUTHENTICATED_WRITES` is off), every write tool on `/mcp` and `/mcp/<connect-secret>` is blocked as read-only and returns the token message below; read tools keep working. The local STDIO transport is not affected. See [Configuration → Authentication](../guides/configuration.md#authentication).
+
+When `API_TOKEN` is configured, you can authenticate MCP clients using either:
 
 #### Option 1: Single-URL Connect Secret (`/mcp/<connect-secret>`) — Recommended
 
@@ -344,6 +346,11 @@ Supported actions: `start_container`, `stop_container`, `restart_container`, `st
 Read-only mode blocks **every state-changing MCP tool** at the server.
 AI agents can monitor and diagnose but never modify the system — regardless
 of which client connects or what it asks for.
+
+The no-token write lock acts the same way for HTTP clients: in tool policy
+precedence it counts as global read-only (`hidden` still wins). Its message
+names the cause instead: `This operation is blocked: write access is disabled
+because no API token is configured. …`
 
 Enable it in any of the usual configuration layers:
 
@@ -1000,6 +1007,7 @@ UMA records connection lifecycle counters in Prometheus (`/metrics`) under `mcp_
 
 | Symptom | HTTP Status | Metric (`mcp_connection_events_total`) | Log Pattern in `/var/log/unraid-management-agent.log` | Resolution |
 | --- | --- | --- | --- | --- |
+| Write tools return `write access is disabled because no API token is configured` | `200 OK` (tool result) | — | `MCP: blocked write tool '<name>': This operation is blocked: write access is disabled …` | Set `API_TOKEN` in **Settings → Unraid Management Agent → Authentication**, click **Apply**, and connect with `Authorization: Bearer <API_TOKEN>` |
 | Missing or invalid `Bearer` token on `/mcp` | `401 Unauthorized` | `event="auth_rejected"` | `MCP connection rejected: category=auth method=<METHOD> path=/mcp` | Pass `Authorization: Bearer <API_TOKEN>` or use your `/mcp/<connect-secret>` Connect URL |
 | Mistyped or rotated `/mcp/<secret>` URL | `404 Not Found` | `event="not_found"` | `MCP connection rejected: category=not_found method=<METHOD> path=/mcp/<redacted>` | Copy the current Connect URL from **Settings → Unraid Management Agent → AI Agent Access (MCP)** and click **Apply** |
 | Disallowed browser `Origin` header | `403 Forbidden` | `event="origin_rejected"` | `MCP connection rejected: category=origin method=<METHOD> path=/mcp` | Ensure `CORS_ORIGIN` includes your custom web UI origin (non-browser CLI/desktop MCP clients omit `Origin` and are allowed automatically) |

@@ -23,6 +23,7 @@ func TestLoadConfigFile(t *testing.T) {
 port: 9090
 log_level: debug
 read_only: true
+allow_unauthenticated_writes: true
 tool_policy:
   container_start: ask
 mqtt:
@@ -54,6 +55,9 @@ intervals:
 		}
 		if cfg.ReadOnly == nil || !*cfg.ReadOnly {
 			t.Errorf("ReadOnly = %v, want true", cfg.ReadOnly)
+		}
+		if cfg.AllowUnauthenticatedWrites == nil || !*cfg.AllowUnauthenticatedWrites {
+			t.Errorf("AllowUnauthenticatedWrites = %v, want true", cfg.AllowUnauthenticatedWrites)
 		}
 		if got := cfg.ToolPolicy["container_start"]; got != "ask" {
 			t.Errorf("ToolPolicy[container_start] = %q, want ask", got)

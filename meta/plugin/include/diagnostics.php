@@ -150,6 +150,11 @@ switch ($action) {
         $out = [];
         $rc = 0;
         exec($cmd, $out, $rc);
+        // Without an API token the agent refuses network writes with 403 (#245);
+        // the policies are still saved to disk and applied on the next start.
+        if ($rc === 22 && strpos(implode("\n", $out), 'error: 403') !== false) {
+            $rc = 1;
+        }
         if ($rc === 22) {
             http_response_code(400);
             echo json_encode(['error' => 'Live agent rejected policy update', 'details' => implode("\n", $out)]);

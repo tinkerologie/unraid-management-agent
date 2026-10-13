@@ -47,9 +47,9 @@ Complete reference for all Unraid Management Agent API endpoints.
 
 ## Authentication
 
-Currently, the API does not require authentication. All endpoints are accessible without credentials.
+When `API_TOKEN` is set, every request (except `/api/v1/health` and `/swagger/`) must send `Authorization: Bearer <token>`. Without a token, `GET`, `HEAD` and `OPTIONS` requests work unauthenticated and every `POST`, `PUT`, `PATCH` and `DELETE` request returns `403 Forbidden`, unless `ALLOW_UNAUTHENTICATED_WRITES` is enabled. See [Configuration → Authentication](../guides/configuration.md#authentication).
 
-**Security Note**: Ensure the API is only accessible on trusted networks or implement network-level security (firewall, VPN, etc.).
+**Security Note**: Use HTTPS when sending a token over untrusted networks, and keep the API on trusted networks.
 
 ---
 

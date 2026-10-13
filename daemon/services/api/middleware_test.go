@@ -1,11 +1,14 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
 	"golang.org/x/time/rate"
 )
 
@@ -723,5 +726,103 @@ func TestRedactMCPPath(t *testing.T) {
 		if got := redactMCPPath(tt.in); got != tt.want {
 			t.Errorf("redactMCPPath(%q) = %q, want %q", tt.in, got, tt.want)
 		}
+	}
+}
+
+func TestWriteLockMiddleware(t *testing.T) {
+	tests := []struct {
+		name        string
+		locked      bool
+		method      string
+		path        string
+		wantReached bool
+	}{
+		{"locked GET passes", true, http.MethodGet, "/api/v1/system", true},
+		{"locked HEAD passes", true, http.MethodHead, "/api/v1/system", true},
+		{"locked OPTIONS passes", true, http.MethodOptions, "/api/v1/system", true},
+		{"locked WebSocket upgrade passes", true, http.MethodGet, "/api/v1/ws", true},
+		{"locked user script execute is refused", true, http.MethodPost, "/api/v1/user-scripts/x/execute", false},
+		{"locked reboot is refused", true, http.MethodPost, "/api/v1/system/reboot", false},
+		{"locked PUT is refused", true, http.MethodPut, "/api/v1/settings/system", false},
+		{"locked PATCH is refused", true, http.MethodPatch, "/api/v1/alerts/rules/x", false},
+		{"locked DELETE is refused", true, http.MethodDelete, "/api/v1/alerts/rules/x", false},
+		{"locked tool policy PUT is refused", true, http.MethodPut, "/api/v1/mcp/tool-policy", false},
+		{"locked MCP endpoint passes", true, http.MethodPost, "/mcp", true},
+		{"locked MCP trailing slash passes", true, http.MethodPost, "/mcp/", true},
+		{"locked MCP connect secret passes", true, http.MethodPost, "/mcp/some-connect-secret", true},
+		{"locked MCP lookalike is refused", true, http.MethodPost, "/mcpfoo", false},
+		{"unlocked POST passes", false, http.MethodPost, "/api/v1/system/reboot", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reached := false
+			handler := writeLockMiddleware(tt.locked)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				reached = true
+				w.WriteHeader(http.StatusOK)
+			}))
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, httptest.NewRequest(tt.method, tt.path, nil))
+
+			if reached != tt.wantReached {
+				t.Fatalf("handler reached = %v, want %v", reached, tt.wantReached)
+			}
+			if tt.wantReached {
+				return
+			}
+			if rr.Code != http.StatusForbidden {
+				t.Errorf("status = %d, want %d", rr.Code, http.StatusForbidden)
+			}
+			var body map[string]string
+			if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+				t.Fatalf("response is not JSON: %v", err)
+			}
+			if body["error"] != writesLockedMessage {
+				t.Errorf("error = %q, want %q", body["error"], writesLockedMessage)
+			}
+		})
+	}
+}
+
+// TestWriteLockWiring checks the lock through the real router: it applies
+// only while no token is configured and the opt-out is off (#245).
+func TestWriteLockWiring(t *testing.T) {
+	const token = "wiring-test-token-1234567890"
+
+	tests := []struct {
+		name       string
+		ctx        *domain.Context
+		authHeader string
+		method     string
+		wantStatus int
+	}{
+		{"no token refuses writes", &domain.Context{}, "", http.MethodPost, http.StatusForbidden},
+		{"whitespace token refuses writes", &domain.Context{Config: domain.Config{APIToken: "   "}}, "", http.MethodPost, http.StatusForbidden},
+		{"no token still serves reads", &domain.Context{}, "", http.MethodGet, http.StatusOK},
+		{"opt-out allows writes", &domain.Context{Config: domain.Config{AllowUnauthenticatedWrites: true}}, "", http.MethodPost, http.StatusBadRequest},
+		{"token without credentials is unauthorized", &domain.Context{Config: domain.Config{APIToken: token}}, "", http.MethodPost, http.StatusUnauthorized},
+		{"token with credentials allows writes", &domain.Context{Config: domain.Config{APIToken: token}}, "Bearer " + token, http.MethodPost, http.StatusBadRequest},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := NewServer(tt.ctx)
+			// An empty notification is rejected by the handler with 400, so a
+			// request that gets past the lock never changes anything.
+			path := "/api/v1/notifications"
+			if tt.method == http.MethodGet {
+				path = healthPath
+			}
+			req := httptest.NewRequest(tt.method, path, strings.NewReader(""))
+			if tt.authHeader != "" {
+				req.Header.Set("Authorization", tt.authHeader)
+			}
+			rr := httptest.NewRecorder()
+			server.router.ServeHTTP(rr, req)
+
+			if rr.Code != tt.wantStatus {
+				t.Errorf("status = %d, want %d", rr.Code, tt.wantStatus)
+			}
+		})
 	}
 }

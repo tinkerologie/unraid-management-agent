@@ -30,6 +30,7 @@ $mcp_connect_secret = preg_replace('/[^A-Za-z0-9_-]/', '', (string)($config['MCP
 $tls_cert_file = $config['TLS_CERT_FILE'] ?? '';
 $tls_key_file = $config['TLS_KEY_FILE'] ?? '';
 $read_only = $config['READ_ONLY'] ?? 'false';
+$allow_unauth_writes = (trim((string)($config['ALLOW_UNAUTHENTICATED_WRITES'] ?? 'false'), "'\"") === 'true') ? 'true' : 'false';
 $log_level = $config['LOG_LEVEL'] ?? 'info';
 
 // MCP Tool Policies
@@ -497,17 +498,26 @@ the agent. Changes apply after clicking Apply, which restarts the service automa
 
 <?php
     $has_token = !empty($api_token);
-    // Security warning banner: shown when agent is exposed with no auth, on all interfaces, with write access
-    $show_sec_warning = (!$has_token && (empty($bind_address) || $bind_address === '0.0.0.0' || $bind_address === '::') && $read_only !== 'true');
+    // Without a token the daemon refuses network writes unless the opt-out is on (#245).
+    $writes_open = !$has_token && $allow_unauth_writes === 'true';
+    $writes_locked = !$has_token && $allow_unauth_writes !== 'true';
 ?>
 
-<div id="uma-security-warning" class="uma-power-warning" style="margin-bottom: 15px; display: <?= $show_sec_warning ? 'block' : 'none' ?>;">
-    <strong><i class="fa fa-exclamation-triangle" style="color: var(--orange-200, #ff9900);"></i> Security Notice:</strong>
-    The agent is listening on all network interfaces with no authentication and write access enabled. Anyone on your local network can execute actions (reboot, container control, etc.). Setting an API Token or binding to a specific interface is strongly recommended.
+<div id="uma-security-warning" class="uma-power-warning" style="margin-bottom: 15px; display: <?= $writes_open ? 'block' : 'none' ?>;">
+    <strong><i class="fa fa-exclamation-triangle" style="color: var(--red-500, #d9534f);"></i> Security Warning:</strong>
+    No API Token is set and <strong>Allow Write Access Without a Token</strong> is on, so anyone on your network can control containers, VMs and User Scripts, and reboot the server.
+    If you upgraded from an earlier version, this was turned on automatically so your existing clients keep working.
+    Generate an API Token, add it to your clients, then turn this option off.
+</div>
+
+<div id="uma-write-lock-notice" class="uma-power-warning" style="margin-bottom: 15px; display: <?= $writes_locked ? 'block' : 'none' ?>;">
+    <strong><i class="fa fa-info-circle"></i> Read-Only Network Access:</strong>
+    No API Token is set, so network clients can read data but every control action (REST and MCP) is refused.
+    Generate an API Token, click <strong>Apply</strong>, and add it to your clients to enable control actions.
 </div>
 
 _(API Token)_:
-: <input type="password" name="API_TOKEN" id="api_token" value="" placeholder="<?= $has_token ? '••••••••' : 'No authentication (disabled)' ?>" autocomplete="off" style="width: 320px;" oninput="document.getElementById('api_token_clear').value = '0'; updateTokenButtons(); updateMcpOnboardingUI();">
+: <input type="password" name="API_TOKEN" id="api_token" value="" placeholder="<?= $has_token ? '••••••••' : ($allow_unauth_writes === 'true' ? 'Not set (network writes allowed without a token)' : 'Not set (network access is read-only)') ?>" autocomplete="off" style="width: 320px;" oninput="document.getElementById('api_token_clear').value = '0'; updateTokenButtons(); updateMcpOnboardingUI();">
   <input type="hidden" name="API_TOKEN_CLEAR" id="api_token_clear" value="0">
   <input type="button" id="uma-btn-token-toggle" value="Show" onclick="toggleTokenVisibility()">
   <input type="button" id="uma-btn-token-generate" value="Generate" onclick="generateToken()">
@@ -518,8 +528,23 @@ _(API Token)_:
 
 <blockquote class="inline_help">
 Bearer token required for all API and MCP requests (except <code>/api/v1/health</code> and <code>/swagger/</code>).
-Leave empty to preserve the existing token (or keep authentication disabled if none is set). When set, clients must pass
-<code>Authorization: Bearer &lt;token&gt;</code> (or connect via an MCP Connect URL secret below).
+When set, clients must pass <code>Authorization: Bearer &lt;token&gt;</code> (or connect via an MCP Connect URL secret below).
+Without a token, network clients can only read data: control actions are refused unless <strong>Allow Write Access Without a Token</strong> is on.
+To set one: click <strong>Generate</strong>, <strong>Copy</strong> it into your clients, then click <strong>Apply</strong>. The saved token is not shown again.
+Leave the field empty to keep the existing token.
+</blockquote>
+
+_(Allow Write Access Without a Token)_:
+: <label class="uma-toggle-switch">
+    <input type="checkbox" name="ALLOW_UNAUTHENTICATED_WRITES_CB" id="allow_unauth_writes" <?= ($allow_unauth_writes === 'true') ? 'checked' : '' ?> onchange="updateAllowUnauthWrites()">
+    <span class="uma-toggle-slider"></span>
+  </label>
+  <input type="hidden" name="ALLOW_UNAUTHENTICATED_WRITES" id="allow_unauth_writes_val" value="<?= $allow_unauth_writes ?>">
+
+<blockquote class="inline_help">
+Not recommended. When no API Token is set, lets anyone on your network use control actions: container, VM and array control,
+User Scripts, reboot and shutdown. Has no effect once an API Token is set. Upgrades from earlier versions without a token turn this on
+so existing clients keep working; set a token and turn it off.
 </blockquote>
 
 <div id="uma-mcp-onboarding" class="title"><span class="left"><i class="title fa fa-shield"></i>AI Agent Access (MCP)</span></div>
@@ -557,7 +582,7 @@ When set (32–256 chars of <code>[A-Za-z0-9_-]</code>), requests to <code>/mcp/
   <?php endif; ?>
 
   <div id="uma-mcp-no-token-warning" class="uma-power-warning" style="margin-top:6px; margin-bottom:0; display: <?= ($has_mcp_secret && !$has_token) ? 'block' : 'none' ?>;">
-    <i class="fa fa-info-circle"></i> <strong>Authentication Note:</strong> <code>MCP_CONNECT_SECRET</code> is configured while <code>API_TOKEN</code> is empty. Both <code>/mcp/&lt;secret&gt;</code> and plain <code>/mcp</code> are reachable without headers, while <code>/mcp/&lt;wrong&gt;</code> returns <code>404</code>. Generate an <strong>API Token</strong> above if you want to require authentication on plain <code>/mcp</code> and REST endpoints.
+    <i class="fa fa-info-circle"></i> <strong>Authentication Note:</strong> <code>MCP_CONNECT_SECRET</code> is configured while <code>API_TOKEN</code> is empty. Both <code>/mcp/&lt;secret&gt;</code> and plain <code>/mcp</code> are reachable without headers (read-only tools only, unless write access without a token is allowed), while <code>/mcp/&lt;wrong&gt;</code> returns <code>404</code>. Generate an <strong>API Token</strong> above if you want to require authentication on plain <code>/mcp</code> and REST endpoints.
   </div>
 </div>
 
@@ -571,7 +596,7 @@ _(Read-Only Mode)_:
 <blockquote class="inline_help">
 When enabled, AI agents connected via MCP can only read data: every state-changing MCP tool
 (container/VM/array actions, reboot, shutdown, updates, fan/CPU control, etc.) is blocked.
-The REST API and WebSocket are not affected.
+The REST API and WebSocket are not affected; protect them with an API Token.
 </blockquote>
 
 _(Tool Access Policies)_:
@@ -962,6 +987,22 @@ function updateMQTTHA() {
     document.getElementById('mqtt_ha_val').value = enabled ? 'true' : 'false';
 }
 
+// Placeholder for an empty token field, matching what the daemon will do
+// with no token and the current write opt-out setting (#245).
+function noTokenPlaceholder() {
+    var allow = document.getElementById('allow_unauth_writes');
+    return (allow && allow.checked) ? 'Not set (network writes allowed without a token)' : 'Not set (network access is read-only)';
+}
+
+function updateAllowUnauthWrites() {
+    var enabled = document.getElementById('allow_unauth_writes').checked;
+    document.getElementById('allow_unauth_writes_val').value = enabled ? 'true' : 'false';
+    var field = document.getElementById('api_token');
+    if (field && field.value === '' && field.placeholder !== '••••••••') {
+        field.placeholder = noTokenPlaceholder();
+    }
+}
+
 function updateReadOnly() {
     var enabled = document.getElementById('read_only').checked;
     document.getElementById('read_only_val').value = enabled ? 'true' : 'false';
@@ -1139,7 +1180,7 @@ function fallbackCopy(field, callback) {
 function clearToken() {
     var field = document.getElementById('api_token');
     field.value = '';
-    field.placeholder = 'No authentication (disabled)';
+    field.placeholder = noTokenPlaceholder();
     document.getElementById('api_token_clear').value = '1';
     var clearBtn = document.getElementById('uma-btn-token-clear');
     if (clearBtn) {

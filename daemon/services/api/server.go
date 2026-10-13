@@ -119,6 +119,7 @@ func (s *Server) setupRoutes() {
 	// throttled before any credential comparison is performed.
 	s.router.Use(rateLimitMiddleware(newPerClientRateLimiter(rate.Limit(rateLimitPerSecond), rateLimitBurst)))
 	s.router.Use(authMiddlewareWithMCPSecret(s.ctx.APIToken, s.ctx.MCPConnectSecret))
+	s.router.Use(writeLockMiddleware(s.ctx.WritesLocked()))
 	s.router.Use(loggingMiddleware)
 
 	s.router.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

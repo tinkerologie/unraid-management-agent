@@ -29,7 +29,7 @@ func (agentTestDocker) Restart(string) error { return nil }
 func newAgentServer(t *testing.T) *Server {
 	t.Helper()
 	hub := domain.NewEventBus(10)
-	s := NewServer(&domain.Context{Hub: hub})
+	s := NewServer(&domain.Context{AllowUnauthenticatedWrites: true, Hub: hub})
 	cfg := dto.DefaultAgentConfig()
 	cfg.Enabled = true
 	p := llm.NewMockProvider(
@@ -160,7 +160,7 @@ func TestAgentGetSessionInjectionID(t *testing.T) {
 
 func TestAgentDisabledReturns503(t *testing.T) {
 	hub := domain.NewEventBus(10)
-	s := NewServer(&domain.Context{Hub: hub}) // agent NOT set
+	s := NewServer(&domain.Context{AllowUnauthenticatedWrites: true, Hub: hub}) // agent NOT set
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/agent/sessions", strings.NewReader(`{"goal":"x"}`))
 	rr := httptest.NewRecorder()
 	s.GetRouter().ServeHTTP(rr, req)
@@ -173,7 +173,7 @@ func TestAgentDisabledReturns503(t *testing.T) {
 }
 
 func TestAgentApproveEndpoint(t *testing.T) {
-	s := NewServer(&domain.Context{Hub: domain.NewEventBus(10)})
+	s := NewServer(&domain.Context{AllowUnauthenticatedWrites: true, Hub: domain.NewEventBus(10)})
 	cfg := dto.DefaultAgentConfig()
 	cfg.Enabled = true
 	p := llm.NewMockProvider(
@@ -224,7 +224,7 @@ func TestAgentMemoryEndpoint(t *testing.T) {
 }
 
 func TestAgentMemoryDisabledReturns503(t *testing.T) {
-	s := NewServer(&domain.Context{Hub: domain.NewEventBus(10)}) // agent NOT set
+	s := NewServer(&domain.Context{AllowUnauthenticatedWrites: true, Hub: domain.NewEventBus(10)}) // agent NOT set
 	rr := httptest.NewRecorder()
 	s.GetRouter().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/v1/agent/memory", nil))
 	if rr.Code != http.StatusServiceUnavailable {
@@ -259,7 +259,7 @@ func TestAgentConfirmPreferenceUnknown(t *testing.T) {
 }
 
 func TestAgentCancelEndpoint(t *testing.T) {
-	s := NewServer(&domain.Context{Hub: domain.NewEventBus(10)})
+	s := NewServer(&domain.Context{AllowUnauthenticatedWrites: true, Hub: domain.NewEventBus(10)})
 	cfg := dto.DefaultAgentConfig()
 	cfg.Enabled = true
 	p := llm.NewMockProvider(

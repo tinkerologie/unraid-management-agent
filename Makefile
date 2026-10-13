@@ -56,6 +56,7 @@ test-packaging: package
 	bash scripts/test-bundle-extraction.sh check-tar-flags
 	bash scripts/test-bundle-extraction.sh check-owners $(BUILD_DIR)/$(BINARY)-$(VERSION).tgz
 	sudo bash scripts/test-bundle-extraction.sh
+	bash scripts/test-secure-defaults-migration.sh
 
 test-coverage:
 	@echo "Running tests with coverage..."

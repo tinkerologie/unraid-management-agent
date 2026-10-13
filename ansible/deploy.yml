@@ -24,6 +24,11 @@
   hosts: unraid
   gather_facts: false
 
+  # Send the API token on every REST check when one is configured (#245).
+  module_defaults:
+    ansible.builtin.uri:
+      headers: "{{ {'Authorization': 'Bearer ' ~ api_token} if (api_token | default('') | length > 0) else {} }}"
+
   roles:
     - role: build
       tags: [build, redeploy]
