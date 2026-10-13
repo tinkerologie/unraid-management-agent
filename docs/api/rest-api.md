@@ -2261,7 +2261,13 @@ Get Network UPS Tools (NUT) status for every NUT device.
     { "name": "ups", "description": "UPS device: ups", "available": true },
     { "name": "ats", "description": "UPS device: ats", "available": true }
   ],
-  "status": { "device_name": "ups", "type": "ups", "status": "OL", "battery_charge_percent": 100, "load_percent": null },
+  "status": {
+    "device_name": "ups",
+    "type": "ups",
+    "status": "OL",
+    "battery_charge_percent": 100,
+    "load_percent": null
+  },
   "statuses": [
     { "device_name": "ups", "type": "ups", "status": "OL", "battery_charge_percent": 100, "load_percent": null },
     { "device_name": "ats", "type": "ats", "status": "OL", "battery_charge_percent": null, "output_frequency": 60 }

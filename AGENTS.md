@@ -16,7 +16,6 @@ All AI coding assistants (Claude Code, Gemini, GitHub Copilot, Cursor, Roo, Devi
 10. Ready for Review: Only mark the PR as ready for review (`gh pr ready`) once all checks pass and all due diligence is verified.
 11. Review Clearance: Review and resolve all CodeRabbit AI and GitHub Copilot comments. Ensure Codecov reports show zero errors, zero warnings, and no coverage drop.
 
-
 > Single source of truth for all AI coding assistants working on this project.
 > Individual tool files (CLAUDE.md, GEMINI.md, copilot-instructions.md, .cursorrules) point here.
 

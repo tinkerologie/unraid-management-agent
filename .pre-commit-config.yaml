@@ -13,10 +13,13 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
+      # Storage-topology fixtures are raw command and sysfs captures; they must
+      # stay byte-exact (padding and missing final newlines included).
       - id: trailing-whitespace
-        exclude: '^(.*\.md|.*\.txt)$'
+        exclude: '^(.*\.md|.*\.txt|daemon/services/collectors/testdata/storage_topology/.*)$'
+      # swag generates daemon/docs without a final newline; `make swagger` would undo a fix.
       - id: end-of-file-fixer
-        exclude: '^(.*\.txt)$'
+        exclude: '^(.*\.txt|daemon/services/collectors/testdata/storage_topology/.*|daemon/docs/.*)$'
       - id: check-yaml
         args: ["--unsafe"] # Allow custom YAML tags
       - id: check-json
@@ -27,6 +30,7 @@ repos:
       - id: check-case-conflict
       - id: mixed-line-ending
         args: ["--fix=lf"]
+        exclude: "^daemon/services/collectors/testdata/storage_topology/"
       - id: detect-private-key
       # Disabled: File permission issues are tracked in git index
       # These would need `git add --chmod=-x` to fix properly
@@ -111,23 +115,20 @@ repos:
           - --issues-exit-code=1
           - ./...
 
-  # gosec - Security scanning with zero tolerance (local hook)
+  # gosec - security scanning with zero tolerance (local hook). Runs the gosec
+  # analyzers through golangci-lint: standalone gosec v2.29.0 cannot read Go
+  # 1.27 export data. Excludes come from the gosec section of .golangci.yml;
+  # errcheck runs too because that config leaves unhandled errors (G104) to it.
   - repo: local
     hooks:
       - id: gosec
         name: GoSec Security Scanner
-        description: Security scanner for Go code
-        entry: gosec
+        description: Security scanner for Go code (gosec via golangci-lint)
+        entry: golangci-lint run --enable-only gosec,errcheck --max-issues-per-linter=0 --max-same-issues=0
         language: system
         pass_filenames: false
         files: '\.go$'
         args:
-          - -fmt=text
-          - -exclude-dir=vendor
-          - -exclude-dir=tests
-          - -exclude=G115,G304,G301,G306,G703,G204,G117,G704
-          - -severity=medium
-          - -confidence=medium
           - ./...
 
   # Prettier - format Markdown, YAML, JSON, XML
@@ -170,7 +171,7 @@ repos:
       - id: detect-secrets
         name: Detect Secrets
         args: ["--baseline", ".secrets.baseline"]
-        exclude: '^(go\.sum|.*\.lock)$'
+        exclude: '^(go\.sum|.*\.lock|daemon/services/collectors/testdata/storage_topology/.*)$'
 
   # Spell checking
   - repo: https://github.com/codespell-project/codespell
@@ -179,7 +180,7 @@ repos:
       - id: codespell
         name: Code Spell Checker
         args:
-          - --ignore-words-list=crate,nd,sav,fo,ue,numer,unexpect,aNULL,socio,socio-economic,hax,publishErr,implementors
+          - --ignore-words-list=crate,nd,sav,fo,ue,numer,unexpect,aNULL,socio,socio-economic,hax,publishErr,implementors,unparseable,ser
           - --skip="*.sum,*.lock,*.json,*.mod,coverage.html,CODE_OF_CONDUCT.md"
           - --quiet-level=2
 

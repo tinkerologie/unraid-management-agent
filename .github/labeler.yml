@@ -9,12 +9,12 @@ documentation:
   # Any Markdown file except CHANGELOG.md, which every pull request updates.
   - changed-files:
       - all-globs-to-any-file:
-          - '**/*.md'
-          - '!CHANGELOG.md'
+          - "**/*.md"
+          - "!CHANGELOG.md"
 
 # Lock files and pinned requirements change only when dependencies do.
 dependencies:
   - changed-files:
       - any-glob-to-any-file:
-          - '**/go.sum'
-          - '**/go.mod'
+          - "**/go.sum"
+          - "**/go.mod"

@@ -43,3 +43,6 @@ node_modules/
 
 # Claude/AI local settings
 .claude/settings.local.json
+
+# Raw hardware command output used as byte-exact parser fixtures
+daemon/services/collectors/testdata/storage_topology/

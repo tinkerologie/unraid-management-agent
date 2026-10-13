@@ -186,4 +186,3 @@ func TestHandleDiagnosticsBundle_DefaultWriteArchive(t *testing.T) {
 		t.Errorf("Content-Type = %q, want application/zip", ct)
 	}
 }
-

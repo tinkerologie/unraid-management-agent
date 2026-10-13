@@ -443,8 +443,9 @@ func TestPackageLevelTestConnection_InvalidBroker(t *testing.T) {
 		t.Error("TestConnection() should fail for unreachable broker")
 	}
 
-	if result.Latency <= 0 {
-		t.Error("Latency should be > 0")
+	// Latency is whole milliseconds; an immediate failure can be 0.
+	if result.Latency < 0 {
+		t.Error("Latency should not be negative")
 	}
 
 	if result.Timestamp.IsZero() {

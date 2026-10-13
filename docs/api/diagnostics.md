@@ -59,12 +59,12 @@ Generates and downloads a ZIP archive containing host metrics, disk status, cont
 
 #### Response Headers (`200 OK`)
 
-| Header | Example Value | Description |
-| --- | --- | --- |
-| `Content-Type` | `application/zip` | Binary ZIP archive |
-| `Content-Disposition` | `attachment; filename="unraid-diagnostics-tower-20261010-050000.zip"` | Suggested download filename |
-| `Cache-Control` | `no-store` | Prevents intermediate caching of sensitive host metrics |
-| `X-Content-Type-Options` | `nosniff` | MIME type sniffing protection |
+| Header                   | Example Value                                                         | Description                                             |
+| ------------------------ | --------------------------------------------------------------------- | ------------------------------------------------------- |
+| `Content-Type`           | `application/zip`                                                     | Binary ZIP archive                                      |
+| `Content-Disposition`    | `attachment; filename="unraid-diagnostics-tower-20261010-050000.zip"` | Suggested download filename                             |
+| `Cache-Control`          | `no-store`                                                            | Prevents intermediate caching of sensitive host metrics |
+| `X-Content-Type-Options` | `nosniff`                                                             | MIME type sniffing protection                           |
 
 #### Error Response (`500 Internal Server Error`)
 

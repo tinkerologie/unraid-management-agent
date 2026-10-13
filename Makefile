@@ -112,11 +112,11 @@ lint:
 # Security checks
 security-check:
 	@echo "Running security checks..."
-	@echo "→ Running gosec..."
-	@if command -v gosec >/dev/null 2>&1; then \
-		gosec -fmt=text -exclude-dir=vendor -exclude-dir=tests -exclude=G115,G304,G301,G306,G703,G204,G117 -severity=medium -confidence=medium ./...; \
+	@echo "→ Running gosec (via golangci-lint; standalone gosec cannot read Go 1.27 export data)..."
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint run --enable-only gosec,errcheck --max-issues-per-linter=0 --max-same-issues=0 ./...; \
 	else \
-		echo "⚠️  gosec not found. Install with: go install github.com/securego/gosec/v2/cmd/gosec@latest"; \
+		echo "⚠️  golangci-lint not found. Install with: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest"; \
 	fi
 	@echo "→ Running govulncheck..."
 	@if command -v govulncheck >/dev/null 2>&1; then \

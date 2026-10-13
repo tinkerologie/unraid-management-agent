@@ -23,7 +23,7 @@ on:
         description: Tag to release (e.g., v2025.12.1). Leave empty to release the version in the VERSION file.
         required: false
         type: string
-        default: ''
+        default: ""
 
 permissions:
   contents: read # jobs request only what they need

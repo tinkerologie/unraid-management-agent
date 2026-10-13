@@ -242,4 +242,3 @@ func TestVMController_NilSeams(t *testing.T) {
 	_, _ = vc.ListSnapshots("test-vm")
 	_ = vc.CloneVM("test-vm", "test-clone")
 }
-

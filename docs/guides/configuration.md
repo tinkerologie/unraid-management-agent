@@ -16,23 +16,23 @@ This file is created automatically after the first installation and persists acr
 
 ### Core Settings
 
-| Option                     | Default  | Description                                                                                        |
-| -------------------------- | -------- | -------------------------------------------------------------------------------------------------- |
-| `--port`                   | `8043`   | HTTP API port                                                                                      |
-| `--bind-address`           | -        | IP to bind the HTTP server to (empty = all). mDNS advertises it. Loopback rejected; invalid → all. |
-| `--read-only`              | `false`  | Block state-changing MCP tools (AI agents read-only; REST API unaffected)                          |
-| `--tool-policy`            | -        | Comma-separated per-tool MCP policies (`tool=policy`), e.g. `system_reboot=ask,container_action=read_only`. If `tool_policy.json` exists on disk, it takes precedence. |
-| `--api-token`              | -        | Require `Authorization: Bearer <token>` on the HTTP API and `/mcp` (empty = unauthenticated reads, network writes refused) |
-| `--allow-unauthenticated-writes` | `false` | Allow network writes without an API token (not recommended; `ALLOW_UNAUTHENTICATED_WRITES`) |
-| `--mcp-connect-secret`     | -        | Optional 32–256 char (`[A-Za-z0-9_-]`) secret enabling header-free MCP onboarding at `/mcp/<secret>` (`MCP_CONNECT_SECRET`) |
-| `--debug`                  | `false`  | Enable debug logging                                                                               |
-| `--mqtt-enabled`           | `false`  | Enable MQTT publishing                                                                             |
-| `--mqtt-broker`            | -        | MQTT broker address (e.g., `tcp://localhost:1883`)                                                 |
-| `--mqtt-topic-prefix`      | `unraid` | MQTT topic prefix                                                                                  |
-| `--mqtt-username`          | -        | MQTT username (optional)                                                                           |
-| `--mqtt-password`          | -        | MQTT password (optional)                                                                           |
-| `--discovery-enabled`      | `true`   | Advertise the agent via mDNS for auto-discovery                                                    |
-| `--discovery-service-name` | -        | Override the advertised mDNS instance name                                                         |
+| Option                           | Default  | Description                                                                                                                                                            |
+| -------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--port`                         | `8043`   | HTTP API port                                                                                                                                                          |
+| `--bind-address`                 | -        | IP to bind the HTTP server to (empty = all). mDNS advertises it. Loopback rejected; invalid → all.                                                                     |
+| `--read-only`                    | `false`  | Block state-changing MCP tools (AI agents read-only; REST API unaffected)                                                                                              |
+| `--tool-policy`                  | -        | Comma-separated per-tool MCP policies (`tool=policy`), e.g. `system_reboot=ask,container_action=read_only`. If `tool_policy.json` exists on disk, it takes precedence. |
+| `--api-token`                    | -        | Require `Authorization: Bearer <token>` on the HTTP API and `/mcp` (empty = unauthenticated reads, network writes refused)                                             |
+| `--allow-unauthenticated-writes` | `false`  | Allow network writes without an API token (not recommended; `ALLOW_UNAUTHENTICATED_WRITES`)                                                                            |
+| `--mcp-connect-secret`           | -        | Optional 32–256 char (`[A-Za-z0-9_-]`) secret enabling header-free MCP onboarding at `/mcp/<secret>` (`MCP_CONNECT_SECRET`)                                            |
+| `--debug`                        | `false`  | Enable debug logging                                                                                                                                                   |
+| `--mqtt-enabled`                 | `false`  | Enable MQTT publishing                                                                                                                                                 |
+| `--mqtt-broker`                  | -        | MQTT broker address (e.g., `tcp://localhost:1883`)                                                                                                                     |
+| `--mqtt-topic-prefix`            | `unraid` | MQTT topic prefix                                                                                                                                                      |
+| `--mqtt-username`                | -        | MQTT username (optional)                                                                                                                                               |
+| `--mqtt-password`                | -        | MQTT password (optional)                                                                                                                                               |
+| `--discovery-enabled`            | `true`   | Advertise the agent via mDNS for auto-discovery                                                                                                                        |
+| `--discovery-service-name`       | -        | Override the advertised mDNS instance name                                                                                                                             |
 
 ### Collection Intervals
 
@@ -454,8 +454,8 @@ keep working, so monitoring clients need no token.
 no token, anyone who can reach the agent can control the server. It has no
 effect once a token is set.
 
-| Setting | CLI flag | Env var | Config key |
-| ------- | -------- | ------- | ---------- |
+| Setting                      | CLI flag                         | Env var                        | Config key                                                                            |
+| ---------------------------- | -------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------- |
 | Allow writes without a token | `--allow-unauthenticated-writes` | `ALLOW_UNAUTHENTICATED_WRITES` | `allow_unauthenticated_writes` (YAML) / `ALLOW_UNAUTHENTICATED_WRITES` (`config.cfg`) |
 
 Plugin installs that were upgraded from an earlier release without a token get
@@ -468,6 +468,7 @@ or the opt-out, to keep write access.
 #### Plugin Settings Page (Recommended)
 
 The easiest way to configure authentication is through the Unraid WebGUI:
+
 1. Go to **Settings** $\rightarrow$ **Unraid Management Agent**.
 2. Scroll to the **Authentication** section.
 3. Click **Generate** to create a secure 64-character token via the browser's cryptographic API.

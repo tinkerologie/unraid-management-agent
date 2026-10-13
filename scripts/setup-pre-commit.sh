@@ -77,8 +77,8 @@ echo ""
 echo "📦 Installing Go development tools..."
 
 tools=(
-    "github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
-    "github.com/securego/gosec/v2/cmd/gosec@latest"
+    "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest"
+    "golang.org/x/tools/cmd/goimports@latest"
     "golang.org/x/vuln/cmd/govulncheck@latest"
 )
 

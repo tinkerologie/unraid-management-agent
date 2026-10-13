@@ -287,18 +287,18 @@ def identify_event_type(data):
 
 ### UPS Status Fields
 
-| Field                    | Type    | Unit    | Range | Nullable | Description                       |
-| ------------------------ | ------- | ------- | ----- | -------- | --------------------------------- |
-| `connected`              | bool    | -       | -     | No       | UPS connected                     |
-| `device_name`            | string  | -       | -     | No       | NUT device (omitted for apcupsd)  |
-| `status`                 | string  | -       | enum  | No       | UPS status                        |
-| `load_percent`           | float64 | percent | 0-100 | Yes      | Load percent                      |
-| `battery_charge_percent` | float64 | percent | 0-100 | Yes      | Battery charge                    |
-| `runtime_left_seconds`   | int     | seconds | ≥0    | Yes      | Runtime est.                      |
-| `power_watts`            | float64 | watts   | ≥0    | Yes      | Power draw (reported or derived)  |
-| `nominal_power_watts`    | float64 | watts   | ≥0    | Yes      | Nominal power                     |
-| `model`                  | string  | -       | -     | No       | UPS model                         |
-| `timestamp`              | string  | -       | -     | No       | Event timestamp                   |
+| Field                    | Type    | Unit    | Range | Nullable | Description                      |
+| ------------------------ | ------- | ------- | ----- | -------- | -------------------------------- |
+| `connected`              | bool    | -       | -     | No       | UPS connected                    |
+| `device_name`            | string  | -       | -     | No       | NUT device (omitted for apcupsd) |
+| `status`                 | string  | -       | enum  | No       | UPS status                       |
+| `load_percent`           | float64 | percent | 0-100 | Yes      | Load percent                     |
+| `battery_charge_percent` | float64 | percent | 0-100 | Yes      | Battery charge                   |
+| `runtime_left_seconds`   | int     | seconds | ≥0    | Yes      | Runtime est.                     |
+| `power_watts`            | float64 | watts   | ≥0    | Yes      | Power draw (reported or derived) |
+| `nominal_power_watts`    | float64 | watts   | ≥0    | Yes      | Nominal power                    |
+| `model`                  | string  | -       | -     | No       | UPS model                        |
+| `timestamp`              | string  | -       | -     | No       | Event timestamp                  |
 
 Nullable fields are `null` when the UPS does not report the value.
 

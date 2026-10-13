@@ -24,13 +24,13 @@ This design adopts the best onboarding ergonomics from `ha-mcp` while eliminatin
 
 ## 2. Onboarding Baseline vs. Target Comparison
 
-| Metric | Before (Manual Setup) | After (`ha-mcp` Style Onboarding) |
-| --- | --- | --- |
-| **User steps to connect** | 5–6 steps (look up LAN IP, verify port `8043`, generate/copy `API_TOKEN`, look up client-specific JSON/CLI syntax, manually craft `Authorization: Bearer` header, test connection) | **2 steps** (click **Generate** -> click **Copy Snippet** in the Unraid WebGUI, then paste/run in the MCP client) |
-| **User-supplied fields** | 3 (`host`, `port`, `API_TOKEN` + header syntax) | **0** (all pre-filled from active server bind IP, TLS scheme, port, and generated secret) |
-| **Time to first `tools/list`** | ~3–5 minutes | **< 20 seconds** |
-| **Clients without custom header UI** | Required `npx mcp-remote --header ...` workaround | Native single-URL connection via `http(s)://<host>:<port>/mcp/<connect-secret>` |
-| **`GET /mcp` probe latency (#166)** | 30,000 ms (hung until server `WriteTimeout` or client timeout) | **< 5 ms** (`405 Method Not Allowed` with `Allow: POST, DELETE` or immediate `: ok` SSE flush with session) |
+| Metric                               | Before (Manual Setup)                                                                                                                                                              | After (`ha-mcp` Style Onboarding)                                                                                 |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **User steps to connect**            | 5–6 steps (look up LAN IP, verify port `8043`, generate/copy `API_TOKEN`, look up client-specific JSON/CLI syntax, manually craft `Authorization: Bearer` header, test connection) | **2 steps** (click **Generate** -> click **Copy Snippet** in the Unraid WebGUI, then paste/run in the MCP client) |
+| **User-supplied fields**             | 3 (`host`, `port`, `API_TOKEN` + header syntax)                                                                                                                                    | **0** (all pre-filled from active server bind IP, TLS scheme, port, and generated secret)                         |
+| **Time to first `tools/list`**       | ~3–5 minutes                                                                                                                                                                       | **< 20 seconds**                                                                                                  |
+| **Clients without custom header UI** | Required `npx mcp-remote --header ...` workaround                                                                                                                                  | Native single-URL connection via `http(s)://<host>:<port>/mcp/<connect-secret>`                                   |
+| **`GET /mcp` probe latency (#166)**  | 30,000 ms (hung until server `WriteTimeout` or client timeout)                                                                                                                     | **< 5 ms** (`405 Method Not Allowed` with `Allow: POST, DELETE` or immediate `: ok` SSE flush with session)       |
 
 ---
 

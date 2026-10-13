@@ -38,4 +38,4 @@ updates:
     groups:
       actions-all:
         patterns:
-          - '*'
+          - "*"

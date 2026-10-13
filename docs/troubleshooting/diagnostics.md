@@ -362,6 +362,7 @@ There are two primary ways to export diagnostics depending on whether you are sh
 The agent provides a built-in diagnostic bundling service that exports a ZIP archive with known sensitive values (API tokens, MCP connect secret, MQTT credentials, and passwords) redacted. Review the archive for sensitive data before attaching it to GitHub issues and bug reports.
 
 **Via HTTP API:**
+
 ```bash
 # Download redacted bundle directly from the agent
 curl -OJ http://localhost:8043/api/v1/diagnostics/bundle
@@ -371,6 +372,7 @@ curl -OJ http://localhost:8043/api/v1/diagnostics/bundle
 Navigate to the Unraid Management Agent settings page in the Unraid WebGUI and click **Download Diagnostics**.
 
 **Via CLI:**
+
 ```bash
 # Generate the redacted ZIP archive locally into the current or specified directory
 /usr/local/emhttp/plugins/unraid-management-agent/unraid-management-agent diagnostics --output-dir=/tmp

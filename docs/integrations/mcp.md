@@ -57,10 +57,10 @@ MCP is an open protocol that standardizes how AI applications can securely conne
 
 The MCP server supports two transports — use the one that fits your deployment:
 
-| Transport              | Endpoint / Command                                               | Best For                                               |
-| ---------------------- | ---------------------------------------------------------------- | ------------------------------------------------------ |
-| **Streamable HTTP** ⭐ | `http(s)://<unraid-ip>:8043/mcp` or `/mcp/<connect-secret>`      | Remote connections from any machine on the network     |
-| **STDIO**              | `unraid-management-agent mcp-stdio`                              | Local AI clients running directly on the Unraid server |
+| Transport              | Endpoint / Command                                          | Best For                                               |
+| ---------------------- | ----------------------------------------------------------- | ------------------------------------------------------ |
+| **Streamable HTTP** ⭐ | `http(s)://<unraid-ip>:8043/mcp` or `/mcp/<connect-secret>` | Remote connections from any machine on the network     |
+| **STDIO**              | `unraid-management-agent mcp-stdio`                         | Local AI clients running directly on the Unraid server |
 
 > **Which transport should I use?**
 >
@@ -237,8 +237,8 @@ The STDIO transport (`mcp-stdio`) does not go through the HTTP server, so no tok
 
 ### Network Card Tools
 
-| Tool                | Description                                                                                                                                                                                                                                                                                   |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tool                | Description                                                                                                                                                                                                                                                                                                         |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `get_network_cards` | Return the cached PCI network cards: model, driver, firmware and hwmon temperatures (ASIC, PHY, MAC, module cages) per card; link state and the plugged SFP/QSFP optic's identity and diagnostics (module temperature/voltage, per-lane bias and TX/RX power, alarm/warning flags, thresholds) per port (read-only) |
 
 ### Alerting & Trend Analysis Tools
@@ -889,13 +889,13 @@ The agent supports fine-grained, per-tool access policy configuration to control
 
 ### Available Policies
 
-| Policy | Effect on `tools/list` | Effect on `tools/call` | Typical Use Case |
-| ------ | --------------------- | ---------------------- | ---------------- |
-| `default` | Visible | Standard plugin behavior: safe tools execute directly; destructive tools require `confirm: true` | Standard operations |
-| `hidden` | Omitted from catalog | Blocked as unknown tool (`"tool \"<name>\" not found"`) | Prevent AI agent from discovering or invoking high-risk tools |
-| `read_only` | Visible | Write/state-changing tools are blocked (`"Blocked by tool access policy"`); read-only tools execute normally | Allow agent to inspect state without making changes |
-| `allow` | Visible | Destructive tools execute immediately without requiring `confirm: true` | Trusted automated autonomous workflows |
-| `ask` | Visible | State-changing tools always require explicit `confirm: true` before execution (read-only tools execute normally) | Enforce human confirmation on state-changing actions |
+| Policy      | Effect on `tools/list` | Effect on `tools/call`                                                                                           | Typical Use Case                                              |
+| ----------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `default`   | Visible                | Standard plugin behavior: safe tools execute directly; destructive tools require `confirm: true`                 | Standard operations                                           |
+| `hidden`    | Omitted from catalog   | Blocked as unknown tool (`"tool \"<name>\" not found"`)                                                          | Prevent AI agent from discovering or invoking high-risk tools |
+| `read_only` | Visible                | Write/state-changing tools are blocked (`"Blocked by tool access policy"`); read-only tools execute normally     | Allow agent to inspect state without making changes           |
+| `allow`     | Visible                | Destructive tools execute immediately without requiring `confirm: true`                                          | Trusted automated autonomous workflows                        |
+| `ask`       | Visible                | State-changing tools always require explicit `confirm: true` before execution (read-only tools execute normally) | Enforce human confirmation on state-changing actions          |
 
 ### Policy Precedence
 
@@ -908,11 +908,14 @@ The agent supports fine-grained, per-tool access policy configuration to control
 ### Configuration Methods
 
 #### 1. Unraid WebUI
+
 Navigate to **Settings → Unraid Management Agent → AI Agent Access (MCP)**. Click **Configure Tool Policies** to filter tools by category, search by name, or apply bulk policies. You can save changes immediately to the running daemon without restarting.
 
 #### 2. REST API
+
 - `GET /api/v1/mcp/tool-policy`: Retrieve the full tool catalog, metadata, and active policies.
 - `PUT /api/v1/mcp/tool-policy`: Update policies in real-time. Payload:
+
   ```json
   {
     "policies": {
@@ -924,14 +927,18 @@ Navigate to **Settings → Unraid Management Agent → AI Agent Access (MCP)**. 
   ```
 
 #### 3. Persistent File Storage
+
 Saved in `/boot/config/plugins/unraid-management-agent/tool_policy.json` across reboots. When this file exists on disk, its policies take precedence over CLI flags and environment variables.
 
 #### 4. Environment Variable / CLI Flag
+
 Set `TOOL_POLICY` or `--tool-policy` as comma-separated `tool=policy` pairs:
+
 ```bash
 TOOL_POLICY="system_reboot=ask,container_action=read_only,delete_vm_snapshot=hidden"
 ```
-*Note: If `tool_policy.json` exists on disk, it takes precedence over `TOOL_POLICY`.*
+
+_Note: If `tool_policy.json` exists on disk, it takes precedence over `TOOL_POLICY`._
 
 ## Limitations
 
@@ -991,29 +998,29 @@ It is started via the `mcp-stdio` CLI subcommand:
 
 ## Client Compatibility Matrix
 
-| Client | Transport | URL-Only Auth (`/mcp/<secret>`) | Header Auth (`Bearer <API_TOKEN>`) | Plain LAN `http://` | Copy-Paste Config Snippet |
-| --- | --- | --- | --- | --- | --- |
-| **Claude Code (`claude`)** | Streamable HTTP | ✅ Supported | ✅ Supported (`--header`) | ✅ Yes | `claude mcp add --transport http unraid "http://<ip>:8043/mcp/<secret>"` |
-| **VS Code (GitHub Copilot)** | Streamable HTTP | ✅ Supported | ✅ Supported (`headers`) | ✅ Yes | `.vscode/mcp.json`: `{"servers":{"unraid":{"type":"http","url":"http://<ip>:8043/mcp/<secret>"}}}` |
-| **Cursor** | Streamable HTTP | ✅ Supported | ✅ Supported (`headers`) | ✅ Yes | `.cursor/mcp.json`: `{"mcpServers":{"unraid":{"url":"http://<ip>:8043/mcp/<secret>"}}}` |
-| **OpenAI Codex CLI** | Streamable HTTP | ✅ Supported | ✅ Supported (`bearer_token_env_var`) | ✅ Yes | `~/.codex/config.toml`: `[mcp_servers.unraid]` `url = "http://<ip>:8043/mcp/<secret>"` |
-| **Gemini CLI** | Streamable HTTP | ✅ Supported | ✅ Supported (`headers`) | ✅ Yes | `~/.gemini/settings.json`: `{"mcpServers":{"unraid":{"httpUrl":"http://<ip>:8043/mcp/<secret>"}}}` |
-| **Claude Desktop** | `mcp-remote` / STDIO | ✅ Supported | ✅ Supported (`--header`) | ✅ Yes | `claude_desktop_config.json`: `{"mcpServers":{"unraid":{"command":"npx","args":["-y","mcp-remote","http://<ip>:8043/mcp/<secret>"]}}}` |
-| **claude.ai (Web Connector)** | Streamable HTTP | ✅ Supported | — (URL-only or OAuth) | ❌ Requires public `https://` (Cloudflare Tunnel / Tailscale Funnel) | Enter `https://<your-tunnel-domain>/mcp/<secret>` in **Settings → Connectors** |
+| Client                        | Transport            | URL-Only Auth (`/mcp/<secret>`) | Header Auth (`Bearer <API_TOKEN>`)    | Plain LAN `http://`                                                  | Copy-Paste Config Snippet                                                                                                              |
+| ----------------------------- | -------------------- | ------------------------------- | ------------------------------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **Claude Code (`claude`)**    | Streamable HTTP      | ✅ Supported                    | ✅ Supported (`--header`)             | ✅ Yes                                                               | `claude mcp add --transport http unraid "http://<ip>:8043/mcp/<secret>"`                                                               |
+| **VS Code (GitHub Copilot)**  | Streamable HTTP      | ✅ Supported                    | ✅ Supported (`headers`)              | ✅ Yes                                                               | `.vscode/mcp.json`: `{"servers":{"unraid":{"type":"http","url":"http://<ip>:8043/mcp/<secret>"}}}`                                     |
+| **Cursor**                    | Streamable HTTP      | ✅ Supported                    | ✅ Supported (`headers`)              | ✅ Yes                                                               | `.cursor/mcp.json`: `{"mcpServers":{"unraid":{"url":"http://<ip>:8043/mcp/<secret>"}}}`                                                |
+| **OpenAI Codex CLI**          | Streamable HTTP      | ✅ Supported                    | ✅ Supported (`bearer_token_env_var`) | ✅ Yes                                                               | `~/.codex/config.toml`: `[mcp_servers.unraid]` `url = "http://<ip>:8043/mcp/<secret>"`                                                 |
+| **Gemini CLI**                | Streamable HTTP      | ✅ Supported                    | ✅ Supported (`headers`)              | ✅ Yes                                                               | `~/.gemini/settings.json`: `{"mcpServers":{"unraid":{"httpUrl":"http://<ip>:8043/mcp/<secret>"}}}`                                     |
+| **Claude Desktop**            | `mcp-remote` / STDIO | ✅ Supported                    | ✅ Supported (`--header`)             | ✅ Yes                                                               | `claude_desktop_config.json`: `{"mcpServers":{"unraid":{"command":"npx","args":["-y","mcp-remote","http://<ip>:8043/mcp/<secret>"]}}}` |
+| **claude.ai (Web Connector)** | Streamable HTTP      | ✅ Supported                    | — (URL-only or OAuth)                 | ❌ Requires public `https://` (Cloudflare Tunnel / Tailscale Funnel) | Enter `https://<your-tunnel-domain>/mcp/<secret>` in **Settings → Connectors**                                                         |
 
 ## Troubleshooting & Connection Diagnostics
 
 UMA records connection lifecycle counters in Prometheus (`/metrics`) under `mcp_connection_events_total{event="..."}` and writes redacted diagnostic messages to `/var/log/unraid-management-agent.log`.
 
-| Symptom | HTTP Status | Metric (`mcp_connection_events_total`) | Log Pattern in `/var/log/unraid-management-agent.log` | Resolution |
-| --- | --- | --- | --- | --- |
-| Write tools return `write access is disabled because no API token is configured` | `200 OK` (tool result) | — | `MCP: blocked write tool '<name>': This operation is blocked: write access is disabled …` | Set `API_TOKEN` in **Settings → Unraid Management Agent → Authentication**, click **Apply**, and connect with `Authorization: Bearer <API_TOKEN>` |
-| Missing or invalid `Bearer` token on `/mcp` | `401 Unauthorized` | `event="auth_rejected"` | `MCP connection rejected: category=auth method=<METHOD> path=/mcp` | Pass `Authorization: Bearer <API_TOKEN>` or use your `/mcp/<connect-secret>` Connect URL |
-| Mistyped or rotated `/mcp/<secret>` URL | `404 Not Found` | `event="not_found"` | `MCP connection rejected: category=not_found method=<METHOD> path=/mcp/<redacted>` | Copy the current Connect URL from **Settings → Unraid Management Agent → AI Agent Access (MCP)** and click **Apply** |
-| Disallowed browser `Origin` header | `403 Forbidden` | `event="origin_rejected"` | `MCP connection rejected: category=origin method=<METHOD> path=/mcp` | Ensure `CORS_ORIGIN` includes your custom web UI origin (non-browser CLI/desktop MCP clients omit `Origin` and are allowed automatically) |
-| Client probes `GET /mcp` without `Mcp-Session-Id` | `405 Method Not Allowed` (`Allow: POST, DELETE`) | — (normal spec probe) | `GET /mcp 405` | Expected per MCP Streamable HTTP specification; compliant clients automatically proceed with `POST /mcp` |
-| `GET /mcp` with `Mcp-Session-Id` hangs behind reverse proxy | Connection timeout | `event="initialize_ok"` (no SSE frames received) | `GET /mcp 200` | Add `proxy_buffering off; proxy_cache off; proxy_read_timeout 3600s;` to your Nginx/Traefik `/mcp` location block |
-| Healthy client handshake | `200 OK` | `event="initialize_ok"` + `event="tools_list_ok"` | `MCP session initialized: client=<name> version=<ver> requested_protocol=<proto> negotiated_protocol=<proto> category=initialize_ok` followed by `MCP session tools/list completed: visible_tools=<N> category=tools_list_ok` | Connection is healthy and ready for tool invocations |
+| Symptom                                                                          | HTTP Status                                      | Metric (`mcp_connection_events_total`)            | Log Pattern in `/var/log/unraid-management-agent.log`                                                                                                                                                                         | Resolution                                                                                                                                        |
+| -------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Write tools return `write access is disabled because no API token is configured` | `200 OK` (tool result)                           | —                                                 | `MCP: blocked write tool '<name>': This operation is blocked: write access is disabled …`                                                                                                                                     | Set `API_TOKEN` in **Settings → Unraid Management Agent → Authentication**, click **Apply**, and connect with `Authorization: Bearer <API_TOKEN>` |
+| Missing or invalid `Bearer` token on `/mcp`                                      | `401 Unauthorized`                               | `event="auth_rejected"`                           | `MCP connection rejected: category=auth method=<METHOD> path=/mcp`                                                                                                                                                            | Pass `Authorization: Bearer <API_TOKEN>` or use your `/mcp/<connect-secret>` Connect URL                                                          |
+| Mistyped or rotated `/mcp/<secret>` URL                                          | `404 Not Found`                                  | `event="not_found"`                               | `MCP connection rejected: category=not_found method=<METHOD> path=/mcp/<redacted>`                                                                                                                                            | Copy the current Connect URL from **Settings → Unraid Management Agent → AI Agent Access (MCP)** and click **Apply**                              |
+| Disallowed browser `Origin` header                                               | `403 Forbidden`                                  | `event="origin_rejected"`                         | `MCP connection rejected: category=origin method=<METHOD> path=/mcp`                                                                                                                                                          | Ensure `CORS_ORIGIN` includes your custom web UI origin (non-browser CLI/desktop MCP clients omit `Origin` and are allowed automatically)         |
+| Client probes `GET /mcp` without `Mcp-Session-Id`                                | `405 Method Not Allowed` (`Allow: POST, DELETE`) | — (normal spec probe)                             | `GET /mcp 405`                                                                                                                                                                                                                | Expected per MCP Streamable HTTP specification; compliant clients automatically proceed with `POST /mcp`                                          |
+| `GET /mcp` with `Mcp-Session-Id` hangs behind reverse proxy                      | Connection timeout                               | `event="initialize_ok"` (no SSE frames received)  | `GET /mcp 200`                                                                                                                                                                                                                | Add `proxy_buffering off; proxy_cache off; proxy_read_timeout 3600s;` to your Nginx/Traefik `/mcp` location block                                 |
+| Healthy client handshake                                                         | `200 OK`                                         | `event="initialize_ok"` + `event="tools_list_ok"` | `MCP session initialized: client=<name> version=<ver> requested_protocol=<proto> negotiated_protocol=<proto> category=initialize_ok` followed by `MCP session tools/list completed: visible_tools=<N> category=tools_list_ok` | Connection is healthy and ready for tool invocations                                                                                              |
 
 ## Related Documentation
 

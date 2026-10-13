@@ -11,3 +11,5 @@
 *.gz binary
 *.woff binary
 *.woff2 binary
+# Raw command/sysfs captures used as parser fixtures: keep byte-exact
+daemon/services/collectors/testdata/storage_topology/** -text
