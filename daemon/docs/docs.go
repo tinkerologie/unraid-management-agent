@@ -12930,7 +12930,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "scan_state": {
-                    "description": "\"scanning\", \"finished\", \"canceled\"",
+                    "description": "\"scanning\", \"finished\", \"canceled\", \"paused\"",
                     "type": "string",
                     "example": "finished"
                 },

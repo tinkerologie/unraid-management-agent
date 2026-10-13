@@ -334,6 +334,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **ZFS scrub and resilver times, progress and repaired bytes** — `scan_start_time`,
+  `scan_end_time`, `scan_repaired_bytes` and `scan_progress_percent` in `/api/v1/zfs/pools` were
+  never filled in. The `zpool status` scan line is now parsed for every OpenZFS format: completed,
+  canceled and in-progress scrubs and resilvers (including vdev-qualified sequential rebuilds
+  such as `resilver (draid1-0) in progress`), and paused scrubs. When zpool prints several scan
+  lines (a scrub plus a resilver, or one rebuild per vdev), an active scan wins over a paused one,
+  and that over a finished or canceled one; between finished scans the latest end time wins. The end time comes from the
+  timestamp (local time) and the start time from the end time minus the printed duration (or the
+  "since" / "scrub started on" time); progress and repaired bytes come from the indented lines of
+  an in-progress or paused scan. `scan_status` now uses the documented values (`scrub in progress`,
+  `resilver completed`, `scrub canceled`, `scrub paused`, ...): a completed resilver was reported as
+  in progress, and an in-progress scrub as `in progress`.
+  ([#185](https://github.com/tinkerologie/unraid-management-agent/issues/185)).
 - **`config.yml` overrode command-line flags and environment variables** — `applyFileConfig` set
   every field the YAML file contains after flags and env were parsed, so for example
   `read_only: false` in `config.yml` overrode `READ_ONLY=true`. Settings given on the command line or

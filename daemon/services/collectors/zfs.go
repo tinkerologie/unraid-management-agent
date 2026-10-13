@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"math"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -326,10 +328,32 @@ func parseZPoolStatusOutput(pool *dto.ZFSPool, output string) error {
 	inConfig := false
 	inErrors := false
 	var currentVdev *dto.ZFSVdev
+	inScan := false
+	// zpool prints a scan: line for the scrub and another for a resilver, or
+	// one per top-level vdev for sequential rebuilds. Each is parsed on its
+	// own and the most relevant one becomes the pool's scan status.
+	var scan *dto.ZFSPool
+	commitScan := func() {
+		if scan != nil {
+			mergeScan(pool, scan)
+			scan = nil
+		}
+	}
 
 	for scanner.Scan() {
 		line := scanner.Text()
 		trimmed := strings.TrimSpace(line)
+
+		// Indented progress lines follow an in-progress or paused scan line
+		// until the next "key:" section (config:, errors:, ...) or a blank line.
+		if inScan {
+			if trimmed == "" || zpoolStatusKeyRe.MatchString(line) {
+				inScan = false
+			} else {
+				parseScanDetail(scan, trimmed)
+				continue
+			}
+		}
 
 		// Parse state
 		if state, found := strings.CutPrefix(trimmed, "state:"); found {
@@ -338,7 +362,12 @@ func parseZPoolStatusOutput(pool *dto.ZFSPool, output string) error {
 
 		// Parse scan/scrub info
 		if strings.HasPrefix(trimmed, "scan:") {
-			parseScanInfo(pool, trimmed)
+			commitScan()
+			scan = &dto.ZFSPool{}
+			parseScanInfo(scan, trimmed)
+			inScan = scan.ScanState == "scanning" || scan.ScanState == "paused"
+		} else if !inScan {
+			commitScan()
 		}
 
 		// Parse errors line. When permanent errors exist, `zpool status -v`
@@ -410,6 +439,8 @@ func parseZPoolStatusOutput(pool *dto.ZFSPool, output string) error {
 		}
 	}
 
+	commitScan()
+
 	// Add last vdev if exists
 	if currentVdev != nil {
 		pool.VDEVs = append(pool.VDEVs, *currentVdev)
@@ -418,35 +449,174 @@ func parseZPoolStatusOutput(pool *dto.ZFSPool, output string) error {
 	return scanner.Err()
 }
 
-// parseScanInfo parses scrub/resilver information from status output line
+// zpoolStatusKeyRe matches a top-level `zpool status` key line such as
+// "config:" or "errors: No known data errors".
+var zpoolStatusKeyRe = regexp.MustCompile(`^\s*[a-z]+:(\s|$)`)
+
+// Scan line formats printed by OpenZFS print_scan_scrub_resilver_status().
+// Sequential rebuilds (OpenZFS 2.x) name the vdev: "resilver (draid1-0) ...".
+var (
+	scanCompletedRe  = regexp.MustCompile(`^(scrub repaired|resilvered)(?: \([^)]*\))? (\S+) in (.+?) with (\d+) errors on (.+)$`)
+	scanCanceledRe   = regexp.MustCompile(`^(scrub|resilver)(?: \([^)]*\))? canceled on (.+)$`)
+	scanInProgressRe = regexp.MustCompile(`^(scrub|resilver)(?: \([^)]*\))? in progress since (.+)$`)
+	scanPausedRe     = regexp.MustCompile(`^scrub paused since (.+)$`)
+	scanProgressRe   = regexp.MustCompile(`^(\S+) (?:repaired|resilvered), ([\d.]+)% done`)
+	scanStartedOnRe  = regexp.MustCompile(`^scrub started on (.+)$`)
+	scanDurationRe   = regexp.MustCompile(`^(?:(\d+) days? )?(\d+):(\d{2}):(\d{2})$`)
+)
+
+// parseScanInfo parses the "scan:" line of `zpool status` (#185):
+//
+//	scrub repaired 0B in 2 days 00:06:12 with 0 errors on Thu Sep 17 22:06:13 2026
+//	resilvered 1.21T in 10:11:12 with 0 errors on Thu Sep 17 22:06:13 2026
+//	scrub canceled on Thu Sep 17 22:06:13 2026
+//	scrub in progress since Thu Sep 17 22:06:13 2026
+//	scrub paused since Thu Sep 17 22:06:13 2026
+//
+// Progress, repaired bytes and a paused scrub's start time are on the
+// indented lines that follow; see parseScanDetail.
 func parseScanInfo(pool *dto.ZFSPool, line string) {
-	// Example: "scan: scrub repaired 0B in 00:00:01 with 0 errors on Sun Nov 10 02:39:43 2025"
-	// Example: "scan: scrub in progress since Sun Nov 10 02:39:43 2025"
-	line = strings.TrimPrefix(line, "scan:")
-	line = strings.TrimSpace(line)
+	line = strings.TrimSpace(strings.TrimPrefix(line, "scan:"))
 
-	if strings.Contains(line, "in progress") {
-		pool.ScanStatus = "in progress"
-		pool.ScanState = "scanning"
-	} else if strings.Contains(line, "scrub repaired") {
-		pool.ScanStatus = "scrub completed"
+	if m := scanCompletedRe.FindStringSubmatch(line); m != nil {
+		kind := "scrub"
+		if m[1] == "resilvered" {
+			kind = "resilver"
+		}
+		pool.ScanStatus = kind + " completed"
 		pool.ScanState = "finished"
-
-		// Try to parse "with X errors"
-		if strings.Contains(line, "with") && strings.Contains(line, "errors") {
-			parts := strings.Split(line, "with")
-			if len(parts) > 1 {
-				errorPart := strings.TrimSpace(parts[1])
-				errorFields := strings.Fields(errorPart)
-				if len(errorFields) > 0 {
-					pool.ScanErrors, _ = strconv.Atoi(errorFields[0])
-				}
+		pool.ScanProgressPct = 100
+		if n, ok := parseZFSSize(m[2]); ok {
+			pool.ScanRepairedBytes = n
+		}
+		pool.ScanErrors, _ = strconv.Atoi(m[4])
+		if end, ok := parseZFSTime(m[5]); ok {
+			pool.ScanEndTime = end
+			if d, ok := parseScanDuration(m[3]); ok {
+				pool.ScanStartTime = end.Add(-d)
 			}
 		}
-	} else if strings.Contains(line, "resilver") {
-		pool.ScanStatus = "resilver in progress"
-		pool.ScanState = "scanning"
+		return
 	}
+	if m := scanCanceledRe.FindStringSubmatch(line); m != nil {
+		pool.ScanStatus = m[1] + " canceled"
+		pool.ScanState = "canceled"
+		if end, ok := parseZFSTime(m[2]); ok {
+			pool.ScanEndTime = end
+		}
+		return
+	}
+	if m := scanInProgressRe.FindStringSubmatch(line); m != nil {
+		pool.ScanStatus = m[1] + " in progress"
+		pool.ScanState = "scanning"
+		if start, ok := parseZFSTime(m[2]); ok {
+			pool.ScanStartTime = start
+		}
+		return
+	}
+	if scanPausedRe.MatchString(line) {
+		// The scrub's start time is on the following "scrub started on" line.
+		pool.ScanStatus = "scrub paused"
+		pool.ScanState = "paused"
+	}
+}
+
+// scanRank orders scan states: an active scan outranks a paused one, which
+// outranks a finished or canceled one.
+func scanRank(state string) int {
+	switch state {
+	case "scanning":
+		return 3
+	case "paused":
+		return 2
+	case "finished", "canceled":
+		return 1
+	}
+	return 0
+}
+
+// mergeScan copies the scan fields of candidate into pool when candidate is
+// more relevant than what pool already holds: a higher-ranked state, or the
+// later end time between two finished/canceled scans. On a tie the first
+// scan printed is kept.
+func mergeScan(pool, candidate *dto.ZFSPool) {
+	have, got := scanRank(pool.ScanState), scanRank(candidate.ScanState)
+	if got == 0 || got < have {
+		return
+	}
+	if got == have && (got != 1 || !candidate.ScanEndTime.After(pool.ScanEndTime)) {
+		return
+	}
+	pool.ScanStatus = candidate.ScanStatus
+	pool.ScanState = candidate.ScanState
+	pool.ScanErrors = candidate.ScanErrors
+	pool.ScanRepairedBytes = candidate.ScanRepairedBytes
+	pool.ScanStartTime = candidate.ScanStartTime
+	pool.ScanEndTime = candidate.ScanEndTime
+	pool.ScanProgressPct = candidate.ScanProgressPct
+}
+
+// parseScanDetail parses an indented line that follows an in-progress or
+// paused scan line, e.g. "0B repaired, 45.67% done, 01:02:03 to go" or
+// "scrub started on Thu Sep 17 22:06:13 2026".
+func parseScanDetail(pool *dto.ZFSPool, line string) {
+	if m := scanProgressRe.FindStringSubmatch(line); m != nil {
+		if n, ok := parseZFSSize(m[1]); ok {
+			pool.ScanRepairedBytes = n
+		}
+		if pct, err := strconv.ParseFloat(m[2], 64); err == nil {
+			pool.ScanProgressPct = pct
+		}
+		return
+	}
+	if m := scanStartedOnRe.FindStringSubmatch(line); m != nil {
+		if start, ok := parseZFSTime(m[1]); ok {
+			pool.ScanStartTime = start
+		}
+	}
+}
+
+// parseZFSTime parses a ctime(3) timestamp as printed by zpool, such as
+// "Thu Sep 17 22:06:13 2026" or "Sun Nov  9 02:39:43 2025", in local time.
+func parseZFSTime(s string) (time.Time, bool) {
+	t, err := time.ParseInLocation("Mon Jan 2 15:04:05 2006", strings.Join(strings.Fields(s), " "), time.Local)
+	return t, err == nil
+}
+
+// parseScanDuration parses a zpool scan duration: "HH:MM:SS" or
+// "N days HH:MM:SS".
+func parseScanDuration(s string) (time.Duration, bool) {
+	m := scanDurationRe.FindStringSubmatch(strings.TrimSpace(s))
+	if m == nil {
+		return 0, false
+	}
+	days, _ := strconv.Atoi(m[1]) // "" (no days) parses as 0
+	h, _ := strconv.Atoi(m[2])
+	mins, _ := strconv.Atoi(m[3])
+	secs, _ := strconv.Atoi(m[4])
+	return time.Duration(days)*24*time.Hour + time.Duration(h)*time.Hour +
+		time.Duration(mins)*time.Minute + time.Duration(secs)*time.Second, true
+}
+
+// parseZFSSize parses a zfs_nicenum size such as "0B", "512B", "4K" or
+// "1.21T" (1024-based) into bytes.
+func parseZFSSize(s string) (uint64, bool) {
+	if s == "" {
+		return 0, false
+	}
+	units := "BKMGTPE"
+	unit := strings.IndexByte(units, s[len(s)-1])
+	num := s
+	if unit >= 0 {
+		num = s[:len(s)-1]
+	} else {
+		unit = 0
+	}
+	v, err := strconv.ParseFloat(num, 64)
+	if err != nil || v < 0 {
+		return 0, false
+	}
+	return uint64(math.Round(v * math.Pow(1024, float64(unit)))), true
 }
 
 // parseVdevLine parses a single vdev line from zpool status output

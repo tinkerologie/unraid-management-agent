@@ -184,8 +184,8 @@ errors: Permanent errors have been detected in the following files:
 				if pool.State != "DEGRADED" {
 					t.Errorf("State = %q, want DEGRADED", pool.State)
 				}
-				if pool.ScanStatus != "in progress" {
-					t.Errorf("ScanStatus = %q, want in progress", pool.ScanStatus)
+				if pool.ScanStatus != "scrub in progress" {
+					t.Errorf("ScanStatus = %q, want scrub in progress", pool.ScanStatus)
 				}
 				if pool.ScanState != "scanning" {
 					t.Errorf("ScanState = %q, want scanning", pool.ScanState)
@@ -225,8 +225,8 @@ config:
 errors: No known data errors
 `,
 			check: func(t *testing.T, pool *dto.ZFSPool) {
-				if pool.ScanStatus != "in progress" {
-					t.Errorf("ScanStatus = %q, want in progress", pool.ScanStatus)
+				if pool.ScanStatus != "resilver in progress" {
+					t.Errorf("ScanStatus = %q, want resilver in progress", pool.ScanStatus)
 				}
 				if pool.ScanState != "scanning" {
 					t.Errorf("ScanState = %q, want scanning", pool.ScanState)
@@ -359,7 +359,7 @@ func TestZFSScanStatusParsing(t *testing.T) {
 		{
 			name:           "scrub in progress",
 			line:           "scan: scrub in progress since Sun Nov 10 02:39:43 2025",
-			expectedStatus: "in progress",
+			expectedStatus: "scrub in progress",
 			expectedState:  "scanning",
 		},
 		{
@@ -371,14 +371,15 @@ func TestZFSScanStatusParsing(t *testing.T) {
 		{
 			name:           "resilver in progress",
 			line:           "scan: resilver in progress since Sun Nov 10 02:39:43 2025",
-			expectedStatus: "in progress", // "in progress" matches first
+			expectedStatus: "resilver in progress",
 			expectedState:  "scanning",
 		},
 		{
-			name:           "resilver alone",
+			// Not a format zpool prints: left unparsed rather than guessed.
+			name:           "unrecognised resilver line",
 			line:           "scan: resilver started since Sun Nov 10 02:39:43 2025",
-			expectedStatus: "resilver in progress",
-			expectedState:  "scanning",
+			expectedStatus: "",
+			expectedState:  "",
 		},
 	}
 

@@ -5322,7 +5322,7 @@ definitions:
         description: When scrub started
         type: string
       scan_state:
-        description: '"scanning", "finished", "canceled"'
+        description: '"scanning", "finished", "canceled", "paused"'
         example: finished
         type: string
       scan_status:

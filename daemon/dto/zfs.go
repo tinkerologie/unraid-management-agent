@@ -40,8 +40,8 @@ type ZFSPool struct {
 	Drives []ZFSDrive `json:"drives,omitempty"`
 
 	// Scrub Information
-	ScanStatus        string    `json:"scan_status,omitempty" example:"scrub completed"` // "scrub in progress", "scrub completed", "resilver in progress"
-	ScanState         string    `json:"scan_state,omitempty" example:"finished"`         // "scanning", "finished", "canceled"
+	ScanStatus        string    `json:"scan_status,omitempty" example:"scrub completed"` // "scrub|resilver in progress", "scrub|resilver completed", "scrub|resilver canceled", "scrub paused"
+	ScanState         string    `json:"scan_state,omitempty" example:"finished"`         // "scanning", "finished", "canceled", "paused"
 	ScanErrors        int       `json:"scan_errors" example:"0"`                         // Errors found during last scrub
 	ScanRepairedBytes uint64    `json:"scan_repaired_bytes" example:"0"`                 // Data repaired in last scrub
 	ScanStartTime     time.Time `json:"scan_start_time"`                                 // When scrub started
