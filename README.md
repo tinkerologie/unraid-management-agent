@@ -1,804 +1,242 @@
-[![GitHub Release](https://img.shields.io/github/v/release/tinkerologie/unraid-management-agent?label=latest%20release)](https://github.com/tinkerologie/unraid-management-agent/releases/latest)
-[![GitHub Last Commit](https://img.shields.io/github/last-commit/tinkerologie/unraid-management-agent)](https://github.com/tinkerologie/unraid-management-agent/commits/main)
-[![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/tinkerologie/unraid-management-agent)](https://github.com/tinkerologie/unraid-management-agent)
-[![GitHub issues](https://img.shields.io/github/issues/tinkerologie/unraid-management-agent)](https://github.com/tinkerologie/unraid-management-agent/issues)
-[![Codecov](https://codecov.io/gh/tinkerologie/unraid-management-agent/branch/main/graph/badge.svg)](https://codecov.io/gh/tinkerologie/unraid-management-agent)
-[![License](https://img.shields.io/github/license/tinkerologie/unraid-management-agent)](./LICENSE)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/tinkerologie/unraid-management-agent)
-
 # Unraid Management Agent
 
-A Go-based plugin for Unraid that exposes comprehensive system monitoring and control via REST API and WebSockets.
+[![CI](https://github.com/tinkerologie/unraid-management-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/tinkerologie/unraid-management-agent/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/tinkerologie/unraid-management-agent?label=release)](https://github.com/tinkerologie/unraid-management-agent/releases/latest)
+[![Codecov](https://codecov.io/gh/tinkerologie/unraid-management-agent/branch/main/graph/badge.svg)](https://codecov.io/gh/tinkerologie/unraid-management-agent)
+[![License: MIT](https://img.shields.io/github/license/tinkerologie/unraid-management-agent)](LICENSE)
 
-## ⚠️ Important: Third-Party Plugin Notice
+Monitor and control your Unraid server over a REST API, WebSocket events, Prometheus metrics, MQTT and
+the Model Context Protocol (MCP), from a single lightweight Go plugin.
 
-**This is a community-developed third-party plugin and is NOT an official Unraid product.**
+The agent reads system state directly from Unraid, `/proc`, `/sys`, the Docker Engine API and libvirt,
+caches it, and serves it to dashboards, Home Assistant, monitoring stacks and AI assistants. It can also
+act: start and stop containers, VMs, the array and parity checks, spin disks, and more.
 
-### Relationship to Official Unraid API
+> [!NOTE]
+> This is a community plugin, not an official Lime Technology product. Unraid 7.2 and later ship an
+> official GraphQL API; this agent is an independent REST, WebSocket, MQTT and MCP alternative. The two
+> run side by side without conflict.
 
-- **Official Unraid API**: Unraid OS 7.2+ includes an official **GraphQL-based API** as part of the core operating system. This is the official API provided and supported by Lime Technology (the creators of Unraid).
+## Contents
 
-- **This Plugin**: The Unraid Management Agent is a **separate, independent third-party plugin** that provides a **REST API and WebSocket interface** for system monitoring and control. It is developed and maintained by the community, not by Lime Technology.
-
-### Key Differences
-
-| Feature          | Official Unraid API        | This Plugin (Unraid Management Agent)         |
-| ---------------- | -------------------------- | --------------------------------------------- |
-| **Developer**    | Lime Technology (Official) | Community (Third-Party)                       |
-| **API Type**     | GraphQL                    | REST API + WebSocket                          |
-| **Availability** | Built into Unraid OS 7.2+  | Separate plugin installation required         |
-| **Support**      | Official Unraid support    | Community support                             |
-| **Purpose**      | Official system API        | Alternative/complementary monitoring solution |
-
-### When to Use This Plugin
-
-You might choose this plugin if you:
-
-- ✅ **Prefer REST API**: You want a traditional REST API instead of GraphQL
-- ✅ **Need WebSocket Support**: You require real-time event streaming via WebSockets
-- ✅ **Want Specific Features**: This plugin offers specific monitoring and control features tailored to community needs
-- ✅ **Compatibility**: You need an API solution that works alongside or independently of the official API
-
-### Coexistence with Official API
-
-This plugin **can coexist** with the official Unraid API. They operate independently and do not conflict with each other. You can use both simultaneously if your use case requires it.
-
-### Official Unraid API Documentation
-
-For information about the official Unraid GraphQL API, please refer to:
-
-- [Unraid Official Documentation](https://docs.unraid.net/)
-- Unraid OS 7.2+ release notes and API documentation
-
----
-
-## 📚 Documentation
-
-**[→ Complete Documentation](docs/README.md)** - Start here for guides, API reference, and integration examples
-
-### Quick Links
-
-- **Getting Started**
-
-  - [Installation Guide](docs/guides/installation.md) - Install the plugin
-  - [Quick Start](docs/guides/quick-start.md) - First API calls
-  - [Configuration](docs/guides/configuration.md) - Customize settings
-  - [System Requirements](docs/guides/system-requirements.md) - Requirements & dependencies
-
-- **API Reference**
-
-  - [REST API](docs/api/rest-api.md) - Complete HTTP API reference (57 endpoints)
-  - [WebSocket Events](docs/api/websocket-events.md) - Real-time events
-  - [Prometheus Metrics](docs/api/prometheus.md) - Metrics endpoint (41 metrics)
-
-- **Integrations**
-
-  - [MCP (AI Agents)](docs/integrations/mcp.md) - Model Context Protocol (126 tools)
-  - [MQTT](docs/integrations/mqtt.md) - MQTT publishing for IoT
-  - [Grafana Dashboards](docs/integrations/grafana.md) - Monitoring dashboards
-  - [Home Assistant](docs/integrations/home-assistant.md) - Smart home integration
-
-- **Development**
-
-  - [Contributing](docs/development/contributing.md) - Contribution guidelines
-  - [Code Quality](docs/development/code-quality.md) - Linting & pre-commit hooks
-  - [Testing](docs/development/testing.md) - Test suite documentation
-  - [Architecture](docs/development/architecture.md) - Technical architecture
-
-- **Troubleshooting**
-  - [Common Issues](docs/troubleshooting/common-issues.md) - Solutions to common problems
-  - [Diagnostics](docs/troubleshooting/diagnostics.md) - Diagnostic commands
-  - [Hardware Compatibility](docs/troubleshooting/hardware-compatibility.md) - Hardware-specific fixes
-
----
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Quick start](#quick-start)
+- [Security and privacy](#security-and-privacy)
+- [Configuration](#configuration)
+- [Integrations](#integrations)
+- [Documentation](#documentation)
+- [Troubleshooting and support](#troubleshooting-and-support)
+- [Development](#development)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Features
 
-### Real-time Monitoring
+**Monitoring**
 
-- **System Information**: CPU usage, RAM, temperatures, uptime, hostname
-- **Array Status**: Array state, parity status, disk counts
-- **Disk Information**: Per-disk metrics, SMART data, temperatures, space usage
-- **Network Interfaces**: Interface status, bandwidth, IP addresses, MAC addresses
-- **Docker Containers**: Container list, status, resource usage (via Docker SDK)
-- **Virtual Machines**: VM list, state, resource allocation (via libvirt API)
-- **UPS Status**: Battery level, runtime, power state
-- **GPU Metrics**: GPU utilization, memory, temperature
-- **User Shares**: Share list, space usage, paths
-- **ZFS Pools/Datasets**: ZFS pool health, datasets, snapshots, ARC stats
-- **Notifications**: System alerts, warnings, and info messages
+- System: CPU, memory, temperatures, fans (with their labels), uptime and hardware (DMI) details
+- Array and parity: array state, capacity, parity status, schedules and check history
+- Disks: per-disk usage, temperatures, SMART health and spin state, without waking spun-down disks
+- Docker containers and VMs: state, resource use and image update checks (Docker Engine SDK and libvirt)
+- Shares, unassigned devices, network interfaces, notifications, mover, plugins and OS updates
+- ZFS: pools, datasets, snapshots, ARC, scrub progress and the SMART health of pool member drives
+- UPS (apcupsd or NUT): charge, load, runtime, power, input/output/battery voltage, line frequency,
+  transfers and self-test result
+- GPUs (Intel, AMD, NVIDIA), network cards with SFP/QSFP optic diagnostics, and SAS storage topology
+  (controllers, enclosures, drive paths)
 
-### Control Operations
+**Hardware auto-detection**: hardware-dependent collectors (network cards and optics, SAS storage
+topology, GPU, UPS, NUT and ZFS) run only when the hardware is present, and the settings page hides
+what your server does not have. See [Hardware Auto-Detection](docs/guides/configuration.md#hardware-auto-detection).
 
-- **Docker**: Start, stop, restart, pause, unpause containers
-- **Virtual Machines**: Start, stop, restart, pause, resume, hibernate, force-stop VMs
-- **Array**: Start, stop array operations
-- **Parity**: Start, stop, pause, resume parity checks
-- **Disk**: Spin up, spin down individual disks
-- **User Scripts**: Execute User Scripts plugin scripts
+**Control**
 
-### Communication Protocols
+- Docker containers: start, stop, restart, pause, unpause and update
+- VMs: start, stop, restart, pause, resume, hibernate, force stop, snapshots and clones
+- Array and parity checks, disk spin up and down, User Scripts, notifications, fan control and CPU tuning
+- Server reboot and shutdown
 
-- **REST API**: HTTP endpoints for synchronous queries
-- **WebSocket**: Real-time event streaming for live updates
-- **Prometheus**: Native `/metrics` endpoint for Grafana/monitoring integration (41 metrics)
-- **MQTT**: Event publishing to MQTT brokers for IoT integration and Home Assistant
-- **MCP (Model Context Protocol)**: AI agent integration for LLM-powered monitoring and control (126 tools)
+**Operations**
 
-## Security and Privacy
+- Alert rules and scheduled health checks with notifications
+- One-click self-test and a redacted diagnostics bundle for bug reports
+- mDNS (zeroconf) advertising, so clients such as Home Assistant find the agent on your network
+- An optional, opt-in embedded AI operator ([Agent Core](docs/integrations/agent.md), beta)
 
-- **Authentication default**: the API listens on all network interfaces on port 8043 over plain HTTP. Without an
-  API token, anyone on your network can read monitoring data, and every control action (REST and MCP) is refused.
-  Installs upgraded from an earlier version without a token keep control actions working through
-  `ALLOW_UNAUTHENTICATED_WRITES` until you set a token (once a token is set, every request must send it). See
-  [Authentication](#authentication) and [Configuration → Authentication](docs/guides/configuration.md#authentication).
-- **Control scope**: with access, the REST API and MCP can reboot or shut down the server, start, stop, update and
-  remove Docker containers, control VMs (including snapshots and clones), start and stop the array, control parity
-  checks, spin disks up and down, and run User Scripts as `/bin/bash` without a sandbox. REST reboot, shutdown and
-  User Scripts need no confirmation. MCP read-only mode and tool policies apply to MCP only; they do not restrict the
-  REST API. See [Core Settings](docs/guides/configuration.md#core-settings) and
-  [Network Security](docs/guides/configuration.md#network-security).
-- **External WAN IP lookups**: when you request network access URLs (`GET /api/v1/network/access-urls` or the MCP
-  tool `get_network_access_urls`), the agent asks `api.ipify.org`, `ifconfig.me` and `icanhazip.com`, in that order,
-  for your WAN IP, and stops at the first answer. Those services see your server's public IP address. Nothing runs
-  at startup or on a schedule, and the result is not cached. If all three fail, the `WANIP=` value in Unraid's
-  `network.cfg` is used. Turn **WAN IP Lookup** off (`WAN_IP_LOOKUP=false`) to make no external requests; the WAN
-  entry then uses only `WANIP=`. See [WAN IP lookup](docs/guides/configuration.md#wan-ip-lookup).
+## Requirements
 
-## Architecture
+- Unraid OS 7.2 or later (amd64)
+- TCP port 8043 free on the server (configurable)
+- No other plugins. Optional features use what is already installed: apcupsd or the NUT plugin for UPS
+  data, `storcli` or `sg_ses` for SAS topology, and the GPU drivers for GPU metrics.
 
-### Event-Driven Design
+See [System Requirements](docs/guides/system-requirements.md) for details.
 
-The agent uses a pubsub event bus for decoupled, real-time data flow:
+## Installation
 
-```
-Collectors → Event Bus → API Server Cache → REST Endpoints
-                        ↓                  ↓
-                 WebSocket Hub      MCP Server → AI Agents
-                        ↓
-                 Connected Clients
+**Community Applications (recommended):** in the Unraid web UI, open **Apps**, search for
+**Unraid Management Agent** and click **Install**.
+
+**Plugin URL:** open **Plugins → Install Plugin** and paste:
+
+```text
+https://raw.githubusercontent.com/tinkerologie/unraid-management-agent/main/unraid-management-agent.plg
 ```
 
-### Native API Integration
+The service starts on port 8043. Open **Settings → Unraid Management Agent** to configure it. See the
+[Installation Guide](docs/guides/installation.md) for upgrades and removal.
 
-For optimal performance, collectors use native Go libraries instead of shell commands:
+## Quick start
 
-| Component  | Library                              | Description                          |
-| ---------- | ------------------------------------ | ------------------------------------ |
-| **Docker** | `github.com/moby/moby/client`        | Docker Engine SDK for container data |
-| **VMs**    | `github.com/digitalocean/go-libvirt` | Native libvirt bindings for VM data  |
-| **System** | Direct `/proc`, `/sys` access        | Kernel interfaces for metrics        |
+Replace `tower.local` with your server's address.
 
-### Components
+1. Check that the agent is up (this endpoint never needs a token):
 
-#### Collectors
-
-Data collectors run at configurable intervals (defaults shown):
-
-- **System Collector** (15s): CPU, RAM, temps, uptime
-- **Array Collector** (30s): Array state and parity info
-- **Disk Collector** (30s): Per-disk metrics
-- **Network Collector** (30s): Interface status and statistics
-- **Docker Collector** (30s): Container information
-- **VM Collector** (30s): Virtual machine data
-- **UPS Collector** (60s): UPS status
-- **GPU Collector** (60s): GPU metrics
-- **Share Collector** (60s): User share information
-- **Hardware Collector** (5m): Hardware info (rarely changes)
-- **Registration Collector** (5m): License info (rarely changes)
-
-#### API Server
-
-- Maintains in-memory cache of latest collector data
-- Serves REST endpoints for instant responses
-- Broadcasts events to WebSocket clients
-- Implements CORS, logging, and recovery middleware
-
-#### Orchestrator
-
-Coordinates the entire application lifecycle:
-
-- Initializes all collectors
-- Starts API server subscriptions before collectors
-- Manages graceful shutdown
-
-## System Requirements and Dependencies
-
-**Important:** The Unraid Management Agent has **NO external plugin dependencies**. It collects data directly from system sources.
-
-For detailed information, see:
-
-- **[System Requirements & Dependencies](docs/guides/system-requirements.md)** - Complete requirements and data collection methods
-- **[Quick Start Guide](docs/guides/quick-start.md)** - Get started quickly
-- **[Diagnostic Commands](docs/troubleshooting/diagnostics.md)** - Troubleshooting guide
-
-### Quick Prerequisites
-
-- Unraid 6.9+ (tested on Unraid 7.x)
-- Port 8043 available (configurable)
-- No other plugins required
-
-### Via Community Applications (Recommended)
-
-**Coming Soon**: This plugin will be available in the Unraid Community Applications store.
-
-For now, you can install manually using the plugin URL:
-
-1. Open your Unraid Web UI
-2. Navigate to **Plugins** → **Install Plugin**
-3. Enter the plugin URL:
-
-   ```
-   https://raw.githubusercontent.com/tinkerologie/unraid-management-agent/main/unraid-management-agent.plg
+   ```bash
+   curl http://tower.local:8043/api/v1/health
    ```
 
-4. Click **Install**
-5. The plugin will automatically:
-   - Download and extract the package
-   - Create default configuration
-   - Start the service on port 8043
-
-### Building from Source
-
-```bash
-# Clone the repository
-git clone https://github.com/tinkerologie/unraid-management-agent.git
-cd unraid-management-agent
-
-# Install dependencies
-make deps
-
-# Build for Unraid (Linux/amd64)
-make release
-
-# Create plugin package
-make package
-```
-
-## System Compatibility
-
-**Important Notice:** This plugin was developed and tested on a specific Unraid system configuration. While we strive for broad compatibility, **there is a possibility that the plugin may not function correctly on all hardware configurations** due to variations in:
-
-- **CPU Architectures**: Different CPU models, instruction sets, and architectures (Intel vs AMD, different generations)
-- **Disk Controllers and Storage Devices**: Various RAID controllers, HBA cards, SAS/SATA controllers, NVMe configurations
-- **GPU Models and Drivers**: Different GPU vendors (NVIDIA, AMD, Intel), driver versions, and passthrough configurations
-- **Network Interfaces**: Various network cards, bonding configurations, VLANs, and bridge setups
-- **UPS Models and Monitoring Tools**: Different UPS brands, monitoring software (apcupsd, nut), and communication protocols
-- **Docker and VM Configurations**: Different Docker API versions, libvirt socket configurations, and virtualization setups
-
-### What This Means for You
-
-- ✅ **If it works on your system**: Great! The plugin should continue to work reliably.
-- ⚠️ **If you encounter issues**: This is likely due to hardware/configuration differences. See the [Contributing](#contributing) section below for how you can help improve compatibility.
-- 🔧 **Debugging across different hardware**: As a single maintainer, it's challenging to test and debug across all possible hardware configurations. Community contributions are essential for broader compatibility.
-
-### Tested Configuration
-
-This plugin has been developed and tested on the following configuration:
-
-- **Unraid Version**: 7.x
-- **Plugin Version**: 2025.11.0
-- **Architecture**: Linux/amd64
-- **Primary Testing**: REST API endpoints, WebSocket events, Docker/VM control operations
-
-**Note:** This configuration represents the primary development and testing environment. Your mileage may vary on different hardware setups.
-
-## Usage
-
-### Starting the Agent
-
-```bash
-# Standard mode
-./unraid-management-agent boot
-
-# Debug mode (stdout logging)
-./unraid-management-agent boot --debug
-
-# Custom port
-./unraid-management-agent boot --port 8043
-```
-
-### REST API Endpoints
-
-Base URL: `http://localhost:8043/api/v1`
-
-#### Monitoring Endpoints
-
-- `GET /health` - Health check
-- `GET /system` - System information
-- `GET /array` - Array status
-- `GET /disks` - List all disks
-- `GET /disks/{id}` - Get specific disk info
-- `GET /network` - Network interface list
-- `GET /shares` - List user shares
-- `GET /docker` - List Docker containers
-- `GET /docker/{id}` - Get container details
-- `GET /vm` - List virtual machines
-- `GET /vm/{id}` - Get VM details
-- `GET /ups` - UPS status
-- `GET /gpu` - GPU metrics
-- `GET /storage/topology` - SAS storage topology: controllers, HBA ports, enclosures (PSUs, fans, sensors, I/O modules, cabling) and drive paths/link speeds (storcli and/or sg_ses)
-- `GET /logs` - List log files or get log content
-- `GET /logs/{filename}` - Get specific log file by name
-
-#### Settings & Configuration Endpoints
-
-- `GET /settings/disk-thresholds` - Global disk temperature warning/critical thresholds
-- `GET /settings/mover` - Mover schedule, thresholds, and running status
-- `GET /settings/services` - Docker and VM Manager enabled/disabled status
-- `GET /settings/network-services` - Network services status (SMB, NFS, FTP, SSH, VPN, etc.)
-- `GET /array/parity-check/schedule` - Parity check schedule configuration
-- `GET /plugins` - List installed plugins with versions and update status
-- `GET /updates` - OS and plugin update availability
-- `GET /system/flash` - USB flash boot drive health statistics
-
-#### Control Endpoints
-
-- `POST /docker/{id}/start` - Start container
-- `POST /docker/{id}/stop` - Stop container
-- `POST /docker/{id}/restart` - Restart container
-- `POST /docker/{id}/pause` - Pause container
-- `POST /docker/{id}/unpause` - Unpause container
-- `POST /vm/{id}/start` - Start VM
-- `POST /vm/{id}/stop` - Stop VM
-- `POST /vm/{id}/restart` - Restart VM
-- `POST /vm/{id}/pause` - Pause VM
-- `POST /vm/{id}/resume` - Resume VM
-- `POST /vm/{id}/hibernate` - Hibernate VM
-- `POST /vm/{id}/force-stop` - Force stop VM
-
-### WebSocket Connection
-
-Connect to `ws://localhost:8043/api/v1/ws` to receive real-time events:
-
-```javascript
-const ws = new WebSocket("ws://localhost:8043/api/v1/ws");
-
-ws.onmessage = (event) => {
-  const data = JSON.parse(event.data);
-  console.log("Event received:", data);
-};
-```
-
-### Prometheus Metrics
-
-The agent exposes **41 metrics** in Prometheus format at `/metrics`:
-
-```bash
-# Scrape metrics
-curl http://localhost:8043/metrics
-```
-
-Available metrics include:
-
-- **Array**: state, capacity, usage, parity status
-- **CPU**: usage, temperature
-- **Memory**: total, used, usage percentage
-- **Disks**: size, free space, temperature, SMART status, standby state
-- **Docker**: container counts, states
-- **VMs**: VM counts, states
-- **GPU**: utilization, temperature, memory, power
-- **UPS**: battery charge, load, runtime, status
-- **Shares**: share counts, usage
-- **Services**: service states
-- **Parity**: parity validity, check progress
-- **System**: uptime, info labels
-
-For Grafana integration, see [docs/integrations/grafana.md](docs/integrations/grafana.md).
-
-### MQTT Publishing
-
-Publish system events to MQTT brokers for IoT integration and Home Assistant:
-
-```bash
-# Enable MQTT publishing
-./unraid-management-agent boot \
-  --mqtt-enabled \
-  --mqtt-broker "192.168.1.100" \
-  --mqtt-port 1883 \
-  --mqtt-topic-prefix "unraid/tower"
-
-# With authentication
-./unraid-management-agent boot \
-  --mqtt-enabled \
-  --mqtt-broker "mqtt.example.com" \
-  --mqtt-port 1883 \
-  --mqtt-username "unraid" \
-  --mqtt-password "secret" \
-  --mqtt-use-tls \
-  --mqtt-topic-prefix "homelab/unraid"
-
-# Home Assistant auto-discovery
-./unraid-management-agent boot \
-  --mqtt-enabled \
-  --mqtt-broker "192.168.1.100" \
-  --mqtt-home-assistant
-```
-
-**Published Events:**
-
-- System metrics (CPU, RAM, temperatures)
-- Array status and capacity
-- Disk information and health
-- Container and VM states
-- Share usage
-- UPS status
-- GPU metrics
-- Network statistics
-- Notifications
-
-**Configuration via REST API:**
-
-```bash
-# Check MQTT status
-curl http://localhost:8043/api/v1/mqtt/status
-
-# Test MQTT connection
-curl -X POST http://localhost:8043/api/v1/mqtt/test
-
-# Publish custom message
-curl -X POST http://localhost:8043/api/v1/mqtt/publish \
-  -H "Content-Type: application/json" \
-  -d '{"topic":"custom/topic","payload":{"message":"hello"},"retained":false}'
-```
-
-### MCP (Model Context Protocol)
-
-The agent includes an MCP endpoint for AI agent integration at `POST /mcp`:
-
-```bash
-# List available MCP tools
-curl -X POST http://localhost:8043/mcp \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'
-
-# Get system info via MCP
-curl -X POST http://localhost:8043/mcp \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_system_info","arguments":{}},"id":1}'
-```
-
-For full MCP documentation including all 126 tools, 5 resources, and 6 prompts, see [docs/integrations/mcp.md](docs/integrations/mcp.md).
-
-### Example API Usage
-
-```bash
-# Get system information
-curl http://localhost:8043/api/v1/system
-
-# Get network interfaces
-curl http://localhost:8043/api/v1/network
-
-# List all disks
-curl http://localhost:8043/api/v1/disks
-
-# Start a Docker container
-curl -X POST http://localhost:8043/api/v1/docker/nginx/start
-
-# Stop a VM
-curl -X POST http://localhost:8043/api/v1/vm/Ubuntu/stop
-```
-
-## Development
-
-### Project Structure
-
-```
-daemon/
-├── cmd/              # CLI commands
-├── common/           # Constants (intervals, paths)
-├── domain/           # Core types (Context, Config)
-├── dto/              # Data transfer objects
-├── lib/              # Utilities (shell execution)
-├── logger/           # Logging wrapper
-└── services/
-    ├── api/          # HTTP server, handlers, WebSocket
-    ├── collectors/   # Data collection subsystems
-    └── controllers/  # Control operations
-
-meta/                 # Unraid plugin metadata
-scripts/              # Developer setup helpers
-tests/                # Unit and integration tests
-```
-
-### Building and Testing
-
-```bash
-# Install dependencies
-make deps
-
-# Build for local development
-make local
-
-# Run tests
-make test
-
-# Generate coverage report
-make test-coverage
-
-# Run specific test
-go test -v ./daemon/services/api/handlers_test.go
-
-# Clean build artifacts
-make clean
-```
-
-### Dev Container (VS Code / GitHub Codespaces)
-
-- Prereqs: Docker (or compatible), VS Code with Dev Containers extension — or just open in GitHub Codespaces.
-- Open the repo in VS Code and run `Dev Containers: Reopen in Container`.
-- Uses [Dev Container Features](https://containers.dev/features) for Go 1.26, Node.js 22, Python 3.12, and GitHub CLI.
-- Ansible + ansible-lint included for deployment automation (`ansible/` directory).
-- Go tools auto-installed: golangci-lint, gosec, govulncheck, swag, goimports.
-- VS Code extensions auto-installed: Go, Python, Ansible, Makefile Tools, Prettier, GitHub Copilot.
-- Lifecycle: `onCreateCommand` installs tools, `updateContentCommand` refreshes deps, `postCreateCommand` sets up pre-commit hooks.
-- Run `make test` to verify after attach.
+2. Generate an **API token** on the settings page and click **Apply**. Read it into a variable with a
+   silent prompt (paste it, then press Enter), so it stays out of your shell history:
+
+   ```bash
+   read -rs UMA_TOKEN && export UMA_TOKEN
+   ```
+
+3. Read data and run an action:
+
+   ```bash
+   curl -H "Authorization: Bearer $UMA_TOKEN" http://tower.local:8043/api/v1/system
+   curl -H "Authorization: Bearer $UMA_TOKEN" http://tower.local:8043/api/v1/docker
+   curl -X POST -H "Authorization: Bearer $UMA_TOKEN" http://tower.local:8043/api/v1/docker/nginx/restart
+   ```
+
+4. Explore every endpoint in the interactive API docs at `http://tower.local:8043/swagger/`.
+
+| Interface        | Address                            |
+| ---------------- | ---------------------------------- |
+| REST API         | `http://tower.local:8043/api/v1`   |
+| WebSocket events | `ws://tower.local:8043/api/v1/ws`  |
+| Prometheus       | `http://tower.local:8043/metrics`  |
+| MCP              | `http://tower.local:8043/mcp`      |
+| Swagger UI       | `http://tower.local:8043/swagger/` |
+
+More examples: [Quick Start Guide](docs/guides/quick-start.md).
+
+## Security and privacy
+
+> [!WARNING]
+> The API listens on all interfaces on port 8043 over plain HTTP. Set an API token, and enable HTTPS
+> before the token crosses a network you do not trust: over plain HTTP anyone on the path can read it.
+> Never forward the port to the internet.
+
+- **Authentication.** Without a token, anyone on your network can read monitoring data, and on a
+  fresh install every control action (REST and MCP) is refused. With a token, every request must send
+  `Authorization: Bearer <token>`, except `/api/v1/health`, the Swagger UI and the optional MCP
+  connect URL (`/mcp/<secret>`), where the secret in the URL is the credential. Treat that URL like a
+  password. Installs upgraded from a version without a token keep control actions working
+  (`ALLOW_UNAUTHENTICATED_WRITES`) until you set one.
+- **What access allows.** The REST API and MCP can reboot or shut down the server, control containers,
+  VMs and the array, spin disks and run User Scripts as `/bin/bash`. MCP read-only mode and per-tool
+  policies restrict MCP clients only, not the REST API.
+- **Encryption.** Serve HTTPS by setting a certificate and key (`TLS_CERT_FILE`, `TLS_KEY_FILE`).
+- **WAN IP lookup.** Only when you request network access URLs, the agent asks `api.ipify.org`,
+  `ifconfig.me` and `icanhazip.com` for your public IP. Turn **WAN IP Lookup** off to make no external
+  requests.
+
+Details: [Configuration → Security](docs/guides/configuration.md#security) and [SECURITY.md](SECURITY.md).
 
 ## Configuration
 
-### Settings Page
+Most settings live on the plugin settings page (**Settings → Unraid Management Agent**) and are saved
+to `/boot/config/plugins/unraid-management-agent/config.cfg`. Clicking **Apply** restarts the service.
 
-Configure the plugin through the Unraid web UI:
+| Setting                  | Purpose                                                             |
+| ------------------------ | ------------------------------------------------------------------- |
+| Port and bind address    | Where the API listens (default `8043` on all interfaces)            |
+| API token                | Requires a bearer token and enables control actions                 |
+| Read-only mode           | Blocks every state-changing MCP tool                                |
+| MCP tool policies        | Hide, allow or restrict individual MCP tools                        |
+| MQTT                     | Broker connection and Home Assistant MQTT discovery                 |
+| Collection intervals     | How often each collector runs; **Auto** for hardware-dependent ones |
+| Show all collectors      | Reveals settings rows for hardware the agent did not detect         |
+| WAN IP lookup, log level | Privacy and logging                                                 |
 
-1. Navigate to **Settings** → **Unraid Management Agent**
-2. Adjust settings as needed:
+Longer intervals use less power. Every option, the `config.yml` file and command-line flags are covered
+in the [Configuration Guide](docs/guides/configuration.md).
 
-   - **Port**: API server port (default: 8043)
-   - **Collection Intervals**: How often each data type is collected
+## Integrations
 
-3. Click **Apply** to save changes (service restarts automatically)
+| Integration                          | How                                                                                                                                                                                 |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Home Assistant                       | The [Home Assistant integration](https://github.com/tinkerologie/ha-unraid-management-agent) (HACS, with dashboard cards), or [MQTT discovery](docs/integrations/home-assistant.md) |
+| Prometheus and Grafana               | Scrape `/metrics`; see [Prometheus metrics](docs/api/prometheus.md) and [Grafana](docs/integrations/grafana.md)                                                                     |
+| Claude, Cursor and other MCP clients | Connect to `/mcp`; see [MCP](docs/integrations/mcp.md) and the [Agent Skill](docs/integrations/claude/README.md)                                                                    |
+| ChatGPT                              | [Custom GPT Actions](docs/integrations/chatgpt/README.md) over the REST API                                                                                                         |
+| MQTT                                 | Publish state to any broker; see [MQTT](docs/integrations/mqtt.md)                                                                                                                  |
 
-### Collection Intervals
+## Documentation
 
-The settings page provides dropdown menus to configure how often data is collected. Default values are optimized for low power consumption:
+| Topic                                               | What it covers                                       |
+| --------------------------------------------------- | ---------------------------------------------------- |
+| [Documentation index](docs/README.md)               | Every guide and reference                            |
+| [Configuration Guide](docs/guides/configuration.md) | Settings, intervals, hardware detection, security    |
+| [REST API](docs/api/rest-api.md)                    | Endpoints, parameters and response examples          |
+| [WebSocket events](docs/api/websocket-events.md)    | Real-time event types and payloads                   |
+| [Diagnostics API](docs/api/diagnostics.md)          | Self-test, detected capabilities, diagnostics bundle |
+| [Integrations](docs/integrations/README.md)         | MCP, Claude, ChatGPT, Home Assistant, MQTT, Grafana  |
+| [CHANGELOG](CHANGELOG.md)                           | What changed in each release                         |
 
-| Category     | Collectors                                           | Default    |
-| ------------ | ---------------------------------------------------- | ---------- |
-| **Fast**     | System Metrics                                       | 15 seconds |
-| **Standard** | Array, Disk, Docker, VM, Network, ZFS, Notifications | 30 seconds |
-| **Moderate** | UPS, GPU, Shares, Unassigned Devices                 | 1 minute   |
-| **Slow**     | Hardware Info, License Info                          | 5 minutes  |
+## Troubleshooting and support
 
-**⚡ Power Note:** Lower intervals provide faster updates but increase CPU usage and power consumption. On Intel systems with many Docker containers, aggressive intervals (5-10s) can increase idle power by 15-20W.
+- Logs: `/var/log/unraid-management-agent.log`. Turn on **Debug Logging** in the settings for more
+  detail.
+- **Run Self-Test** on the settings page checks every data source; **Download Diagnostics** creates a
+  redacted bundle to attach to a bug report.
+- See [Diagnostic Commands](docs/troubleshooting/diagnostics.md) for command-line checks.
+- Ask on the [Unraid forum support thread](https://forums.unraid.net/topic/196675-plugin-unraid-management-agent)
+  or [open an issue](https://github.com/tinkerologie/unraid-management-agent/issues/new/choose).
 
-### Advanced: Manual Configuration
+## Development
 
-For automation or headless setups, you can edit the config file directly:
-
-```
-/boot/config/plugins/unraid-management-agent/config.cfg
-```
-
-Changes require a service restart:
+Requires Go (the version in [`go.mod`](go.mod)) and `make`.
 
 ```bash
-/usr/local/emhttp/plugins/unraid-management-agent/scripts/stop
-/usr/local/emhttp/plugins/unraid-management-agent/scripts/start
+git clone https://github.com/tinkerologie/unraid-management-agent.git
+cd unraid-management-agent
+make deps            # install dependencies and tools
+make local           # build for this machine
+make test            # run the tests with the race detector
+make pre-commit-run  # lint, format and security checks
+make package         # build the Unraid plugin bundle
 ```
 
-### Authentication
+<details>
+<summary>Deploy to an Unraid server for testing</summary>
 
-Without an API token, network clients can read data, but control actions are
-refused (see [Security and Privacy](#security-and-privacy)). Set an API token to
-require `Authorization: Bearer <token>` and enable control actions:
+The [Ansible playbook](ansible/README.md) builds the plugin, deploys it to a server and verifies the
+endpoints:
 
 ```bash
-# In /boot/config/plugins/unraid-management-agent/config.cfg
-API_TOKEN="your-generated-token"
+cp ansible/inventory.yml.example ansible/inventory.yml   # set the server address and credentials
+ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --tags build,deploy,verify
 ```
 
-Keep the token out of your shell history and the process list by reading it from
-the environment rather than typing it into commands:
+</details>
 
-```bash
-export API_TOKEN='your-generated-token'
-curl -H "Authorization: Bearer $API_TOKEN" \
-  http://your-unraid-ip:8043/api/v1/system
-```
-
-This protects every REST endpoint, `/mcp`, and `/metrics`. Two paths stay open:
-`/api/v1/health`, so uptime monitoring works without a credential, and
-`/swagger/`, because the docs UI cannot send an `Authorization` header when
-fetching its own schema. Leaving the token empty preserves the previous
-unauthenticated behaviour, so upgrades are non-breaking.
-
-See [Configuration → Authentication](docs/guides/configuration.md#authentication)
-for token generation and TLS guidance.
-
-### Logging
-
-The agent uses log rotation with the following settings:
-
-- **Location**: `/var/log/unraid-management-agent.log`
-- **Max Size**: 5 MB per file
-- **Backups**: 1 backup file (older backups are automatically deleted)
-- **Age-based Retention**: 1 day (backup files older than 1 day are deleted)
-- **Log Levels**: DEBUG, INFO, WARNING, ERROR (configurable via `--log-level` CLI flag)
-- **Default Level**: INFO
-- **Auto Cleanup**: On startup, old rotated log files from previous versions are automatically removed
-
-In debug mode (`--debug` or `--log-level debug`), logs are written to stdout for immediate visibility.
-
-## Troubleshooting
-
-### No Data Returned
-
-If endpoints return empty or default data:
-
-1. Check that the agent is running: `ps aux | grep unraid-management-agent`
-2. Review logs: `tail -f /var/log/unraid-management-agent.log`
-3. Verify collection intervals haven't expired
-4. Ensure proper permissions for system file access
-
-### Collectors Not Running
-
-1. Enable debug mode: `./unraid-management-agent boot --debug`
-2. Check for panic recovery messages in logs
-3. Verify event bus subscriptions are initialized before collectors start
-
-### WebSocket Connection Issues
-
-1. Verify WebSocket hub is running: check logs for "API server subscriptions started"
-2. Test REST endpoints first to isolate API vs WebSocket issues
-3. Check browser console for connection errors
-
-## API Response Examples
-
-### System Information
-
-```json
-{
-  "hostname": "Tower",
-  "version": "2025.10.03",
-  "cpu_usage": 12.5,
-  "ram_usage": 45.2,
-  "temperature": 42.0,
-  "uptime": 86400,
-  "timestamp": "2025-10-02T08:00:00Z"
-}
-```
-
-### Network Interfaces
-
-```json
-[
-  {
-    "name": "eth0",
-    "mac_address": "00:11:22:33:44:55",
-    "ip_address": "192.168.1.100",
-    "speed_mbps": 1000,
-    "state": "up",
-    "bytes_received": 1234567890,
-    "bytes_sent": 987654321,
-    "packets_received": 5000000,
-    "packets_sent": 4500000,
-    "errors_received": 0,
-    "errors_sent": 0,
-    "timestamp": "2025-10-02T08:00:00Z"
-  }
-]
-```
-
-### Array Status
-
-```json
-{
-  "state": "STARTED",
-  "num_disks": 8,
-  "num_data_disks": 6,
-  "num_parity_disks": 2,
-  "sync_percent": 100.0,
-  "parity_valid": true,
-  "timestamp": "2025-10-02T08:00:00Z"
-}
-```
+Architecture, conventions and the AI-assistant workflow are described in [AGENTS.md](AGENTS.md).
 
 ## Contributing
 
-Contributions are welcome and greatly appreciated! This project benefits from community involvement, especially for improving hardware compatibility across different Unraid configurations.
+Contributions are welcome, especially fixes for hardware the maintainer cannot test: disk controllers,
+GPUs, UPS models and network cards. Every change starts with an issue, and pull requests follow the
+template and pass the quality checks. Read [CONTRIBUTING.md](CONTRIBUTING.md) before you start.
 
-### Code Quality Standards
-
-This project enforces **zero tolerance** for code quality issues:
-
-- ✅ No linting warnings or errors
-- ✅ No security vulnerabilities (medium+ severity)
-- ✅ All tests must pass with race detection
-- ✅ Code must be properly formatted (gofmt/goimports)
-
-We use **pre-commit hooks** to automatically enforce these standards.
-
-#### Quick Setup
-
-```bash
-# Automated setup (recommended)
-./scripts/setup-pre-commit.sh
-
-# Or manual setup
-pip install pre-commit
-make pre-commit-install
-```
-
-Pre-commit will automatically run checks before each commit. See [docs/development/code-quality.md](docs/development/code-quality.md) for detailed documentation.
-
-#### Available Commands
-
-```bash
-make pre-commit-run   # Run all pre-commit checks
-make lint             # Run golangci-lint only
-make security-check   # Run security scans
-make test-coverage    # Run tests with coverage
-```
-
-### How to Contribute
-
-#### General Contributions
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/your-feature-name`)
-3. Commit your changes with descriptive messages
-4. Add tests for new functionality
-5. Ensure all checks pass: `make pre-commit-run && make test-coverage`
-6. Submit a pull request with a clear description of your changes
-
-**Important**: Pre-commit hooks will block commits that don't meet quality standards. Fix all issues before committing.
-
-#### Hardware Compatibility Contributions
-
-**Encountered compatibility issues on your system?** You can help improve the plugin for everyone!
-
-If the plugin doesn't work correctly on your hardware configuration:
-
-1. **Fork the Repository**: Create your own fork to work on fixes
-2. **Identify the Issue**: Determine which component is failing (disk detection, GPU metrics, UPS monitoring, etc.)
-3. **Make Necessary Changes**: Modify the code to support your hardware configuration
-   - Update collectors in `daemon/services/collectors/` for data collection issues
-   - Update parsers in `daemon/lib/` for command output parsing issues
-   - Add fallback logic for different hardware variations
-4. **Test Thoroughly**: Ensure your changes work on your system and don't break existing functionality
-   - Run the full test suite: `make test`
-   - Test all affected API endpoints
-   - Verify WebSocket events are working correctly
-5. **Document Your Changes**: In your pull request, include:
-   - **Hardware Configuration**: CPU model, disk controllers, GPU model, UPS model, etc.
-   - **Issue Description**: What wasn't working and why
-   - **Solution Implemented**: How your changes fix the issue
-   - **Testing Performed**: What you tested and the results
-   - **Unraid Version**: Your Unraid version number
-
-**Example PR Description:**
-
-```
-Hardware: AMD Ryzen 9 5950X, LSI 9300-8i HBA, NVIDIA RTX 3080
-Issue: GPU temperature not detected due to different nvidia-smi output format
-Solution: Added parsing for alternative nvidia-smi XML format
-Testing: Verified GPU metrics endpoint returns correct data, all tests pass
-Unraid Version: 7.2
-```
-
-### Why Community Contributions Matter
-
-As a single maintainer, it's challenging to:
-
-- Test across all possible hardware configurations
-- Debug issues on systems I don't have access to
-- Support every variation of disk controllers, GPUs, UPS models, etc.
-
-**Your contributions help make this plugin work for everyone!** Even small fixes for specific hardware configurations are valuable and appreciated.
-
-### Areas Where Contributions Are Especially Helpful
-
-- 🔧 **Hardware-Specific Fixes**: Support for different disk controllers, GPU models, UPS brands
-- 📊 **Data Collection Improvements**: Better parsing of system commands for different hardware
-- 🧪 **Testing**: Testing on different Unraid versions and hardware configurations
-- 📝 **Documentation**: Improving docs, adding examples, documenting edge cases
-- 🐛 **Bug Fixes**: Fixing issues you encounter on your system
-- ✨ **New Features**: Adding support for additional hardware or metrics
+When you report a hardware problem, include your Unraid version, the hardware involved and a
+diagnostics bundle from the settings page.
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for detailed version history and release notes.
+[MIT](LICENSE)

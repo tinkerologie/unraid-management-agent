@@ -240,6 +240,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **README refreshed** — rewritten around what users need first: features, requirements, Community
+  Applications install, a quick start with token handling, security and privacy, configuration,
+  integrations and links to the full documentation. Removed duplicated endpoint lists and response
+  samples (they live in `docs/api/`), stale claims (Unraid 6.9+, "Community Applications coming
+  soon", old interval defaults and plugin version), a Dev Container section for a container that no
+  longer exists, and broken links; added hardware auto-detection, UPS, NIC optics, SAS topology, ZFS
+  drive health, alerting, diagnostics, TLS and the Home Assistant integration.
 - **Hardware-dependent collectors default to Auto** — fresh installs, `default.cfg` and the start
   script now default `INTERVAL_NIC`, `INTERVAL_STORAGE_TOPOLOGY`, `INTERVAL_GPU`, `INTERVAL_UPS`,
   `INTERVAL_NUT` and `INTERVAL_ZFS` to `auto`. On the first upgrade a one-time migration
