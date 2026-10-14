@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -332,5 +333,80 @@ func TestParseCLIRejectsInvalidValue(t *testing.T) {
 	}
 	if explicitFlags != nil {
 		t.Error("explicit flags were recorded for a failed parse")
+	}
+}
+
+// TestResolveAutoCollectors covers parsing and the precedence of the automatic-mode list.
+func TestResolveAutoCollectors(t *testing.T) {
+	zero := map[string]int{"nic": 0, "storage_topology": 0, "gpu": 0, "ups": 0, "nut": 0, "zfs": 0}
+	tests := []struct {
+		name      string
+		csv       string
+		disabled  map[string]bool
+		intervals map[string]int
+		fromFile  map[string]bool
+		want      []string
+	}{
+		{name: "empty keeps current behaviour", csv: "", want: nil},
+		{name: "parses, trims and lowercases", csv: " NIC, storage_topology ,,gpu", want: []string{"gpu", "nic", "storage_topology"}},
+		{name: "ignores collectors that are not hardware-gated", csv: "nic,system,docker,bogus", want: []string{"nic"}},
+		{name: "disabled list wins", csv: "nic,ups", disabled: map[string]bool{"ups": true}, want: []string{"nic"}},
+		{name: "config.yml interval wins", csv: "nic,zfs", fromFile: map[string]bool{"zfs": true}, want: []string{"nic"}},
+		{name: "explicit nonzero interval wins", csv: "nic,gpu", intervals: map[string]int{"nic": 0, "gpu": 60}, want: []string{"nic"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			intervals := tt.intervals
+			if intervals == nil {
+				intervals = zero
+			}
+			got := resolveAutoCollectors(tt.csv, tt.disabled, intervals, tt.fromFile)
+			var names []string
+			for name := range got {
+				names = append(names, name)
+			}
+			slices.Sort(names)
+			if !slices.Equal(names, tt.want) {
+				t.Errorf("got %v, want %v", names, tt.want)
+			}
+		})
+	}
+}
+
+// TestApplyFileConfigAutoCollectors checks config.yml auto_collectors and interval tracking.
+func TestApplyFileConfigAutoCollectors(t *testing.T) {
+	origAuto, origNIC := cli.AutoCollectors, cli.IntervalNIC
+	origFile := fileConfigIntervals
+	t.Cleanup(func() {
+		cli.AutoCollectors, cli.IntervalNIC = origAuto, origNIC
+		fileConfigIntervals = origFile
+	})
+	fileConfigIntervals = map[string]bool{}
+
+	list, nic := "nic,gpu", 0
+	applyFileConfig(&domain.FileConfig{AutoCollectors: &list, Intervals: &domain.FileConfigIntervals{NIC: &nic}})
+	if cli.AutoCollectors != "nic,gpu" {
+		t.Errorf("AutoCollectors = %q, want the file value", cli.AutoCollectors)
+	}
+	if !fileConfigIntervals["nic"] || fileConfigIntervals["gpu"] {
+		t.Errorf("fileConfigIntervals = %v, want only nic", fileConfigIntervals)
+	}
+	got := resolveAutoCollectors(cli.AutoCollectors, nil, map[string]int{"nic": 0, "gpu": 0}, fileConfigIntervals)
+	if got["nic"] || !got["gpu"] {
+		t.Errorf("auto = %v: an explicit config.yml interval (even 0) must take nic out of automatic mode", got)
+	}
+}
+
+// TestHardwareGatedCollectors checks every hardware collector is gated except disabled ones.
+func TestHardwareGatedCollectors(t *testing.T) {
+	got := hardwareGatedCollectors(map[string]bool{"ups": true, "docker": true})
+	var names []string
+	for name := range got {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	want := []string{"gpu", "nic", "nut", "storage_topology", "zfs"}
+	if !slices.Equal(names, want) {
+		t.Errorf("gated = %v, want %v (every hardware collector except the disabled ups)", names, want)
 	}
 }

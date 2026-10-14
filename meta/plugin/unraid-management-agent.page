@@ -33,6 +33,7 @@ $read_only = $config['READ_ONLY'] ?? 'false';
 $wan_ip_lookup = (trim((string)($config['WAN_IP_LOOKUP'] ?? 'true'), "'\"") === 'false') ? 'false' : 'true';
 $allow_unauth_writes = (trim((string)($config['ALLOW_UNAUTHENTICATED_WRITES'] ?? 'false'), "'\"") === 'true') ? 'true' : 'false';
 $log_level = $config['LOG_LEVEL'] ?? 'info';
+$show_all_collectors = (trim((string)($config['SHOW_ALL_COLLECTORS'] ?? 'false'), "'\"") === 'true') ? 'true' : 'false';
 
 // MCP Tool Policies
 $policy_file = "/boot/config/plugins/$plugin/tool_policy.json";
@@ -73,18 +74,18 @@ $interval_array = $config['INTERVAL_ARRAY'] ?? '60';
 $interval_disk = $config['INTERVAL_DISK'] ?? '300';
 $interval_docker = $config['INTERVAL_DOCKER'] ?? '30';
 $interval_vm = $config['INTERVAL_VM'] ?? '60';
-$interval_ups = $config['INTERVAL_UPS'] ?? '60';
-$interval_nut = $config['INTERVAL_NUT'] ?? '0';
-$interval_gpu = $config['INTERVAL_GPU'] ?? '60';
+$interval_ups = $config['INTERVAL_UPS'] ?? 'auto';
+$interval_nut = $config['INTERVAL_NUT'] ?? 'auto';
+$interval_gpu = $config['INTERVAL_GPU'] ?? 'auto';
 $interval_shares = $config['INTERVAL_SHARES'] ?? '60';
 $interval_network = $config['INTERVAL_NETWORK'] ?? '60';
-$interval_zfs = $config['INTERVAL_ZFS'] ?? '0';
+$interval_zfs = $config['INTERVAL_ZFS'] ?? 'auto';
 $interval_notification = $config['INTERVAL_NOTIFICATION'] ?? '30';
 $interval_hardware = $config['INTERVAL_HARDWARE'] ?? '600';
 $interval_registration = $config['INTERVAL_REGISTRATION'] ?? '600';
 $interval_unassigned = $config['INTERVAL_UNASSIGNED'] ?? '60';
-$interval_storage_topology = $config['INTERVAL_STORAGE_TOPOLOGY'] ?? '0';
-$interval_nic = $config['INTERVAL_NIC'] ?? '0';
+$interval_storage_topology = $config['INTERVAL_STORAGE_TOPOLOGY'] ?? 'auto';
+$interval_nic = $config['INTERVAL_NIC'] ?? 'auto';
 
 // Check if service is running
 exec("pidof $plugin 2>/dev/null", $pids, $pid_rc);
@@ -162,7 +163,9 @@ if (!in_array($bind_address, $bind_known, true)) {
 }
 
 // Helper function to generate interval select options
-function intervalOptions($selected, $type = 'standard') {
+// $auto adds the "auto" choice of hardware-dependent collectors (#261): on at
+// 5 minutes only while the daemon detects the hardware.
+function intervalOptions($selected, $type = 'standard', $auto = false) {
     $options = [];
     $extended = [
         '3600' => '1 hour',
@@ -210,9 +213,12 @@ function intervalOptions($selected, $type = 'standard') {
             '1800' => '30 minutes',
         ] + $extended;
     }
+    if ($auto) {
+        $options = ['auto' => 'Auto'] + $options;
+    }
     $html = '';
     foreach ($options as $value => $label) {
-        $isSelected = ($selected == $value) ? 'selected' : '';
+        $isSelected = ((string)$selected === (string)$value) ? 'selected' : '';
         $html .= "<option value=\"$value\" $isSelected>$label</option>";
     }
     return $html;
@@ -241,6 +247,21 @@ function intervalOptions($selected, $type = 'standard') {
 }
 .uma-config-section {
     margin-bottom: 20px;
+}
+.uma-hw-detect {
+    margin: 0 0 12px 0;
+}
+.uma-hw-detect-label {
+    margin: 0 12px 0 6px;
+    vertical-align: middle;
+}
+.uma-hw-status {
+    font-size: 12px;
+    color: var(--text-secondary, #666);
+    margin-top: 6px;
+}
+.uma-interval-row.uma-hw-absent .uma-interval-label {
+    opacity: 0.6;
 }
 .uma-interval-section {
     margin-top: 8px;
@@ -781,6 +802,17 @@ which subsystems are healthy. Both require the service to be running.
         How often data is collected. Lower = faster updates but higher power usage.
     </p>
 
+    <div class="uma-hw-detect">
+        <label class="uma-toggle-switch">
+            <input type="checkbox" name="SHOW_ALL_COLLECTORS_CB" id="show_all_collectors" <?= ($show_all_collectors === 'true') ? 'checked' : '' ?> onchange="updateShowAllCollectors()">
+            <span class="uma-toggle-slider"></span>
+        </label>
+        <span class="uma-hw-detect-label">Show all collectors</span>
+        <input type="hidden" name="SHOW_ALL_COLLECTORS" id="show_all_collectors_val" value="<?= $show_all_collectors ?>">
+        <input type="button" id="uma-hw-recheck-btn" value="Re-check hardware" onclick="loadCapabilities(true)" <?= $running ? '' : 'disabled' ?>>
+        <div id="uma-hw-status" class="uma-hw-status">Checking detected hardware…</div>
+    </div>
+
     <div class="uma-interval-section">
         <div class="uma-section-header">System Monitoring</div>
         <div class="uma-interval-grid">
@@ -832,28 +864,28 @@ which subsystems are healthy. Both require the service to be running.
     <div class="uma-interval-section">
         <div class="uma-section-header">Hardware</div>
         <div class="uma-interval-grid">
-            <div class="uma-interval-row">
+            <div class="uma-interval-row" data-uma-capability="hardware.gpu">
                 <span class="uma-interval-label">GPU Metrics</span>
                 <select name="INTERVAL_GPU" class="uma-interval-select">
-                    <?= intervalOptions($interval_gpu, 'standard') ?>
+                    <?= intervalOptions($interval_gpu, 'standard', true) ?>
                 </select>
             </div>
-            <div class="uma-interval-row">
+            <div class="uma-interval-row" data-uma-capability="hardware.nic_optics">
                 <span class="uma-interval-label">Network Cards &amp; Optics</span>
                 <select name="INTERVAL_NIC" class="uma-interval-select">
-                    <?= intervalOptions($interval_nic, 'standard') ?>
+                    <?= intervalOptions($interval_nic, 'standard', true) ?>
                 </select>
             </div>
-            <div class="uma-interval-row">
+            <div class="uma-interval-row" data-uma-capability="hardware.ups">
                 <span class="uma-interval-label">UPS Status</span>
                 <select name="INTERVAL_UPS" class="uma-interval-select">
-                    <?= intervalOptions($interval_ups, 'standard') ?>
+                    <?= intervalOptions($interval_ups, 'standard', true) ?>
                 </select>
             </div>
-            <div class="uma-interval-row">
+            <div class="uma-interval-row" data-uma-capability="hardware.nut">
                 <span class="uma-interval-label">NUT Plugin</span>
                 <select name="INTERVAL_NUT" class="uma-interval-select">
-                    <?= intervalOptions($interval_nut, 'standard') ?>
+                    <?= intervalOptions($interval_nut, 'standard', true) ?>
                 </select>
             </div>
             <div class="uma-interval-row">
@@ -874,10 +906,10 @@ which subsystems are healthy. Both require the service to be running.
                     <?= intervalOptions($interval_shares, 'standard') ?>
                 </select>
             </div>
-            <div class="uma-interval-row">
+            <div class="uma-interval-row" data-uma-capability="hardware.zfs">
                 <span class="uma-interval-label">ZFS Pools</span>
                 <select name="INTERVAL_ZFS" class="uma-interval-select">
-                    <?= intervalOptions($interval_zfs, 'slow') ?>
+                    <?= intervalOptions($interval_zfs, 'slow', true) ?>
                 </select>
             </div>
             <div class="uma-interval-row">
@@ -886,10 +918,10 @@ which subsystems are healthy. Both require the service to be running.
                     <?= intervalOptions($interval_unassigned, 'standard') ?>
                 </select>
             </div>
-            <div class="uma-interval-row">
+            <div class="uma-interval-row" data-uma-capability="hardware.storage_topology">
                 <span class="uma-interval-label">Storage Topology (SAS/SES)</span>
                 <select name="INTERVAL_STORAGE_TOPOLOGY" class="uma-interval-select">
-                    <?= intervalOptions($interval_storage_topology, 'slow') ?>
+                    <?= intervalOptions($interval_storage_topology, 'slow', true) ?>
                 </select>
             </div>
         </div>
@@ -914,12 +946,20 @@ which subsystems are healthy. Both require the service to be running.
     </div>
 
     <div class="uma-power-warning">
-        <strong>⚡ Power Tip:</strong> Defaults follow industry-standard monitoring intervals. Set to <strong>Disabled</strong> to completely stop a collector, or use longer intervals (up to 24 hours) for data that rarely changes. Click <strong>Default</strong> to restore industry-standard settings.
+        <strong>⚡ Power Tip:</strong> Defaults follow industry-standard monitoring intervals. Hardware collectors run only while the agent detects their hardware and are hidden when it is absent; <strong>Auto</strong> runs them every 5 minutes. Set to <strong>Disabled</strong> to completely stop a collector, or use longer intervals (up to 24 hours) for data that rarely changes. Click <strong>Default</strong> to restore industry-standard settings.
     </div>
 </div>
 
 <blockquote class="inline_help">
 Service auto-starts with array. Changes apply after clicking Apply and will restart the service if it is running.
+
+Hardware-dependent collectors (GPU, Network Cards &amp; Optics, UPS, NUT, ZFS, Storage Topology) follow hardware
+detection: the agent checks for the hardware at startup, every 15 minutes and on <strong>Re-check hardware</strong>.
+While the hardware is absent the collector is off and its row is hidden, whatever its setting; the setting is kept and
+applies again once the hardware is detected. With the hardware present, <strong>Auto</strong> runs the collector every
+5 minutes, an explicit interval runs it at that interval, and <strong>Disabled</strong> keeps it off.
+<strong>Show all collectors</strong> only reveals hidden rows — it never turns a collector on. If hardware detection is
+unavailable (for example the agent is stopped), every row is shown.
 </blockquote>
 
 <input type="submit" name="#default" value="_(Default)_">
@@ -967,6 +1007,11 @@ function updateServiceStatus(running) {
     var stBtn = document.getElementById('uma-selftest-btn');
     if (dlBtn) dlBtn.disabled = !running;
     if (stBtn) stBtn.disabled = !running;
+    umaServiceRunning = running;
+    var hwBtn = document.getElementById('uma-hw-recheck-btn');
+    if (hwBtn) hwBtn.disabled = !running;
+    // Re-read hardware detection: rows fail open while the agent is stopped.
+    loadCapabilities(false);
 
     if (running) {
         statusOrb.className = 'fa fa-circle green-orb';
@@ -1208,6 +1253,100 @@ function clearToken() {
     markFieldChanged(field);
     updateTokenButtons();
     updateMcpOnboardingUI();
+}
+
+function updateShowAllCollectors() {
+    var enabled = document.getElementById('show_all_collectors').checked;
+    document.getElementById('show_all_collectors_val').value = enabled ? 'true' : 'false';
+    applyCapabilityVisibility();
+}
+
+// Whether the agent runs; the Re-check hardware button needs it.
+var umaServiceRunning = <?= $running ? 'true' : 'false' ?>;
+
+// Hardware detection (#261). umaCapabilities maps capability name -> item, or
+// is null when detection is unavailable (fail open: every row is shown).
+var umaCapabilities = null;
+
+function applyCapabilityVisibility() {
+    var showAll = document.getElementById('show_all_collectors');
+    showAll = showAll && showAll.checked;
+    document.querySelectorAll('.uma-interval-row[data-uma-capability]').forEach(function(row) {
+        var item = umaCapabilities ? umaCapabilities[row.getAttribute('data-uma-capability')] : null;
+        var absent = !!(item && item.state === 'absent');
+        row.title = item && item.detail ? (item.state === 'present' ? 'Detected: ' : 'Not detected: ') + item.detail : '';
+        row.classList.toggle('uma-hw-absent', absent);
+        // Absent hardware hides the row whatever its setting: the agent keeps
+        // the collector off. Hidden inputs keep their values and are still
+        // submitted, so the setting applies again when the hardware returns.
+        row.style.display = (!showAll && absent) ? 'none' : '';
+    });
+    document.querySelectorAll('.uma-interval-section').forEach(function(section) {
+        var rows = Array.prototype.slice.call(section.querySelectorAll('.uma-interval-row'));
+        var allHidden = rows.length > 0 && rows.every(function(row) { return row.style.display === 'none'; });
+        section.style.display = allHidden ? 'none' : '';
+    });
+}
+
+function renderCapabilityStatus(message) {
+    var status = document.getElementById('uma-hw-status');
+    if (!status) return;
+    if (message) {
+        status.textContent = message;
+        return;
+    }
+    var found = [];
+    var names = {
+        'hardware.gpu': 'GPU', 'hardware.nic_optics': 'NIC optics/sensors', 'hardware.ups': 'UPS',
+        'hardware.nut': 'NUT', 'hardware.zfs': 'ZFS pools', 'hardware.storage_topology': 'SAS/SES storage'
+    };
+    Object.keys(names).forEach(function(key) {
+        if (umaCapabilities[key] && umaCapabilities[key].state === 'present') found.push(names[key]);
+    });
+    var checked = umaCapabilities._checkedAt ? new Date(umaCapabilities._checkedAt) : null;
+    var unknown = Object.keys(names).some(function(key) {
+        return !umaCapabilities[key] || umaCapabilities[key].state === 'unknown';
+    });
+    status.innerHTML = 'Detected hardware: <strong>' + umaEscapeHtml(found.length ? found.join(', ') : 'none') + '</strong>' +
+        (checked && !isNaN(checked.getTime()) ? ' · last checked ' + umaEscapeHtml(checked.toLocaleString()) : '') +
+        (unknown ? ' · detection unavailable for some hardware, so its rows stay visible' : '');
+}
+
+// umaCapabilitySeq numbers hardware checks; only the latest may update the page,
+// so an older response that lands late cannot overwrite a newer result.
+var umaCapabilitySeq = 0;
+
+function loadCapabilities(refresh) {
+    var seq = ++umaCapabilitySeq;
+    var btn = document.getElementById('uma-hw-recheck-btn');
+    if (btn) {
+        btn.disabled = true;
+        if (refresh) btn.value = 'Checking…';
+    }
+    $.post('/plugins/<?=$plugin?>/include/diagnostics.php', {action: 'capabilities', refresh: refresh ? '1' : '0'}, function(data) {
+        if (seq !== umaCapabilitySeq) return;
+        var items = (data && Array.isArray(data.items)) ? data.items : null;
+        if (!items) {
+            umaCapabilities = null;
+            renderCapabilityStatus('Hardware detection unavailable — showing all collectors.');
+        } else {
+            umaCapabilities = {_checkedAt: data.checked_at};
+            items.forEach(function(it) {
+                if (it && typeof it.name === 'string' && it.name.indexOf('hardware.') === 0) umaCapabilities[it.name] = it;
+            });
+            renderCapabilityStatus();
+        }
+        applyCapabilityVisibility();
+    }, 'json').fail(function() {
+        if (seq !== umaCapabilitySeq) return;
+        umaCapabilities = null;
+        renderCapabilityStatus('Hardware detection unavailable (is the service running?) — showing all collectors.');
+        applyCapabilityVisibility();
+    }).always(function() {
+        if (seq !== umaCapabilitySeq || !btn) return;
+        btn.disabled = !umaServiceRunning;
+        btn.value = 'Re-check hardware';
+    });
 }
 
 // Highlight disabled interval selects
@@ -1592,6 +1731,7 @@ $(function() {
     document.querySelectorAll('.uma-interval-select').forEach(function(select) {
         select.addEventListener('change', updateDisabledHighlighting);
     });
+    loadCapabilities(false);
     updateTokenButtons();
     updateMcpOnboardingUI();
 });

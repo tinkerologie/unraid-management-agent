@@ -81,6 +81,13 @@ type CollectorStatus struct {
 	LastRun    *time.Time `json:"last_run,omitempty"`
 	ErrorCount int        `json:"error_count"`
 	Required   bool       `json:"required"` // true if collector cannot be disabled
+	// HardwareGated is true while the collector follows hardware detection: it
+	// is off while its hardware is absent. A manual enable, disable or interval
+	// change ends this until the agent restarts.
+	HardwareGated bool `json:"hardware_gated"`
+	// Auto is true while a hardware-gated collector is in automatic mode: it
+	// runs at the auto-enable interval while its hardware is present.
+	Auto bool `json:"auto"`
 }
 
 // CollectorsStatusResponse is the response for /collectors/status

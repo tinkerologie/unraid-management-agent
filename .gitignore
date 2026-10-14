@@ -106,3 +106,9 @@ graphify-out/
 # superpowers/planning docs — kept locally, not committed
 docs/superpowers/
 docs/plans/
+
+# Playwright UI tests (tests/ui)
+tests/ui/node_modules/
+tests/ui/.render/
+tests/ui/test-results/
+tests/ui/playwright-report/

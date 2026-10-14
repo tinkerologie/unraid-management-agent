@@ -1,6 +1,6 @@
 #!/bin/bash
 # Tests the settings-page save hook (meta/plugin/include/update.php) for the
-# security and privacy toggles (#245, #252). Run by `make test-packaging`.
+# security, privacy and display toggles (#245, #252, #261). Run by `make test-packaging`.
 #
 # Usage: bash scripts/test-plugin-settings.sh
 
@@ -56,3 +56,11 @@ check ALLOW_UNAUTHENTICATED_WRITES yes false
 check ALLOW_UNAUTHENTICATED_WRITES "" false
 check ALLOW_UNAUTHENTICATED_WRITES "<absent>" "<unset>"
 echo "✓ ALLOW_UNAUTHENTICATED_WRITES saves as false unless explicitly true; its checkbox field is dropped"
+
+# Show all collectors: only an explicit "true" turns it on (default off).
+check SHOW_ALL_COLLECTORS true true
+check SHOW_ALL_COLLECTORS false false
+check SHOW_ALL_COLLECTORS yes false
+check SHOW_ALL_COLLECTORS "" false
+check SHOW_ALL_COLLECTORS "<absent>" "<unset>"
+echo "✓ SHOW_ALL_COLLECTORS saves as false unless explicitly true; its checkbox field is dropped"

@@ -10,6 +10,8 @@
  *
  *   action=selftest  (POST)  -> returns the agent self-test JSON
  *   action=download  (GET)   -> streams the diagnostics ZIP as an attachment
+ *   action=capabilities (GET/POST, optional refresh=1)
+ *                            -> returns the agent's detected capabilities JSON
  *
  * Authentication and CSRF are handled by Unraid's local_prepend.php auto-prepend.
  */
@@ -57,6 +59,24 @@ switch ($action) {
             exit;
         }
         // Pass the agent's JSON through verbatim.
+        echo implode("\n", $out);
+        break;
+
+    case 'capabilities':
+        // Hardware detection for the settings page (#261). refresh=1 asks the
+        // agent to re-check now (it rate-limits re-checks itself).
+        header('Content-Type: application/json');
+        $refresh = in_array((string)($_REQUEST['refresh'] ?? ''), ['1', 'true'], true);
+        $url = "$base/api/v1/capabilities" . ($refresh ? '?refresh=true' : '');
+        exec("curl -fsS -m 10 $auth_header " . escapeshellarg($url) . ' 2>/dev/null', $out, $rc);
+        if ($rc !== 0) {
+            http_response_code(502);
+            echo json_encode([
+                'error' => 'Could not reach the agent capabilities endpoint — is the service running?',
+                'rc'    => $rc,
+            ]);
+            exit;
+        }
         echo implode("\n", $out);
         break;
 

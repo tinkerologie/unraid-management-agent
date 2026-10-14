@@ -46,5 +46,14 @@ type Context struct {
 	DiagnosticLogger   *logger.DiagnosticLogger
 	LogsDir            string
 	DockerUpdateNotify bool
+	// GatedCollectors are the hardware-gated collectors the capability policy
+	// controls: off while their hardware is absent, whatever the configured
+	// interval (#261).
+	GatedCollectors map[string]bool
+	// AutoCollectors are the gated collectors in automatic mode: they run at
+	// the auto-enable interval while their hardware is present.
+	AutoCollectors map[string]bool
+	// LowPowerMode multiplies collector intervals by 4 (also auto-enabled ones).
+	LowPowerMode bool
 	Config
 }

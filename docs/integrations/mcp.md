@@ -200,6 +200,17 @@ The STDIO transport (`mcp-stdio`) does not go through the HTTP server, so no tok
 | `list_collectors`      | List all data collectors and their status |
 | `get_collector_status` | Get status of a specific collector        |
 
+`run_self_test` includes the detected hardware classes (`hardware.nic_optics`,
+`hardware.storage_topology`, `hardware.gpu`, `hardware.ups`, `hardware.nut`,
+`hardware.zfs`, `hardware.fan_control`) with a `state` and a `detail` reason
+(see [Hardware Auto-Detection](../guides/configuration.md#hardware-auto-detection)).
+Collector status includes `hardware_gated: true` while a hardware-dependent
+collector follows detection (off while its hardware is absent) and `auto: true`
+in automatic mode. Using `collector_action` or `update_collector_interval` on
+such a collector takes it out of hardware control until the agent restarts. The tool
+list does not change with detected hardware: tools for absent hardware stay
+listed and report that no data is available.
+
 ### Plugin Tools
 
 | Tool                     | Description                                                                                               |

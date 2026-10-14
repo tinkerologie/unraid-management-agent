@@ -76,6 +76,13 @@ if (isset($_POST['WAN_IP_LOOKUP'])) {
 }
 unset($_POST['WAN_IP_LOOKUP_CB']);
 
+// Normalise "Show all collectors" to exactly "true" or "false" (#261). It only
+// reveals settings rows; the daemon never reads it.
+if (isset($_POST['SHOW_ALL_COLLECTORS'])) {
+    $_POST['SHOW_ALL_COLLECTORS'] = ($_POST['SHOW_ALL_COLLECTORS'] === 'true') ? 'true' : 'false';
+}
+unset($_POST['SHOW_ALL_COLLECTORS_CB']);
+
 // Save tool policy JSON if submitted
 $policy_file = "/boot/config/plugins/$plugin/tool_policy.json";
 if (isset($_POST['TOOL_POLICY_JSON'])) {

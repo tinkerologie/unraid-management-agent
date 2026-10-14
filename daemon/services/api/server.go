@@ -67,12 +67,14 @@ type Server struct {
 	alertEngine      *alerting.Engine
 	alertStore       *alerting.Store
 	watchdogRunner   *watchdog.Runner
-	watchdogStore    *watchdog.Store
-	fanController    *controllers.FanController
-	cpuController    *controllers.CPUController
-	tuningController *controllers.TuningController
-	agentSvc         *agent.Service
-	toolPolicyStore  *domain.ToolPolicyStore
+	// capabilityRefresher serves GET /capabilities?refresh=true; nil until set.
+	capabilityRefresher CapabilityRefresher
+	watchdogStore       *watchdog.Store
+	fanController       *controllers.FanController
+	cpuController       *controllers.CPUController
+	tuningController    *controllers.TuningController
+	agentSvc            *agent.Service
+	toolPolicyStore     *domain.ToolPolicyStore
 
 	// diskSpinFn replaces the array controller's spin calls in tests.
 	diskSpinFn func(diskID string, up bool) error
@@ -149,6 +151,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/health", s.handleHealth).Methods("GET")
 	api.HandleFunc("/health/report", s.handleHealthReport).Methods("GET")
 	api.HandleFunc("/diagnostics/self-test", s.handleSelfTest).Methods("GET")
+	api.HandleFunc("/capabilities", s.handleCapabilities).Methods("GET")
 	api.HandleFunc("/diagnostics/bundle", s.handleDiagnosticsBundle).Methods("GET")
 
 	// Monitoring endpoints

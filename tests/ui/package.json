@@ -1,0 +1,12 @@
+{
+  "name": "unraid-management-agent-ui-tests",
+  "private": true,
+  "description": "Playwright tests for the plugin settings page (meta/plugin/unraid-management-agent.page)",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "jquery": "3.7.1"
+  }
+}

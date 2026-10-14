@@ -998,6 +998,46 @@ const docTemplate = `{
                 }
             }
         },
+        "/capabilities": {
+            "get": {
+                "description": "Returns the capability snapshot: OS paths and binaries plus detected hardware classes (hardware.nic_optics, hardware.storage_topology, hardware.gpu, hardware.ups, hardware.nut, hardware.zfs, hardware.fan_control), each with state present/absent/unknown and a detail reason, and when the snapshot was checked. Capabilities are re-checked every 15 minutes; refresh=true re-checks now (at most every 30 seconds, otherwise the cached snapshot is returned). Collectors in automatic mode follow the hardware state.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Diagnostics"
+                ],
+                "summary": "Get detected capabilities",
+                "parameters": [
+                    {
+                        "type": "boolean",
+                        "description": "Re-check capabilities now (rate-limited)",
+                        "name": "refresh",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Capabilities"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid refresh value",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "503": {
+                        "description": "Capability detection is not available",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/collectors/status": {
             "get": {
                 "description": "Retrieve status of all data collectors including enabled state and intervals",
@@ -6566,6 +6606,11 @@ const docTemplate = `{
         "dto.Capabilities": {
             "type": "object",
             "properties": {
+                "checked_at": {
+                    "description": "CheckedAt is when the snapshot was taken.",
+                    "type": "string",
+                    "format": "date-time"
+                },
                 "items": {
                     "type": "array",
                     "items": {
@@ -6573,7 +6618,8 @@ const docTemplate = `{
                     }
                 },
                 "unraid_version": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "7.3.3"
                 }
             }
         },
@@ -6581,18 +6627,49 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "available": {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "example": true
                 },
                 "detail": {
-                    "type": "string"
+                    "description": "Detail explains the result, e.g. \"SAS controller at 0000:01:00.0\".",
+                    "type": "string",
+                    "example": "SAS controller at 0000:01:00.0"
                 },
                 "name": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "hardware.storage_topology"
+                },
+                "state": {
+                    "description": "State is present, absent or unknown. Available is true only when present.",
+                    "enum": [
+                        "present",
+                        "absent",
+                        "unknown"
+                    ],
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.CapabilityState"
+                        }
+                    ],
+                    "example": "present"
                 },
                 "target": {
                     "type": "string"
                 }
             }
+        },
+        "dto.CapabilityState": {
+            "type": "string",
+            "enum": [
+                "present",
+                "absent",
+                "unknown"
+            ],
+            "x-enum-varnames": [
+                "CapabilityPresent",
+                "CapabilityAbsent",
+                "CapabilityUnknown"
+            ]
         },
         "dto.ChassisInfo": {
             "type": "object",
@@ -6648,11 +6725,19 @@ const docTemplate = `{
         "dto.CollectorStatus": {
             "type": "object",
             "properties": {
+                "auto": {
+                    "description": "Auto is true while a hardware-gated collector is in automatic mode: it\nruns at the auto-enable interval while its hardware is present.",
+                    "type": "boolean"
+                },
                 "enabled": {
                     "type": "boolean"
                 },
                 "error_count": {
                     "type": "integer"
+                },
+                "hardware_gated": {
+                    "description": "HardwareGated is true while the collector follows hardware detection: it\nis off while its hardware is absent. A manual enable, disable or interval\nchange ends this until the agent restarts.",
+                    "type": "boolean"
                 },
                 "interval_seconds": {
                     "description": "0 if disabled",

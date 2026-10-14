@@ -531,24 +531,53 @@ definitions:
     type: object
   dto.Capabilities:
     properties:
+      checked_at:
+        description: CheckedAt is when the snapshot was taken.
+        format: date-time
+        type: string
       items:
         items:
           $ref: '#/definitions/dto.Capability'
         type: array
       unraid_version:
+        example: 7.3.3
         type: string
     type: object
   dto.Capability:
     properties:
       available:
+        example: true
         type: boolean
       detail:
+        description: Detail explains the result, e.g. "SAS controller at 0000:01:00.0".
+        example: SAS controller at 0000:01:00.0
         type: string
       name:
+        example: hardware.storage_topology
         type: string
+      state:
+        allOf:
+        - $ref: '#/definitions/dto.CapabilityState'
+        description: State is present, absent or unknown. Available is true only when
+          present.
+        enum:
+        - present
+        - absent
+        - unknown
+        example: present
       target:
         type: string
     type: object
+  dto.CapabilityState:
+    enum:
+    - present
+    - absent
+    - unknown
+    type: string
+    x-enum-varnames:
+    - CapabilityPresent
+    - CapabilityAbsent
+    - CapabilityUnknown
   dto.ChassisInfo:
     properties:
       asset_tag:
@@ -586,10 +615,21 @@ definitions:
     type: object
   dto.CollectorStatus:
     properties:
+      auto:
+        description: |-
+          Auto is true while a hardware-gated collector is in automatic mode: it
+          runs at the auto-enable interval while its hardware is present.
+        type: boolean
       enabled:
         type: boolean
       error_count:
         type: integer
+      hardware_gated:
+        description: |-
+          HardwareGated is true while the collector follows hardware detection: it
+          is off while its hardware is absent. A manual enable, disable or interval
+          change ends this until the agent restarts.
+        type: boolean
       interval_seconds:
         description: 0 if disabled
         type: integer
@@ -6068,6 +6108,38 @@ paths:
       summary: Stop array
       tags:
       - Array
+  /capabilities:
+    get:
+      description: 'Returns the capability snapshot: OS paths and binaries plus detected
+        hardware classes (hardware.nic_optics, hardware.storage_topology, hardware.gpu,
+        hardware.ups, hardware.nut, hardware.zfs, hardware.fan_control), each with
+        state present/absent/unknown and a detail reason, and when the snapshot was
+        checked. Capabilities are re-checked every 15 minutes; refresh=true re-checks
+        now (at most every 30 seconds, otherwise the cached snapshot is returned).
+        Collectors in automatic mode follow the hardware state.'
+      parameters:
+      - description: Re-check capabilities now (rate-limited)
+        in: query
+        name: refresh
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Capabilities'
+        "400":
+          description: Invalid refresh value
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Capability detection is not available
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Get detected capabilities
+      tags:
+      - Diagnostics
   /collectors/{name}:
     get:
       description: Retrieve status of a specific collector by name

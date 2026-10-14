@@ -5,7 +5,7 @@ PLUGIN_DIR := meta/plugin
 DATE := $(shell date '+%Y.%m.%d')
 HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo "dev")
 
-.PHONY: all local release package clean test test-packaging test-coverage deps swagger pre-commit-install pre-commit-run lint security-check
+.PHONY: all local release package clean test test-packaging test-ui test-coverage deps swagger pre-commit-install pre-commit-run lint security-check
 
 all: test local
 
@@ -51,14 +51,21 @@ test:
 	@echo "Running tests..."
 	go test -v ./...
 
+# Playwright tests for the plugin settings page (needs Node.js and the PHP CLI)
+test-ui:
+	@echo "Running settings page UI tests..."
+	cd tests/ui && npm ci && npx playwright install chromium && npx playwright test
+
 test-packaging: package
 	@echo "Running bundle packaging tests..."
 	bash scripts/test-bundle-extraction.sh check-tar-flags
 	bash scripts/test-bundle-extraction.sh check-owners $(BUILD_DIR)/$(BINARY)-$(VERSION).tgz
 	sudo bash scripts/test-bundle-extraction.sh
 	bash scripts/test-secure-defaults-migration.sh
+	bash scripts/test-auto-intervals-migration.sh
 	bash scripts/test-plg-checksums.sh
 	bash scripts/test-plugin-settings.sh
+	bash scripts/test-diagnostics-proxy.sh
 
 test-coverage:
 	@echo "Running tests with coverage..."

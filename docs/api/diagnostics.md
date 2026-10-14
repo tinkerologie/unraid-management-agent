@@ -76,6 +76,54 @@ Generates and downloads a ZIP archive containing host metrics, disk status, cont
 }
 ```
 
+### 3. Detected Capabilities
+
+Returns the capability snapshot: the OS paths and binaries the agent depends
+on, plus the detected hardware classes that gate the hardware-dependent
+collectors ([#261](https://github.com/tinkerologie/unraid-management-agent/issues/261)).
+See [Hardware Auto-Detection](../guides/configuration.md#hardware-auto-detection).
+
+- **Method**: `GET`
+- **Path**: `/api/v1/capabilities`
+- **Query**: `refresh=true` re-checks now; within 30 seconds of the last check
+  the cached snapshot is returned. Capabilities are also re-checked every
+  15 minutes.
+- **Authentication**: Bearer token (if configured)
+- **Response Format**: `application/json`
+
+#### Response (`200 OK`)
+
+```json
+{
+  "unraid_version": "7.3.3",
+  "checked_at": "2026-10-14T09:00:00Z",
+  "items": [
+    { "name": "docker", "available": true, "state": "present", "target": "/usr/bin/docker" },
+    {
+      "name": "hardware.nic_optics",
+      "available": false,
+      "state": "absent",
+      "detail": "no NIC with optics or temperature sensors"
+    },
+    {
+      "name": "hardware.storage_topology",
+      "available": true,
+      "state": "present",
+      "detail": "SAS controller at 0000:01:00.0; storcli found, sg_ses found"
+    }
+  ]
+}
+```
+
+`state` is `present`, `absent` or `unknown`; `available` is `true` only when
+`present`. The self-test's `capabilities` object has the same shape, so it also
+gains the additive `state` and `checked_at` fields.
+
+#### Error Responses
+
+- `400 Bad Request` — `refresh` is not a boolean.
+- `503 Service Unavailable` — capability detection is not initialised.
+
 ---
 
 ## See Also

@@ -1,0 +1,52 @@
+#!/bin/bash
+# One-time migration to automatic hardware-gated collectors (#261).
+#
+# Before this release no setting recorded whether an interval was chosen by the
+# user or filled in by a default, so a value equal to a previously shipped
+# default is treated as "not set" and becomes "auto". Any other value is an
+# explicit choice and is kept. Missing keys become "auto" too.
+#
+# Skipped once .auto-intervals-migrated exists (the installer creates it only
+# when this script exits 0). Exits non-zero if config.cfg cannot be updated.
+
+PLUGIN="unraid-management-agent"
+CONFIG_DIR="${CONFIG_DIR:-/boot/config/plugins/$PLUGIN}"
+CONFIG_FILE="${CONFIG_DIR}/config.cfg"
+
+if [ -f "${CONFIG_DIR}/.auto-intervals-migrated" ] || [ ! -f "$CONFIG_FILE" ]; then
+    exit 0
+fi
+
+# key:space-separated previously shipped defaults
+DEFAULTS="INTERVAL_NIC:60,0 INTERVAL_STORAGE_TOPOLOGY:300,0 INTERVAL_GPU:60 INTERVAL_UPS:60 INTERVAL_NUT:0 INTERVAL_ZFS:0,30"
+
+content=$(cat "$CONFIG_FILE") || exit 1
+changed=0
+for entry in $DEFAULTS; do
+    key="${entry%%:*}"
+    olds=",${entry#*:},"
+    line=$(printf '%s\n' "$content" | grep -E "^[[:space:]]*${key}=" | tail -n1)
+    if [ -z "$line" ]; then
+        content=$(printf '%s\n%s="auto"' "$content" "$key")
+        changed=1
+        continue
+    fi
+    value="${line#*=}"
+    value=$(printf '%s' "$value" | tr -d "\"'[:space:]")
+    case "$olds" in
+        *",${value},"*)
+            content=$(printf '%s\n' "$content" | sed -E "s/^[[:space:]]*${key}=.*/${key}=\"auto\"/")
+            changed=1
+            ;;
+    esac
+done
+
+[ "$changed" = 1 ] || exit 0
+
+# Rewrite in place (cat >) so the file keeps its mode and owner. Only keys are
+# written: config.cfg is also read by PHP's parse_ini_file.
+if ! printf '%s\n' "$content" >"$CONFIG_FILE" 2>/dev/null; then
+    echo "✗ Could not update ${CONFIG_FILE}; hardware collectors keep their saved intervals" >&2
+    exit 1
+fi
+echo "✓ Hardware-dependent collectors now default to Auto (enabled only when their hardware is detected)"

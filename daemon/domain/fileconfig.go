@@ -30,6 +30,8 @@ type FileConfig struct {
 	// Power mode
 	LowPowerMode      *bool   `yaml:"low_power_mode,omitempty"`
 	DisableCollectors *string `yaml:"disable_collectors,omitempty"`
+	// AutoCollectors lists hardware-gated collectors in automatic mode (#261).
+	AutoCollectors *string `yaml:"auto_collectors,omitempty"`
 
 	// CORS
 	CORSOrigin *string `yaml:"cors_origin,omitempty"`

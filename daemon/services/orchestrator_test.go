@@ -8,7 +8,9 @@ import (
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
 	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/platform"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/api"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/collectors"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/mqtt"
 )
 
@@ -109,4 +111,30 @@ func TestOrchestrator_Shutdown(t *testing.T) {
 			t.Error("collectorManager was unexpectedly cleared")
 		}
 	})
+}
+
+// TestOrchestratorCapabilityWiring checks the startup snapshot and the refresher start and stop.
+func TestOrchestratorCapabilityWiring(t *testing.T) {
+	appCtx := &domain.Context{Hub: domain.NewEventBus(10), Platform: platform.NewRegistry(), AutoCollectors: map[string]bool{"nic": true}}
+	o := CreateOrchestrator(appCtx)
+	var wg sync.WaitGroup
+	o.collectorManager = NewCollectorManager(appCtx, &wg)
+	o.collectorManager.Register("nic", func(*domain.Context) Collector { return newMockCollector() }, 0, false)
+
+	refresher := o.detectCapabilities()
+	caps := appCtx.Platform.Capabilities()
+	if caps.CheckedAt.IsZero() {
+		t.Fatal("startup snapshot not stored")
+	}
+	for _, c := range collectors.HardwareClasses {
+		if _, ok := caps.Item(c.Capability); !ok {
+			t.Errorf("startup snapshot lacks %s", c.Capability)
+		}
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	o.startCapabilityRefresher(ctx, &wg, refresher)
+	cancel()
+	o.collectorManager.StopAll()
+	wg.Wait()
 }

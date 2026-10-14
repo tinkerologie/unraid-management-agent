@@ -36,10 +36,10 @@ func (r *Registry) SetNotifier(n Notifier) { r.mu.Lock(); r.notifier = n; r.mu.U
 // SetClock overrides the time source (tests).
 func (r *Registry) SetClock(f func() time.Time) { r.mu.Lock(); r.clock = f; r.mu.Unlock() }
 
-// SetCapabilities stores the startup capability snapshot.
+// SetCapabilities stores the latest capability snapshot.
 func (r *Registry) SetCapabilities(c dto.Capabilities) { r.mu.Lock(); r.caps = c; r.mu.Unlock() }
 
-// Capabilities returns the startup capability snapshot.
+// Capabilities returns the latest capability snapshot.
 func (r *Registry) Capabilities() dto.Capabilities { r.mu.RLock(); defer r.mu.RUnlock(); return r.caps }
 
 // Report records a subsystem's source state. On a state transition it logs once

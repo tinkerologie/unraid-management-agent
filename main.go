@@ -20,6 +20,7 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/lib"
 	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
 	"github.com/tinkerologie/unraid-management-agent/daemon/platform"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/collectors"
 )
 
 // Version is the application version, set at build time via ldflags.
@@ -96,6 +97,10 @@ var cli struct {
 
 	// Collector disable flag (alternative to setting interval=0)
 	DisableCollectors string `default:"" env:"UNRAID_DISABLE_COLLECTORS" help:"comma-separated list of collectors to disable (e.g., gpu,ups,zfs)"`
+
+	// Hardware-gated collectors in automatic mode: they run only while their
+	// hardware is detected (#261). Set by the plugin for intervals set to "auto".
+	AutoCollectors string `default:"" env:"UNRAID_AUTO_COLLECTORS" help:"comma-separated hardware-gated collectors in automatic mode (nic,storage_topology,gpu,ups,nut,zfs): run at 300s only while their hardware is detected"`
 
 	// MQTT Configuration
 	MQTTEnabled            bool   `default:"false" env:"MQTT_ENABLED" help:"enable MQTT publishing"`
@@ -309,6 +314,16 @@ func main() {
 		}
 	}
 
+	autoCollectors := resolveAutoCollectors(cli.AutoCollectors, disabledCollectors, map[string]int{
+		"nic":              cli.IntervalNIC,
+		"storage_topology": cli.IntervalStorageTopology,
+		"gpu":              cli.IntervalGPU,
+		"ups":              cli.IntervalUPS,
+		"nut":              cli.IntervalNUT,
+		"zfs":              cli.IntervalZFS,
+	}, fileConfigIntervals)
+	gatedCollectors := hardwareGatedCollectors(disabledCollectors)
+
 	// Helper function to get interval (returns 0 if collector is disabled)
 	// In low power mode, intervals are multiplied by 4 for reduced CPU usage
 	getInterval := func(name string, cliInterval int) int {
@@ -391,6 +406,9 @@ func main() {
 		DiagnosticLogger:   diagLogger,
 		LogsDir:            cli.LogsDir,
 		DockerUpdateNotify: cli.DockerUpdateNotify,
+		GatedCollectors:    gatedCollectors,
+		AutoCollectors:     autoCollectors,
+		LowPowerMode:       cli.LowPowerMode,
 		Intervals: domain.Intervals{
 			System:         getInterval("system", cli.IntervalSystem),
 			Array:          getInterval("array", cli.IntervalArray),
@@ -561,6 +579,7 @@ func applyFileConfig(cfg *domain.FileConfig) {
 	setBool(&cli.ReadOnly, cfg.ReadOnly)
 	setBool(&cli.LowPowerMode, cfg.LowPowerMode)
 	setStr(&cli.DisableCollectors, cfg.DisableCollectors)
+	setStr(&cli.AutoCollectors, cfg.AutoCollectors)
 	setStr(&cli.CORSOrigin, cfg.CORSOrigin)
 	setStr(&cli.APIToken, cfg.APIToken)
 	setStr(&cli.MCPConnectSecret, cfg.MCPConnectSecret)
@@ -592,33 +611,89 @@ func applyFileConfig(cfg *domain.FileConfig) {
 		setStr(&cli.DiscoveryServiceName, d.ServiceName)
 	}
 
-	// Intervals
+	// Intervals. Remember which ones the file set: an explicit interval for a
+	// hardware-gated collector takes it out of automatic mode.
 	if iv := cfg.Intervals; iv != nil {
-		setInt(&cli.IntervalSystem, iv.System)
-		setInt(&cli.IntervalArray, iv.Array)
-		setInt(&cli.IntervalDisk, iv.Disk)
-		setInt(&cli.IntervalDocker, iv.Docker)
-		setInt(&cli.IntervalVM, iv.VM)
-		setInt(&cli.IntervalUPS, iv.UPS)
-		setInt(&cli.IntervalNUT, iv.NUT)
-		setInt(&cli.IntervalGPU, iv.GPU)
-		setInt(&cli.IntervalShares, iv.Shares)
-		setInt(&cli.IntervalNetwork, iv.Network)
-		setInt(&cli.IntervalHardware, iv.Hardware)
-		setInt(&cli.IntervalZFS, iv.ZFS)
-		setInt(&cli.IntervalNotification, iv.Notification)
-		setInt(&cli.IntervalRegistration, iv.Registration)
-		setInt(&cli.IntervalUnassigned, iv.Unassigned)
-		setInt(&cli.IntervalFanControl, iv.FanControl)
-		setInt(&cli.IntervalTuning, iv.Tuning)
-		setInt(&cli.IntervalDockerUpdate, iv.DockerUpdate)
-		setInt(&cli.IntervalDockerNetworks, iv.DockerNetworks)
-		setInt(&cli.IntervalPluginUpdate, iv.PluginUpdate)
-		setInt(&cli.IntervalOSUpdate, iv.OSUpdate)
-		setInt(&cli.IntervalMover, iv.Mover)
-		setInt(&cli.IntervalStorageTopology, iv.StorageTopology)
-		setInt(&cli.IntervalNIC, iv.NIC)
+		setInterval := func(name string, dst *int, src *int) {
+			if src != nil && !isExplicitFlag(dst) {
+				*dst = *src
+				fileConfigIntervals[name] = true
+			}
+		}
+		setInterval("system", &cli.IntervalSystem, iv.System)
+		setInterval("array", &cli.IntervalArray, iv.Array)
+		setInterval("disk", &cli.IntervalDisk, iv.Disk)
+		setInterval("docker", &cli.IntervalDocker, iv.Docker)
+		setInterval("vm", &cli.IntervalVM, iv.VM)
+		setInterval("ups", &cli.IntervalUPS, iv.UPS)
+		setInterval("nut", &cli.IntervalNUT, iv.NUT)
+		setInterval("gpu", &cli.IntervalGPU, iv.GPU)
+		setInterval("shares", &cli.IntervalShares, iv.Shares)
+		setInterval("network", &cli.IntervalNetwork, iv.Network)
+		setInterval("hardware", &cli.IntervalHardware, iv.Hardware)
+		setInterval("zfs", &cli.IntervalZFS, iv.ZFS)
+		setInterval("notification", &cli.IntervalNotification, iv.Notification)
+		setInterval("registration", &cli.IntervalRegistration, iv.Registration)
+		setInterval("unassigned", &cli.IntervalUnassigned, iv.Unassigned)
+		setInterval("fancontrol", &cli.IntervalFanControl, iv.FanControl)
+		setInterval("tuning", &cli.IntervalTuning, iv.Tuning)
+		setInterval("docker_update", &cli.IntervalDockerUpdate, iv.DockerUpdate)
+		setInterval("docker_networks", &cli.IntervalDockerNetworks, iv.DockerNetworks)
+		setInterval("plugin_update", &cli.IntervalPluginUpdate, iv.PluginUpdate)
+		setInterval("os_update", &cli.IntervalOSUpdate, iv.OSUpdate)
+		setInterval("mover", &cli.IntervalMover, iv.Mover)
+		setInterval("storage_topology", &cli.IntervalStorageTopology, iv.StorageTopology)
+		setInterval("nic", &cli.IntervalNIC, iv.NIC)
 	}
+}
+
+// fileConfigIntervals records the collectors whose interval came from config.yml.
+var fileConfigIntervals = map[string]bool{}
+
+// resolveAutoCollectors parses the automatic-mode collector list (#261). A name
+// must be a hardware-gated collector. A collector stays out of automatic mode
+// when it is in the disabled list, when its interval came from config.yml, or
+// when its configured interval is not 0: an explicit interval is used instead
+// of the auto interval while the hardware is present.
+func resolveAutoCollectors(csv string, disabled map[string]bool, intervals map[string]int, fromFile map[string]bool) map[string]bool {
+	auto := make(map[string]bool)
+	for name := range strings.SplitSeq(csv, ",") {
+		name = strings.TrimSpace(strings.ToLower(name))
+		switch {
+		case name == "":
+			continue
+		case !isHardwareGated(name):
+			logger.Warning("'%s' in UNRAID_AUTO_COLLECTORS is not a hardware-gated collector, ignoring", name)
+		case disabled[name]:
+			logger.Warning("Collector '%s' is in both UNRAID_DISABLE_COLLECTORS and UNRAID_AUTO_COLLECTORS; it stays disabled", name)
+		case fromFile[name]:
+			logger.Info("Collector '%s' has an interval in config.yml; automatic mode off", name)
+		case intervals[name] != 0:
+			logger.Info("Collector '%s' has an explicit interval (%ds); automatic mode off", name, intervals[name])
+		default:
+			auto[name] = true
+		}
+	}
+	return auto
+}
+
+// hardwareGatedCollectors returns the collectors the hardware policy controls:
+// every hardware-gated collector except those in the disabled list. Absent
+// hardware turns them off whatever their configured interval (#261).
+func hardwareGatedCollectors(disabled map[string]bool) map[string]bool {
+	gated := make(map[string]bool)
+	for _, class := range collectors.HardwareClasses {
+		if class.Collector != "" && !disabled[class.Collector] {
+			gated[class.Collector] = true
+		}
+	}
+	return gated
+}
+
+// isHardwareGated reports whether name is a collector gated by a hardware class.
+func isHardwareGated(name string) bool {
+	_, ok := collectors.HardwareClassForCollector(name)
+	return ok
 }
 
 // parseToolPolicyCSV parses a comma-separated tool=policy string into a map of ToolPolicyValue.

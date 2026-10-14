@@ -50,16 +50,45 @@ type SourceStatus struct {
 	LastError   string    `json:"last_error,omitempty"`
 }
 
-// Capability is one probed OS capability (a binary or a path).
+// CapabilityState is the outcome of one capability check.
+type CapabilityState string
+
+const (
+	// CapabilityPresent means the capability (path, binary or hardware) was found.
+	CapabilityPresent CapabilityState = "present"
+	// CapabilityAbsent means the check ran and found nothing.
+	CapabilityAbsent CapabilityState = "absent"
+	// CapabilityUnknown means the check could not decide (read error, timeout,
+	// panic). Callers must not act on an unknown result.
+	CapabilityUnknown CapabilityState = "unknown"
+)
+
+// Capability is one probed capability: an OS binary or path, or a hardware
+// class such as "hardware.nic_optics".
 type Capability struct {
-	Name      string `json:"name"`
-	Available bool   `json:"available"`
-	Target    string `json:"target,omitempty"`
-	Detail    string `json:"detail,omitempty"`
+	Name      string `json:"name" example:"hardware.storage_topology"`
+	Available bool   `json:"available" example:"true"`
+	// State is present, absent or unknown. Available is true only when present.
+	State  CapabilityState `json:"state,omitempty" enums:"present,absent,unknown" example:"present"`
+	Target string          `json:"target,omitempty"`
+	// Detail explains the result, e.g. "SAS controller at 0000:01:00.0".
+	Detail string `json:"detail,omitempty" example:"SAS controller at 0000:01:00.0"`
 }
 
-// Capabilities is the startup probe snapshot.
+// Capabilities is the periodically refreshed capability snapshot.
 type Capabilities struct {
-	UnraidVersion string       `json:"unraid_version"`
+	UnraidVersion string       `json:"unraid_version" example:"7.3.3"`
 	Items         []Capability `json:"items"`
+	// CheckedAt is when the snapshot was taken.
+	CheckedAt time.Time `json:"checked_at" format:"date-time"`
+}
+
+// Item returns the capability with the given name.
+func (c Capabilities) Item(name string) (Capability, bool) {
+	for _, it := range c.Items {
+		if it.Name == name {
+			return it, true
+		}
+	}
+	return Capability{}, false
 }

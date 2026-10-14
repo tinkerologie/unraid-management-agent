@@ -1,6 +1,8 @@
 // Package constants provides shared constants and configuration values for the Unraid Management Agent.
 package constants
 
+import "time"
+
 const (
 	// VarIni is the path to the Unraid var.ini configuration file.
 	VarIni = "/var/local/emhttp/var.ini"
@@ -105,6 +107,9 @@ const (
 	NutPluginDir = "/usr/local/emhttp/plugins/nut-dw"
 	// ApcPidFile is the path to the APC UPS daemon PID file.
 	ApcPidFile = "/var/run/apcupsd.pid"
+	// ApcupsdPluginCfg is Unraid's UPS settings file (SERVICE="enable" when the
+	// built-in apcupsd is turned on).
+	ApcupsdPluginCfg = "/boot/config/plugins/dynamix.apcupsd/dynamix.apcupsd.cfg"
 
 	// Collection intervals optimized for power efficiency (Issue #8)
 	// Higher intervals reduce CPU wake-ups and allow deeper C-states
@@ -174,6 +179,18 @@ const (
 	// IntervalNIC is the interval for collecting network cards (hwmon temperatures
 	// and optic diagnostics) in seconds. Sysfs reads plus one ioctl per port.
 	IntervalNIC = 60
+	// IntervalAutoEnable is the interval, in seconds, at which a collector in
+	// automatic mode is enabled once its hardware is detected (x4 in low
+	// power mode).
+	IntervalAutoEnable = 300
+
+	// CapabilityRefreshInterval is how often hardware capabilities are re-checked.
+	CapabilityRefreshInterval = 15 * time.Minute
+	// CapabilityMinRefreshInterval rate-limits on-demand re-checks: a request
+	// within this window of the last check returns the cached snapshot.
+	CapabilityMinRefreshInterval = 30 * time.Second
+	// CapabilityRefreshTimeout bounds one capability re-check.
+	CapabilityRefreshTimeout = 10 * time.Second
 
 	// WSPingInterval is the WebSocket ping interval in seconds.
 	WSPingInterval = 30

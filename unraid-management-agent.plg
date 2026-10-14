@@ -120,15 +120,18 @@ INTERVAL_ARRAY="30"
 INTERVAL_DISK="30"
 INTERVAL_DOCKER="30"
 INTERVAL_VM="30"
-INTERVAL_UPS="60"
-INTERVAL_GPU="60"
+INTERVAL_UPS="auto"
+INTERVAL_GPU="auto"
 INTERVAL_SHARES="60"
 INTERVAL_NETWORK="30"
-INTERVAL_ZFS="30"
+INTERVAL_ZFS="auto"
 INTERVAL_NOTIFICATION="30"
 INTERVAL_HARDWARE="300"
 INTERVAL_REGISTRATION="300"
 INTERVAL_UNASSIGNED="60"
+INTERVAL_NUT="auto"
+INTERVAL_STORAGE_TOPOLOGY="auto"
+INTERVAL_NIC="auto"
 ]]>
 </INLINE>
 </FILE>
@@ -229,6 +232,14 @@ if "${INSTALL_DIR}/scripts/migrate-secure-defaults"; then
     touch "${CONFIG_DIR}/.secure-defaults-migrated"
 else
     echo "⚠ Secure-defaults migration failed; set an API token to re-enable control actions"
+fi
+
+# Switch hardware-dependent collectors left on a shipped default to "auto" (#261).
+# The marker is set only on success, so a failed migration is retried.
+if "${INSTALL_DIR}/scripts/migrate-auto-intervals"; then
+    touch "${CONFIG_DIR}/.auto-intervals-migrated"
+else
+    echo "⚠ Auto-interval migration failed; hardware collectors keep their saved intervals"
 fi
 
 # Start service if it was running before, or if this is a fresh install

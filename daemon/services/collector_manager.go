@@ -34,6 +34,13 @@ type ManagedCollector struct {
 	LastRun    *time.Time
 	ErrorCount int
 	Required   bool // Cannot be disabled (e.g., system)
+	// Gated marks a hardware-gated collector the capability policy controls
+	// (ApplyHardwareState): off while its hardware is absent. Auto additionally
+	// runs it at the auto-enable interval while present; otherwise it runs at
+	// configured. Manual runtime control clears both.
+	Gated      bool
+	Auto       bool
+	configured int
 
 	// Runtime management
 	ctx       context.Context
@@ -81,18 +88,24 @@ func (cm *CollectorManager) Register(name string, factory CollectorFactory, inte
 		status = "disabled"
 	}
 
+	auto := interval == 0 && cm.domainCtx != nil && cm.domainCtx.AutoCollectors[name]
+	gated := auto || (cm.domainCtx != nil && cm.domainCtx.GatedCollectors[name])
+
 	cm.collectors[name] = &ManagedCollector{
-		Name:      name,
-		Enabled:   enabled,
-		Interval:  interval,
-		Status:    status,
-		Required:  required,
-		factory:   factory,
-		domainCtx: cm.domainCtx,
-		wg:        cm.wg,
+		Name:       name,
+		Enabled:    enabled,
+		Interval:   interval,
+		Status:     status,
+		Required:   required,
+		Gated:      gated,
+		Auto:       auto,
+		configured: interval,
+		factory:    factory,
+		domainCtx:  cm.domainCtx,
+		wg:         cm.wg,
 	}
 
-	logger.Debug("Registered collector: %s (interval: %ds, required: %v)", name, interval, required)
+	logger.Debug("Registered collector: %s (interval: %ds, required: %v, gated: %v, auto: %v)", name, interval, required, gated, auto)
 }
 
 // StartAll starts all enabled collectors
@@ -152,6 +165,7 @@ func (cm *CollectorManager) EnableCollector(name string) error {
 		cm.mu.Unlock()
 		return fmt.Errorf("unknown collector: %s", name)
 	}
+	mc.Gated, mc.Auto = false, false // manual control ends hardware gating
 
 	if mc.Status == "running" {
 		cm.mu.Unlock()
@@ -191,6 +205,7 @@ func (cm *CollectorManager) DisableCollector(name string) error {
 		cm.mu.Unlock()
 		return fmt.Errorf("cannot disable %s collector (always required)", name)
 	}
+	mc.Gated, mc.Auto = false, false // manual control ends hardware gating
 
 	if mc.Status != "running" {
 		cm.mu.Unlock()
@@ -229,6 +244,7 @@ func (cm *CollectorManager) UpdateInterval(name string, intervalSeconds int) err
 	if intervalSeconds < 5 || intervalSeconds > 86400 {
 		return errors.New("invalid interval: must be between 5 and 86400 seconds")
 	}
+	mc.Gated, mc.Auto = false, false // manual control ends hardware gating
 
 	wasRunning := mc.Status == "running"
 
@@ -253,6 +269,57 @@ func (cm *CollectorManager) UpdateInterval(name string, intervalSeconds int) err
 	return nil
 }
 
+// ApplyHardwareState applies the hardware capability policy to a gated
+// collector. Absent hardware stops and disables it whatever its configured
+// interval; present hardware runs it at autoInterval in automatic mode and at
+// its configured interval otherwise (a configured 0 keeps it off). It reports
+// whether anything changed; collectors that are unknown or not gated are left
+// alone.
+func (cm *CollectorManager) ApplyHardwareState(name string, present bool, autoInterval int) bool {
+	cm.mu.Lock()
+	mc, exists := cm.collectors[name]
+	if !exists || !mc.Gated {
+		cm.mu.Unlock()
+		return false
+	}
+	interval := 0
+	if present {
+		interval = mc.configured
+		if mc.Auto {
+			interval = autoInterval
+		}
+	}
+	running := mc.Status == "running"
+	if interval <= 0 {
+		if !running && mc.Interval == 0 {
+			cm.mu.Unlock()
+			return false
+		}
+		cm.stopCollectorLocked(mc)
+		mc.Interval = 0
+		mc.Enabled = false
+		mc.Status = "disabled"
+		logger.Info("Hardware-gated collector stopped: %s", name)
+	} else {
+		if running && mc.Interval == interval {
+			cm.mu.Unlock()
+			return false
+		}
+		if running {
+			cm.stopCollectorLocked(mc)
+			mc.Status = "stopped"
+		}
+		mc.Interval = interval
+		cm.startCollectorLocked(name)
+		logger.Info("Hardware-gated collector started: %s (interval: %ds)", name, interval)
+	}
+	event := cm.buildStateEvent(name, mc.Enabled)
+	cm.mu.Unlock()
+
+	domain.Publish(cm.domainCtx.Hub, constants.TopicCollectorStateChange, event)
+	return true
+}
+
 // GetStatus returns the status of a specific collector
 func (cm *CollectorManager) GetStatus(name string) (*dto.CollectorStatus, error) {
 	cm.mu.RLock()
@@ -264,13 +331,15 @@ func (cm *CollectorManager) GetStatus(name string) (*dto.CollectorStatus, error)
 	}
 
 	return &dto.CollectorStatus{
-		Name:       mc.Name,
-		Enabled:    mc.Enabled,
-		Interval:   mc.Interval,
-		Status:     mc.Status,
-		LastRun:    mc.LastRun,
-		ErrorCount: mc.ErrorCount,
-		Required:   mc.Required,
+		Name:          mc.Name,
+		Enabled:       mc.Enabled,
+		Interval:      mc.Interval,
+		Status:        mc.Status,
+		LastRun:       mc.LastRun,
+		ErrorCount:    mc.ErrorCount,
+		Required:      mc.Required,
+		HardwareGated: mc.Gated,
+		Auto:          mc.Auto,
 	}, nil
 }
 
@@ -305,13 +374,15 @@ func (cm *CollectorManager) GetAllStatus() dto.CollectorsStatusResponse {
 		}
 
 		statuses = append(statuses, dto.CollectorStatus{
-			Name:       mc.Name,
-			Enabled:    mc.Enabled,
-			Interval:   mc.Interval,
-			Status:     mc.Status,
-			LastRun:    mc.LastRun,
-			ErrorCount: mc.ErrorCount,
-			Required:   mc.Required,
+			Name:          mc.Name,
+			Enabled:       mc.Enabled,
+			Interval:      mc.Interval,
+			Status:        mc.Status,
+			LastRun:       mc.LastRun,
+			ErrorCount:    mc.ErrorCount,
+			Required:      mc.Required,
+			HardwareGated: mc.Gated,
+			Auto:          mc.Auto,
 		})
 	}
 
