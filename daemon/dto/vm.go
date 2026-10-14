@@ -4,11 +4,15 @@ import "time"
 
 // VMInfo contains virtual machine information
 type VMInfo struct {
-	ID              string    `json:"id" example:"1"`
-	Name            string    `json:"name" example:"Windows 11"`
-	State           string    `json:"state" example:"running"`
-	CPUCount        int       `json:"cpu_count" example:"4"`
-	GuestCPUPercent float64   `json:"guest_cpu_percent" example:"25.5"`
+	ID       string `json:"id" example:"1"`
+	Name     string `json:"name" example:"Windows 11"`
+	State    string `json:"state" example:"running"`
+	CPUCount int    `json:"cpu_count" example:"4"`
+	// GuestCPUPercent is the VM's CPU time relative to its allocated vCPUs
+	// (0–100; 0 on the first sample after the VM starts).
+	GuestCPUPercent float64 `json:"guest_cpu_percent" example:"25.5"`
+	// HostCPUPercent is the VM's CPU time relative to the host's logical CPUs:
+	// its share of the whole server (0–100; 0 on the first sample).
 	HostCPUPercent  float64   `json:"host_cpu_percent" example:"12.3"`
 	MemoryAllocated uint64    `json:"memory_allocated_bytes" example:"8589934592"`
 	MemoryUsed      uint64    `json:"memory_used_bytes" example:"4294967296"`

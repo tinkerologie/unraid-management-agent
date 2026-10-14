@@ -374,6 +374,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **VM `host_cpu_percent` was always 0** — the VM collector now fills `host_cpu_percent` in
+  `/api/v1/vm` (and the `vm_list_update` event): the VM's share of the whole server, its CPU-time
+  delta over the host's logical CPU count. The count comes from libvirt `NodeGetInfo`, so CPUs
+  isolated for VMs (`isolcpus`) do not inflate the share; `runtime.NumCPU()` is the fallback.
+  `guest_cpu_percent` stays relative to the VM's vCPUs. Both share one guarded calculation: a CPU
+  counter that goes backwards (domain restart) no longer reports a false 100 %, it starts a new
+  baseline. ([#175](https://github.com/tinkerologie/unraid-management-agent/issues/175))
 - **ZFS scrub and resilver times, progress and repaired bytes** — `scan_start_time`,
   `scan_end_time`, `scan_repaired_bytes` and `scan_progress_percent` in `/api/v1/zfs/pools` were
   never filled in. The `zpool status` scan line is now parsed for every OpenZFS format: completed,

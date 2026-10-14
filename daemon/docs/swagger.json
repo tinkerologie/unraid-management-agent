@@ -12522,10 +12522,12 @@
                     "example": 536870912
                 },
                 "guest_cpu_percent": {
+                    "description": "GuestCPUPercent is the VM's CPU time relative to its allocated vCPUs\n(0–100; 0 on the first sample after the VM starts).",
                     "type": "number",
                     "example": 25.5
                 },
                 "host_cpu_percent": {
+                    "description": "HostCPUPercent is the VM's CPU time relative to the host's logical CPUs:\nits share of the whole server (0–100; 0 on the first sample).",
                     "type": "number",
                     "example": 12.3
                 },

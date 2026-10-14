@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -18,8 +19,7 @@ import (
 
 // vmCPUStats holds CPU usage tracking data for a VM
 type vmCPUStats struct {
-	guestCPUTime uint64    // Cumulative guest CPU time in nanoseconds
-	hostCPUTime  uint64    //nolint:unused // Reserved for future CPU tracking features
+	guestCPUTime uint64    // Cumulative domain CPU time in nanoseconds
 	timestamp    time.Time // When this measurement was taken
 }
 
@@ -116,6 +116,7 @@ func (c *VMCollector) Collect() {
 	}
 
 	vms := make([]*dto.VMInfo, 0, len(domains))
+	hostCPUs := c.hostCPUCount(l)
 
 	for _, domain := range domains {
 		vm := &dto.VMInfo{
@@ -157,7 +158,7 @@ func (c *VMCollector) Collect() {
 		// For running VMs, get more stats
 		if vm.State == "running" {
 			// Get CPU usage (using CPU stats)
-			c.getCPUUsage(l, domain, vm)
+			c.getCPUUsage(l, domain, vm, hostCPUs)
 
 			// Get block I/O stats
 			c.getBlockIO(l, domain, vm)
@@ -213,44 +214,83 @@ func (c *VMCollector) stateToString(state libvirt.DomainState) string {
 	}
 }
 
+// nodeInfoGetter is the libvirt call hostCPUCount needs; *libvirt.Libvirt implements it.
+type nodeInfoGetter interface {
+	NodeGetInfo() (rModel [32]int8, rMemory uint64, rCpus int32, rMhz int32, rNodes int32, rSockets int32, rCores int32, rThreads int32, err error)
+}
+
+// domainInfoGetter is the libvirt call getCPUUsage needs; *libvirt.Libvirt implements it.
+type domainInfoGetter interface {
+	DomainGetInfo(dom libvirt.Domain) (rState uint8, rMaxMem uint64, rMemory uint64, rNrVirtCPU uint16, rCPUTime uint64, err error)
+}
+
+// numCPU returns the CPUs the agent may run on; replaceable for tests.
+var numCPU = runtime.NumCPU
+
+// hostCPUCount returns the host's logical CPU count from libvirt (#175). It is
+// independent of the agent's CPU affinity, which isolcpus shrinks on hosts
+// that isolate cores for VMs.
+func (c *VMCollector) hostCPUCount(l nodeInfoGetter) int {
+	_, _, cpus, _, _, _, _, _, err := l.NodeGetInfo()
+	return resolveHostCPUCount(cpus, err)
+}
+
+// resolveHostCPUCount picks the host CPU count: libvirt's active CPU count,
+// else runtime.NumCPU(), else 1.
+func resolveHostCPUCount(libvirtCPUs int32, err error) int {
+	if err == nil && libvirtCPUs > 0 {
+		return int(libvirtCPUs)
+	}
+	if n := numCPU(); n > 0 {
+		return n
+	}
+	return 1
+}
+
+// cpuPercent converts a CPU-time delta to a percentage of divisor CPUs over
+// elapsedSeconds, clamped to 0–100. It reports false when there is no valid
+// value: no elapsed time, no CPUs, or a counter that went backwards (reset).
+func cpuPercent(prevCPUTime, curCPUTime uint64, elapsedSeconds float64, divisor int) (float64, bool) {
+	if elapsedSeconds <= 0 || divisor <= 0 || curCPUTime < prevCPUTime {
+		return 0, false
+	}
+	pct := float64(curCPUTime-prevCPUTime) / (elapsedSeconds * 1e9 * float64(divisor)) * 100
+	return min(max(pct, 0), 100), true
+}
+
 // getCPUUsage gets CPU usage for a running VM
-func (c *VMCollector) getCPUUsage(l *libvirt.Libvirt, domain libvirt.Domain, vm *dto.VMInfo) {
+func (c *VMCollector) getCPUUsage(l domainInfoGetter, domain libvirt.Domain, vm *dto.VMInfo, hostCPUs int) {
 	// Get domain info for CPU time
 	// DomainGetInfo returns: rState, rMaxMem, rMemory, rNrVirtCPU, rCPUTime, err
 	_, _, _, _, cpuTime, err := l.DomainGetInfo(domain)
 	if err != nil {
 		return
 	}
+	c.recordCPUSample(domain.Name, cpuTime, time.Now(), hostCPUs, vm)
+}
 
-	currentTime := time.Now()
-	guestCPUTime := cpuTime // nanoseconds
-
+// recordCPUSample sets the guest and host CPU percentages from the previous
+// sample of the VM, then stores this sample. The guest share is relative to
+// the VM's vCPUs, the host share to the host's logical CPUs. Both stay 0 on
+// the first sample and after a counter reset.
+func (c *VMCollector) recordCPUSample(name string, cpuTime uint64, now time.Time, hostCPUs int, vm *dto.VMInfo) {
 	c.cpuStatsMutex.Lock()
 	defer c.cpuStatsMutex.Unlock()
 
-	prevStats, hasPrev := c.previousStats[domain.Name]
-
-	if hasPrev && currentTime.Sub(prevStats.timestamp) > 0 {
-		// Calculate CPU percentage
-		timeDelta := currentTime.Sub(prevStats.timestamp).Seconds()
-		cpuTimeDelta := float64(guestCPUTime - prevStats.guestCPUTime)
-
-		// CPU percentage = (CPU time delta in ns) / (wall time delta in s * 1e9 * num_vcpus) * 100
-		if vm.CPUCount > 0 && timeDelta > 0 {
-			vm.GuestCPUPercent = (cpuTimeDelta / (timeDelta * 1e9 * float64(vm.CPUCount))) * 100
-			if vm.GuestCPUPercent < 0 {
-				vm.GuestCPUPercent = 0
-			}
-			if vm.GuestCPUPercent > 100 {
-				vm.GuestCPUPercent = 100
-			}
+	if prev, ok := c.previousStats[name]; ok {
+		elapsed := now.Sub(prev.timestamp).Seconds()
+		if pct, valid := cpuPercent(prev.guestCPUTime, cpuTime, elapsed, vm.CPUCount); valid {
+			vm.GuestCPUPercent = pct
+		}
+		if pct, valid := cpuPercent(prev.guestCPUTime, cpuTime, elapsed, hostCPUs); valid {
+			vm.HostCPUPercent = pct
 		}
 	}
 
 	// Store current stats for next calculation
-	c.previousStats[domain.Name] = &vmCPUStats{
-		guestCPUTime: guestCPUTime,
-		timestamp:    currentTime,
+	c.previousStats[name] = &vmCPUStats{
+		guestCPUTime: cpuTime,
+		timestamp:    now,
 	}
 }
 

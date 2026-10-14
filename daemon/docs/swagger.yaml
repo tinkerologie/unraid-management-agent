@@ -4980,9 +4980,15 @@ definitions:
         example: 536870912
         type: integer
       guest_cpu_percent:
+        description: |-
+          GuestCPUPercent is the VM's CPU time relative to its allocated vCPUs
+          (0–100; 0 on the first sample after the VM starts).
         example: 25.5
         type: number
       host_cpu_percent:
+        description: |-
+          HostCPUPercent is the VM's CPU time relative to the host's logical CPUs:
+          its share of the whole server (0–100; 0 on the first sample).
         example: 12.3
         type: number
       id:
