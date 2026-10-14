@@ -287,18 +287,28 @@ def identify_event_type(data):
 
 ### UPS Status Fields
 
-| Field                    | Type    | Unit    | Range | Nullable | Description                      |
-| ------------------------ | ------- | ------- | ----- | -------- | -------------------------------- |
-| `connected`              | bool    | -       | -     | No       | UPS connected                    |
-| `device_name`            | string  | -       | -     | No       | NUT device (omitted for apcupsd) |
-| `status`                 | string  | -       | enum  | No       | UPS status                       |
-| `load_percent`           | float64 | percent | 0-100 | Yes      | Load percent                     |
-| `battery_charge_percent` | float64 | percent | 0-100 | Yes      | Battery charge                   |
-| `runtime_left_seconds`   | int     | seconds | ≥0    | Yes      | Runtime est.                     |
-| `power_watts`            | float64 | watts   | ≥0    | Yes      | Power draw (reported or derived) |
-| `nominal_power_watts`    | float64 | watts   | ≥0    | Yes      | Nominal power                    |
-| `model`                  | string  | -       | -     | No       | UPS model                        |
-| `timestamp`              | string  | -       | -     | No       | Event timestamp                  |
+| Field                                | Type    | Unit    | Range | Nullable | Description                                 |
+| ------------------------------------ | ------- | ------- | ----- | -------- | ------------------------------------------- |
+| `connected`                          | bool    | -       | -     | No       | UPS connected                               |
+| `device_name`                        | string  | -       | -     | No       | NUT device (omitted for apcupsd)            |
+| `status`                             | string  | -       | enum  | No       | UPS status                                  |
+| `load_percent`                       | float64 | percent | 0-100 | Yes      | Load percent                                |
+| `battery_charge_percent`             | float64 | percent | 0-100 | Yes      | Battery charge                              |
+| `runtime_left_seconds`               | int     | seconds | ≥0    | Yes      | Runtime est.                                |
+| `power_watts`                        | float64 | watts   | ≥0    | Yes      | Power draw (reported or derived)            |
+| `nominal_power_watts`                | float64 | watts   | ≥0    | Yes      | Nominal power                               |
+| `input_voltage`                      | float64 | volts   | ≥0    | Yes      | Input (line) voltage                        |
+| `output_voltage`                     | float64 | volts   | ≥0    | Yes      | Output voltage                              |
+| `battery_voltage`                    | float64 | volts   | ≥0    | Yes      | Battery voltage                             |
+| `line_frequency`                     | float64 | hertz   | ≥0    | Yes      | Input line frequency                        |
+| `temperature_celsius`                | float64 | °C      | -     | Yes      | Internal UPS temperature                    |
+| `time_on_battery_seconds`            | int     | seconds | ≥0    | Yes      | On battery, current outage                  |
+| `cumulative_time_on_battery_seconds` | int     | seconds | ≥0    | Yes      | Total on battery (apcupsd only)             |
+| `transfer_count`                     | int     | count   | ≥0    | Yes      | Transfers to battery                        |
+| `self_test`                          | string  | -       | -     | No       | Raw self-test result (omitted when unknown) |
+| `serial_number`                      | string  | -       | -     | No       | Serial number (omitted when unknown)        |
+| `model`                              | string  | -       | -     | No       | UPS model                                   |
+| `timestamp`                          | string  | -       | -     | No       | Event timestamp                             |
 
 Nullable fields are `null` when the UPS does not report the value.
 
@@ -353,7 +363,9 @@ Nullable fields are `null` when the UPS does not report the value.
 
 ### General Rules
 
-1. **Required Fields**: All non-nullable fields must be present
+1. **Required Fields**: All non-nullable fields must be present, except fields
+   documented as omitted (for example `device_name`, `self_test` and
+   `serial_number`): these may be absent, but are never `null` when present
 2. **Type Safety**: Fields must match specified types
 3. **Range Validation**: Numeric fields must be within specified ranges
 4. **Enum Validation**: String enums must match allowed values

@@ -12168,14 +12168,38 @@ const docTemplate = `{
                     "x-nullable": true,
                     "example": 100
                 },
+                "battery_voltage": {
+                    "description": "Battery voltage in volts; null when the UPS does not report it",
+                    "type": "number",
+                    "x-nullable": true,
+                    "example": 27.1
+                },
                 "connected": {
                     "type": "boolean",
                     "example": true
+                },
+                "cumulative_time_on_battery_seconds": {
+                    "description": "Total seconds on battery since apcupsd started; apcupsd only, null for NUT",
+                    "type": "integer",
+                    "x-nullable": true,
+                    "example": 0
                 },
                 "device_name": {
                     "description": "NUT device name (upsc -l) when the data comes from NUT; empty for apcupsd.\nGET /nut lists every NUT device; this is the first one.",
                     "type": "string",
                     "example": "ups"
+                },
+                "input_voltage": {
+                    "description": "Input (line) voltage in volts; null when the UPS does not report it",
+                    "type": "number",
+                    "x-nullable": true,
+                    "example": 230
+                },
+                "line_frequency": {
+                    "description": "Input line frequency in hertz; null when the UPS does not report it",
+                    "type": "number",
+                    "x-nullable": true,
+                    "example": 50
                 },
                 "load_percent": {
                     "description": "Load percentage; null when the UPS does not report it",
@@ -12193,6 +12217,12 @@ const docTemplate = `{
                     "x-nullable": true,
                     "example": 1000
                 },
+                "output_voltage": {
+                    "description": "Output voltage in volts; null when the UPS does not report it",
+                    "type": "number",
+                    "x-nullable": true,
+                    "example": 230
+                },
                 "power_watts": {
                     "description": "Real power draw in watts; null unless the UPS reports it or both nominal power and load",
                     "type": "number",
@@ -12205,12 +12235,40 @@ const docTemplate = `{
                     "x-nullable": true,
                     "example": 3600
                 },
+                "self_test": {
+                    "description": "Last battery self-test result as the backend reports it, not normalised\n(apcupsd \"NO\", \"OK\", \"NG\"; NUT \"Done and passed\"); omitted when unknown",
+                    "type": "string",
+                    "example": "OK"
+                },
+                "serial_number": {
+                    "description": "UPS serial number; omitted when the UPS does not report it",
+                    "type": "string",
+                    "example": "AS1234567890"
+                },
                 "status": {
                     "type": "string",
                     "example": "OL"
                 },
+                "temperature_celsius": {
+                    "description": "Internal UPS temperature in degrees Celsius; null when the UPS does not\nreport it (or reports another unit)",
+                    "type": "number",
+                    "x-nullable": true,
+                    "example": 29.2
+                },
+                "time_on_battery_seconds": {
+                    "description": "Seconds on battery in the current outage (0 on line power); null when the\nUPS does not report it",
+                    "type": "integer",
+                    "x-nullable": true,
+                    "example": 0
+                },
                 "timestamp": {
                     "type": "string"
+                },
+                "transfer_count": {
+                    "description": "Number of transfers to battery; null when the UPS does not report it",
+                    "type": "integer",
+                    "x-nullable": true,
+                    "example": 0
                 }
             }
         },

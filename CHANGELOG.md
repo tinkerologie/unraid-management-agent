@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **UPS telemetry: voltages, frequency, temperature, transfers and self-test** — `/api/v1/ups`
+  (and the `ups_status_update` event) now reports `input_voltage`, `output_voltage`,
+  `battery_voltage`, `line_frequency`, `temperature_celsius`, `time_on_battery_seconds`,
+  `cumulative_time_on_battery_seconds`, `transfer_count`, `self_test` and `serial_number`. From
+  apcupsd: `LINEV`, `OUTPUTV`, `BATTV`, `LINEFREQ`, `ITEMP`, `TONBATT`, `CUMONBATT`, `NUMXFERS`,
+  `SELFTEST`, `SERIALNO`; from NUT: `input.voltage`, `output.voltage`, `battery.voltage`,
+  `input.frequency`, `ups.temperature`, `battery.runtime.elapsed`, `input.transfers` (only
+  drivers that report this non-standard variable),
+  `ups.test.result`, `device.serial`/`ups.serial` (NUT has no cumulative on-battery time). Numeric
+  readings the UPS does not report are `null`, never `0`; `self_test` (the raw backend value) and
+  `serial_number` are omitted when unknown. `LINEV`, `BATTV`, `input.voltage` and
+  `battery.voltage` were parsed before but discarded.
+  ([#193](https://github.com/tinkerologie/unraid-management-agent/issues/193))
 - **Hardware auto-detection for the settings page and collectors** — the agent now detects which
   optional hardware the server has and runs the matching collectors only when it is present. Seven
   read-only hardware classes join the capability snapshot: `hardware.nic_optics` (a wired PCI NIC

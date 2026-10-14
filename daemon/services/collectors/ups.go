@@ -159,17 +159,26 @@ func parseAPCOutput(output string) (*dto.UPSStatus, error) {
 			}
 			status.NominalPower = parseOptionalFloat(value)
 		case "LINEV":
-			if strings.HasSuffix(value, "Volts") {
-				value = strings.TrimSuffix(value, " Volts")
-			}
-			// InputVoltage field not in DTO, parsing for potential future use
-			_, _ = strconv.ParseFloat(value, 64)
+			status.InputVoltage = parseOptionalFloat(strings.TrimSuffix(value, " Volts"))
+		case "OUTPUTV":
+			status.OutputVoltage = parseOptionalFloat(strings.TrimSuffix(value, " Volts"))
 		case "BATTV":
-			if strings.HasSuffix(value, "Volts") {
-				value = strings.TrimSuffix(value, " Volts")
-			}
-			// BatteryVoltage field not in DTO, parsing for potential future use
-			_, _ = strconv.ParseFloat(value, 64)
+			status.BatteryVoltage = parseOptionalFloat(strings.TrimSuffix(value, " Volts"))
+		case "LINEFREQ":
+			status.LineFrequency = parseOptionalFloat(strings.TrimSuffix(value, " Hz"))
+		case "ITEMP":
+			// Celsius only: another unit leaves the suffix, so the reading stays null.
+			status.Temperature = parseOptionalFloat(strings.TrimSuffix(value, " C"))
+		case "TONBATT":
+			status.TimeOnBattery = parseOptionalInt(strings.TrimSuffix(value, " Seconds"))
+		case "CUMONBATT":
+			status.CumulativeTimeOnBattery = parseOptionalInt(strings.TrimSuffix(value, " Seconds"))
+		case "NUMXFERS":
+			status.TransferCount = parseOptionalInt(value)
+		case "SELFTEST":
+			status.SelfTest = value
+		case "SERIALNO":
+			status.SerialNumber = value
 		case "MODEL":
 			status.Model = value
 		}
@@ -252,11 +261,27 @@ func parseNUTUpscOutput(output string) (*dto.UPSStatus, error) {
 			// is not used: VA × load would overstate the power draw.
 			status.NominalPower = parseOptionalFloat(value)
 		case "input.voltage":
-			// InputVoltage field not in DTO, parsing for potential future use
-			_, _ = strconv.ParseFloat(value, 64)
+			status.InputVoltage = parseOptionalFloat(value)
+		case "output.voltage":
+			status.OutputVoltage = parseOptionalFloat(value)
 		case "battery.voltage":
-			// BatteryVoltage field not in DTO, parsing for potential future use
-			_, _ = strconv.ParseFloat(value, 64)
+			status.BatteryVoltage = parseOptionalFloat(value)
+		case "input.frequency":
+			status.LineFrequency = parseOptionalFloat(value)
+		case "ups.temperature":
+			status.Temperature = parseOptionalFloat(value)
+		case "battery.runtime.elapsed":
+			status.TimeOnBattery = parseOptionalInt(value)
+		case "input.transfers":
+			// Not a standard NUT variable; only some drivers report it.
+			status.TransferCount = parseOptionalInt(value)
+		case "ups.test.result":
+			status.SelfTest = value
+		case "device.serial", "ups.serial":
+			// Some drivers report the placeholder "unknown"; leave it out.
+			if !strings.EqualFold(value, "unknown") {
+				status.SerialNumber = value
+			}
 		case "device.model", "ups.model":
 			status.Model = value
 		}

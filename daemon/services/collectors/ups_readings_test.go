@@ -152,12 +152,21 @@ func TestUPSCollectorNUTMissingReadingsAreNull(t *testing.T) {
 	if status.Status != "OL" || status.Model != "Smart-UPS X 3000" {
 		t.Errorf("status/model = %q/%q", status.Status, status.Model)
 	}
+	if status.BatteryVoltage == nil || *status.BatteryVoltage != 134.7 || status.SerialNumber != "AS0000000000" {
+		t.Errorf("battery voltage/serial = %v/%q, want 134.7/AS0000000000", status.BatteryVoltage, status.SerialNumber)
+	}
+	if status.InputVoltage != nil || status.OutputVoltage != nil || status.LineFrequency != nil || status.Temperature != nil ||
+		status.TimeOnBattery != nil || status.CumulativeTimeOnBattery != nil || status.TransferCount != nil {
+		t.Errorf("unreported telemetry must be nil: %+v", status)
+	}
 
 	body, err := json.Marshal(status)
 	if err != nil {
 		t.Fatalf("json.Marshal() error = %v", err)
 	}
-	for _, field := range []string{`"load_percent":null`, `"power_watts":null`, `"nominal_power_watts":null`} {
+	for _, field := range []string{`"load_percent":null`, `"power_watts":null`, `"nominal_power_watts":null`,
+		`"input_voltage":null`, `"output_voltage":null`, `"line_frequency":null`, `"temperature_celsius":null`,
+		`"time_on_battery_seconds":null`, `"cumulative_time_on_battery_seconds":null`, `"transfer_count":null`} {
 		if !strings.Contains(string(body), field) {
 			t.Errorf("JSON %s does not contain %s", body, field)
 		}
@@ -416,5 +425,136 @@ func TestNUTCollectStatusDefaultExec(t *testing.T) {
 	// server named this, so the query fails cleanly.
 	if _, err := (&NUTCollector{}).collectStatus("uma-test-no-such-ups", "127.0.0.1"); err == nil {
 		t.Skip("upsc unexpectedly answered for a non-existent UPS")
+	}
+}
+
+// apcaccessTelemetry is apcaccess output with the extended telemetry (#193),
+// modelled on a CyberPower PR1000ELCDRT1U plus BATTV/ITEMP from an APC unit.
+const apcaccessTelemetry = `STATUS   : ONLINE
+MODEL    : PR1000ELCDRT1U
+LINEV    : 250.0 Volts
+LOADPCT  : 13.0 Percent
+OUTPUTV  : 249.5 Volts
+BATTV    : 24.3 Volts
+LINEFREQ : 49.9 Hz
+ITEMP    : 29.2 C
+SELFTEST : NO
+NUMXFERS : 3
+TONBATT  : 12 Seconds
+CUMONBATT: 95 Seconds
+SERIALNO : PZSQ0000000000
+`
+
+// TestParseAPCOutputTelemetry maps every extended apcupsd key (#193).
+func TestParseAPCOutputTelemetry(t *testing.T) {
+	status, err := parseAPCOutput(apcaccessTelemetry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	floats := map[string]struct {
+		got  *float64
+		want float64
+	}{
+		"InputVoltage": {status.InputVoltage, 250}, "OutputVoltage": {status.OutputVoltage, 249.5},
+		"BatteryVoltage": {status.BatteryVoltage, 24.3}, "LineFrequency": {status.LineFrequency, 49.9},
+		"Temperature": {status.Temperature, 29.2},
+	}
+	for name, f := range floats {
+		if f.got == nil || *f.got != f.want {
+			t.Errorf("%s = %v, want %v", name, f.got, f.want)
+		}
+	}
+	ints := map[string]struct {
+		got  *int
+		want int
+	}{
+		"TimeOnBattery": {status.TimeOnBattery, 12}, "CumulativeTimeOnBattery": {status.CumulativeTimeOnBattery, 95},
+		"TransferCount": {status.TransferCount, 3},
+	}
+	for name, f := range ints {
+		if f.got == nil || *f.got != f.want {
+			t.Errorf("%s = %v, want %d", name, f.got, f.want)
+		}
+	}
+	if status.SelfTest != "NO" || status.SerialNumber != "PZSQ0000000000" {
+		t.Errorf("self test/serial = %q/%q", status.SelfTest, status.SerialNumber)
+	}
+}
+
+// TestParseAPCOutputTelemetryInvalid keeps malformed or non-Celsius readings
+// null and leaves empty strings out of the JSON.
+func TestParseAPCOutputTelemetryInvalid(t *testing.T) {
+	status, err := parseAPCOutput("STATUS   : ONLINE\nLINEV    : N/A\nOUTPUTV  : -- Volts\nLINEFREQ : bad Hz\nITEMP    : 84.6 F\nTONBATT  : x Seconds\nNUMXFERS : many\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.InputVoltage != nil || status.OutputVoltage != nil || status.LineFrequency != nil ||
+		status.Temperature != nil || status.TimeOnBattery != nil || status.TransferCount != nil || status.BatteryVoltage != nil {
+		t.Errorf("malformed readings must be nil: %+v", status)
+	}
+	body, err := json.Marshal(status)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(body), `"self_test"`) || strings.Contains(string(body), `"serial_number"`) {
+		t.Errorf("empty self_test/serial_number must be omitted: %s", body)
+	}
+}
+
+// TestParseNUTUpscOutputTelemetry maps every extended NUT variable (#193).
+func TestParseNUTUpscOutputTelemetry(t *testing.T) {
+	status, err := parseNUTUpscOutput(`ups.status: OL
+input.voltage: 231.4
+output.voltage: 230.0
+battery.voltage: 27.1
+input.frequency: 50.0
+ups.temperature: 31.5
+battery.runtime.elapsed: 0
+input.transfers: 7
+ups.test.result: Done and passed
+device.serial: AS1234567890
+input.1.voltage: 999
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checks := []struct {
+		name string
+		got  *float64
+		want float64
+	}{
+		{"InputVoltage", status.InputVoltage, 231.4}, {"OutputVoltage", status.OutputVoltage, 230},
+		{"BatteryVoltage", status.BatteryVoltage, 27.1}, {"LineFrequency", status.LineFrequency, 50},
+		{"Temperature", status.Temperature, 31.5},
+	}
+	for _, c := range checks {
+		if c.got == nil || *c.got != c.want {
+			t.Errorf("%s = %v, want %v", c.name, c.got, c.want)
+		}
+	}
+	if status.TimeOnBattery == nil || *status.TimeOnBattery != 0 || status.TransferCount == nil || *status.TransferCount != 7 {
+		t.Errorf("time on battery/transfers = %v/%v, want 0/7", status.TimeOnBattery, status.TransferCount)
+	}
+	if status.CumulativeTimeOnBattery != nil {
+		t.Errorf("CumulativeTimeOnBattery = %v, want nil for NUT", status.CumulativeTimeOnBattery)
+	}
+	if status.SelfTest != "Done and passed" || status.SerialNumber != "AS1234567890" {
+		t.Errorf("self test/serial = %q/%q", status.SelfTest, status.SerialNumber)
+	}
+
+	status, err = parseNUTUpscOutput("ups.serial: unknown\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.SerialNumber != "" {
+		t.Errorf("placeholder serial must be omitted, got %q", status.SerialNumber)
+	}
+
+	status, err = parseNUTUpscOutput("ups.serial: 3B1234X56789\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.SerialNumber != "3B1234X56789" {
+		t.Errorf("ups.serial-only SerialNumber = %q", status.SerialNumber)
 	}
 }

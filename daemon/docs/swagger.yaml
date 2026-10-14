@@ -4725,15 +4725,38 @@ definitions:
         example: 100
         type: number
         x-nullable: true
+      battery_voltage:
+        description: Battery voltage in volts; null when the UPS does not report it
+        example: 27.1
+        type: number
+        x-nullable: true
       connected:
         example: true
         type: boolean
+      cumulative_time_on_battery_seconds:
+        description: Total seconds on battery since apcupsd started; apcupsd only,
+          null for NUT
+        example: 0
+        type: integer
+        x-nullable: true
       device_name:
         description: |-
           NUT device name (upsc -l) when the data comes from NUT; empty for apcupsd.
           GET /nut lists every NUT device; this is the first one.
         example: ups
         type: string
+      input_voltage:
+        description: Input (line) voltage in volts; null when the UPS does not report
+          it
+        example: 230
+        type: number
+        x-nullable: true
+      line_frequency:
+        description: Input line frequency in hertz; null when the UPS does not report
+          it
+        example: 50
+        type: number
+        x-nullable: true
       load_percent:
         description: Load percentage; null when the UPS does not report it
         example: 25.5
@@ -4745,6 +4768,11 @@ definitions:
       nominal_power_watts:
         description: Nominal power in watts; null when the UPS does not report it
         example: 1000
+        type: number
+        x-nullable: true
+      output_voltage:
+        description: Output voltage in volts; null when the UPS does not report it
+        example: 230
         type: number
         x-nullable: true
       power_watts:
@@ -4759,11 +4787,41 @@ definitions:
         example: 3600
         type: integer
         x-nullable: true
+      self_test:
+        description: |-
+          Last battery self-test result as the backend reports it, not normalised
+          (apcupsd "NO", "OK", "NG"; NUT "Done and passed"); omitted when unknown
+        example: OK
+        type: string
+      serial_number:
+        description: UPS serial number; omitted when the UPS does not report it
+        example: AS1234567890
+        type: string
       status:
         example: OL
         type: string
+      temperature_celsius:
+        description: |-
+          Internal UPS temperature in degrees Celsius; null when the UPS does not
+          report it (or reports another unit)
+        example: 29.2
+        type: number
+        x-nullable: true
+      time_on_battery_seconds:
+        description: |-
+          Seconds on battery in the current outage (0 on line power); null when the
+          UPS does not report it
+        example: 0
+        type: integer
+        x-nullable: true
       timestamp:
         type: string
+      transfer_count:
+        description: Number of transfers to battery; null when the UPS does not report
+          it
+        example: 0
+        type: integer
+        x-nullable: true
     type: object
   dto.UnassignedDevice:
     properties:

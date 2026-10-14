@@ -273,6 +273,16 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
   "runtime_left_seconds": 3600,
   "power_watts": 150.0,
   "nominal_power_watts": 600.0,
+  "input_voltage": 230.0,
+  "output_voltage": 230.0,
+  "battery_voltage": 27.1,
+  "line_frequency": 50.0,
+  "temperature_celsius": null,
+  "time_on_battery_seconds": 0,
+  "cumulative_time_on_battery_seconds": null,
+  "transfer_count": 2,
+  "self_test": "OK",
+  "serial_number": "3B1234X56789",
   "model": "Back-UPS RS 1500G",
   "timestamp": "2025-10-02T14:02:59.850035377+10:00"
 }
@@ -286,6 +296,14 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 - `runtime_left_seconds` - Estimated runtime
 - `load_percent` - Load percentage
 - `power_watts` - Power draw: NUT's `ups.realpower`, or nominal power × load when the UPS reports both
+- `input_voltage`, `output_voltage`, `battery_voltage` - Volts
+- `line_frequency` - Input line frequency in hertz
+- `temperature_celsius` - Internal UPS temperature
+- `time_on_battery_seconds` - Seconds on battery in the current outage
+- `cumulative_time_on_battery_seconds` - Total seconds on battery (apcupsd only)
+- `transfer_count` - Number of transfers to battery
+- `self_test` - Last self-test result as reported by apcupsd or NUT (omitted when unknown)
+- `serial_number` - UPS serial number (omitted when unknown)
 
 The numeric fields are `null` when the UPS does not report the value (many
 UPSes have no load or power reading). They are never sent as a made-up `0`.

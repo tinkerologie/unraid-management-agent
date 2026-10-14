@@ -2232,15 +2232,40 @@ Get UPS status and information.
   "runtime_left_seconds": 623,
   "power_watts": null,
   "nominal_power_watts": null,
+  "input_voltage": null,
+  "output_voltage": null,
+  "battery_voltage": 134.7,
+  "line_frequency": null,
+  "temperature_celsius": null,
+  "time_on_battery_seconds": null,
+  "cumulative_time_on_battery_seconds": null,
+  "transfer_count": null,
+  "serial_number": "AS0000000000",
   "model": "Smart-UPS X 3000",
   "timestamp": "2025-10-03T13:41:13+10:00"
 }
 ```
 
-`load_percent`, `battery_charge_percent`, `runtime_left_seconds`, `power_watts`
-and `nominal_power_watts` are `null` when the UPS does not report them. The
-example above is a UPS that reports battery data but no load or power. The
-numeric readings in `GET /nut` (`status`) follow the same rule.
+Every numeric reading is `null` when the UPS does not report it. The example
+above is a UPS that reports battery data but no load, power or line readings.
+The numeric readings in `GET /nut` (`status`) follow the same rule.
+
+| Field                                | Unit    | apcupsd     | NUT                                                              |
+| ------------------------------------ | ------- | ----------- | ---------------------------------------------------------------- |
+| `input_voltage`                      | volts   | `LINEV`     | `input.voltage`                                                  |
+| `output_voltage`                     | volts   | `OUTPUTV`   | `output.voltage`                                                 |
+| `battery_voltage`                    | volts   | `BATTV`     | `battery.voltage`                                                |
+| `line_frequency`                     | hertz   | `LINEFREQ`  | `input.frequency`                                                |
+| `temperature_celsius`                | °C      | `ITEMP`     | `ups.temperature`                                                |
+| `time_on_battery_seconds`            | seconds | `TONBATT`   | `battery.runtime.elapsed`                                        |
+| `cumulative_time_on_battery_seconds` | seconds | `CUMONBATT` | — (always `null`)                                                |
+| `transfer_count`                     | count   | `NUMXFERS`  | `input.transfers` (driver-specific, not a standard NUT variable) |
+| `self_test`                          | —       | `SELFTEST`  | `ups.test.result`                                                |
+| `serial_number`                      | —       | `SERIALNO`  | `device.serial`/`ups.serial`                                     |
+
+`self_test` is the last battery self-test result exactly as the backend reports
+it (apcupsd `NO`, `OK`, `NG`; NUT for example `Done and passed`). `self_test`
+and `serial_number` are omitted when unknown.
 
 With NUT, `device_name` is the NUT device the data comes from: the first one
 `upsc -l` lists. It is absent for apcupsd.
