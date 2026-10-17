@@ -1064,3 +1064,30 @@ func TestHandleServicesList(t *testing.T) {
 		}
 	}
 }
+
+func TestHandleVMGuestList(t *testing.T) {
+	server, _ := setupTestServer()
+
+	get := func() []dto.VMGuestInfo {
+		t.Helper()
+		rr := httptest.NewRecorder()
+		server.router.ServeHTTP(rr, httptest.NewRequest("GET", "/api/v1/vm/guest", nil))
+		if rr.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200", rr.Code)
+		}
+		var got []dto.VMGuestInfo
+		if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+
+	if got := get(); got == nil || len(got) != 0 {
+		t.Errorf("empty cache: got %v, want []", got)
+	}
+	guests := []*dto.VMGuestInfo{{VMName: "Windows 11"}}
+	server.vmGuestCache.Store(&guests)
+	if got := get(); len(got) != 1 || got[0].VMName != "Windows 11" {
+		t.Errorf("got %+v", got)
+	}
+}

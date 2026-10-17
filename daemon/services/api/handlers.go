@@ -299,6 +299,22 @@ func (s *Server) handleVMList(w http.ResponseWriter, _ *http.Request) {
 	respondJSON(w, http.StatusOK, vms)
 }
 
+// handleVMGuestList godoc
+//
+//	@Summary		Get data read inside VMs
+//	@Description	Retrieve GPU, disk, filesystem and custom sensor readings from inside the VMs listed in the vm_guest_agent configuration, read through the QEMU guest agent. While a VM is off, its last-known GPUs, disks and sensors are listed with null readings.
+//	@Tags			VMs
+//	@Produce		json
+//	@Success		200	{array}	dto.VMGuestInfo	"Guest data per configured VM"
+//	@Router			/vm/guest [get]
+func (s *Server) handleVMGuestList(w http.ResponseWriter, _ *http.Request) {
+	guests := s.GetVMGuestCache()
+	if guests == nil {
+		guests = []*dto.VMGuestInfo{}
+	}
+	respondJSON(w, http.StatusOK, guests)
+}
+
 // handleVMInfo godoc
 //
 //	@Summary		Get specific VM

@@ -172,6 +172,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/docker/{id}/logs", s.handleDockerLogs).Methods("GET")
 	api.HandleFunc("/docker/{id}/update", s.handleDockerUpdate).Methods("POST")
 	api.HandleFunc("/vm", s.handleVMList).Methods("GET")
+	api.HandleFunc("/vm/guest", s.handleVMGuestList).Methods("GET")
 	api.HandleFunc("/vm/{id}", s.handleVMInfo).Methods("GET")
 	api.HandleFunc("/ups", s.handleUPS).Methods("GET")
 	api.HandleFunc("/nut", s.handleNUT).Methods("GET")

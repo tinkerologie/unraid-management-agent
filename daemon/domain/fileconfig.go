@@ -53,6 +53,10 @@ type FileConfig struct {
 	TLSCertFile *string `yaml:"tls_cert_file,omitempty"`
 	TLSKeyFile  *string `yaml:"tls_key_file,omitempty"`
 
+	// VMGuestAgent reads data from inside the listed VMs through the QEMU
+	// guest agent.
+	VMGuestAgent *FileConfigVMGuest `yaml:"vm_guest_agent,omitempty"`
+
 	// MQTT configuration
 	MQTT *FileConfigMQTT `yaml:"mqtt,omitempty"`
 
@@ -67,6 +71,27 @@ type FileConfig struct {
 type FileConfigDiscovery struct {
 	Enabled     *bool   `yaml:"enabled,omitempty"`
 	ServiceName *string `yaml:"service_name,omitempty"`
+}
+
+// FileConfigVMGuest holds the vm_guest_agent section of config.yml.
+type FileConfigVMGuest struct {
+	VMs      []string                  `yaml:"vms,omitempty"`
+	Interval *int                      `yaml:"interval,omitempty"`
+	Sensors  []FileConfigVMGuestSensor `yaml:"sensors,omitempty"`
+}
+
+// FileConfigVMGuestSensor is a custom command run inside a VM. Command is the
+// program followed by its arguments; it runs without a shell.
+type FileConfigVMGuestSensor struct {
+	VM       string   `yaml:"vm"`
+	Name     string   `yaml:"name"`
+	Command  []string `yaml:"command"`
+	Interval int      `yaml:"interval,omitempty"`
+	// JSON expands a flat JSON object on standard output into one sensor per key.
+	JSON bool `yaml:"json,omitempty"`
+	// Attributes maps a JSON key to the key whose sensor gets it as an
+	// attribute instead of a sensor of its own. Only valid with json: true.
+	Attributes map[string]string `yaml:"attributes,omitempty"`
 }
 
 // FileConfigMQTT holds MQTT-specific settings from the config file.

@@ -5017,6 +5017,144 @@ definitions:
       path:
         type: string
     type: object
+  dto.VMGuestDisk:
+    properties:
+      bus:
+        example: NVMe
+        type: string
+      model:
+        example: WD_BLACK SN850X 4000GB
+        type: string
+      serial:
+        example: E823_8FA6_BF53_0001_001B_448B_4EB4_93E5.
+        type: string
+      temperature_celsius:
+        example: 35
+        type: number
+        x-nullable: true
+      temperature_max_celsius:
+        example: 90
+        type: number
+        x-nullable: true
+      wear_percent:
+        example: 1
+        type: number
+        x-nullable: true
+    type: object
+  dto.VMGuestFilesystem:
+    properties:
+      mountpoint:
+        example: C:\
+        type: string
+      total_bytes:
+        example: 1073741819904
+        type: integer
+        x-nullable: true
+      type:
+        example: NTFS
+        type: string
+      used_bytes:
+        example: 173512880128
+        type: integer
+        x-nullable: true
+    type: object
+  dto.VMGuestGPU:
+    properties:
+      clock_mhz:
+        example: 2535
+        type: number
+        x-nullable: true
+      fan_percent:
+        example: 0
+        type: number
+        x-nullable: true
+      index:
+        example: 0
+        type: integer
+      memory_total_bytes:
+        example: 25757220864
+        type: integer
+        x-nullable: true
+      memory_used_bytes:
+        example: 13631488
+        type: integer
+        x-nullable: true
+      name:
+        example: NVIDIA GeForce RTX 4090
+        type: string
+      power_watts:
+        example: 63.29
+        type: number
+        x-nullable: true
+      temperature_celsius:
+        example: 34
+        type: number
+        x-nullable: true
+      utilization_percent:
+        example: 12
+        type: number
+        x-nullable: true
+    type: object
+  dto.VMGuestInfo:
+    properties:
+      agent_connected:
+        example: true
+        type: boolean
+      disks:
+        items:
+          $ref: '#/definitions/dto.VMGuestDisk'
+        type: array
+      error:
+        example: guest agent not responding
+        type: string
+      filesystems:
+        items:
+          $ref: '#/definitions/dto.VMGuestFilesystem'
+        type: array
+      gpus:
+        items:
+          $ref: '#/definitions/dto.VMGuestGPU'
+        type: array
+      hostname:
+        example: WIN11
+        type: string
+      os_name:
+        example: Microsoft Windows 11
+        type: string
+      running:
+        example: true
+        type: boolean
+      sensors:
+        items:
+          $ref: '#/definitions/dto.VMGuestSensor'
+        type: array
+      timestamp:
+        type: string
+      vm_name:
+        example: Windows 11
+        type: string
+    type: object
+  dto.VMGuestSensor:
+    properties:
+      attributes:
+        additionalProperties:
+          type: string
+        description: 'Attributes are extra values of a json: true sensor, by JSON
+          key.'
+        type: object
+      error:
+        example: exit code 1
+        type: string
+      name:
+        example: fps
+        type: string
+      updated_at:
+        type: string
+      value:
+        example: "144"
+        type: string
+        x-nullable: true
+    type: object
   dto.VMInfo:
     properties:
       autostart:
@@ -9330,6 +9468,24 @@ paths:
           schema:
             $ref: '#/definitions/dto.Response'
       summary: Stop VM
+      tags:
+      - VMs
+  /vm/guest:
+    get:
+      description: Retrieve GPU, disk, filesystem and custom sensor readings from
+        inside the VMs listed in the vm_guest_agent configuration, read through the
+        QEMU guest agent. While a VM is off, its last-known GPUs, disks and sensors
+        are listed with null readings.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Guest data per configured VM
+          schema:
+            items:
+              $ref: '#/definitions/dto.VMGuestInfo'
+            type: array
+      summary: Get data read inside VMs
       tags:
       - VMs
   /ws:

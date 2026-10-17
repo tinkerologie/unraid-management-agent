@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -149,6 +150,113 @@ func TestApplyWANIPLookup(t *testing.T) {
 		if appCtx.WANIPLookup != enabled {
 			t.Errorf("WANIPLookup = %v, want %v", appCtx.WANIPLookup, enabled)
 		}
+	}
+}
+
+func TestBuildVMGuestConfig(t *testing.T) {
+	ps := []string{"powershell.exe", "-File", "rtss.ps1", "fps"}
+	interval := func(n int) *int { return &n }
+
+	t.Run("nothing configured", func(t *testing.T) {
+		got := buildVMGuestConfig("", nil)
+		if len(got.VMs) != 0 || len(got.Sensors) != 0 || got.Interval != vmGuestDefaultInterval {
+			t.Errorf("got %+v", got)
+		}
+	})
+
+	t.Run("flag VMs, no file", func(t *testing.T) {
+		got := buildVMGuestConfig(" Windows 11 ,,bad/name,Windows 11,ubuntu", nil)
+		if !reflect.DeepEqual(got.VMs, []string{"Windows 11", "ubuntu"}) {
+			t.Errorf("VMs = %q", got.VMs)
+		}
+	})
+
+	t.Run("sensor VM names are trimmed like the VM list", func(t *testing.T) {
+		got := buildVMGuestConfig("", &domain.FileConfigVMGuest{
+			VMs:     []string{" Windows 11"},
+			Sensors: []domain.FileConfigVMGuestSensor{{VM: " Windows 11 ", Name: "fps", Command: ps}},
+		})
+		if len(got.Sensors) != 1 || got.Sensors[0].VM != "Windows 11" {
+			t.Errorf("Sensors = %+v", got.Sensors)
+		}
+	})
+
+	t.Run("file with sensors", func(t *testing.T) {
+		got := buildVMGuestConfig("", &domain.FileConfigVMGuest{
+			VMs:      []string{"Windows 11"},
+			Interval: interval(3),
+			Sensors: []domain.FileConfigVMGuestSensor{
+				{VM: "Windows 11", Name: "fps", Command: ps, Interval: 1},
+				{VM: "Windows 11", Name: "game", Command: ps, JSON: true},
+				{VM: "Windows 11", Name: "fps", Command: ps},
+				{VM: "Windows 11", Name: "game_score", Command: ps},
+				{VM: "Windows 11", Name: "gamer", Command: ps},
+				{VM: "Other", Name: "x", Command: ps},
+				{VM: "Windows 11", Name: "Bad Name", Command: ps},
+				{VM: "Windows 11", Name: "empty"},
+				{VM: "Windows 11", Name: "blank", Command: []string{""}},
+				{VM: "Windows 11", Name: "plainattr", Command: ps, Attributes: map[string]string{"a": "b"}},
+				{VM: "Windows 11", Name: "emptykey", Command: ps, JSON: true, Attributes: map[string]string{" ": "b"}},
+				{VM: "Windows 11", Name: "emptytarget", Command: ps, JSON: true, Attributes: map[string]string{"a": ""}},
+				{VM: "Windows 11", Name: "chain", Command: ps, JSON: true, Attributes: map[string]string{"a": "b", "b": "c"}},
+				{VM: "Windows 11", Name: "selfattr", Command: ps, JSON: true, Attributes: map[string]string{"a": "a"}},
+				{VM: "Windows 11", Name: "okattr", Command: ps, JSON: true, Attributes: map[string]string{"graph": "avg"}},
+			},
+		})
+		if got.Interval != vmGuestMinInterval {
+			t.Errorf("Interval = %d, want %d", got.Interval, vmGuestMinInterval)
+		}
+		want := []domain.VMGuestSensorConfig{
+			{VM: "Windows 11", Name: "fps", Command: ps, Interval: vmGuestMinSensorSecs},
+			{VM: "Windows 11", Name: "game", Command: ps, Interval: vmGuestDefaultInterval, JSON: true},
+			{VM: "Windows 11", Name: "gamer", Command: ps, Interval: vmGuestDefaultInterval},
+			{VM: "Windows 11", Name: "okattr", Command: ps, Interval: vmGuestDefaultInterval, JSON: true, Attributes: map[string]string{"graph": "avg"}},
+		}
+		if !reflect.DeepEqual(got.Sensors, want) {
+			t.Errorf("Sensors = %+v, want %+v", got.Sensors, want)
+		}
+	})
+
+	t.Run("attributes are normalised and collisions rejected", func(t *testing.T) {
+		mk := func(name string, attrs map[string]string) domain.FileConfigVMGuestSensor {
+			return domain.FileConfigVMGuestSensor{VM: "Windows 11", Name: name, Command: ps, JSON: true, Attributes: attrs}
+		}
+		got := buildVMGuestConfig("", &domain.FileConfigVMGuest{
+			VMs: []string{"Windows 11"},
+			Sensors: []domain.FileConfigVMGuestSensor{
+				mk("ok", map[string]string{"Graph-X": "AVG"}),
+				mk("casedup", map[string]string{"Graph": "avg", "graph": "avg"}),
+				mk("punctdup", map[string]string{"a-b": "avg", "a_b": "avg"}),
+				mk("targetattr", map[string]string{"Avg": "x", "a": "AVG"}),
+			},
+		})
+		want := []domain.VMGuestSensorConfig{
+			{VM: "Windows 11", Name: "ok", Command: ps, Interval: vmGuestDefaultInterval, JSON: true, Attributes: map[string]string{"graph_x": "avg"}},
+		}
+		if !reflect.DeepEqual(got.Sensors, want) {
+			t.Errorf("Sensors = %+v, want %+v", got.Sensors, want)
+		}
+	})
+
+	t.Run("flag replaces file VMs", func(t *testing.T) {
+		got := buildVMGuestConfig("ubuntu", &domain.FileConfigVMGuest{
+			VMs:      []string{"Windows 11"},
+			Interval: interval(60),
+			Sensors:  []domain.FileConfigVMGuestSensor{{VM: "Windows 11", Name: "fps", Command: ps}},
+		})
+		if !reflect.DeepEqual(got.VMs, []string{"ubuntu"}) || len(got.Sensors) != 0 || got.Interval != 60 {
+			t.Errorf("got %+v", got)
+		}
+	})
+}
+
+func TestVMGuestFileConfig(t *testing.T) {
+	if vmGuestFileConfig(nil) != nil {
+		t.Error("want nil for nil file config")
+	}
+	section := &domain.FileConfigVMGuest{VMs: []string{"a"}}
+	if vmGuestFileConfig(&domain.FileConfig{VMGuestAgent: section}) != section {
+		t.Error("want the vm_guest_agent section")
 	}
 }
 

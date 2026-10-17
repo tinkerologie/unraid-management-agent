@@ -25,6 +25,7 @@ This file is created automatically after the first installation and persists acr
 | `--api-token`                    | -        | Require `Authorization: Bearer <token>` on the HTTP API and `/mcp` (empty = unauthenticated reads, network writes refused)                                             |
 | `--allow-unauthenticated-writes` | `false`  | Allow network writes without an API token (not recommended; `ALLOW_UNAUTHENTICATED_WRITES`)                                                                            |
 | `--wan-ip-lookup`                | `true`   | Ask api.ipify.org, ifconfig.me and icanhazip.com for the WAN IP on request (`WAN_IP_LOOKUP`; `false` uses only Unraid's `WANIP`)                                       |
+| `--vm-guest-agent`               | -        | Comma-separated VMs to read through the QEMU guest agent (`VM_GUEST_AGENT`); see [VM guest agent](#vm-guest-agent)                                                     |
 | `--mcp-connect-secret`           | -        | Optional 32–256 char (`[A-Za-z0-9_-]`) secret enabling header-free MCP onboarding at `/mcp/<secret>` (`MCP_CONNECT_SECRET`)                                            |
 | `--debug`                        | `false`  | Enable debug logging                                                                                                                                                   |
 | `--mqtt-enabled`                 | `false`  | Enable MQTT publishing                                                                                                                                                 |
@@ -337,6 +338,80 @@ Topics will be:
 ```bash
 MQTT_BROKER=ssl://mqtt.example.com:8883
 ```
+
+## VM Guest Agent
+
+The agent can read data from inside VMs through the QEMU guest agent, so a VM
+needs no monitoring software of its own (such as LibreHardwareMonitor).
+Each listed VM needs the guest agent installed and running
+(`qemu-guest-agent` on Linux, the virtio-win guest tools on Windows).
+
+Every `interval` seconds (default 30, minimum 10) the agent reads:
+
+- host name, OS name and filesystem usage
+- NVIDIA GPUs with `nvidia-smi`: temperature, utilization, memory, power, fan and clock
+- on Windows, physical disks with `Get-StorageReliabilityCounter`: temperature, maximum
+  temperature and wear
+
+Custom sensors run a command inside the VM on their own interval (default 30, minimum
+5 seconds); the trimmed standard output becomes the sensor value. Commands run without
+a shell, as SYSTEM on Windows or root on Linux, and time out after 30 seconds.
+
+A sensor with `json: true` must print a flat JSON object. Each key becomes its own sensor
+named `<name>_<key>`: the key is lowercased, any character other than a letter, digit or
+underscore becomes `_`, and the result must still be 1-64 characters (otherwise that key is
+skipped with a log message). Numbers are written in plain decimal (`98.4`, `82`), strings
+as they are, booleans as `true`/`false` and `null` as a `null` value; nested objects and
+arrays are skipped. Sensors are listed in config order, then keys sorted. Output that is not
+a JSON object counts as a failed run: the keys seen so far stay listed with `null` values.
+
+`attributes` (only with `json: true`) maps a JSON key to the key whose sensor gets it as an
+attribute instead of a sensor of its own; `attributes: {graph: avg}` reports `frames_graph`'s
+value as attribute `graph` of sensor `frames_avg`. Both sides are normalised like sensor
+keys. An attribute whose key is missing or fails is `null`; if the target key is missing, the
+attributes are left out for that run. Empty names, or a target that is itself an attribute
+key, skip the sensor with a log message.
+
+Results are at `GET /api/v1/vm/guest` and in the `vm_guest_update` WebSocket event.
+While a VM is off, or its guest agent is not answering, its GPUs, disks, filesystems
+and sensors stay listed with `null` readings, so a consumer can display them as unknown
+rather than unavailable.
+
+Configure it in `config.yml`:
+
+```yaml
+vm_guest_agent:
+  vms: ["Windows 11"]
+  interval: 30
+  sensors:
+    - vm: "Windows 11"
+      name: fps # 1-64 lowercase letters, digits or underscores
+      interval: 5
+      command:
+        - C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+        - -NoProfile
+        - -ExecutionPolicy
+        - Bypass
+        - -File
+        - C:\ProgramData\Scripts\fps.ps1
+    # frames.ps1 prints {"avg":98.4,"low5":91,"low1":82,"graph":"82|10"} -> sensors
+    # frames_avg (with attribute graph), frames_low5 and frames_low1
+    - vm: "Windows 11"
+      name: frames
+      json: true
+      attributes:
+        graph: avg
+      interval: 5
+      command:
+        - C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+        - -NoProfile
+        - -File
+        - C:\ProgramData\Scripts\frames.ps1
+```
+
+`--vm-guest-agent` / `VM_GUEST_AGENT` (comma-separated VM names) replaces the `vms`
+list; custom sensors are set only in `config.yml`, and a sensor whose VM is not in
+the list is skipped.
 
 ## Auto-Discovery (zeroconf/mDNS)
 

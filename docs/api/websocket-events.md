@@ -254,6 +254,62 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 
 ---
 
+### 5a. VM Guest Update (`vm_guest_update`)
+
+**Frequency**: Every `vm_guest_agent.interval` seconds (default 30) and after each custom sensor run
+**Collector**: `VMCollector` (only when `vm_guest_agent` lists VMs)
+**Topic**: `vm_guest_update`
+
+**Identification**: Contains `vm_name` AND `agent_connected`
+
+**Data Structure** (array, one entry per configured VM):
+
+```json
+[
+  {
+    "vm_name": "Windows 11",
+    "running": true,
+    "agent_connected": true,
+    "hostname": "WIN11",
+    "os_name": "Microsoft Windows 11 Pro",
+    "filesystems": [{ "mountpoint": "C:\\", "type": "NTFS", "total_bytes": 1073741819904, "used_bytes": 173512880128 }],
+    "gpus": [
+      {
+        "index": 0,
+        "name": "NVIDIA GeForce RTX 4090",
+        "temperature_celsius": 34,
+        "utilization_percent": 12,
+        "memory_used_bytes": 13631488,
+        "memory_total_bytes": 25757220864,
+        "power_watts": 63.29,
+        "fan_percent": 0,
+        "clock_mhz": 2535
+      }
+    ],
+    "disks": [
+      {
+        "model": "WD_BLACK SN850X 4000GB",
+        "serial": "E823_8FA6_BF53_0001_001B_448B_4EB4_93E5.",
+        "bus": "NVMe",
+        "temperature_celsius": 35,
+        "temperature_max_celsius": 90,
+        "wear_percent": 1
+      }
+    ],
+    "sensors": [{ "name": "fps", "value": "144", "updated_at": "2026-10-14T12:00:05Z" }],
+    "timestamp": "2026-10-14T12:00:00Z"
+  }
+]
+```
+
+**Key Fields**:
+
+- `running` / `agent_connected` - whether the VM is running and its guest agent answers
+- `gpus`, `disks`, `filesystems` - readings are `null` while the VM is off or a reading is unavailable; the entries seen last stay listed
+- `sensors[].value` - trimmed output of a custom command, `null` while the VM is off or after a failed run (`error` says why)
+
+---
+
 ### 6. UPS Status Update (`ups_status_update`)
 
 **Frequency**: Every 10 seconds  
@@ -429,6 +485,7 @@ UPSes have no load or power reading). They are never sent as a made-up `0`.
 | disk_list_update        | 30s                                    | DiskCollector            |
 | container_list_update   | 10s                                    | DockerCollector          |
 | vm_list_update          | 10s                                    | VMCollector              |
+| vm_guest_update         | 30s and on each custom sensor run      | VMCollector              |
 | ups_status_update       | 10s                                    | UPSCollector             |
 | gpu_update              | 10s                                    | GPUCollector             |
 | network_list_update     | 15s                                    | NetworkCollector         |

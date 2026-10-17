@@ -1,6 +1,7 @@
 package collectors
 
 import (
+	"context"
 	"errors"
 	"math"
 	"runtime"
@@ -380,5 +381,28 @@ func TestVMCollectorGetCPUUsage(t *testing.T) {
 	// here the wall clock runs, so only check that both shares were set.
 	if vm.HostCPUPercent <= 0 || vm.GuestCPUPercent != 100 {
 		t.Fatalf("guest/host = %v/%v, want 100/>0", vm.GuestCPUPercent, vm.HostCPUPercent)
+	}
+}
+
+// TestVMCollector_StartWithGuestAgent checks Start launches the guest agent
+// reads when VMs are configured and stops when the context is cancelled.
+func TestVMCollector_StartWithGuestAgent(t *testing.T) {
+	hub := domain.NewEventBus(100)
+	sub := hub.Sub("vm_guest_update")
+	ctx := &domain.Context{Hub: hub, VMGuest: domain.VMGuestConfig{VMs: []string{"Windows 11"}, Interval: 30}}
+	runCtx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { NewVMCollector(ctx).Start(runCtx, time.Hour); close(done) }()
+
+	select {
+	case <-sub:
+	case <-time.After(5 * time.Second):
+		t.Fatal("no vm_guest_update published")
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Start did not return after cancel")
 	}
 }

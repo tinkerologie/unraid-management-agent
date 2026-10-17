@@ -57,6 +57,9 @@ func cacheBindings() []eventBinding {
 			}
 			c.vmsCache.Store(&vms)
 		}),
+		bind(constants.TopicVMGuestUpdate, func(c *CacheStore, v []*dto.VMGuestInfo) {
+			c.vmGuestCache.Store(&v)
+		}),
 		bind(constants.TopicUPSStatusUpdate, func(c *CacheStore, v *dto.UPSStatus) {
 			c.upsCache.Store(v)
 		}),

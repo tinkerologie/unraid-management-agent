@@ -5086,6 +5086,29 @@ const docTemplate = `{
                 }
             }
         },
+        "/vm/guest": {
+            "get": {
+                "description": "Retrieve GPU, disk, filesystem and custom sensor readings from inside the VMs listed in the vm_guest_agent configuration, read through the QEMU guest agent. While a VM is off, its last-known GPUs, disks and sensors are listed with null readings.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "VMs"
+                ],
+                "summary": "Get data read inside VMs",
+                "responses": {
+                    "200": {
+                        "description": "Guest data per configured VM",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.VMGuestInfo"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/vm/{id}": {
             "get": {
                 "description": "Retrieve information about a specific virtual machine by ID or name",
@@ -12551,6 +12574,193 @@ const docTemplate = `{
                 },
                 "path": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.VMGuestDisk": {
+            "type": "object",
+            "properties": {
+                "bus": {
+                    "type": "string",
+                    "example": "NVMe"
+                },
+                "model": {
+                    "type": "string",
+                    "example": "WD_BLACK SN850X 4000GB"
+                },
+                "serial": {
+                    "type": "string",
+                    "example": "E823_8FA6_BF53_0001_001B_448B_4EB4_93E5."
+                },
+                "temperature_celsius": {
+                    "type": "number",
+                    "x-nullable": true,
+                    "example": 35
+                },
+                "temperature_max_celsius": {
+                    "type": "number",
+                    "x-nullable": true,
+                    "example": 90
+                },
+                "wear_percent": {
+                    "type": "number",
+                    "x-nullable": true,
+                    "example": 1
+                }
+            }
+        },
+        "dto.VMGuestFilesystem": {
+            "type": "object",
+            "properties": {
+                "mountpoint": {
+                    "type": "string",
+                    "example": "C:\\"
+                },
+                "total_bytes": {
+                    "type": "integer",
+                    "x-nullable": true,
+                    "example": 1073741819904
+                },
+                "type": {
+                    "type": "string",
+                    "example": "NTFS"
+                },
+                "used_bytes": {
+                    "type": "integer",
+                    "x-nullable": true,
+                    "example": 173512880128
+                }
+            }
+        },
+        "dto.VMGuestGPU": {
+            "type": "object",
+            "properties": {
+                "clock_mhz": {
+                    "type": "number",
+                    "x-nullable": true,
+                    "example": 2535
+                },
+                "fan_percent": {
+                    "type": "number",
+                    "x-nullable": true,
+                    "example": 0
+                },
+                "index": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "memory_total_bytes": {
+                    "type": "integer",
+                    "x-nullable": true,
+                    "example": 25757220864
+                },
+                "memory_used_bytes": {
+                    "type": "integer",
+                    "x-nullable": true,
+                    "example": 13631488
+                },
+                "name": {
+                    "type": "string",
+                    "example": "NVIDIA GeForce RTX 4090"
+                },
+                "power_watts": {
+                    "type": "number",
+                    "x-nullable": true,
+                    "example": 63.29
+                },
+                "temperature_celsius": {
+                    "type": "number",
+                    "x-nullable": true,
+                    "example": 34
+                },
+                "utilization_percent": {
+                    "type": "number",
+                    "x-nullable": true,
+                    "example": 12
+                }
+            }
+        },
+        "dto.VMGuestInfo": {
+            "type": "object",
+            "properties": {
+                "agent_connected": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "disks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.VMGuestDisk"
+                    }
+                },
+                "error": {
+                    "type": "string",
+                    "example": "guest agent not responding"
+                },
+                "filesystems": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.VMGuestFilesystem"
+                    }
+                },
+                "gpus": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.VMGuestGPU"
+                    }
+                },
+                "hostname": {
+                    "type": "string",
+                    "example": "WIN11"
+                },
+                "os_name": {
+                    "type": "string",
+                    "example": "Microsoft Windows 11"
+                },
+                "running": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "sensors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.VMGuestSensor"
+                    }
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "vm_name": {
+                    "type": "string",
+                    "example": "Windows 11"
+                }
+            }
+        },
+        "dto.VMGuestSensor": {
+            "type": "object",
+            "properties": {
+                "attributes": {
+                    "description": "Attributes are extra values of a json: true sensor, by JSON key.",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "error": {
+                    "type": "string",
+                    "example": "exit code 1"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "fps"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string",
+                    "x-nullable": true,
+                    "example": "144"
                 }
             }
         },

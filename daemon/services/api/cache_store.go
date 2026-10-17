@@ -31,6 +31,7 @@ type CacheStore struct {
 	sharesCache          atomic.Pointer[[]dto.ShareInfo]
 	dockerCache          atomic.Pointer[[]dto.ContainerInfo]
 	vmsCache             atomic.Pointer[[]dto.VMInfo]
+	vmGuestCache         atomic.Pointer[[]*dto.VMGuestInfo]
 	upsCache             atomic.Pointer[dto.UPSStatus]
 	gpuCache             atomic.Pointer[[]*dto.GPUMetrics]
 	networkCache         atomic.Pointer[[]dto.NetworkInfo]
@@ -232,6 +233,14 @@ func (c *CacheStore) GetNICCache() *dto.NICList {
 // GetVMsCache returns cached VM information.
 func (c *CacheStore) GetVMsCache() []dto.VMInfo {
 	if v := c.vmsCache.Load(); v != nil {
+		return *v
+	}
+	return nil
+}
+
+// GetVMGuestCache returns cached data read through the QEMU guest agent.
+func (c *CacheStore) GetVMGuestCache() []*dto.VMGuestInfo {
+	if v := c.vmGuestCache.Load(); v != nil {
 		return *v
 	}
 	return nil

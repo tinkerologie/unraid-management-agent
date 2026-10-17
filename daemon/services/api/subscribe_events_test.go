@@ -574,3 +574,20 @@ func TestBroadcastEvents_ForwardsToWSHub(t *testing.T) {
 		t.Fatalf("WebSocket client did not receive broadcast: %v", err)
 	}
 }
+
+func TestSubscribeToEvents_VMGuestUpdate(t *testing.T) {
+	hub := domain.NewEventBus(10)
+	appCtx := &domain.Context{Hub: hub, Version: "test"}
+	server := NewServer(appCtx)
+
+	cancel := startSubscribeToEvents(t, server)
+	defer cancel()
+
+	hub.Pub([]*dto.VMGuestInfo{{VMName: "Windows 11", Running: true}}, "vm_guest_update")
+	eventually(t, func() bool {
+		return len(server.GetVMGuestCache()) == 1
+	})
+	if got := server.GetVMGuestCache()[0].VMName; got != "Windows 11" {
+		t.Errorf("VMName = %q, want %q", got, "Windows 11")
+	}
+}

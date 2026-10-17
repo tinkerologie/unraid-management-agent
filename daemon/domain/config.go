@@ -72,6 +72,37 @@ type Config struct {
 	TLSKeyFile  string `json:"tls_key_file,omitempty"`
 	// ToolPolicy configures per-tool access controls for MCP tools.
 	ToolPolicy map[string]ToolPolicyValue `json:"tool_policy,omitempty"`
+	// VMGuest lists the VMs read through the QEMU guest agent and the custom
+	// commands run inside them. Empty (the default) turns guest reads off.
+	VMGuest VMGuestConfig `json:"vm_guest,omitempty"`
+}
+
+// VMGuestConfig configures reading data from inside VMs through the QEMU
+// guest agent.
+type VMGuestConfig struct {
+	// VMs are the libvirt domain names to query.
+	VMs []string `json:"vms,omitempty"`
+	// Interval is the number of seconds between full guest updates (GPUs,
+	// disks, filesystems).
+	Interval int `json:"interval,omitempty"`
+	// Sensors are custom commands run inside the listed VMs.
+	Sensors []VMGuestSensorConfig `json:"sensors,omitempty"`
+}
+
+// VMGuestSensorConfig is a custom command run inside a VM on its own interval.
+// Its trimmed standard output becomes the sensor value.
+type VMGuestSensorConfig struct {
+	VM       string   `json:"vm"`
+	Name     string   `json:"name"`
+	Command  []string `json:"command"`
+	Interval int      `json:"interval"`
+	// JSON expands a flat JSON object on standard output into one sensor per
+	// key, named <Name>_<key>.
+	JSON bool `json:"json,omitempty"`
+	// Attributes turns keys of the JSON object into attributes of another key's
+	// sensor instead of sensors of their own: the map key is the JSON key, the
+	// value is the key whose sensor gets the attribute. Only valid with JSON.
+	Attributes map[string]string `json:"attributes,omitempty"`
 }
 
 // ToolPolicyValue defines the access policy for an individual MCP tool.

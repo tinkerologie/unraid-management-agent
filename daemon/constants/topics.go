@@ -21,6 +21,9 @@ var (
 	TopicContainerListUpdate = domain.NewTopic[[]*dto.ContainerInfo]("container_list_update")
 	// TopicVMListUpdate is published by the VM collector with []*dto.VMInfo.
 	TopicVMListUpdate = domain.NewTopic[[]*dto.VMInfo]("vm_list_update")
+	// TopicVMGuestUpdate is published by the VM collector with []*dto.VMGuestInfo
+	// for the VMs read through the QEMU guest agent.
+	TopicVMGuestUpdate = domain.NewTopic[[]*dto.VMGuestInfo]("vm_guest_update")
 	// TopicUPSStatusUpdate is published by the UPS collector with *dto.UPSStatus.
 	TopicUPSStatusUpdate = domain.NewTopic[*dto.UPSStatus]("ups_status_update")
 	// TopicNUTStatusUpdate is published by the NUT collector with *dto.NUTResponse.

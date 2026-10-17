@@ -123,6 +123,7 @@ Since events lack a `type` field, clients must inspect the `data` structure to d
 | `network_list_update`   | Has `mac_address` AND `bytes_received`                             |
 | `container_list_update` | Has `image` AND `ports`                                            |
 | `vm_list_update`        | Has `state` AND `vcpus`                                            |
+| `vm_guest_update`       | Has `vm_name` AND `agent_connected`                                |
 | `disk_list_update`      | Has `device` AND `mount_point`                                     |
 | `share_list_update`     | Has `name` AND `path` AND `size_bytes`                             |
 
@@ -168,6 +169,10 @@ def identify_event_type(data):
     # VM
     if "state" in data and "vcpus" in data:
         return "vm_list_update"
+
+    # VM guest agent
+    if "vm_name" in data and "agent_connected" in data:
+        return "vm_guest_update"
 
     # Disk
     if "device" in data and "mount_point" in data:
