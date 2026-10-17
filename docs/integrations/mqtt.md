@@ -30,7 +30,20 @@ MQTT_PASSWORD=your_secure_password
 
 # Optional: Topic prefix (default: unraid)
 MQTT_TOPIC_PREFIX=homelab/unraid
+
+# Optional: Client ID (default: unraid-management-agent-<hostname>)
+MQTT_CLIENT_ID=unraid-agent-tower
 ```
+
+The broker allows one connection per client ID, so each server needs its own.
+The default `unraid-management-agent` (or an empty value) is sent as
+`unraid-management-agent-<hostname>`, which keeps several servers on one broker
+apart without configuration. Any other value is used exactly as set. Old
+MQTT 3.1 brokers accept at most 23 characters and reject longer IDs with
+"identifier rejected"; set a short `MQTT_CLIENT_ID` for those. The agent logs
+the client ID it connects with. The same
+setting is `mqtt.client_id` in `config.yml` and `client_id` in the MQTT config
+REST endpoint.
 
 ### Restart Service
 

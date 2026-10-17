@@ -405,6 +405,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **mDNS discovery advertised Docker and virtual bridge IPs** — the agent now advertises one
+  address on one LAN interface. It uses the bind address if set, otherwise the default route's
+  source address, otherwise the first IPv4 of `br0`, then `bond*`, then `eth*`. Docker
+  (`docker0`, `br-*`, `veth*`), LXC/LXD/Incus/Podman, CNI, libvirt (`virbr*`, `vnet*`), Unraid
+  shim and VPN interfaces are never used, and announcements go out on the chosen interface only.
+  Before, a start without a default route (common early in boot) fell back to answering on every interface with that interface's
+  own address, so Home Assistant discovered the server once per Docker bridge (`172.17.0.1`,
+  `172.18.0.1`, ...). If no LAN interface is up yet, the agent now retries every 30 seconds
+  instead. ([#274](https://github.com/tinkerologie/unraid-management-agent/issues/274))
+- **Agents on several servers fought over one MQTT session** — the default MQTT client ID
+  `unraid-management-agent` is now sent as `unraid-management-agent-<hostname>`, so two servers
+  on one broker no longer disconnect each other in a loop. An empty client ID gets the same
+  treatment; any other configured `MQTT_CLIENT_ID` is used unchanged. Single-server setups see
+  the new client ID in broker logs and ACLs. `GET /api/v1/mqtt/status` reports the ID in use.
+  ([#275](https://github.com/tinkerologie/unraid-management-agent/issues/275))
 - **VM `host_cpu_percent` was always 0** — the VM collector now fills `host_cpu_percent` in
   `/api/v1/vm` (and the `vm_list_update` event): the VM's share of the whole server, its CPU-time
   delta over the host's logical CPU count. The count comes from libvirt `NodeGetInfo`, so CPUs

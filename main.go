@@ -113,7 +113,7 @@ var cli struct {
 	MQTTPort               int    `default:"1883" env:"MQTT_PORT" help:"MQTT broker port"`
 	MQTTUsername           string `default:"" env:"MQTT_USERNAME" help:"MQTT username"`
 	MQTTPassword           string `default:"" env:"MQTT_PASSWORD" help:"MQTT password"`
-	MQTTClientID           string `default:"unraid-management-agent" env:"MQTT_CLIENT_ID" help:"MQTT client ID"`
+	MQTTClientID           string `default:"unraid-management-agent" env:"MQTT_CLIENT_ID" help:"MQTT client ID; the default is sent as unraid-management-agent-<hostname>"`
 	MQTTTopicPrefix        string `default:"unraid" env:"MQTT_TOPIC_PREFIX" help:"MQTT topic prefix"`
 	MQTTUseTLS             bool   `default:"false" env:"MQTT_USE_TLS" help:"use TLS for MQTT connection"`
 	MQTTInsecureSkipVerify bool   `default:"false" env:"MQTT_INSECURE_SKIP_VERIFY" help:"skip TLS certificate verification"`

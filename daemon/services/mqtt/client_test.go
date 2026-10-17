@@ -1,6 +1,7 @@
 package mqtt
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -183,8 +184,8 @@ func TestClientGetStatus(t *testing.T) {
 		t.Errorf("status.Broker = %q, want %q", status.Broker, "tcp://localhost:1883")
 	}
 
-	if status.ClientID != "unraid-management-agent" {
-		t.Errorf("status.ClientID = %q, want %q", status.ClientID, "unraid-management-agent")
+	if status.ClientID != "unraid-management-agent-test-server" {
+		t.Errorf("status.ClientID = %q, want %q", status.ClientID, "unraid-management-agent-test-server")
 	}
 
 	if status.TopicPrefix != "unraid" {
@@ -713,5 +714,70 @@ func TestPublishSystemInfoNilSafe(t *testing.T) {
 	err := client.PublishSystemInfo(nil)
 	if err != nil {
 		t.Errorf("PublishSystemInfo(nil) = %v, want nil", err)
+	}
+}
+
+func TestResolveClientID(t *testing.T) {
+	tests := []struct {
+		name, configured, hostname, want string
+	}{
+		{name: "default ID gets the hostname", configured: "unraid-management-agent", hostname: "Tower", want: "unraid-management-agent-Tower"},
+		{name: "empty ID gets the hostname", configured: "", hostname: "tower", want: "unraid-management-agent-tower"},
+		{name: "default ID with spaces", configured: " unraid-management-agent ", hostname: "tower", want: "unraid-management-agent-tower"},
+		{name: "dotted hostname is kept", configured: "", hostname: "node.example", want: "unraid-management-agent-node.example"},
+		{name: "no usable hostname keeps the default", configured: "", hostname: "", want: "unraid-management-agent"},
+		{name: "custom ID is kept", configured: "unraid-agent-cube", hostname: "tower", want: "unraid-agent-cube"},
+		{name: "custom ID is used exactly as set", configured: " my-id ", hostname: "tower", want: " my-id "},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ResolveClientID(tt.configured, tt.hostname); got != tt.want {
+				t.Errorf("ResolveClientID(%q, %q) = %q, want %q", tt.configured, tt.hostname, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestResolveClientIDDiffersPerHost(t *testing.T) {
+	for _, pair := range [][2]string{{"tower", "cube"}, {"node.example", "node-example"}} {
+		a := ResolveClientID(DefaultConfig().ClientID, pair[0])
+		b := ResolveClientID(DefaultConfig().ClientID, pair[1])
+		if a == b {
+			t.Errorf("hosts %q and %q with the default config share client ID %q", pair[0], pair[1], a)
+		}
+	}
+}
+
+func TestConnectSendsResolvedClientID(t *testing.T) {
+	tests := []struct {
+		name, configured, want string
+	}{
+		{name: "default ID gets the hostname", configured: DefaultClientID, want: "unraid-management-agent-tower"},
+		{name: "custom ID is unchanged", configured: "my-agent", want: "my-agent"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := DefaultConfig()
+			config.Enabled = true
+			config.Broker = "tcp://127.0.0.1:1" // refused at once
+			config.ClientID = tt.configured
+			config.ConnectTimeout = 1
+			config.AutoReconnect = false
+			client := NewClient(config, "tower", "1.0.0", nil)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = client.Connect(ctx) // the connection fails; only the options matter
+
+			client.mu.RLock()
+			defer client.mu.RUnlock()
+			if client.client == nil {
+				t.Fatal("Connect() did not create the MQTT client")
+			}
+			opts := client.client.OptionsReader()
+			if got := opts.ClientID(); got != tt.want {
+				t.Errorf("client ID sent to the broker = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
