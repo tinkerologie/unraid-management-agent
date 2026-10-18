@@ -10,8 +10,8 @@
     <!ENTITY launch      "Settings/unraid-management-agent">
     <!ENTITY bundle      "&name;-&version;.tgz">
     <!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
-    <!ENTITY md5         "0aaa07e0e31fbf1b88c7b3e578466fa8"> <!-- pragma: allowlist secret -->
-    <!ENTITY sha256      "aae0fa132a41836d72f3fb7cc6da5b543a8b3507620d7cf785d0f985a852a3bd"> <!-- pragma: allowlist secret -->
+    <!ENTITY md5         "4fd3c0024e386317a7affd6cd945338c"> <!-- pragma: allowlist secret -->
+    <!ENTITY sha256      "2b6d9e85789f51965cbffbdf723157038469243bad72bd4361b7703dead3c52b"> <!-- pragma: allowlist secret -->
 ]>
 
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" icon="server" min="7.2.0" pluginURL="&pluginURL;" support="&supportURL;" project="&gitURL;" readme="&gitURL;#readme">
