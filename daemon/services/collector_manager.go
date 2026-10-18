@@ -451,7 +451,7 @@ func (cm *CollectorManager) getDefaultInterval(name string) int {
 		"notification":    30,
 		"registration":    300,
 		"unassigned":      60,
-		"fancontrol":      30,
+		"fancontrol":      constants.IntervalFanControl,
 		"tuning":          120,
 		"docker_update":   constants.IntervalDockerUpdate,
 		"docker_networks": constants.IntervalDockerNetworks,

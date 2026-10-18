@@ -9,6 +9,7 @@ import (
 
 	"github.com/alecthomas/kong"
 
+	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
 	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
 )
 
@@ -516,5 +517,45 @@ func TestHardwareGatedCollectors(t *testing.T) {
 	want := []string{"gpu", "nic", "nut", "storage_topology", "zfs"}
 	if !slices.Equal(names, want) {
 		t.Errorf("gated = %v, want %v (every hardware collector except the disabled ups)", names, want)
+	}
+}
+
+// TestFanControlIntervalDefault guards #277: fan control status defaults to
+// 60s, and explicit values (including 5 and 0) are kept.
+func TestFanControlIntervalDefault(t *testing.T) {
+	if constants.IntervalFanControl != 60 {
+		t.Fatalf("constants.IntervalFanControl = %d, want 60", constants.IntervalFanControl)
+	}
+	tests := []struct {
+		name string
+		env  string
+		args []string
+		want int
+	}{
+		{name: "default", want: constants.IntervalFanControl},
+		{name: "env 5", env: "5", want: 5},
+		{name: "env 0 disables", env: "0", want: 0},
+		{name: "flag 5", args: []string{"--interval-fan-control=5"}, want: 5},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("INTERVAL_FAN_CONTROL", tt.env)
+			if tt.env == "" {
+				if err := os.Unsetenv("INTERVAL_FAN_CONTROL"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			c := cli
+			parser, err := kong.New(&c, kong.Exit(func(int) { t.Fatal("kong exited") }))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := parser.Parse(append(tt.args, "boot")); err != nil {
+				t.Fatal(err)
+			}
+			if c.IntervalFanControl != tt.want {
+				t.Errorf("IntervalFanControl = %d, want %d", c.IntervalFanControl, tt.want)
+			}
+		})
 	}
 }

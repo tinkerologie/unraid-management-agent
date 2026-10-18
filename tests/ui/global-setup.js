@@ -19,7 +19,7 @@ module.exports = async () => {
   fs.writeFileSync(
     config,
     [
-      'INTERVAL_FAN_CONTROL="60"',
+      'INTERVAL_FAN_CONTROL="30"',
       'INTERVAL_TUNING="300"',
       'INTERVAL_DOCKER_UPDATE="86400"',
       'INTERVAL_DOCKER_NETWORKS="0"',

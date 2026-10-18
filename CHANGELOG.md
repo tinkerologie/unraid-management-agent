@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   named `<name>_<key>` (for example `frames_avg`); output that is not a JSON object counts as a
   failed run and the known keys stay listed with `null` values. `attributes` (for example
   `graph: avg`) turns a key into an attribute of another key's sensor instead of a sensor of its own.
-- **Seven more collector intervals on the plugin settings page** — `INTERVAL_FAN_CONTROL` (5 s),
+- **Seven more collector intervals on the plugin settings page** — `INTERVAL_FAN_CONTROL` (60 s),
   `INTERVAL_TUNING` (120 s), `INTERVAL_DOCKER_UPDATE` (6 h), `INTERVAL_DOCKER_NETWORKS` (60 s),
   `INTERVAL_PLUGIN_UPDATE` (1 h), `INTERVAL_OS_UPDATE` (24 h) and `INTERVAL_MOVER` (30 s) are now in
   `default.cfg`, the first-install config, the start script (default, validation and passthrough
@@ -258,6 +258,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Fan control status defaults to 60 s instead of 5 s** (#277) — `INTERVAL_FAN_CONTROL` /
+  `--interval-fan-control` / `intervals.fancontrol` now default to 60 s in the daemon, the plugin
+  defaults, the start script and the settings page. The collector only reports fan RPM/PWM; at 5 s
+  its `fan_control_update` events made WebSocket consumers such as Home Assistant refresh every
+  5 s. The fan curve engine still evaluates curves every `poll_interval_seconds` (5 s by default),
+  so fan control stays as responsive as before. Installs that set the interval explicitly keep
+  their value, and 5 s is still selectable.
 - **README refreshed** — rewritten around what users need first: features, requirements, Community
   Applications install, a quick start with token handling, security and privacy, configuration,
   integrations and links to the full documentation. Removed duplicated endpoint lists and response

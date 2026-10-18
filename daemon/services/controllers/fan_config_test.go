@@ -74,3 +74,11 @@ func TestFanConfigLoadMigratesLegacyFile(t *testing.T) {
 		t.Fatalf("legacy file did not migrate via Load: %+v", got)
 	}
 }
+
+// TestDefaultFanCurvePollInterval guards #277: raising the fan control status
+// interval must not slow the fan curve engine, which keeps its own 5s timer.
+func TestDefaultFanCurvePollInterval(t *testing.T) {
+	if got := defaultFanControlConfig().PollInterval; got != 5 {
+		t.Errorf("default PollInterval = %d, want 5", got)
+	}
+}

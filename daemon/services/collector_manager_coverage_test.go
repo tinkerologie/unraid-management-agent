@@ -35,6 +35,7 @@ func TestGetDefaultInterval_AllNames(t *testing.T) {
 		{"notification", 30},
 		{"registration", 300},
 		{"unassigned", 60},
+		{"fancontrol", 60},
 		{"unknown_collector", 30}, // fallback
 		{"", 30},                  // empty name fallback
 	}

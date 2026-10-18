@@ -12,7 +12,7 @@ const JQUERY = path.join(__dirname, '..', 'node_modules', 'jquery', 'dist', 'jqu
 // Select name, row label, the daemon default (main.go), the value set in the
 // test config.cfg (global-setup.js) and an option list value.
 const INTERVALS = [
-  { name: 'INTERVAL_FAN_CONTROL', label: 'Fan Control', def: '5', configured: '60', fastest: '5' },
+  { name: 'INTERVAL_FAN_CONTROL', label: 'Fan Control', def: '60', configured: '30', fastest: '5' },
   { name: 'INTERVAL_TUNING', label: 'Tuning Parameters', def: '120', configured: '300', fastest: '10' },
   { name: 'INTERVAL_DOCKER_UPDATE', label: 'Docker Update Checks', def: '21600', configured: '86400', fastest: '10' },
   { name: 'INTERVAL_DOCKER_NETWORKS', label: 'Docker Networks', def: '60', configured: '0', fastest: '10' },
@@ -66,10 +66,10 @@ test('fan control offers 5 seconds and OS updates use the slow list', async ({ p
 test('new interval values are submitted with the form', async ({ page }) => {
   await openPage(page);
   const form = page.locator('select[name="INTERVAL_FAN_CONTROL"]').locator('xpath=ancestor::form');
-  await page.locator('select[name="INTERVAL_FAN_CONTROL"]').selectOption('60');
+  await page.locator('select[name="INTERVAL_FAN_CONTROL"]').selectOption('5');
   await page.locator('select[name="INTERVAL_MOVER"]').selectOption('0');
   const fields = await form.evaluate((f) => Object.fromEntries(new FormData(f)));
-  expect(fields.INTERVAL_FAN_CONTROL).toBe('60');
+  expect(fields.INTERVAL_FAN_CONTROL).toBe('5');
   expect(fields.INTERVAL_MOVER).toBe('0');
   for (const { name, def } of INTERVALS.filter((i) => !['INTERVAL_FAN_CONTROL', 'INTERVAL_MOVER'].includes(i.name))) {
     expect(fields[name], name).toBe(def);

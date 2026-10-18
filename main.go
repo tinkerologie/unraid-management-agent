@@ -144,7 +144,7 @@ var cli struct {
 	IntervalNotification   int  `default:"30" env:"INTERVAL_NOTIFICATION" help:"notification interval (seconds, 0=disabled, max 86400)"`
 	IntervalRegistration   int  `default:"600" env:"INTERVAL_REGISTRATION" help:"registration interval (seconds, 0=disabled, max 86400)"`
 	IntervalUnassigned     int  `default:"60" env:"INTERVAL_UNASSIGNED" help:"unassigned devices interval (seconds, 0=disabled, max 86400)"`
-	IntervalFanControl     int  `default:"5" env:"INTERVAL_FAN_CONTROL" help:"fan control interval (seconds, 0=disabled, max 86400)"`
+	IntervalFanControl     int  `default:"60" env:"INTERVAL_FAN_CONTROL" help:"fan control interval (seconds, 0=disabled, max 86400)"`
 	IntervalTuning         int  `default:"120" env:"INTERVAL_TUNING" help:"tuning parameters interval (seconds, 0=disabled, max 86400)"`
 	IntervalDockerUpdate   int  `default:"21600" env:"INTERVAL_DOCKER_UPDATE" help:"container update check interval (seconds, 0=disabled, max 86400)"`
 	IntervalDockerNetworks int  `default:"60" env:"INTERVAL_DOCKER_NETWORKS" help:"docker networks listing interval (seconds, 0=disabled, max 86400)"`
