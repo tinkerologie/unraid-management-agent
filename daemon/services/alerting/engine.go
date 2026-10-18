@@ -55,6 +55,15 @@ type Engine struct {
 
 	mu           sync.RWMutex
 	alertHistory []dto.AlertEvent
+
+	// floorMu guards the collectors that enabled rules read and the floor
+	// listener. floorNotifying and floorDirty let one caller deliver the
+	// latest set in order while fn runs without the lock.
+	floorMu        sync.Mutex
+	required       map[string]bool
+	floorFn        func(map[string]bool)
+	floorNotifying bool
+	floorDirty     bool
 }
 
 // NewEngine creates and initializes the alerting engine.
@@ -249,11 +258,59 @@ func (e *Engine) RecompileRules() {
 	e.compileEnabledRules()
 }
 
-// compileEnabledRules compiles all enabled rules from the store.
+// compileEnabledRules compiles all enabled rules from the store and reports
+// the collectors they read to the floor listener.
 func (e *Engine) compileEnabledRules() {
 	rules := e.store.GetEnabledRules()
 	errs := e.evaluator.CompileRules(rules)
 	logger.Info("Alerting: Compiled %d enabled rules (%d errors)", len(rules), len(errs))
+
+	required := requiredCollectors(rules)
+	e.floorMu.Lock()
+	e.required = required
+	e.floorMu.Unlock()
+	e.notifyFloor()
+}
+
+// RequiredCollectors returns the collectors that enabled alert rules read.
+func (e *Engine) RequiredCollectors() map[string]bool {
+	e.floorMu.Lock()
+	defer e.floorMu.Unlock()
+	return cloneCollectors(e.required)
+}
+
+// SetFloorListener registers fn to receive RequiredCollectors whenever the
+// enabled rule set changes (after every RecompileRules), and calls it once
+// immediately. fn is called without engine locks held.
+func (e *Engine) SetFloorListener(fn func(map[string]bool)) {
+	e.floorMu.Lock()
+	e.floorFn = fn
+	e.floorMu.Unlock()
+	e.notifyFloor()
+}
+
+// notifyFloor delivers the latest required collectors to the floor listener.
+// Only one caller delivers at a time, so the listener sees the sets in order;
+// a call made meanwhile (including from fn itself) is picked up by that caller.
+func (e *Engine) notifyFloor() {
+	e.floorMu.Lock()
+	e.floorDirty = true
+	if e.floorNotifying {
+		e.floorMu.Unlock()
+		return
+	}
+	e.floorNotifying = true
+	for e.floorDirty {
+		e.floorDirty = false
+		fn, required := e.floorFn, cloneCollectors(e.required)
+		e.floorMu.Unlock()
+		if fn != nil {
+			fn(required)
+		}
+		e.floorMu.Lock()
+	}
+	e.floorNotifying = false
+	e.floorMu.Unlock()
 }
 
 // smartRawInt parses the integer portion of a SMART RawValue string (e.g. "5" or "5 (raw)").

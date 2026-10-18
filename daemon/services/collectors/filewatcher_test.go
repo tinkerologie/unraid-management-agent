@@ -285,3 +285,95 @@ func TestFileWatcher_CloseWhileRunning(t *testing.T) {
 		t.Fatal("Run did not exit after external Close()")
 	}
 }
+
+// startRunDir runs fw.RunDir in a goroutine, recording callbacks, and returns
+// a channel closed when RunDir returns.
+func startRunDir(t *testing.T, dir, glob string) (*triggerRecorder, <-chan struct{}) {
+	t.Helper()
+	fw, err := NewFileWatcher(10 * time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := fw.WatchDir(dir); err != nil {
+		t.Fatal(err)
+	}
+	rec := newTriggerRecorder()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		defer func() { _ = fw.Close() }()
+		fw.RunDir(t.Context(), dir, glob, rec.trigger)
+	}()
+	return rec, done
+}
+
+func TestFileWatcher_RunDir(t *testing.T) {
+	dir := t.TempDir()
+	plg := filepath.Join(dir, "a.plg")
+	rec, _ := startRunDir(t, dir, "*.plg")
+
+	steps := []struct {
+		name string
+		do   func() error
+	}{
+		{"create", func() error { return os.WriteFile(plg, []byte("x"), 0o600) }},
+		{"write", func() error { return os.WriteFile(plg, []byte("y"), 0o600) }},
+		{"rename", func() error { return os.Rename(plg, filepath.Join(dir, "b.plg")) }},
+		{"remove", func() error { return os.Remove(filepath.Join(dir, "b.plg")) }},
+	}
+	for _, s := range steps {
+		if err := s.do(); err != nil {
+			t.Fatalf("%s: %v", s.name, err)
+		}
+		rec.wait(t)
+	}
+}
+
+func TestFileWatcher_RunDirIgnoresNonMatching(t *testing.T) {
+	dir := t.TempDir()
+	rec, _ := startRunDir(t, dir, "*.plg")
+
+	if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	rec.none(t, 150*time.Millisecond)
+}
+
+func TestFileWatcher_RunDirReturnsWhenDirRemoved(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "watched")
+	if err := os.Mkdir(dir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	_, done := startRunDir(t, dir, "")
+
+	if err := os.Remove(dir); err != nil {
+		t.Fatal(err)
+	}
+	waitClosed(t, done, "RunDir")
+}
+
+// TestFileWatcher_RunIgnoresRemove pins the file-mode behaviour: only writes
+// and creates of watched files trigger the callback.
+func TestFileWatcher_RunIgnoresRemove(t *testing.T) {
+	testFile := filepath.Join(t.TempDir(), "test.ini")
+	if err := os.WriteFile(testFile, []byte("initial"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	fw, err := NewFileWatcher(10 * time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := fw.WatchFile(testFile); err != nil {
+		t.Fatal(err)
+	}
+	rec := newTriggerRecorder()
+	go func() {
+		defer func() { _ = fw.Close() }()
+		fw.Run(t.Context(), []string{testFile}, rec.trigger)
+	}()
+
+	if err := os.Remove(testFile); err != nil {
+		t.Fatal(err)
+	}
+	rec.none(t, 150*time.Millisecond)
+}

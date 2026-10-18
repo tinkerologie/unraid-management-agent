@@ -3,6 +3,7 @@ package domain
 import (
 	"slices"
 	"sync"
+	"sync/atomic"
 )
 
 // EventBus is a type-safe publish/subscribe event bus.
@@ -13,6 +14,8 @@ type EventBus struct {
 	mu         sync.RWMutex
 	subs       map[string][]chan any
 	bufferSize int
+	// published counts messages per topic (topic → *atomic.Uint64).
+	published sync.Map
 }
 
 // NewEventBus creates a new EventBus with the given per-subscriber buffer size.
@@ -43,6 +46,9 @@ func (bus *EventBus) Sub(topics ...string) chan any {
 // Pub publishes msg to all subscribers of the given topics.
 // Argument order matches cskr/pubsub: data first, then topic(s).
 func (bus *EventBus) Pub(msg any, topics ...string) {
+	for _, t := range topics {
+		bus.counter(t).Add(1)
+	}
 	bus.mu.RLock()
 	for _, t := range topics {
 		for _, ch := range bus.subs[t] {
@@ -54,6 +60,20 @@ func (bus *EventBus) Pub(msg any, topics ...string) {
 		}
 	}
 	bus.mu.RUnlock()
+}
+
+// PublishCount returns how many messages were published to topic.
+func (bus *EventBus) PublishCount(topic string) uint64 {
+	return bus.counter(topic).Load()
+}
+
+// counter returns the topic's publish counter, creating it.
+func (bus *EventBus) counter(topic string) *atomic.Uint64 {
+	if c, ok := bus.published.Load(topic); ok {
+		return c.(*atomic.Uint64)
+	}
+	c, _ := bus.published.LoadOrStore(topic, new(atomic.Uint64))
+	return c.(*atomic.Uint64)
 }
 
 // Unsub removes ch from the given topics. If no topics are specified,

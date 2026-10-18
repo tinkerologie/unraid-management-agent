@@ -23,6 +23,7 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/discovery"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/mcp"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/mqtt"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/scheduler"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/watchdog"
 )
 
@@ -129,6 +130,7 @@ func (o *Orchestrator) Run() error {
 	// reads of the hub field don't race with a later SetEventBus write.
 	// Publishing to agent_wake with no subscriber (agent disabled) is a no-op.
 	alertEngine.SetEventBus(o.ctx.Hub)
+	o.applyAlertFloors(alertEngine)
 	wg.Go(func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -272,6 +274,14 @@ func (o *Orchestrator) Run() error {
 	o.shutdown(apiServer, &wg)
 
 	return nil
+}
+
+// applyAlertFloors keeps, in Dynamic mode, the collectors enabled alert
+// rules read at their Manual default rate or faster (#280).
+func (o *Orchestrator) applyAlertFloors(engine *alerting.Engine) {
+	if o.collectorManager.Dynamic() {
+		engine.SetFloorListener(o.collectorManager.SetFloors)
+	}
 }
 
 // detectCapabilities takes the startup capability snapshot and wires the
@@ -435,6 +445,7 @@ func (o *Orchestrator) RunMCPStdio() error {
 	alertEngine := alerting.NewEngine(alertStore, apiServer)
 	apiServer.SetAlertEngine(alertEngine, alertStore)
 	mcpServer.SetAlertEngine(alertEngine, alertStore)
+	o.applyAlertFloors(alertEngine)
 	wg.Go(func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -592,6 +603,12 @@ func mqttBind[T any](topic domain.Topic[T], fn func(T) error) mqttBinding {
 	}
 }
 
+// mqttDemand returns the MQTT connection-state handler of Dynamic mode: the
+// collectors MQTT publishes are active while the broker is connected.
+func mqttDemand(demand *scheduler.Demand, bound map[string]bool) func(connected bool) {
+	return func(connected bool) { demand.SetMQTT(connected, bound) }
+}
+
 // subscribeMQTTEvents subscribes to collector events and publishes them via MQTT.
 func (o *Orchestrator) subscribeMQTTEvents(ctx context.Context, _ *api.Server) {
 	if o.mqttClient == nil {
@@ -637,9 +654,20 @@ func (o *Orchestrator) subscribeMQTTEvents(ctx context.Context, _ *api.Server) {
 
 	topics := make([]string, len(bindings))
 	dispatch := make(map[reflect.Type]func(any), len(bindings))
+	bound := map[string]bool{}
 	for i, b := range bindings {
 		topics[i] = b.topicName
 		dispatch[b.msgType] = b.handle
+		if name, ok := scheduler.CollectorForTopic(b.topicName); ok {
+			bound[name] = true
+		}
+	}
+
+	// In Dynamic mode the collectors MQTT publishes are active while the
+	// broker is connected.
+	if o.collectorManager != nil && o.collectorManager.Dynamic() {
+		// Registration delivers the current state, ordered with later changes.
+		o.mqttClient.SetConnectionStateHandler(mqttDemand(o.collectorManager.Demand(), bound))
 	}
 
 	ch := o.ctx.Hub.Sub(topics...)

@@ -1,0 +1,68 @@
+#!/bin/bash
+# One-time migration to the collection mode setting (#280).
+#
+# Fresh installs use dynamic collection. An existing install moves to dynamic
+# only when every interval is still a shipped default; any other value is a
+# tuning choice, so the install stays on manual intervals. No setting records
+# where a value came from, so a value equal to a shipped default counts as
+# "not set", and a missing key counts as a default. Intervals are never changed.
+#
+# Runs only when the plugin was installed before (.installed exists), this
+# migration has not run yet (.collection-mode-migrated is absent) and
+# COLLECTION_MODE is not set. The installer creates the marker only when this
+# script exits 0, which it also does for fresh installs. Exits non-zero if
+# config.cfg cannot be read or updated.
+
+PLUGIN="unraid-management-agent"
+CONFIG_DIR="${CONFIG_DIR:-/boot/config/plugins/$PLUGIN}"
+CONFIG_FILE="${CONFIG_DIR}/config.cfg"
+
+if [ ! -f "$CONFIG_FILE" ] || [ ! -f "${CONFIG_DIR}/.installed" ] ||
+    [ -f "${CONFIG_DIR}/.collection-mode-migrated" ]; then
+    exit 0
+fi
+
+content=$(cat "$CONFIG_FILE") || exit 1
+
+# An explicit choice already exists; leave it alone.
+if printf '%s\n' "$content" | grep -q '^[[:space:]]*COLLECTION_MODE='; then
+    exit 0
+fi
+
+# key:comma-separated shipped defaults — default.cfg and scripts/start, the
+# first-install config in the .plg, and the hardware defaults replaced by
+# migrate-auto-intervals. "auto" is a default for every key.
+DEFAULTS="INTERVAL_SYSTEM:15 INTERVAL_ARRAY:60,30 INTERVAL_DISK:300,30 INTERVAL_NETWORK:60,30
+INTERVAL_DOCKER:30 INTERVAL_VM:60,30 INTERVAL_GPU:60 INTERVAL_UPS:60 INTERVAL_NUT:0
+INTERVAL_HARDWARE:600,300 INTERVAL_SHARES:60 INTERVAL_ZFS:0,30 INTERVAL_UNASSIGNED:60
+INTERVAL_NOTIFICATION:30 INTERVAL_REGISTRATION:600,300 INTERVAL_STORAGE_TOPOLOGY:300,0
+INTERVAL_NIC:60,0 INTERVAL_FAN_CONTROL:60 INTERVAL_TUNING:120 INTERVAL_DOCKER_UPDATE:21600
+INTERVAL_DOCKER_NETWORKS:60 INTERVAL_PLUGIN_UPDATE:3600 INTERVAL_OS_UPDATE:86400 INTERVAL_MOVER:30"
+
+mode="dynamic"
+for entry in $DEFAULTS; do
+    key="${entry%%:*}"
+    defaults=",${entry#*:},auto,"
+    line=$(printf '%s\n' "$content" | grep -E "^[[:space:]]*${key}=" | tail -n1)
+    [ -n "$line" ] || continue
+    value="${line#*=}"
+    value=$(printf '%s' "$value" | tr -d "\"'[:space:]")
+    case "$defaults" in
+        *",${value},"*) ;;
+        *)
+            mode="manual"
+            break
+            ;;
+    esac
+done
+
+# Append only the key: config.cfg is also read by PHP's parse_ini_file.
+if ! printf '\nCOLLECTION_MODE="%s"\n' "$mode" >>"$CONFIG_FILE" 2>/dev/null; then
+    echo "✗ Could not update ${CONFIG_FILE}; the agent keeps using the manual intervals" >&2
+    exit 1
+fi
+if [ "$mode" = "dynamic" ]; then
+    echo "✓ Dynamic collection is on: the agent decides when each collector runs (Settings → Collection Intervals)"
+else
+    echo "✓ Kept your custom collection intervals (manual mode). Turn on Dynamic collection in Settings to let the agent decide."
+fi

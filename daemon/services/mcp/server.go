@@ -20,6 +20,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -1875,6 +1876,9 @@ func (s *Server) registerControlTools() {
 		logger.Info("MCP: Updating collector '%s' interval to %d seconds", args.CollectorName, args.Interval)
 
 		err := s.cacheProvider.UpdateCollectorInterval(args.CollectorName, args.Interval)
+		if errors.Is(err, domain.ErrDynamicCollectionMode) {
+			return textResult(fmt.Sprintf("Conflict: %v", err)), nil, nil
+		}
 		if err != nil {
 			logger.Error("MCP: Collector interval update failed: %v", err)
 			return textResult(fmt.Sprintf("Failed to update interval: %v", err)), nil, nil
@@ -2794,7 +2798,7 @@ func (s *Server) registerAgentTools() {
 // registerResources registers MCP resources for real-time data access.
 func (s *Server) registerResources() {
 	// System resource
-	s.mcpServer.AddResource(&mcp.Resource{
+	s.addResource(&mcp.Resource{
 		URI:         "unraid://system",
 		Name:        "system-info",
 		Description: "Real-time Unraid system information",
@@ -2809,7 +2813,7 @@ func (s *Server) registerResources() {
 	})
 
 	// Array resource
-	s.mcpServer.AddResource(&mcp.Resource{
+	s.addResource(&mcp.Resource{
 		URI:         "unraid://array",
 		Name:        "array-status",
 		Description: "Real-time Unraid array status",
@@ -2824,7 +2828,7 @@ func (s *Server) registerResources() {
 	})
 
 	// Containers resource
-	s.mcpServer.AddResource(&mcp.Resource{
+	s.addResource(&mcp.Resource{
 		URI:         "unraid://containers",
 		Name:        "docker-containers",
 		Description: "Real-time Docker container list and status",
@@ -2839,7 +2843,7 @@ func (s *Server) registerResources() {
 	})
 
 	// VMs resource
-	s.mcpServer.AddResource(&mcp.Resource{
+	s.addResource(&mcp.Resource{
 		URI:         "unraid://vms",
 		Name:        "virtual-machines",
 		Description: "Real-time virtual machine list and status",
@@ -2854,7 +2858,7 @@ func (s *Server) registerResources() {
 	})
 
 	// Disks resource
-	s.mcpServer.AddResource(&mcp.Resource{
+	s.addResource(&mcp.Resource{
 		URI:         "unraid://disks",
 		Name:        "disk-status",
 		Description: "Real-time disk information and health status",
@@ -2874,7 +2878,7 @@ func (s *Server) registerResources() {
 // registerPrompts registers MCP prompts for guided interactions.
 func (s *Server) registerPrompts() {
 	// Disk health diagnostic prompt (replaces analyze_disk_health with richer analysis)
-	s.mcpServer.AddPrompt(&mcp.Prompt{
+	s.addPrompt(&mcp.Prompt{
 		Name:        "diagnose_disk_health",
 		Description: "Walk through SMART data, temperatures, error rates, and power-on hours to produce a plain-English health verdict per disk",
 	}, func(_ context.Context, _ *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
@@ -2915,7 +2919,7 @@ Disk Data:
 	})
 
 	// Performance issue diagnostic prompt
-	s.mcpServer.AddPrompt(&mcp.Prompt{
+	s.addPrompt(&mcp.Prompt{
 		Name:        "diagnose_performance_issue",
 		Description: "Correlate CPU, RAM, Docker resource usage, and VM count to identify performance bottlenecks",
 	}, func(_ context.Context, _ *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
@@ -2960,7 +2964,7 @@ System Data:
 	})
 
 	// Maintenance suggestion prompt
-	s.mcpServer.AddPrompt(&mcp.Prompt{
+	s.addPrompt(&mcp.Prompt{
 		Name:        "suggest_maintenance",
 		Description: "Review parity history, disk ages, array errors, and temperatures to generate a prioritized maintenance checklist",
 	}, func(_ context.Context, _ *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
@@ -3008,7 +3012,7 @@ System Data:
 	})
 
 	// Array state explanation prompt
-	s.mcpServer.AddPrompt(&mcp.Prompt{
+	s.addPrompt(&mcp.Prompt{
 		Name:        "explain_array_state",
 		Description: "Translate raw array status into human-readable context with recommended actions",
 	}, func(_ context.Context, _ *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
@@ -3048,7 +3052,7 @@ Array Data:
 	})
 
 	// System overview prompt
-	s.mcpServer.AddPrompt(&mcp.Prompt{
+	s.addPrompt(&mcp.Prompt{
 		Name:        "system_overview",
 		Description: "Get a comprehensive overview of the Unraid system status",
 	}, func(_ context.Context, _ *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
@@ -3092,7 +3096,7 @@ System Data:
 	})
 
 	// Troubleshooting prompt
-	s.mcpServer.AddPrompt(&mcp.Prompt{
+	s.addPrompt(&mcp.Prompt{
 		Name:        "troubleshoot_issue",
 		Description: "Help troubleshoot common Unraid issues",
 	}, func(_ context.Context, _ *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
@@ -3183,6 +3187,13 @@ func addToolDirect[In, Out any](s *Server, tool *mcp.Tool, handler mcp.ToolHandl
 	destructive := tool.Annotations != nil && tool.Annotations.DestructiveHint != nil && *tool.Annotations.DestructiveHint
 	if s.toolPolicyStore != nil {
 		s.toolPolicyStore.RegisterTool(tool.Name, tool.Description, readOnly, destructive)
+	}
+	if _, ok := readCollectors[tool.Name]; ok {
+		inner := handler
+		handler = func(ctx context.Context, req *mcp.CallToolRequest, args In) (*mcp.CallToolResult, Out, error) {
+			s.ensureFresh(ctx, tool.Name)
+			return inner(ctx, req, args)
+		}
 	}
 	mcp.AddTool(s.mcpServer, tool, handler)
 }

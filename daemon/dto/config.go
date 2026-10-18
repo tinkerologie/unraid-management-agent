@@ -88,15 +88,29 @@ type CollectorStatus struct {
 	// Auto is true while a hardware-gated collector is in automatic mode: it
 	// runs at the auto-enable interval while its hardware is present.
 	Auto bool `json:"auto"`
+	// Mode is the collection mode: "dynamic" or "manual" (#280).
+	Mode string `json:"mode"`
+	// EffectiveInterval is the interval the collector runs at right now, 0
+	// while it is stopped. In Dynamic mode it follows demand and floors.
+	EffectiveInterval int `json:"effective_interval_seconds"`
+	// Reason explains EffectiveInterval: "event", "active", "idle", "floor"
+	// or "manual".
+	Reason string `json:"reason"`
+	// EventDriven is true when change events trigger the collector in Dynamic mode.
+	EventDriven bool `json:"event_driven"`
+	// PublishCount is how many updates the collector published since the agent started.
+	PublishCount uint64 `json:"publish_count"`
 }
 
 // CollectorsStatusResponse is the response for /collectors/status
 type CollectorsStatusResponse struct {
-	Collectors    []CollectorStatus `json:"collectors"`
-	Total         int               `json:"total"`
-	EnabledCount  int               `json:"enabled_count"`
-	DisabledCount int               `json:"disabled_count"`
-	Timestamp     time.Time         `json:"timestamp"`
+	Collectors []CollectorStatus `json:"collectors"`
+	// Mode is the collection mode: "dynamic" or "manual".
+	Mode          string    `json:"mode"`
+	Total         int       `json:"total"`
+	EnabledCount  int       `json:"enabled_count"`
+	DisabledCount int       `json:"disabled_count"`
+	Timestamp     time.Time `json:"timestamp"`
 }
 
 // CollectorResponse is the response for enable/disable/interval operations

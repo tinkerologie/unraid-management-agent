@@ -107,6 +107,10 @@ var cli struct {
 	// hardware is detected (#261). Set by the plugin for intervals set to "auto".
 	AutoCollectors string `default:"" env:"UNRAID_AUTO_COLLECTORS" help:"comma-separated hardware-gated collectors in automatic mode (nic,storage_topology,gpu,ups,nut,zfs): run at 300s only while their hardware is detected"`
 
+	// Collection mode (#280): dynamic lets the agent decide when collectors
+	// run; manual uses the configured intervals.
+	CollectionMode string `default:"manual" enum:"dynamic,manual" env:"COLLECTION_MODE" help:"collection mode: dynamic (event-driven and demand-aware, INTERVAL_* unused) or manual (configured intervals)"`
+
 	// MQTT Configuration
 	MQTTEnabled            bool   `default:"false" env:"MQTT_ENABLED" help:"enable MQTT publishing"`
 	MQTTBroker             string `default:"" env:"MQTT_BROKER" help:"MQTT broker hostname or IP"`
@@ -344,6 +348,7 @@ func main() {
 	if cli.LowPowerMode {
 		log.Printf("Low power mode enabled - all intervals multiplied by 4x")
 	}
+	log.Printf("Collection mode: %s", cli.CollectionMode)
 
 	// Create diagnostic logger for structured JSON logging
 	diagLogger := logger.NewDiagnosticLogger(
@@ -414,6 +419,8 @@ func main() {
 		DockerUpdateNotify: cli.DockerUpdateNotify,
 		GatedCollectors:    gatedCollectors,
 		AutoCollectors:     autoCollectors,
+		DisabledCollectors: disabledCollectors,
+		CollectionMode:     cli.CollectionMode,
 		LowPowerMode:       cli.LowPowerMode,
 		Intervals: domain.Intervals{
 			System:         getInterval("system", cli.IntervalSystem),
@@ -727,6 +734,13 @@ func applyFileConfig(cfg *domain.FileConfig) {
 	setBool(&cli.LowPowerMode, cfg.LowPowerMode)
 	setStr(&cli.DisableCollectors, cfg.DisableCollectors)
 	setStr(&cli.AutoCollectors, cfg.AutoCollectors)
+	if m := cfg.CollectionMode; m != nil && !isExplicitFlag(&cli.CollectionMode) {
+		if *m == domain.CollectionModeDynamic || *m == domain.CollectionModeManual {
+			cli.CollectionMode = *m
+		} else {
+			log.Printf("WARNING: Invalid collection_mode %q in config.yml (want dynamic or manual), ignoring", *m)
+		}
+	}
 	setStr(&cli.CORSOrigin, cfg.CORSOrigin)
 	setStr(&cli.APIToken, cfg.APIToken)
 	setStr(&cli.MCPConnectSecret, cfg.MCPConnectSecret)

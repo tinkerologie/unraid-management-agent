@@ -71,6 +71,12 @@ func collectWithWatchdog(ctx context.Context, name string, interval time.Duratio
 	runCollectWithWatchdog(ctx, name, watchdogThreshold(interval), collect)
 }
 
+// CollectWithWatchdog runs one collect cycle under the stall watchdog, for
+// callers outside this package (the Dynamic-mode collector runner).
+func CollectWithWatchdog(ctx context.Context, name string, interval time.Duration, collect func()) {
+	collectWithWatchdog(ctx, name, interval, collect)
+}
+
 // runCollectWithWatchdog is the threshold-based core of collectWithWatchdog,
 // separated so the watchdog behaviour can be tested with a small threshold
 // without waiting for the interval-derived minimum.

@@ -32,6 +32,15 @@ type WSHub struct {
 	register   chan *WSClient
 	unregister chan *WSClient
 	mu         sync.RWMutex
+	// demand, when set (Dynamic collection mode), learns each client's topic
+	// filter so subscribed collectors run at their active rate (#280).
+	demand wsDemand
+}
+
+// wsDemand records WebSocket topic filters; a nil filter means every topic.
+type wsDemand interface {
+	WSAdd(topics map[string]bool)
+	WSRemove(topics map[string]bool)
 }
 
 // WSClient represents a single WebSocket client connection.
@@ -42,6 +51,8 @@ type WSClient struct {
 	send   chan dto.WSEvent
 	topics map[string]bool // nil = all topics; non-nil = only matching topics
 	topMu  sync.RWMutex
+	// tracked is true while the hub's demand counts this client. Protected by topMu.
+	tracked bool
 }
 
 // NewWSHub creates and initializes a new WebSocket hub.
@@ -72,6 +83,7 @@ func (h *WSHub) Run(ctx context.Context) {
 			// Close all client connections
 			h.mu.Lock()
 			for client := range h.clients {
+				client.untrack()
 				close(client.send)
 				delete(h.clients, client)
 			}
@@ -82,11 +94,13 @@ func (h *WSHub) Run(ctx context.Context) {
 			h.mu.Lock()
 			h.clients[client] = true
 			h.mu.Unlock()
+			client.track()
 			logger.Debug("WebSocket client connected")
 
 		case client := <-h.unregister:
 			h.mu.Lock()
 			if _, ok := h.clients[client]; ok {
+				client.untrack()
 				delete(h.clients, client)
 				close(client.send)
 				logger.Debug("WebSocket client disconnected")
@@ -126,6 +140,7 @@ func (h *WSHub) Run(ctx context.Context) {
 			h.mu.Lock()
 			for _, client := range staleClients {
 				if _, ok := h.clients[client]; ok {
+					client.untrack()
 					delete(h.clients, client)
 					close(client.send)
 					// A client is evicted when its send buffer (WSBufferSize) is
@@ -171,6 +186,10 @@ func (c *WSClient) wantsTopic(topic string) bool {
 func (c *WSClient) setTopics(topics []string) {
 	c.topMu.Lock()
 	defer c.topMu.Unlock()
+	if d := c.demandLocked(); d != nil {
+		d.WSRemove(c.topics)
+		defer func() { d.WSAdd(c.topics) }()
+	}
 	if len(topics) == 0 {
 		c.topics = nil
 		return
@@ -178,6 +197,36 @@ func (c *WSClient) setTopics(topics []string) {
 	c.topics = make(map[string]bool, len(topics))
 	for _, t := range topics {
 		c.topics[t] = true
+	}
+}
+
+// demandLocked returns the hub's demand recorder while it counts this
+// client; topMu must be held.
+func (c *WSClient) demandLocked() wsDemand {
+	if !c.tracked || c.hub == nil {
+		return nil
+	}
+	return c.hub.demand
+}
+
+// track starts counting the client's topic filter as demand.
+func (c *WSClient) track() {
+	c.topMu.Lock()
+	defer c.topMu.Unlock()
+	if c.hub == nil || c.hub.demand == nil || c.tracked {
+		return
+	}
+	c.tracked = true
+	c.hub.demand.WSAdd(c.topics)
+}
+
+// untrack stops counting the client's topic filter as demand.
+func (c *WSClient) untrack() {
+	c.topMu.Lock()
+	defer c.topMu.Unlock()
+	if d := c.demandLocked(); d != nil {
+		d.WSRemove(c.topics)
+		c.tracked = false
 	}
 }
 

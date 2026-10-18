@@ -32,6 +32,8 @@ type FileConfig struct {
 	DisableCollectors *string `yaml:"disable_collectors,omitempty"`
 	// AutoCollectors lists hardware-gated collectors in automatic mode (#261).
 	AutoCollectors *string `yaml:"auto_collectors,omitempty"`
+	// CollectionMode is "dynamic" or "manual" (#280).
+	CollectionMode *string `yaml:"collection_mode,omitempty"`
 
 	// CORS
 	CORSOrigin *string `yaml:"cors_origin,omitempty"`

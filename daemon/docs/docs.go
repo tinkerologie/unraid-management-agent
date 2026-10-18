@@ -1243,6 +1243,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/dto.Response"
                         }
                     },
+                    "409": {
+                        "description": "Dynamic collection mode: the agent manages intervals",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
                     "503": {
                         "description": "Collector management not available",
                         "schema": {
@@ -6752,11 +6758,19 @@ const docTemplate = `{
                     "description": "Auto is true while a hardware-gated collector is in automatic mode: it\nruns at the auto-enable interval while its hardware is present.",
                     "type": "boolean"
                 },
+                "effective_interval_seconds": {
+                    "description": "EffectiveInterval is the interval the collector runs at right now, 0\nwhile it is stopped. In Dynamic mode it follows demand and floors.",
+                    "type": "integer"
+                },
                 "enabled": {
                     "type": "boolean"
                 },
                 "error_count": {
                     "type": "integer"
+                },
+                "event_driven": {
+                    "description": "EventDriven is true when change events trigger the collector in Dynamic mode.",
+                    "type": "boolean"
                 },
                 "hardware_gated": {
                     "description": "HardwareGated is true while the collector follows hardware detection: it\nis off while its hardware is absent. A manual enable, disable or interval\nchange ends this until the agent restarts.",
@@ -6769,7 +6783,19 @@ const docTemplate = `{
                 "last_run": {
                     "type": "string"
                 },
+                "mode": {
+                    "description": "Mode is the collection mode: \"dynamic\" or \"manual\" (#280).",
+                    "type": "string"
+                },
                 "name": {
+                    "type": "string"
+                },
+                "publish_count": {
+                    "description": "PublishCount is how many updates the collector published since the agent started.",
+                    "type": "integer"
+                },
+                "reason": {
+                    "description": "Reason explains EffectiveInterval: \"event\", \"active\", \"idle\", \"floor\"\nor \"manual\".",
                     "type": "string"
                 },
                 "required": {
@@ -6796,6 +6822,10 @@ const docTemplate = `{
                 },
                 "enabled_count": {
                     "type": "integer"
+                },
+                "mode": {
+                    "description": "Mode is the collection mode: \"dynamic\" or \"manual\".",
+                    "type": "string"
                 },
                 "timestamp": {
                     "type": "string"

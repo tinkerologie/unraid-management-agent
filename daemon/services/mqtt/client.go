@@ -47,6 +47,10 @@ type Client struct {
 	// connectCancel cancels the context for goroutines spawned by handleConnect.
 	// Protected by mu.
 	connectCancel context.CancelFunc
+	// onConnState receives every connection state change. connStateMu
+	// guards it and serialises its calls, so they arrive in order.
+	onConnState func(connected bool)
+	connStateMu sync.Mutex
 
 	// remoteShareSources maps a sanitized remote-share ID (used in MQTT switch
 	// command topics) back to the share's source identifier so incoming
@@ -211,6 +215,7 @@ func (c *Client) handleConnect() {
 	now := time.Now()
 	c.lastConnect = &now
 	c.lastError = ""
+	c.notifyConnState()
 
 	logger.Success("MQTT: Connected to broker %s", c.config.Broker)
 
@@ -249,6 +254,7 @@ func (c *Client) handleDisconnect(err error) {
 	c.connected.Store(false)
 	now := time.Now()
 	c.lastDisconn = &now
+	c.notifyConnState()
 
 	// Cancel any in-flight connect goroutines.
 	c.mu.Lock()
@@ -269,7 +275,13 @@ func (c *Client) handleDisconnect(err error) {
 // Disconnect closes the MQTT connection gracefully.
 func (c *Client) Disconnect() {
 	c.mu.Lock()
-	defer c.mu.Unlock()
+	disconnected := false
+	defer func() {
+		c.mu.Unlock()
+		if disconnected {
+			c.notifyConnState()
+		}
+	}()
 
 	// Cancel any in-flight connect goroutines.
 	if c.connectCancel != nil {
@@ -284,7 +296,34 @@ func (c *Client) Disconnect() {
 
 		c.client.Disconnect(250)
 		c.connected.Store(false)
+		disconnected = true
 		logger.Info("MQTT: Disconnected from broker")
+	}
+}
+
+// SetConnectionStateHandler registers fn, calls it with the current
+// connection state and then again on every state change. Calls are
+// serialised and always pass the live state, so a change racing with the
+// registration cannot leave fn with a stale value. fn must not call
+// SetConnectionStateHandler. Dynamic collection mode uses it to run the
+// published collectors at their active rate while the broker is connected
+// (#280).
+func (c *Client) SetConnectionStateHandler(fn func(connected bool)) {
+	c.connStateMu.Lock()
+	defer c.connStateMu.Unlock()
+	c.onConnState = fn
+	if fn != nil {
+		fn(c.connected.Load())
+	}
+}
+
+// notifyConnState calls the connection-state handler with the live state,
+// without holding c.mu.
+func (c *Client) notifyConnState() {
+	c.connStateMu.Lock()
+	defer c.connStateMu.Unlock()
+	if c.onConnState != nil {
+		c.onConnState(c.connected.Load())
 	}
 }
 

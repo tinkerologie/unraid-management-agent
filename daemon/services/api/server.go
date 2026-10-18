@@ -62,6 +62,9 @@ type Server struct {
 	cancelFunc       context.CancelFunc
 	ready            chan struct{} // closed when subscriptions are fully wired
 	collectorManager CollectorManagerInterface
+	// dynamic is the collector manager in Dynamic collection mode, nil in
+	// Manual mode: reads refresh stale data and record demand (#280).
+	dynamic          dynamicCollectors
 	mqttClient       MQTTClientInterface
 	systemController SystemControllerInterface
 	alertEngine      *alerting.Engine
@@ -108,6 +111,11 @@ func NewServerWithCollectorManager(ctx *domain.Context, cm CollectorManagerInter
 		networkAccess:    collectors.NewNetworkAccessDiscovery(ctx.WANIPLookup),
 	}
 
+	if dc, ok := cm.(dynamicCollectors); ok && dc.Dynamic() {
+		s.dynamic = dc
+		s.wsHub.demand = dc.Demand()
+	}
+
 	s.setupRoutes()
 	return s
 }
@@ -125,6 +133,7 @@ func (s *Server) setupRoutes() {
 	s.router.Use(authMiddlewareWithMCPSecret(s.ctx.APIToken, s.ctx.MCPConnectSecret))
 	s.router.Use(writeLockMiddleware(s.ctx.WritesLocked()))
 	s.router.Use(loggingMiddleware)
+	s.router.Use(s.freshnessMiddleware)
 
 	s.router.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if isMCPPath(r.URL) {
@@ -519,6 +528,7 @@ func (s *Server) subscribeToEvents(ctx context.Context, readyWg *sync.WaitGroup)
 	}
 	ch := s.ctx.Hub.Sub(topics...)
 	dispatch := buildCacheDispatch(bindings)
+	typeToTopic := buildTypeToTopicMap()
 
 	logger.Info("Cache: Subscription ready (%d topics), waiting for events...", len(bindings))
 	readyWg.Done()
@@ -532,6 +542,7 @@ func (s *Server) subscribeToEvents(ctx context.Context, readyWg *sync.WaitGroup)
 		case msg := <-ch:
 			if handler, ok := dispatch[reflect.TypeOf(msg)]; ok {
 				handler(s.CacheStore, msg)
+				s.markInstalled(typeToTopic[reflect.TypeOf(msg)], time.Now())
 				logger.Debug("Cache: Updated %T", msg)
 			} else {
 				logger.Warning("Cache: Received unknown event type: %T", msg)

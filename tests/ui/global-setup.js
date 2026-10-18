@@ -1,6 +1,7 @@
 // Renders the plugin settings page before the tests run: .render/page.html
 // without a config file (fallback defaults) and .render/page-configured.html
-// with .render/config.cfg, which sets non-default collector intervals.
+// with .render/config.cfg, which sets non-default collector intervals, and
+// .render/page-dynamic.html with dynamic collection on.
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -30,4 +31,12 @@ module.exports = async () => {
     ].join('\n'),
   );
   render('page-configured.html', config);
+
+  // Dynamic collection on, with saved non-default intervals (#280).
+  const dynamic = path.join(out, 'config-dynamic.cfg');
+  fs.writeFileSync(
+    dynamic,
+    ['COLLECTION_MODE="dynamic"', 'INTERVAL_SYSTEM="30"', 'INTERVAL_DOCKER="10"', 'INTERVAL_MOVER="120"', ''].join('\n'),
+  );
+  render('page-dynamic.html', dynamic);
 };

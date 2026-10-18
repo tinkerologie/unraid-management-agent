@@ -478,6 +478,11 @@ UPSes have no load or power reading). They are never sent as a made-up `0`.
 
 ## Event Frequency Summary
 
+The intervals below are example Manual-mode intervals; see the Configuration Guide for the
+current defaults. In Dynamic collection mode the agent sets each
+collector's rate from change events and from which topics clients subscribe to; see the
+[Configuration Guide](../guides/configuration.md#collection-mode).
+
 | Event Type              | Interval                               | Collector                |
 | ----------------------- | -------------------------------------- | ------------------------ |
 | system_update           | 5s                                     | SystemCollector          |

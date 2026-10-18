@@ -9,6 +9,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.10.01] - 2026-10-18
+
+### Added
+
+- **Dynamic collection mode** (#280) — `COLLECTION_MODE="dynamic|manual"` (`--collection-mode`,
+  `collection_mode` in `config.yml`). In Dynamic mode the agent decides when each collector runs
+  instead of the 21 interval settings:
+  - **Change events** run collectors right away: Docker container events, libvirt VM lifecycle
+    events, file changes under `/var/local/emhttp` and `/boot/config` (array, disks, shares,
+    notifications, mover, Unassigned Devices, plugin installs) and kernel hotplug uevents.
+    Every event-driven collector keeps a slow safety-net poll.
+  - **Demand-aware cadence**: a collector runs at its active rate while a WebSocket client is
+    subscribed to one of its topics, MQTT is connected, or its data was read over REST or MCP in
+    the last 5 minutes, and drops to its idle rate otherwise. Clients subscribed only to other
+    topics do not speed it up.
+  - **Refresh on read**: for demand-following collectors, a REST, MCP or `/metrics` read of data
+    older than the collector's staleness limit triggers one shared collection and waits up to
+    2 s for it. If the collection fails or is late the cached data is returned; REST responses
+    carry `X-Cache-Updated-At` and `X-Cache-Stale`. Collectors on long fixed schedules (update
+    checks, license, tuning, hardware info) are not refreshed by reads.
+  - **Safety floors**: while an enabled alert rule reads a collector's data, it never runs slower
+    than its Manual default. The 15 s alert evaluation, health checks and fan control are
+    unchanged.
+  - `GET /collectors/status` reports `mode`, `effective_interval_seconds`, `reason` (`event`,
+    `active`, `idle`, `floor` or `manual`), `event_driven` and `publish_count`. In Dynamic mode
+    `PATCH /collectors/{name}/interval` (and the MCP `update_collector_interval` tool) returns a
+    conflict.
+- **"Dynamic collection" toggle** on the plugin settings page. When it is on, the interval settings
+  below it (the interval grid, Show all collectors, Re-check hardware and the power tip) are hidden;
+  saved intervals are kept and apply again in Manual mode. Hardware detection keeps gating the
+  hardware collectors in both modes.
+
+### Changed
+
+- Fresh plugin installs start in Dynamic mode. On upgrade, installs whose intervals are all
+  shipped defaults move to Dynamic; installs with any changed interval stay on Manual, and no
+  interval is changed. The daemon outside the plugin still defaults to Manual.
+
 ## [2026.10.00] - 2026-10-18
 
 ### Added

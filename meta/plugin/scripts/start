@@ -41,6 +41,8 @@ MCP_CONNECT_SECRET="${MCP_CONNECT_SECRET:-}"
 MCP_CONNECT_SECRET_DISABLED="${MCP_CONNECT_SECRET_DISABLED:-false}"
 TOOL_POLICY="${TOOL_POLICY:-}"
 LOG_LEVEL="${LOG_LEVEL:-info}"
+# Configs the collection-mode migration has not reached yet stay on manual (#280).
+COLLECTION_MODE="${COLLECTION_MODE:-manual}"
 # Defaults follow industry standards (Zabbix, Prometheus, Datadog). Hardware-
 # dependent collectors default to "auto": on only when their hardware is found.
 INTERVAL_SYSTEM="${INTERVAL_SYSTEM:-15}"
@@ -100,6 +102,10 @@ fi
 TOOL_POLICY=$(echo "$TOOL_POLICY" | tr -cd 'a-zA-Z0-9,_=-')
 LOG_LEVEL=$(echo "$LOG_LEVEL" | grep -xE 'debug|info|warning|error' || echo "info")
 LOG_LEVEL="${LOG_LEVEL:-info}"
+case "$COLLECTION_MODE" in
+    dynamic|manual) ;;
+    *) COLLECTION_MODE="manual" ;;
+esac
 
 # "auto" intervals become 0 plus an entry in UNRAID_AUTO_COLLECTORS (#261).
 # shellcheck source=meta/plugin/scripts/auto-intervals
@@ -176,6 +182,7 @@ nohup env \
   API_TOKEN="$API_TOKEN" \
   MCP_CONNECT_SECRET="$MCP_CONNECT_SECRET" \
   TOOL_POLICY="$TOOL_POLICY" \
+  COLLECTION_MODE="$COLLECTION_MODE" \
   INTERVAL_SYSTEM="$INTERVAL_SYSTEM" \
   INTERVAL_ARRAY="$INTERVAL_ARRAY" \
   INTERVAL_DISK="$INTERVAL_DISK" \

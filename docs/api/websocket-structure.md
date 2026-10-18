@@ -65,6 +65,11 @@ type WSEvent struct {
 2. **Type Identification**: Event types are determined by inspecting the `data` structure
 3. **Timestamp Format**: RFC3339Nano format with timezone offset
 4. **Data Variability**: The `data` field can be an object or array depending on event type
+5. **Subscriptions drive collection**: In Dynamic collection mode a client's topic filter
+   (`{"subscribe": ["container_list_update", ...]}`) decides which collectors run at their active
+   rate. A client that never subscribes receives every topic, so it keeps every collector active;
+   subscribe to the topics you use to let the others idle. See the
+   [Configuration Guide](../guides/configuration.md#collection-mode).
 
 ---
 

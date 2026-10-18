@@ -2521,6 +2521,10 @@ func (s *Server) handleCollectorsStatus(w http.ResponseWriter, _ *http.Request) 
 	var statuses []dto.CollectorStatus
 	enabledCount := 0
 	disabledCount := 0
+	mode := domain.CollectionModeManual
+	if s.ctx.DynamicCollection() {
+		mode = domain.CollectionModeDynamic
+	}
 
 	for _, c := range collectors {
 		enabled := c.interval > 0
@@ -2532,16 +2536,24 @@ func (s *Server) handleCollectorsStatus(w http.ResponseWriter, _ *http.Request) 
 			enabledCount++
 		}
 
-		statuses = append(statuses, dto.CollectorStatus{
+		st := dto.CollectorStatus{
 			Name:     c.name,
 			Enabled:  enabled,
 			Interval: c.interval,
 			Status:   status,
-		})
+			Mode:     mode,
+		}
+		// Without a manager only Manual mode's schedule is known: the configured interval.
+		if enabled && mode == domain.CollectionModeManual {
+			st.EffectiveInterval = c.interval
+			st.Reason = "manual"
+		}
+		statuses = append(statuses, st)
 	}
 
 	respondJSON(w, http.StatusOK, dto.CollectorsStatusResponse{
 		Collectors:    statuses,
+		Mode:          mode,
 		Total:         len(collectors),
 		EnabledCount:  enabledCount,
 		DisabledCount: disabledCount,
@@ -2687,6 +2699,7 @@ func (s *Server) handleCollectorStateChange(w http.ResponseWriter, r *http.Reque
 //	@Success		200			{object}	dto.CollectorResponse			"Interval updated"
 //	@Failure		400			{object}	dto.Response					"Invalid request"
 //	@Failure		404			{object}	dto.Response					"Collector not found"
+//	@Failure		409			{object}	dto.Response					"Dynamic collection mode: the agent manages intervals"
 //	@Failure		503			{object}	dto.Response					"Collector management not available"
 //	@Router			/collectors/{name}/interval [patch]
 func (s *Server) handleCollectorInterval(w http.ResponseWriter, r *http.Request) {
@@ -2718,6 +2731,8 @@ func (s *Server) handleCollectorInterval(w http.ResponseWriter, r *http.Request)
 		statusCode := http.StatusBadRequest
 		if err.Error() == fmt.Sprintf("unknown collector: %s", name) {
 			statusCode = http.StatusNotFound
+		} else if errors.Is(err, domain.ErrDynamicCollectionMode) {
+			statusCode = http.StatusConflict
 		}
 		respondJSON(w, statusCode, dto.Response{
 			Success:   false,

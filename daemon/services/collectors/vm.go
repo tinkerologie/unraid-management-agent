@@ -29,6 +29,7 @@ type VMCollector struct {
 	appCtx        *domain.Context
 	cpuStatsMutex sync.RWMutex
 	previousStats map[string]*vmCPUStats // vmName -> previous CPU stats
+	guests        *sync.WaitGroup        // guest-agent poller started by Open (Dynamic mode)
 }
 
 // NewVMCollector creates a new libvirt-based VM collector

@@ -63,6 +63,7 @@ test-packaging: package
 	sudo bash scripts/test-bundle-extraction.sh
 	bash scripts/test-secure-defaults-migration.sh
 	bash scripts/test-auto-intervals-migration.sh
+	bash scripts/test-collection-mode-migration.sh
 	bash scripts/test-plg-checksums.sh
 	bash scripts/test-plugin-settings.sh
 	bash scripts/test-plugin-intervals.sh

@@ -25,6 +25,7 @@ log_level: debug
 read_only: true
 allow_unauthenticated_writes: true
 wan_ip_lookup: false
+collection_mode: dynamic
 tool_policy:
   container_start: ask
 mqtt:
@@ -62,6 +63,9 @@ intervals:
 		}
 		if cfg.WANIPLookup == nil || *cfg.WANIPLookup {
 			t.Errorf("WANIPLookup = %v, want explicit false", cfg.WANIPLookup)
+		}
+		if cfg.CollectionMode == nil || *cfg.CollectionMode != CollectionModeDynamic {
+			t.Errorf("CollectionMode = %v, want dynamic", cfg.CollectionMode)
 		}
 		if got := cfg.ToolPolicy["container_start"]; got != "ask" {
 			t.Errorf("ToolPolicy[container_start] = %q, want ask", got)

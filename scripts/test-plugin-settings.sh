@@ -1,6 +1,7 @@
 #!/bin/bash
 # Tests the settings-page save hook (meta/plugin/include/update.php) for the
-# security, privacy and display toggles (#245, #252, #261). Run by `make test-packaging`.
+# security, privacy, display and collection mode toggles (#245, #252, #261,
+# #280). Run by `make test-packaging`.
 #
 # Usage: bash scripts/test-plugin-settings.sh
 
@@ -64,3 +65,12 @@ check SHOW_ALL_COLLECTORS yes false
 check SHOW_ALL_COLLECTORS "" false
 check SHOW_ALL_COLLECTORS "<absent>" "<unset>"
 echo "✓ SHOW_ALL_COLLECTORS saves as false unless explicitly true; its checkbox field is dropped"
+
+# Collection mode: only an explicit "dynamic" turns it on; anything else is manual.
+check COLLECTION_MODE dynamic dynamic
+check COLLECTION_MODE manual manual
+check COLLECTION_MODE Dynamic manual
+check COLLECTION_MODE true manual
+check COLLECTION_MODE "" manual
+check COLLECTION_MODE "<absent>" "<unset>"
+echo "✓ COLLECTION_MODE saves as manual unless explicitly dynamic; its checkbox field is dropped"

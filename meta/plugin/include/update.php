@@ -83,6 +83,12 @@ if (isset($_POST['SHOW_ALL_COLLECTORS'])) {
 }
 unset($_POST['SHOW_ALL_COLLECTORS_CB']);
 
+// Normalise the collection mode to exactly "dynamic" or "manual" (#280).
+if (isset($_POST['COLLECTION_MODE'])) {
+    $_POST['COLLECTION_MODE'] = ($_POST['COLLECTION_MODE'] === 'dynamic') ? 'dynamic' : 'manual';
+}
+unset($_POST['COLLECTION_MODE_CB']);
+
 // Save tool policy JSON if submitted
 $policy_file = "/boot/config/plugins/$plugin/tool_policy.json";
 if (isset($_POST['TOOL_POLICY_JSON'])) {

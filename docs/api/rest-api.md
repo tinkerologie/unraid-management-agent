@@ -2532,6 +2532,28 @@ The agent runs multiple collectors that gather data at configurable intervals. T
 
 Get status of all collectors including enabled state, interval, and runtime information.
 
+Every collector also reports how it is scheduled (#280):
+
+| Field                        | Description                                                                                                                                                                                               |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mode`                       | `dynamic` or `manual` (also at the top level of the response)                                                                                                                                             |
+| `effective_interval_seconds` | The interval the collector runs at right now; `0` while it is stopped                                                                                                                                     |
+| `reason`                     | `manual` (configured interval), `active` (a consumer reads it), `idle` (no consumer), `event` (no consumer, event-driven with a safety-net poll) or `floor` (held at its Manual default by an alert rule) |
+| `event_driven`               | `true` when change events trigger the collector in Dynamic mode                                                                                                                                           |
+| `publish_count`              | Updates the collector published since the agent started                                                                                                                                                   |
+
+`interval_seconds` stays the configured (saved) interval; in Dynamic mode it is not used.
+Reading this endpoint never triggers a collection.
+
+**Freshness headers.** In Dynamic mode, GET endpoints that serve collector data (and
+`/metrics`) refresh data older than the collector's staleness limit before responding, waiting
+up to 2 seconds. They set `X-Cache-Updated-At` (RFC 3339, the oldest of the collectors behind
+the endpoint) and, when the refresh failed or timed out and cached data is returned,
+`X-Cache-Stale: true`. Collectors on long fixed schedules (`hardware`, `registration`, `tuning`,
+`docker_update`, `plugin_update`, `os_update`) are never refreshed by a read and never marked
+stale; their data is as old as their last scheduled run. `GET /vm/guest` is never refreshed either: the guest
+poller updates it on its own interval, and it is marked stale once it is older than two intervals.
+
 **Response**:
 
 ```json
@@ -2737,6 +2759,16 @@ Update the collection interval for a collector. If the collector is running, it 
 **Validation**:
 
 - Interval must be between 5 and 3600 seconds
+
+**Error Response (409)** - Dynamic collection mode, where the agent manages intervals:
+
+```json
+{
+  "success": false,
+  "message": "collector intervals are managed by the agent in dynamic collection mode; switch to manual mode to set them",
+  "timestamp": "2026-10-18T12:05:47+10:00"
+}
+```
 
 **Error Response (400)** - Invalid Interval:
 

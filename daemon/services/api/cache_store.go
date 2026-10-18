@@ -1,6 +1,7 @@
 package api
 
 import (
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -59,6 +60,10 @@ type CacheStore struct {
 
 	// registry is the OS-resilience status registry (may be nil in tests).
 	registry *platform.Registry
+
+	// installs records each topic's last cache install, for refresh on read.
+	installMu sync.Mutex
+	installs  map[string]*cacheInstall
 }
 
 // DegradedSubsystemCount reports how many data sources are not healthy. It

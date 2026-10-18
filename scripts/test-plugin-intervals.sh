@@ -2,7 +2,8 @@
 # Checks that the collector intervals added to the plugin (#276) use the
 # daemon's defaults everywhere and reach the daemon: default.cfg, the
 # first-install config in the .plg, the start script (fallback, validation
-# and passthrough) and the settings page. Run by `make test-packaging`.
+# and passthrough) and the settings page. Also checks the collection mode
+# setting (#280) the same way. Run by `make test-packaging`.
 #
 # Usage: bash scripts/test-plugin-intervals.sh
 
@@ -68,6 +69,20 @@ for var in "${INTERVALS[@]}"; do
     echo "✓ $var defaults to $want everywhere and reaches the daemon"
 done
 
+# ── Collection mode (#280) ────────────────────────────────────
+mode_field=$(grep 'env:"COLLECTION_MODE"' "$MAIN" || true)
+[ -n "$mode_field" ] || fail "COLLECTION_MODE: main.go has no COLLECTION_MODE field"
+grep -q 'default:"manual"' <<<"$mode_field" || fail "COLLECTION_MODE: main.go default is not manual"
+grep -q 'enum:"dynamic,manual"' <<<"$mode_field" || fail "COLLECTION_MODE: main.go enum is not dynamic,manual"
+echo "✓ main.go reads COLLECTION_MODE (dynamic|manual, default manual)"
+[ "$(cfg_value COLLECTION_MODE "$DEFAULT_CFG")" = "dynamic" ] || fail "COLLECTION_MODE: default.cfg is not dynamic"
+[ "$(cfg_value COLLECTION_MODE "$PLG")" = "dynamic" ] || fail "COLLECTION_MODE: .plg first-install config is not dynamic"
+# shellcheck disable=SC2016 # literal start script lines, not expansions
+grep -qx 'COLLECTION_MODE="${COLLECTION_MODE:-manual}"' "$START" || fail "COLLECTION_MODE: start script fallback is not manual"
+# shellcheck disable=SC2016 # literal start script lines, not expansions
+grep -q '^  COLLECTION_MODE="$COLLECTION_MODE" \\$' <<<"$passthrough" || fail "COLLECTION_MODE: not passed to the daemon by the start script"
+echo "✓ COLLECTION_MODE is dynamic for new installs, falls back to manual in the start script and reaches the daemon"
+
 # sanitize_int keeps digits only, so a bad value cannot inject shell code.
 eval "$(grep '^sanitize_int()' "$START")"
 [ "$(sanitize_int '60')" = "60" ] || fail "sanitize_int changed a valid value"
@@ -99,7 +114,7 @@ run_start() {
     printf '%s\n' "$cfg" >"$SANDBOX/config/config.cfg"
     rm -f "$SANDBOX/env.out"
     # Clear the intervals so values exported by the caller cannot leak in.
-    env $(printf -- '-u %s ' "${INTERVALS[@]}") PATH="$SANDBOX/bin:$PATH" \
+    env -u COLLECTION_MODE $(printf -- '-u %s ' "${INTERVALS[@]}") PATH="$SANDBOX/bin:$PATH" \
         bash "$SANDBOX/scripts/start" >/dev/null
     for i in $(seq 1 50); do
         [ -s "$SANDBOX/env.out" ] && break
@@ -137,3 +152,14 @@ echo "✓ configured intervals, including 0 (Disabled), reach the daemon unchang
 got=$(run_start $'PORT="8043"\nINTERVAL_FAN_CONTROL="15s"\nINTERVAL_MOVER="30;reboot"' INTERVAL_FAN_CONTROL INTERVAL_MOVER | paste -sd, -)
 [ "$got" = "15,30" ] || fail "invalid intervals: daemon got '$got', want '15,30'"
 echo "✓ non-digit characters are stripped from configured intervals"
+
+# Collection mode: unset falls back to manual; anything but dynamic|manual is manual.
+for pair in '<unset>:manual' 'dynamic:dynamic' 'manual:manual' 'Dynamic:manual' 'auto:manual' 'dynamic;reboot:manual' ':manual'; do
+    value="${pair%:*}"
+    want="${pair##*:}"
+    cfg='PORT="8043"'
+    [ "$value" = '<unset>' ] || cfg+=$'\n'"COLLECTION_MODE=\"$value\""
+    got=$(run_start "$cfg" COLLECTION_MODE)
+    [ "$got" = "$want" ] || fail "COLLECTION_MODE='$value': daemon got '$got', want '$want'"
+done
+echo "✓ COLLECTION_MODE reaches the daemon as dynamic or manual only; unset and invalid values become manual"

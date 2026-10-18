@@ -34,6 +34,8 @@ $wan_ip_lookup = (trim((string)($config['WAN_IP_LOOKUP'] ?? 'true'), "'\"") === 
 $allow_unauth_writes = (trim((string)($config['ALLOW_UNAUTHENTICATED_WRITES'] ?? 'false'), "'\"") === 'true') ? 'true' : 'false';
 $log_level = $config['LOG_LEVEL'] ?? 'info';
 $show_all_collectors = (trim((string)($config['SHOW_ALL_COLLECTORS'] ?? 'false'), "'\"") === 'true') ? 'true' : 'false';
+// Without the key the start script runs the daemon on manual intervals (#280).
+$collection_mode = (trim((string)($config['COLLECTION_MODE'] ?? 'manual'), "'\"") === 'dynamic') ? 'dynamic' : 'manual';
 
 // MCP Tool Policies
 $policy_file = "/boot/config/plugins/$plugin/tool_policy.json";
@@ -805,6 +807,18 @@ which subsystems are healthy. Both require the service to be running.
 <div class="title"><span class="left"><i class="title fa fa-clock-o"></i>Collection Intervals</span></div>
 
 <div class="uma-config-section">
+    <div class="uma-hw-detect">
+        <label class="uma-toggle-switch">
+            <input type="checkbox" name="COLLECTION_MODE_CB" id="collection_mode" <?= ($collection_mode === 'dynamic') ? 'checked' : '' ?> onchange="updateCollectionMode()">
+            <span class="uma-toggle-slider"></span>
+        </label>
+        <span class="uma-hw-detect-label">Dynamic collection</span>
+        <input type="hidden" name="COLLECTION_MODE" id="collection_mode_val" value="<?= $collection_mode ?>">
+        <div class="uma-hw-status">Recommended: the agent decides when each collector runs, from change events and connected clients. Turn off to set every interval yourself.</div>
+    </div>
+
+    <!-- Hidden, never disabled, in dynamic mode: every interval is still submitted. -->
+    <div id="uma-manual-intervals"<?= ($collection_mode === 'dynamic') ? ' style="display: none;"' : '' ?>>
     <p style="font-size: 12px; color: var(--text-secondary, #666); margin-bottom: 10px;">
         How often data is collected. Lower = faster updates but higher power usage.
     </p>
@@ -997,10 +1011,16 @@ which subsystems are healthy. Both require the service to be running.
     <div class="uma-power-warning">
         <strong>⚡ Power Tip:</strong> Defaults follow industry-standard monitoring intervals. Hardware collectors run only while the agent detects their hardware and are hidden when it is absent; <strong>Auto</strong> runs them every 5 minutes. Set to <strong>Disabled</strong> to completely stop a collector, or use longer intervals (up to 24 hours) for data that rarely changes. Click <strong>Default</strong> to restore industry-standard settings.
     </div>
+    </div>
 </div>
 
 <blockquote class="inline_help">
 Service auto-starts with array. Changes apply after clicking Apply and will restart the service if it is running.
+
+<strong>Dynamic collection</strong> lets the agent decide when each collector runs: on change events where the source
+has them, faster while a client is consuming the data, and slowly otherwise. Turn it off to set the intervals below
+yourself; your saved intervals are kept in both modes. <code>GET /api/v1/collectors/status</code> shows what each
+collector does right now.
 
 Hardware-dependent collectors (GPU, Network Cards &amp; Optics, UPS, NUT, ZFS, Storage Topology) follow hardware
 detection: the agent checks for the hardware at startup, every 15 minutes and on <strong>Re-check hardware</strong>.
@@ -1396,6 +1416,15 @@ function loadCapabilities(refresh) {
         btn.disabled = !umaServiceRunning;
         btn.value = 'Re-check hardware';
     });
+}
+
+// Collection mode (#280). Dynamic hides the interval settings with
+// style.display, never by disabling them, so every INTERVAL_* value is still
+// submitted and the saved intervals are shown again when the toggle is off.
+function updateCollectionMode() {
+    var dynamic = document.getElementById('collection_mode').checked;
+    document.getElementById('collection_mode_val').value = dynamic ? 'dynamic' : 'manual';
+    document.getElementById('uma-manual-intervals').style.display = dynamic ? 'none' : '';
 }
 
 // Highlight disabled interval selects

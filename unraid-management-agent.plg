@@ -3,7 +3,7 @@
 <!DOCTYPE PLUGIN [
     <!ENTITY name        "unraid-management-agent">
     <!ENTITY author      "Ruaan Deysel">
-    <!ENTITY version     "2026.10.00">
+    <!ENTITY version     "2026.10.01">
     <!ENTITY gitURL      "https://github.com/tinkerologie/&name;">
     <!ENTITY pluginURL   "&gitURL;/raw/main/&name;.plg">
     <!ENTITY supportURL  "https://forums.unraid.net/topic/196675-plugin-unraid-management-agent">
@@ -111,6 +111,10 @@ SERVICE="enable"
 # API Server Configuration
 PORT="8043"
 ENABLE_CORS="yes"
+
+# Collection mode - dynamic lets the agent decide when each collector runs,
+# manual uses the intervals below
+COLLECTION_MODE="dynamic"
 
 # Collection intervals (seconds) - Power-optimized defaults
 # Higher intervals reduce CPU wakeups and power consumption
@@ -247,6 +251,16 @@ if "${INSTALL_DIR}/scripts/migrate-auto-intervals"; then
     touch "${CONFIG_DIR}/.auto-intervals-migrated"
 else
     echo "⚠ Auto-interval migration failed; hardware collectors keep their saved intervals"
+fi
+
+# Move existing installs whose intervals are all shipped defaults to dynamic
+# collection; tuned installs stay on manual (#280). Runs after the auto-interval
+# migration so its "auto" values count as defaults. The marker is set only on
+# success (the script exits 0 for fresh installs too), so a failure is retried.
+if "${INSTALL_DIR}/scripts/migrate-collection-mode"; then
+    touch "${CONFIG_DIR}/.collection-mode-migrated"
+else
+    echo "⚠ Collection-mode migration failed; the agent keeps using the manual intervals"
 fi
 
 # Start service if it was running before, or if this is a fresh install

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
@@ -15,7 +16,12 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/collectors"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/controllers"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/scheduler"
 )
+
+// ErrDynamicMode is returned by UpdateInterval in Dynamic collection mode,
+// where the agent decides each collector's interval.
+var ErrDynamicMode = domain.ErrDynamicCollectionMode
 
 // Collector is the interface that all collectors must implement for runtime management
 type Collector interface {
@@ -48,6 +54,8 @@ type ManagedCollector struct {
 	factory   CollectorFactory
 	domainCtx *domain.Context
 	wg        *sync.WaitGroup
+	// runner runs the collector in Dynamic mode while it is running.
+	runner *collectorRunner
 }
 
 // CollectorManager manages runtime enable/disable of collectors
@@ -56,6 +64,14 @@ type CollectorManager struct {
 	collectors map[string]*ManagedCollector
 	domainCtx  *domain.Context
 	wg         *sync.WaitGroup
+
+	// Dynamic collection mode (#280).
+	dynamic bool
+	clock   scheduler.Clock
+	demand  *scheduler.Demand
+	floors  atomic.Pointer[map[string]bool]
+	// eventSources returns a collector's change-event sources in Dynamic mode.
+	eventSources func(name string) []eventSource
 }
 
 func (cm *CollectorManager) stopCollectorLocked(mc *ManagedCollector) {
@@ -64,15 +80,85 @@ func (cm *CollectorManager) stopCollectorLocked(mc *ManagedCollector) {
 		mc.cancel = nil
 	}
 	mc.ctx = nil
+	mc.runner = nil
 }
 
 // NewCollectorManager creates a new collector manager
 func NewCollectorManager(domainCtx *domain.Context, wg *sync.WaitGroup) *CollectorManager {
-	return &CollectorManager{
-		collectors: make(map[string]*ManagedCollector),
-		domainCtx:  domainCtx,
-		wg:         wg,
+	clock := scheduler.Clock(scheduler.RealClock{})
+	cm := &CollectorManager{
+		collectors:   make(map[string]*ManagedCollector),
+		domainCtx:    domainCtx,
+		wg:           wg,
+		dynamic:      domainCtx != nil && domainCtx.DynamicCollection(),
+		clock:        clock,
+		demand:       scheduler.NewDemand(clock),
+		eventSources: defaultEventSources,
 	}
+	cm.demand.SetOnChange(cm.wakeRunners)
+	return cm
+}
+
+// Demand returns the tracker of collector consumers (WebSocket, MQTT, reads).
+func (cm *CollectorManager) Demand() *scheduler.Demand {
+	return cm.demand
+}
+
+// Dynamic reports whether the manager runs in Dynamic collection mode.
+func (cm *CollectorManager) Dynamic() bool {
+	return cm.dynamic
+}
+
+// wakeRunners asks the named collectors' runners to re-decide their cadence.
+func (cm *CollectorManager) wakeRunners(names []string) {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+	for _, name := range names {
+		if mc, ok := cm.collectors[name]; ok && mc.runner != nil {
+			mc.runner.Wake()
+		}
+	}
+}
+
+// SetFloors sets the collectors that enabled alert rules read: in Dynamic
+// mode they never run slower than their Manual default.
+func (cm *CollectorManager) SetFloors(required map[string]bool) {
+	var changed []string
+	if old := cm.floors.Load(); old != nil {
+		for name := range *old {
+			if !required[name] {
+				changed = append(changed, name)
+			}
+		}
+	}
+	for name := range required {
+		changed = append(changed, name)
+	}
+	cm.floors.Store(&required)
+	cm.wakeRunners(changed)
+}
+
+// floorRequired reports whether an enabled alert rule reads the collector.
+func (cm *CollectorManager) floorRequired(name string) bool {
+	f := cm.floors.Load()
+	return f != nil && (*f)[name]
+}
+
+// RequestRefresh asks a running collector for a Dynamic-mode run and returns
+// a channel that receives its outcome. It returns false in Manual mode and
+// for collectors that are not running.
+func (cm *CollectorManager) RequestRefresh(name string) (<-chan error, bool) {
+	cm.mu.RLock()
+	mc, ok := cm.collectors[name]
+	var r *collectorRunner
+	if ok {
+		r = mc.runner
+	}
+	cm.mu.RUnlock()
+	if r == nil {
+		return nil, false
+	}
+	return r.RequestRefresh(), true
 }
 
 // Register registers a collector with the manager
@@ -81,6 +167,11 @@ func (cm *CollectorManager) Register(name string, factory CollectorFactory, inte
 	defer cm.mu.Unlock()
 
 	enabled := interval > 0
+	if cm.dynamic {
+		// INTERVAL_* values are kept but unused: only the disable list turns
+		// a collector off.
+		enabled = cm.domainCtx.DisabledCollectors == nil || !cm.domainCtx.DisabledCollectors[name]
+	}
 	var status string
 	if enabled {
 		status = "registered"
@@ -90,6 +181,11 @@ func (cm *CollectorManager) Register(name string, factory CollectorFactory, inte
 
 	auto := interval == 0 && cm.domainCtx != nil && cm.domainCtx.AutoCollectors[name]
 	gated := auto || (cm.domainCtx != nil && cm.domainCtx.GatedCollectors[name])
+	if cm.dynamic {
+		// Every gated collector follows its hardware; there is no auto interval.
+		auto = false
+		gated = enabled && cm.domainCtx.GatedCollectors[name]
+	}
 
 	cm.collectors[name] = &ManagedCollector{
 		Name:       name,
@@ -115,7 +211,7 @@ func (cm *CollectorManager) StartAll() int {
 
 	enabledCount := 0
 	for name, mc := range cm.collectors {
-		if mc.Enabled && mc.Interval > 0 {
+		if mc.Enabled && (mc.Interval > 0 || cm.dynamic) {
 			cm.startCollectorLocked(name)
 			enabledCount++
 		}
@@ -128,6 +224,10 @@ func (cm *CollectorManager) StartAll() int {
 func (cm *CollectorManager) startCollectorLocked(name string) {
 	mc, exists := cm.collectors[name]
 	if !exists || mc.Status == "running" {
+		return
+	}
+	if cm.dynamic {
+		cm.startRunnerLocked(mc)
 		return
 	}
 
@@ -241,6 +341,10 @@ func (cm *CollectorManager) UpdateInterval(name string, intervalSeconds int) err
 		return fmt.Errorf("unknown collector: %s", name)
 	}
 
+	if cm.dynamic {
+		return ErrDynamicMode
+	}
+
 	if intervalSeconds < 5 || intervalSeconds > 86400 {
 		return errors.New("invalid interval: must be between 5 and 86400 seconds")
 	}
@@ -281,6 +385,9 @@ func (cm *CollectorManager) ApplyHardwareState(name string, present bool, autoIn
 	if !exists || !mc.Gated {
 		cm.mu.Unlock()
 		return false
+	}
+	if cm.dynamic {
+		return cm.applyHardwareStateDynamic(mc, present)
 	}
 	interval := 0
 	if present {
@@ -330,17 +437,8 @@ func (cm *CollectorManager) GetStatus(name string) (*dto.CollectorStatus, error)
 		return nil, fmt.Errorf("unknown collector: %s", name)
 	}
 
-	return &dto.CollectorStatus{
-		Name:          mc.Name,
-		Enabled:       mc.Enabled,
-		Interval:      mc.Interval,
-		Status:        mc.Status,
-		LastRun:       mc.LastRun,
-		ErrorCount:    mc.ErrorCount,
-		Required:      mc.Required,
-		HardwareGated: mc.Gated,
-		Auto:          mc.Auto,
-	}, nil
+	status := cm.statusLocked(mc)
+	return &status, nil
 }
 
 // GetAllStatus returns the status of all collectors
@@ -373,26 +471,65 @@ func (cm *CollectorManager) GetAllStatus() dto.CollectorsStatusResponse {
 			disabledCount++
 		}
 
-		statuses = append(statuses, dto.CollectorStatus{
-			Name:          mc.Name,
-			Enabled:       mc.Enabled,
-			Interval:      mc.Interval,
-			Status:        mc.Status,
-			LastRun:       mc.LastRun,
-			ErrorCount:    mc.ErrorCount,
-			Required:      mc.Required,
-			HardwareGated: mc.Gated,
-			Auto:          mc.Auto,
-		})
+		statuses = append(statuses, cm.statusLocked(mc))
 	}
 
 	return dto.CollectorsStatusResponse{
 		Collectors:    statuses,
+		Mode:          cm.mode(),
 		Total:         len(statuses),
 		EnabledCount:  enabledCount,
 		DisabledCount: disabledCount,
 		Timestamp:     time.Now(),
 	}
+}
+
+// mode returns the collection mode name.
+func (cm *CollectorManager) mode() string {
+	if cm.dynamic {
+		return domain.CollectionModeDynamic
+	}
+	return domain.CollectionModeManual
+}
+
+// statusLocked builds a collector's status; cm.mu must be held.
+func (cm *CollectorManager) statusLocked(mc *ManagedCollector) dto.CollectorStatus {
+	policy, _ := scheduler.PolicyFor(mc.Name)
+	status := dto.CollectorStatus{
+		Name:          mc.Name,
+		Enabled:       mc.Enabled,
+		Interval:      mc.Interval,
+		Status:        mc.Status,
+		LastRun:       mc.LastRun,
+		ErrorCount:    mc.ErrorCount,
+		Required:      mc.Required,
+		HardwareGated: mc.Gated,
+		Auto:          mc.Auto,
+		Mode:          cm.mode(),
+		Reason:        string(scheduler.BaselineReason(policy, !cm.dynamic)),
+		EventDriven:   cm.dynamic && policy.EventDriven,
+	}
+	if len(policy.Topics) > 0 && cm.domainCtx != nil && cm.domainCtx.Hub != nil {
+		status.PublishCount = cm.domainCtx.Hub.PublishCount(policy.Topics[0])
+	}
+	if mc.Status != "running" {
+		return status
+	}
+	if !cm.dynamic {
+		status.EffectiveInterval = mc.Interval
+		return status
+	}
+	if mc.runner != nil {
+		st := mc.runner.snapshot()
+		status.EffectiveInterval = int(st.decision.Interval / time.Second)
+		status.Reason = string(st.decision.Reason)
+		status.ErrorCount = st.errorCount
+		if !st.lastAttempt.IsZero() {
+			at := st.lastAttempt
+			status.LastRun = &at
+		}
+	}
+	return status
 }
 
 // GetCollectorNames returns all registered collector names
