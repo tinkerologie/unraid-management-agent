@@ -4,10 +4,11 @@
 // "---" line is metadata and the rest is PHP/HTML. This keeps the PHP part and
 // wraps it in a minimal document with jQuery, which the webGUI provides.
 //
-// Usage: php render-page.php <page file> <output html>
+// Usage: php render-page.php <page file> <output html> [config.cfg]
 
 $page = $argv[1] ?? '';
 $out = $argv[2] ?? '';
+$configFile = $argv[3] ?? '/nonexistent/uma-ui-test/config.cfg';
 if ($page === '' || $out === '') {
     fwrite(STDERR, "usage: php render-page.php <page file> <output html>\n");
     exit(2);
@@ -25,8 +26,16 @@ set_error_handler(function ($severity, $message, $file, $line) {
     throw new ErrorException($message, 0, $severity, $file, $line);
 });
 
+// Render with the given config, or none, never the host's saved settings, so
+// the tests see known values even on an Unraid server with a config.cfg.
+$body = preg_replace('/^\$config_file = .*;$/m', '$config_file = ' . var_export($configFile, true) . ';', $parts[1], 1, $count);
+if ($count !== 1) {
+    fwrite(STDERR, "cannot find the \$config_file assignment in $page\n");
+    exit(1);
+}
+
 $tmp = tempnam(sys_get_temp_dir(), 'uma-page-');
-file_put_contents($tmp, $parts[1]);
+file_put_contents($tmp, $body);
 ob_start();
 include $tmp;
 $body = ob_get_clean();

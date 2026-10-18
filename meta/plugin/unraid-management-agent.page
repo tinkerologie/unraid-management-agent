@@ -86,6 +86,13 @@ $interval_registration = $config['INTERVAL_REGISTRATION'] ?? '600';
 $interval_unassigned = $config['INTERVAL_UNASSIGNED'] ?? '60';
 $interval_storage_topology = $config['INTERVAL_STORAGE_TOPOLOGY'] ?? 'auto';
 $interval_nic = $config['INTERVAL_NIC'] ?? 'auto';
+$interval_fan_control = $config['INTERVAL_FAN_CONTROL'] ?? '5';
+$interval_tuning = $config['INTERVAL_TUNING'] ?? '120';
+$interval_docker_update = $config['INTERVAL_DOCKER_UPDATE'] ?? '21600';
+$interval_docker_networks = $config['INTERVAL_DOCKER_NETWORKS'] ?? '60';
+$interval_plugin_update = $config['INTERVAL_PLUGIN_UPDATE'] ?? '3600';
+$interval_os_update = $config['INTERVAL_OS_UPDATE'] ?? '86400';
+$interval_mover = $config['INTERVAL_MOVER'] ?? '30';
 
 // Check if service is running
 exec("pidof $plugin 2>/dev/null", $pids, $pid_rc);
@@ -858,6 +865,18 @@ which subsystems are healthy. Both require the service to be running.
                     <?= intervalOptions($interval_vm, 'standard') ?>
                 </select>
             </div>
+            <div class="uma-interval-row">
+                <span class="uma-interval-label">Docker Update Checks</span>
+                <select name="INTERVAL_DOCKER_UPDATE" class="uma-interval-select">
+                    <?= intervalOptions($interval_docker_update, 'standard') ?>
+                </select>
+            </div>
+            <div class="uma-interval-row">
+                <span class="uma-interval-label">Docker Networks</span>
+                <select name="INTERVAL_DOCKER_NETWORKS" class="uma-interval-select">
+                    <?= intervalOptions($interval_docker_networks, 'standard') ?>
+                </select>
+            </div>
         </div>
     </div>
 
@@ -868,6 +887,12 @@ which subsystems are healthy. Both require the service to be running.
                 <span class="uma-interval-label">GPU Metrics</span>
                 <select name="INTERVAL_GPU" class="uma-interval-select">
                     <?= intervalOptions($interval_gpu, 'standard', true) ?>
+                </select>
+            </div>
+            <div class="uma-interval-row">
+                <span class="uma-interval-label">Fan Control</span>
+                <select name="INTERVAL_FAN_CONTROL" class="uma-interval-select">
+                    <?= intervalOptions($interval_fan_control, 'fast') ?>
                 </select>
             </div>
             <div class="uma-interval-row" data-uma-capability="hardware.nic_optics">
@@ -918,6 +943,12 @@ which subsystems are healthy. Both require the service to be running.
                     <?= intervalOptions($interval_unassigned, 'standard') ?>
                 </select>
             </div>
+            <div class="uma-interval-row">
+                <span class="uma-interval-label">Mover Status</span>
+                <select name="INTERVAL_MOVER" class="uma-interval-select">
+                    <?= intervalOptions($interval_mover, 'standard') ?>
+                </select>
+            </div>
             <div class="uma-interval-row" data-uma-capability="hardware.storage_topology">
                 <span class="uma-interval-label">Storage Topology (SAS/SES)</span>
                 <select name="INTERVAL_STORAGE_TOPOLOGY" class="uma-interval-select">
@@ -940,6 +971,24 @@ which subsystems are healthy. Both require the service to be running.
                 <span class="uma-interval-label">License Info</span>
                 <select name="INTERVAL_REGISTRATION" class="uma-interval-select">
                     <?= intervalOptions($interval_registration, 'slow') ?>
+                </select>
+            </div>
+            <div class="uma-interval-row">
+                <span class="uma-interval-label">Tuning Parameters</span>
+                <select name="INTERVAL_TUNING" class="uma-interval-select">
+                    <?= intervalOptions($interval_tuning, 'standard') ?>
+                </select>
+            </div>
+            <div class="uma-interval-row">
+                <span class="uma-interval-label">Plugin Update Checks</span>
+                <select name="INTERVAL_PLUGIN_UPDATE" class="uma-interval-select">
+                    <?= intervalOptions($interval_plugin_update, 'standard') ?>
+                </select>
+            </div>
+            <div class="uma-interval-row">
+                <span class="uma-interval-label">OS Update Checks</span>
+                <select name="INTERVAL_OS_UPDATE" class="uma-interval-select">
+                    <?= intervalOptions($interval_os_update, 'slow') ?>
                 </select>
             </div>
         </div>

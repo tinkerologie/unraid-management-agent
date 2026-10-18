@@ -22,6 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   named `<name>_<key>` (for example `frames_avg`); output that is not a JSON object counts as a
   failed run and the known keys stay listed with `null` values. `attributes` (for example
   `graph: avg`) turns a key into an attribute of another key's sensor instead of a sensor of its own.
+- **Seven more collector intervals on the plugin settings page** — `INTERVAL_FAN_CONTROL` (5 s),
+  `INTERVAL_TUNING` (120 s), `INTERVAL_DOCKER_UPDATE` (6 h), `INTERVAL_DOCKER_NETWORKS` (60 s),
+  `INTERVAL_PLUGIN_UPDATE` (1 h), `INTERVAL_OS_UPDATE` (24 h) and `INTERVAL_MOVER` (30 s) are now in
+  `default.cfg`, the first-install config, the start script (default, validation and passthrough
+  to the daemon) and the settings page; Disabled = 0. The daemon already supported them, but the
+  plugin dropped them, so they could not be changed from the UI.
+
 - **UPS telemetry: voltages, frequency, temperature, transfers and self-test** — `/api/v1/ups`
   (and the `ups_status_update` event) now reports `input_voltage`, `output_voltage`,
   `battery_voltage`, `line_frequency`, `temperature_celsius`, `time_on_battery_seconds`,

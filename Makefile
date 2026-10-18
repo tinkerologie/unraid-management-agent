@@ -65,6 +65,7 @@ test-packaging: package
 	bash scripts/test-auto-intervals-migration.sh
 	bash scripts/test-plg-checksums.sh
 	bash scripts/test-plugin-settings.sh
+	bash scripts/test-plugin-intervals.sh
 	bash scripts/test-diagnostics-proxy.sh
 
 test-coverage:
