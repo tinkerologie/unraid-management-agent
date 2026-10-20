@@ -3581,7 +3581,8 @@ definitions:
   dto.Registration:
     properties:
       expiration:
-        description: License expiration date
+        description: License expiration (regTm2), set only for trial and expired keys;
+          zero when the key does not expire
         type: string
       guid:
         description: Registration GUID
@@ -3599,7 +3600,8 @@ definitions:
         description: '"trial", "basic", "plus", "pro", "lifetime"'
         type: string
       update_expiration:
-        description: Update expiration date
+        description: Update eligibility expiration (regExp); zero when the key has
+          none
         type: string
     type: object
   dto.RemoteShareActionRequest:

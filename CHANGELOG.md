@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Registration reported valid licenses as expired** — `/api/v1/registration` read `regTm`, the
+  date the key was registered, as both the license expiration and the update expiration, so every
+  key registered before the current moment showed `state: expired`. Expiration now comes from
+  `regTm2` for trial and expired keys only, and update expiration from `regExp`, matching how
+  Unraid's webGui reads them. Basic, Plus, Pro and Lifetime keys report `valid` with no expiration,
+  an active trial reports `trial`, and a lapsed update period never changes `state`, so a Starter
+  or Unleashed key with lapsed updates stays `valid`. ([#285](https://github.com/tinkerologie/unraid-management-agent/issues/285))
+
 ## [2026.10.01] - 2026-10-18
 
 ### Added

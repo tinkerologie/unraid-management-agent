@@ -10751,7 +10751,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "expiration": {
-                    "description": "License expiration date",
+                    "description": "License expiration (regTm2), set only for trial and expired keys; zero when the key does not expire",
                     "type": "string"
                 },
                 "guid": {
@@ -10775,7 +10775,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "update_expiration": {
-                    "description": "Update expiration date",
+                    "description": "Update eligibility expiration (regExp); zero when the key has none",
                     "type": "string"
                 }
             }

@@ -1,9 +1,17 @@
 package collectors
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
 	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
+	"gopkg.in/ini.v1"
 )
 
 func TestNewRegistrationCollector(t *testing.T) {
@@ -18,6 +26,10 @@ func TestNewRegistrationCollector(t *testing.T) {
 
 	if collector.ctx != ctx {
 		t.Error("RegistrationCollector context not set correctly")
+	}
+
+	if collector.varIniPath != constants.VarIni {
+		t.Errorf("varIniPath = %q, want %q", collector.varIniPath, constants.VarIni)
 	}
 }
 
@@ -284,4 +296,231 @@ func isValidTimestamp(s string) bool {
 		}
 	}
 	return true
+}
+
+// TestParseRegistration checks type, state and both dates for each key type,
+// including the #285 regression where a Pro key reported expired.
+func TestParseRegistration(t *testing.T) {
+	now := time.Unix(1792454400, 0) // 2026-10-19
+	past := "1601401334"            // 2020-09-29
+	future := "1893456000"          // 2030-01-01
+
+	tests := []struct {
+		name           string
+		varIni         string
+		wantType       string
+		wantState      string
+		wantExpiration string
+		wantUpdateExp  string
+	}{
+		{
+			name:      "Pro key registered years ago stays valid (#285)",
+			varIni:    "regTy=\"Pro\"\nregTm=\"" + past + "\"\nregExp=\"\"\n",
+			wantType:  "pro",
+			wantState: "valid",
+		},
+		{
+			name:      "Basic key with a past regTm",
+			varIni:    "regTy=\"Basic\"\nregTm=\"" + past + "\"\nregExp=\"\"\n",
+			wantType:  "basic",
+			wantState: "valid",
+		},
+		{
+			name:      "Plus key ignores an unrelated regTm2",
+			varIni:    "regTy=\"Plus\"\nregTm=\"" + past + "\"\nregTm2=\"" + past + "\"\nregExp=\"\"\n",
+			wantType:  "plus",
+			wantState: "valid",
+		},
+		{
+			name:          "Starter key with lapsed updates is still a valid license",
+			varIni:        "regTy=\"Starter\"\nregTm=\"" + past + "\"\nregExp=\"" + past + "\"\n",
+			wantType:      "starter",
+			wantState:     "valid",
+			wantUpdateExp: past,
+		},
+		{
+			name:          "Unleashed key reports its update-eligibility date",
+			varIni:        "regTy=\"Unleashed\"\nregTm=\"" + past + "\"\nregExp=\"" + future + "\"\n",
+			wantType:      "unleashed",
+			wantState:     "valid",
+			wantUpdateExp: future,
+		},
+		{
+			name:           "active trial",
+			varIni:         "regTy=\"Trial\"\nregTm=\"" + past + "\"\nregTm2=\"" + future + "\"\n",
+			wantType:       "trial",
+			wantState:      "trial",
+			wantExpiration: future,
+		},
+		{
+			name:           "trial past its expiry",
+			varIni:         "regTy=\"Trial\"\nregTm=\"" + past + "\"\nregTm2=\"" + past + "\"\n",
+			wantType:       "trial",
+			wantState:      "expired",
+			wantExpiration: past,
+		},
+		{
+			name:           "key Unraid marks expired",
+			varIni:         "regTy=\"expired\"\nregTm2=\"" + past + "\"\n",
+			wantType:       "expired",
+			wantState:      "expired",
+			wantExpiration: past,
+		},
+		{
+			name:      "zero dates are ignored",
+			varIni:    "regTy=\"Trial\"\nregTm2=\"0\"\nregExp=\"0\"\n",
+			wantType:  "trial",
+			wantState: "trial",
+		},
+		{
+			name:      "empty dates are ignored",
+			varIni:    "regTy=\"Trial\"\nregTm2=\"\"\nregExp=\"\"\n",
+			wantType:  "trial",
+			wantState: "trial",
+		},
+		{
+			name:      "non-numeric dates are ignored",
+			varIni:    "regTy=\"Trial\"\nregTm2=\"soon\"\nregExp=\"later\"\n",
+			wantType:  "trial",
+			wantState: "trial",
+		},
+		{
+			name:      "missing regTy",
+			varIni:    "regTm=\"" + past + "\"\n",
+			wantType:  "unknown",
+			wantState: "invalid",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := ini.Load([]byte(tt.varIni))
+			if err != nil {
+				t.Fatalf("ini.Load: %v", err)
+			}
+			reg := parseRegistration(cfg.Section(""), now)
+
+			if reg.Type != tt.wantType {
+				t.Errorf("Type = %q, want %q", reg.Type, tt.wantType)
+			}
+			if reg.State != tt.wantState {
+				t.Errorf("State = %q, want %q", reg.State, tt.wantState)
+			}
+			if !reg.Timestamp.Equal(now) {
+				t.Errorf("Timestamp = %v, want %v", reg.Timestamp, now)
+			}
+			checkUnix(t, "Expiration", reg.Expiration, tt.wantExpiration)
+			checkUnix(t, "UpdateExpiration", reg.UpdateExpiration, tt.wantUpdateExp)
+		})
+	}
+}
+
+// TestParseRegistrationNameAndGUID checks the GUID and server name are read.
+func TestParseRegistrationNameAndGUID(t *testing.T) {
+	cfg, err := ini.Load([]byte("regTy=\"Pro\"\nregGUID=\"ABCD-1234\"\nNAME=\"Tower\"\n"))
+	if err != nil {
+		t.Fatalf("ini.Load: %v", err)
+	}
+	reg := parseRegistration(cfg.Section(""), time.Now())
+
+	if reg.GUID != "ABCD-1234" {
+		t.Errorf("GUID = %q, want %q", reg.GUID, "ABCD-1234")
+	}
+	if reg.ServerName != "Tower" {
+		t.Errorf("ServerName = %q, want %q", reg.ServerName, "Tower")
+	}
+}
+
+// TestParseRegistrationFixture parses the Unraid 7.3.1 var.ini fixture.
+func TestParseRegistrationFixture(t *testing.T) {
+	cfg, err := ini.Load("testdata/fixtures/unraid-7.3.1/var.ini")
+	if err != nil {
+		t.Fatalf("ini.Load: %v", err)
+	}
+	reg := parseRegistration(cfg.Section(""), time.Now())
+
+	if reg.Type != "plus" || reg.State != "valid" {
+		t.Errorf("Type/State = %q/%q, want plus/valid", reg.Type, reg.State)
+	}
+	if !reg.Expiration.IsZero() || !reg.UpdateExpiration.IsZero() {
+		t.Errorf("Expiration/UpdateExpiration = %v/%v, want zero", reg.Expiration, reg.UpdateExpiration)
+	}
+}
+
+// TestParseRegistrationJSON locks the wire format for a key with no dates.
+func TestParseRegistrationJSON(t *testing.T) {
+	cfg, err := ini.Load([]byte("regTy=\"Pro\"\nregTm=\"1601401334\"\nregExp=\"\"\n"))
+	if err != nil {
+		t.Fatalf("ini.Load: %v", err)
+	}
+	b, err := json.Marshal(parseRegistration(cfg.Section(""), time.Now()))
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+	for _, want := range []string{
+		`"state":"valid"`,
+		`"expiration":"0001-01-01T00:00:00Z"`,
+		`"update_expiration":"0001-01-01T00:00:00Z"`,
+	} {
+		if !strings.Contains(string(b), want) {
+			t.Errorf("JSON %s missing %s", b, want)
+		}
+	}
+}
+
+// checkUnix fails the test unless got is zero for an empty want, or equals the
+// Unix timestamp in want.
+func checkUnix(t *testing.T, field string, got time.Time, want string) {
+	t.Helper()
+	if want == "" {
+		if !got.IsZero() {
+			t.Errorf("%s = %v, want zero", field, got)
+		}
+		return
+	}
+	wantTS, err := strconv.ParseInt(want, 10, 64)
+	if err != nil {
+		t.Fatalf("bad test timestamp %q: %v", want, err)
+	}
+	if got.IsZero() || got.Unix() != wantTS {
+		t.Errorf("%s = %v, want Unix %s", field, got, want)
+	}
+}
+
+// TestCollectRegistrationFromFile reads a var.ini through the collector's
+// injectable path and returns the parsed registration.
+func TestCollectRegistrationFromFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "var.ini")
+	content := "NAME=\"Tower\"\nregTy=\"Pro\"\nregTm=\"1601401334\"\nregExp=\"\"\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	collector := NewRegistrationCollector(&domain.Context{Hub: domain.NewEventBus(10)})
+	collector.varIniPath = path
+
+	reg, err := collector.collectRegistration()
+	if err != nil {
+		t.Fatalf("collectRegistration: %v", err)
+	}
+	if reg.Type != "pro" || reg.State != "valid" || reg.ServerName != "Tower" {
+		t.Errorf("got type=%q state=%q server=%q, want pro/valid/Tower", reg.Type, reg.State, reg.ServerName)
+	}
+	if reg.Timestamp.IsZero() {
+		t.Error("Timestamp not set")
+	}
+}
+
+// TestCollectRegistrationLoadError returns the ini.Load error when var.ini is
+// missing.
+func TestCollectRegistrationLoadError(t *testing.T) {
+	collector := NewRegistrationCollector(&domain.Context{Hub: domain.NewEventBus(10)})
+	collector.varIniPath = filepath.Join(t.TempDir(), "missing.ini")
+
+	reg, err := collector.collectRegistration()
+	if err == nil {
+		t.Fatal("collectRegistration: want error for a missing file")
+	}
+	if reg != nil {
+		t.Errorf("registration = %+v, want nil on error", reg)
+	}
 }
