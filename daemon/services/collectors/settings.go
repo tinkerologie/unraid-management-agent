@@ -364,6 +364,7 @@ func (c *SettingsCollector) parseParityScheduleFromDynamix(schedule *dto.ParityS
 func parseParityScheduleSection(r io.Reader, schedule *dto.ParitySchedule) error {
 	scanner := bufio.NewScanner(r)
 	inParitySection := false
+	rawDotm := ""
 
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -427,6 +428,8 @@ func parseParityScheduleSection(r io.Reader, schedule *dto.ParitySchedule) error
 				}
 			}
 		case "dotm":
+			rawDotm = strings.TrimSpace(value)
+			schedule.DayOfMonth = 0
 			if dotm, err := strconv.Atoi(value); err == nil {
 				schedule.DayOfMonth = dotm
 			}
@@ -454,7 +457,39 @@ func parseParityScheduleSection(r io.Reader, schedule *dto.ParitySchedule) error
 		}
 	}
 
+	applyParityScheduleDotm(schedule, rawDotm)
+
 	return scanner.Err()
+}
+
+// applyParityScheduleDotm applies week_of_month or last_day_of_month selectors
+// based on the final resolved mode and the raw dotm configuration value (Issue #281).
+// It also clears custom-only fields when the final mode is not custom.
+func applyParityScheduleDotm(schedule *dto.ParitySchedule, rawDotm string) {
+	schedule.WeekOfMonth = ""
+	schedule.LastDayOfMonth = false
+	if schedule.Mode != "custom" {
+		schedule.Cron = ""
+	}
+
+	upper := strings.ToUpper(rawDotm)
+	switch schedule.Mode {
+	case "custom":
+		switch upper {
+		case "W1", "W2", "W3", "W4", "WL", "*":
+			schedule.WeekOfMonth = upper
+			schedule.DayOfMonth = 0
+		}
+	case "monthly", "yearly":
+		switch upper {
+		case "W1", "W2", "W3", "W4", "WL":
+			schedule.WeekOfMonth = upper
+			schedule.DayOfMonth = 0
+		case "28-31":
+			schedule.LastDayOfMonth = true
+			schedule.DayOfMonth = 0
+		}
+	}
 }
 
 // parseParityCheckCron reads the scheduled check entry and pause/resume times

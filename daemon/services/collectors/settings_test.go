@@ -220,6 +220,455 @@ func TestParseParityCheckCronLines_CheckEntryAndPauseResume(t *testing.T) {
 	}
 }
 
+func TestParseParityScheduleSection_DotmSelectors(t *testing.T) {
+	tests := []struct {
+		name            string
+		cfg             string
+		wantMode        string
+		wantDay         int
+		wantDayOfMonth  int
+		wantWeekOfMonth string
+		wantLastDay     bool
+		wantMonth       int
+	}{
+		{
+			name: "Custom W1 first week",
+			cfg: `[parity]
+mode="5"
+day="5"
+dotm="W1"
+`,
+			wantMode:        "custom",
+			wantDay:         5,
+			wantDayOfMonth:  0,
+			wantWeekOfMonth: "W1",
+			wantLastDay:     false,
+		},
+		{
+			name: "Custom W2 second week",
+			cfg: `[parity]
+mode="5"
+day="5"
+dotm="W2"
+`,
+			wantMode:        "custom",
+			wantDay:         5,
+			wantDayOfMonth:  0,
+			wantWeekOfMonth: "W2",
+			wantLastDay:     false,
+		},
+		{
+			name: "Custom W3 third week",
+			cfg: `[parity]
+mode="5"
+day="5"
+dotm="W3"
+`,
+			wantMode:        "custom",
+			wantDay:         5,
+			wantDayOfMonth:  0,
+			wantWeekOfMonth: "W3",
+			wantLastDay:     false,
+		},
+		{
+			name: "Custom W4 fourth week",
+			cfg: `[parity]
+mode="5"
+day="5"
+dotm="W4"
+`,
+			wantMode:        "custom",
+			wantDay:         5,
+			wantDayOfMonth:  0,
+			wantWeekOfMonth: "W4",
+			wantLastDay:     false,
+		},
+		{
+			name: "Custom WL last week",
+			cfg: `[parity]
+mode="5"
+day="5"
+dotm="WL"
+`,
+			wantMode:        "custom",
+			wantDay:         5,
+			wantDayOfMonth:  0,
+			wantWeekOfMonth: "WL",
+			wantLastDay:     false,
+		},
+		{
+			name: "Custom lower-case w2 normalizes to W2",
+			cfg: `[parity]
+mode="5"
+day="5"
+dotm="w2"
+`,
+			wantMode:        "custom",
+			wantDay:         5,
+			wantDayOfMonth:  0,
+			wantWeekOfMonth: "W2",
+			wantLastDay:     false,
+		},
+		{
+			name: "Custom wildcard every week",
+			cfg: `[parity]
+mode="5"
+day="5"
+dotm="*"
+`,
+			wantMode:        "custom",
+			wantDay:         5,
+			wantDayOfMonth:  0,
+			wantWeekOfMonth: "*",
+			wantLastDay:     false,
+		},
+		{
+			name: "Custom invalid X9 ignored",
+			cfg: `[parity]
+mode="5"
+day="5"
+dotm="X9"
+`,
+			wantMode:        "custom",
+			wantDay:         5,
+			wantDayOfMonth:  0,
+			wantWeekOfMonth: "",
+			wantLastDay:     false,
+		},
+		{
+			name: "Monthly last day 28-31",
+			cfg: `[parity]
+mode="3"
+dotm="28-31"
+`,
+			wantMode:        "monthly",
+			wantDayOfMonth:  0,
+			wantWeekOfMonth: "",
+			wantLastDay:     true,
+		},
+		{
+			name: "Yearly last day 28-31 with month",
+			cfg: `[parity]
+mode="4"
+dotm="28-31"
+month="6"
+`,
+			wantMode:        "yearly",
+			wantDayOfMonth:  0,
+			wantWeekOfMonth: "",
+			wantLastDay:     true,
+			wantMonth:       6,
+		},
+		{
+			name: "Monthly numeric 15 ungated",
+			cfg: `[parity]
+mode="3"
+dotm="15"
+`,
+			wantMode:        "monthly",
+			wantDayOfMonth:  15,
+			wantWeekOfMonth: "",
+			wantLastDay:     false,
+		},
+		{
+			name: "Daily numeric 15 ungated",
+			cfg: `[parity]
+mode="1"
+dotm="15"
+`,
+			wantMode:        "daily",
+			wantDayOfMonth:  15,
+			wantWeekOfMonth: "",
+			wantLastDay:     false,
+		},
+		{
+			name: "Stale W2 in Daily mode",
+			cfg: `[parity]
+mode="1"
+dotm="W2"
+`,
+			wantMode:        "daily",
+			wantDayOfMonth:  0,
+			wantWeekOfMonth: "",
+			wantLastDay:     false,
+		},
+		{
+			name: "Stale W2 in Weekly mode",
+			cfg: `[parity]
+mode="2"
+dotm="W2"
+`,
+			wantMode:        "weekly",
+			wantDayOfMonth:  0,
+			wantWeekOfMonth: "",
+			wantLastDay:     false,
+		},
+		{
+			name: "W2 in Monthly mode",
+			cfg: `[parity]
+mode="3"
+dotm="W2"
+`,
+			wantMode:        "monthly",
+			wantDayOfMonth:  0,
+			wantWeekOfMonth: "W2",
+			wantLastDay:     false,
+		},
+		{
+			name: "W1 in Yearly mode",
+			cfg: `[parity]
+mode="4"
+dotm="W1"
+month="3"
+`,
+			wantMode:        "yearly",
+			wantDayOfMonth:  0,
+			wantWeekOfMonth: "W1",
+			wantLastDay:     false,
+			wantMonth:       3,
+		},
+		{
+			name: "Stale 28-31 in Daily mode",
+			cfg: `[parity]
+mode="1"
+dotm="28-31"
+`,
+			wantMode:        "daily",
+			wantDayOfMonth:  0,
+			wantWeekOfMonth: "",
+			wantLastDay:     false,
+		},
+		{
+			name: "28-31 in Custom mode does not set last_day_of_month",
+			cfg: `[parity]
+mode="5"
+dotm="28-31"
+`,
+			wantMode:        "custom",
+			wantDayOfMonth:  0,
+			wantWeekOfMonth: "",
+			wantLastDay:     false,
+		},
+		{
+			name: "dotm before mode key order",
+			cfg: `[parity]
+dotm="W3"
+day="4"
+mode="5"
+`,
+			wantMode:        "custom",
+			wantDay:         4,
+			wantDayOfMonth:  0,
+			wantWeekOfMonth: "W3",
+			wantLastDay:     false,
+		},
+		{
+			name: "Repeated mode changes Custom to Daily",
+			cfg: `[parity]
+mode="5"
+dotm="W2"
+mode="1"
+`,
+			wantMode:        "daily",
+			wantDayOfMonth:  0,
+			wantWeekOfMonth: "",
+			wantLastDay:     false,
+		},
+		{
+			name: "Repeated [parity] section sets Custom mode",
+			cfg: `[parity]
+dotm="W4"
+mode="1"
+[other]
+key="val"
+[parity]
+mode="5"
+`,
+			wantMode:        "custom",
+			wantDayOfMonth:  0,
+			wantWeekOfMonth: "W4",
+			wantLastDay:     false,
+		},
+		{
+			name: "Stale cron in Daily mode cleared",
+			cfg: `[parity]
+mode="1"
+cron="0 3 * * 0"
+`,
+			wantMode:        "daily",
+			wantDayOfMonth:  0,
+			wantWeekOfMonth: "",
+			wantLastDay:     false,
+		},
+		{
+			name: "Repeated dotm entries numeric then week selector",
+			cfg: `[parity]
+mode="5"
+dotm="15"
+dotm="W2"
+`,
+			wantMode:        "custom",
+			wantDayOfMonth:  0,
+			wantWeekOfMonth: "W2",
+			wantLastDay:     false,
+		},
+		{
+			name: "Repeated dotm entries week selector then numeric",
+			cfg: `[parity]
+mode="3"
+dotm="W2"
+dotm="15"
+`,
+			wantMode:        "monthly",
+			wantDayOfMonth:  15,
+			wantWeekOfMonth: "",
+			wantLastDay:     false,
+		},
+		{
+			name: "Repeated dotm entries numeric then last-day selector",
+			cfg: `[parity]
+mode="3"
+dotm="15"
+dotm="28-31"
+`,
+			wantMode:        "monthly",
+			wantDayOfMonth:  0,
+			wantWeekOfMonth: "",
+			wantLastDay:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			schedule := &dto.ParitySchedule{}
+			if err := parseParityScheduleSection(strings.NewReader(tt.cfg), schedule); err != nil {
+				t.Fatalf("parseParityScheduleSection returned error: %v", err)
+			}
+			if schedule.Mode != tt.wantMode {
+				t.Errorf("Mode = %q, want %q", schedule.Mode, tt.wantMode)
+			}
+			if schedule.Day != tt.wantDay {
+				t.Errorf("Day = %d, want %d", schedule.Day, tt.wantDay)
+			}
+			if schedule.DayOfMonth != tt.wantDayOfMonth {
+				t.Errorf("DayOfMonth = %d, want %d", schedule.DayOfMonth, tt.wantDayOfMonth)
+			}
+			if schedule.WeekOfMonth != tt.wantWeekOfMonth {
+				t.Errorf("WeekOfMonth = %q, want %q", schedule.WeekOfMonth, tt.wantWeekOfMonth)
+			}
+			if schedule.LastDayOfMonth != tt.wantLastDay {
+				t.Errorf("LastDayOfMonth = %v, want %v", schedule.LastDayOfMonth, tt.wantLastDay)
+			}
+			if tt.wantMonth != 0 && schedule.Month != tt.wantMonth {
+				t.Errorf("Month = %d, want %d", schedule.Month, tt.wantMonth)
+			}
+			if tt.wantMode != "custom" && schedule.Cron != "" {
+				t.Errorf("Cron = %q, want empty for non-custom mode", schedule.Cron)
+			}
+		})
+	}
+}
+
+func TestParitySchedule_DynamixAndCronMerge(t *testing.T) {
+	tests := []struct {
+		name            string
+		cfg             string
+		cron            string
+		wantMode        string
+		wantWeekOfMonth string
+		wantLastDay     bool
+		wantCheckCron   string
+	}{
+		{
+			name: "Custom second week with guard",
+			cfg: `[parity]
+mode="5"
+day="5"
+dotm="W2"
+`,
+			cron:            "0 22 * * 5 [[ $(date +%e -d -7days) -le 7 ]] && /usr/local/sbin/mdcmd check NOCORRECT &> /dev/null || :\n",
+			wantMode:        "custom",
+			wantWeekOfMonth: "W2",
+			wantLastDay:     false,
+			wantCheckCron:   "0 22 * * 5",
+		},
+		{
+			name: "Custom every week unguarded",
+			cfg: `[parity]
+mode="5"
+day="5"
+dotm="*"
+`,
+			cron:            "0 22 * * 5 /usr/local/sbin/mdcmd check NOCORRECT &> /dev/null || :\n",
+			wantMode:        "custom",
+			wantWeekOfMonth: "*",
+			wantLastDay:     false,
+			wantCheckCron:   "0 22 * * 5",
+		},
+		{
+			name: "Monthly 28-31 with guard",
+			cfg: `[parity]
+mode="3"
+dotm="28-31"
+`,
+			cron:            "0 22 28-31 * * [[ $(date +%e -d +1day) -eq 1 ]] && /usr/local/sbin/mdcmd check NOCORRECT &> /dev/null || :\n",
+			wantMode:        "monthly",
+			wantWeekOfMonth: "",
+			wantLastDay:     true,
+			wantCheckCron:   "0 22 28-31 * *",
+		},
+		{
+			name: "Monthly second week with guard",
+			cfg: `[parity]
+mode="3"
+day="5"
+dotm="W2"
+`,
+			cron:            "0 22 * * 5 [[ $(date +%e -d -7days) -le 7 ]] && /usr/local/sbin/mdcmd check NOCORRECT &> /dev/null || :\n",
+			wantMode:        "monthly",
+			wantWeekOfMonth: "W2",
+			wantLastDay:     false,
+			wantCheckCron:   "0 22 * * 5",
+		},
+		{
+			name: "Stale Daily W2 with daily line",
+			cfg: `[parity]
+mode="1"
+dotm="W2"
+`,
+			cron:            "0 22 * * * /usr/local/sbin/mdcmd check &> /dev/null\n",
+			wantMode:        "daily",
+			wantWeekOfMonth: "",
+			wantLastDay:     false,
+			wantCheckCron:   "0 22 * * *",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			schedule := &dto.ParitySchedule{}
+			if err := parseParityScheduleSection(strings.NewReader(tt.cfg), schedule); err != nil {
+				t.Fatalf("parseParityScheduleSection returned error: %v", err)
+			}
+			if err := parseParityCheckCronLines(strings.NewReader(tt.cron), schedule); err != nil {
+				t.Fatalf("parseParityCheckCronLines returned error: %v", err)
+			}
+			if schedule.Mode != tt.wantMode {
+				t.Errorf("Mode = %q, want %q", schedule.Mode, tt.wantMode)
+			}
+			if schedule.WeekOfMonth != tt.wantWeekOfMonth {
+				t.Errorf("WeekOfMonth = %q, want %q", schedule.WeekOfMonth, tt.wantWeekOfMonth)
+			}
+			if schedule.LastDayOfMonth != tt.wantLastDay {
+				t.Errorf("LastDayOfMonth = %v, want %v", schedule.LastDayOfMonth, tt.wantLastDay)
+			}
+			if schedule.CheckCron != tt.wantCheckCron {
+				t.Errorf("CheckCron = %q, want %q", schedule.CheckCron, tt.wantCheckCron)
+			}
+		})
+	}
+}
+
 func TestSettingsCollector_GetPluginList(t *testing.T) {
 	collector := NewSettingsCollector()
 	plugins, err := collector.GetPluginList()

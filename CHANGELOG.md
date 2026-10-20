@@ -11,6 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Parity schedule endpoint lost week of month and last day of month selectors**
+  (#281) — `GET /api/v1/array/parity-check/schedule` parsed `dotm` from `dynamix.cfg`
+  with `strconv.Atoi`, dropping non-numeric selectors like `W1`–`W4`, `WL` (last week)
+  used in weekday-based schedules (Monthly, Yearly, and Custom modes), `*` (every week in
+  Custom mode), and `28-31` (last day of month in Monthly and Yearly modes). Because
+  `check_cron` extracts the five standard cron fields without Unraid's shell guards (e.g.
+  `[[ $(date +%e) ... ]]`), schedules on different weeks or the last day returned identical
+  data and day 0. The endpoint now exposes optional `week_of_month` (`"W1"`–`"W4"`, `"WL"`,
+  and `"*"` for Custom mode) and `last_day_of_month` (`true` for Monthly/Yearly `28-31` schedules)
+  while keeping the numeric `day_of_month` contract unchanged. Both fields are gated on the
+  final resolved mode to omit stale selectors when modes change. Swagger and REST documentation
+  have been updated, and `check_cron` documentation corrected to clarify that shell date
+  guards are excluded.
+
 - **Registration reported valid licenses as expired** — `/api/v1/registration` read `regTm`, the
   date the key was registered, as both the license expiration and the update expiration, so every
   key registered before the current moment showed `state: expired`. Expiration now comes from

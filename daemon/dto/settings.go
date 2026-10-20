@@ -46,23 +46,37 @@ type MoverSettings struct {
 // @Description Parity check schedule configuration
 type ParitySchedule struct {
 	// Schedule settings
-	Mode       string `json:"mode" example:"manual"`      // Schedule mode: "manual", "disabled", "daily", "weekly", "monthly", "yearly", "custom"
-	Day        int    `json:"day" example:"0"`            // Cron day of week (0=Sunday..6=Saturday) for weekly mode
-	Hour       int    `json:"hour" example:"0"`           // Hour to run (0-23). dynamix.cfg stores "minute hour"; only the hour part is exposed here — use check_cron for the exact time
-	DayOfMonth int    `json:"day_of_month" example:"1"`   // Day of month (1-31) for monthly/yearly schedule
-	Month      int    `json:"month" example:"1"`          // Month of year (1-12) for yearly schedule (Issue #124)
-	Frequency  int    `json:"frequency" example:"1"`      // Frequency multiplier
-	Duration   int    `json:"duration_hours" example:"6"` // Max duration in hours (0 = unlimited)
-	Cumulative bool   `json:"cumulative" example:"true"`  // Resume paused checks
-	Correcting bool   `json:"correcting" example:"true"`  // Correcting vs non-correcting check
+	Mode       string `json:"mode" example:"manual"`    // Schedule mode: "manual", "disabled", "daily", "weekly", "monthly", "yearly", "custom"
+	Day        int    `json:"day" example:"0"`          // Cron day of week (0=Sunday..6=Saturday) for weekly mode
+	Hour       int    `json:"hour" example:"0"`         // Hour to run (0-23). dynamix.cfg stores "minute hour"; only the hour part is exposed here — use check_cron for the exact time
+	DayOfMonth int    `json:"day_of_month" example:"1"` // Day of month (1-31) for monthly/yearly schedule; 0 when week_of_month or last_day_of_month is set
+
+	// WeekOfMonth is the week selector for weekday-based parity schedules (Issue #281).
+	// Values are "W1" (days 1-7), "W2" (8-14), "W3" (15-21), "W4" (22-28),
+	// "WL" (last 7 days of month), or "*" (every week in custom mode).
+	// Qualifies day and the weekday in check_cron. Omitted when not applicable.
+	WeekOfMonth string `json:"week_of_month,omitempty" example:"W2"`
+
+	// LastDayOfMonth is true when a monthly or yearly schedule is set to run on
+	// the actual last calendar day of the month (dotm="28-31", Issue #281).
+	// When true, day_of_month is 0 and check_cron specifies days 28-31.
+	// Omitted for other modes and when false.
+	LastDayOfMonth bool `json:"last_day_of_month,omitempty" example:"true"`
+
+	Month      int  `json:"month" example:"1"`          // Month of year (1-12) for yearly schedule (Issue #124)
+	Frequency  int  `json:"frequency" example:"1"`      // Frequency multiplier
+	Duration   int  `json:"duration_hours" example:"6"` // Max duration in hours (0 = unlimited)
+	Cumulative bool `json:"cumulative" example:"true"`  // Resume paused checks
+	Correcting bool `json:"correcting" example:"true"`  // Correcting vs non-correcting check
 
 	// Cron is the raw cron expression configured in dynamix.cfg for custom
 	// mode (mode "custom"); empty for the other modes (Issue #124).
 	Cron string `json:"cron,omitempty" example:"0 3 * * 0"`
-	// CheckCron is the authoritative cron spec of the scheduled check entry
-	// from parity-check.cron (the line Unraid actually runs), valid for every
-	// scheduled mode including custom. Use it to compute the next check
-	// without re-implementing Unraid's scheduling rules (Issue #124).
+	// CheckCron is the authoritative five-field cron spec of the scheduled
+	// check entry from parity-check.cron (the line Unraid actually runs), valid
+	// for every scheduled mode including custom (Issue #124, #281). The five
+	// cron fields give candidate run times; week_of_month or last_day_of_month
+	// can restrict actual runs via shell guards.
 	CheckCron string `json:"check_cron,omitempty" example:"0 0 1 1 *"`
 
 	// Pause/resume schedule

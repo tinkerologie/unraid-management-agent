@@ -10469,7 +10469,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "check_cron": {
-                    "description": "CheckCron is the authoritative cron spec of the scheduled check entry\nfrom parity-check.cron (the line Unraid actually runs), valid for every\nscheduled mode including custom. Use it to compute the next check\nwithout re-implementing Unraid's scheduling rules (Issue #124).",
+                    "description": "CheckCron is the authoritative five-field cron spec of the scheduled\ncheck entry from parity-check.cron (the line Unraid actually runs), valid\nfor every scheduled mode including custom (Issue #124, #281). The five\ncron fields give candidate run times; week_of_month or last_day_of_month\ncan restrict actual runs via shell guards.",
                     "type": "string",
                     "example": "0 0 1 1 *"
                 },
@@ -10494,7 +10494,7 @@ const docTemplate = `{
                     "example": 0
                 },
                 "day_of_month": {
-                    "description": "Day of month (1-31) for monthly/yearly schedule",
+                    "description": "Day of month (1-31) for monthly/yearly schedule; 0 when week_of_month or last_day_of_month is set",
                     "type": "integer",
                     "example": 1
                 },
@@ -10512,6 +10512,11 @@ const docTemplate = `{
                     "description": "Hour to run (0-23). dynamix.cfg stores \"minute hour\"; only the hour part is exposed here — use check_cron for the exact time",
                     "type": "integer",
                     "example": 0
+                },
+                "last_day_of_month": {
+                    "description": "LastDayOfMonth is true when a monthly or yearly schedule is set to run on\nthe actual last calendar day of the month (dotm=\"28-31\", Issue #281).\nWhen true, day_of_month is 0 and check_cron specifies days 28-31.\nOmitted for other modes and when false.",
+                    "type": "boolean",
+                    "example": true
                 },
                 "mode": {
                     "description": "Schedule settings",
@@ -10535,6 +10540,11 @@ const docTemplate = `{
                 },
                 "timestamp": {
                     "type": "string"
+                },
+                "week_of_month": {
+                    "description": "WeekOfMonth is the week selector for weekday-based parity schedules (Issue #281).\nValues are \"W1\" (days 1-7), \"W2\" (8-14), \"W3\" (15-21), \"W4\" (22-28),\n\"WL\" (last 7 days of month), or \"*\" (every week in custom mode).\nQualifies day and the weekday in check_cron. Omitted when not applicable.",
+                    "type": "string",
+                    "example": "W2"
                 }
             }
         },

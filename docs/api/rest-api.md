@@ -3267,32 +3267,91 @@ Get comprehensive status of all Unraid network services.
 
 Get parity check schedule configuration.
 
-**Response**:
+**Response (Custom Mode - Second Friday Example)**:
 
 ```json
 {
-  "enabled": true,
-  "frequency": "monthly",
-  "day_of_week": 0,
-  "day_of_month": 1,
-  "hour": 3,
-  "minute": 0,
-  "write_corrections": true,
-  "timestamp": "2025-10-03T13:41:13+10:00"
+  "mode": "custom",
+  "day": 5,
+  "hour": 22,
+  "day_of_month": 0,
+  "week_of_month": "W2",
+  "month": 0,
+  "frequency": 1,
+  "duration_hours": 6,
+  "cumulative": true,
+  "correcting": true,
+  "check_cron": "0 22 * * 5",
+  "pause_hour": 6,
+  "timestamp": "2026-10-20T14:30:00+10:00"
+}
+```
+
+**Alternative Schedules**:
+
+_Custom - Every Friday (`dotm="*"`)_:
+
+```json
+{
+  "mode": "custom",
+  "day": 5,
+  "hour": 22,
+  "day_of_month": 0,
+  "week_of_month": "*",
+  "frequency": 1,
+  "duration_hours": 6,
+  "cumulative": true,
+  "correcting": true,
+  "check_cron": "0 22 * * 5",
+  "timestamp": "2026-10-20T14:30:00+10:00"
+}
+```
+
+_Monthly - Last Day of Month (`dotm="28-31"`)_:
+
+```json
+{
+  "mode": "monthly",
+  "day": 0,
+  "hour": 22,
+  "day_of_month": 0,
+  "last_day_of_month": true,
+  "month": 0,
+  "frequency": 1,
+  "duration_hours": 6,
+  "cumulative": true,
+  "correcting": true,
+  "check_cron": "0 22 28-31 * *",
+  "timestamp": "2026-10-20T14:30:00+10:00"
 }
 ```
 
 **Fields**:
 
-| Field               | Type   | Description                                                |
-| ------------------- | ------ | ---------------------------------------------------------- |
-| `enabled`           | bool   | Whether scheduled parity checks are enabled                |
-| `frequency`         | string | Schedule frequency: "daily", "weekly", "monthly", "custom" |
-| `day_of_week`       | int    | Day of week for weekly checks (0 = Sunday)                 |
-| `day_of_month`      | int    | Day of month for monthly checks                            |
-| `hour`              | int    | Hour to start check (24-hour format)                       |
-| `minute`            | int    | Minute to start check                                      |
-| `write_corrections` | bool   | Whether to automatically write corrections                 |
+| Field               | Type   | Description                                                                                                                                                                                                                                      |
+| ------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `mode`              | string | Schedule mode: `"manual"`, `"disabled"`, `"daily"`, `"weekly"`, `"monthly"`, `"yearly"`, or `"custom"`                                                                                                                                           |
+| `day`               | int    | Cron day of week (0 = Sunday .. 6 = Saturday) for weekly and custom modes                                                                                                                                                                        |
+| `hour`              | int    | Hour to run (0–23). Unraid stores `"minute hour"`; only the hour part is exposed here — use `check_cron` for the exact time                                                                                                                      |
+| `day_of_month`      | int    | Day of month (1–31) for monthly/yearly schedules; `0` when `week_of_month` or `last_day_of_month` applies                                                                                                                                        |
+| `week_of_month`     | string | _(Optional)_ Week selector for weekday-based schedules: `"W1"` (days 1–7), `"W2"` (8–14), `"W3"` (15–21), `"W4"` (22–28), `"WL"` (last 7 days of month), or `"*"` (every week in custom mode). Omitted when not applicable or for stale settings |
+| `last_day_of_month` | bool   | _(Optional, Monthly/Yearly modes only)_ True when configured to run on the actual last calendar day (`dotm="28-31"`). `day_of_month` is `0` when this is true. Omitted when false or for other modes                                             |
+| `month`             | int    | Month of year (1–12) for yearly schedules                                                                                                                                                                                                        |
+| `frequency`         | int    | Frequency multiplier                                                                                                                                                                                                                             |
+| `duration_hours`    | int    | Max duration in hours (0 = unlimited)                                                                                                                                                                                                            |
+| `cumulative`        | bool   | Resume paused checks                                                                                                                                                                                                                             |
+| `correcting`        | bool   | Correcting (`true`) vs non-correcting (`false`) check                                                                                                                                                                                            |
+| `cron`              | string | _(Optional, Custom mode only)_ Raw cron expression configured in `dynamix.cfg` for custom mode; cleared and omitted for other modes                                                                                                              |
+| `check_cron`        | string | _(Optional)_ Authoritative five-field cron spec from `parity-check.cron`. Note: excludes Unraid shell date guards (e.g. `[[ $(date +%e) ... ]]`); combine with `week_of_month` or `last_day_of_month` for exact run                              |
+| `pause_hour`        | int    | _(Optional)_ Hour to pause check if scheduled                                                                                                                                                                                                    |
+| `resume_hour`       | int    | _(Optional)_ Hour to resume check if scheduled                                                                                                                                                                                                   |
+| `timestamp`         | string | ISO 8601 collection timestamp                                                                                                                                                                                                                    |
+
+> **Note on Custom Mode Multi-Selects**: In Custom mode, Unraid webGui allows
+> multi-selecting days of week or months (stored in `dynamix.cfg` as
+> comma-separated lists). `check_cron` preserves the full multi-value lists
+> (e.g. `"0 22 * 2,4,6,8,10,12 2"`), while the integer `day` and `month` fields
+> represent single values or `0` when multi-selected.
 
 ---
 

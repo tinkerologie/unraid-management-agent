@@ -28,13 +28,23 @@
     - name: Upload plugin bundle via SCP
       delegate_to: localhost
       ansible.builtin.command:
-        cmd: >
-          sshpass -p '{{ ansible_password }}'
-          scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
-          -o PubkeyAuthentication=no -o PreferredAuthentications=password
-          -o ConnectTimeout=10
-          {{ plugin_bundle }}
-          {{ ansible_user }}@{{ ansible_host }}:/tmp/{{ plugin_name }}.tgz
+        argv:
+          - sshpass
+          - -p
+          - "{{ ansible_password }}"
+          - scp
+          - -o
+          - StrictHostKeyChecking=no
+          - -o
+          - UserKnownHostsFile=/dev/null
+          - -o
+          - PubkeyAuthentication=no
+          - -o
+          - PreferredAuthentications=password
+          - -o
+          - ConnectTimeout=10
+          - "{{ plugin_bundle }}"
+          - "{{ ansible_user }}@{{ ansible_host }}:/tmp/{{ plugin_name }}.tgz"
       register: scp_result
       retries: 3
       delay: 3

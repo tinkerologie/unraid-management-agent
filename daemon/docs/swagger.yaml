@@ -3363,10 +3363,11 @@ definitions:
     properties:
       check_cron:
         description: |-
-          CheckCron is the authoritative cron spec of the scheduled check entry
-          from parity-check.cron (the line Unraid actually runs), valid for every
-          scheduled mode including custom. Use it to compute the next check
-          without re-implementing Unraid's scheduling rules (Issue #124).
+          CheckCron is the authoritative five-field cron spec of the scheduled
+          check entry from parity-check.cron (the line Unraid actually runs), valid
+          for every scheduled mode including custom (Issue #124, #281). The five
+          cron fields give candidate run times; week_of_month or last_day_of_month
+          can restrict actual runs via shell guards.
         example: 0 0 1 1 *
         type: string
       correcting:
@@ -3388,7 +3389,8 @@ definitions:
         example: 0
         type: integer
       day_of_month:
-        description: Day of month (1-31) for monthly/yearly schedule
+        description: Day of month (1-31) for monthly/yearly schedule; 0 when week_of_month
+          or last_day_of_month is set
         example: 1
         type: integer
       duration_hours:
@@ -3404,6 +3406,14 @@ definitions:
           hour part is exposed here — use check_cron for the exact time
         example: 0
         type: integer
+      last_day_of_month:
+        description: |-
+          LastDayOfMonth is true when a monthly or yearly schedule is set to run on
+          the actual last calendar day of the month (dotm="28-31", Issue #281).
+          When true, day_of_month is 0 and check_cron specifies days 28-31.
+          Omitted for other modes and when false.
+        example: true
+        type: boolean
       mode:
         description: Schedule settings
         example: manual
@@ -3421,6 +3431,14 @@ definitions:
         example: 0
         type: integer
       timestamp:
+        type: string
+      week_of_month:
+        description: |-
+          WeekOfMonth is the week selector for weekday-based parity schedules (Issue #281).
+          Values are "W1" (days 1-7), "W2" (8-14), "W3" (15-21), "W4" (22-28),
+          "WL" (last 7 days of month), or "*" (every week in custom mode).
+          Qualifies day and the weekday in check_cron. Omitted when not applicable.
+        example: W2
         type: string
     type: object
   dto.PlanStep:
