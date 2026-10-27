@@ -17,24 +17,25 @@ import (
 
 // haEntityOpts holds configuration for a single HA MQTT discovery entity.
 type haEntityOpts struct {
-	entityType     string // sensor, binary_sensor, switch, button
-	stateTopic     string
-	commandTopic   string // for switch and button entity types
-	id             string
-	name           string
-	unit           string
-	icon           string
-	template       string
-	deviceClass    string
-	stateClass     string
-	entityCategory string
-	payloadOn      string   // for binary_sensor and switch
-	payloadOff     string   // for binary_sensor and switch
-	payloadPress   string   // for button
-	stateOn        string   // for switch (value that means ON)
-	stateOff       string   // for switch (value that means OFF)
-	optimistic     bool     // for switch (no state feedback)
-	eventTypes     []string // for event entity type
+	stateAvailabilityTemplate string
+	entityType                string // sensor, binary_sensor, switch, button
+	stateTopic                string
+	commandTopic              string // for switch and button entity types
+	id                        string
+	name                      string
+	unit                      string
+	icon                      string
+	template                  string
+	deviceClass               string
+	stateClass                string
+	entityCategory            string
+	payloadOn                 string   // for binary_sensor and switch
+	payloadOff                string   // for binary_sensor and switch
+	payloadPress              string   // for button
+	stateOn                   string   // for switch (value that means ON)
+	stateOff                  string   // for switch (value that means OFF)
+	optimistic                bool     // for switch (no state feedback)
+	eventTypes                []string // for event entity type
 }
 
 // discoveryTracker tracks published per-item HA discovery entities
@@ -91,6 +92,15 @@ func (c *Client) publishHAEntity(opts haEntityOpts) {
 		"payload_not_available": "offline",
 		"icon":                  opts.icon,
 		"device":                c.deviceInfo,
+	}
+
+	if opts.stateAvailabilityTemplate != "" {
+		delete(config, "availability_topic")
+		config["availability_mode"] = "all"
+		config["availability"] = []map[string]string{
+			{"topic": c.buildTopic("availability"), "payload_available": "online", "payload_not_available": "offline"},
+			{"topic": opts.stateTopic, "value_template": opts.stateAvailabilityTemplate, "payload_available": "online", "payload_not_available": "offline"},
+		}
 	}
 
 	// state_topic is used by sensor, binary_sensor, and switch (not button)

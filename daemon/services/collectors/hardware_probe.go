@@ -18,6 +18,7 @@ import (
 
 // Hardware capability names reported in the capability snapshot (#261).
 const (
+	CapabilityPSU             = "hardware.psu"
 	CapabilityNICOptics       = "hardware.nic_optics"
 	CapabilityStorageTopology = "hardware.storage_topology"
 	CapabilityGPU             = "hardware.gpu"
@@ -38,6 +39,7 @@ type HardwareClass struct {
 // they gate. A gated collector in automatic mode runs only while its class is
 // present. Fan control is reported only: it has no plugin interval setting.
 var HardwareClasses = []HardwareClass{
+	{Capability: CapabilityPSU, Collector: "psu"},
 	{Capability: CapabilityNICOptics, Collector: "nic"},
 	{Capability: CapabilityStorageTopology, Collector: "storage_topology"},
 	{Capability: CapabilityGPU, Collector: "gpu"},
@@ -95,6 +97,8 @@ func NewHardwareProbe() *HardwareProbe {
 // CheckFor returns the check of a hardware capability, or nil for an unknown name.
 func (p *HardwareProbe) CheckFor(capability string) func(context.Context) (dto.CapabilityState, string) {
 	switch capability {
+	case CapabilityPSU:
+		return p.CheckPSU
 	case CapabilityNICOptics:
 		return p.CheckNICOptics
 	case CapabilityStorageTopology:
@@ -111,6 +115,19 @@ func (p *HardwareProbe) CheckFor(capability string) func(context.Context) (dto.C
 		return p.CheckFanControl
 	}
 	return nil
+}
+
+// CheckPSU detects an exact supported USB PSU independently of driver readiness.
+// A missing kernel driver must not hide a recognized device from diagnostics.
+func (p *HardwareProbe) CheckPSU(ctx context.Context) (dto.CapabilityState, string) {
+	sources, errs := discoverPSUs(ctx, p.path("/sys"))
+	if len(sources) > 0 {
+		return dto.CapabilityPresent, "recognized Corsair RMi/HXi USB PSU"
+	}
+	if len(errs) > 0 {
+		return dto.CapabilityUnknown, strings.Join(errs, "; ")
+	}
+	return dto.CapabilityAbsent, "no recognized host-visible PSU telemetry interface"
 }
 
 // path maps an absolute system path below Root.

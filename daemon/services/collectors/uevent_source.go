@@ -35,6 +35,12 @@ func HardwareDeviceUevent(e lib.Uevent) bool {
 	return slices.Contains(hardwareUeventSubsystems, e.Subsystem) && isAddOrRemove(e.Action)
 }
 
+// PSUDeviceUevent notices USB hotplug and hwmon registration/removal. Sensor
+// reads still validate exact identity; an unrelated event only wakes inventory.
+func PSUDeviceUevent(e lib.Uevent) bool {
+	return (e.Subsystem == "usb" || e.Subsystem == "hwmon") && isAddOrRemove(e.Action)
+}
+
 // isAddOrRemove reports a device add or remove action.
 func isAddOrRemove(action string) bool {
 	return action == "add" || action == "remove"

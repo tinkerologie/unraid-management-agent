@@ -36,6 +36,7 @@ type Intervals struct {
 	StorageTopology int
 	// NIC is the nic collector interval in seconds.
 	NIC int
+	PSU int
 }
 
 // Collection modes (#280). In Dynamic mode the agent decides when each

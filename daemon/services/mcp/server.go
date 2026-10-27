@@ -74,6 +74,7 @@ type CacheProvider interface {
 	GetMoverCache() *dto.MoverStatus
 	GetStorageTopologyCache() *dto.StorageTopology
 	GetNICCache() *dto.NICList
+	GetPSUCache() *dto.PSUStatus
 	// Logs
 	ListLogFiles() []dto.LogFile
 	GetLogContent(path, lines, start string) (*dto.LogFileContent, error)
@@ -1200,6 +1201,15 @@ func (s *Server) registerNewMonitoringTools() {
 		}
 		return jsonResult(dto.NewPendingStorageTopology(time.Now()))
 	})
+
+	addReadTool[dto.MCPEmptyArgs](s, "get_psu_status",
+		"Return host-visible PSU telemetry and per-device availability. Corsair RMi/HXi use kernel hwmon. DC output watts are not AC wall power; missing readings are null and load is derived from rated capacity. No PSU control operations.",
+		"PSU data not available", func() (any, bool) {
+			if cached := s.cacheProvider.GetPSUCache(); cached != nil {
+				return cached, true
+			}
+			return dto.NewPSUStatus(dto.PSUStatePending, time.Now()), true
+		})
 
 	// Get network cards (cached hwmon temperatures and optic diagnostics)
 	addReadTool[dto.MCPEmptyArgs](s,

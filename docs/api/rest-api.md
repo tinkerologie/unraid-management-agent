@@ -5082,3 +5082,8 @@ info = client.get_system_info()
 
 **Last Updated**: 2025-10-03
 **API Version**: 1.0.0
+
+## PSU telemetry
+
+`GET /api/v1/psu` returns shared PSU availability, devices and nullable sensors. See
+[PSU telemetry](../guides/psu-telemetry.md) for model scope and DC/AC power semantics.

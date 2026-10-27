@@ -88,6 +88,7 @@ $interval_registration = $config['INTERVAL_REGISTRATION'] ?? '600';
 $interval_unassigned = $config['INTERVAL_UNASSIGNED'] ?? '60';
 $interval_storage_topology = $config['INTERVAL_STORAGE_TOPOLOGY'] ?? 'auto';
 $interval_nic = $config['INTERVAL_NIC'] ?? 'auto';
+$interval_psu = $config['INTERVAL_PSU'] ?? 'auto';
 $interval_fan_control = $config['INTERVAL_FAN_CONTROL'] ?? '60';
 $interval_tuning = $config['INTERVAL_TUNING'] ?? '120';
 $interval_docker_update = $config['INTERVAL_DOCKER_UPDATE'] ?? '21600';
@@ -915,6 +916,12 @@ which subsystems are healthy. Both require the service to be running.
                     <?= intervalOptions($interval_nic, 'standard', true) ?>
                 </select>
             </div>
+            <div class="uma-interval-row" data-uma-capability="hardware.psu">
+                <span class="uma-interval-label">PSU Telemetry</span>
+                <select name="INTERVAL_PSU" class="uma-interval-select">
+                    <?= intervalOptions($interval_psu, 'standard', true) ?>
+                </select>
+            </div>
             <div class="uma-interval-row" data-uma-capability="hardware.ups">
                 <span class="uma-interval-label">UPS Status</span>
                 <select name="INTERVAL_UPS" class="uma-interval-select">
@@ -1366,7 +1373,7 @@ function renderCapabilityStatus(message) {
     }
     var found = [];
     var names = {
-        'hardware.gpu': 'GPU', 'hardware.nic_optics': 'NIC optics/sensors', 'hardware.ups': 'UPS',
+        'hardware.psu': 'PSU telemetry', 'hardware.gpu': 'GPU', 'hardware.nic_optics': 'NIC optics/sensors', 'hardware.ups': 'UPS',
         'hardware.nut': 'NUT', 'hardware.zfs': 'ZFS pools', 'hardware.storage_topology': 'SAS/SES storage'
     };
     Object.keys(names).forEach(function(key) {

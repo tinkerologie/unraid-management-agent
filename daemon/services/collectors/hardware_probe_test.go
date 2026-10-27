@@ -462,6 +462,7 @@ func TestHardwareProbeReferenceServer(t *testing.T) {
 	})
 
 	want := map[string]dto.CapabilityState{
+		CapabilityPSU:             dto.CapabilityAbsent,
 		CapabilityNICOptics:       dto.CapabilityAbsent,
 		CapabilityStorageTopology: dto.CapabilityAbsent,
 		CapabilityGPU:             dto.CapabilityPresent,

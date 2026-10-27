@@ -640,7 +640,9 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	s.updateNetworkServiceMetrics()
 
 	// Serve metrics using Prometheus HTTP handler
-	promhttp.HandlerFor(metricsRegistry, promhttp.HandlerOpts{
+	psuRegistry := prometheus.NewRegistry()
+	psuRegistry.MustRegister(psuMetricsCollector{cache: s.CacheStore})
+	promhttp.HandlerFor(prometheus.Gatherers{metricsRegistry, psuRegistry}, promhttp.HandlerOpts{
 		EnableOpenMetrics: true,
 	}).ServeHTTP(w, r)
 }

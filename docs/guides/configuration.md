@@ -919,3 +919,9 @@ Running multiple instances is not recommended and may cause conflicts.
 
 **Last Updated**: January 2026  
 **Configuration Version**: v2025.11.0
+
+## PSU collection
+
+Use `INTERVAL_PSU`, `--interval-psu` or YAML `intervals.psu` for Manual cadence. The plugin
+defaults PSU Telemetry to Automatic. Dynamic mode manages cadence and explicit disable is
+respected in both modes. See [PSU telemetry](psu-telemetry.md).

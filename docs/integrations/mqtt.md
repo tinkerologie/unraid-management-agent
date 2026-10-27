@@ -509,3 +509,9 @@ Impact on MQTT broker:
 **Last Updated**: January 2026  
 **MQTT Protocol Version**: 3.1.1  
 **Topics Published**: 10+
+
+## PSU telemetry
+
+PSU snapshots publish to `<topic_prefix>/<hostname>/psu`. Home Assistant discovery uses
+stable hashed device IDs, per-sensor availability and measured values only. See
+[PSU telemetry](../guides/psu-telemetry.md) for supported models and measurement semantics.

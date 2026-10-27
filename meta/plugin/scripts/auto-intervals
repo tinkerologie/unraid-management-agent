@@ -7,7 +7,7 @@
 # (Disabled), is an explicit choice the daemon never changes.
 
 # AUTO_INTERVAL_KEYS pairs each config key with its collector name.
-AUTO_INTERVAL_KEYS="INTERVAL_NIC:nic INTERVAL_STORAGE_TOPOLOGY:storage_topology INTERVAL_GPU:gpu INTERVAL_UPS:ups INTERVAL_NUT:nut INTERVAL_ZFS:zfs"
+AUTO_INTERVAL_KEYS="INTERVAL_PSU:psu INTERVAL_NIC:nic INTERVAL_STORAGE_TOPOLOGY:storage_topology INTERVAL_GPU:gpu INTERVAL_UPS:ups INTERVAL_NUT:nut INTERVAL_ZFS:zfs"
 
 # resolve_auto_intervals rewrites every "auto" interval to 0 and lists its
 # collector in UNRAID_AUTO_COLLECTORS (comma-separated). Numeric values are
@@ -18,7 +18,7 @@ resolve_auto_intervals() {
     for pair in $AUTO_INTERVAL_KEYS; do
         key="${pair%%:*}"
         name="${pair#*:}"
-        value="${!key}"
+        value="${!key-}"
         if [ "$value" = "auto" ]; then
             printf -v "$key" '%s' 0
             UNRAID_AUTO_COLLECTORS="${UNRAID_AUTO_COLLECTORS:+${UNRAID_AUTO_COLLECTORS},}${name}"

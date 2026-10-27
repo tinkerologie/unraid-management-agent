@@ -104,6 +104,7 @@ var policies = map[string]Policy{
 	"os_update":        fixed(24*time.Hour, 60*sec, constants.TopicOSUpdateUpdate.Name),
 	"mover":            delayed(10*sec, evented(30*sec, 5*minute, 30*sec, constants.TopicMoverUpdate.Name)),
 	"storage_topology": delayed(20*sec, demand(5*minute, 15*minute, 5*minute, constants.TopicStorageTopologyUpdate.Name)),
+	"psu":              evented(60*sec, 5*minute, 60*sec, constants.TopicPSUStatusUpdate.Name),
 	"nic":              delayed(10*sec, demand(60*sec, 5*minute, 5*minute, constants.TopicNICUpdate.Name)),
 }
 

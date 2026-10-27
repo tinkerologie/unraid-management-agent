@@ -9,6 +9,7 @@ const PAGE_HTML = path.join(__dirname, '..', '.render', 'page.html');
 const JQUERY = path.join(__dirname, '..', 'node_modules', 'jquery', 'dist', 'jquery.min.js');
 
 const HARDWARE_SELECTS = [
+  'INTERVAL_PSU',
   'INTERVAL_GPU',
   'INTERVAL_NIC',
   'INTERVAL_UPS',
@@ -19,6 +20,7 @@ const HARDWARE_SELECTS = [
 
 // The reference server of #261: an Intel iGPU and an APC UPS, nothing else.
 const REFERENCE = {
+  'hardware.psu': 'absent',
   'hardware.gpu': 'present',
   'hardware.ups': 'present',
   'hardware.nic_optics': 'absent',
@@ -222,7 +224,7 @@ test('service start and stop keep Re-check hardware and detection in sync', asyn
   await expectReferenceVisibility(page);
 });
 
-test('only the six hardware selects offer Auto, selected by default', async ({ page }) => {
+test('only hardware selects offer Auto, selected by default', async ({ page }) => {
   await openPage(page, () => json(capabilities(REFERENCE)));
   for (const name of HARDWARE_SELECTS) {
     const select = page.locator(`select[name="${name}"]`);
@@ -256,4 +258,12 @@ test('a section whose rows are all hidden is hidden', async ({ page }) => {
   await expect(page.locator('#test-section')).toBeHidden();
   // The page's own sections each keep a visible row.
   expect(sections.slice(0, -1).every((d) => d === '')).toBe(true);
+});
+
+
+test('PSU telemetry uses automatic detection and appears when its USB interface is present', async ({ page }) => {
+  await openPage(page, () => json(capabilities({ ...REFERENCE, 'hardware.psu': 'present' })));
+  await expect(row(page, 'hardware.psu')).toBeVisible();
+  await expect(page.locator('select[name="INTERVAL_PSU"]')).toHaveValue('auto');
+  await expect(status(page)).toContainText('PSU telemetry');
 });

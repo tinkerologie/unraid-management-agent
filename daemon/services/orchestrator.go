@@ -310,7 +310,16 @@ func (o *Orchestrator) detectCapabilities() *CapabilityRefresher {
 func (o *Orchestrator) startCapabilityRefresher(ctx context.Context, wg *sync.WaitGroup, refresher *CapabilityRefresher) {
 	policy := newCollectorAutoPolicy(o.collectorManager, o.ctx.LowPowerMode)
 	policy.Apply(o.ctx.Platform.Capabilities())
+	o.collectorManager.initializePSUAvailability()
 	refresher.SetHook(policy.Apply)
+	wg.Go(func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.LogPanicWithStack("PSU inventory watcher", r)
+			}
+		}()
+		watchPSUInventory(ctx, refresher)
+	})
 	wg.Go(func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -573,14 +582,22 @@ func (o *Orchestrator) initializeMQTT(ctx context.Context, wg *sync.WaitGroup, a
 	apiServer.SetMQTTClient(o.mqttClient)
 
 	// Start MQTT event subscriber
+	ready := make(chan struct{})
+	var readyOnce sync.Once
+	signalReady := func() { readyOnce.Do(func() { close(ready) }) }
 	wg.Go(func() {
+		defer signalReady()
 		defer func() {
 			if r := recover(); r != nil {
 				logger.LogPanicWithStack("MQTT subscriber goroutine", r)
 			}
 		}()
-		o.subscribeMQTTEvents(ctx, apiServer)
+		o.subscribeMQTTEvents(ctx, apiServer, signalReady)
 	})
+	select {
+	case <-ready:
+	case <-ctx.Done():
+	}
 }
 
 // mqttBinding connects a topic to its MQTT publish function.
@@ -610,7 +627,7 @@ func mqttDemand(demand *scheduler.Demand, bound map[string]bool) func(connected 
 }
 
 // subscribeMQTTEvents subscribes to collector events and publishes them via MQTT.
-func (o *Orchestrator) subscribeMQTTEvents(ctx context.Context, _ *api.Server) {
+func (o *Orchestrator) subscribeMQTTEvents(ctx context.Context, _ *api.Server, subscribed ...func()) {
 	if o.mqttClient == nil {
 		logger.Debug("MQTT: Skipping event subscription — client is nil")
 		return
@@ -637,6 +654,7 @@ func (o *Orchestrator) subscribeMQTTEvents(ctx context.Context, _ *api.Server) {
 			}
 			return o.mqttClient.PublishVMs(vms)
 		}),
+		mqttBind(constants.TopicPSUStatusUpdate, o.mqttClient.PublishPSUStatus),
 		mqttBind(constants.TopicUPSStatusUpdate, o.mqttClient.PublishUPSStatus),
 		mqttBind(constants.TopicGPUMetricsUpdate, o.mqttClient.PublishGPUMetrics),
 		mqttBind(constants.TopicNetworkListUpdate, o.mqttClient.PublishNetworkInfo),
@@ -672,6 +690,9 @@ func (o *Orchestrator) subscribeMQTTEvents(ctx context.Context, _ *api.Server) {
 
 	ch := o.ctx.Hub.Sub(topics...)
 	defer o.ctx.Hub.Unsub(ch)
+	if len(subscribed) > 0 {
+		subscribed[0]()
+	}
 
 	for {
 		select {

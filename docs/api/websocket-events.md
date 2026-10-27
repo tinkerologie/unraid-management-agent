@@ -618,3 +618,8 @@ This will:
 
 **Last Updated**: 2025-10-02  
 **Version**: 1.1.0
+
+## PSU telemetry updates
+
+`psu_status_update` carries the same `PSUStatus` payload as `GET /api/v1/psu`, including
+empty/unavailable snapshots after removal or disable. See [PSU telemetry](../guides/psu-telemetry.md).

@@ -285,3 +285,9 @@ Check collector intervals in plugin settings. Increase scrape frequency or decre
 
 **Last Updated**: January 2026  
 **Metrics Count**: 41
+
+## PSU metrics
+
+`unraid_psu_state` and `unraid_psu_device_state` expose availability. Per-device sensor metrics
+cover voltage, current, DC output watts, temperature, fan RPM and derived load. Missing readings
+produce no samples. See [PSU telemetry](../guides/psu-telemetry.md) for exact series names.

@@ -174,3 +174,18 @@ out=$(bash -c '
 ' -- "$AUTO_LIB")
 [ "$out" = "[] 60 300" ] || fail "translation without auto: got '${out}'"
 echo "✓ Start translation turns auto into 0 plus UNRAID_AUTO_COLLECTORS and keeps numeric values"
+
+# PSU automatic mode is optional for older configs and is preserved when explicit.
+# shellcheck disable=SC2016
+out=$(bash -c '
+    set -euo pipefail
+    source "$1"
+    INTERVAL_PSU=auto
+    resolve_auto_intervals
+    echo "$INTERVAL_PSU $UNRAID_AUTO_COLLECTORS"
+    INTERVAL_PSU=0
+    resolve_auto_intervals
+    echo "$INTERVAL_PSU [$UNRAID_AUTO_COLLECTORS]"
+' -- "$AUTO_LIB")
+[ "$out" = $'0 psu\n0 []' ] || fail "PSU translation: got '${out}'"
+echo "✓ PSU automatic detection translates correctly and explicit Disabled stays off"

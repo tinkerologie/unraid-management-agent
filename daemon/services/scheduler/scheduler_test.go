@@ -11,6 +11,7 @@ var epoch = time.Date(2026, 10, 18, 12, 0, 0, 0, time.UTC)
 
 // manualDefaults are the plugin's default.cfg intervals ("auto" = 300 s).
 var manualDefaults = map[string]time.Duration{
+	"psu":    60 * sec,
 	"system": 15 * sec, "array": 60 * sec, "disk": 300 * sec, "network": 60 * sec,
 	"docker": 30 * sec, "vm": 60 * sec, "gpu": 300 * sec, "ups": 300 * sec, "nut": 300 * sec,
 	"hardware": 600 * sec, "shares": 60 * sec, "zfs": 300 * sec, "unassigned": 60 * sec,
