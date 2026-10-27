@@ -143,6 +143,9 @@ jobs:
 
           cache: false
 
+      - name: Install XML validation tooling
+        run: sudo apt-get update && sudo apt-get install -y libxml2-utils
+
       - name: Verify VERSION file matches tag
         env:
           DETECT_VERSION: ${{ needs.detect.outputs.version }}
@@ -235,32 +238,14 @@ jobs:
         run: |
           VERSION="${DETECT_VERSION}"
 
-          # Extract this version's section body: everything between the
-          # "## [VERSION]" heading and the next "## [" heading (or EOF when it
-          # is the last/only section). Fixed-string matching — no regex
-          # surprises from the dots in date-based versions.
-          NOTES=$(awk -v ver="$VERSION" '
-            /^## \[/ {
-              if (found) exit
-              if (index($0, "[" ver "]") > 0) { found = 1; next }
-            }
-            found { print }
-          ' CHANGELOG.md)
-
-          # Trim leading/trailing blank lines while preserving inner spacing.
-          NOTES=$(printf '%s\n' "$NOTES" | sed -e '/./,$!d' | sed -e ':a' -e '/^\n*$/{$d;N;ba' -e '}')
-
-          if [ -n "$NOTES" ]; then
-            echo "✅ Extracted release notes for version $VERSION from CHANGELOG.md"
-            printf '%s\n' "$NOTES" > build/RELEASE_NOTES.md
-            {
-              echo ""
-              echo "See [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md) for the full history."
-            } >> build/RELEASE_NOTES.md
-          else
-            echo "::warning::No release notes found for version $VERSION in CHANGELOG.md"
-            echo "See [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md) for details." > build/RELEASE_NOTES.md
-          fi
+          # Preserve the release checkout's notes through the later switch to main.
+          # build/ is ignored and untracked. Extraction failure blocks publication.
+          bash scripts/extract-release-notes.sh "$VERSION" > build/RELEASE_NOTES_BASE.md
+          cp build/RELEASE_NOTES_BASE.md build/RELEASE_NOTES.md
+          {
+            echo ""
+            echo "See [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md) for the full history."
+          } >> build/RELEASE_NOTES.md
 
           # Add checksums to release notes
           {
@@ -279,6 +264,13 @@ jobs:
           } >> build/RELEASE_NOTES.md
 
           cat build/RELEASE_NOTES.md
+
+      - name: Validate plugin release notes before publication
+        env:
+          DETECT_VERSION: ${{ needs.detect.outputs.version }}
+        run: |
+          bash scripts/update-plg-changes.sh "$DETECT_VERSION" build/RELEASE_NOTES_BASE.md
+          xmllint --nonet --noout unraid-management-agent.plg
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
@@ -320,19 +312,21 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Drop the release-checkout edit, then apply the checksums to main's
-          # .plg. The script refuses if main's .plg pins a different version.
+          # Drop the release-checkout edit, then apply checksums and the preserved
+          # release notes to main. Both helpers refuse a different manifest version.
           git checkout -- unraid-management-agent.plg
           git fetch origin main
           git checkout main
           git pull origin main
           bash scripts/update-plg-checksums.sh "$CHECKSUM_MD5" "$CHECKSUM_SHA256" "$DETECT_VERSION"
+          bash scripts/update-plg-changes.sh "$DETECT_VERSION" build/RELEASE_NOTES_BASE.md
+          xmllint --nonet --noout unraid-management-agent.plg
 
           if git diff --quiet unraid-management-agent.plg; then
-            echo "PLG on main already pins these checksums"
+            echo "PLG on main already pins these checksums and release notes"
           else
             git add unraid-management-agent.plg
-            git commit -m "chore: update PLG checksums for v${DETECT_VERSION} [skip ci]"
+            git commit -m "chore: update PLG checksums and release notes for v${DETECT_VERSION} [skip ci]"
             git push "https://x-access-token:${PLG_PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" main
             echo "✅ Committed and pushed PLG update"
           fi
