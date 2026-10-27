@@ -184,6 +184,8 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/vm/guest", s.handleVMGuestList).Methods("GET")
 	api.HandleFunc("/vm/{id}", s.handleVMInfo).Methods("GET")
 	api.HandleFunc("/ups", s.handleUPS).Methods("GET")
+	// Read-only PSU hardware telemetry.
+	api.HandleFunc("/psu", s.handlePSU).Methods("GET")
 	api.HandleFunc("/nut", s.handleNUT).Methods("GET")
 	api.HandleFunc("/gpu", s.handleGPU).Methods("GET")
 
@@ -274,7 +276,6 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/mover", s.handleMover).Methods("GET")
 
 	// SAS storage topology (controllers, HBA ports, enclosures, drive paths)
-	api.HandleFunc("/psu", s.handlePSU).Methods("GET")
 	api.HandleFunc("/storage/topology", s.handleStorageTopology).Methods("GET")
 
 	// Configuration endpoints (write)
