@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.10.03] - 2026-10-27
+
+### Changed
+
+- **Current release notes in the Unraid plugin manager** (#289) — release automation now replaces
+  the manifest's `CHANGES` block with the matching version's notes from `CHANGELOG.md`, while retaining
+  the full history in the changelog. Missing, empty or duplicate release sections block publication.
+  Notes are XML-escaped and validated before publication, then published alongside the checksums on
+  `main` using the preserved release notes. Packaging regression tests cover extraction, replacement
+  across releases, XML special characters and failures that leave the manifest unchanged.
+
 ## [2026.10.02] - 2026-10-20
 
 ### Fixed

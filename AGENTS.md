@@ -447,7 +447,8 @@ Uses date-based versioning: `YYYY.MM.DD` (e.g., `2025.12.01`).
 
 1. **Update `CHANGELOG.md`** — required for every change
    - Add entry at the top under new version section
-   - Follow format: `## [YYYY.MM.DD]` with date
+   - Follow format: `## [VERSION] - DATE` with non-empty notes for the release
+   - Release extraction fails on missing, empty or duplicate matching sections
    - Group changes: Added, Fixed, Changed, Security, Performance
 2. **Update `VERSION` file** with new version number
 3. **Update `unraid-management-agent.plg`**:
@@ -455,6 +456,8 @@ Uses date-based versioning: `YYYY.MM.DD` (e.g., `2025.12.01`).
    - Leave the `md5` and `sha256` entities alone: the release workflow writes both from the built
      artifact with `scripts/update-plg-checksums.sh`, before publishing and again on `main`
    - Keep the `<!-- pragma: allowlist secret -->` comments on both checksum lines (detect-secrets)
+   - Release automation also owns `<CHANGES>`: do not edit it by hand. The workflow replaces it
+     with only the matching version's changelog notes, then publishes those same notes with the checksums on `main`
 4. **Update `unraid-management-agent.xml`** as needed for listing metadata changes
 5. **Tag and push:** `git tag vYYYY.MM.DD && git push origin vYYYY.MM.DD`
 6. GitHub Actions builds and releases automatically

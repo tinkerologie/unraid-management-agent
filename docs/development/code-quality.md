@@ -205,7 +205,15 @@ make pre-commit-install # Install pre-commit hooks
 ```bash
 make test              # Run all tests with race detection
 make test-coverage     # Generate coverage report (coverage.html)
+make test-packaging    # Build and test bundle packaging, migrations, checksums and release notes (uses sudo)
 ```
+
+The release-note packaging tests cover exact matching-version extraction
+(`scripts/test-release-notes.sh`) and replacement of the manifest's `CHANGES` block
+(`scripts/test-plg-changes.sh`), including XML escaping, subsequent releases and non-destructive failures.
+Local XML validation uses optional `xmllint` (`brew install libxml2` on macOS or
+`apt-get install libxml2-utils` on Debian/Ubuntu); the tests report a skip when it is absent.
+CI and release publication install this tool and require valid XML before publishing.
 
 ### Build Commands
 

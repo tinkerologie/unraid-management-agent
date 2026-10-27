@@ -89,6 +89,9 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Install XML validation tooling
+        run: sudo apt-get update && sudo apt-get install -y libxml2-utils
+
       # Builds the bundle, checks every entry is 0/0, then runs the .plg
       # extraction command as root against a uid-1001 archive (#242)
       - name: Run packaging tests
