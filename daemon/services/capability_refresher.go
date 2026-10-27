@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"time"
 
@@ -49,6 +50,45 @@ func (r *CapabilityRefresher) SetHook(hook func(dto.Capabilities)) {
 	r.mu.Lock()
 	r.hook = hook
 	r.mu.Unlock()
+}
+
+// RefreshCapability rechecks one hardware class without running unrelated probes.
+// The hook receives only this class so absent counters for others do not advance.
+func (r *CapabilityRefresher) RefreshCapability(ctx context.Context, name string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if ctx.Err() != nil {
+		return
+	}
+	for _, probe := range r.probes() {
+		if probe.Name != name {
+			continue
+		}
+		checkCtx, cancel := context.WithTimeout(ctx, r.Timeout)
+		fresh := platform.DetectContext(checkCtx, []platform.Probe{probe})
+		cancel()
+		if ctx.Err() != nil {
+			return
+		}
+		previous := r.registry.Capabilities()
+		logCapabilityChanges(previous, fresh)
+		previous.Items = slices.Clone(previous.Items)
+		found := false
+		for i := range previous.Items {
+			if previous.Items[i].Name == name {
+				previous.Items[i] = fresh.Items[0]
+				found = true
+			}
+		}
+		if !found {
+			previous.Items = append(previous.Items, fresh.Items[0])
+		}
+		r.registry.SetCapabilities(previous)
+		if r.hook != nil {
+			r.hook(fresh)
+		}
+		return
+	}
 }
 
 // Refresh re-checks capabilities unless the last check is younger than

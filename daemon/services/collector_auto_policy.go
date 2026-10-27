@@ -50,6 +50,9 @@ func (p *collectorAutoPolicy) Apply(caps dto.Capabilities) {
 		if !ok {
 			continue
 		}
+		if class.Collector == "psu" {
+			p.cm.setPSUPresence(item.State)
+		}
 		switch item.State {
 		case dto.CapabilityPresent:
 			p.absent[class.Collector] = 0

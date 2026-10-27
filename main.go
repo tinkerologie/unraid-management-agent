@@ -54,6 +54,7 @@ var validCollectorNames = map[string]bool{
 
 	"storage_topology": true,
 	"nic":              true,
+	"psu":              true,
 }
 
 var cli struct {
@@ -105,7 +106,7 @@ var cli struct {
 
 	// Hardware-gated collectors in automatic mode: they run only while their
 	// hardware is detected (#261). Set by the plugin for intervals set to "auto".
-	AutoCollectors string `default:"" env:"UNRAID_AUTO_COLLECTORS" help:"comma-separated hardware-gated collectors in automatic mode (nic,storage_topology,gpu,ups,nut,zfs): run at 300s only while their hardware is detected"`
+	AutoCollectors string `default:"" env:"UNRAID_AUTO_COLLECTORS" help:"comma-separated hardware-gated collectors in automatic mode (psu,nic,storage_topology,gpu,ups,nut,zfs): run at 300s only while their hardware is detected"`
 
 	// Collection mode (#280): dynamic lets the agent decide when collectors
 	// run; manual uses the configured intervals.
@@ -157,6 +158,7 @@ var cli struct {
 	IntervalMover          int  `default:"30" env:"INTERVAL_MOVER" help:"mover status collection interval (seconds, 0=disabled, max 86400)"`
 	DockerUpdateNotify     bool `default:"false" env:"DOCKER_UPDATE_NOTIFY" help:"raise an Unraid notification when new container updates become available"`
 
+	IntervalPSU             int `default:"60" env:"INTERVAL_PSU" help:"PSU telemetry interval (seconds, 0=disabled, max 86400); monitors detected supported USB PSUs"`
 	IntervalStorageTopology int `default:"0" env:"INTERVAL_STORAGE_TOPOLOGY" help:"SAS storage topology (storcli/sg_ses) collection interval (seconds, 0=disabled (default), max 86400; 300 recommended when enabled)"`
 	IntervalNIC             int `default:"0" env:"INTERVAL_NIC" help:"Network card (temperatures, optic diagnostics) collection interval (seconds, 0=disabled (default), max 86400; 60 recommended when enabled)"`
 
@@ -325,6 +327,7 @@ func main() {
 
 	autoCollectors := resolveAutoCollectors(cli.AutoCollectors, disabledCollectors, map[string]int{
 		"nic":              cli.IntervalNIC,
+		"psu":              cli.IntervalPSU,
 		"storage_topology": cli.IntervalStorageTopology,
 		"gpu":              cli.IntervalGPU,
 		"ups":              cli.IntervalUPS,
@@ -448,6 +451,7 @@ func main() {
 
 			StorageTopology: getInterval("storage_topology", cli.IntervalStorageTopology),
 			NIC:             getInterval("nic", cli.IntervalNIC),
+			PSU:             getInterval("psu", cli.IntervalPSU),
 		},
 	}
 	applyWriteAccess(appCtx, cli.APIToken, cli.AllowUnauthenticatedWrites)
@@ -805,6 +809,7 @@ func applyFileConfig(cfg *domain.FileConfig) {
 		setInterval("mover", &cli.IntervalMover, iv.Mover)
 		setInterval("storage_topology", &cli.IntervalStorageTopology, iv.StorageTopology)
 		setInterval("nic", &cli.IntervalNIC, iv.NIC)
+		setInterval("psu", &cli.IntervalPSU, iv.PSU)
 	}
 }
 

@@ -41,6 +41,23 @@ func TestApplyFileConfigNICInterval(t *testing.T) {
 	}
 }
 
+func TestPSUFileConfigAndExplicitDisable(t *testing.T) {
+	orig := cli.IntervalPSU
+	t.Cleanup(func() { cli.IntervalPSU = orig })
+	for _, interval := range []int{120, 0} {
+		applyFileConfig(&domain.FileConfig{Intervals: &domain.FileConfigIntervals{PSU: &interval}})
+		if cli.IntervalPSU != interval {
+			t.Fatalf("PSU interval = %d want %d", cli.IntervalPSU, interval)
+		}
+	}
+	if !validCollectorNames["psu"] || !isHardwareGated("psu") {
+		t.Fatal("PSU is missing from configuration registries")
+	}
+	if auto := resolveAutoCollectors("psu", map[string]bool{"psu": true}, map[string]int{"psu": 0}, nil); auto["psu"] {
+		t.Fatal("explicit disable must win over auto")
+	}
+}
+
 func TestApplyFileConfigAllowUnauthenticatedWrites(t *testing.T) {
 	orig := cli.AllowUnauthenticatedWrites
 	t.Cleanup(func() { cli.AllowUnauthenticatedWrites = orig })
@@ -514,7 +531,7 @@ func TestHardwareGatedCollectors(t *testing.T) {
 		names = append(names, name)
 	}
 	slices.Sort(names)
-	want := []string{"gpu", "nic", "nut", "storage_topology", "zfs"}
+	want := []string{"gpu", "nic", "nut", "psu", "storage_topology", "zfs"}
 	if !slices.Equal(names, want) {
 		t.Errorf("gated = %v, want %v (every hardware collector except the disabled ups)", names, want)
 	}

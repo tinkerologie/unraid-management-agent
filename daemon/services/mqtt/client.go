@@ -21,21 +21,27 @@ import (
 
 // Client represents an MQTT client that publishes Unraid metrics and events.
 type Client struct {
-	config       *dto.MQTTConfig
-	client       pahomqtt.Client
-	mu           sync.RWMutex
-	connected    atomic.Bool
-	startTime    time.Time
-	lastConnect  *time.Time
-	lastDisconn  *time.Time
-	lastError    string
-	msgSent      atomic.Int64
-	msgErrors    atomic.Int64
-	deviceInfo   *dto.HADeviceInfo
-	hostname     string
-	agentVersion string
-	tracker      *discoveryTracker
-	domainCtx    *domain.Context // domain context for controllers (array, system)
+	// PSU state ordering is independent of the bounded discovery worker.
+	psuDiscoveryMu      sync.Mutex
+	psuDiscoveryPending *psuDiscoveryUpdate
+	psuDiscoveryRunning bool
+	psuDiscoveryIDs     map[string]bool // owned exclusively by the discovery worker
+	psuMu               sync.Mutex
+	config              *dto.MQTTConfig
+	client              pahomqtt.Client
+	mu                  sync.RWMutex
+	connected           atomic.Bool
+	startTime           time.Time
+	lastConnect         *time.Time
+	lastDisconn         *time.Time
+	lastError           string
+	msgSent             atomic.Int64
+	msgErrors           atomic.Int64
+	deviceInfo          *dto.HADeviceInfo
+	hostname            string
+	agentVersion        string
+	tracker             *discoveryTracker
+	domainCtx           *domain.Context // domain context for controllers (array, system)
 
 	// Notification event tracking. seenNotifications holds IDs already
 	// emitted as HA events; notifSeeded guards against replaying the
@@ -46,7 +52,8 @@ type Client struct {
 
 	// connectCancel cancels the context for goroutines spawned by handleConnect.
 	// Protected by mu.
-	connectCancel context.CancelFunc
+	connectCancel  context.CancelFunc
+	connectContext context.Context // protected by mu; cancels queued PSU discovery
 	// onConnState receives every connection state change. connStateMu
 	// guards it and serialises its calls, so they arrive in order.
 	onConnState func(connected bool)
@@ -91,11 +98,12 @@ func normalizeQoS(qos int) byte {
 // NewClient creates a new MQTT client with the given configuration.
 func NewClient(config *dto.MQTTConfig, hostname, agentVersion string, domainCtx *domain.Context) *Client {
 	return &Client{
-		config:       config,
-		hostname:     hostname,
-		agentVersion: agentVersion,
-		tracker:      newDiscoveryTracker(),
-		domainCtx:    domainCtx,
+		config:         config,
+		hostname:       hostname,
+		agentVersion:   agentVersion,
+		tracker:        newDiscoveryTracker(),
+		domainCtx:      domainCtx,
+		connectContext: context.Background(),
 		deviceInfo: &dto.HADeviceInfo{
 			Identifiers:  []string{fmt.Sprintf("unraid_%s", strings.ReplaceAll(hostname, " ", "_"))},
 			Name:         hostname,
@@ -209,6 +217,7 @@ func (c *Client) handleConnect() {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	c.connectCancel = cancel
+	c.connectContext = ctx
 	c.mu.Unlock()
 
 	c.connected.Store(true)

@@ -9,6 +9,8 @@ import (
 // send the correct Go type, eliminating a class of runtime type-assertion bugs.
 
 var (
+	// TopicPSUStatusUpdate carries shared PSU monitoring snapshots.
+	TopicPSUStatusUpdate = domain.NewTopic[*dto.PSUStatus]("psu_status_update")
 	// TopicSystemUpdate is published by the system collector with *dto.SystemInfo.
 	TopicSystemUpdate = domain.NewTopic[*dto.SystemInfo]("system_update")
 	// TopicArrayStatusUpdate is published by the array collector with *dto.ArrayStatus.

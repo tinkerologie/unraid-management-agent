@@ -31,6 +31,7 @@ func bind[T any](topic domain.Topic[T], fn func(*CacheStore, T)) eventBinding {
 // Adding a new collector requires only one new entry here.
 func cacheBindings() []eventBinding {
 	return []eventBinding{
+		bind(constants.TopicPSUStatusUpdate, func(c *CacheStore, v *dto.PSUStatus) { c.psuCache.Store(v) }),
 		bind(constants.TopicSystemUpdate, func(c *CacheStore, v *dto.SystemInfo) {
 			c.systemCache.Store(v)
 		}),

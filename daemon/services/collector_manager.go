@@ -60,10 +60,12 @@ type ManagedCollector struct {
 
 // CollectorManager manages runtime enable/disable of collectors
 type CollectorManager struct {
-	mu         sync.RWMutex
-	collectors map[string]*ManagedCollector
-	domainCtx  *domain.Context
-	wg         *sync.WaitGroup
+	psuPresent   bool
+	psuAnnounced string
+	mu           sync.RWMutex
+	collectors   map[string]*ManagedCollector
+	domainCtx    *domain.Context
+	wg           *sync.WaitGroup
 
 	// Dynamic collection mode (#280).
 	dynamic bool
@@ -75,6 +77,20 @@ type CollectorManager struct {
 }
 
 func (cm *CollectorManager) stopCollectorLocked(mc *ManagedCollector) {
+	wasRunning := mc.cancel != nil
+	cm.cancelCollectorLocked(mc)
+	if mc.Name == "psu" && wasRunning {
+		state := dto.PSUStateDisabled
+		if mc.Gated && !cm.psuPresent {
+			state = dto.PSUStateNotDetected
+		}
+		cm.announcePSULocked(state)
+	}
+}
+
+// cancelCollectorLocked also serves immediate restarts. Preserve the last
+// snapshot across a restart so HA discovery is not withdrawn and recreated.
+func (cm *CollectorManager) cancelCollectorLocked(mc *ManagedCollector) {
 	if mc.cancel != nil {
 		mc.cancel()
 		mc.cancel = nil
@@ -308,6 +324,9 @@ func (cm *CollectorManager) DisableCollector(name string) error {
 	mc.Gated, mc.Auto = false, false // manual control ends hardware gating
 
 	if mc.Status != "running" {
+		if name == "psu" {
+			cm.announcePSULocked(dto.PSUStateDisabled)
+		}
 		cm.mu.Unlock()
 		return nil // Already stopped
 	}
@@ -354,7 +373,7 @@ func (cm *CollectorManager) UpdateInterval(name string, intervalSeconds int) err
 
 	// Stop the collector if running
 	if wasRunning {
-		cm.stopCollectorLocked(mc)
+		cm.cancelCollectorLocked(mc)
 		mc.Status = "stopped"
 		// Give time for graceful stop
 		time.Sleep(100 * time.Millisecond)
@@ -413,7 +432,7 @@ func (cm *CollectorManager) ApplyHardwareState(name string, present bool, autoIn
 			return false
 		}
 		if running {
-			cm.stopCollectorLocked(mc)
+			cm.cancelCollectorLocked(mc)
 			mc.Status = "stopped"
 		}
 		mc.Interval = interval
@@ -456,7 +475,7 @@ func (cm *CollectorManager) GetAllStatus() dto.CollectorsStatusResponse {
 		"ups", "nut", "gpu", "shares", "network",
 		"hardware", "zfs", "notification", "registration", "unassigned",
 		"fancontrol", "tuning", "docker_update", "docker_networks", "plugin_update",
-		"os_update", "mover", "storage_topology", "nic",
+		"os_update", "mover", "storage_topology", "nic", "psu",
 	}
 
 	for _, name := range collectorOrder {
@@ -598,6 +617,7 @@ func (cm *CollectorManager) getDefaultInterval(name string) int {
 
 		"storage_topology": constants.IntervalStorageTopology,
 		"nic":              constants.IntervalNIC,
+		"psu":              constants.IntervalPSU,
 	}
 
 	if interval, ok := defaults[name]; ok {
@@ -800,8 +820,14 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 		return collectors.NewStorageTopologyCollector(ctx)
 	}, intervals.StorageTopology, false)
 
-	// NIC collector — PCI network cards: hwmon temperatures, port link state and
-	// optic diagnostics (SFF-8472/SFF-8636 via the SIOCETHTOOL ioctl).
+	// Shared PSU collector, initially using the passive Corsair hwmon backend.
+	cm.Register("psu", func(ctx *domain.Context) Collector {
+		c := collectors.NewPSUCollector(ctx)
+		c.PublishGuard = cm.publishPSU
+		return c
+	}, intervals.PSU, false)
+
+	// NIC collector — PCI network cards and optic diagnostics.
 	cm.Register("nic", func(ctx *domain.Context) Collector {
 		return collectors.NewNICCollector(ctx)
 	}, intervals.NIC, false)

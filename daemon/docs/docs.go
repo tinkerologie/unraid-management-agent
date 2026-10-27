@@ -1000,7 +1000,7 @@ const docTemplate = `{
         },
         "/capabilities": {
             "get": {
-                "description": "Returns the capability snapshot: OS paths and binaries plus detected hardware classes (hardware.nic_optics, hardware.storage_topology, hardware.gpu, hardware.ups, hardware.nut, hardware.zfs, hardware.fan_control), each with state present/absent/unknown and a detail reason, and when the snapshot was checked. Capabilities are re-checked every 15 minutes; refresh=true re-checks now (at most every 30 seconds, otherwise the cached snapshot is returned). Collectors in automatic mode follow the hardware state.",
+                "description": "Returns the capability snapshot: OS paths and binaries plus detected hardware classes (hardware.psu, hardware.nic_optics, hardware.storage_topology, hardware.gpu, hardware.ups, hardware.nut, hardware.zfs, hardware.fan_control), each with state present/absent/unknown and a detail reason, and when the snapshot was checked. PSU inventory also refreshes on USB/hwmon events and every 30 seconds. Other capabilities are re-checked every 15 minutes; refresh=true re-checks now (at most every 30 seconds, otherwise the cached snapshot is returned). Collectors in automatic mode follow the hardware state.",
                 "produces": [
                     "application/json"
                 ],
@@ -4004,6 +4004,26 @@ const docTemplate = `{
                         "description": "Failed to sample process I/O",
                         "schema": {
                             "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/psu": {
+            "get": {
+                "description": "Read host-visible PSU interfaces and per-device monitoring state. Corsair RMi/HXi use kernel hwmon. Output power is DC watts; unsupported AC input power and efficiency are null. Load is derived from verified capacity. No control operations.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Hardware"
+                ],
+                "summary": "Get PSU telemetry",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PSUStatus"
                         }
                     }
                 }
@@ -10414,6 +10434,101 @@ const docTemplate = `{
                     "description": "UpdateAvailable is true when LatestVersion != \"\" and LatestVersion != CurrentVersion.",
                     "type": "boolean",
                     "example": false
+                }
+            }
+        },
+        "dto.PSUDevice": {
+            "type": "object",
+            "properties": {
+                "backend": {
+                    "type": "string"
+                },
+                "capacity_watts": {
+                    "type": "number",
+                    "x-nullable": true
+                },
+                "driver": {
+                    "type": "string"
+                },
+                "family": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "model": {
+                    "type": "string"
+                },
+                "product_id": {
+                    "type": "string"
+                },
+                "sensors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.PSUSensor"
+                    }
+                },
+                "state": {
+                    "type": "string"
+                },
+                "vendor": {
+                    "type": "string"
+                },
+                "vendor_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.PSUSensor": {
+            "type": "object",
+            "properties": {
+                "derived": {
+                    "type": "boolean"
+                },
+                "kind": {
+                    "type": "string",
+                    "example": "power"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "unit": {
+                    "type": "string",
+                    "example": "W"
+                },
+                "value": {
+                    "type": "number",
+                    "x-nullable": true
+                }
+            }
+        },
+        "dto.PSUStatus": {
+            "type": "object",
+            "properties": {
+                "devices": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.PSUDevice"
+                    }
+                },
+                "errors": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "state": {
+                    "type": "string",
+                    "example": "ok"
+                },
+                "timestamp": {
+                    "type": "string"
                 }
             }
         },

@@ -36,6 +36,7 @@ var readCollectors = map[string][]string{
 	"get_nut_status":             {"nut"},
 	"get_gpu_metrics":            {"gpu"},
 	"get_network_info":           {"network"},
+	"get_psu_status":             {"psu"},
 	"get_network_cards":          {"nic"},
 	"get_hardware_info":          {"hardware"},
 	"get_registration":           {"registration"},

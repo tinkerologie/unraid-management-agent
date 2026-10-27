@@ -184,6 +184,8 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/vm/guest", s.handleVMGuestList).Methods("GET")
 	api.HandleFunc("/vm/{id}", s.handleVMInfo).Methods("GET")
 	api.HandleFunc("/ups", s.handleUPS).Methods("GET")
+	// Read-only PSU hardware telemetry.
+	api.HandleFunc("/psu", s.handlePSU).Methods("GET")
 	api.HandleFunc("/nut", s.handleNUT).Methods("GET")
 	api.HandleFunc("/gpu", s.handleGPU).Methods("GET")
 
