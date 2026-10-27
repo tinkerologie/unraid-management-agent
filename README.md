@@ -211,7 +211,14 @@ make local           # build for this machine
 make test            # run the tests with the race detector
 make pre-commit-run  # lint, format and security checks
 make package         # build the Unraid plugin bundle
+make test-packaging  # bundle, migration, checksum and release-note regression tests (uses sudo)
 ```
+
+Packaging tests include exact changelog extraction (`scripts/test-release-notes.sh`) and safe manifest
+`CHANGES` replacement (`scripts/test-plg-changes.sh`). Install optional `xmllint` locally for XML validation
+(`brew install libxml2` on macOS, `apt-get install libxml2-utils` on Debian/Ubuntu); CI requires it.
+Each release needs a non-empty `## [VERSION] - DATE` changelog section. Release automation generates the
+manifest's current-version notes from that section and keeps the full history in `CHANGELOG.md`.
 
 <details>
 <summary>Deploy to an Unraid server for testing</summary>
