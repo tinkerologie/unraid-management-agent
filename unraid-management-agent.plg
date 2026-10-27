@@ -10,8 +10,8 @@
     <!ENTITY launch      "Settings/unraid-management-agent">
     <!ENTITY bundle      "&name;-&version;.tgz">
     <!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
-    <!ENTITY md5         "3ca6a57656835ff6e1d8277bd562aec3"> <!-- pragma: allowlist secret -->
-    <!ENTITY sha256      "749e98af067d0181bc77db916ea634a84fa8fcbdacf6812937819ccb878ae760"> <!-- pragma: allowlist secret -->
+    <!ENTITY md5         "1d2790c932c978b2ae38b0f5d465db26"> <!-- pragma: allowlist secret -->
+    <!ENTITY sha256      "98d32578461deec213f985b27a5dfeb9b99e1ecd61279f9542eae7ee34e95c27"> <!-- pragma: allowlist secret -->
 ]>
 
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" icon="server" min="7.2.0" pluginURL="&pluginURL;" support="&supportURL;" project="&gitURL;" readme="&gitURL;#readme">
@@ -21,8 +21,16 @@ Monitor and control your Unraid system via REST API, WebSocket, MCP, Prometheus,
 </DESCRIPTION>
 
 <CHANGES>
-See CHANGELOG.md for full release notes and change history:
-https://github.com/tinkerologie/unraid-management-agent/blob/main/CHANGELOG.md
+### 2026.10.03
+
+### Changed
+
+- **Current release notes in the Unraid plugin manager** (#289) — release automation now replaces
+  the manifest's `CHANGES` block with the matching version's notes from `CHANGELOG.md`, while retaining
+  the full history in the changelog. Missing, empty or duplicate release sections block publication.
+  Notes are XML-escaped and validated before publication, then published alongside the checksums on
+  `main` using the preserved release notes. Packaging regression tests cover extraction, replacement
+  across releases, XML special characters and failures that leave the manifest unchanged.
 </CHANGES>
 
 <!--
