@@ -180,6 +180,8 @@ const (
 	// IntervalNIC is the interval for collecting network cards (hwmon temperatures
 	// and optic diagnostics) in seconds. Sysfs reads plus one ioctl per port.
 	IntervalNIC = 60
+	// IntervalPSU is the passive PSU telemetry cadence in seconds.
+	IntervalPSU = 60
 	// IntervalAutoEnable is the interval, in seconds, at which a collector in
 	// automatic mode is enabled once its hardware is detected (x4 in low
 	// power mode).

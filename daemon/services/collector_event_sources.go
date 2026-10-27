@@ -55,6 +55,8 @@ func defaultEventSources(name string) []eventSource {
 		return []eventSource{collectors.NewDockerEventSource()}
 	case "vm":
 		return []eventSource{collectors.NewLibvirtEventSource()}
+	case "psu":
+		return []eventSource{collectors.NewUeventSource(collectors.PSUDeviceUevent)}
 	case "hardware":
 		return []eventSource{collectors.NewUeventSource(collectors.HardwareDeviceUevent)}
 	default:

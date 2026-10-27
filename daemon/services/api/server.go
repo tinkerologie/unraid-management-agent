@@ -274,6 +274,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/mover", s.handleMover).Methods("GET")
 
 	// SAS storage topology (controllers, HBA ports, enclosures, drive paths)
+	api.HandleFunc("/psu", s.handlePSU).Methods("GET")
 	api.HandleFunc("/storage/topology", s.handleStorageTopology).Methods("GET")
 
 	// Configuration endpoints (write)

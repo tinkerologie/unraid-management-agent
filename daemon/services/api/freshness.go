@@ -183,7 +183,7 @@ func (s *Server) freshnessMiddleware(next http.Handler) http.Handler {
 // its EnsureFresh sources. TestRouteCollectorsCoverGETRoutes makes every new GET
 // route choose between this table and the test's routesWithoutCollectors.
 var routeCollectors = map[string][]string{
-	"/metrics":                         {"system", "array", "disk", "shares", "docker", "docker_update", "vm", "ups", "gpu", "fancontrol"},
+	"/metrics":                         {"system", "array", "disk", "shares", "docker", "docker_update", "vm", "ups", "gpu", "fancontrol", "psu"},
 	"/api/v1/health/report":            {"array", "disk", "docker", "docker_update"},
 	"/api/v1/system":                   {"system"},
 	"/api/v1/temperatures":             {"system"},
@@ -199,6 +199,7 @@ var routeCollectors = map[string][]string{
 	"/api/v1/vm":                       {"vm"},
 	"/api/v1/vm/{id}":                  {"vm"},
 	"/api/v1/vm/guest":                 {"vm:vm_guest_update"},
+	"/api/v1/psu":                      {"psu"},
 	"/api/v1/ups":                      {"ups"},
 	"/api/v1/nut":                      {"nut"},
 	"/api/v1/gpu":                      {"gpu"},

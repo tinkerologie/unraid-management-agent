@@ -21,6 +21,7 @@ import (
 
 // Client represents an MQTT client that publishes Unraid metrics and events.
 type Client struct {
+	psuMu        sync.Mutex
 	config       *dto.MQTTConfig
 	client       pahomqtt.Client
 	mu           sync.RWMutex

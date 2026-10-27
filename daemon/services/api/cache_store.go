@@ -26,6 +26,7 @@ var _ alerting.DataProvider = (*CacheStore)(nil)
 // It is embedded in Server and provides the pure cache getter methods required
 // by the mcp.CacheProvider interface.
 type CacheStore struct {
+	psuCache             atomic.Pointer[dto.PSUStatus]
 	systemCache          atomic.Pointer[dto.SystemInfo]
 	arrayCache           atomic.Pointer[dto.ArrayStatus]
 	disksCache           atomic.Pointer[[]dto.DiskInfo]

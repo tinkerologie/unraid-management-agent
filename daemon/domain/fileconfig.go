@@ -142,6 +142,7 @@ type FileConfigIntervals struct {
 	StorageTopology *int `yaml:"storage_topology,omitempty"`
 	// NIC is the nic collector interval in seconds.
 	NIC *int `yaml:"nic,omitempty"`
+	PSU *int `yaml:"psu,omitempty"`
 }
 
 // LoadConfigFile reads and parses a YAML config file.

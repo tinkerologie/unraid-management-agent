@@ -1040,3 +1040,8 @@ UMA records connection lifecycle counters in Prometheus (`/metrics`) under `mcp_
 - [REST API Reference](../api/API_REFERENCE.md)
 - [WebSocket Events](../websocket/WEBSOCKET_EVENTS_DOCUMENTATION.md)
 - [MCP Protocol Specification](https://modelcontextprotocol.io/docs)
+
+## PSU telemetry tool
+
+`get_psu_status` is a read-only tool returning the shared PSU snapshot. It reports
+`pending` before a snapshot exists. See [PSU telemetry](../guides/psu-telemetry.md).
