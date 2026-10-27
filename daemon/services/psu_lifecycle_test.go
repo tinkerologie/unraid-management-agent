@@ -2,17 +2,23 @@ package services
 
 import (
 	"context"
+	"encoding/json"
+	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/eclipse/paho.mqtt.golang/packets"
+
 	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
 	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
 	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 	"github.com/tinkerologie/unraid-management-agent/daemon/platform"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/api"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/collectors"
 )
 
@@ -349,5 +355,142 @@ func TestPSUIntervalRestartPreservesAvailability(t *testing.T) {
 	case s := <-updates:
 		t.Fatal("interval restart withdrew availability or accepted an obsolete run", s)
 	default:
+	}
+}
+
+// Exercise the real subscriber startup barrier against a local MQTT peer, so
+// the first disabled snapshot cannot disappear before the MQTT subscription.
+func TestPSUInitialDisabledStateReachesMQTT(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	published := make(chan *packets.PublishPacket, 10)
+	peerDone := make(chan struct{})
+	go func() {
+		defer close(peerDone)
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		if err := conn.SetDeadline(time.Now().Add(5 * time.Second)); err != nil {
+			return
+		}
+		if _, err := packets.ReadPacket(conn); err != nil {
+			return
+		}
+		if err := packets.NewControlPacket(packets.Connack).Write(conn); err != nil {
+			return
+		}
+		for {
+			packet, err := packets.ReadPacket(conn)
+			if err != nil {
+				return
+			}
+			if packet, ok := packet.(*packets.PublishPacket); ok {
+				published <- packet
+			}
+			if _, ok := packet.(*packets.DisconnectPacket); ok {
+				return
+			}
+		}
+	}()
+	config := domain.DefaultMQTTConfig()
+	config.Enabled = true
+	config.Broker = "127.0.0.1"
+	config.Port = listener.Addr().(*net.TCPAddr).Port
+	app := &domain.Context{Hub: domain.NewEventBus(10), MQTTConfig: config, DisabledCollectors: map[string]bool{"psu": true}}
+	o := CreateOrchestrator(app)
+	var wg sync.WaitGroup
+	o.collectorManager = NewCollectorManager(app, &wg)
+	o.collectorManager.RegisterAllCollectors()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer wg.Wait()
+	defer cancel()
+	o.initializeMQTT(ctx, &wg, api.NewServer(app))
+	if o.mqttClient == nil {
+		t.Fatal("MQTT client not initialized")
+	}
+	defer o.mqttClient.Disconnect()
+	// OnConnect may finish after Connect's token; online confirms its completion.
+	select {
+	case packet := <-published:
+		if !strings.HasSuffix(packet.TopicName, "/availability") {
+			t.Fatal("missing online availability")
+		}
+	case <-ctx.Done():
+		t.Fatal("MQTT peer did not become online")
+	}
+	o.collectorManager.initializePSUAvailability()
+	select {
+	case packet := <-published:
+		if !strings.HasSuffix(packet.TopicName, "/psu") {
+			t.Fatal("PSU snapshot not forwarded")
+		}
+		var snapshot dto.PSUStatus
+		if err := json.Unmarshal(packet.Payload, &snapshot); err != nil {
+			t.Fatal(err)
+		}
+		if snapshot.State != dto.PSUStateDisabled || len(snapshot.Devices) != 0 {
+			t.Fatalf("unexpected initial snapshot: %+v", snapshot)
+		}
+	case <-ctx.Done():
+		t.Fatal("initial PSU snapshot lost before subscriber readiness")
+	}
+	cancel()
+	o.mqttClient.Disconnect()
+	select {
+	case <-peerDone:
+	case <-time.After(time.Second):
+		t.Fatal("MQTT peer did not stop")
+	}
+}
+
+func TestPSUInventoryRecoversFromEventAndHookPanics(t *testing.T) {
+	r := NewCapabilityRefresher(platform.NewRegistry(), func() []platform.Probe {
+		return []platform.Probe{{Name: collectors.CapabilityPSU, Kind: platform.ProbeCheck, Check: func(context.Context) (dto.CapabilityState, string) { return dto.CapabilityAbsent, "no PSU" }}}
+	})
+	var calls atomic.Int64
+	recovered := make(chan struct{})
+	r.SetHook(func(dto.Capabilities) {
+		if calls.Add(1) == 1 {
+			panic("inventory hook failure")
+		}
+		if calls.Load() == 2 {
+			close(recovered)
+		}
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan struct{})
+	go func() { runPSUInventory(ctx, r, time.Millisecond, panicSource{}); close(done) }()
+	select {
+	case <-recovered:
+	case <-time.After(time.Second):
+		t.Fatal("inventory did not recover after event/hook failure")
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("inventory did not stop")
+	}
+}
+
+func TestPSUScopedRefreshDiscardsCancelledProbe(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	r := NewCapabilityRefresher(platform.NewRegistry(), func() []platform.Probe {
+		return []platform.Probe{{Name: collectors.CapabilityPSU, Kind: platform.ProbeCheck, Check: func(context.Context) (dto.CapabilityState, string) {
+			cancel()
+			return dto.CapabilityPresent, "stale evidence"
+		}}}
+	})
+	r.SetHook(func(dto.Capabilities) { t.Error("cancelled probe was published") })
+	r.RefreshCapability(ctx, collectors.CapabilityPSU)
+	if len(r.registry.Capabilities().Items) != 0 {
+		t.Fatal("cancelled probe updated registry")
 	}
 }

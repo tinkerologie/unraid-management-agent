@@ -332,3 +332,45 @@ func TestPSUBindingAndUnknownCapacity(t *testing.T) {
 		t.Fatal("other binding treated as ready", got)
 	}
 }
+
+func TestPSUInventoryAndBindingErrors(t *testing.T) {
+	root := t.TempDir()
+	usb := psuUSB(t, root, "1-1", "1c07", "", "hwmon1", map[string]string{"fan1_input": "0"})
+	link := filepath.Join(usb, "1-1:1.0/0003:1B1C:1C07.0001/driver")
+	if err := os.Remove(link); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(link, link); err != nil {
+		t.Fatal(err)
+	}
+	hub := domain.NewEventBus(10)
+	updates := hub.Sub(constants.TopicPSUStatusUpdate.Name)
+	defer hub.Unsub(updates)
+	c := NewPSUCollector(&domain.Context{Hub: hub})
+	c.SysfsRoot = root
+	c.Collect(context.Background())
+	if got := (<-updates).(*dto.PSUStatus); got.State != dto.PSUStateError || len(got.Errors) == 0 {
+		t.Fatal("driver access failure mistaken for absence", got)
+	}
+	// The same error may recur without changing availability or fabricating data.
+	c.Collect(context.Background())
+	<-updates
+	if err := os.RemoveAll(filepath.Join(root, "class/hwmon")); err != nil {
+		t.Fatal(err)
+	}
+	psuWrite(t, filepath.Join(root, "class/hwmon"), "not a directory")
+	if got := c.Gather(context.Background()); got.State != dto.PSUStateError || len(got.Errors) == 0 {
+		t.Fatal("hwmon inventory failure hidden", got)
+	}
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	c.Start(cancelled, time.Second)
+	c.Start(context.Background(), 0)
+	// A cancelled device read skips acquisition and never invents a measurement.
+	dev, _ := readPSUDevice(cancelled, psuSource{device: dto.PSUDevice{ID: "psu-cancelled", Sensors: []dto.PSUSensor{}}, hwmonPath: root})
+	for _, sensor := range dev.Sensors {
+		if sensor.Value != nil {
+			t.Fatal("cancelled acquisition returned telemetry")
+		}
+	}
+}

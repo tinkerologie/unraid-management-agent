@@ -15,7 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   through the kernel `corsairpsu` hwmon interface (part of #61). Includes hardware gating,
   independent hotplug inventory, Dynamic/Manual configuration and plugin settings, explicit
   availability and nullable readings, derived DC load, REST/WebSocket/MCP, MQTT/Home Assistant
-  discovery, and Prometheus. AXi and other vendor backends remain separate follow-up work.
+  discovery, and Prometheus. Bounded, ordered discovery keeps slow MQTT brokers from blocking
+  other telemetry; regression tests cover startup delivery, cancellation and recovery. AXi and other vendor backends remain separate follow-up work.
 - PSU telemetry feasibility research for #61, #194, #195, #196 and #197, covering
   model-specific interfaces, automatic discovery, implementation phases and validation requirements.
   This documents proposed work; it does not add runtime PSU monitoring.
