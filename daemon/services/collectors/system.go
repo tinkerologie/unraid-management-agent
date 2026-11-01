@@ -352,13 +352,9 @@ func parseCPUSnapshot(r io.Reader) (systemCPUSnapshot, error) {
 			continue
 		}
 		name := fields[0]
-		if !strings.HasPrefix(name, "cpu") {
-			// CPU lines come first; nothing after them is needed.
-			break
-		}
 		if name != "cpu" {
-			suffix := strings.TrimPrefix(name, "cpu")
-			if suffix == "" || strings.ContainsFunc(suffix, func(r rune) bool { return r < '0' || r > '9' }) {
+			suffix, ok := strings.CutPrefix(name, "cpu")
+			if !ok || suffix == "" || strings.ContainsFunc(suffix, func(r rune) bool { return r < '0' || r > '9' }) {
 				continue
 			}
 		}
