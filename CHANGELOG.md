@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- VM telemetry now reports guest memory usage, then QEMU RSS, then zero for running VMs,
+  and zero for non-running VMs (#295). The Home Assistant "Memory Used" sensor now shows
+  real or zero usage instead of allocated memory. Primary disk source and guest-visible virtual
+  capacity are collected best effort through native libvirt for all VM states.
 - Read disk filesystem, spin state, boot flash role and filesystem capacity from `disks.ini` (#296).
   Use `fsType` rather than partition format and `spundown` rather than temperature or device probes.
   Preserve KiB-based `fsFree`/`fsUsed`/`fsSize`, including zero free space, without statfs or ZFS overrides;

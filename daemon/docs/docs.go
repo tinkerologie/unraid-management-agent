@@ -12977,6 +12977,7 @@ const docTemplate = `{
                     "example": 4
                 },
                 "disk_path": {
+                    "description": "DiskPath is the source path or identifier of the first device=disk entry with a source,\nresolving storage volumes to paths. Empty when libvirt cannot provide it.",
                     "type": "string",
                     "example": "/mnt/user/domains/Windows 11/vdisk1.img"
                 },
@@ -12985,6 +12986,7 @@ const docTemplate = `{
                     "example": 1073741824
                 },
                 "disk_size_bytes": {
+                    "description": "DiskSize is the primary disk's guest-visible virtual capacity in bytes,\ncollected best effort in every VM state; 0 when libvirt cannot provide it.",
                     "type": "integer",
                     "example": 107374182400
                 },
@@ -13007,6 +13009,7 @@ const docTemplate = `{
                     "example": "1"
                 },
                 "memory_allocated_bytes": {
+                    "description": "MemoryAllocated is the maximum configured memory in bytes.",
                     "type": "integer",
                     "example": 8589934592
                 },
@@ -13015,6 +13018,7 @@ const docTemplate = `{
                     "example": "4 GiB / 8 GiB"
                 },
                 "memory_used_bytes": {
+                    "description": "MemoryUsed is 0 when not running. When running, use guest available minus unused\nfrom balloon stats, else host QEMU RSS (including overhead), else 0 if unavailable.\nGuest stats require a balloon driver providing stats; allocated memory is never usage.",
                     "type": "integer",
                     "example": 4294967296
                 },

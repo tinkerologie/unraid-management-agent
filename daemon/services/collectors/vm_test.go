@@ -88,6 +88,11 @@ func TestVMCollector_FormatMemoryDisplay(t *testing.T) {
 			expected:  "0 B / 0 B",
 		},
 		{
+			name:      "zero used with allocation",
+			allocated: 8 * 1024 * 1024 * 1024,
+			expected:  "0.00 GB / 8.00 GB",
+		},
+		{
 			name:      "megabytes",
 			used:      512 * 1024 * 1024,   // 512 MB
 			allocated: 1024 * 1024 * 1024,  // 1 GB
@@ -404,5 +409,212 @@ func TestVMCollector_StartWithGuestAgent(t *testing.T) {
 	case <-done:
 	case <-time.After(5 * time.Second):
 		t.Fatal("Start did not return after cancel")
+	}
+}
+
+// fakeLibvirtVM exercises the same native query seam used by Collect.
+type fakeLibvirtVM struct {
+	fakeLibvirtCPU
+	maxMem, balloon                                         uint64
+	stats                                                   []libvirt.DomainMemoryStat
+	statsErr, xmlErr, blockErr, poolErr, volumeErr, pathErr error
+	description, volumePath                                 string
+	statsCalls, xmlCalls, blockCalls                        int
+	blockPath                                               string
+	requestedDomain                                         libvirt.Domain
+	t                                                       *testing.T
+}
+
+func (f *fakeLibvirtVM) DomainGetInfo(dom libvirt.Domain) (uint8, uint64, uint64, uint16, uint64, error) {
+	f.checkDomain(dom)
+	return 0, f.maxMem, f.balloon, 4, 0, f.infoErr
+}
+
+func (f *fakeLibvirtVM) checkDomain(dom libvirt.Domain) {
+	f.t.Helper()
+	if dom != f.requestedDomain {
+		f.t.Fatalf("queried domain %v, want %v", dom, f.requestedDomain)
+	}
+}
+
+func (f *fakeLibvirtVM) DomainMemoryStats(dom libvirt.Domain, maxStats, flags uint32) ([]libvirt.DomainMemoryStat, error) {
+	f.checkDomain(dom)
+	f.statsCalls++
+	if maxStats != uint32(libvirt.DomainMemoryStatNr) || flags != 0 {
+		f.t.Fatalf("DomainMemoryStats arguments = %d, %d", maxStats, flags)
+	}
+	return f.stats, f.statsErr
+}
+
+func (f *fakeLibvirtVM) DomainGetXMLDesc(dom libvirt.Domain, flags libvirt.DomainXMLFlags) (string, error) {
+	f.checkDomain(dom)
+	f.xmlCalls++
+	if flags != 0 {
+		f.t.Fatalf("XML flags = %d, want 0", flags)
+	}
+	return f.description, f.xmlErr
+}
+
+func (f *fakeLibvirtVM) DomainGetBlockInfo(dom libvirt.Domain, path string, flags uint32) (uint64, uint64, uint64, error) {
+	f.checkDomain(dom)
+	f.blockCalls++
+	f.blockPath = path
+	if flags != 0 {
+		f.t.Fatalf("block flags = %d, want 0", flags)
+	}
+	// Distinct values catch using allocation or physical size as capacity.
+	return 1024, 100 * 1024 * 1024 * 1024, 2048, f.blockErr
+}
+
+func (f *fakeLibvirtVM) StoragePoolLookupByName(name string) (libvirt.StoragePool, error) {
+	if name != "default" {
+		f.t.Fatalf("pool = %q", name)
+	}
+	return libvirt.StoragePool{Name: name}, f.poolErr
+}
+
+func (f *fakeLibvirtVM) StorageVolLookupByName(pool libvirt.StoragePool, name string) (libvirt.StorageVol, error) {
+	if pool.Name != "default" || name != "guest.qcow2" {
+		f.t.Fatalf("volume = %v/%q", pool, name)
+	}
+	return libvirt.StorageVol{Name: name}, f.volumeErr
+}
+
+func (f *fakeLibvirtVM) StorageVolGetPath(volume libvirt.StorageVol) (string, error) {
+	if volume.Name != "guest.qcow2" {
+		f.t.Fatalf("volume = %v", volume)
+	}
+	return f.volumePath, f.pathErr
+}
+
+func TestVMCollector_GetMemoryInfo(t *testing.T) {
+	stat := func(tag libvirt.DomainMemoryStatTags, val uint64) libvirt.DomainMemoryStat {
+		return libvirt.DomainMemoryStat{Tag: int32(tag), Val: val}
+	}
+	available := stat(libvirt.DomainMemoryStatAvailable, 8192)
+	unused := stat(libvirt.DomainMemoryStatUnused, 2048)
+	rss := stat(libvirt.DomainMemoryStatRss, 20000) // Deliberately above allocation.
+	failure := errors.New("stats unavailable")
+	tests := []struct {
+		name, state       string
+		stats             []libvirt.DomainMemoryStat
+		statsErr, infoErr error
+		wantUsed          uint64
+		wantStatsCalls    int
+	}{
+		{"shut off balloon is not usage", "shut off", []libvirt.DomainMemoryStat{rss}, nil, nil, 0, 0},
+		{"paused", "paused", nil, nil, nil, 0, 0},
+		{"suspended", "suspended", nil, nil, nil, 0, 0},
+		{"unknown", "unknown", nil, nil, nil, 0, 0},
+		{"guest usage before RSS", "running", []libvirt.DomainMemoryStat{rss, unused, available}, nil, nil, 6144 * 1024, 1},
+		{"RSS above allocation", "running", []libvirt.DomainMemoryStat{rss}, nil, nil, 20000 * 1024, 1},
+		{"no stats", "running", nil, nil, nil, 0, 1},
+		{"stats error", "running", []libvirt.DomainMemoryStat{rss}, failure, nil, 0, 1},
+		{"unused exceeds available with RSS", "running", []libvirt.DomainMemoryStat{stat(libvirt.DomainMemoryStatAvailable, 1), unused, rss}, nil, nil, 20000 * 1024, 1},
+		{"unused exceeds available without RSS", "running", []libvirt.DomainMemoryStat{stat(libvirt.DomainMemoryStatAvailable, 1), unused}, nil, nil, 0, 1},
+		{"available missing", "running", []libvirt.DomainMemoryStat{unused, rss}, nil, nil, 20000 * 1024, 1},
+		{"unused missing", "running", []libvirt.DomainMemoryStat{available, rss}, nil, nil, 20000 * 1024, 1},
+		{"zero guest usage takes precedence", "running", []libvirt.DomainMemoryStat{available, stat(libvirt.DomainMemoryStatUnused, 8192), rss}, nil, nil, 0, 1},
+		{"zero valued tags present", "running", []libvirt.DomainMemoryStat{stat(libvirt.DomainMemoryStatAvailable, 0), stat(libvirt.DomainMemoryStatUnused, 0), rss}, nil, nil, 0, 1},
+		{"balloon only", "running", []libvirt.DomainMemoryStat{stat(libvirt.DomainMemoryStatActualBalloon, 16384)}, nil, nil, 0, 1},
+		{"info error", "running", []libvirt.DomainMemoryStat{rss}, nil, failure, 0, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dom := libvirt.Domain{Name: "guest"}
+			fake := &fakeLibvirtVM{t: t, requestedDomain: dom, maxMem: 16384, balloon: 16384, stats: tt.stats, statsErr: tt.statsErr}
+			fake.infoErr = tt.infoErr
+			vm := &dto.VMInfo{State: tt.state, MemoryUsed: 999, MemoryAllocated: 999, CPUCount: 99}
+			(&VMCollector{}).getMemoryInfo(fake, dom, vm)
+			wantAllocated, wantCPUs := uint64(16384*1024), 4
+			if tt.infoErr != nil {
+				wantAllocated, wantCPUs = 0, 0
+			}
+			if vm.MemoryUsed != tt.wantUsed || vm.MemoryAllocated != wantAllocated || vm.CPUCount != wantCPUs {
+				t.Fatalf("used/allocated/CPUs = %d/%d/%d, want %d/%d/%d", vm.MemoryUsed, vm.MemoryAllocated, vm.CPUCount, tt.wantUsed, wantAllocated, wantCPUs)
+			}
+			if fake.statsCalls != tt.wantStatsCalls {
+				t.Errorf("stats calls = %d, want %d", fake.statsCalls, tt.wantStatsCalls)
+			}
+		})
+	}
+}
+
+func TestPrimaryDisk(t *testing.T) {
+	tests := []struct {
+		name, disks, path, target string
+	}{
+		{"file double quotes", `<disk device="disk"><target bus="virtio" dev="vda"/><source file="/vm/a&amp;b.img"/></disk>`, "/vm/a&b.img", "vda"},
+		{"block single quotes", `<disk device='disk'><source dev='/dev/zvol/pool/vm'/><target dev='sda'/></disk>`, "/dev/zvol/pool/vm", "sda"},
+		{"skip removable and sourceless", `<disk device='cdrom'><source file='/boot/os.iso'/></disk><disk device='floppy'><source file='/boot/floppy.img'/></disk><disk device='disk'/><disk device='disk'><source file='/first'/><target dev='vda'/></disk><disk device='disk'><source file='/second'/></disk>`, "/first", "vda"},
+		{"no disk", `<interface><source dev='br0'/></interface>`, "", ""},
+		{"malformed after disk", `<disk device='disk'><source file='/bad'/></disk><broken>`, "", ""},
+		{"empty source preserves primary selection", `<disk device='disk'><source/></disk><disk device='disk'><source file='/second'/></disk>`, "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			disk := primaryDisk("<domain><devices>" + tt.disks + "</devices></domain>")
+			path := ""
+			if disk.Source != nil {
+				path = disk.Source.File
+				if path == "" {
+					path = disk.Source.Dev
+				}
+			}
+			if path != tt.path || disk.Target.Dev != tt.target {
+				t.Errorf("disk = %q/%q, want %q/%q", path, disk.Target.Dev, tt.path, tt.target)
+			}
+		})
+	}
+	for _, invalid := range []string{"", "<domain>", "<other/>"} {
+		if got := primaryDisk(invalid); got.Source != nil {
+			t.Errorf("primaryDisk(%q) = %+v", invalid, got)
+		}
+	}
+}
+
+func TestVMCollector_GetPrimaryDiskInfo(t *testing.T) {
+	failure := errors.New("libvirt unavailable")
+	fileXML := `<domain><devices><disk device='disk'><source file='/vm/disk.qcow2'/><target dev='vda'/></disk></devices></domain>`
+	volumeXML := `<domain><devices><disk device='disk'><source pool='default' volume='guest.qcow2'/><target dev='vda'/></disk></devices></domain>`
+	tests := []struct {
+		name, description                             string
+		xmlErr, blockErr, poolErr, volumeErr, pathErr error
+		volumePath, wantPath                          string
+		wantSize                                      uint64
+	}{
+		{"file capacity", fileXML, nil, nil, nil, nil, nil, "", "/vm/disk.qcow2", 100 << 30},
+		{"block failure retains path", fileXML, nil, failure, nil, nil, nil, "", "/vm/disk.qcow2", 0},
+		{"XML failure", fileXML, failure, nil, nil, nil, nil, "", "", 0},
+		{"malformed XML", "<domain>", nil, nil, nil, nil, nil, "", "", 0},
+		{"no disks", "<domain/>", nil, nil, nil, nil, nil, "", "", 0},
+		{"empty source", "<domain><devices><disk device='disk'><source/></disk></devices></domain>", nil, nil, nil, nil, nil, "", "", 0},
+		{"block device", `<domain><devices><disk device='disk'><source dev='/dev/sdb'/></disk></devices></domain>`, nil, nil, nil, nil, nil, "", "/dev/sdb", 100 << 30},
+		{"network source", `<domain><devices><disk device='disk'><source name='pool/image'/></disk></devices></domain>`, nil, nil, nil, nil, nil, "", "pool/image", 100 << 30},
+		{"volume resolved", volumeXML, nil, nil, nil, nil, nil, "/vm/guest.qcow2", "/vm/guest.qcow2", 100 << 30},
+		{"pool failure", volumeXML, nil, nil, failure, nil, nil, "", "", 0},
+		{"volume failure", volumeXML, nil, nil, nil, failure, nil, "", "", 0},
+		{"path failure", volumeXML, nil, nil, nil, nil, failure, "", "", 0},
+		{"empty volume path", volumeXML, nil, nil, nil, nil, nil, "", "", 0},
+	}
+	for _, state := range []string{"running", "shut off", "paused", "unknown"} {
+		for _, tt := range tests {
+			t.Run(state+"/"+tt.name, func(t *testing.T) {
+				dom := libvirt.Domain{Name: "guest"}
+				fake := &fakeLibvirtVM{t: t, requestedDomain: dom, description: tt.description, xmlErr: tt.xmlErr, blockErr: tt.blockErr, poolErr: tt.poolErr, volumeErr: tt.volumeErr, pathErr: tt.pathErr, volumePath: tt.volumePath}
+				vm := &dto.VMInfo{State: state, DiskPath: "stale", DiskSize: 999}
+				(&VMCollector{}).getPrimaryDiskInfo(fake, dom, vm)
+				if vm.DiskPath != tt.wantPath || vm.DiskSize != tt.wantSize {
+					t.Fatalf("disk = %q/%d, want %q/%d", vm.DiskPath, vm.DiskSize, tt.wantPath, tt.wantSize)
+				}
+				wantCalls := 0
+				if tt.wantPath != "" {
+					wantCalls = 1
+				}
+				if fake.xmlCalls != 1 || fake.blockCalls != wantCalls || fake.blockPath != tt.wantPath {
+					t.Errorf("XML/block calls = %d/%d, block path = %q", fake.xmlCalls, fake.blockCalls, fake.blockPath)
+				}
+			})
+		}
 	}
 }

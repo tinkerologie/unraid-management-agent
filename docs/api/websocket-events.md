@@ -223,7 +223,7 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 **Collector**: `VMCollector`  
 **Topic**: `vm_list_update`
 
-**Identification**: Contains `state` AND `vcpus`
+**Identification**: Contains `state` AND `cpu_count`
 
 **Data Structure** (array of VMs):
 
@@ -233,7 +233,7 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
     "id": "1",
     "name": "Ubuntu",
     "state": "running",
-    "vcpus": 4,
+    "cpu_count": 4,
     "memory_allocated_bytes": 4294967296,
     "memory_used_bytes": 2147483648,
     "disk_path": "/mnt/user/domains/Ubuntu/vdisk1.img",
@@ -248,9 +248,23 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 **Key Fields**:
 
 - `state` - VM state: "running", "paused", "shut off", "crashed"
-- `vcpus` - Number of virtual CPUs
-- `memory_allocated_bytes` - Allocated memory
+- `cpu_count` - Number of virtual CPUs
+- `memory_allocated_bytes` - Maximum configured memory
+- `memory_used_bytes` - Guest usage, else QEMU RSS, else 0; 0 when not running
+- `disk_path` - Primary disk source, empty when unavailable
+- `disk_size_bytes` - Guest-visible capacity, 0 when unavailable
 - `autostart` - Whether VM starts automatically
+
+`memory_allocated_bytes` is the maximum configured memory. `memory_used_bytes` is 0 for non-running VMs.
+For running VMs it uses guest `available - unused` from libvirt balloon stats when both values are present
+and valid, otherwise host QEMU RSS (including QEMU overhead, which can exceed allocation), otherwise 0.
+Guest stats require a balloon driver providing stats; the collector does not configure the balloon stats period.
+Allocated memory is never used as usage. A running VM can report 0 when stats are unavailable or usage is zero.
+
+The primary disk is the first `device="disk"` entry with a source in domain XML order; CD-ROMs and floppies
+are skipped. `disk_path` is its source path or identifier (storage volumes are resolved to paths), or empty
+when unavailable. `disk_size_bytes` is its guest-visible virtual capacity in bytes, collected best effort
+for all VM states; 0 means unavailable. It is not host allocation or physical space used.
 
 ---
 

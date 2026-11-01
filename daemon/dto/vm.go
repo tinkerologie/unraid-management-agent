@@ -13,11 +13,19 @@ type VMInfo struct {
 	GuestCPUPercent float64 `json:"guest_cpu_percent" example:"25.5"`
 	// HostCPUPercent is the VM's CPU time relative to the host's logical CPUs:
 	// its share of the whole server (0–100; 0 on the first sample).
-	HostCPUPercent  float64   `json:"host_cpu_percent" example:"12.3"`
-	MemoryAllocated uint64    `json:"memory_allocated_bytes" example:"8589934592"`
-	MemoryUsed      uint64    `json:"memory_used_bytes" example:"4294967296"`
-	MemoryDisplay   string    `json:"memory_display" example:"4 GiB / 8 GiB"`
-	DiskPath        string    `json:"disk_path" example:"/mnt/user/domains/Windows 11/vdisk1.img"`
+	HostCPUPercent float64 `json:"host_cpu_percent" example:"12.3"`
+	// MemoryAllocated is the maximum configured memory in bytes.
+	MemoryAllocated uint64 `json:"memory_allocated_bytes" example:"8589934592"`
+	// MemoryUsed is 0 when not running. When running, use guest available minus unused
+	// from balloon stats, else host QEMU RSS (including overhead), else 0 if unavailable.
+	// Guest stats require a balloon driver providing stats; allocated memory is never usage.
+	MemoryUsed    uint64 `json:"memory_used_bytes" example:"4294967296"`
+	MemoryDisplay string `json:"memory_display" example:"4 GiB / 8 GiB"`
+	// DiskPath is the source path or identifier of the first device=disk entry with a source,
+	// resolving storage volumes to paths. Empty when libvirt cannot provide it.
+	DiskPath string `json:"disk_path" example:"/mnt/user/domains/Windows 11/vdisk1.img"`
+	// DiskSize is the primary disk's guest-visible virtual capacity in bytes,
+	// collected best effort in every VM state; 0 when libvirt cannot provide it.
 	DiskSize        uint64    `json:"disk_size_bytes" example:"107374182400"`
 	DiskReadBytes   uint64    `json:"disk_read_bytes" example:"1073741824"`
 	DiskWriteBytes  uint64    `json:"disk_write_bytes" example:"536870912"`
