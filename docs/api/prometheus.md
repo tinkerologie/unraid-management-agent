@@ -134,13 +134,13 @@ report that value, rather than being exported as 0.
 
 ### Share Metrics
 
-| Metric | Type | Description |
-| --- | --- | --- |
-| `unraid_shares_total` | Gauge | Total number of shares |
-| `unraid_share_used_bytes` | Gauge | Measured share content in bytes; omitted when unknown |
-| `unraid_share_storage_used_bytes` | Gauge | Backing-storage used space in bytes |
-| `unraid_share_storage_free_bytes` | Gauge | Backing-storage free space in bytes |
-| `unraid_share_storage_total_bytes` | Gauge | Backing-storage capacity in bytes |
+| Metric                             | Type  | Description                                           |
+| ---------------------------------- | ----- | ----------------------------------------------------- |
+| `unraid_shares_total`              | Gauge | Total number of shares                                |
+| `unraid_share_used_bytes`          | Gauge | Measured share content in bytes; omitted when unknown |
+| `unraid_share_storage_used_bytes`  | Gauge | Backing-storage used space in bytes                   |
+| `unraid_share_storage_free_bytes`  | Gauge | Backing-storage free space in bytes                   |
+| `unraid_share_storage_total_bytes` | Gauge | Backing-storage capacity in bytes                     |
 
 **Labels**: `name` on per-share gauges; no labels on `unraid_shares_total`.
 
