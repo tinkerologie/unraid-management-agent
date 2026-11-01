@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -19,6 +18,11 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 	"github.com/tinkerologie/unraid-management-agent/daemon/lib"
 	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
+)
+
+var (
+	diskMountsPath = "/proc/mounts"
+	diskStatfs     = syscall.Statfs
 )
 
 // DiskCollector collects detailed information about all disks in the Unraid system.
@@ -226,6 +230,7 @@ func (c *DiskCollector) parseDisksINIFrom(r io.Reader) ([]dto.DiskInfo, error) {
 		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
 			// Save previous disk if exists
 			if currentDisk != nil {
+				finalizeDiskSource(currentDisk)
 				disks = append(disks, *currentDisk)
 			}
 
@@ -244,6 +249,7 @@ func (c *DiskCollector) parseDisksINIFrom(r io.Reader) ([]dto.DiskInfo, error) {
 
 	// Save last disk
 	if currentDisk != nil {
+		finalizeDiskSource(currentDisk)
 		disks = append(disks, *currentDisk)
 	}
 
@@ -279,16 +285,8 @@ func (c *DiskCollector) parseDiskKeyValue(disk *dto.DiskInfo, line string) {
 			disk.Size = size * 1024 // Unraid disks.ini stores size in KiB (1024-byte blocks)
 		}
 	case "temp":
-		disk.Temperature = nil
-		// Temperature might be "*" if spun down, or empty, or a number
-		// Unraid uses "*" to indicate disk is spun down (no temperature available)
-		if value == "*" || value == "" {
-			// Temperature unavailable - disk is likely spun down
-			// Keep Temperature nil (unmeasured) and we'll set SpinState appropriately
-			logger.Debug("Disk: Device %s temperature unavailable (value='%s'), likely spun down", disk.Device, value)
-		} else {
-			disk.Temperature = parseOptionalFloat(value)
-		}
+		// Unavailable temperature is not evidence of spin state.
+		disk.Temperature = parseOptionalFloat(value)
 	case "numErrors":
 		if errors, err := strconv.Atoi(value); err == nil {
 			disk.SMARTErrors = errors
@@ -297,8 +295,35 @@ func (c *DiskCollector) parseDiskKeyValue(disk *dto.DiskInfo, line string) {
 		if delay, err := strconv.Atoi(value); err == nil {
 			disk.SpindownDelay = delay
 		}
-	case "format":
+	case "fsType":
 		disk.FileSystem = value
+	case "spundown":
+		switch value {
+		case "0":
+			disk.SpinState = "active"
+		case "1":
+			disk.SpinState = "standby"
+		default:
+			disk.SpinState = "unknown"
+		}
+	case "type":
+		if strings.EqualFold(value, "Flash") {
+			disk.Role = "flash"
+		}
+	case "fsFree", "fsUsed", "fsSize":
+		// Limit KiB to 54 bits so converting to bytes cannot overflow uint64.
+		if kib, err := strconv.ParseUint(value, 10, 54); err == nil {
+			bytes := kib * 1024
+			switch key {
+			case "fsFree":
+				disk.Free = bytes
+				disk.FreeFromSource = true
+			case "fsUsed":
+				disk.Used = bytes
+			case "fsSize":
+				disk.FilesystemSize = bytes
+			}
+		}
 	// Per-disk temperature threshold overrides (Issue #46)
 	case "warning":
 		// Per-disk warning temperature override
@@ -314,6 +339,24 @@ func (c *DiskCollector) parseDiskKeyValue(disk *dto.DiskInfo, line string) {
 				disk.TempCritical = &temp
 			}
 		}
+	}
+}
+
+// finalizeDiskSource derives values only from the completed INI section, regardless of key order.
+func finalizeDiskSource(disk *dto.DiskInfo) {
+	if disk.FilesystemSize > 0 {
+		// ZFS capacity describes the whole pool. Keep physical size for other
+		// filesystems unless their combined usage exceeds it (e.g. striped btrfs).
+		// Compare without adding Used and Free, which could overflow uint64.
+		if strings.EqualFold(disk.FileSystem, "zfs") || disk.Used > disk.Size || disk.Free > disk.Size-disk.Used {
+			disk.Size = disk.FilesystemSize
+		}
+		disk.UsagePercent = float64(disk.Used) / float64(disk.FilesystemSize) * 100
+	}
+	if disk.Device == "" {
+		disk.SpinState = ""
+	} else if disk.SpinState == "" {
+		disk.SpinState = "unknown"
 	}
 }
 
@@ -339,7 +382,7 @@ func (c *DiskCollector) enrichDisks(disks []dto.DiskInfo) {
 		// Get disk role
 		c.enrichWithRole(&disks[i])
 
-		// For ZFS cache/pool disks, override statfs values with pool-level usage
+		// Without INI capacity, use pool-level usage for ZFS cache/pool disks
 		// so mirrored pools and child datasets report the same numbers as Unraid.
 		c.enrichWithZFSPoolUsage(&disks[i], zfsPoolUsages)
 
@@ -781,7 +824,7 @@ func (c *DiskCollector) enrichWithMountInfo(disk *dto.DiskInfo) {
 	}
 
 	// Read /proc/mounts to find mount point
-	data, err := os.ReadFile("/proc/mounts")
+	data, err := os.ReadFile(diskMountsPath)
 	if err != nil {
 		return
 	}
@@ -821,10 +864,13 @@ func (c *DiskCollector) enrichWithMountInfo(disk *dto.DiskInfo) {
 	}
 
 	disk.MountPoint = mountPoint
+	if disk.FreeFromSource {
+		return
+	}
 
 	// Get filesystem statistics using statfs
 	var stat syscall.Statfs_t
-	if err := syscall.Statfs(disk.MountPoint, &stat); err == nil {
+	if err := diskStatfs(disk.MountPoint, &stat); err == nil {
 		// Calculate sizes in bytes (safe conversion - Bsize is always positive)
 		//nolint:gosec // G115: Bsize is always positive on Linux systems
 		bsize := uint64(stat.Bsize)
@@ -842,13 +888,18 @@ func (c *DiskCollector) enrichWithMountInfo(disk *dto.DiskInfo) {
 	}
 }
 
-// enrichWithRole determines the disk role (parity, parity2, data, cache, pool)
+// enrichWithRole preserves source roles and determines missing roles from disk name/ID.
 func (c *DiskCollector) enrichWithRole(disk *dto.DiskInfo) {
+	if disk.Role != "" {
+		return
+	}
 	// Determine role based on disk name/ID
 	name := strings.ToLower(disk.Name)
 	id := strings.ToLower(disk.ID)
 
 	switch {
+	case name == "flash":
+		disk.Role = "flash"
 	case strings.Contains(name, "parity2") || strings.Contains(id, "parity2"):
 		disk.Role = "parity2"
 	case strings.Contains(name, "parity") || strings.Contains(id, "parity"):
@@ -865,6 +916,9 @@ func (c *DiskCollector) enrichWithRole(disk *dto.DiskInfo) {
 }
 
 func shouldUseZFSPoolUsage(disk *dto.DiskInfo) bool {
+	if disk.FreeFromSource {
+		return false
+	}
 	if strings.EqualFold(disk.FileSystem, "zfs") {
 		return true
 	}
@@ -984,36 +1038,11 @@ func parseZFSPoolUsageLine(line string) (string, zfsPoolUsage, bool) {
 	}, true
 }
 
-// enrichWithSpinState checks the current spin state of the disk
+// enrichWithSpinState fills only the default; disks.ini is the source of spin state.
 func (c *DiskCollector) enrichWithSpinState(disk *dto.DiskInfo) {
-	devicePath := "/dev/" + disk.Device
-
-	// Check if device exists
-	if _, err := os.Stat(devicePath); err != nil {
+	if disk.Device != "" && disk.SpinState == "" {
 		disk.SpinState = "unknown"
-		return
 	}
-
-	// Determine spin state from temperature reading
-	// In Unraid's disks.ini, temp="*" indicates disk is spun down
-	// Any measured temperature, including 0, indicates an active disk.
-	if disk.Temperature != nil {
-		// Disk has a valid temperature reading - it must be active
-		disk.SpinState = "active"
-	} else {
-		// Temperature is unavailable - disk is likely in standby
-		// This could be because:
-		// 1. The disk is spun down (temp="*" in disks.ini)
-		// 2. Temperature couldn't be read (SMART not available)
-		disk.SpinState = "standby"
-	}
-
-	temperature := "unknown"
-	if disk.Temperature != nil {
-		temperature = fmt.Sprintf("%.1f", *disk.Temperature)
-	}
-	logger.Debug("Disk: Device %s spin state determined as '%s' (temp=%s)",
-		disk.Device, disk.SpinState, temperature)
 }
 
 // collectDockerVDisk collects Docker vDisk usage information

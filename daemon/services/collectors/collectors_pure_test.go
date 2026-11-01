@@ -33,6 +33,9 @@ func TestEnrichWithRole(t *testing.T) {
 		{"pool disk by ID", "", "pool_ssd", "pool"},
 		{"unknown role", "sda", "sata-drive", "unknown"},
 		{"empty names", "", "", "unknown"},
+		{"flash before SanDisk ID", "flash", "SanDisk_Ultra_Fit_REDACTED", "flash"},
+		{"case insensitive flash name", "FLASH", "", "flash"},
+		{"flash substring is not boot flash", "flashpool", "", "pool"},
 		{"case insensitive name", "PARITY", "", "parity"},
 		{"case insensitive ID", "", "DISK1", "data"},
 	}

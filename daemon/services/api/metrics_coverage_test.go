@@ -307,3 +307,22 @@ func TestMetricsUPSMissingReadingsNotExported(t *testing.T) {
 		}
 	}
 }
+
+func TestMetricsDiskRoleTypeLabels(t *testing.T) {
+	server := newMetricsTestServer()
+	for _, tt := range []struct{ role, label string }{
+		{"flash", "Flash"}, {"cache", "SSD"}, {"pool", "SSD"},
+		{"data", "HDD"}, {"parity", "HDD"}, {"parity2", "HDD"},
+		{"unknown", "HDD"}, {"docker_vdisk", "HDD"}, {"log", "HDD"},
+	} {
+		t.Run(tt.role, func(t *testing.T) {
+			disks := []dto.DiskInfo{{Name: "disk", Device: "test", Role: tt.role, Temperature: new(float64(30))}}
+			server.disksCache.Store(&disks)
+			body := getMetricsBody(t, server)
+			want := `unraid_disk_temperature_celsius{device="test",disk="disk",type="` + tt.label + `"} 30`
+			if !strings.Contains(body, want) {
+				t.Errorf("expected %s", want)
+			}
+		})
+	}
+}

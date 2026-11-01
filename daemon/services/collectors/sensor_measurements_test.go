@@ -218,8 +218,8 @@ func TestDiskNullableTemperatureAndSpinState(t *testing.T) {
 		temp  float64
 		spin  string
 	}{
-		{"*", false, 0, "standby"}, {"", false, 0, "standby"}, {"garbled", false, 0, "standby"},
-		{"NaN", false, 0, "standby"}, {"0", true, 0, "active"}, {"35", true, 35, "active"},
+		{"*", false, 0, "unknown"}, {"", false, 0, "unknown"}, {"garbled", false, 0, "unknown"},
+		{"NaN", false, 0, "unknown"}, {"0", true, 0, "unknown"}, {"35", true, 35, "unknown"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.value, func(t *testing.T) {
