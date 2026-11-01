@@ -1336,7 +1336,9 @@ List all disks in the system.
 - `device`: Linux device name (e.g., `sdb`, `sdc`)
 - `name`: Unraid disk name (e.g., `parity`, `disk1`, `cache`)
 - `status`: Disk status (`DISK_OK`, `DISK_DSBL`, etc.)
-- `size_bytes`: Total disk capacity in bytes
+- `size_bytes`: Physical disk capacity from `size` (KiB × 1024). ZFS records use a positive
+  `fsSize` instead so size, used and free describe the whole pool. Other filesystems retain
+  physical size unless `used_bytes + free_bytes` exceeds it, in which case a positive `fsSize` is used.
 - `used_bytes`: Used space from `disks.ini` `fsUsed` (KiB × 1024) when `fsFree` is present
 - `free_bytes`: Free space from `disks.ini` `fsFree` (KiB × 1024), including valid zero.
   When present, INI capacity takes precedence and skips statfs and ZFS capacity overrides for that disk;
@@ -1359,7 +1361,7 @@ List all disks in the system.
 - `power_cycle_count`: Number of power cycles (optional)
 - `mount_point`: Mount point path (optional)
 - `usage_percent`: `fsUsed / fsSize × 100` when source capacity is present and `fsSize > 0` (optional).
-  `fsSize` is filesystem capacity; `size_bytes` remains the device size from `size` (KiB × 1024).
+  `fsSize` is filesystem capacity (KiB × 1024).
 
 **Note**: An unavailable temperature does not establish standby state. Reading these INI fields does not wake disks.
 

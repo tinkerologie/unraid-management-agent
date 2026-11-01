@@ -3,6 +3,7 @@ package collectors
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -94,11 +95,11 @@ pool1 /mnt/pool1 zfs rw 0 0
 		present                     bool
 	}{
 		{"disk1", "xfs", "data", "standby", "/mnt/disk1", 2000, 400, 600, 40, true},
-		{"cache", "zfs", "cache", "active", "/mnt/cache", 4000, 500, 1500, 25, true},
+		{"cache", "zfs", "cache", "active", "/mnt/cache", 2000, 500, 1500, 25, true},
 		{"flash", "vfat", "flash", "active", "/boot", 3000, 500, 500, 50, true},
 		{"disk2", "auto", "data", "", "", 0, 0, 0, 0, true},
 		{"parity2", "", "parity2", "standby", "", 2000, 0, 0, 0, false},
-		{"pool1", "zfs", "pool", "unknown", "/mnt/pool1", 2000, 1000, 0, 100, true},
+		{"pool1", "zfs", "pool", "unknown", "/mnt/pool1", 1000, 1000, 0, 100, true},
 		{"disk3", "btrfs", "data", "unknown", "/mnt/disk3", 2000, 250, 750, 25, true},
 	}
 	if len(disks) != len(wants) {
@@ -172,6 +173,59 @@ func TestDiskSourceCapacityFallback(t *testing.T) {
 	usage := zfsPoolUsage{Size: 400, Used: 100, Free: 300, UsagePercent: 25}
 	if !collector.enrichWithZFSPoolUsage(disk, map[string]zfsPoolUsage{"cache": usage}) || disk.Size != 400 || disk.Free != 300 || disk.Used != 100 || disk.UsagePercent != 25 {
 		t.Errorf("ZFS fallback changed: %+v", disk)
+	}
+}
+
+func TestDiskSourcePoolCapacityTotals(t *testing.T) {
+	const memberKiB = uint64(1 << 30) // One TiB physical member.
+	tests := []struct {
+		name, filesystem                string
+		filesystemKiB, usedKiB, freeKiB uint64
+		wantSizeKiB                     uint64
+	}{
+		{"striped ZFS pool", "zfs", 2 * memberKiB, memberKiB / 2, 3 * memberKiB / 2, 2 * memberKiB},
+		{"case insensitive ZFS", "ZFS", 2 * memberKiB, memberKiB / 2, 3 * memberKiB / 2, 2 * memberKiB},
+		{"smaller ZFS filesystem", "zfs", memberKiB / 2, memberKiB / 4, memberKiB / 4, memberKiB / 2},
+		{"full ZFS pool", "zfs", 2 * memberKiB, 2 * memberKiB, 0, 2 * memberKiB},
+		{"ordinary XFS disk", "xfs", memberKiB / 2, memberKiB / 4, memberKiB / 4, memberKiB},
+		{"ordinary btrfs pool", "btrfs", memberKiB / 2, memberKiB / 4, memberKiB / 4, memberKiB},
+		{"striped btrfs free exceeds member", "btrfs", 2 * memberKiB, memberKiB / 2, 3 * memberKiB / 2, 2 * memberKiB},
+		{"btrfs combined usage exceeds member", "btrfs", 2 * memberKiB, memberKiB, memberKiB, 2 * memberKiB},
+	}
+	collector := &DiskCollector{}
+	mockDiskMounts(t, "cache /mnt/cache zfs rw 0 0\n", func(path string, _ *syscall.Statfs_t) error {
+		t.Errorf("source capacity must not trigger statfs: %s", path)
+		return errors.New("unexpected statfs")
+	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Put filesystem type and physical size last to exercise section finalization.
+			source := fmt.Sprintf("[cache]\nname=cache\nfsSize=%d\nfsUsed=%d\nfsFree=%d\nsize=%d\nfsType=%s\n",
+				tt.filesystemKiB, tt.usedKiB, tt.freeKiB, memberKiB, tt.filesystem)
+			disks, err := collector.parseDisksINIFrom(strings.NewReader(source))
+			if err != nil || len(disks) != 1 {
+				t.Fatalf("parse: %v, %v", disks, err)
+			}
+			disk := &disks[0]
+			collector.enrichWithRole(disk)
+			collector.enrichWithMountInfo(disk)
+			if collector.enrichWithZFSPoolUsage(disk, map[string]zfsPoolUsage{
+				"cache": {Size: 9999, Used: 1111, Free: 8888, UsagePercent: 11},
+			}) {
+				t.Error("ZFS fallback must not override source capacity")
+			}
+			if disk.Size != tt.wantSizeKiB*1024 || disk.Used != tt.usedKiB*1024 || disk.Free != tt.freeKiB*1024 {
+				t.Errorf("capacity = size %d, used %d, free %d; want %d, %d, %d bytes",
+					disk.Size, disk.Used, disk.Free, tt.wantSizeKiB*1024, tt.usedKiB*1024, tt.freeKiB*1024)
+			}
+			if disk.Used+disk.Free > disk.Size {
+				t.Errorf("filesystem usage exceeds reported size: %+v", disk)
+			}
+			wantPercent := float64(tt.usedKiB) / float64(tt.filesystemKiB) * 100
+			if disk.UsagePercent != wantPercent {
+				t.Errorf("usage percent = %v, want %v", disk.UsagePercent, wantPercent)
+			}
+		})
 	}
 }
 

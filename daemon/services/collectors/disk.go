@@ -345,6 +345,12 @@ func (c *DiskCollector) parseDiskKeyValue(disk *dto.DiskInfo, line string) {
 // finalizeDiskSource derives values only from the completed INI section, regardless of key order.
 func finalizeDiskSource(disk *dto.DiskInfo) {
 	if disk.FilesystemSize > 0 {
+		// ZFS capacity describes the whole pool. Keep physical size for other
+		// filesystems unless their combined usage exceeds it (e.g. striped btrfs).
+		// Compare without adding Used and Free, which could overflow uint64.
+		if strings.EqualFold(disk.FileSystem, "zfs") || disk.Used > disk.Size || disk.Free > disk.Size-disk.Used {
+			disk.Size = disk.FilesystemSize
+		}
 		disk.UsagePercent = float64(disk.Used) / float64(disk.FilesystemSize) * 100
 	}
 	if disk.Device == "" {
