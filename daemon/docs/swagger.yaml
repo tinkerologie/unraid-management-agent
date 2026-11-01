@@ -964,9 +964,12 @@ definitions:
         example: sda
         type: string
       filesystem:
+        description: FileSystem comes from disks.ini fsType, not the partition format.
         example: xfs
         type: string
       free_bytes:
+        description: Free comes from disks.ini fsFree (KiB converted to bytes) when
+          present; statfs/ZFS is the fallback.
         example: 6600076243764
         type: integer
       id:
@@ -999,7 +1002,8 @@ definitions:
         example: 100000
         type: integer
       role:
-        description: '"parity", "parity2", "data", "cache", "pool"'
+        description: Role is parity, parity2, data, cache, pool, flash, docker_vdisk,
+          log or unknown.
         example: data
         type: string
       serial_number:
@@ -1026,7 +1030,8 @@ definitions:
         description: SourceStatus is non-nil only when the backing data source is
           not healthy.
       spin_state:
-        description: '"active", "standby", "unknown"'
+        description: 'SpinState comes from disks.ini spundown: 0 = active, 1 = standby;
+          otherwise unknown. Omitted for empty slots.'
         example: active
         type: string
       spindown_delay:

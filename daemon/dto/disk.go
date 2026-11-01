@@ -4,24 +4,32 @@ import "time"
 
 // DiskInfo contains disk information
 type DiskInfo struct {
-	ID            string  `json:"id" example:"disk1"`
-	Device        string  `json:"device" example:"sda"`
-	Name          string  `json:"name" example:"Disk 1"`
-	Status        string  `json:"status" example:"OK"`
-	Size          uint64  `json:"size_bytes" example:"12000138625024"`
-	Used          uint64  `json:"used_bytes" example:"5400062381260"`
+	ID     string `json:"id" example:"disk1"`
+	Device string `json:"device" example:"sda"`
+	Name   string `json:"name" example:"Disk 1"`
+	Status string `json:"status" example:"OK"`
+	Size   uint64 `json:"size_bytes" example:"12000138625024"`
+	Used   uint64 `json:"used_bytes" example:"5400062381260"`
+	// Free comes from disks.ini fsFree (KiB converted to bytes) when present; statfs/ZFS is the fallback.
 	Free          uint64  `json:"free_bytes" example:"6600076243764"`
 	Temperature   float64 `json:"temperature_celsius" example:"35"`
 	SMARTStatus   string  `json:"smart_status" example:"PASSED"`
 	SMARTErrors   int     `json:"smart_errors" example:"0"`
 	SpindownDelay int     `json:"spindown_delay" example:"30"`
-	FileSystem    string  `json:"filesystem" example:"xfs"`
+	// FileSystem comes from disks.ini fsType, not the partition format.
+	FileSystem string `json:"filesystem" example:"xfs"`
 
 	// Disk identification
 	SerialNumber string `json:"serial_number,omitempty" example:"WD-WMC4N0123456"`
 	Model        string `json:"model,omitempty" example:"WDC WD120EFBX-68B0EN0"`
-	Role         string `json:"role,omitempty" example:"data"`         // "parity", "parity2", "data", "cache", "pool"
-	SpinState    string `json:"spin_state,omitempty" example:"active"` // "active", "standby", "unknown"
+	// Role is parity, parity2, data, cache, pool, flash, docker_vdisk, log or unknown.
+	Role string `json:"role,omitempty" example:"data"`
+	// SpinState comes from disks.ini spundown: 0 = active, 1 = standby; otherwise unknown. Omitted for empty slots.
+	SpinState string `json:"spin_state,omitempty" example:"active"`
+
+	// Collector-internal source metadata; never serialized. Valid zero fsFree must prevent fallback queries.
+	FreeFromSource bool   `json:"-"`
+	FilesystemSize uint64 `json:"-"`
 
 	// Enhanced SMART attributes
 	SMARTAttributes map[string]SMARTAttribute `json:"smart_attributes,omitempty"`

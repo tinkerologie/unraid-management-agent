@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Read disk filesystem, spin state, boot flash role and filesystem capacity from `disks.ini` (#296).
+  Use `fsType` rather than partition format and `spundown` rather than temperature or device probes.
+  Preserve KiB-based `fsFree`/`fsUsed`/`fsSize`, including zero free space, without statfs or ZFS overrides;
+  keep existing capacity fallbacks for disks without valid `fsFree`. Boot flash reports role `flash` and
+  its own Prometheus `Flash` type label. Source-field collection performs no disk-waking queries.
+
 ### Added
 
 - Shared read-only PSU collector with exact-ID auto-detection for Corsair RMi/HXi USB PSUs

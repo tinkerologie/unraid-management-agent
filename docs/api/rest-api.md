@@ -496,12 +496,12 @@ interface DiskInfo {
   id: string;
   device: string;
   name: string;
-  role: "parity" | "parity2" | "data" | "cache" | "pool" | "docker_vdisk" | "log";
+  role?: "parity" | "parity2" | "data" | "cache" | "pool" | "flash" | "docker_vdisk" | "log" | "unknown";
   size_bytes: number;
   used_bytes: number;
   free_bytes: number;
   temperature_celsius: number;
-  spin_state: "active" | "standby" | "idle";
+  spin_state?: "active" | "standby" | "unknown";
   serial_number: string;
   model: string;
   filesystem: string;
@@ -1337,24 +1337,31 @@ List all disks in the system.
 - `name`: Unraid disk name (e.g., `parity`, `disk1`, `cache`)
 - `status`: Disk status (`DISK_OK`, `DISK_DSBL`, etc.)
 - `size_bytes`: Total disk capacity in bytes
-- `used_bytes`: Used space in bytes
-- `free_bytes`: Free space in bytes
-- `temperature_celsius`: Disk temperature in Celsius (0 if spun down)
+- `used_bytes`: Used space from `disks.ini` `fsUsed` (KiB × 1024) when `fsFree` is present
+- `free_bytes`: Free space from `disks.ini` `fsFree` (KiB × 1024), including valid zero.
+  When present, INI capacity takes precedence and skips statfs and ZFS capacity overrides for that disk;
+  when absent or invalid, the existing statfs/ZFS fallback applies.
+- `temperature_celsius`: Disk temperature in Celsius (0 when unavailable)
 - `smart_status`: SMART health status (`PASSED`, `FAILED`)
 - `smart_errors`: Number of SMART errors
 - `spindown_delay`: Spindown delay in minutes (0 = never)
-- `filesystem`: Filesystem type (`xfs`, `btrfs`, etc.)
+- `filesystem`: `disks.ini` `fsType` verbatim (`xfs`, `btrfs`, `zfs`, `vfat`, or `auto` for an empty slot).
+  The `format` key describes partition layout and is not used.
 - `serial_number`: Disk serial number
 - `model`: Disk model name
-- `role`: Disk role (`parity`, `parity2`, `data`, `cache`, `pool`)
-- `spin_state`: Current spin state (`active`, `standby`, `unknown`)
+- `role`: Disk role (`parity`, `parity2`, `data`, `cache`, `pool`, `flash`, `docker_vdisk`, `log`, `unknown`).
+  `type="Flash"` identifies boot flash; exact name `flash` is a fallback.
+  Prometheus disk temperature metrics label flash as `type="Flash"` (cache/pool remain `SSD`).
+- `spin_state`: From `disks.ini` `spundown`: `0` → `active`, `1` → `standby`, missing/other → `unknown`.
+  Omitted for empty slots. Temperature and device probes do not determine spin state.
 - `smart_attributes`: SMART attribute details (optional)
 - `power_on_hours`: Total power-on hours (optional)
 - `power_cycle_count`: Number of power cycles (optional)
 - `mount_point`: Mount point path (optional)
-- `usage_percent`: Disk usage percentage (optional)
+- `usage_percent`: `fsUsed / fsSize × 100` when source capacity is present and `fsSize > 0` (optional).
+  `fsSize` is filesystem capacity; `size_bytes` remains the device size from `size` (KiB × 1024).
 
-**Note**: Temperature of 0°C typically indicates the disk is in standby/spun down state.
+**Note**: An unavailable temperature does not establish standby state. Reading these INI fields does not wake disks.
 
 ---
 
