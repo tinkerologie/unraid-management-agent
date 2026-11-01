@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Separate share content from backing-storage usage (#293): add `storage_used_bytes`,
+  `storage_free_bytes`, `storage_total_bytes` and `storage_usage_percent`; retain
+  `free_bytes`, `total_bytes` and `usage_percent` as deprecated storage aliases.
+  `used_bytes` is now omitted unless measured from the assigned, cache-only ZFS pool
+  with every member known spinning. Include only mounted descendant filesystems at or beneath
+  the share dataset's mountpoint, without directory walks; omit usage when mount metadata is unknown.
+  Refresh spin state before each pool query and after queries before checking share locations.
+  Prometheus omits unknown share usage and adds storage gauges; Home Assistant discovery
+  labels storage readings explicitly and preserves unknown versus measured-zero usage.
+
 ### Added
 
 - Shared read-only PSU collector with exact-ID auto-detection for Corsair RMi/HXi USB PSUs

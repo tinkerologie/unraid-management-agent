@@ -510,7 +510,7 @@ func (s *Server) registerMonitoringTools() {
 	// List shares tool
 	addReadTool[dto.MCPEmptyArgs](s,
 		"list_shares",
-		"List all network shares configured on the Unraid server with their settings and usage",
+		"List all network shares with settings and shared backing-storage capacity (storage_*). used_bytes is present only for measured content on awake, cache-only ZFS pools. free_bytes, total_bytes and usage_percent are deprecated storage aliases.",
 		"Share information not available yet",
 		func() ([]dto.ShareInfo, bool) { v := s.cacheProvider.GetSharesCache(); return v, v != nil },
 	)
