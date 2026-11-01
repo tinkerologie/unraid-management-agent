@@ -212,83 +212,6 @@ func TestUsagePercentCalculation(t *testing.T) {
 	}
 }
 
-// TestDiskRoleDetection tests the disk role detection logic
-func TestDiskRoleDetection(t *testing.T) {
-	tests := []struct {
-		name     string
-		diskName string
-		diskID   string
-		wantRole string
-	}{
-		{
-			name:     "parity disk",
-			diskName: "parity",
-			diskID:   "parity",
-			wantRole: "parity",
-		},
-		{
-			name:     "parity2 disk",
-			diskName: "parity2",
-			diskID:   "parity2",
-			wantRole: "parity",
-		},
-		{
-			name:     "data disk",
-			diskName: "disk1",
-			diskID:   "disk1",
-			wantRole: "data",
-		},
-		{
-			name:     "cache disk",
-			diskName: "cache",
-			diskID:   "cache",
-			wantRole: "cache",
-		},
-		{
-			name:     "pool disk",
-			diskName: "pool1",
-			diskID:   "pool1",
-			wantRole: "pool",
-		},
-		{
-			name:     "flash drive",
-			diskName: "flash",
-			diskID:   "flash",
-			wantRole: "flash",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			role := detectDiskRole(tt.diskName, tt.diskID)
-			if role != tt.wantRole {
-				t.Errorf("detectDiskRole(%s, %s) = %s, want %s", tt.diskName, tt.diskID, role, tt.wantRole)
-			}
-		})
-	}
-}
-
-// detectDiskRole is a helper function that mimics the role detection logic
-func detectDiskRole(name, id string) string {
-	// Match the logic in enrichWithRole
-	if name == "parity" || name == "parity2" || id == "parity" || id == "parity2" {
-		return "parity"
-	}
-	if name == "flash" || id == "flash" {
-		return "flash"
-	}
-	if name == "cache" || id == "cache" {
-		return "cache"
-	}
-	if len(name) >= 4 && name[:4] == "pool" {
-		return "pool"
-	}
-	if len(name) >= 4 && name[:4] == "disk" {
-		return "data"
-	}
-	return "unknown"
-}
-
 // TestDiskSpinStateValues tests valid spin state values
 func TestDiskSpinStateValues(t *testing.T) {
 	validStates := []string{"active", "standby", "unknown"}
@@ -378,7 +301,7 @@ func TestParseDiskKeyValue(t *testing.T) {
 			name:       "parse temperature wildcard",
 			line:       "temp=*",
 			checkField: "temp",
-			expected:   nil, // "*" means spun down, no temp
+			expected:   nil, // "*" means temperature unavailable
 		},
 		{
 			name:       "parse numErrors",
@@ -393,10 +316,10 @@ func TestParseDiskKeyValue(t *testing.T) {
 			expected:   30,
 		},
 		{
-			name:       "parse format",
-			line:       "format=xfs",
+			name:       "ignore partition format",
+			line:       "format=GPT: 4KiB-aligned",
 			checkField: "format",
-			expected:   "xfs",
+			expected:   "",
 		},
 		{
 			name:       "invalid line (no equals)",
@@ -495,9 +418,9 @@ temp="*"
 		if disks[1].Size != 1024000 {
 			t.Errorf("disk[1].Size = %d, want 1024000", disks[1].Size)
 		}
-		// temp="*" means spun down -> temperature stays nil
+		// temp="*" is unavailable -> temperature stays nil
 		if disks[1].Temperature != nil {
-			t.Errorf("disk[1] temp = %v, want nil (spun down)", disks[1].Temperature)
+			t.Errorf("disk[1] temp = %v, want nil (unavailable)", disks[1].Temperature)
 		}
 	})
 

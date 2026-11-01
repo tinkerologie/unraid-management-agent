@@ -7245,10 +7245,12 @@ const docTemplate = `{
                     "example": "sda"
                 },
                 "filesystem": {
+                    "description": "FileSystem comes from disks.ini fsType, not the partition format.",
                     "type": "string",
                     "example": "xfs"
                 },
                 "free_bytes": {
+                    "description": "Free comes from disks.ini fsFree (KiB converted to bytes) when present; statfs/ZFS is the fallback.",
                     "type": "integer",
                     "example": 6600076243764
                 },
@@ -7291,7 +7293,7 @@ const docTemplate = `{
                     "example": 100000
                 },
                 "role": {
-                    "description": "\"parity\", \"parity2\", \"data\", \"cache\", \"pool\"",
+                    "description": "Role is parity, parity2, data, cache, pool, flash, docker_vdisk, log or unknown.",
                     "type": "string",
                     "example": "data"
                 },
@@ -7333,7 +7335,7 @@ const docTemplate = `{
                     ]
                 },
                 "spin_state": {
-                    "description": "\"active\", \"standby\", \"unknown\"",
+                    "description": "SpinState comes from disks.ini spundown: 0 = active, 1 = standby; otherwise unknown. Omitted for empty slots.",
                     "type": "string",
                     "example": "active"
                 },

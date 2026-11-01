@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Read disk filesystem, spin state, boot flash role and filesystem capacity from `disks.ini` (#296).
+  Use `fsType` rather than partition format and `spundown` rather than temperature or device probes.
+  Preserve KiB-based `fsFree`/`fsUsed`/`fsSize`, including zero free space, without statfs or ZFS overrides;
+  use `fsSize` for ZFS pool totals and for other filesystems when used plus free exceeds physical size.
+  Keep existing capacity fallbacks for disks without valid `fsFree`. Boot flash reports role `flash` and
+  its own Prometheus `Flash` type label. Source-field collection performs no disk-waking queries.
 - Separate share content from backing-storage usage (#293): add `storage_used_bytes`,
   `storage_free_bytes`, `storage_total_bytes` and `storage_usage_percent`; retain
   `free_bytes`, `total_bytes` and `usage_percent` as deprecated storage aliases.

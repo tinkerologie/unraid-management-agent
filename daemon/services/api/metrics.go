@@ -501,9 +501,12 @@ func (s *Server) updateMetrics() {
 		diskSmartStatus.Reset()
 
 		for _, disk := range disksSlice {
-			// Determine disk type based on role (cache/pool disks are often SSDs)
+			// Give boot flash its own type; cache/pool disks are often SSDs.
 			diskType := "HDD"
-			if disk.Role == "cache" || disk.Role == "pool" {
+			switch disk.Role {
+			case "flash":
+				diskType = "Flash"
+			case "cache", "pool":
 				diskType = "SSD"
 			}
 
