@@ -81,8 +81,8 @@ func TestHandleMetrics(t *testing.T) {
 		{ID: "2", Name: "Ubuntu", State: "shutoff"},
 	}
 	server.vmsCache.Store(&vmsVal)
-	sharesVal := []dto.ShareInfo{{Name: "appdata", Used: 50000000000},
-		{Name: "media", Used: 4000000000000},
+	sharesVal := []dto.ShareInfo{{Name: "appdata", Used: new(uint64(50000000000))},
+		{Name: "media", Used: new(uint64(4000000000000))},
 	}
 	server.sharesCache.Store(&sharesVal)
 	server.upsCache.Store(&dto.UPSStatus{
@@ -271,6 +271,50 @@ func TestRuntimeMetricsExposed(t *testing.T) {
 	for _, want := range []string{"go_goroutines", "go_memstats_heap_inuse_bytes"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("expected runtime metric %q in /metrics output", want)
+		}
+	}
+}
+
+func TestShareMetricsOptionalUsage(t *testing.T) {
+	server := NewServer(&domain.Context{Port: 8043})
+	scrape := func(shares []dto.ShareInfo) string {
+		server.sharesCache.Store(&shares)
+		rr := httptest.NewRecorder()
+		server.handleMetrics(rr, httptest.NewRequest("GET", "/metrics", nil))
+		if rr.Code != http.StatusOK {
+			t.Fatalf("status=%d", rr.Code)
+		}
+		return rr.Body.String()
+	}
+	for _, tt := range []struct {
+		name   string
+		used   *uint64
+		sample string
+	}{
+		{"measured", new(uint64(7)), "unraid_share_used_bytes{name=\"media\"} 7\n"},
+		{"known zero", new(uint64(0)), "unraid_share_used_bytes{name=\"media\"} 0\n"},
+		{"unknown", nil, ""},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			body := scrape([]dto.ShareInfo{{Name: "media", Used: tt.used, StorageUsed: 40, StorageFree: 60, StorageTotal: 100}})
+			if tt.sample == "" {
+				if strings.Contains(body, "unraid_share_used_bytes{name=\"media\"}") {
+					t.Error("unknown usage emitted")
+				}
+			} else if !strings.Contains(body, tt.sample) {
+				t.Errorf("missing %s", tt.sample)
+			}
+			for _, want := range []string{"unraid_share_storage_used_bytes{name=\"media\"} 40\n", "unraid_share_storage_free_bytes{name=\"media\"} 60\n", "unraid_share_storage_total_bytes{name=\"media\"} 100\n"} {
+				if !strings.Contains(body, want) {
+					t.Errorf("missing %s", want)
+				}
+			}
+		})
+	}
+	body := scrape([]dto.ShareInfo{})
+	for _, metric := range []string{"unraid_share_used_bytes{", "unraid_share_storage_used_bytes{", "unraid_share_storage_free_bytes{", "unraid_share_storage_total_bytes{"} {
+		if strings.Contains(body, metric) {
+			t.Errorf("stale series: %s", metric)
 		}
 	}
 }

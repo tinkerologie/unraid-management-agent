@@ -452,7 +452,7 @@ with keys retained. Measured zero values remain numbers. CPU temperature is sepa
 **Collector**: `ShareCollector`  
 **Topic**: `share_list_update`
 
-**Identification**: Contains `name` AND `path` AND `size_bytes`
+**Identification**: Contains `name` AND `path` AND `storage_total_bytes`
 
 **Data Structure** (array of shares):
 
@@ -461,7 +461,11 @@ with keys retained. Measured zero values remain numbers. CPU temperature is sepa
   {
     "name": "appdata",
     "path": "/mnt/user/appdata",
-    "size_bytes": 107374182400,
+    "storage_used_bytes": 53687091200,
+    "storage_free_bytes": 53687091200,
+    "storage_total_bytes": 107374182400,
+    "storage_usage_percent": 50.0,
+    "total_bytes": 107374182400,
     "used_bytes": 53687091200,
     "free_bytes": 53687091200,
     "usage_percent": 50.0,
@@ -474,8 +478,15 @@ with keys retained. Measured zero values remain numbers. CPU temperature is sepa
 
 - `name` - Share name
 - `path` - Mount path
-- `size_bytes` - Total size
-- `usage_percent` - Usage percentage
+- `used_bytes` - Measured share content, including mounted descendants visible beneath the share;
+  omitted when unknown, `0` when empty
+- `storage_used_bytes`, `storage_free_bytes`, `storage_total_bytes` - Backing pool/array space in bytes
+- `storage_usage_percent` - Backing pool/array usage percentage
+- `free_bytes`, `total_bytes`, `usage_percent` - Deprecated aliases of the corresponding storage fields
+
+Measured usage is available only for cache-only shares on their assigned mounted ZFS pool when all members
+are known spinning. Descendants count only when mounted at or beneath the share dataset's mountpoint;
+unknown mount metadata leaves usage unknown. The storage figures are shared by shares on the same storage.
 
 ---
 
