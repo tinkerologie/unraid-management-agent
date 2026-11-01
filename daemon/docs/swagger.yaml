@@ -5330,12 +5330,18 @@ definitions:
         example: 4
         type: integer
       disk_path:
+        description: |-
+          DiskPath is the source path or identifier of the first device=disk entry with a source,
+          resolving storage volumes to paths. Empty when libvirt cannot provide it.
         example: /mnt/user/domains/Windows 11/vdisk1.img
         type: string
       disk_read_bytes:
         example: 1073741824
         type: integer
       disk_size_bytes:
+        description: |-
+          DiskSize is the primary disk's guest-visible virtual capacity in bytes,
+          collected best effort in every VM state; 0 when libvirt cannot provide it.
         example: 107374182400
         type: integer
       disk_write_bytes:
@@ -5357,12 +5363,17 @@ definitions:
         example: "1"
         type: string
       memory_allocated_bytes:
+        description: MemoryAllocated is the maximum configured memory in bytes.
         example: 8589934592
         type: integer
       memory_display:
         example: 4 GiB / 8 GiB
         type: string
       memory_used_bytes:
+        description: |-
+          MemoryUsed is 0 when not running. When running, use guest available minus unused
+          from balloon stats, else host QEMU RSS (including overhead), else 0 if unavailable.
+          Guest stats require a balloon driver providing stats; allocated memory is never usage.
         example: 4294967296
         type: integer
       name:
