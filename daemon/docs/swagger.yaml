@@ -4602,6 +4602,9 @@ definitions:
         additionalProperties:
           format: float64
           type: number
+        description: |-
+          CPUPerCore uses the same snapshot as CPUUsage; first readings and new cores use the average since boot.
+          Zero deltas retain the previous reading and baseline.
         type: object
       cpu_power_state:
         allOf:
@@ -4618,7 +4621,9 @@ definitions:
         example: 8
         type: integer
       cpu_usage_percent:
-        description: CPU Information
+        description: |-
+          CPUUsage is usage since the previous successful collection.
+          The first value after collector start is the average since boot.
         example: 45.2
         type: number
       dram_power_watts:

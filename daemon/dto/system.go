@@ -10,11 +10,16 @@ type SystemInfo struct {
 	Uptime       int64  `json:"uptime_seconds" example:"86400"`
 
 	// CPU Information
-	CPUUsage       float64            `json:"cpu_usage_percent" example:"45.2"`
-	CPUModel       string             `json:"cpu_model" example:"Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz"`
-	CPUCores       int                `json:"cpu_cores" example:"8"`
-	CPUThreads     int                `json:"cpu_threads" example:"8"`
-	CPUMHz         float64            `json:"cpu_mhz" example:"4900.0"`
+
+	// CPUUsage is usage since the previous successful collection.
+	// The first value after collector start is the average since boot.
+	CPUUsage   float64 `json:"cpu_usage_percent" example:"45.2"`
+	CPUModel   string  `json:"cpu_model" example:"Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz"`
+	CPUCores   int     `json:"cpu_cores" example:"8"`
+	CPUThreads int     `json:"cpu_threads" example:"8"`
+	CPUMHz     float64 `json:"cpu_mhz" example:"4900.0"`
+	// CPUPerCore uses the same snapshot as CPUUsage; first readings and new cores use the average since boot.
+	// Zero deltas retain the previous reading and baseline.
 	CPUPerCore     map[string]float64 `json:"cpu_per_core_usage,omitempty"`
 	CPUTemp        float64            `json:"cpu_temp_celsius" example:"45.0"`
 	CPUPowerWatts  *float64           `json:"cpu_power_watts,omitempty" example:"65.5"` // CPU package power in watts (only present when Intel RAPL is available)

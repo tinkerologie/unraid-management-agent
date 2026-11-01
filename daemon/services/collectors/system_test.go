@@ -283,27 +283,15 @@ func TestSystemInfoCPUStatParsing(t *testing.T) {
 cpu0 1292830 36410 386526 5765120 3479 0 11149 0 0 0
 cpu1 1291881 36252 385618 5764888 2500 0 3146 0 0 0
 `
-	lines := strings.Split(stat, "\n")
-
-	var totalCPU []uint64
-	for _, line := range lines {
-		if strings.HasPrefix(line, "cpu ") {
-			parts := strings.Fields(line)
-			if len(parts) >= 5 {
-				for i := 1; i < len(parts); i++ {
-					val, _ := strconv.ParseUint(parts[i], 10, 64)
-					totalCPU = append(totalCPU, val)
-				}
-			}
-			break
-		}
+	snapshot, err := parseCPUSnapshot(strings.NewReader(stat))
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	if len(totalCPU) < 4 {
-		t.Errorf("Expected at least 4 CPU values, got %d", len(totalCPU))
+	if snapshot.aggregate[0] != 10132153 {
+		t.Errorf("User time = %d, want 10132153", snapshot.aggregate[0])
 	}
-	if totalCPU[0] != 10132153 {
-		t.Errorf("User time = %d, want 10132153", totalCPU[0])
+	if len(snapshot.cores) != 2 {
+		t.Errorf("Core count = %d, want 2", len(snapshot.cores))
 	}
 }
 

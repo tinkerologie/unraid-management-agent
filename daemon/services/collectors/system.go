@@ -5,6 +5,8 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
+	"maps"
 	"math"
 	"os"
 	"path/filepath"
@@ -26,6 +28,12 @@ import (
 type SystemCollector struct {
 	ctx      *domain.Context
 	prevRAPL *lib.RAPLReading // Previous RAPL reading for power delta calculation
+
+	cpuMu          sync.Mutex
+	openCPUStat    func() (io.ReadCloser, error)
+	prevCPU        systemCPUSnapshot
+	lastCPUUsage   float64
+	lastCPUPerCore map[string]float64
 
 	// sysfsRoot is the sysfs mount point ("/sys"); replaceable for tests.
 	sysfsRoot string
@@ -59,7 +67,10 @@ func (c *SystemCollector) logDroppedFan(name string, value float64) {
 
 // NewSystemCollector creates a new system information collector with the given context.
 func NewSystemCollector(ctx *domain.Context) *SystemCollector {
-	return &SystemCollector{ctx: ctx, sysfsRoot: defaultSysfsRoot}
+	return &SystemCollector{
+		ctx: ctx, sysfsRoot: defaultSysfsRoot,
+		openCPUStat: func() (io.ReadCloser, error) { return os.Open("/proc/stat") },
+	}
 }
 
 // Start begins the system collector's periodic data collection.
@@ -157,12 +168,13 @@ func (c *SystemCollector) collectSystemInfo() (*dto.SystemInfo, error) {
 		info.Uptime = uptime
 	}
 
-	// Get CPU info
-	cpuPercent, err := c.getCPUInfo()
+	// Aggregate and per-core usage share one snapshot and collection window.
+	cpuPercent, perCoreUsage, err := c.sampleCPU()
 	if err != nil {
 		logger.Warning("Failed to get CPU info: %v", err)
 	} else {
 		info.CPUUsage = cpuPercent
+		info.CPUPerCore = perCoreUsage
 	}
 
 	// Get CPU model and specs
@@ -171,14 +183,6 @@ func (c *SystemCollector) collectSystemInfo() (*dto.SystemInfo, error) {
 	info.CPUCores = cpuCores
 	info.CPUThreads = cpuThreads
 	info.CPUMHz = cpuMHz
-
-	// Get per-core CPU usage
-	perCoreUsage, err := c.getPerCoreCPUUsage()
-	if err != nil {
-		logger.Debug("Failed to get per-core CPU usage: %v", err)
-	} else {
-		info.CPUPerCore = perCoreUsage
-	}
 
 	// Get memory info
 	memUsed, memTotal, memFree, memBuffers, memCached, err := c.getMemoryInfo()
@@ -318,103 +322,136 @@ func (c *SystemCollector) getUptime() (int64, error) {
 	return int64(uptime), nil
 }
 
-func (c *SystemCollector) getCPUInfo() (float64, error) {
-	// Get CPU usage by reading /proc/stat
-	cpuPercent, err := c.calculateCPUPercent()
-	if err != nil {
-		logger.Warning("Failed to calculate CPU percent: %v", err)
-		return 0, err
-	}
+// cpuCounters follows the first eight /proc/stat fields. Guest counters are
+// already included in user/nice and must not be counted again.
+type cpuCounters [8]uint64
 
-	return cpuPercent, nil
+func (c cpuCounters) total() uint64 {
+	var total uint64
+	for _, value := range c {
+		total += value
+	}
+	return total
 }
 
-func (c *SystemCollector) calculateCPUPercent() (float64, error) {
-	// Read first snapshot
-	stat1, err := c.readCPUStat()
-	if err != nil {
-		return 0, err
-	}
+func (c cpuCounters) idle() uint64 { return c[3] + c[4] }
 
-	// Wait a short time
-	time.Sleep(100 * time.Millisecond)
-
-	// Read second snapshot
-	stat2, err := c.readCPUStat()
-	if err != nil {
-		return 0, err
-	}
-
-	// Calculate usage
-	total1 := stat1["user"] + stat1["nice"] + stat1["system"] + stat1["idle"] + stat1["iowait"] + stat1["irq"] + stat1["softirq"] + stat1["steal"]
-	total2 := stat2["user"] + stat2["nice"] + stat2["system"] + stat2["idle"] + stat2["iowait"] + stat2["irq"] + stat2["softirq"] + stat2["steal"]
-
-	idle1 := stat1["idle"] + stat1["iowait"]
-	idle2 := stat2["idle"] + stat2["iowait"]
-
-	totalDelta := total2 - total1
-	idleDelta := idle2 - idle1
-
-	if totalDelta == 0 {
-		return 0, nil
-	}
-
-	usage := (float64(totalDelta-idleDelta) / float64(totalDelta)) * 100
-	return usage, nil
+type systemCPUSnapshot struct {
+	aggregate cpuCounters
+	cores     map[string]cpuCounters
 }
 
-func (c *SystemCollector) readCPUStat() (map[string]uint64, error) {
-	file, err := os.Open("/proc/stat")
+func parseCPUSnapshot(r io.Reader) (systemCPUSnapshot, error) {
+	snapshot := systemCPUSnapshot{cores: make(map[string]cpuCounters)}
+	foundAggregate := false
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) == 0 {
+			continue
+		}
+		name := fields[0]
+		if name != "cpu" {
+			suffix, ok := strings.CutPrefix(name, "cpu")
+			if !ok || suffix == "" || strings.ContainsFunc(suffix, func(r rune) bool { return r < '0' || r > '9' }) {
+				continue
+			}
+		}
+		if len(fields) < 9 {
+			return systemCPUSnapshot{}, fmt.Errorf("invalid %s stat: need eight counters", name)
+		}
+		var counters cpuCounters
+		for i := range counters {
+			value, err := strconv.ParseUint(fields[i+1], 10, 64)
+			if err != nil {
+				return systemCPUSnapshot{}, fmt.Errorf("parse %s counter %d: %w", name, i, err)
+			}
+			counters[i] = value
+		}
+		if name == "cpu" {
+			snapshot.aggregate = counters
+			foundAggregate = true
+		} else {
+			snapshot.cores[name] = counters
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return systemCPUSnapshot{}, fmt.Errorf("scan CPU stats: %w", err)
+	}
+	if !foundAggregate {
+		return systemCPUSnapshot{}, fmt.Errorf("aggregate cpu line not found in /proc/stat")
+	}
+	return snapshot, nil
+}
+
+type cpuDeltaStatus uint8
+
+const (
+	cpuDeltaValid cpuDeltaStatus = iota
+	cpuDeltaZero
+	cpuDeltaReset
+)
+
+func cpuUsageDelta(previous, current cpuCounters) (float64, cpuDeltaStatus) {
+	status := cpuDeltaValid
+	switch {
+	case current.total() < previous.total():
+		previous = cpuCounters{}
+		status = cpuDeltaReset
+	case current.total() == previous.total():
+		return 0, cpuDeltaZero
+	}
+	var delta cpuCounters
+	for i := range delta {
+		// Linux iowait can decrease independently; never underflow a field.
+		if current[i] >= previous[i] {
+			delta[i] = current[i] - previous[i]
+		}
+	}
+	total := delta.total()
+	if total == 0 {
+		return 0, cpuDeltaZero
+	}
+	busy := float64(total) - float64(delta.idle())
+	return math.Max(0, math.Min(100, busy/float64(total)*100)), status
+}
+
+// sampleCPU retains the complete baseline on read/parse failure or an aggregate
+// zero delta. Returned maps are copies so published DTOs cannot mutate history.
+func (c *SystemCollector) sampleCPU() (float64, map[string]float64, error) {
+	c.cpuMu.Lock()
+	defer c.cpuMu.Unlock()
+
+	file, err := c.openCPUStat()
 	if err != nil {
-		return nil, err
+		return 0, nil, fmt.Errorf("open CPU stats: %w", err)
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
 			logger.Debug("Error closing CPU stat file: %v", err)
 		}
 	}()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, "cpu ") {
-			fields := strings.Fields(line)
-			if len(fields) < 9 {
-				return nil, fmt.Errorf("invalid cpu stat format")
-			}
-
-			stat := make(map[string]uint64)
-			var err error
-			if stat["user"], err = strconv.ParseUint(fields[1], 10, 64); err != nil {
-				logger.Warning("Failed to parse CPU user stat: %v", err)
-			}
-			if stat["nice"], err = strconv.ParseUint(fields[2], 10, 64); err != nil {
-				logger.Warning("Failed to parse CPU nice stat: %v", err)
-			}
-			if stat["system"], err = strconv.ParseUint(fields[3], 10, 64); err != nil {
-				logger.Warning("Failed to parse CPU system stat: %v", err)
-			}
-			if stat["idle"], err = strconv.ParseUint(fields[4], 10, 64); err != nil {
-				logger.Warning("Failed to parse CPU idle stat: %v", err)
-			}
-			if stat["iowait"], err = strconv.ParseUint(fields[5], 10, 64); err != nil {
-				logger.Warning("Failed to parse CPU iowait stat: %v", err)
-			}
-			if stat["irq"], err = strconv.ParseUint(fields[6], 10, 64); err != nil {
-				logger.Warning("Failed to parse CPU irq stat: %v", err)
-			}
-			if stat["softirq"], err = strconv.ParseUint(fields[7], 10, 64); err != nil {
-				logger.Warning("Failed to parse CPU softirq stat: %v", err)
-			}
-			if stat["steal"], err = strconv.ParseUint(fields[8], 10, 64); err != nil {
-				logger.Warning("Failed to parse CPU steal stat: %v", err)
-			}
-
-			return stat, nil
-		}
+	snapshot, err := parseCPUSnapshot(file)
+	if err != nil {
+		return 0, nil, err
 	}
-
-	return nil, fmt.Errorf("cpu line not found in /proc/stat")
+	usage, status := cpuUsageDelta(c.prevCPU.aggregate, snapshot.aggregate)
+	if status == cpuDeltaZero {
+		return c.lastCPUUsage, maps.Clone(c.lastCPUPerCore), nil
+	}
+	perCore := make(map[string]float64, len(snapshot.cores))
+	for name, counters := range snapshot.cores {
+		value, coreStatus := cpuUsageDelta(c.prevCPU.cores[name], counters)
+		if coreStatus == cpuDeltaZero {
+			value = c.lastCPUPerCore[name]
+			snapshot.cores[name] = c.prevCPU.cores[name]
+		}
+		perCore[name] = value
+	}
+	c.prevCPU = snapshot
+	c.lastCPUUsage = usage
+	c.lastCPUPerCore = perCore
+	return usage, maps.Clone(perCore), nil
 }
 
 func (c *SystemCollector) getMemoryInfo() (uint64, uint64, uint64, uint64, uint64, error) {
@@ -952,118 +989,6 @@ func (c *SystemCollector) getSystemHardwareInfo() (string, string, string) {
 	}
 
 	return serverModel, biosVersion, biosDate
-}
-
-// getPerCoreCPUUsage calculates per-core CPU usage
-func (c *SystemCollector) getPerCoreCPUUsage() (map[string]float64, error) {
-	// Read first snapshot
-	stat1, err := c.readPerCoreCPUStat()
-	if err != nil {
-		return nil, err
-	}
-
-	// Wait a short time
-	time.Sleep(100 * time.Millisecond)
-
-	// Read second snapshot
-	stat2, err := c.readPerCoreCPUStat()
-	if err != nil {
-		return nil, err
-	}
-
-	// Calculate usage per core
-	perCoreUsage := make(map[string]float64)
-	for core, values1 := range stat1 {
-		if values2, exists := stat2[core]; exists {
-			total1 := values1["user"] + values1["nice"] + values1["system"] + values1["idle"] + values1["iowait"] + values1["irq"] + values1["softirq"] + values1["steal"]
-			total2 := values2["user"] + values2["nice"] + values2["system"] + values2["idle"] + values2["iowait"] + values2["irq"] + values2["softirq"] + values2["steal"]
-
-			idle1 := values1["idle"] + values1["iowait"]
-			idle2 := values2["idle"] + values2["iowait"]
-
-			totalDelta := total2 - total1
-			idleDelta := idle2 - idle1
-
-			if totalDelta > 0 {
-				usage := (float64(totalDelta-idleDelta) / float64(totalDelta)) * 100
-				perCoreUsage[core] = usage
-			}
-		}
-	}
-
-	return perCoreUsage, nil
-}
-
-// readPerCoreCPUStat reads CPU statistics for each core from /proc/stat
-func (c *SystemCollector) readPerCoreCPUStat() (map[string]map[string]uint64, error) {
-	file, err := os.Open("/proc/stat")
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err := file.Close(); err != nil {
-			logger.Debug("Error closing per-core CPU stat file: %v", err)
-		}
-	}()
-
-	coreStats := make(map[string]map[string]uint64)
-	scanner := bufio.NewScanner(file)
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		// Look for lines starting with "cpu" followed by a number (cpu0, cpu1, etc.)
-		if strings.HasPrefix(line, "cpu") && len(line) > 3 {
-			fields := strings.Fields(line)
-			if len(fields) < 9 {
-				continue
-			}
-
-			coreName := fields[0]
-			// Skip the aggregate "cpu" line
-			if coreName == "cpu" {
-				continue
-			}
-
-			stat := make(map[string]uint64)
-			var parseErr error
-			if stat["user"], parseErr = strconv.ParseUint(fields[1], 10, 64); parseErr != nil {
-				logger.Debug("Failed to parse per-core CPU user stat for %s: %v", coreName, parseErr)
-			}
-			if stat["nice"], parseErr = strconv.ParseUint(fields[2], 10, 64); parseErr != nil {
-				logger.Debug("Failed to parse per-core CPU nice stat for %s: %v", coreName, parseErr)
-			}
-			if stat["system"], parseErr = strconv.ParseUint(fields[3], 10, 64); parseErr != nil {
-				logger.Debug("Failed to parse per-core CPU system stat for %s: %v", coreName, parseErr)
-			}
-			if stat["idle"], parseErr = strconv.ParseUint(fields[4], 10, 64); parseErr != nil {
-				logger.Debug("Failed to parse per-core CPU idle stat for %s: %v", coreName, parseErr)
-			}
-			if stat["iowait"], parseErr = strconv.ParseUint(fields[5], 10, 64); parseErr != nil {
-				logger.Debug("Failed to parse per-core CPU iowait stat for %s: %v", coreName, parseErr)
-			}
-			if stat["irq"], parseErr = strconv.ParseUint(fields[6], 10, 64); parseErr != nil {
-				logger.Debug("Failed to parse per-core CPU irq stat for %s: %v", coreName, parseErr)
-			}
-			if stat["softirq"], parseErr = strconv.ParseUint(fields[7], 10, 64); parseErr != nil {
-				logger.Debug("Failed to parse per-core CPU softirq stat for %s: %v", coreName, parseErr)
-			}
-			if stat["steal"], parseErr = strconv.ParseUint(fields[8], 10, 64); parseErr != nil {
-				logger.Debug("Failed to parse per-core CPU steal stat for %s: %v", coreName, parseErr)
-			}
-
-			coreStats[coreName] = stat
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
-
-	if len(coreStats) == 0 {
-		return nil, fmt.Errorf("no per-core CPU stats found")
-	}
-
-	return coreStats, nil
 }
 
 // isHVMEnabled checks if hardware virtualization (HVM) is enabled

@@ -12019,6 +12019,7 @@
                     "example": "Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz"
                 },
                 "cpu_per_core_usage": {
+                    "description": "CPUPerCore uses the same snapshot as CPUUsage; first readings and new cores use the average since boot.\nZero deltas retain the previous reading and baseline.",
                     "type": "object",
                     "additionalProperties": {
                         "type": "number",
@@ -12047,7 +12048,7 @@
                     "example": 8
                 },
                 "cpu_usage_percent": {
-                    "description": "CPU Information",
+                    "description": "CPUUsage is usage since the previous successful collection.\nThe first value after collector start is the average since boot.",
                     "type": "number",
                     "example": 45.2
                 },

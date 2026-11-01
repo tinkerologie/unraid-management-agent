@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- CPU usage now uses one `/proc/stat` snapshot per collection for aggregate and per-core readings,
+  without sampling sleeps (#298). Readings cover the interval since the previous successful collection;
+  the first reading is the since-boot average. Counter resets and decreases are handled safely,
+  and zero deltas retain the previous reading and baseline.
+
 ### Added
 
 - Shared read-only PSU collector with exact-ID auto-detection for Corsair RMi/HXi USB PSUs
