@@ -525,9 +525,12 @@ interface ContainerInfo {
 interface VMInfo {
   id: string;
   name: string;
-  state: "running" | "stopped" | "paused";
+  state: "running" | "blocked" | "paused" | "shutdown" | "shut off" | "crashed" | "suspended" | "unknown";
   cpu_count: number;
-  memory_bytes: number;
+  memory_allocated_bytes: number; // Maximum configured memory.
+  memory_used_bytes: number; // Guest available - unused, else QEMU RSS, else 0; 0 when not running.
+  disk_path: string; // Primary disk source; empty when unavailable.
+  disk_size_bytes: number; // Guest-visible virtual capacity; 0 when unavailable.
   timestamp: string;
 }
 
@@ -1921,6 +1924,17 @@ curl http://192.168.20.21:8043/api/v1/docker/networks
 
 List all virtual machines.
 
+`memory_allocated_bytes` is the maximum configured memory. `memory_used_bytes` is 0 for non-running VMs.
+For running VMs it uses guest `available - unused` from libvirt balloon stats when both values are present
+and valid, otherwise host QEMU RSS (including QEMU overhead, which can exceed allocation), otherwise 0.
+Guest stats require a balloon driver providing stats; the collector does not configure the balloon stats period.
+Allocated memory is never used as usage. A running VM can report 0 when stats are unavailable or usage is zero.
+
+The primary disk is the first `device="disk"` entry with a source in domain XML order; CD-ROMs and floppies
+are skipped. `disk_path` is its source path or identifier (storage volumes are resolved to paths), or empty
+when unavailable. `disk_size_bytes` is its guest-visible virtual capacity in bytes, collected best effort
+for all VM states; 0 means unavailable. It is not host allocation or physical space used.
+
 **Response**:
 
 ```json
@@ -1930,7 +1944,10 @@ List all virtual machines.
     "name": "Windows 10",
     "state": "running",
     "cpu_count": 4,
-    "memory_bytes": 8589934592,
+    "memory_allocated_bytes": 8589934592,
+    "memory_used_bytes": 4294967296,
+    "disk_path": "/mnt/user/domains/Windows 10/vdisk1.img",
+    "disk_size_bytes": 107374182400,
     "timestamp": "2025-10-03T13:41:13+10:00"
   }
 ]
@@ -1956,7 +1973,10 @@ Get a single VM by ID or name.
   "name": "Windows 10",
   "state": "running",
   "cpu_count": 4,
-  "memory_bytes": 8589934592,
+  "memory_allocated_bytes": 8589934592,
+  "memory_used_bytes": 4294967296,
+  "disk_path": "/mnt/user/domains/Windows 10/vdisk1.img",
+  "disk_size_bytes": 107374182400,
   "timestamp": "2025-10-03T13:41:13+10:00"
 }
 ```

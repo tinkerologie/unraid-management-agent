@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- VM telemetry now reports guest memory usage, then QEMU RSS, then zero for running VMs,
+  and zero for non-running VMs (#295). The Home Assistant "Memory Used" sensor now shows
+  real or zero usage instead of allocated memory. Primary disk source and guest-visible virtual
+  capacity are collected best effort through native libvirt for all VM states.
+
 ### Added
 
 - Shared read-only PSU collector with exact-ID auto-detection for Corsair RMi/HXi USB PSUs

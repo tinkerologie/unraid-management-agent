@@ -2,6 +2,7 @@ package collectors
 
 import (
 	"context"
+	"encoding/xml"
 	"fmt"
 	"net/url"
 	"runtime"
@@ -141,14 +142,8 @@ func (c *VMCollector) Collect() {
 			vm.State = c.stateToString(libvirt.DomainState(state))
 		}
 
-		// Get domain info (vCPUs, memory)
-		// DomainGetInfo returns: rState, rMaxMem, rMemory, rNrVirtCPU, rCPUTime, err
-		_, maxMem, memory, nrVirtCPU, _, err := l.DomainGetInfo(domain)
-		if err == nil {
-			vm.CPUCount = int(nrVirtCPU)
-			vm.MemoryAllocated = maxMem * 1024 // Convert from KiB to bytes
-			vm.MemoryUsed = memory * 1024      // Convert from KiB to bytes
-		}
+		c.getMemoryInfo(l, domain, vm)
+		c.getPrimaryDiskInfo(l, domain, vm)
 
 		// Check autostart
 		autostart, err := l.DomainGetAutostart(domain)
@@ -229,6 +224,126 @@ type nodeInfoGetter interface {
 // domainInfoGetter is the libvirt call getCPUUsage needs; *libvirt.Libvirt implements it.
 type domainInfoGetter interface {
 	DomainGetInfo(dom libvirt.Domain) (rState uint8, rMaxMem uint64, rMemory uint64, rNrVirtCPU uint16, rCPUTime uint64, err error)
+}
+
+// vmInfoGetter is the native libvirt query seam for memory and primary disk data.
+type vmInfoGetter interface {
+	domainInfoGetter
+	DomainMemoryStats(libvirt.Domain, uint32, uint32) ([]libvirt.DomainMemoryStat, error)
+	DomainGetXMLDesc(libvirt.Domain, libvirt.DomainXMLFlags) (string, error)
+	DomainGetBlockInfo(libvirt.Domain, string, uint32) (uint64, uint64, uint64, error)
+	StoragePoolLookupByName(string) (libvirt.StoragePool, error)
+	StorageVolLookupByName(libvirt.StoragePool, string) (libvirt.StorageVol, error)
+	StorageVolGetPath(libvirt.StorageVol) (string, error)
+}
+
+var _ vmInfoGetter = (*libvirt.Libvirt)(nil)
+
+func (c *VMCollector) getMemoryInfo(l vmInfoGetter, domain libvirt.Domain, vm *dto.VMInfo) {
+	vm.MemoryAllocated, vm.MemoryUsed, vm.CPUCount = 0, 0, 0
+	_, maxMem, _, nrVirtCPU, _, err := l.DomainGetInfo(domain)
+	if err != nil {
+		return
+	}
+	vm.CPUCount = int(nrVirtCPU)
+	vm.MemoryAllocated = maxMem * 1024 // KiB to bytes; balloon size is not usage.
+	if vm.State != "running" {
+		return
+	}
+	stats, err := l.DomainMemoryStats(domain, uint32(libvirt.DomainMemoryStatNr), 0)
+	if err != nil {
+		return
+	}
+	values := make(map[libvirt.DomainMemoryStatTags]uint64, len(stats))
+	for _, stat := range stats {
+		values[libvirt.DomainMemoryStatTags(stat.Tag)] = stat.Val
+	}
+	available, hasAvailable := values[libvirt.DomainMemoryStatAvailable]
+	unused, hasUnused := values[libvirt.DomainMemoryStatUnused]
+	if hasAvailable && hasUnused && available >= unused {
+		vm.MemoryUsed = (available - unused) * 1024
+	} else {
+		// RSS includes QEMU overhead and can exceed the configured allocation.
+		vm.MemoryUsed = values[libvirt.DomainMemoryStatRss] * 1024
+	}
+}
+
+type vmDiskSource struct {
+	File   string `xml:"file,attr"`
+	Dev    string `xml:"dev,attr"`
+	Name   string `xml:"name,attr"`
+	Pool   string `xml:"pool,attr"`
+	Volume string `xml:"volume,attr"`
+}
+
+type vmDisk struct {
+	Device string        `xml:"device,attr"`
+	Source *vmDiskSource `xml:"source"`
+	Target struct {
+		Dev string `xml:"dev,attr"`
+	} `xml:"target"`
+}
+
+// primaryDisk selects the first disk with a source, preserving XML order.
+// Decode the entire document before selecting, so malformed XML yields no disk.
+func primaryDisk(description string) vmDisk {
+	var domain struct {
+		XMLName xml.Name `xml:"domain"`
+		Disks   []vmDisk `xml:"devices>disk"`
+	}
+	if err := xml.Unmarshal([]byte(description), &domain); err != nil {
+		return vmDisk{}
+	}
+	for _, disk := range domain.Disks {
+		if disk.Device == "disk" && disk.Source != nil {
+			return disk
+		}
+	}
+	return vmDisk{}
+}
+
+// getPrimaryDiskInfo is best effort for active and inactive domains alike.
+func (c *VMCollector) getPrimaryDiskInfo(l vmInfoGetter, domain libvirt.Domain, vm *dto.VMInfo) {
+	vm.DiskPath, vm.DiskSize = "", 0
+	description, err := l.DomainGetXMLDesc(domain, 0)
+	if err != nil {
+		return
+	}
+	disk := primaryDisk(description)
+	if disk.Source == nil {
+		return
+	}
+	source := disk.Source
+	switch {
+	case source.File != "":
+		vm.DiskPath = source.File
+	case source.Dev != "":
+		vm.DiskPath = source.Dev
+	case source.Pool != "" && source.Volume != "":
+		// A volume name is not a path. Resolve it through native storage APIs.
+		pool, err := l.StoragePoolLookupByName(source.Pool)
+		if err != nil {
+			return
+		}
+		volume, err := l.StorageVolLookupByName(pool, source.Volume)
+		if err != nil {
+			return
+		}
+		path, err := l.StorageVolGetPath(volume)
+		if err != nil {
+			return
+		}
+		vm.DiskPath = path
+	case source.Name != "":
+		vm.DiskPath = source.Name // Network-backed disk source identifier.
+	}
+	if vm.DiskPath == "" {
+		return
+	}
+	_, capacity, _, err := l.DomainGetBlockInfo(domain, vm.DiskPath, 0)
+	if err == nil {
+		vm.DiskSize = capacity // Guest-visible capacity, not host allocation.
+	}
 }
 
 // numCPU returns the CPUs the agent may run on; replaceable for tests.
