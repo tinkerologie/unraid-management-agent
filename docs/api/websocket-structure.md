@@ -249,6 +249,7 @@ def identify_event_type(data):
 | `temperature_celsius`    | float64 | °C      | 0-∞   | Yes      | Temperature     |
 | `smart_status`           | string  | -       | enum  | No       | SMART status    |
 | `smart_errors`           | int     | count   | ≥0    | No       | Error count     |
+| `smart_exit_status`      | int     | bitmask | 0-255 | Yes      | smartctl exit   |
 | `spindown_delay`         | int     | minutes | ≥0    | No       | Spindown delay  |
 | `filesystem`             | string  | -       | -     | No       | FS type         |
 | `mount_point`            | string  | -       | -     | No       | Mount path      |
