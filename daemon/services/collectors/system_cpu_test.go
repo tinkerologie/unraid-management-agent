@@ -236,3 +236,14 @@ func TestSystemCollectorCPUInfoPartialSuccess(t *testing.T) {
 		})
 	}
 }
+
+func TestParseCPUSnapshotStopsBeforeLongIntrLine(t *testing.T) {
+	input := "cpu  1 2 3 4 5 6 7 8\ncpu0 1 2 3 4 5 6 7 8\nintr " + strings.Repeat("0 ", 100000) + "\nctxt 1\n"
+	snapshot, err := parseCPUSnapshot(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("parseCPUSnapshot: %v", err)
+	}
+	if _, ok := snapshot.cores["cpu0"]; !ok {
+		t.Fatal("cpu0 missing")
+	}
+}

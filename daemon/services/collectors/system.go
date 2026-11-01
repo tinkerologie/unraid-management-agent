@@ -4,6 +4,7 @@ package collectors
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -351,9 +352,13 @@ func parseCPUSnapshot(r io.Reader) (systemCPUSnapshot, error) {
 			continue
 		}
 		name := fields[0]
+		if !strings.HasPrefix(name, "cpu") {
+			// CPU lines come first; nothing after them is needed.
+			break
+		}
 		if name != "cpu" {
-			suffix, ok := strings.CutPrefix(name, "cpu")
-			if !ok || suffix == "" || strings.ContainsFunc(suffix, func(r rune) bool { return r < '0' || r > '9' }) {
+			suffix := strings.TrimPrefix(name, "cpu")
+			if suffix == "" || strings.ContainsFunc(suffix, func(r rune) bool { return r < '0' || r > '9' }) {
 				continue
 			}
 		}
@@ -375,7 +380,8 @@ func parseCPUSnapshot(r io.Reader) (systemCPUSnapshot, error) {
 			snapshot.cores[name] = counters
 		}
 	}
-	if err := scanner.Err(); err != nil {
+	// The intr line after the CPU lines can exceed the scanner limit on large hosts.
+	if err := scanner.Err(); err != nil && (!foundAggregate || !errors.Is(err, bufio.ErrTooLong)) {
 		return systemCPUSnapshot{}, fmt.Errorf("scan CPU stats: %w", err)
 	}
 	if !foundAggregate {
