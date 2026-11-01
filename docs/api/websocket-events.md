@@ -85,7 +85,7 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 - `cpu_usage_percent` - Overall CPU usage (0-100)
 - `cpu_temp_celsius` - CPU temperature
 - `ram_usage_percent` - RAM usage (0-100)
-- `motherboard_temp_celsius` - Motherboard temperature
+- `motherboard_temp_celsius` - Motherboard temperature (`null` when unmeasured)
 - `fans[]` - Array of fan sensors with RPM
 
 ---
@@ -166,7 +166,7 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 **Key Fields**:
 
 - `id` - Disk identifier (disk1, disk2, parity, cache)
-- `temperature_celsius` - Disk temperature (0 if spun down)
+- `temperature_celsius` - Disk temperature (`null` if spun down or unreadable; measured 0 stays 0)
 - `smart_status` - SMART health status
 - `smart_errors` - Count of SMART errors
 - `usage_percent` - Disk usage percentage
@@ -381,14 +381,14 @@ UPSes have no load or power reading). They are never sent as a made-up `0`.
   {
     "available": true,
     "name": "Intel UHD Graphics 630",
-    "driver_version": "6.12.24-Unraid",
-    "temperature_celsius": 0,
+    "driver_version": "i915",
+    "temperature_celsius": null,
     "cpu_temperature_celsius": 34,
     "utilization_gpu_percent": 0,
-    "utilization_memory_percent": 0,
-    "memory_total_bytes": 0,
-    "memory_used_bytes": 0,
-    "power_draw_watts": 0,
+    "utilization_memory_percent": null,
+    "memory_total_bytes": null,
+    "memory_used_bytes": null,
+    "power_draw_watts": null,
     "timestamp": "2025-10-02T14:02:59.789972296+10:00"
   }
 ]
@@ -398,10 +398,13 @@ UPSes have no load or power reading). They are never sent as a made-up `0`.
 
 - `available` - Whether GPU is available
 - `name` - GPU model name
-- `driver_version` - GPU driver version
+- `driver_version` - GPU driver version; for Intel, the bound driver name plus module version when available
 - `cpu_temperature_celsius` - CPU temp (for iGPUs)
 - `utilization_gpu_percent` - GPU utilization
 - `power_draw_watts` - Power consumption
+
+GPU temperature, power, memory total, memory used and memory utilisation are `null` when unmeasured,
+with keys retained. Measured zero values remain numbers. CPU temperature is separate from GPU temperature.
 
 ---
 
@@ -449,7 +452,7 @@ UPSes have no load or power reading). They are never sent as a made-up `0`.
 **Collector**: `ShareCollector`  
 **Topic**: `share_list_update`
 
-**Identification**: Contains `name` AND `path` AND `size_bytes`
+**Identification**: Contains `name` AND `path` AND `storage_total_bytes`
 
 **Data Structure** (array of shares):
 
@@ -458,7 +461,11 @@ UPSes have no load or power reading). They are never sent as a made-up `0`.
   {
     "name": "appdata",
     "path": "/mnt/user/appdata",
-    "size_bytes": 107374182400,
+    "storage_used_bytes": 53687091200,
+    "storage_free_bytes": 53687091200,
+    "storage_total_bytes": 107374182400,
+    "storage_usage_percent": 50.0,
+    "total_bytes": 107374182400,
     "used_bytes": 53687091200,
     "free_bytes": 53687091200,
     "usage_percent": 50.0,
@@ -471,8 +478,15 @@ UPSes have no load or power reading). They are never sent as a made-up `0`.
 
 - `name` - Share name
 - `path` - Mount path
-- `size_bytes` - Total size
-- `usage_percent` - Usage percentage
+- `used_bytes` - Measured share content, including mounted descendants visible beneath the share;
+  omitted when unknown, `0` when empty
+- `storage_used_bytes`, `storage_free_bytes`, `storage_total_bytes` - Backing pool/array space in bytes
+- `storage_usage_percent` - Backing pool/array usage percentage
+- `free_bytes`, `total_bytes`, `usage_percent` - Deprecated aliases of the corresponding storage fields
+
+Measured usage is available only for cache-only shares on their assigned mounted ZFS pool when all members
+are known spinning. Descendants count only when mounted at or beneath the share dataset's mountpoint;
+unknown mount metadata leaves usage unknown. The storage figures are shared by shares on the same storage.
 
 ---
 

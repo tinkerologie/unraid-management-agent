@@ -215,7 +215,7 @@ type MCPAlertRuleIDArgs struct {
 type MCPCreateAlertRuleArgs struct {
 	ID              string   `json:"id" jsonschema:"Unique identifier for the alert rule (e.g. high-cpu, disk-temp-warn)"`
 	Name            string   `json:"name" jsonschema:"Human-readable name for the alert rule"`
-	Expression      string   `json:"expression" jsonschema:"expr-lang boolean expression evaluated against system metrics (e.g. CPU > 90, MaxDiskTemp > 55)"`
+	Expression      string   `json:"expression" jsonschema:"expr-lang boolean expression evaluated against system metrics (e.g. CPU > 90, MaxDiskTemp != nil && MaxDiskTemp > 55)"`
 	Severity        string   `json:"severity,omitempty" jsonschema:"Alert severity level: info, warning, or critical (default: warning)"`
 	DurationSeconds int      `json:"duration_seconds,omitempty" jsonschema:"Seconds the expression must be true before firing (0 = immediate)"`
 	CooldownMinutes int      `json:"cooldown_minutes,omitempty" jsonschema:"Minutes between re-fires of the same alert (default: 5)"`

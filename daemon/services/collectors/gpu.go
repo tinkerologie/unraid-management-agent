@@ -5,6 +5,9 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"math"
+	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -22,13 +25,15 @@ import (
 // It gathers temperature, utilization, memory usage, and power consumption data.
 type GPUCollector struct {
 	ctx *domain.Context
+	// sysfsRoot allows PCI-bound metadata reads against a fixture.
+	sysfsRoot string
 	// nvidiaExec runs nvidia-smi. Nil means lib.ExecCommandOutput; tests inject a fake.
 	nvidiaExec func(name string, args ...string) (string, error)
 }
 
 // NewGPUCollector creates a new GPU metrics collector with the given context.
 func NewGPUCollector(ctx *domain.Context) *GPUCollector {
-	return &GPUCollector{ctx: ctx}
+	return &GPUCollector{ctx: ctx, sysfsRoot: defaultSysfsRoot}
 }
 
 // runNvidia invokes nvidia-smi via the injected executor, defaulting to lib.ExecCommandOutput.
@@ -293,6 +298,30 @@ func (c *GPUCollector) collectSingleIntelGPU(pciID, model string, index int) *dt
 
 	logger.Debug("Intel GPU: Successfully parsed sample for GPU %d", index)
 
+	gpu := parseIntelGPUSample(intelData, pciID, model, index)
+	// Read the driver bound to this PCI device, with its module version if available.
+	if driverVersion, err := c.getIntelDriverVersion(pciID); err == nil {
+		gpu.DriverVersion = driverVersion
+	}
+
+	// Intel iGPU typically doesn't report temperature via intel_gpu_top or sysfs hwmon
+	// Most Intel integrated GPUs don't expose temperature sensors
+	if temp, err := c.getIntelGPUTemp(pciID); err == nil {
+		gpu.Temperature = new(temp)
+	}
+
+	// For Intel iGPUs, add CPU temperature as they share the die with the CPU
+	// This provides useful thermal information since iGPUs don't have dedicated temp sensors
+	if cpuTemp, err := c.getCPUTemp(); err == nil {
+		gpu.CPUTemperature = cpuTemp
+		logger.Debug("Intel GPU: CPU temperature: %.1f°C", cpuTemp)
+	}
+
+	return gpu
+}
+
+// parseIntelGPUSample preserves missing power and shared-memory measurements.
+func parseIntelGPUSample(intelData map[string]any, pciID, model string, index int) *dto.GPUMetrics {
 	gpu := &dto.GPUMetrics{
 		Available: true,
 		Index:     index,
@@ -300,11 +329,6 @@ func (c *GPUCollector) collectSingleIntelGPU(pciID, model string, index int) *dt
 		Vendor:    "intel",
 		Name:      "Intel " + model,
 		Timestamp: time.Now(),
-	}
-
-	// Extract driver version from modinfo
-	if driverVersion, err := c.getIntelDriverVersion(); err == nil {
-		gpu.DriverVersion = driverVersion
 	}
 
 	// Extract utilization from engines
@@ -329,7 +353,7 @@ func (c *GPUCollector) collectSingleIntelGPU(pciID, model string, index int) *dt
 	// Extract power consumption (GPU power, not package power)
 	if power, ok := intelData["power"].(map[string]any); ok {
 		if gpuPower, ok := power["GPU"].(float64); ok {
-			gpu.PowerDraw = gpuPower
+			gpu.PowerDraw = new(gpuPower)
 			logger.Debug("Intel GPU power: %.3f W", gpuPower)
 		}
 	}
@@ -337,48 +361,45 @@ func (c *GPUCollector) collectSingleIntelGPU(pciID, model string, index int) *dt
 	// Extract memory info (Note: Intel iGPU shares system RAM, intel_gpu_top doesn't report memory usage)
 	// The "memory" field is not present in intel_gpu_top JSON output for integrated GPUs
 	if memory, ok := intelData["memory"].(map[string]any); ok {
-		if total, ok := memory["total"].(float64); ok {
-			gpu.MemoryTotal = uint64(total)
+		if total, ok := memory["total"].(float64); ok && total >= 0 && total < float64(^uint64(0)) {
+			gpu.MemoryTotal = new(uint64(total))
 		}
-		if shared, ok := memory["shared"].(float64); ok {
-			gpu.MemoryUsed = uint64(shared)
+		if shared, ok := memory["shared"].(float64); ok && shared >= 0 && shared < float64(^uint64(0)) {
+			gpu.MemoryUsed = new(uint64(shared))
 		}
-		if gpu.MemoryTotal > 0 {
-			gpu.UtilizationMemory = float64(gpu.MemoryUsed) / float64(gpu.MemoryTotal) * 100
+		if gpu.MemoryTotal != nil && gpu.MemoryUsed != nil && *gpu.MemoryTotal > 0 {
+			gpu.UtilizationMemory = new(float64(*gpu.MemoryUsed) / float64(*gpu.MemoryTotal) * 100)
 		}
-	}
-
-	// Intel iGPU typically doesn't report temperature via intel_gpu_top or sysfs hwmon
-	// Most Intel integrated GPUs don't expose temperature sensors
-	if temp, err := c.getIntelGPUTemp(); err == nil {
-		gpu.Temperature = temp
-	}
-
-	// For Intel iGPUs, add CPU temperature as they share the die with the CPU
-	// This provides useful thermal information since iGPUs don't have dedicated temp sensors
-	if cpuTemp, err := c.getCPUTemp(); err == nil {
-		gpu.CPUTemperature = cpuTemp
-		logger.Debug("Intel GPU: CPU temperature: %.1f°C", cpuTemp)
 	}
 
 	return gpu
 }
 
-// Get Intel GPU temperature from sysfs
-func (c *GPUCollector) getIntelGPUTemp() (float64, error) {
-	// Intel iGPU temp is usually in hwmon under i915
-	output, err := lib.ExecCommandOutput("bash", "-c", "cat /sys/class/drm/card*/device/hwmon/hwmon*/temp1_input 2>/dev/null | head -1")
-	if err != nil || output == "" {
-		return 0, fmt.Errorf("failed to read Intel GPU temperature")
+// sysfs returns the mount point, including for zero-value collectors in tests.
+func (c *GPUCollector) sysfs() string {
+	if c.sysfsRoot != "" {
+		return c.sysfsRoot
 	}
+	return defaultSysfsRoot
+}
 
-	tempMilliC, err := strconv.ParseFloat(strings.TrimSpace(output), 64)
+// getIntelGPUTemp reads only hwmon channels belonging to the detected PCI device.
+func (c *GPUCollector) getIntelGPUTemp(pciID string) (float64, error) {
+	paths, err := filepath.Glob(filepath.Join(c.sysfs(), "bus/pci/devices", pciID, "hwmon/hwmon*/temp1_input"))
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("finding Intel GPU temperature: %w", err)
 	}
-
-	// Convert from millidegrees to degrees
-	return tempMilliC / 1000.0, nil
+	for _, path := range paths {
+		// #nosec G304 -- path is a hwmon temperature file under the internally detected PCI device.
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		if temp, err := strconv.ParseFloat(strings.TrimSpace(string(data)), 64); err == nil && !math.IsNaN(temp) && !math.IsInf(temp, 0) {
+			return temp / 1000, nil
+		}
+	}
+	return 0, fmt.Errorf("no Intel GPU temperature for PCI device %s", pciID)
 }
 
 // Get CPU temperature from coretemp hwmon
@@ -401,28 +422,23 @@ func (c *GPUCollector) getCPUTemp() (float64, error) {
 	return tempMilliC / 1000.0, nil
 }
 
-// Get Intel GPU driver version from modinfo
-func (c *GPUCollector) getIntelDriverVersion() (string, error) {
-	// Get vermagic from modinfo i915 (contains kernel version)
-	output, err := lib.ExecCommandOutput("modinfo", "i915")
+// getIntelDriverVersion reports the bound driver name, plus its module version
+// when the module exposes one. Kernel vermagic is not a driver version.
+func (c *GPUCollector) getIntelDriverVersion(pciID string) (string, error) {
+	driverPath, err := filepath.EvalSymlinks(filepath.Join(c.sysfs(), "bus/pci/devices", pciID, "driver"))
 	if err != nil {
-		return "", fmt.Errorf("modinfo i915 failed: %w", err)
+		return "", fmt.Errorf("resolving Intel GPU driver: %w", err)
 	}
-
-	// Parse vermagic line: "vermagic:       6.12.24-Unraid SMP preempt mod_unload"
-	lines := strings.SplitSeq(output, "\n")
-	for line := range lines {
-		if strings.HasPrefix(line, "vermagic:") {
-			// Extract kernel version from vermagic
-			parts := strings.Fields(line)
-			if len(parts) >= 2 {
-				// Return kernel version (e.g., "6.12.24-Unraid")
-				return parts[1], nil
-			}
-		}
+	driver := filepath.Base(driverPath)
+	if driver != "i915" && driver != "xe" {
+		return "", fmt.Errorf("unexpected Intel GPU driver %q", driver)
 	}
-
-	return "", fmt.Errorf("failed to parse driver version from modinfo")
+	// #nosec G304 -- driver is restricted above to i915 or xe; the root is the sysfs mount.
+	version, err := os.ReadFile(filepath.Join(c.sysfs(), "module", driver, "version"))
+	if err == nil && strings.TrimSpace(string(version)) != "" {
+		return driver + " " + strings.TrimSpace(string(version)), nil
+	}
+	return driver, nil
 }
 
 // NVIDIA GPU collection using nvidia-smi
@@ -459,7 +475,7 @@ func (c *GPUCollector) collectNvidiaGPU() ([]*dto.GPUMetrics, error) {
 // index,pci.bus_id,uuid,name,temperature.gpu,utilization.gpu,memory.used,
 // memory.total,power.draw,fan.speed into GPU metrics. Memory values are
 // converted from MiB to bytes and memory utilization is derived. Records with
-// fewer than 10 fields are skipped; unparseable numeric fields are left at zero.
+// fewer than 10 fields are skipped; unparseable measurements are left nil.
 func parseNvidiaGPUCSV(output string) ([]*dto.GPUMetrics, error) {
 	reader := csv.NewReader(strings.NewReader(output))
 	// Tolerate variable field counts so a single malformed/short row is skipped
@@ -498,8 +514,8 @@ func parseNvidiaGPUCSV(output string) ([]*dto.GPUMetrics, error) {
 		gpu.Name = strings.TrimSpace(record[3])
 
 		// Temperature (°C)
-		if temp, err := strconv.ParseFloat(strings.TrimSpace(record[4]), 64); err == nil {
-			gpu.Temperature = temp
+		if temp, err := strconv.ParseFloat(strings.TrimSpace(record[4]), 64); err == nil && !math.IsNaN(temp) && !math.IsInf(temp, 0) {
+			gpu.Temperature = new(temp)
 		}
 
 		// Utilization (%)
@@ -508,21 +524,21 @@ func parseNvidiaGPUCSV(output string) ([]*dto.GPUMetrics, error) {
 		}
 
 		// Memory Used (MiB)
-		if memUsed, err := strconv.ParseFloat(strings.TrimSpace(record[6]), 64); err == nil {
-			gpu.MemoryUsed = uint64(memUsed * 1024 * 1024) // Convert MiB to bytes
+		if memUsed, err := strconv.ParseFloat(strings.TrimSpace(record[6]), 64); err == nil && memUsed >= 0 && memUsed < float64(^uint64(0))/(1024*1024) {
+			gpu.MemoryUsed = new(uint64(memUsed * 1024 * 1024)) // Convert MiB to bytes
 		}
 
 		// Memory Total (MiB)
-		if memTotal, err := strconv.ParseFloat(strings.TrimSpace(record[7]), 64); err == nil {
-			gpu.MemoryTotal = uint64(memTotal * 1024 * 1024) // Convert MiB to bytes
-			if gpu.MemoryTotal > 0 {
-				gpu.UtilizationMemory = float64(gpu.MemoryUsed) / float64(gpu.MemoryTotal) * 100
+		if memTotal, err := strconv.ParseFloat(strings.TrimSpace(record[7]), 64); err == nil && memTotal >= 0 && memTotal < float64(^uint64(0))/(1024*1024) {
+			gpu.MemoryTotal = new(uint64(memTotal * 1024 * 1024)) // Convert MiB to bytes
+			if gpu.MemoryTotal != nil && gpu.MemoryUsed != nil && *gpu.MemoryTotal > 0 {
+				gpu.UtilizationMemory = new(float64(*gpu.MemoryUsed) / float64(*gpu.MemoryTotal) * 100)
 			}
 		}
 
 		// Power Draw (W)
-		if power, err := strconv.ParseFloat(strings.TrimSpace(record[8]), 64); err == nil {
-			gpu.PowerDraw = power
+		if power, err := strconv.ParseFloat(strings.TrimSpace(record[8]), 64); err == nil && !math.IsNaN(power) && !math.IsInf(power, 0) {
+			gpu.PowerDraw = new(power)
 		}
 
 		// Fan Speed (%)
@@ -662,13 +678,13 @@ func (c *GPUCollector) collectSingleAMDGPU(pciID, model string, index int) *dto.
 		// Extract VRAM usage: "vram 15.00% 1234mb"
 		if matches := regexp.MustCompile(`vram\s+([\d.]+)%\s+([\d]+)mb`).FindStringSubmatch(output); len(matches) > 2 {
 			if vramPercent, err := strconv.ParseFloat(matches[1], 64); err == nil {
-				gpu.UtilizationMemory = vramPercent
+				gpu.UtilizationMemory = new(vramPercent)
 			}
 			if vramUsedMB, err := strconv.ParseUint(matches[2], 10, 64); err == nil {
-				gpu.MemoryUsed = vramUsedMB * 1024 * 1024 // Convert MB to bytes
+				gpu.MemoryUsed = new(vramUsedMB * 1024 * 1024) // Convert MB to bytes
 				// Calculate total from percentage
-				if gpu.UtilizationMemory > 0 {
-					gpu.MemoryTotal = uint64(float64(gpu.MemoryUsed) / (gpu.UtilizationMemory / 100.0))
+				if gpu.UtilizationMemory != nil && *gpu.UtilizationMemory > 0 {
+					gpu.MemoryTotal = new(uint64(float64(*gpu.MemoryUsed) / (*gpu.UtilizationMemory / 100.0)))
 				}
 			}
 		}
@@ -676,7 +692,7 @@ func (c *GPUCollector) collectSingleAMDGPU(pciID, model string, index int) *dto.
 
 	// Get temperature from sysfs
 	if temp, err := c.getAMDGPUTemp(index); err == nil {
-		gpu.Temperature = temp
+		gpu.Temperature = new(temp)
 	}
 
 	// Get fan speed from sysfs (discrete GPUs only)
@@ -701,12 +717,11 @@ func (c *GPUCollector) getAMDGPUTemp(cardIndex int) (float64, error) {
 		return 0, fmt.Errorf("failed to read AMD GPU temperature")
 	}
 
-	tempMilliC, err := strconv.ParseFloat(strings.TrimSpace(output), 64)
-	if err != nil {
-		return 0, err
+	tempMilliC := parseOptionalFloat(output)
+	if tempMilliC == nil {
+		return 0, fmt.Errorf("invalid AMD GPU temperature")
 	}
-
-	return tempMilliC / 1000.0, nil
+	return *tempMilliC / 1000.0, nil
 }
 
 // getAMDGPUFanSpeed gets AMD GPU fan speed from sysfs (discrete GPUs only)
@@ -809,7 +824,7 @@ func (c *GPUCollector) collectAMDGPUWithROCm() ([]*dto.GPUMetrics, error) {
 
 		// Get temperature
 		if temp, ok := gpuData["Temperature (Sensor edge) (C)"].(float64); ok {
-			gpu.Temperature = temp
+			gpu.Temperature = new(temp)
 		}
 
 		// Get GPU utilization
@@ -818,13 +833,13 @@ func (c *GPUCollector) collectAMDGPUWithROCm() ([]*dto.GPUMetrics, error) {
 		}
 
 		// Get memory info
-		if memUsed, ok := gpuData["VRAM Total Used Memory (B)"].(float64); ok {
-			gpu.MemoryUsed = uint64(memUsed)
+		if memUsed, ok := gpuData["VRAM Total Used Memory (B)"].(float64); ok && memUsed >= 0 && memUsed < float64(^uint64(0)) {
+			gpu.MemoryUsed = new(uint64(memUsed))
 		}
-		if memTotal, ok := gpuData["VRAM Total Memory (B)"].(float64); ok {
-			gpu.MemoryTotal = uint64(memTotal)
-			if gpu.MemoryTotal > 0 {
-				gpu.UtilizationMemory = float64(gpu.MemoryUsed) / float64(gpu.MemoryTotal) * 100
+		if memTotal, ok := gpuData["VRAM Total Memory (B)"].(float64); ok && memTotal >= 0 && memTotal < float64(^uint64(0)) {
+			gpu.MemoryTotal = new(uint64(memTotal))
+			if gpu.MemoryTotal != nil && gpu.MemoryUsed != nil && *gpu.MemoryTotal > 0 {
+				gpu.UtilizationMemory = new(float64(*gpu.MemoryUsed) / float64(*gpu.MemoryTotal) * 100)
 			}
 		}
 

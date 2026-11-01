@@ -1,6 +1,9 @@
 package collectors
 
 import (
+	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
@@ -8,6 +11,7 @@ import (
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
 	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/lib"
 )
 
 func TestNewDiskCollector(t *testing.T) {
@@ -208,83 +212,6 @@ func TestUsagePercentCalculation(t *testing.T) {
 	}
 }
 
-// TestDiskRoleDetection tests the disk role detection logic
-func TestDiskRoleDetection(t *testing.T) {
-	tests := []struct {
-		name     string
-		diskName string
-		diskID   string
-		wantRole string
-	}{
-		{
-			name:     "parity disk",
-			diskName: "parity",
-			diskID:   "parity",
-			wantRole: "parity",
-		},
-		{
-			name:     "parity2 disk",
-			diskName: "parity2",
-			diskID:   "parity2",
-			wantRole: "parity",
-		},
-		{
-			name:     "data disk",
-			diskName: "disk1",
-			diskID:   "disk1",
-			wantRole: "data",
-		},
-		{
-			name:     "cache disk",
-			diskName: "cache",
-			diskID:   "cache",
-			wantRole: "cache",
-		},
-		{
-			name:     "pool disk",
-			diskName: "pool1",
-			diskID:   "pool1",
-			wantRole: "pool",
-		},
-		{
-			name:     "flash drive",
-			diskName: "flash",
-			diskID:   "flash",
-			wantRole: "flash",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			role := detectDiskRole(tt.diskName, tt.diskID)
-			if role != tt.wantRole {
-				t.Errorf("detectDiskRole(%s, %s) = %s, want %s", tt.diskName, tt.diskID, role, tt.wantRole)
-			}
-		})
-	}
-}
-
-// detectDiskRole is a helper function that mimics the role detection logic
-func detectDiskRole(name, id string) string {
-	// Match the logic in enrichWithRole
-	if name == "parity" || name == "parity2" || id == "parity" || id == "parity2" {
-		return "parity"
-	}
-	if name == "flash" || id == "flash" {
-		return "flash"
-	}
-	if name == "cache" || id == "cache" {
-		return "cache"
-	}
-	if len(name) >= 4 && name[:4] == "pool" {
-		return "pool"
-	}
-	if len(name) >= 4 && name[:4] == "disk" {
-		return "data"
-	}
-	return "unknown"
-}
-
 // TestDiskSpinStateValues tests valid spin state values
 func TestDiskSpinStateValues(t *testing.T) {
 	validStates := []string{"active", "standby", "unknown"}
@@ -374,7 +301,7 @@ func TestParseDiskKeyValue(t *testing.T) {
 			name:       "parse temperature wildcard",
 			line:       "temp=*",
 			checkField: "temp",
-			expected:   0.0, // "*" means spun down, no temp
+			expected:   nil, // "*" means temperature unavailable
 		},
 		{
 			name:       "parse numErrors",
@@ -389,10 +316,10 @@ func TestParseDiskKeyValue(t *testing.T) {
 			expected:   30,
 		},
 		{
-			name:       "parse format",
-			line:       "format=xfs",
+			name:       "ignore partition format",
+			line:       "format=GPT: 4KiB-aligned",
 			checkField: "format",
-			expected:   "xfs",
+			expected:   "",
 		},
 		{
 			name:       "invalid line (no equals)",
@@ -429,8 +356,8 @@ func TestParseDiskKeyValue(t *testing.T) {
 					t.Errorf("Size = %d, want %d", disk.Size, tt.expected)
 				}
 			case "temp":
-				if disk.Temperature != tt.expected.(float64) {
-					t.Errorf("Temperature = %f, want %f", disk.Temperature, tt.expected)
+				if (tt.expected == nil && disk.Temperature != nil) || (tt.expected != nil && (disk.Temperature == nil || *disk.Temperature != tt.expected.(float64))) {
+					t.Errorf("Temperature = %v, want %v", disk.Temperature, tt.expected)
 				}
 			case "errors":
 				if disk.SMARTErrors != tt.expected.(int) {
@@ -481,7 +408,7 @@ temp="*"
 		if disks[0].Name != "parity" || disks[0].Device != "sdb" {
 			t.Errorf("disk[0] = %+v, want parity/sdb", disks[0])
 		}
-		if disks[0].Temperature != 34 {
+		if disks[0].Temperature == nil || *disks[0].Temperature != 34 {
 			t.Errorf("disk[0] temp = %v, want 34", disks[0].Temperature)
 		}
 		if disks[1].Name != "disk1" {
@@ -491,9 +418,9 @@ temp="*"
 		if disks[1].Size != 1024000 {
 			t.Errorf("disk[1].Size = %d, want 1024000", disks[1].Size)
 		}
-		// temp="*" means spun down -> temperature stays 0
-		if disks[1].Temperature != 0 {
-			t.Errorf("disk[1] temp = %v, want 0 (spun down)", disks[1].Temperature)
+		// temp="*" is unavailable -> temperature stays nil
+		if disks[1].Temperature != nil {
+			t.Errorf("disk[1] temp = %v, want nil (unavailable)", disks[1].Temperature)
 		}
 	})
 
@@ -1039,5 +966,164 @@ func TestEnrichWithModelAndSerialEmptyID(t *testing.T) {
 	if disk.Model != "" && disk.SerialNumber != "" {
 		// If both are populated, sysfs read worked (unlikely in test environment)
 		t.Logf("Sysfs read succeeded: Model=%q, Serial=%q", disk.Model, disk.SerialNumber)
+	}
+}
+
+func TestApplySMARTResult(t *testing.T) {
+	sata := func(health string) []string {
+		return []string{
+			"SMART overall-health self-assessment test result: " + health,
+			"ID# ATTRIBUTE_NAME          FLAG     VALUE WORST THRESH TYPE      UPDATED  WHEN_FAILED RAW_VALUE",
+			"  9 Power_On_Hours          0x0032   093   093   000    Old_age   Always       -       6400",
+			" 12 Power_Cycle_Count       0x0032   100   100   020    Old_age   Always       -       37",
+			"190 Airflow_Temperature_Cel 0x0022   074   039   040    Old_age   Always   In_the_past 26 (Min/Max 21/50 #9)",
+		}
+	}
+	tests := []struct {
+		name       string
+		lines      []string
+		exitStatus int
+		nvme       bool
+		wantStatus string
+		wantAttrs  bool
+	}{
+		{"clean", sata("PASSED"), 0, false, "PASSED", true},
+		{"past threshold", sata("PASSED"), 32, false, "PASSED", true},
+		{"past threshold and error log", sata("PASSED"), 96, false, "PASSED", true},
+		{"self-test log", sata("PASSED"), 128, false, "PASSED", true},
+		{"pre-fail now", sata("PASSED"), 16, false, "PASSED", true},
+		{"standby", []string{"Device is in STANDBY mode, exit(2)"}, 2, false, "UNKNOWN", false},
+		{"bad command line ignores output", sata("PASSED"), 1, false, "UNKNOWN", false},
+		{"command failed", sata("PASSED"), 4, false, "UNKNOWN", false},
+		{"failing", sata("FAILED!"), 8, false, "FAILED", true},
+		{"failing wins over command failed", sata("PASSED"), 12, false, "FAILED", true},
+		{"failing keeps informational bits", sata("FAILED!"), 40, false, "FAILED", true},
+		{"nvme ok", []string{"SMART Health Status: OK"}, 0, true, "PASSED", false},
+		{"nvme error log", []string{"SMART Health Status: OK"}, 64, true, "PASSED", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			disk := &dto.DiskInfo{Device: "sda", SMARTStatus: "UNKNOWN"}
+			applySMARTResult(disk, tt.lines, tt.exitStatus, tt.nvme)
+			if disk.SMARTStatus != tt.wantStatus {
+				t.Errorf("SMARTStatus = %q, want %q", disk.SMARTStatus, tt.wantStatus)
+			}
+			if disk.SMARTExitStatus != tt.exitStatus {
+				t.Errorf("SMARTExitStatus = %d, want %d", disk.SMARTExitStatus, tt.exitStatus)
+			}
+			if got := len(disk.SMARTAttributes) > 0; got != tt.wantAttrs {
+				t.Fatalf("attributes present = %v, want %v", got, tt.wantAttrs)
+			}
+			if !tt.wantAttrs {
+				return
+			}
+			if got := disk.SMARTAttributes["190"]; got.WhenFailed != "In_the_past" || got.RawValue != "26 (Min/Max 21/50 #9)" {
+				t.Errorf("attribute 190 = %+v", got)
+			}
+			if disk.PowerOnHours != 6400 || disk.PowerCycleCount != 37 {
+				t.Errorf("PowerOnHours = %d, PowerCycleCount = %d", disk.PowerOnHours, disk.PowerCycleCount)
+			}
+		})
+	}
+}
+
+func TestEnrichWithSMARTDataCommandResult(t *testing.T) {
+	const output = `SMART overall-health self-assessment test result: PASSED
+ID# ATTRIBUTE_NAME          FLAG     VALUE WORST THRESH TYPE      UPDATED  WHEN_FAILED RAW_VALUE
+  9 Power_On_Hours          0x0032   093   093   000    Old_age   Always       -       6400
+ 12 Power_Cycle_Count       0x0032   100   100   020    Old_age   Always       -       37`
+
+	tests := []struct {
+		name       string
+		action     string
+		wantStatus string
+		wantExit   int
+		wantAttrs  bool
+	}{
+		{"success", "exit 0", "PASSED", 0, true},
+		{"informational exit preserves data", "exit 96", "PASSED", 96, true},
+		{"failing exit overrides passed output", "exit 8", "FAILED", 8, true},
+		{"standby exit ignores output", "exit 2", "UNKNOWN", 2, false},
+		{"signal ignores partial output", "kill -KILL $$", "UNKNOWN", 128, false},
+		{"start failure", "", "UNKNOWN", 128, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			binDir := t.TempDir()
+			argsPath := filepath.Join(t.TempDir(), "args")
+			t.Setenv("PATH", binDir)
+			t.Setenv("SMARTCTL_TEST_ARGS", argsPath)
+			t.Setenv("SMARTCTL_TEST_OUTPUT", output)
+			if tt.action != "" {
+				script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$SMARTCTL_TEST_ARGS\"\nprintf '%s\\n' \"$SMARTCTL_TEST_OUTPUT\"\n" + tt.action + "\n"
+				if err := os.WriteFile(filepath.Join(binDir, "smartctl"), []byte(script), 0700); err != nil { // #nosec G306 -- owner-only executable fixture in t.TempDir.
+					t.Fatal(err)
+				}
+			}
+
+			// /dev/null passes the existence check without needing disk hardware.
+			// Seed a previous result to verify incomplete commands do not replace
+			// the last completed exit status or retain a stale healthy status.
+			disk := &dto.DiskInfo{Device: "null", SMARTStatus: "PASSED", SMARTExitStatus: 128}
+			collector := &DiskCollector{}
+			collector.enrichWithSMARTData(disk)
+
+			if tt.action != "" {
+				args, err := os.ReadFile(argsPath) // #nosec G304 -- fixed filename inside t.TempDir, not user input.
+				if err != nil {
+					t.Fatalf("smartctl was not invoked: %v", err)
+				}
+				if got, want := string(args), "-n\nstandby\n-H\n-A\n/dev/null\n"; got != want {
+					t.Errorf("smartctl arguments = %q, want %q", got, want)
+				}
+			}
+			if disk.SMARTStatus != tt.wantStatus {
+				t.Errorf("SMARTStatus = %q, want %q", disk.SMARTStatus, tt.wantStatus)
+			}
+			if disk.SMARTExitStatus != tt.wantExit {
+				t.Errorf("SMARTExitStatus = %d, want %d", disk.SMARTExitStatus, tt.wantExit)
+			}
+			if !tt.wantAttrs {
+				if len(disk.SMARTAttributes) != 0 || disk.PowerOnHours != 0 || disk.PowerCycleCount != 0 {
+					t.Errorf("unusable output populated SMART data: %+v", disk)
+				}
+				return
+			}
+			if len(disk.SMARTAttributes) != 2 {
+				t.Errorf("SMARTAttributes = %v, want two attributes", disk.SMARTAttributes)
+			}
+			if got := disk.SMARTAttributes["9"]; got.ID != 9 || got.Name != "Power_On_Hours" || got.RawValue != "6400" {
+				t.Errorf("power-on-hours attribute = %+v", got)
+			}
+			if got := disk.SMARTAttributes["12"]; got.ID != 12 || got.Name != "Power_Cycle_Count" || got.RawValue != "37" {
+				t.Errorf("power-cycle-count attribute = %+v", got)
+			}
+			if disk.PowerOnHours != 6400 || disk.PowerCycleCount != 37 {
+				t.Errorf("PowerOnHours = %d, PowerCycleCount = %d; want 6400 and 37", disk.PowerOnHours, disk.PowerCycleCount)
+			}
+		})
+	}
+}
+
+func TestSMARTExitStatus(t *testing.T) {
+	lines, err := lib.ExecCommand("sh", "-c", "echo 'SMART Health Status: OK'; exit 96")
+	if err == nil {
+		t.Fatal("expected an error from a non-zero exit")
+	}
+	if len(lines) != 1 {
+		t.Errorf("stdout must survive a non-zero exit, got %q", lines)
+	}
+	if status, completed := smartExitStatus(err); status != 96 || !completed {
+		t.Errorf("real exit: got (%d, %v), want (96, true)", status, completed)
+	}
+	if status, completed := smartExitStatus(nil); status != 0 || !completed {
+		t.Errorf("nil: got (%d, %v), want (0, true)", status, completed)
+	}
+	if _, completed := smartExitStatus(errors.New("command timed out after 60s")); completed {
+		t.Error("timeout must not count as completed")
+	}
+	_, err = lib.ExecCommand("sh", "-c", "kill -9 $$")
+	if _, completed := smartExitStatus(err); completed {
+		t.Error("a killed process must not count as completed")
 	}
 }
