@@ -81,7 +81,7 @@ func TestShareMeasuredUsage(t *testing.T) {
 		{"unmounted child", "cache/media\t10\tyes\t/mnt/cache/media\ncache/media/child\t20\tno\t/mnt/cache/media/child", nil, new(uint64(10))},
 		{"child mounted outside", "cache/media\t10\tyes\t/mnt/cache/media\ncache/media/archive\t20\tyes\t/mnt/cache/backups", nil, new(uint64(10))},
 		{"mountpoint prefix collision", "cache/media\t10\tyes\t/mnt/cache/media\ncache/media/child\t20\tyes\t/mnt/cache/mediabox", nil, new(uint64(10))},
-		{"same mountpoint", "cache/media\t10\tyes\t/mnt/cache/media\ncache/media/child\t20\tyes\t/mnt/cache/media", nil, new(uint64(30))},
+		{"same mountpoint", "cache/media\t10\tyes\t/mnt/cache/media\ncache/media/child\t20\tyes\t/mnt/cache/media", nil, nil},
 		{"unmounted direct", "cache/media\t10\tno\t/mnt/cache/media", nil, nil},
 		{"unknown mounted state", "cache/media\t10\tyes\t/mnt/cache/media\ncache/media/child\t20\t-\t/mnt/cache/media/child", nil, nil},
 		{"unknown child mountpoint", "cache/media\t10\tyes\t/mnt/cache/media\ncache/media/child\t20\tyes\t-", nil, nil},

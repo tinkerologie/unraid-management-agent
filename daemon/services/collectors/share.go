@@ -429,6 +429,7 @@ func shareDatasetUsage(out, dataset string) (uint64, bool) {
 		return 0, false
 	}
 	var total uint64
+	seen := make(map[string]bool, len(rows))
 	for _, fields := range rows {
 		if fields[2] == "no" {
 			continue
@@ -437,6 +438,11 @@ func shareDatasetUsage(out, dataset string) (uint64, bool) {
 			return 0, false
 		}
 		childMountpoint := path.Clean(fields[3])
+		// Filesystems stacked on one mountpoint hide each other, so the visible size is unknown.
+		if seen[childMountpoint] {
+			return 0, false
+		}
+		seen[childMountpoint] = true
 		if childMountpoint != mountpoint && !strings.HasPrefix(childMountpoint, strings.TrimSuffix(mountpoint, "/")+"/") {
 			continue
 		}
