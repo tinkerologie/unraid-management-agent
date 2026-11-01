@@ -23,6 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   model-specific interfaces, automatic discovery, implementation phases and validation requirements.
   This documents proposed work; it does not add runtime PSU monitoring.
 
+### Fixed
+
+- Container memory usage now excludes the `inactive_file` page cache from cgroup v2
+  `memory.current`, clamped at zero. Missing or malformed `memory.stat` falls back to raw usage;
+  memory percentages, displays and aggregates use the corrected value (#294).
+
 ### Security
 
 - Require Go 1.27.3 for builds to include the `crypto/x509` intermediate-certificate distrust

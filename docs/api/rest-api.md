@@ -1644,6 +1644,10 @@ List all Docker containers.
 
 > `mac_address` is populated from `docker inspect` (Docker 29 / Unraid 7.3 fixed-MAC support).
 
+`memory_usage_bytes` is cgroup v2 `memory.current` minus `inactive_file` from `memory.stat`,
+clamped at zero; if `memory.stat` is missing, unreadable or lacks a valid `inactive_file`, raw
+`memory.current` is used. Memory usage in MB, percentage, display and aggregates use this same value.
+
 **New container fields (this branch):**
 
 | Field                      | Type      | Description                                                         |
