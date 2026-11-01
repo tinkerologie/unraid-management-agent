@@ -86,7 +86,7 @@ func plausibleTelemetryTemp(label string, value float64) bool {
 		return false
 	}
 	label = strings.ToUpper(strings.TrimSpace(label))
-	if strings.Contains(label, "PECI") && value <= 0 {
+	if (strings.Contains(label, "PECI") || strings.Contains(label, "DIMM")) && value <= 0 {
 		return false
 	}
 	if label == "SYSTIN" || strings.HasPrefix(label, "AUXTIN") {

@@ -30,7 +30,7 @@ func TestTelemetryTemperatureLabels(t *testing.T) {
 	}{
 		{"SYSTIN", 116, false}, {"AUXTIN1", 108, false}, {"AUXTIN2", 109, false}, {"AUXTIN3", 108, false},
 		{"systin", 100, true}, {"auxTin12", 101, false}, {"SYSTIN", 33, true}, {"AUXTIN", 45, true},
-		{"PECI Agent 0", 0, false}, {"PECI Agent 1", -1, false}, {"peci Agent 0", 42, true},
+		{"Agent0 Dimm0", 0, false}, {"Agent0 Dimm0", 38, true}, {"PECI Agent 0", 0, false}, {"PECI Agent 1", -1, false}, {"peci Agent 0", 42, true},
 		{"External Probe", 0, true}, {"External Probe", -10, true}, {"CPUTIN", 116, true},
 		{"Core 0", 110, true}, {"Package id 0", 120, true}, {"VRM", 110, true},
 		{"AUXTIN extra", 110, false}, {"SYSTIN", 101, false}, {"VRM", 125, false},
