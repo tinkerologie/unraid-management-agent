@@ -1,11 +1,134 @@
 package collectors
 
 import (
+	"fmt"
+	"io"
+	"math"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
+	"testing/iotest"
 	"time"
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/lib/testutil"
 )
+
+func TestParseCgroupInactiveFile(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  uint64
+		ok    bool
+	}{
+		{"valid", "anon 100\nactive_file 200\ninactive_file 436\nfile 636\n", 436, true},
+		{"whitespace", "\n\tinactive_file\t42 \n", 42, true},
+		{"zero", "inactive_file 0\n", 0, true},
+		{"maximum", "inactive_file 18446744073709551615\n", math.MaxUint64, true},
+		{"absent", "active_file 436\n", 0, false},
+		{"empty", "", 0, false},
+		{"non-numeric", "inactive_file invalid\n", 0, false},
+		{"negative", "inactive_file -1\n", 0, false},
+		{"overflow", "inactive_file 18446744073709551616\n", 0, false},
+		{"missing value", "inactive_file\n", 0, false},
+		{"extra fields", "inactive_file 436 extra\n", 0, false},
+		{"prefixed key", "inactive_file_x 436\n", 0, false},
+		{"scanner error", strings.Repeat("x", 64*1024), 0, false},
+		{"scanner error after counter", "inactive_file 436\n" + strings.Repeat("x", 64*1024), 0, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, ok := parseCgroupInactiveFile(strings.NewReader(tt.input))
+			if got != tt.want || ok != tt.ok {
+				t.Errorf("parseCgroupInactiveFile() = (%d, %t), want (%d, %t)", got, ok, tt.want, tt.ok)
+			}
+		})
+	}
+	t.Run("read error after counter", func(t *testing.T) {
+		reader := io.MultiReader(strings.NewReader("inactive_file 436\n"), iotest.ErrReader(io.ErrUnexpectedEOF))
+		if got, ok := parseCgroupInactiveFile(reader); got != 0 || ok {
+			t.Errorf("parseCgroupInactiveFile() = (%d, %t), want (0, false)", got, ok)
+		}
+	})
+}
+
+func TestDockerWorkingSetMemory(t *testing.T) {
+	tests := []struct {
+		name                  string
+		current, inactiveFile uint64
+		want                  uint64
+	}{
+		{"normal", 636, 436, 200},
+		{"zero inactive", 636, 0, 636},
+		{"equal", 636, 636, 0},
+		{"greater", 636, 637, 0},
+		{"both zero", 0, 0, 0},
+		{"maximum inactive", 1, math.MaxUint64, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := dockerWorkingSetMemory(tt.current, tt.inactiveFile); got != tt.want {
+				t.Errorf("dockerWorkingSetMemory(%d, %d) = %d, want %d", tt.current, tt.inactiveFile, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestReadCgroupMemory(t *testing.T) {
+	const mib = 1024 * 1024
+	current := fmt.Sprintf("%d\n", 636*mib)
+	inactive := fmt.Sprintf("active_file 100\ninactive_file %d\n", 436*mib)
+	tests := []struct {
+		name          string
+		current       string
+		stat          string
+		statDirectory bool
+		wantMB        float64
+		wantPercent   float64
+		wantDisplay   string
+	}{
+		{"adjusted", current, inactive, false, 200, 25, "200.00 MB / 800.00 MB"},
+		{"missing stat", current, "", false, 636, 79.5, "636.00 MB / 800.00 MB"},
+		{"unreadable stat", current, "", true, 636, 79.5, "636.00 MB / 800.00 MB"},
+		{"malformed stat", current, "inactive_file invalid\n", false, 636, 79.5, "636.00 MB / 800.00 MB"},
+		{"absent counter", current, "active_file 436\n", false, 636, 79.5, "636.00 MB / 800.00 MB"},
+		{"zero inactive", current, "inactive_file 0\n", false, 636, 79.5, "636.00 MB / 800.00 MB"},
+		{"equal inactive", current, fmt.Sprintf("inactive_file %d\n", 636*mib), false, 0, 0, "0.00 MB / 800.00 MB"},
+		{"greater inactive", current, fmt.Sprintf("inactive_file %d\n", 637*mib), false, 0, 0, "0.00 MB / 800.00 MB"},
+		{"missing current", "", inactive, false, 0, 0, "0.00 MB / 800.00 MB"},
+		{"malformed current", "invalid\n", inactive, false, 0, 0, "0.00 MB / 800.00 MB"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			testutil.WriteFile(t, dir, "memory.max", fmt.Sprintf("%d\n", 800*mib))
+			if tt.current != "" {
+				testutil.WriteFile(t, dir, "memory.current", tt.current)
+			}
+			if tt.stat != "" {
+				testutil.WriteFile(t, dir, "memory.stat", tt.stat)
+			}
+			if tt.statDirectory {
+				if err := os.Mkdir(filepath.Join(dir, "memory.stat"), 0o750); err != nil {
+					t.Fatal(err)
+				}
+			}
+			var cont dto.ContainerInfo
+			readCgroupMemory(dir, &cont)
+			if cont.MemoryUsage != uint64(tt.wantMB*mib) || cont.MemoryUsageMB != tt.wantMB ||
+				cont.MemoryPercent != tt.wantPercent || cont.MemoryDisplay != tt.wantDisplay || cont.MemoryLimit != 800*mib {
+				t.Errorf("memory = (%d bytes, %g MB, %g%%, %q, limit %d), want (%g MB, %g%%, %q, limit %d)",
+					cont.MemoryUsage, cont.MemoryUsageMB, cont.MemoryPercent, cont.MemoryDisplay, cont.MemoryLimit,
+					tt.wantMB, tt.wantPercent, tt.wantDisplay, 800*mib)
+			}
+		})
+	}
+}
 
 func TestNewDockerCollector(t *testing.T) {
 	hub := domain.NewEventBus(10)

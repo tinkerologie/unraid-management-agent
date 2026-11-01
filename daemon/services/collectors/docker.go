@@ -313,20 +313,31 @@ func (c *DockerCollector) Collect() {
 // getMemoryFromCgroups reads memory stats directly from cgroup v2 filesystem
 // This is much faster than using Docker's ContainerStats API
 func (c *DockerCollector) getMemoryFromCgroups(fullID string, cont *dto.ContainerInfo) {
-	cgroupPath := "/sys/fs/cgroup/docker/" + fullID
+	readCgroupMemory("/sys/fs/cgroup/docker/"+fullID, cont)
+}
 
+// readCgroupMemory reports cache-adjusted usage from a container's cgroup directory.
+func readCgroupMemory(cgroupDir string, cont *dto.ContainerInfo) {
 	// Read memory.current
-	// #nosec G304 -- cgroupPath is constructed from a trusted Docker container ID under /sys/fs/cgroup/docker.
-	if data, err := os.ReadFile(cgroupPath + "/memory.current"); err == nil {
+	// #nosec G304 -- cgroupDir is constructed from a trusted Docker container ID under /sys/fs/cgroup/docker.
+	if data, err := os.ReadFile(cgroupDir + "/memory.current"); err == nil {
 		var memUsage uint64
 		if _, err := fmt.Sscanf(strings.TrimSpace(string(data)), "%d", &memUsage); err == nil {
 			cont.MemoryUsage = memUsage
+			// Missing or invalid cache statistics leave raw usage intact.
+			// #nosec G304 -- cgroupDir is the same trusted container cgroup directory.
+			if f, err := os.Open(cgroupDir + "/memory.stat"); err == nil {
+				defer func() { _ = f.Close() }()
+				if inactiveFile, ok := parseCgroupInactiveFile(f); ok {
+					cont.MemoryUsage = dockerWorkingSetMemory(memUsage, inactiveFile)
+				}
+			}
 		}
 	}
 
 	// Read memory.max
-	// #nosec G304 -- cgroupPath is constructed from a trusted Docker container ID under /sys/fs/cgroup/docker.
-	if data, err := os.ReadFile(cgroupPath + "/memory.max"); err == nil {
+	// #nosec G304 -- cgroupDir is constructed from a trusted Docker container ID under /sys/fs/cgroup/docker.
+	if data, err := os.ReadFile(cgroupDir + "/memory.max"); err == nil {
 		content := strings.TrimSpace(string(data))
 		if content != "max" {
 			var memLimit uint64
@@ -345,6 +356,40 @@ func (c *DockerCollector) getMemoryFromCgroups(fullID string, cont *dto.Containe
 		cont.MemoryPercent = float64(cont.MemoryUsage) / float64(cont.MemoryLimit) * 100
 	}
 	cont.MemoryUsageMB = float64(cont.MemoryUsage) / (1024 * 1024)
+}
+
+// parseCgroupInactiveFile reads the exact inactive_file counter from memory.stat.
+// Scan the entire input so a later read error cannot produce a partial result.
+func parseCgroupInactiveFile(r io.Reader) (uint64, bool) {
+	var inactiveFile uint64
+	found := false
+	sc := bufio.NewScanner(r)
+	for sc.Scan() {
+		fields := strings.Fields(sc.Text())
+		if len(fields) == 0 || fields[0] != "inactive_file" {
+			continue
+		}
+		if len(fields) != 2 {
+			return 0, false
+		}
+		value, err := strconv.ParseUint(fields[1], 10, 64)
+		if err != nil {
+			return 0, false
+		}
+		inactiveFile, found = value, true
+	}
+	if sc.Err() != nil {
+		return 0, false
+	}
+	return inactiveFile, found
+}
+
+// dockerWorkingSetMemory excludes inactive file cache without unsigned underflow.
+func dockerWorkingSetMemory(current, inactiveFile uint64) uint64 {
+	if inactiveFile >= current {
+		return 0
+	}
+	return current - inactiveFile
 }
 
 // convertPorts converts Docker API port format to our DTO format

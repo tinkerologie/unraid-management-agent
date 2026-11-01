@@ -43,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Container memory usage now excludes the `inactive_file` page cache from cgroup v2
+  `memory.current`, clamped at zero. Missing or malformed `memory.stat` falls back to raw usage;
+  memory percentages, displays and aggregates use the corrected value (#294).
 - **Sensor plausibility and unknown measurements** (#297): apply a 100 °C ceiling only to `SYSTIN`
   and `AUXTIN*` temperature labels, and drop readings at or below 0 °C only for PECI and DIMM labels.
   Other labels retain the global −40 °C < reading < 125 °C range. AUXTIN VRM readings above
