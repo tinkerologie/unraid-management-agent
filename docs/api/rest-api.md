@@ -855,12 +855,15 @@ Get system information including CPU, memory, temperatures, and uptime.
 - `version`: Unraid OS version
 - `agent_version`: Management Agent version
 - `uptime_seconds`: System uptime in seconds
-- `cpu_usage_percent`: Overall CPU usage percentage
+- `cpu_usage_percent`: Overall CPU usage percentage (0–100) since the previous successful collection;
+  the first reading after collector start is the average since boot.
 - `cpu_model`: CPU model name
 - `cpu_cores`: Number of physical CPU cores
 - `cpu_threads`: Number of CPU threads (with hyperthreading)
 - `cpu_mhz`: Current CPU frequency in MHz
-- `cpu_per_core_usage`: Per-core CPU usage map (optional)
+- `cpu_per_core_usage`: Per-core CPU usage map (optional), from the same snapshot as `cpu_usage_percent`.
+  New cores and reset counters use the since-boot average. Zero deltas retain the previous reading and baseline.
+  Failed CPU reads preserve the baseline, so the next successful reading spans the gap.
 - `cpu_temp_celsius`: CPU temperature in Celsius
 - `ram_usage_percent`: RAM usage percentage
 - `ram_total_bytes`: Total RAM in bytes

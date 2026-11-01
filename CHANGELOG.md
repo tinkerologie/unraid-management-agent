@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- CPU usage now uses one `/proc/stat` snapshot per collection for aggregate and per-core readings,
+  without sampling sleeps (#298). Readings cover the interval since the previous successful collection;
+  the first reading is the since-boot average. Counter resets and decreases are handled safely,
+  and zero deltas retain the previous reading and baseline.
 - VM telemetry now reports guest memory usage, then QEMU RSS, then zero for running VMs,
   and zero for non-running VMs (#295). The Home Assistant "Memory Used" sensor now shows
   real or zero usage instead of allocated memory. Primary disk source and guest-visible virtual

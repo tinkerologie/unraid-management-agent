@@ -82,7 +82,11 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 **Key Fields**:
 
 - `hostname` - Server hostname
-- `cpu_usage_percent` - Overall CPU usage (0-100)
+- `cpu_usage_percent` - Overall CPU usage (0-100) since the previous successful collection;
+  the first reading after collector start is the average since boot.
+- `cpu_per_core_usage` - Optional per-core usage map from the same snapshot. New cores and reset counters
+  use the since-boot average. Zero deltas retain the previous reading and baseline. Failed CPU reads
+  preserve the baseline, so the next successful reading spans the gap.
 - `cpu_temp_celsius` - CPU temperature
 - `ram_usage_percent` - RAM usage (0-100)
 - `motherboard_temp_celsius` - Motherboard temperature (`null` when unmeasured)
