@@ -7315,6 +7315,11 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 0
                 },
+                "smart_exit_status": {
+                    "description": "SMARTExitStatus is the bitmask smartctl exited with (see the SMARTExit\nconstants), omitted when zero or when smartctl did not run to its own exit.",
+                    "type": "integer",
+                    "example": 32
+                },
                 "smart_status": {
                     "type": "string",
                     "example": "PASSED"
