@@ -174,7 +174,7 @@ func TestBuildHealthReport_UpdateAvailableIsInfo(t *testing.T) {
 func TestBuildHealthReport_DiskHighTemp(t *testing.T) {
 	array := &dto.ArrayStatus{State: "Started"}
 	disks := []dto.DiskInfo{
-		{ID: "disk1", Name: "Hot Disk", SMARTStatus: "PASSED", Temperature: 60},
+		{ID: "disk1", Name: "Hot Disk", SMARTStatus: "PASSED", Temperature: new(float64(60))},
 	}
 
 	report := BuildHealthReport(nil, array, disks, nil)
@@ -217,7 +217,7 @@ func TestBuildHealthReport_SeverityCounts(t *testing.T) {
 	array := &dto.ArrayStatus{State: "Stopped"}
 	disks := []dto.DiskInfo{
 		{ID: "d1", Name: "d1", SMARTStatus: "FAILED"},
-		{ID: "d2", Name: "d2", SMARTStatus: "PASSED", Temperature: 57},
+		{ID: "d2", Name: "d2", SMARTStatus: "PASSED", Temperature: new(float64(57))},
 	}
 
 	report := BuildHealthReport(containers, array, disks, nil)

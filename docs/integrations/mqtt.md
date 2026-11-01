@@ -11,6 +11,14 @@ The Unraid Management Agent can publish system events to MQTT brokers in real-ti
 - **Custom automation** scripts
 - **Multi-server monitoring** from a central MQTT broker
 
+## Unavailable measurements
+
+Unmeasured motherboard temperature, disk temperature (including standby disks), and GPU temperature,
+power, memory used, memory total and memory utilisation retain their JSON keys with `null` values.
+Measured zeros remain numbers. Home Assistant discovery templates for these numeric sensors render `None`
+for null or missing fields, so Home Assistant displays unknown rather than a fabricated 0.
+GPU power and memory utilisation keep one decimal place when measured.
+
 ## Configuration
 
 ### Enable MQTT

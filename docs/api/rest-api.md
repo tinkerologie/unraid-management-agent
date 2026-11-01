@@ -873,7 +873,7 @@ Get system information including CPU, memory, temperatures, and uptime.
 - `server_model`: Server/motherboard model
 - `bios_version`: BIOS version
 - `bios_date`: BIOS date
-- `motherboard_temp_celsius`: Motherboard temperature in Celsius
+- `motherboard_temp_celsius`: Motherboard temperature in Celsius; `null` when no motherboard sensor is measured
 - `hvm_enabled`: Hardware virtualization enabled
 - `iommu_enabled`: IOMMU enabled for PCIe passthrough
 - `openssl_version`: OpenSSL version (optional)
@@ -898,6 +898,17 @@ curl http://192.168.20.21:8043/api/v1/system
 ```
 
 **Note**: All size fields are in **bytes**, all temperatures are in **Celsius**, and all percentages use the `_percent` suffix.
+
+Temperature telemetry keeps the global range −40 °C < reading < 125 °C. The raw label `SYSTIN`
+and labels starting with `AUXTIN` (case-insensitive) additionally have a 100 °C ceiling.
+Labels containing `PECI` or `DIMM` drop readings at or below 0 °C; other labels retain legitimate zero and negative readings.
+An AUXTIN connected to a VRM running above 100 °C is therefore hidden too. These telemetry filters do not change
+fan-control or thermal-safety policy.
+
+A fan channel with a non-finite, negative or above-25000 RPM reading is hidden for 15 minutes from its last
+implausible reading. Further implausible samples restart this per-channel quarantine; healthy channels keep their names.
+A measured 25000 RPM is accepted. The `sensors` source retains 0 RPM; the sysfs fallback continues to omit
+unpopulated 0 RPM channels. Fan DTO fields are unchanged.
 
 ---
 
@@ -1302,7 +1313,7 @@ List all disks in the system.
     "size_bytes": 8000450304000,
     "used_bytes": 0,
     "free_bytes": 8000450304000,
-    "temperature_celsius": 0,
+    "temperature_celsius": null,
     "smart_status": "PASSED",
     "smart_errors": 0,
     "spindown_delay": 0,
@@ -1339,7 +1350,7 @@ List all disks in the system.
 - `size_bytes`: Total disk capacity in bytes
 - `used_bytes`: Used space in bytes
 - `free_bytes`: Free space in bytes
-- `temperature_celsius`: Disk temperature in Celsius (0 if spun down)
+- `temperature_celsius`: Disk temperature in Celsius (`null` if spun down or unreadable; a measured 0 stays 0)
 - `smart_status`: SMART health status (`PASSED`, `FAILED`)
 - `smart_errors`: Number of SMART errors
 - `spindown_delay`: Spindown delay in minutes (0 = never)
@@ -2346,17 +2357,34 @@ Get GPU information and metrics.
 ```json
 [
   {
-    "id": "0",
+    "available": true,
+    "index": 0,
+    "pci_id": "0000:00:02.0",
     "name": "Intel UHD Graphics 770",
-    "vendor": "Intel",
-    "temperature_celsius": 45,
-    "usage_percent": 10,
-    "memory_total_bytes": 8589934592,
-    "memory_used_bytes": 1073741824,
+    "vendor": "intel",
+    "driver_version": "i915",
+    "temperature_celsius": null,
+    "cpu_temperature_celsius": 45,
+    "utilization_gpu_percent": 10,
+    "utilization_memory_percent": null,
+    "memory_total_bytes": null,
+    "memory_used_bytes": null,
+    "power_draw_watts": null,
     "timestamp": "2025-10-03T13:41:13+10:00"
   }
 ]
 ```
+
+`temperature_celsius`, `power_draw_watts`, `memory_total_bytes`, `memory_used_bytes` and
+`utilization_memory_percent` are `null` when unmeasured. Their keys stay present, and a measured zero stays 0.
+Memory utilisation requires both total and used memory readings and a positive total.
+This contract applies to all GPU vendors, including unsupported NVIDIA and unreadable AMD measurements.
+
+Intel temperature is read only from the detected PCI device's hwmon; CPU temperature remains separate.
+Intel `driver_version` is the bound driver name (`i915` or `xe`), followed by a space and the contents of
+`/sys/module/<driver>/version` when available (for example `xe 1.2.3`). It is empty if no supported bound driver
+can be resolved. The kernel release/vermagic is never reported as the driver version.
+The `intel_gpu_top` sample is still not bound to an individual GPU on multi-Intel-GPU hosts.
 
 ---
 
@@ -3805,6 +3833,12 @@ to their alert rules configuration file.
 | `MaxReallocatedSectors`       | int   | Maximum reallocated sector count across all array disks                |
 | `MaxPendingSectors`           | int   | Maximum pending (uncorrectable) sector count across all array disks    |
 | `DiskErrorsIncreasing`        | bool  | `true` when any disk's error count has a positive slope                |
+
+`MotherboardTemp`, `MaxDiskTemp`, `MaxGPUTemp` and `TotalGPUPower` are nullable numbers.
+They are `nil` when no valid measurement exists. Aggregates use only measured values.
+Guard custom rules, for example `MaxDiskTemp != nil && MaxDiskTemp > 55`.
+An unguarded comparison with `nil` fails evaluation, logs the failure once and preserves the alert's prior state;
+a measured zero evaluates normally. Missing disk temperatures do not add fake zero samples to trend history.
 
 **How to write a trend alert rule:**
 

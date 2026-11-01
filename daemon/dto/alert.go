@@ -41,20 +41,22 @@ type AlertStatus struct {
 // The source tag names the collectors whose data feeds each field (comma
 // separated when several do), or "-" when no collector does. Enabled rules keep
 // those collectors running at their default interval in Dynamic collection mode.
+// MotherboardTemp, MaxDiskTemp, MaxGPUTemp and TotalGPUPower are nil when
+// unmeasured. Guard comparisons with != nil, as with UPS/NUT readings.
 type AlertEnv struct {
 	// System
-	CPU             float64 `expr:"CPU" source:"system"`
-	RAMUsedPct      float64 `expr:"RAMUsedPct" source:"system"`
-	RAMTotalBytes   uint64  `expr:"RAMTotalBytes" source:"system"`
-	RAMUsedBytes    uint64  `expr:"RAMUsedBytes" source:"system"`
-	RAMFreeBytes    uint64  `expr:"RAMFreeBytes" source:"system"`
-	SwapUsedPct     float64 `expr:"SwapUsedPct" source:"system"`
-	SwapTotalBytes  uint64  `expr:"SwapTotalBytes" source:"system"`
-	SwapUsedBytes   uint64  `expr:"SwapUsedBytes" source:"system"`
-	SwapFreeBytes   uint64  `expr:"SwapFreeBytes" source:"system"`
-	CPUTemp         float64 `expr:"CPUTemp" source:"system"`
-	MotherboardTemp float64 `expr:"MotherboardTemp" source:"system"`
-	Uptime          int64   `expr:"Uptime" source:"system"`
+	CPU             float64  `expr:"CPU" source:"system"`
+	RAMUsedPct      float64  `expr:"RAMUsedPct" source:"system"`
+	RAMTotalBytes   uint64   `expr:"RAMTotalBytes" source:"system"`
+	RAMUsedBytes    uint64   `expr:"RAMUsedBytes" source:"system"`
+	RAMFreeBytes    uint64   `expr:"RAMFreeBytes" source:"system"`
+	SwapUsedPct     float64  `expr:"SwapUsedPct" source:"system"`
+	SwapTotalBytes  uint64   `expr:"SwapTotalBytes" source:"system"`
+	SwapUsedBytes   uint64   `expr:"SwapUsedBytes" source:"system"`
+	SwapFreeBytes   uint64   `expr:"SwapFreeBytes" source:"system"`
+	CPUTemp         float64  `expr:"CPUTemp" source:"system"`
+	MotherboardTemp *float64 `expr:"MotherboardTemp" source:"system"`
+	Uptime          int64    `expr:"Uptime" source:"system"`
 
 	// Array
 	ArrayState          string  `expr:"ArrayState" source:"array"`
@@ -68,17 +70,17 @@ type AlertEnv struct {
 	NumParityDisks      int     `expr:"NumParityDisks" source:"array"`
 
 	// Aggregated
-	ContainerCount            int     `expr:"ContainerCount" source:"docker"`
-	RunningContainers         int     `expr:"RunningContainers" source:"docker"`
-	StoppedContainers         int     `expr:"StoppedContainers" source:"docker"`
-	ContainerUpdatesAvailable int     `expr:"ContainerUpdatesAvailable" source:"docker,docker_update"`
-	PluginUpdatesAvailable    int     `expr:"PluginUpdatesAvailable" source:"plugin_update"`
-	VMCount                   int     `expr:"VMCount" source:"vm"`
-	RunningVMs                int     `expr:"RunningVMs" source:"vm"`
-	MaxDiskTemp               float64 `expr:"MaxDiskTemp" source:"disk"`
-	MaxDiskUsedPct            float64 `expr:"MaxDiskUsedPct" source:"disk"`
-	TotalDiskErrors           int     `expr:"TotalDiskErrors" source:"disk"`
-	UPSStatus                 string  `expr:"UPSStatus" source:"ups"`
+	ContainerCount            int      `expr:"ContainerCount" source:"docker"`
+	RunningContainers         int      `expr:"RunningContainers" source:"docker"`
+	StoppedContainers         int      `expr:"StoppedContainers" source:"docker"`
+	ContainerUpdatesAvailable int      `expr:"ContainerUpdatesAvailable" source:"docker,docker_update"`
+	PluginUpdatesAvailable    int      `expr:"PluginUpdatesAvailable" source:"plugin_update"`
+	VMCount                   int      `expr:"VMCount" source:"vm"`
+	RunningVMs                int      `expr:"RunningVMs" source:"vm"`
+	MaxDiskTemp               *float64 `expr:"MaxDiskTemp" source:"disk"`
+	MaxDiskUsedPct            float64  `expr:"MaxDiskUsedPct" source:"disk"`
+	TotalDiskErrors           int      `expr:"TotalDiskErrors" source:"disk"`
+	UPSStatus                 string   `expr:"UPSStatus" source:"ups"`
 	// UPS and NUT readings are nil when there is no UPS or it does not report
 	// the value. Guard them in expressions, e.g.
 	// "UPSLoadPercent != nil && UPSLoadPercent > 80". An unguarded comparison
@@ -90,10 +92,10 @@ type AlertEnv struct {
 	UPSRuntimeLeft   *float64 `expr:"UPSRuntimeLeft" source:"ups"`
 
 	// GPU
-	GPUCount      int     `expr:"GPUCount" source:"gpu"`
-	MaxGPUTemp    float64 `expr:"MaxGPUTemp" source:"gpu"`
-	MaxGPUUtil    float64 `expr:"MaxGPUUtil" source:"gpu"`
-	TotalGPUPower float64 `expr:"TotalGPUPower" source:"gpu"`
+	GPUCount      int      `expr:"GPUCount" source:"gpu"`
+	MaxGPUTemp    *float64 `expr:"MaxGPUTemp" source:"gpu"`
+	MaxGPUUtil    float64  `expr:"MaxGPUUtil" source:"gpu"`
+	TotalGPUPower *float64 `expr:"TotalGPUPower" source:"gpu"`
 
 	// ZFS
 	ZFSPoolCount      int     `expr:"ZFSPoolCount" source:"zfs"`

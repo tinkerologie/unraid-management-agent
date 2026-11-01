@@ -7351,7 +7351,9 @@ const docTemplate = `{
                     "example": 50
                 },
                 "temperature_celsius": {
+                    "description": "Null when not measured.",
                     "type": "number",
+                    "x-nullable": true,
                     "example": 35
                 },
                 "timestamp": {
@@ -8426,6 +8428,7 @@ const docTemplate = `{
                     "example": 45
                 },
                 "driver_version": {
+                    "description": "Intel: bound driver name plus module version when available.",
                     "type": "string",
                     "example": "535.183.01"
                 },
@@ -8450,11 +8453,15 @@ const docTemplate = `{
                     "example": 0
                 },
                 "memory_total_bytes": {
+                    "description": "Null when not measured.",
                     "type": "integer",
+                    "x-nullable": true,
                     "example": 10737418240
                 },
                 "memory_used_bytes": {
+                    "description": "Null when not measured.",
                     "type": "integer",
+                    "x-nullable": true,
                     "example": 6442450944
                 },
                 "name": {
@@ -8467,11 +8474,15 @@ const docTemplate = `{
                     "example": "0000:01:00.0"
                 },
                 "power_draw_watts": {
+                    "description": "Null when not measured.",
                     "type": "number",
+                    "x-nullable": true,
                     "example": 250.5
                 },
                 "temperature_celsius": {
+                    "description": "Null when not measured.",
                     "type": "number",
+                    "x-nullable": true,
                     "example": 55
                 },
                 "timestamp": {
@@ -8482,7 +8493,9 @@ const docTemplate = `{
                     "example": 75.5
                 },
                 "utilization_memory_percent": {
+                    "description": "Null when not measured.",
                     "type": "number",
+                    "x-nullable": true,
                     "example": 60.2
                 },
                 "uuid": {
@@ -12107,7 +12120,9 @@ const docTemplate = `{
                     "example": "6.1.64-Unraid"
                 },
                 "motherboard_temp_celsius": {
+                    "description": "Null when not measured.",
                     "type": "number",
+                    "x-nullable": true,
                     "example": 35
                 },
                 "openssl_version": {

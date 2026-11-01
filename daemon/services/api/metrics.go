@@ -490,9 +490,9 @@ func (s *Server) updateMetrics() {
 	}
 
 	// Update disk metrics
+	diskTemperature.Reset()
 	if disksSlice != nil {
 		// Reset disk metrics to clear stale entries
-		diskTemperature.Reset()
 		diskSizeBytes.Reset()
 		diskUsedBytes.Reset()
 		diskFreeBytes.Reset()
@@ -507,8 +507,8 @@ func (s *Server) updateMetrics() {
 				diskType = "SSD"
 			}
 
-			if disk.Temperature > 0 {
-				diskTemperature.WithLabelValues(disk.Name, disk.Device, diskType).Set(disk.Temperature)
+			if disk.Temperature != nil {
+				diskTemperature.WithLabelValues(disk.Name, disk.Device, diskType).Set(*disk.Temperature)
 			}
 
 			diskSizeBytes.WithLabelValues(disk.Name, disk.Device).Set(float64(disk.Size))
@@ -613,23 +613,31 @@ func (s *Server) updateMetrics() {
 	}
 
 	// Update GPU metrics
+	gpuTemperature.Reset()
+	gpuMemoryUsed.Reset()
+	gpuMemoryTotal.Reset()
+	gpuPowerWatts.Reset()
 	if gpuSlice != nil {
-		gpuTemperature.Reset()
 		gpuUtilization.Reset()
-		gpuMemoryUsed.Reset()
-		gpuMemoryTotal.Reset()
-		gpuPowerWatts.Reset()
 
 		for i, gpu := range gpuSlice {
 			if gpu == nil {
 				continue
 			}
 			idx := fmt.Sprintf("%d", i)
-			gpuTemperature.WithLabelValues(idx, gpu.Name).Set(gpu.Temperature)
+			if gpu.Temperature != nil {
+				gpuTemperature.WithLabelValues(idx, gpu.Name).Set(*gpu.Temperature)
+			}
 			gpuUtilization.WithLabelValues(idx, gpu.Name).Set(gpu.UtilizationGPU)
-			gpuMemoryUsed.WithLabelValues(idx, gpu.Name).Set(float64(gpu.MemoryUsed))
-			gpuMemoryTotal.WithLabelValues(idx, gpu.Name).Set(float64(gpu.MemoryTotal))
-			gpuPowerWatts.WithLabelValues(idx, gpu.Name).Set(gpu.PowerDraw)
+			if gpu.MemoryUsed != nil {
+				gpuMemoryUsed.WithLabelValues(idx, gpu.Name).Set(float64(*gpu.MemoryUsed))
+			}
+			if gpu.MemoryTotal != nil {
+				gpuMemoryTotal.WithLabelValues(idx, gpu.Name).Set(float64(*gpu.MemoryTotal))
+			}
+			if gpu.PowerDraw != nil {
+				gpuPowerWatts.WithLabelValues(idx, gpu.Name).Set(*gpu.PowerDraw)
+			}
 		}
 	}
 

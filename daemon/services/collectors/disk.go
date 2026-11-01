@@ -3,6 +3,7 @@ package collectors
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"strconv"
@@ -276,16 +277,15 @@ func (c *DiskCollector) parseDiskKeyValue(disk *dto.DiskInfo, line string) {
 			disk.Size = size * 1024 // Unraid disks.ini stores size in KiB (1024-byte blocks)
 		}
 	case "temp":
+		disk.Temperature = nil
 		// Temperature might be "*" if spun down, or empty, or a number
 		// Unraid uses "*" to indicate disk is spun down (no temperature available)
 		if value == "*" || value == "" {
 			// Temperature unavailable - disk is likely spun down
-			// Keep Temperature at 0 (default) and we'll set SpinState appropriately
+			// Keep Temperature nil (unmeasured) and we'll set SpinState appropriately
 			logger.Debug("Disk: Device %s temperature unavailable (value='%s'), likely spun down", disk.Device, value)
 		} else {
-			if temp, err := strconv.ParseFloat(value, 64); err == nil {
-				disk.Temperature = temp
-			}
+			disk.Temperature = parseOptionalFloat(value)
 		}
 	case "numErrors":
 		if errors, err := strconv.Atoi(value); err == nil {
@@ -963,21 +963,24 @@ func (c *DiskCollector) enrichWithSpinState(disk *dto.DiskInfo) {
 
 	// Determine spin state from temperature reading
 	// In Unraid's disks.ini, temp="*" indicates disk is spun down
-	// If temperature is 0, this usually means the disk was spun down when parsed
-	// A temperature > 0 indicates the disk is active/spinning
-	if disk.Temperature > 0 {
+	// Any measured temperature, including 0, indicates an active disk.
+	if disk.Temperature != nil {
 		// Disk has a valid temperature reading - it must be active
 		disk.SpinState = "active"
 	} else {
-		// Temperature is 0 or unavailable - disk is likely in standby
+		// Temperature is unavailable - disk is likely in standby
 		// This could be because:
 		// 1. The disk is spun down (temp="*" in disks.ini)
 		// 2. Temperature couldn't be read (SMART not available)
 		disk.SpinState = "standby"
 	}
 
-	logger.Debug("Disk: Device %s spin state determined as '%s' (temp=%.1f)",
-		disk.Device, disk.SpinState, disk.Temperature)
+	temperature := "unknown"
+	if disk.Temperature != nil {
+		temperature = fmt.Sprintf("%.1f", *disk.Temperature)
+	}
+	logger.Debug("Disk: Device %s spin state determined as '%s' (temp=%s)",
+		disk.Device, disk.SpinState, temperature)
 }
 
 // collectDockerVDisk collects Docker vDisk usage information
