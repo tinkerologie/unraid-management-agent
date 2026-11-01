@@ -11,6 +11,14 @@ The Unraid Management Agent can publish system events to MQTT brokers in real-ti
 - **Custom automation** scripts
 - **Multi-server monitoring** from a central MQTT broker
 
+## Unavailable measurements
+
+Unmeasured motherboard temperature, disk temperature (including standby disks), and GPU temperature,
+power, memory used, memory total and memory utilisation retain their JSON keys with `null` values.
+Measured zeros remain numbers. Home Assistant discovery templates for these numeric sensors render `None`
+for null or missing fields, so Home Assistant displays unknown rather than a fabricated 0.
+GPU power and memory utilisation keep one decimal place when measured.
+
 ## Configuration
 
 ### Enable MQTT
@@ -207,6 +215,21 @@ mqtt:
       value_template: "{{ 'Valid' if value_json.parity_valid else 'Invalid' }}"
       icon: mdi:shield-check
 ```
+
+### Share Discovery Sensors
+
+Each share publishes its state to `<prefix>/shares/<share_id>` and exposes these discovery sensors:
+
+| Sensor        | JSON field              | Notes                                                                                |
+| ------------- | ----------------------- | ------------------------------------------------------------------------------------ |
+| Used          | `used_bytes`            | Measured share content; absent values render unknown, while measured zero stays zero |
+| Storage Usage | `storage_usage_percent` | Backing-storage percentage; retains the existing Usage unique ID                     |
+| Storage Free  | `storage_free_bytes`    | Backing-storage free bytes; retains the existing Free unique ID                      |
+| Storage Used  | `storage_used_bytes`    | Backing-storage used bytes; new sensor                                               |
+
+Measured usage requires a cache-only share on its assigned mounted ZFS pool with all members known
+spinning. Storage figures are shared by shares on the same storage. The state payload retains
+`free_bytes`, `total_bytes` and `usage_percent` as deprecated storage aliases.
 
 ### Home Assistant Automation Examples
 

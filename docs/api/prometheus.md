@@ -85,6 +85,9 @@ volumes:
 
 **Labels**: `hostname`, `disk_id`, `disk_name`, `device`
 
+Disk temperature series are omitted while the reading is unavailable (including standby disks).
+Previously exported temperature series are removed when the reading becomes unavailable; measured 0 °C is exported.
+
 ### Container Metrics (Docker)
 
 | Metric                      | Type  | Description                  |
@@ -114,9 +117,12 @@ volumes:
 | `unraid_gpu_temperature_celsius` | Gauge | GPU temperature in Celsius |
 | `unraid_gpu_memory_used_bytes`   | Gauge | GPU memory used in bytes   |
 | `unraid_gpu_memory_total_bytes`  | Gauge | Total GPU memory in bytes  |
-| `unraid_gpu_power_draw_watts`    | Gauge | GPU power draw in watts    |
+| `unraid_gpu_power_watts`         | Gauge | GPU power draw in watts    |
 
 **Labels**: `hostname`, `gpu_index`, `gpu_name`
+
+GPU temperature, memory used, memory total and power series are omitted when their readings are unavailable.
+Previously exported series are removed when readings become unavailable. Measured zero values remain exported.
 
 ### UPS Metrics
 
@@ -134,12 +140,19 @@ report that value, rather than being exported as 0.
 
 ### Share Metrics
 
-| Metric                    | Type  | Description            |
-| ------------------------- | ----- | ---------------------- |
-| `unraid_shares_total`     | Gauge | Total number of shares |
-| `unraid_share_size_bytes` | Gauge | Share size in bytes    |
+| Metric                             | Type  | Description                                           |
+| ---------------------------------- | ----- | ----------------------------------------------------- |
+| `unraid_shares_total`              | Gauge | Total number of shares                                |
+| `unraid_share_used_bytes`          | Gauge | Measured share content in bytes; omitted when unknown |
+| `unraid_share_storage_used_bytes`  | Gauge | Backing-storage used space in bytes                   |
+| `unraid_share_storage_free_bytes`  | Gauge | Backing-storage free space in bytes                   |
+| `unraid_share_storage_total_bytes` | Gauge | Backing-storage capacity in bytes                     |
 
-**Labels**: `hostname`, `share_name`
+**Labels**: `name` on per-share gauges; no labels on `unraid_shares_total`.
+
+Measured usage is available only for cache-only shares on an assigned mounted ZFS pool whose members
+are all known spinning. A measured empty share emits zero. Storage figures are shared by all shares
+on the same backing storage, so summing these per-share gauges can double-count capacity.
 
 ### Service Metrics
 

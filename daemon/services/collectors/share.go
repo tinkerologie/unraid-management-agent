@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -24,6 +25,9 @@ type ShareCollector struct {
 	// paths locates shares.ini, var.ini, disks.ini and /mnt; the zero value
 	// uses the production paths.
 	paths sharePaths
+
+	// runCommand is overridden by tests; production uses the context-aware lib helper.
+	runCommand func(context.Context, string, ...string) (string, error)
 }
 
 // NewShareCollector creates a new user share collector with the given context.
@@ -97,7 +101,8 @@ func (c *ShareCollector) Start(ctx context.Context, interval time.Duration) {
 }
 
 // Collect gathers user share information and publishes it to the event bus.
-// It reads share configuration from /boot/config/shares/ and enriches with usage data from df command.
+// It reads emhttp storage counters and share configuration, then measures share
+// content only on assigned ZFS pools whose members are all known spinning.
 func (c *ShareCollector) Collect(ctx context.Context) {
 	logger.Debug("Collecting share data...")
 
@@ -205,15 +210,15 @@ func (c *ShareCollector) collectShares(ctx context.Context) ([]dto.ShareInfo, er
 				currentShare.Name = value
 			case "size":
 				if size, err := strconv.ParseUint(value, 10, 64); err == nil {
-					currentShare.Total = size * kibToBytes // shares.ini stores size in KiB (1024-byte blocks)
+					currentShare.StorageTotal = size * kibToBytes // shares.ini stores size in KiB (1024-byte blocks)
 				}
 			case "free":
 				if free, err := strconv.ParseUint(value, 10, 64); err == nil {
-					currentShare.Free = free * kibToBytes // shares.ini stores free in KiB (1024-byte blocks)
+					currentShare.StorageFree = free * kibToBytes // shares.ini stores free in KiB (1024-byte blocks)
 				}
 			case "used":
 				if used, err := strconv.ParseUint(value, 10, 64); err == nil {
-					currentShare.Used = used * kibToBytes // shares.ini stores used in KiB (1024-byte blocks)
+					currentShare.StorageUsed = used * kibToBytes // shares.ini stores used in KiB (1024-byte blocks)
 				}
 			// Cache settings from shares.ini (Issue #53)
 			case "useCache":
@@ -241,60 +246,32 @@ func (c *ShareCollector) collectShares(ctx context.Context) ([]dto.ShareInfo, er
 		return shares, err
 	}
 
-	// Enrich Used with per-share ZFS referenced bytes when ZFS collector is enabled.
-	// Each share can span multiple pools (cachePool, cachePool2, array).
-	// Sum all matching "<pool>/<sharename>" dataset sizes.
-	if c.ctx.Intervals.ZFS > 0 {
-		if zfsSizes := zfsDatasetSizes(ctx); zfsSizes != nil {
-			for i := range shares {
-				var total uint64
-				found := false
-				for dataset, bytes := range zfsSizes {
-					// Only count direct "<pool>/<sharename>" datasets (exactly one slash).
-					// Nested datasets like "pool/share/child" must not inflate the share total.
-					parts := strings.SplitN(dataset, "/", 3)
-					if len(parts) != 2 || parts[1] != shares[i].Name {
-						continue
-					}
-					total += bytes
-					found = true
-				}
-				// Only replace Used with ZFS referenced bytes when the share is
-				// guaranteed to be pool-only (useCache=only). Mixed cache+array shares
-				// ("yes"/"prefer") still hold data on the array, so overwriting Used
-				// with only the pool bytes would under-report actual usage.
-				if found && shares[i].UseCache == "only" {
-					shares[i].Used = total
-				}
-			}
-		}
-	}
-
-	// Calculate total and usage percentage for each share
+	// Preserve the existing storage-total calculation and deprecated aliases.
 	for i := range shares {
-		// If total is 0, calculate it from used + free
-		if shares[i].Total == 0 && (shares[i].Used > 0 || shares[i].Free > 0) {
-			shares[i].Total = shares[i].Used + shares[i].Free
+		share := &shares[i]
+		if share.StorageTotal == 0 {
+			share.StorageTotal = share.StorageUsed + share.StorageFree
 		}
-
-		// Calculate usage percentage
-		if shares[i].Total > 0 {
-			shares[i].UsagePercent = float64(shares[i].Used) / float64(shares[i].Total) * 100
+		if share.StorageTotal > 0 {
+			share.StorageUsagePercent = float64(share.StorageUsed) / float64(share.StorageTotal) * 100
 		}
-
-		// Set timestamp
-		shares[i].Timestamp = time.Now()
+		share.Free, share.Total = share.StorageFree, share.StorageTotal
+		share.UsagePercent = share.StorageUsagePercent
+		share.Timestamp = time.Now()
 	}
 
 	// Enrich shares with configuration data
-	configCollector := NewConfigCollector()
+	configCollector := &ConfigCollector{bootConfigDir: c.paths.bootConfigDir}
 	exportUnknown := map[string]bool{}
 	for i := range shares {
 		if !c.enrichShareWithConfig(&shares[i], configCollector) {
 			exportUnknown[shares[i].Name] = true
 		}
 	}
-	c.paths.applyExclusiveState(shares, exportUnknown)
+	c.enrichShareUsage(ctx, shares)
+	// ZFS commands can block long enough for disks to spin down. Only a fresh
+	// snapshot may authorize the exclusive-state filesystem probes.
+	c.paths.applyExclusiveState(shares, exportUnknown, c.paths.readDisks())
 
 	logger.Debug("Share: Parsed %d shares successfully", len(shares))
 	return shares, nil
@@ -373,28 +350,109 @@ func (c *ShareCollector) isNFSExported(exportNFS string) bool {
 	return exportNFS == "e"
 }
 
-// zfsDatasetSizes runs "zfs list -Hp -o name,refer" and returns a map of
-// dataset name → referenced bytes. Returns nil if zfs is unavailable.
-func zfsDatasetSizes(ctx context.Context) map[string]uint64 {
-	cmdCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
-	defer cancel()
-
-	out, err := lib.ExecCommandOutputWithContext(cmdCtx, "zfs", "list", "-Hp", "-o", "name,refer")
-	if err != nil {
-		logger.Debug("zfsDatasetSizes: zfs list failed: %v (output: %q)", err, out)
-		return nil
+// enrichShareUsage queries each eligible, awake ZFS pool once. No filesystem
+// walks or probes of sleeping/unknown devices are used to measure share content.
+func (c *ShareCollector) enrichShareUsage(ctx context.Context, shares []dto.ShareInfo) {
+	if c.ctx.Intervals.ZFS <= 0 {
+		return
 	}
-	sizes := make(map[string]uint64)
-	for line := range strings.SplitSeq(out, "\n") {
-		fields := strings.Fields(line)
-		if len(fields) != 2 {
+	pools := map[string][]int{}
+	for i, share := range shares {
+		if share.UseCache == "only" && share.CachePool2 == "" &&
+			validateShareName(share.Name) == nil && validateShareName(share.CachePool) == nil {
+			pools[share.CachePool] = append(pools[share.CachePool], i)
+		}
+	}
+	run := c.runCommand
+	if run == nil {
+		run = lib.ExecCommandOutputWithContext
+	}
+	for pool, indexes := range pools {
+		// A preceding pool query may have blocked for up to a minute. Refresh
+		// every member's spin state immediately before querying this pool.
+		disks := c.paths.readDisks()
+		spinning := diskSpinStates(disks)
+		awake := false
+		for section, kv := range disks {
+			name := kv["name"]
+			if name == "" {
+				name = section
+			}
+			if name == pool && kv["type"] == "Cache" && kv["fsType"] == "zfs" &&
+				kv["fsStatus"] == "Mounted" && kv["shareEnabled"] != "no" {
+				awake = branchAwake(kv, spinning, true)
+				break
+			}
+		}
+		if !awake {
 			continue
 		}
-		if bytes, err := strconv.ParseUint(fields[1], 10, 64); err == nil {
-			sizes[fields[0]] = bytes
+		cmdCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+		out, err := run(cmdCtx, "zfs", "list", "-Hp", "-t", "filesystem", "-o", "name,refer,mounted,mountpoint", "-r", pool)
+		cancel()
+		if err != nil {
+			logger.Debug("Share: zfs list for pool %s failed: %v", pool, err)
+			continue
+		}
+		for _, i := range indexes {
+			if total, valid := shareDatasetUsage(out, pool+"/"+shares[i].Name); valid {
+				shares[i].Used = &total
+			}
 		}
 	}
-	return sizes
+}
+
+// shareDatasetUsage counts referenced bytes only for mounted filesystems at or
+// beneath the share dataset's mountpoint. Dataset ancestry alone does not imply
+// visibility. Missing or ambiguous mount metadata leaves usage unknown.
+func shareDatasetUsage(out, dataset string) (uint64, bool) {
+	var rows [][]string
+	var mountpoint string
+	for line := range strings.SplitSeq(out, "\n") {
+		// zfs list -H separates columns with tabs; mountpoints may contain spaces.
+		fields := strings.Split(line, "\t")
+		if fields[0] != dataset && !strings.HasPrefix(fields[0], dataset+"/") {
+			continue
+		}
+		if len(fields) != 4 {
+			return 0, false
+		}
+		if fields[0] == dataset {
+			if mountpoint != "" || fields[2] != "yes" || !path.IsAbs(fields[3]) {
+				return 0, false
+			}
+			mountpoint = path.Clean(fields[3])
+		}
+		rows = append(rows, fields)
+	}
+	if mountpoint == "" {
+		return 0, false
+	}
+	var total uint64
+	seen := make(map[string]bool, len(rows))
+	for _, fields := range rows {
+		if fields[2] == "no" {
+			continue
+		}
+		if fields[2] != "yes" || !path.IsAbs(fields[3]) {
+			return 0, false
+		}
+		childMountpoint := path.Clean(fields[3])
+		// Filesystems stacked on one mountpoint hide each other, so the visible size is unknown.
+		if seen[childMountpoint] {
+			return 0, false
+		}
+		seen[childMountpoint] = true
+		if childMountpoint != mountpoint && !strings.HasPrefix(childMountpoint, strings.TrimSuffix(mountpoint, "/")+"/") {
+			continue
+		}
+		bytes, err := strconv.ParseUint(fields[1], 10, 64)
+		if err != nil || bytes > ^uint64(0)-total {
+			return 0, false
+		}
+		total += bytes
+	}
+	return total, true
 }
 
 // determineMoverAction determines the mover action based on cache settings

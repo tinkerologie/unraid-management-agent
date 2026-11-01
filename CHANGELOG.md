@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Separate share content from backing-storage usage (#293): add `storage_used_bytes`,
+  `storage_free_bytes`, `storage_total_bytes` and `storage_usage_percent`; retain
+  `free_bytes`, `total_bytes` and `usage_percent` as deprecated storage aliases.
+  `used_bytes` is now omitted unless measured from the assigned, cache-only ZFS pool
+  with every member known spinning. Include only mounted descendant filesystems at or beneath
+  the share dataset's mountpoint, without directory walks; omit usage when mount metadata is unknown.
+  Refresh spin state before each pool query and after queries before checking share locations.
+  Prometheus omits unknown share usage and adds storage gauges; Home Assistant discovery
+  labels storage readings explicitly and preserves unknown versus measured-zero usage.
+
 ### Added
 
 - Shared read-only PSU collector with exact-ID auto-detection for Corsair RMi/HXi USB PSUs
@@ -22,6 +34,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - PSU telemetry feasibility research for #61, #194, #195, #196 and #197, covering
   model-specific interfaces, automatic discovery, implementation phases and validation requirements.
   This documents proposed work; it does not add runtime PSU monitoring.
+
+### Fixed
+
+- **Sensor plausibility and unknown measurements** (#297): apply a 100 °C ceiling only to `SYSTIN`
+  and `AUXTIN*` temperature labels, and drop readings at or below 0 °C only for PECI and DIMM labels.
+  Other labels retain the global −40 °C < reading < 125 °C range. AUXTIN VRM readings above
+  100 °C are hidden as a trade-off. Implausible fan channels are quarantined for 15 minutes
+  after their last bad sample, with stable names and no fan DTO or safety/control-policy changes.
+- Unmeasured `motherboard_temp_celsius`, disk `temperature_celsius`, and GPU `temperature_celsius`,
+  `power_draw_watts`, `memory_total_bytes`, `memory_used_bytes` and `utilization_memory_percent`
+  now serialize as JSON `null` with keys retained (`x-nullable`), following UPS/NUT. Measured zeros
+  remain numbers. MQTT/Home Assistant numeric sensors render `None`; Prometheus omits and removes
+  unavailable series; health checks and MCP do not treat missing temperature as measured 0.
+  Alert variables `MotherboardTemp`, `MaxDiskTemp`, `MaxGPUTemp` and `TotalGPUPower` are nullable:
+  guard rules with `!= nil`. Unguarded nil evaluations preserve alert state and log the failure once.
+  Disk-temperature trends exclude unavailable readings; history expires after one hour even
+  without new measurements.
+- Intel GPU temperature and driver metadata are read from the detected PCI device. `driver_version`
+  reports the bound driver name (`i915` or `xe`) plus the module version when available, replacing
+  the unrelated kernel vermagic value. CPU temperature is kept separate from GPU temperature.
 
 ### Security
 

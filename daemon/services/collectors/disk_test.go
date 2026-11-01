@@ -378,7 +378,7 @@ func TestParseDiskKeyValue(t *testing.T) {
 			name:       "parse temperature wildcard",
 			line:       "temp=*",
 			checkField: "temp",
-			expected:   0.0, // "*" means spun down, no temp
+			expected:   nil, // "*" means spun down, no temp
 		},
 		{
 			name:       "parse numErrors",
@@ -433,8 +433,8 @@ func TestParseDiskKeyValue(t *testing.T) {
 					t.Errorf("Size = %d, want %d", disk.Size, tt.expected)
 				}
 			case "temp":
-				if disk.Temperature != tt.expected.(float64) {
-					t.Errorf("Temperature = %f, want %f", disk.Temperature, tt.expected)
+				if (tt.expected == nil && disk.Temperature != nil) || (tt.expected != nil && (disk.Temperature == nil || *disk.Temperature != tt.expected.(float64))) {
+					t.Errorf("Temperature = %v, want %v", disk.Temperature, tt.expected)
 				}
 			case "errors":
 				if disk.SMARTErrors != tt.expected.(int) {
@@ -485,7 +485,7 @@ temp="*"
 		if disks[0].Name != "parity" || disks[0].Device != "sdb" {
 			t.Errorf("disk[0] = %+v, want parity/sdb", disks[0])
 		}
-		if disks[0].Temperature != 34 {
+		if disks[0].Temperature == nil || *disks[0].Temperature != 34 {
 			t.Errorf("disk[0] temp = %v, want 34", disks[0].Temperature)
 		}
 		if disks[1].Name != "disk1" {
@@ -495,9 +495,9 @@ temp="*"
 		if disks[1].Size != 1024000 {
 			t.Errorf("disk[1].Size = %d, want 1024000", disks[1].Size)
 		}
-		// temp="*" means spun down -> temperature stays 0
-		if disks[1].Temperature != 0 {
-			t.Errorf("disk[1] temp = %v, want 0 (spun down)", disks[1].Temperature)
+		// temp="*" means spun down -> temperature stays nil
+		if disks[1].Temperature != nil {
+			t.Errorf("disk[1] temp = %v, want nil (spun down)", disks[1].Temperature)
 		}
 	})
 

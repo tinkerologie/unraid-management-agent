@@ -1052,8 +1052,10 @@ definitions:
         example: 50
         type: integer
       temperature_celsius:
+        description: Null when not measured.
         example: 35
         type: number
+        x-nullable: true
       timestamp:
         type: string
       usage_percent:
@@ -1852,6 +1854,7 @@ definitions:
         example: 45
         type: number
       driver_version:
+        description: 'Intel: bound driver name plus module version when available.'
         example: 535.183.01
         type: string
       fan_max_rpm:
@@ -1872,11 +1875,15 @@ definitions:
         example: 0
         type: integer
       memory_total_bytes:
+        description: Null when not measured.
         example: 10737418240
         type: integer
+        x-nullable: true
       memory_used_bytes:
+        description: Null when not measured.
         example: 6442450944
         type: integer
+        x-nullable: true
       name:
         example: NVIDIA GeForce RTX 3080
         type: string
@@ -1885,19 +1892,25 @@ definitions:
         example: "0000:01:00.0"
         type: string
       power_draw_watts:
+        description: Null when not measured.
         example: 250.5
         type: number
+        x-nullable: true
       temperature_celsius:
+        description: Null when not measured.
         example: 55
         type: number
+        x-nullable: true
       timestamp:
         type: string
       utilization_gpu_percent:
         example: 75.5
         type: number
       utilization_memory_percent:
+        description: Null when not measured.
         example: 60.2
         type: number
+        x-nullable: true
       uuid:
         description: Device UUID (NVIDIA only)
         example: GPU-12345678-1234-1234-1234-123456789012
@@ -3858,6 +3871,9 @@ definitions:
         example: cache
         type: string
       free_bytes:
+        description: |-
+          Free is a deprecated alias of StorageFree.
+          Deprecated: use storage_free_bytes.
         example: 5368709120000
         type: integer
       locations:
@@ -3914,12 +3930,38 @@ definitions:
         description: '"cache", "array", "cache+array", or "unknown"'
         example: cache+array
         type: string
+      storage_free_bytes:
+        description: StorageFree is backing pool/array free space, shared by shares
+          on that storage.
+        example: 5368709120000
+        type: integer
+      storage_total_bytes:
+        description: StorageTotal is backing pool/array capacity, shared by shares
+          on that storage.
+        example: 10737418240000
+        type: integer
+      storage_usage_percent:
+        description: StorageUsagePercent is backing pool/array usage, shared by shares
+          on that storage.
+        example: 50
+        type: number
+      storage_used_bytes:
+        description: StorageUsed is backing pool/array usage, shared by shares on
+          that storage.
+        example: 5368709120000
+        type: integer
       timestamp:
         type: string
       total_bytes:
+        description: |-
+          Total is a deprecated alias of StorageTotal.
+          Deprecated: use storage_total_bytes.
         example: 10737418240000
         type: integer
       usage_percent:
+        description: |-
+          UsagePercent is a deprecated alias of StorageUsagePercent.
+          Deprecated: use storage_usage_percent.
         example: 50
         type: number
       use_cache:
@@ -3927,6 +3969,9 @@ definitions:
         example: prefer
         type: string
       used_bytes:
+        description: |-
+          Used is measured share content in bytes, including descendant filesystems.
+          Omitted unless the cache-only share's assigned ZFS pool is known awake.
         example: 5368709120000
         type: integer
     type: object
@@ -4650,8 +4695,10 @@ definitions:
         example: 6.1.64-Unraid
         type: string
       motherboard_temp_celsius:
+        description: Null when not measured.
         example: 35
         type: number
+        x-nullable: true
       openssl_version:
         description: Additional System Information
         example: 3.0.2
