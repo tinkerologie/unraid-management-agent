@@ -2,6 +2,8 @@ package collectors
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
@@ -1097,6 +1099,84 @@ func TestApplySMARTResult(t *testing.T) {
 			}
 			if disk.PowerOnHours != 6400 || disk.PowerCycleCount != 37 {
 				t.Errorf("PowerOnHours = %d, PowerCycleCount = %d", disk.PowerOnHours, disk.PowerCycleCount)
+			}
+		})
+	}
+}
+
+func TestEnrichWithSMARTDataCommandResult(t *testing.T) {
+	const output = `SMART overall-health self-assessment test result: PASSED
+ID# ATTRIBUTE_NAME          FLAG     VALUE WORST THRESH TYPE      UPDATED  WHEN_FAILED RAW_VALUE
+  9 Power_On_Hours          0x0032   093   093   000    Old_age   Always       -       6400
+ 12 Power_Cycle_Count       0x0032   100   100   020    Old_age   Always       -       37`
+
+	tests := []struct {
+		name       string
+		action     string
+		wantStatus string
+		wantExit   int
+		wantAttrs  bool
+	}{
+		{"success", "exit 0", "PASSED", 0, true},
+		{"informational exit preserves data", "exit 96", "PASSED", 96, true},
+		{"failing exit overrides passed output", "exit 8", "FAILED", 8, true},
+		{"standby exit ignores output", "exit 2", "UNKNOWN", 2, false},
+		{"signal ignores partial output", "kill -KILL $$", "UNKNOWN", 128, false},
+		{"start failure", "", "UNKNOWN", 128, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			binDir := t.TempDir()
+			argsPath := filepath.Join(t.TempDir(), "args")
+			t.Setenv("PATH", binDir)
+			t.Setenv("SMARTCTL_TEST_ARGS", argsPath)
+			t.Setenv("SMARTCTL_TEST_OUTPUT", output)
+			if tt.action != "" {
+				script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$SMARTCTL_TEST_ARGS\"\nprintf '%s\\n' \"$SMARTCTL_TEST_OUTPUT\"\n" + tt.action + "\n"
+				if err := os.WriteFile(filepath.Join(binDir, "smartctl"), []byte(script), 0700); err != nil { // #nosec G306 -- owner-only executable fixture in t.TempDir.
+					t.Fatal(err)
+				}
+			}
+
+			// /dev/null passes the existence check without needing disk hardware.
+			// Seed a previous result to verify incomplete commands do not replace
+			// the last completed exit status or retain a stale healthy status.
+			disk := &dto.DiskInfo{Device: "null", SMARTStatus: "PASSED", SMARTExitStatus: 128}
+			collector := &DiskCollector{}
+			collector.enrichWithSMARTData(disk)
+
+			if tt.action != "" {
+				args, err := os.ReadFile(argsPath) // #nosec G304 -- fixed filename inside t.TempDir, not user input.
+				if err != nil {
+					t.Fatalf("smartctl was not invoked: %v", err)
+				}
+				if got, want := string(args), "-n\nstandby\n-H\n-A\n/dev/null\n"; got != want {
+					t.Errorf("smartctl arguments = %q, want %q", got, want)
+				}
+			}
+			if disk.SMARTStatus != tt.wantStatus {
+				t.Errorf("SMARTStatus = %q, want %q", disk.SMARTStatus, tt.wantStatus)
+			}
+			if disk.SMARTExitStatus != tt.wantExit {
+				t.Errorf("SMARTExitStatus = %d, want %d", disk.SMARTExitStatus, tt.wantExit)
+			}
+			if !tt.wantAttrs {
+				if len(disk.SMARTAttributes) != 0 || disk.PowerOnHours != 0 || disk.PowerCycleCount != 0 {
+					t.Errorf("unusable output populated SMART data: %+v", disk)
+				}
+				return
+			}
+			if len(disk.SMARTAttributes) != 2 {
+				t.Errorf("SMARTAttributes = %v, want two attributes", disk.SMARTAttributes)
+			}
+			if got := disk.SMARTAttributes["9"]; got.ID != 9 || got.Name != "Power_On_Hours" || got.RawValue != "6400" {
+				t.Errorf("power-on-hours attribute = %+v", got)
+			}
+			if got := disk.SMARTAttributes["12"]; got.ID != 12 || got.Name != "Power_Cycle_Count" || got.RawValue != "37" {
+				t.Errorf("power-cycle-count attribute = %+v", got)
+			}
+			if disk.PowerOnHours != 6400 || disk.PowerCycleCount != 37 {
+				t.Errorf("PowerOnHours = %d, PowerCycleCount = %d; want 6400 and 37", disk.PowerOnHours, disk.PowerCycleCount)
 			}
 		})
 	}
