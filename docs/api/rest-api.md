@@ -901,7 +901,7 @@ curl http://192.168.20.21:8043/api/v1/system
 
 Temperature telemetry keeps the global range −40 °C < reading < 125 °C. The raw label `SYSTIN`
 and labels starting with `AUXTIN` (case-insensitive) additionally have a 100 °C ceiling.
-Labels containing `PECI` drop readings at or below 0 °C; other labels retain legitimate zero and negative readings.
+Labels containing `PECI` or `DIMM` drop readings at or below 0 °C; other labels retain legitimate zero and negative readings.
 An AUXTIN connected to a VRM running above 100 °C is therefore hidden too. These telemetry filters do not change
 fan-control or thermal-safety policy.
 

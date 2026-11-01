@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
 	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 )
 
@@ -142,6 +143,70 @@ func TestNullableMotherboardTemperature(t *testing.T) {
 	populateSystemTemperatures(info, map[string]float64{"chip_MB_Temp_temp1_input": 0}, nil)
 	if info.MotherboardTemp == nil || *info.MotherboardTemp != 0 {
 		t.Fatal("measured motherboard zero was lost")
+	}
+}
+
+func TestSystemTemperatureClassificationAndMaximum(t *testing.T) {
+	info := &dto.SystemInfo{}
+	// Use successive readings to exercise both replacement and retention of
+	// the hottest motherboard temperature without depending on map order.
+	for _, value := range []float64{0, 35, 20} {
+		populateSystemTemperatures(info, map[string]float64{
+			"board_MB_Temp_temp1_input": value,
+			"coretemp_Core_0":           45,
+			"board_PCH_temp2_input":     50,
+			"board_bad_temp3_input":     math.NaN(),
+		}, map[string]string{"board": "board-id"})
+		want := value
+		if value == 20 {
+			want = 35
+		}
+		if info.MotherboardTemp == nil || *info.MotherboardTemp != want || info.CPUTemp != 45 {
+			t.Fatalf("CPU/motherboard temperatures = %v/%v, want 45/%v", info.CPUTemp, info.MotherboardTemp, want)
+		}
+		if len(info.Temperatures) != 3 {
+			t.Fatalf("readings = %+v; want three plausible readings", info.Temperatures)
+		}
+		wantTypes := map[string]string{
+			"board_MB_Temp_temp1_input": "motherboard",
+			"coretemp_Core_0":           "cpu",
+			"board_PCH_temp2_input":     "chipset",
+		}
+		for _, reading := range info.Temperatures {
+			if kind, ok := wantTypes[reading.Name]; !ok || reading.SensorType != kind {
+				t.Errorf("incorrect sensor classification: %+v", reading)
+			}
+			if strings.HasPrefix(reading.Name, "board_") && (reading.Source != "board" || reading.DeviceID != "board-id") {
+				t.Errorf("lost sensor identity: %+v", reading)
+			}
+		}
+	}
+}
+
+func TestCollectSystemInfoPopulatesTemperatures(t *testing.T) {
+	bin := t.TempDir()
+	t.Setenv("PATH", bin)
+	writeCollectorCommand(t, bin, "sensors", `
+[ "$*" = "-u" ] || exit 1
+printf '%s\n' 'coretemp-isa-0000
+Core 0:
+  temp1_input: 45.000
+
+board-isa-0290
+MB Temp:
+  temp1_input: 32.500'
+`)
+	c := NewSystemCollector(&domain.Context{Version: "test-version"})
+	c.sysfsRoot = t.TempDir()
+	info, err := c.collectSystemInfo()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.CPUTemp != 45 || info.MotherboardTemp == nil || *info.MotherboardTemp != 32.5 || len(info.Temperatures) != 2 {
+		t.Errorf("collected temperatures = CPU %v, motherboard %v, readings %+v", info.CPUTemp, info.MotherboardTemp, info.Temperatures)
+	}
+	if info.AgentVersion != "test-version" || info.Hostname == "" || info.Timestamp.IsZero() {
+		t.Errorf("temperature collection lost system metadata: %+v", info)
 	}
 }
 

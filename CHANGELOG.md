@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Sensor plausibility and unknown measurements** (#297): apply a 100 °C ceiling only to `SYSTIN`
-  and `AUXTIN*` temperature labels, and drop readings at or below 0 °C only for PECI labels.
+  and `AUXTIN*` temperature labels, and drop readings at or below 0 °C only for PECI and DIMM labels.
   Other labels retain the global −40 °C < reading < 125 °C range. AUXTIN VRM readings above
   100 °C are hidden as a trade-off. Implausible fan channels are quarantined for 15 minutes
   after their last bad sample, with stable names and no fan DTO or safety/control-policy changes.
