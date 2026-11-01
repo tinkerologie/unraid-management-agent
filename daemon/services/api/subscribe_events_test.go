@@ -236,7 +236,7 @@ func TestSubscribeToEvents_GPUMetricsUpdate(t *testing.T) {
 	cancel := startSubscribeToEvents(t, server)
 	defer cancel()
 
-	gpus := []*dto.GPUMetrics{{Name: "RTX 3080", Temperature: 65}}
+	gpus := []*dto.GPUMetrics{{Name: "RTX 3080", Temperature: new(float64(65))}}
 	hub.Pub(gpus, "gpu_metrics_update")
 	eventually(t, func() bool {
 		return len(server.GetGPUCache()) == 1

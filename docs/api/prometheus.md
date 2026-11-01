@@ -85,6 +85,9 @@ volumes:
 
 **Labels**: `hostname`, `disk_id`, `disk_name`, `device`
 
+Disk temperature series are omitted while the reading is unavailable (including standby disks).
+Previously exported temperature series are removed when the reading becomes unavailable; measured 0 °C is exported.
+
 ### Container Metrics (Docker)
 
 | Metric                      | Type  | Description                  |
@@ -114,9 +117,12 @@ volumes:
 | `unraid_gpu_temperature_celsius` | Gauge | GPU temperature in Celsius |
 | `unraid_gpu_memory_used_bytes`   | Gauge | GPU memory used in bytes   |
 | `unraid_gpu_memory_total_bytes`  | Gauge | Total GPU memory in bytes  |
-| `unraid_gpu_power_draw_watts`    | Gauge | GPU power draw in watts    |
+| `unraid_gpu_power_watts`         | Gauge | GPU power draw in watts    |
 
 **Labels**: `hostname`, `gpu_index`, `gpu_name`
+
+GPU temperature, memory used, memory total and power series are omitted when their readings are unavailable.
+Previously exported series are removed when readings become unavailable. Measured zero values remain exported.
 
 ### UPS Metrics
 

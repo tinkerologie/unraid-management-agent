@@ -53,6 +53,69 @@ func hwmonChipDeviceIDs(sysfsRoot string) map[string]string {
 	return ids
 }
 
+// hwmonFanIdentities maps lm-sensors chip names (and unique chip models) to
+// the same physical identity used by the sysfs fan fallback.
+func hwmonFanIdentities(sysfsRoot string) map[string]string {
+	if sysfsRoot == "" {
+		sysfsRoot = defaultSysfsRoot
+	}
+	identities := make(map[string]string)
+	models := make(map[string]int)
+	dirs, _ := filepath.Glob(filepath.Join(sysfsRoot, "class", "hwmon", "hwmon*"))
+	for _, dir := range dirs {
+		name := readSysfsValue(filepath.Join(dir, "name"))
+		chip, identity := hwmonFanIdentity(dir, sysfsRoot)
+		if chip != "" {
+			identities[chip] = identity
+		}
+		models[name]++
+		if models[name] == 1 {
+			identities[name] = identity
+		} else {
+			delete(identities, name)
+		}
+	}
+	return identities
+}
+
+// hwmonFanIdentity uses a physical device path, or a USB serial/port identity
+// for HID chips that can re-enumerate during the quarantine hold.
+func hwmonFanIdentity(dir, sysfsRoot string) (chip, identity string) {
+	name := readSysfsValue(filepath.Join(dir, "name"))
+	if hidChip, dev, ok := hidHwmonChip(dir); ok {
+		if id := usbDeviceID(dev, sysfsRoot); id != "" {
+			return hidChip, name + "/" + id
+		}
+		return hidChip, name + "/" + dev
+	}
+	dev, err := filepath.EvalSymlinks(filepath.Join(dir, "device"))
+	if err != nil {
+		dev, err = filepath.EvalSymlinks(dir)
+		if err != nil {
+			dev = dir
+		}
+	}
+	// Native lm-sensors addresses: platform ISA ports, I2C devices and PCI.
+	base := filepath.Base(dev)
+	if _, address, ok := strings.Cut(base, "."); ok {
+		if port, err := strconv.ParseUint(address, 10, 16); err == nil {
+			chip = fmt.Sprintf("%s-isa-%04x", name, port)
+		}
+	}
+	if bus, address, ok := strings.Cut(base, "-"); ok {
+		busNum, busErr := strconv.ParseUint(bus, 10, 16)
+		addr, addrErr := strconv.ParseUint(address, 16, 16)
+		if busErr == nil && addrErr == nil {
+			chip = fmt.Sprintf("%s-i2c-%d-%x", name, busNum, addr)
+		}
+	}
+	var domain, bus, slot, function uint
+	if n, err := fmt.Sscanf(base, "%x:%x:%x.%x", &domain, &bus, &slot, &function); err == nil && n == 4 {
+		chip = fmt.Sprintf("%s-pci-%04x", name, bus<<8|slot<<3|function)
+	}
+	return chip, name + "/" + dev
+}
+
 // hidHwmonChip returns the lm-sensors chip name and the resolved device
 // directory of a hwmon entry whose parent device is a HID device.
 func hidHwmonChip(hwmonDir string) (chip, devDir string, ok bool) {

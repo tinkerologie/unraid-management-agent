@@ -1056,7 +1056,7 @@ func (s *Server) registerMonitoringTools() {
 		disks := s.cacheProvider.GetDisksCache()
 		var diskIssues []map[string]any
 		for _, disk := range disks {
-			if disk.Temperature > 50 || disk.Status != "PASSED" {
+			if (disk.Temperature != nil && *disk.Temperature > 50) || disk.Status != "PASSED" {
 				diskIssues = append(diskIssues, map[string]any{
 					"id":          disk.ID,
 					"name":        disk.Name,
@@ -2296,10 +2296,10 @@ func (s *Server) registerRemediationTools() {
 		// Disk temperatures: flag any disk >= 50 °C.
 		const warnTempC = 50.0
 		for _, d := range s.cacheProvider.GetDisksCache() {
-			if d.Temperature >= warnTempC {
+			if d.Temperature != nil && *d.Temperature >= warnTempC {
 				causes = append(causes, rootCauseEntry{
 					Signal:  "high_disk_temp",
-					Detail:  fmt.Sprintf("disk %q temperature is %.1f°C", d.Name, d.Temperature),
+					Detail:  fmt.Sprintf("disk %q temperature is %.1f°C", d.Name, *d.Temperature),
 					Suspect: d.Name,
 				})
 			}
@@ -2358,7 +2358,7 @@ func (s *Server) registerAlertingTools() {
 	// Create alert rule
 	addWriteTool(s, &mcp.Tool{
 		Name:        "create_alert_rule",
-		Description: "Create a new alert rule with an expr-lang expression that evaluates against system metrics. Available variables: CPU, RAMUsedPct, CPUTemp, MotherboardTemp, ArrayState, ArrayUsedPct, ParityValid, ContainerCount, RunningContainers, StoppedContainers, VMCount, RunningVMs, MaxDiskTemp, MaxDiskUsedPct, TotalDiskErrors, UPSStatus, UPSBatteryCharge, UPSLoadPercent, UPSRuntimeLeft. UPS readings are nil when there is no UPS or it does not report the value, so guard them, e.g. UPSLoadPercent != nil && UPSLoadPercent > 80",
+		Description: "Create a new alert rule with an expr-lang expression that evaluates against system metrics. Available variables: CPU, RAMUsedPct, CPUTemp, MotherboardTemp, ArrayState, ArrayUsedPct, ParityValid, ContainerCount, RunningContainers, StoppedContainers, VMCount, RunningVMs, MaxDiskTemp, MaxDiskUsedPct, TotalDiskErrors, UPSStatus, UPSBatteryCharge, UPSLoadPercent, UPSRuntimeLeft. MotherboardTemp, MaxDiskTemp, MaxGPUTemp, TotalGPUPower and UPS readings are nil when not measured; use guards such as MaxDiskTemp != nil && MaxDiskTemp > 55. UPS readings are nil when there is no UPS or it does not report the value, so guard them, e.g. UPSLoadPercent != nil && UPSLoadPercent > 80",
 		Annotations: &mcp.ToolAnnotations{
 			DestructiveHint: new(false),
 			IdempotentHint:  false,
