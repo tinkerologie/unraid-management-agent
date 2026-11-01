@@ -3,8 +3,10 @@ package collectors
 import (
 	"bufio"
 	"context"
+	"errors"
 	"io"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -284,9 +286,7 @@ func (c *DiskCollector) parseDiskKeyValue(disk *dto.DiskInfo, line string) {
 		}
 	case "temp":
 		// Unavailable temperature is not evidence of spin state.
-		if temp, err := strconv.ParseFloat(value, 64); err == nil {
-			disk.Temperature = temp
-		}
+		disk.Temperature = parseOptionalFloat(value)
 	case "numErrors":
 		if errors, err := strconv.Atoi(value); err == nil {
 			disk.SMARTErrors = errors
@@ -648,19 +648,47 @@ func (c *DiskCollector) enrichWithSMARTData(disk *dto.DiskInfo) {
 		// SATA/SAS drives: combine health check (-H) and attribute table (-A) in one
 		// call while respecting standby mode (-n standby). Adding -A does not change
 		// the exit-code semantics: exit 2 still means "disk in standby, skipped".
-		//
-		// Exit codes:
-		//   0 = Success, disk is active, SMART data retrieved
-		//   2 = Disk is in standby/sleep mode, check skipped (disk NOT woken up)
-		//   Other = Error accessing disk
 		logger.Debug("Disk: Collecting SMART data for SATA/SAS device %s (with standby check)", disk.Device)
 		lines, err = lib.ExecCommand("smartctl", "-n", "standby", "-H", "-A", devicePath)
 	}
 
-	if err != nil {
-		// Disk may be in standby mode (exit code 2) or otherwise inaccessible.
-		// The SMART status will remain as the last known value or UNKNOWN.
-		logger.Debug("Disk: Skipping SMART check for %s (disk may be in standby mode): %v", disk.Device, err)
+	exitStatus, completed := smartExitStatus(err)
+	if !completed {
+		logger.Debug("Disk: SMART check for %s did not complete: %v", disk.Device, err)
+		return
+	}
+	applySMARTResult(disk, lines, exitStatus, isNVMe)
+}
+
+// smartExitStatus returns smartctl's exit status from the error ExecCommand
+// returned. completed is false when smartctl did not run to its own exit, as
+// with a timeout, a start failure or a signal.
+func smartExitStatus(err error) (status int, completed bool) {
+	if err == nil {
+		return 0, true
+	}
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) && exitErr.ExitCode() >= 0 {
+		return exitErr.ExitCode(), true
+	}
+	return 0, false
+}
+
+// applySMARTResult updates disk from the output of a smartctl run that exited
+// with exitStatus, a bitmask described in smartctl(8). disk.SMARTStatus is
+// expected to hold UNKNOWN on entry. Bits 0-2 mean smartctl could not read the
+// disk (bit 1 also covers a skipped standby disk). Bit 3 means the disk is
+// failing, whatever the health line says. Bits 4-7 do not affect the reading.
+func applySMARTResult(disk *dto.DiskInfo, lines []string, exitStatus int, isNVMe bool) {
+	disk.SMARTExitStatus = exitStatus
+
+	if exitStatus&(dto.SMARTExitCommandLine|dto.SMARTExitDeviceOpen) != 0 {
+		logger.Debug("Disk: Skipping SMART data for %s (disk may be in standby mode): exit status %d", disk.Device, exitStatus)
+		return
+	}
+	failing := exitStatus&dto.SMARTExitDiskFailing != 0
+	if exitStatus&dto.SMARTExitCommandFailed != 0 && !failing {
+		logger.Debug("Disk: SMART command failed for %s: exit status %d", disk.Device, exitStatus)
 		return
 	}
 
@@ -694,6 +722,9 @@ func (c *DiskCollector) enrichWithSMARTData(disk *dto.DiskInfo) {
 				logger.Debug("Disk: Parsed NVMe SMART status for %s: %s (original: %s)", disk.Device, disk.SMARTStatus, status)
 			}
 		}
+	}
+	if failing {
+		disk.SMARTStatus = "FAILED"
 	}
 
 	// Parse the ATA attribute table (only present for SATA/SAS with -A).

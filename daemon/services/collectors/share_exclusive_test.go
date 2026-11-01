@@ -176,7 +176,7 @@ func TestApplyExclusiveState(t *testing.T) {
 		{Name: "old", UseCache: "only", CachePool: "cache"}, // no exclusive key in shares.ini
 		poolOnly("../escape", "cache", false),
 	}
-	p.applyExclusiveState(shares, nil)
+	p.applyExclusiveState(shares, nil, p.readDisks())
 
 	unchecked := []string{"disk4", "disk6", "slow"}
 	want := []struct {
@@ -212,7 +212,7 @@ func TestApplyExclusiveState(t *testing.T) {
 func TestApplyExclusiveStateGloballyDisabled(t *testing.T) {
 	p := exclusiveFixture(t, "shareUser=\"e\"\nfsState=\"Started\"\nshareUserExclusive=\"no\"\n")
 	shares := []dto.ShareInfo{poolOnly("appdata", "cache", false)}
-	p.applyExclusiveState(shares, nil)
+	p.applyExclusiveState(shares, nil, p.readDisks())
 	if shares[0].Exclusive == nil || *shares[0].Exclusive || shares[0].ExclusiveEligible == nil || *shares[0].ExclusiveEligible {
 		t.Fatalf("want exclusive=false eligible=false, got %+v", shares[0])
 	}
@@ -230,7 +230,8 @@ func TestApplyExclusiveStateUnavailable(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			shares := []dto.ShareInfo{poolOnly("system", "cache", true)}
-			exclusiveFixture(t, varIni).applyExclusiveState(shares, nil)
+			p := exclusiveFixture(t, varIni)
+			p.applyExclusiveState(shares, nil, p.readDisks())
 			if shares[0].Exclusive != nil || shares[0].ExclusiveEligible != nil || shares[0].ExclusivePool != "" {
 				t.Errorf("fields set although state is unknown: %+v", shares[0])
 			}
@@ -244,7 +245,7 @@ func TestApplyExclusiveStateNoDisksIni(t *testing.T) {
 		t.Fatal(err)
 	}
 	shares := []dto.ShareInfo{poolOnly("appdata", "cache", false), poolOnly("downloads", "cache", false)}
-	p.applyExclusiveState(shares, nil)
+	p.applyExclusiveState(shares, nil, p.readDisks())
 	for _, s := range shares {
 		if s.Exclusive == nil || *s.Exclusive || s.ExclusiveEligible != nil || s.Locations != nil || s.LocationsUnchecked != nil {
 			t.Errorf("%s: want FUSE with eligibility unknown, got %+v", s.Name, s)
@@ -276,7 +277,7 @@ func TestShareLocationsProbeError(t *testing.T) {
 func TestApplyExclusiveStateIncludedDisks(t *testing.T) {
 	p := exclusiveFixture(t, startedVarIni+"shareUserInclude=\"disk5\"\n")
 	shares := []dto.ShareInfo{poolOnly("appdata", "cache", false)}
-	p.applyExclusiveState(shares, nil)
+	p.applyExclusiveState(shares, nil, p.readDisks())
 	// disk1 is not in the included disks; pools are unaffected.
 	if want := []string{"cache", "disk5"}; !reflect.DeepEqual(locs(shares[0].Locations), want) {
 		t.Errorf("locations = %v, want %v", locs(shares[0].Locations), want)
@@ -298,7 +299,7 @@ func TestApplyExclusiveStatePoolsOnlyServer(t *testing.T) {
 	} {
 		p := exclusiveFixture(t, startedVarIni+tt.slots)
 		shares := []dto.ShareInfo{prefer, yes, twoPools}
-		p.applyExclusiveState(shares, nil)
+		p.applyExclusiveState(shares, nil, p.readDisks())
 		if deref(shares[0].ExclusiveEligible) != tt.eligible || deref(shares[1].ExclusiveEligible) != tt.eligible {
 			t.Errorf("%q: eligible=%v/%v, want %v", tt.slots, deref(shares[0].ExclusiveEligible), deref(shares[1].ExclusiveEligible), tt.eligible)
 		}
@@ -320,7 +321,7 @@ func TestApplyExclusiveStatePoolsOnlyImplicitPool(t *testing.T) {
 		{Name: "appdata", UseCache: "yes", Exclusive: boolPtr(false)},
 		{Name: "system", UseCache: "no", Exclusive: boolPtr(true)},
 	}
-	p.applyExclusiveState(shares, nil)
+	p.applyExclusiveState(shares, nil, p.readDisks())
 	for _, s := range shares {
 		if s.ExclusivePool != "cache" || deref(s.ExclusiveEligible) != true {
 			t.Errorf("%s: pool=%q eligible=%v, want cache true", s.Name, s.ExclusivePool, deref(s.ExclusiveEligible))
@@ -335,7 +336,7 @@ func TestApplyExclusiveStatePoolsOnlyImplicitPool(t *testing.T) {
 		t.Fatal(err)
 	}
 	shares = []dto.ShareInfo{{Name: "appdata", UseCache: "yes", Exclusive: boolPtr(false)}}
-	p.applyExclusiveState(shares, nil)
+	p.applyExclusiveState(shares, nil, p.readDisks())
 	if deref(shares[0].ExclusiveEligible) != false || shares[0].ExclusivePool != "" {
 		t.Errorf("no pools: %+v", shares[0])
 	}
@@ -347,7 +348,7 @@ func TestApplyExclusiveStateRemovedPool(t *testing.T) {
 		poolOnly("appdata", "gone", false),
 		poolOnly("system", "gone", true), // exclusive: trusted as is
 	}
-	p.applyExclusiveState(shares, nil)
+	p.applyExclusiveState(shares, nil, p.readDisks())
 	if s := shares[0]; deref(s.ExclusiveEligible) != false || s.ExclusivePool != "" || s.Locations != nil {
 		t.Errorf("removed pool: %+v", s)
 	}
@@ -383,7 +384,7 @@ func TestApplyExclusiveStateExportUnknown(t *testing.T) {
 	for version, eligible := range map[string]*bool{"7.1.4": nil, "7.4.0": boolPtr(true)} {
 		p := exclusiveFixture(t, startedVarIni+"version=\""+version+"\"\n")
 		shares := []dto.ShareInfo{poolOnly("appdata", "cache", false)}
-		p.applyExclusiveState(shares, map[string]bool{"appdata": true})
+		p.applyExclusiveState(shares, map[string]bool{"appdata": true}, p.readDisks())
 		got := shares[0]
 		if deref(got.Exclusive) != false || !reflect.DeepEqual(got.ExclusiveEligible, eligible) {
 			t.Errorf("%s: exclusive=%v eligible=%v, want false %v", version, deref(got.Exclusive), deref(got.ExclusiveEligible), deref(eligible))
@@ -440,7 +441,7 @@ func TestApplyExclusiveStateNFSBeforeRelease72(t *testing.T) {
 	} {
 		p := exclusiveFixture(t, startedVarIni+"version=\""+tt.version+"\"\n")
 		shares := []dto.ShareInfo{nfsShare, poolOnly("downloads", "cache", false)}
-		p.applyExclusiveState(shares, nil)
+		p.applyExclusiveState(shares, nil, p.readDisks())
 		if got := *shares[0].ExclusiveEligible; got != tt.eligible {
 			t.Errorf("%s: NFS share eligible=%v, want %v", tt.version, got, tt.eligible)
 		}

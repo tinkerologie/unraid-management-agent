@@ -34,22 +34,22 @@ func TestMetricsGPUCache(t *testing.T) {
 	gpuVal := []*dto.GPUMetrics{{
 		Available:      true,
 		Name:           "NVIDIA RTX 3080",
-		Temperature:    65.0,
+		Temperature:    new(float64(65.0)),
 		UtilizationGPU: 85.0,
-		MemoryUsed:     6442450944,
-		MemoryTotal:    10737418240,
-		PowerDraw:      250.5,
+		MemoryUsed:     new(uint64(6442450944)),
+		MemoryTotal:    new(uint64(10737418240)),
+		PowerDraw:      new(float64(250.5)),
 		Timestamp:      time.Now(),
 	},
 		nil, // nil entry — exercises the nil guard
 		{
 			Available:      true,
 			Name:           "Intel UHD 630",
-			Temperature:    45.0,
+			Temperature:    new(float64(45.0)),
 			UtilizationGPU: 10.0,
-			MemoryUsed:     256000000,
-			MemoryTotal:    1024000000,
-			PowerDraw:      15.0,
+			MemoryUsed:     new(uint64(256000000)),
+			MemoryTotal:    new(uint64(1024000000)),
+			PowerDraw:      new(float64(15.0)),
 			Timestamp:      time.Now(),
 		},
 	}
@@ -149,7 +149,7 @@ func TestMetricsDiskCachePoolType(t *testing.T) {
 		Device:      "nvme0n1",
 		Role:        "cache",
 		Status:      "DISK_OK",
-		Temperature: 40.0,
+		Temperature: new(float64(40.0)),
 		SMARTStatus: "PASSED",
 		SpinState:   "active",
 	},
@@ -158,7 +158,7 @@ func TestMetricsDiskCachePoolType(t *testing.T) {
 			Device:      "nvme1n1",
 			Role:        "pool",
 			Status:      "DISK_OK",
-			Temperature: 38.0,
+			Temperature: new(float64(38.0)),
 			SMARTStatus: "PASSED",
 			SpinState:   "active",
 		},
@@ -316,7 +316,7 @@ func TestMetricsDiskRoleTypeLabels(t *testing.T) {
 		{"unknown", "HDD"}, {"docker_vdisk", "HDD"}, {"log", "HDD"},
 	} {
 		t.Run(tt.role, func(t *testing.T) {
-			disks := []dto.DiskInfo{{Name: "disk", Device: "test", Role: tt.role, Temperature: 30}}
+			disks := []dto.DiskInfo{{Name: "disk", Device: "test", Role: tt.role, Temperature: new(float64(30))}}
 			server.disksCache.Store(&disks)
 			body := getMetricsBody(t, server)
 			want := `unraid_disk_temperature_celsius{device="test",disk="disk",type="` + tt.label + `"} 30`

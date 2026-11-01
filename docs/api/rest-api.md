@@ -873,7 +873,7 @@ Get system information including CPU, memory, temperatures, and uptime.
 - `server_model`: Server/motherboard model
 - `bios_version`: BIOS version
 - `bios_date`: BIOS date
-- `motherboard_temp_celsius`: Motherboard temperature in Celsius
+- `motherboard_temp_celsius`: Motherboard temperature in Celsius; `null` when no motherboard sensor is measured
 - `hvm_enabled`: Hardware virtualization enabled
 - `iommu_enabled`: IOMMU enabled for PCIe passthrough
 - `openssl_version`: OpenSSL version (optional)
@@ -898,6 +898,17 @@ curl http://192.168.20.21:8043/api/v1/system
 ```
 
 **Note**: All size fields are in **bytes**, all temperatures are in **Celsius**, and all percentages use the `_percent` suffix.
+
+Temperature telemetry keeps the global range −40 °C < reading < 125 °C. The raw label `SYSTIN`
+and labels starting with `AUXTIN` (case-insensitive) additionally have a 100 °C ceiling.
+Labels containing `PECI` or `DIMM` drop readings at or below 0 °C; other labels retain legitimate zero and negative readings.
+An AUXTIN connected to a VRM running above 100 °C is therefore hidden too. These telemetry filters do not change
+fan-control or thermal-safety policy.
+
+A fan channel with a non-finite, negative or above-25000 RPM reading is hidden for 15 minutes from its last
+implausible reading. Further implausible samples restart this per-channel quarantine; healthy channels keep their names.
+A measured 25000 RPM is accepted. The `sensors` source retains 0 RPM; the sysfs fallback continues to omit
+unpopulated 0 RPM channels. Fan DTO fields are unchanged.
 
 ---
 
@@ -1302,7 +1313,7 @@ List all disks in the system.
     "size_bytes": 8000450304000,
     "used_bytes": 0,
     "free_bytes": 8000450304000,
-    "temperature_celsius": 0,
+    "temperature_celsius": null,
     "smart_status": "PASSED",
     "smart_errors": 0,
     "spindown_delay": 0,
@@ -1343,7 +1354,7 @@ List all disks in the system.
 - `free_bytes`: Free space from `disks.ini` `fsFree` (KiB × 1024), including valid zero.
   When present, INI capacity takes precedence and skips statfs and ZFS capacity overrides for that disk;
   when absent or invalid, the existing statfs/ZFS fallback applies.
-- `temperature_celsius`: Disk temperature in Celsius (0 when unavailable)
+- `temperature_celsius`: Disk temperature in Celsius (`null` if spun down or unreadable; a measured 0 stays 0)
 - `smart_status`: SMART health status (`PASSED`, `FAILED`)
 - `smart_errors`: Number of SMART errors
 - `spindown_delay`: Spindown delay in minutes (0 = never)
@@ -1442,7 +1453,11 @@ List all user shares.
 [
   {
     "name": "appdata",
-    "size_bytes": 100000000000,
+    "storage_used_bytes": 50000000000,
+    "storage_free_bytes": 50000000000,
+    "storage_total_bytes": 100000000000,
+    "storage_usage_percent": 50.0,
+    "total_bytes": 100000000000,
     "used_bytes": 50000000000,
     "free_bytes": 50000000000,
     "usage_percent": 50.0,
@@ -1455,7 +1470,11 @@ List all user shares.
   },
   {
     "name": "media",
-    "used_bytes": 2000000000000,
+    "storage_used_bytes": 2000000000000,
+    "storage_free_bytes": 1000000000000,
+    "storage_total_bytes": 3000000000000,
+    "storage_usage_percent": 66.7,
+    "total_bytes": 3000000000000,
     "free_bytes": 1000000000000,
     "usage_percent": 66.7,
     "use_cache": "only",
@@ -1468,6 +1487,24 @@ List all user shares.
   }
 ]
 ```
+
+`used_bytes` is optional measured share content, including mounted descendant filesystems whose mountpoints
+are at or beneath the share dataset's mountpoint. It is available only for
+cache-only shares on their assigned mounted ZFS pool when every pool member is known spinning.
+It is omitted when usage or mount metadata is unknown; a measured empty share reports `0`.
+No directory walks are performed.
+The `storage_*` figures describe backing storage and are shared by shares on the same storage.
+
+| Field                   | Description                                               |
+| ----------------------- | --------------------------------------------------------- |
+| `used_bytes`            | Measured share content in bytes; omitted when unavailable |
+| `storage_used_bytes`    | Backing pool/array used space in bytes                    |
+| `storage_free_bytes`    | Backing pool/array free space in bytes                    |
+| `storage_total_bytes`   | Backing pool/array capacity in bytes                      |
+| `storage_usage_percent` | Backing pool/array usage percentage                       |
+| `free_bytes`            | Deprecated alias of `storage_free_bytes`                  |
+| `total_bytes`           | Deprecated alias of `storage_total_bytes`                 |
+| `usage_percent`         | Deprecated alias of `storage_usage_percent`               |
 
 **Exclusive shares (Unraid 6.12+)**: with _Permit exclusive shares_ enabled,
 Unraid makes `/mnt/user/<share>` a symlink to `/mnt/<pool>/<share>` for shares
@@ -2329,17 +2366,34 @@ Get GPU information and metrics.
 ```json
 [
   {
-    "id": "0",
+    "available": true,
+    "index": 0,
+    "pci_id": "0000:00:02.0",
     "name": "Intel UHD Graphics 770",
-    "vendor": "Intel",
-    "temperature_celsius": 45,
-    "usage_percent": 10,
-    "memory_total_bytes": 8589934592,
-    "memory_used_bytes": 1073741824,
+    "vendor": "intel",
+    "driver_version": "i915",
+    "temperature_celsius": null,
+    "cpu_temperature_celsius": 45,
+    "utilization_gpu_percent": 10,
+    "utilization_memory_percent": null,
+    "memory_total_bytes": null,
+    "memory_used_bytes": null,
+    "power_draw_watts": null,
     "timestamp": "2025-10-03T13:41:13+10:00"
   }
 ]
 ```
+
+`temperature_celsius`, `power_draw_watts`, `memory_total_bytes`, `memory_used_bytes` and
+`utilization_memory_percent` are `null` when unmeasured. Their keys stay present, and a measured zero stays 0.
+Memory utilisation requires both total and used memory readings and a positive total.
+This contract applies to all GPU vendors, including unsupported NVIDIA and unreadable AMD measurements.
+
+Intel temperature is read only from the detected PCI device's hwmon; CPU temperature remains separate.
+Intel `driver_version` is the bound driver name (`i915` or `xe`), followed by a space and the contents of
+`/sys/module/<driver>/version` when available (for example `xe 1.2.3`). It is empty if no supported bound driver
+can be resolved. The kernel release/vermagic is never reported as the driver version.
+The `intel_gpu_top` sample is still not bound to an individual GPU on multi-Intel-GPU hosts.
 
 ---
 
@@ -3789,6 +3843,12 @@ to their alert rules configuration file.
 | `MaxPendingSectors`           | int   | Maximum pending (uncorrectable) sector count across all array disks    |
 | `DiskErrorsIncreasing`        | bool  | `true` when any disk's error count has a positive slope                |
 
+`MotherboardTemp`, `MaxDiskTemp`, `MaxGPUTemp` and `TotalGPUPower` are nullable numbers.
+They are `nil` when no valid measurement exists. Aggregates use only measured values.
+Guard custom rules, for example `MaxDiskTemp != nil && MaxDiskTemp > 55`.
+An unguarded comparison with `nil` fails evaluation, logs the failure once and preserves the alert's prior state;
+a measured zero evaluates normally. Missing disk temperatures do not add fake zero samples to trend history.
+
 **How to write a trend alert rule:**
 
 1. Call `GET /alerts/templates` to review the available templates.
@@ -4046,48 +4106,51 @@ Prometheus exposition format endpoint for native Grafana integration.
 
 #### Available Metrics
 
-| Category     | Metric                              | Type  | Labels                     | Description                        |
-| ------------ | ----------------------------------- | ----- | -------------------------- | ---------------------------------- |
-| **System**   | `unraid_system_info`                | Gauge | version, hostname          | Unraid system information          |
-|              | `unraid_system_uptime_seconds`      | Gauge | -                          | System uptime in seconds           |
-|              | `unraid_cpu_usage_percent`          | Gauge | -                          | Current CPU usage percentage       |
-|              | `unraid_cpu_temperature_celsius`    | Gauge | -                          | CPU temperature                    |
-|              | `unraid_memory_total_bytes`         | Gauge | -                          | Total system memory                |
-|              | `unraid_memory_used_bytes`          | Gauge | -                          | Used system memory                 |
-|              | `unraid_memory_free_bytes`          | Gauge | -                          | Free system memory                 |
-|              | `unraid_memory_usage_percent`       | Gauge | -                          | Memory usage percentage            |
-| **Array**    | `unraid_array_state`                | Gauge | state                      | Array state (1=started, 0=stopped) |
-|              | `unraid_array_total_bytes`          | Gauge | -                          | Total array capacity               |
-|              | `unraid_array_used_bytes`           | Gauge | -                          | Used array space                   |
-|              | `unraid_array_free_bytes`           | Gauge | -                          | Free array space                   |
-|              | `unraid_parity_check_running`       | Gauge | -                          | Whether parity check is running    |
-|              | `unraid_parity_check_progress`      | Gauge | -                          | Parity check progress (0-100)      |
-|              | `unraid_parity_check_errors`        | Gauge | -                          | Number of parity errors found      |
-| **Disks**    | `unraid_disk_temperature_celsius`   | Gauge | name, device, type         | Disk temperature                   |
-|              | `unraid_disk_size_bytes`            | Gauge | name, device, type         | Disk total size                    |
-|              | `unraid_disk_used_bytes`            | Gauge | name, device, type         | Disk used space                    |
-|              | `unraid_disk_status`                | Gauge | name, device, type, status | Disk status (1=healthy, 0=problem) |
-|              | `unraid_disk_standby`               | Gauge | name, device, type         | Disk standby state                 |
-|              | `unraid_disk_smart_status`          | Gauge | name, device, type         | SMART status (1=passed, 0=failed)  |
-| **Docker**   | `unraid_docker_container_state`     | Gauge | name, id, image            | Container state (1=running)        |
-|              | `unraid_docker_containers_total`    | Gauge | -                          | Total number of containers         |
-|              | `unraid_docker_containers_running`  | Gauge | -                          | Number of running containers       |
-| **VMs**      | `unraid_vm_state`                   | Gauge | name, id                   | VM state (1=running, 2=paused)     |
-|              | `unraid_vms_total`                  | Gauge | -                          | Total number of VMs                |
-|              | `unraid_vms_running`                | Gauge | -                          | Number of running VMs              |
-| **UPS**      | `unraid_ups_status`                 | Gauge | status                     | UPS status (1=online)              |
-|              | `unraid_ups_battery_charge_percent` | Gauge | -                          | Battery charge percentage          |
-|              | `unraid_ups_load_percent`           | Gauge | -                          | UPS load percentage                |
-|              | `unraid_ups_runtime_seconds`        | Gauge | -                          | Remaining runtime                  |
-| **Shares**   | `unraid_share_used_bytes`           | Gauge | name                       | Share used space                   |
-|              | `unraid_shares_total`               | Gauge | -                          | Total number of shares             |
-| **Services** | `unraid_service_enabled`            | Gauge | service                    | Service enabled state              |
-|              | `unraid_service_running`            | Gauge | service                    | Service running state              |
-| **GPU**      | `unraid_gpu_temperature_celsius`    | Gauge | name, index                | GPU temperature                    |
-|              | `unraid_gpu_utilization_percent`    | Gauge | name, index                | GPU utilization                    |
-|              | `unraid_gpu_memory_used_bytes`      | Gauge | name, index                | GPU memory used                    |
-|              | `unraid_gpu_memory_total_bytes`     | Gauge | name, index                | GPU memory total                   |
-|              | `unraid_gpu_power_watts`            | Gauge | name, index                | GPU power draw                     |
+| Category     | Metric                              | Type  | Labels                     | Description                                  |
+| ------------ | ----------------------------------- | ----- | -------------------------- | -------------------------------------------- |
+| **System**   | `unraid_system_info`                | Gauge | version, hostname          | Unraid system information                    |
+|              | `unraid_system_uptime_seconds`      | Gauge | -                          | System uptime in seconds                     |
+|              | `unraid_cpu_usage_percent`          | Gauge | -                          | Current CPU usage percentage                 |
+|              | `unraid_cpu_temperature_celsius`    | Gauge | -                          | CPU temperature                              |
+|              | `unraid_memory_total_bytes`         | Gauge | -                          | Total system memory                          |
+|              | `unraid_memory_used_bytes`          | Gauge | -                          | Used system memory                           |
+|              | `unraid_memory_free_bytes`          | Gauge | -                          | Free system memory                           |
+|              | `unraid_memory_usage_percent`       | Gauge | -                          | Memory usage percentage                      |
+| **Array**    | `unraid_array_state`                | Gauge | state                      | Array state (1=started, 0=stopped)           |
+|              | `unraid_array_total_bytes`          | Gauge | -                          | Total array capacity                         |
+|              | `unraid_array_used_bytes`           | Gauge | -                          | Used array space                             |
+|              | `unraid_array_free_bytes`           | Gauge | -                          | Free array space                             |
+|              | `unraid_parity_check_running`       | Gauge | -                          | Whether parity check is running              |
+|              | `unraid_parity_check_progress`      | Gauge | -                          | Parity check progress (0-100)                |
+|              | `unraid_parity_check_errors`        | Gauge | -                          | Number of parity errors found                |
+| **Disks**    | `unraid_disk_temperature_celsius`   | Gauge | name, device, type         | Disk temperature                             |
+|              | `unraid_disk_size_bytes`            | Gauge | name, device, type         | Disk total size                              |
+|              | `unraid_disk_used_bytes`            | Gauge | name, device, type         | Disk used space                              |
+|              | `unraid_disk_status`                | Gauge | name, device, type, status | Disk status (1=healthy, 0=problem)           |
+|              | `unraid_disk_standby`               | Gauge | name, device, type         | Disk standby state                           |
+|              | `unraid_disk_smart_status`          | Gauge | name, device, type         | SMART status (1=passed, 0=failed)            |
+| **Docker**   | `unraid_docker_container_state`     | Gauge | name, id, image            | Container state (1=running)                  |
+|              | `unraid_docker_containers_total`    | Gauge | -                          | Total number of containers                   |
+|              | `unraid_docker_containers_running`  | Gauge | -                          | Number of running containers                 |
+| **VMs**      | `unraid_vm_state`                   | Gauge | name, id                   | VM state (1=running, 2=paused)               |
+|              | `unraid_vms_total`                  | Gauge | -                          | Total number of VMs                          |
+|              | `unraid_vms_running`                | Gauge | -                          | Number of running VMs                        |
+| **UPS**      | `unraid_ups_status`                 | Gauge | status                     | UPS status (1=online)                        |
+|              | `unraid_ups_battery_charge_percent` | Gauge | -                          | Battery charge percentage                    |
+|              | `unraid_ups_load_percent`           | Gauge | -                          | UPS load percentage                          |
+|              | `unraid_ups_runtime_seconds`        | Gauge | -                          | Remaining runtime                            |
+| **Shares**   | `unraid_share_used_bytes`           | Gauge | name                       | Measured share content; omitted when unknown |
+|              | `unraid_share_storage_used_bytes`   | Gauge | name                       | Backing-storage used space                   |
+|              | `unraid_share_storage_free_bytes`   | Gauge | name                       | Backing-storage free space                   |
+|              | `unraid_share_storage_total_bytes`  | Gauge | name                       | Backing-storage capacity                     |
+|              | `unraid_shares_total`               | Gauge | -                          | Total number of shares                       |
+| **Services** | `unraid_service_enabled`            | Gauge | service                    | Service enabled state                        |
+|              | `unraid_service_running`            | Gauge | service                    | Service running state                        |
+| **GPU**      | `unraid_gpu_temperature_celsius`    | Gauge | name, index                | GPU temperature                              |
+|              | `unraid_gpu_utilization_percent`    | Gauge | name, index                | GPU utilization                              |
+|              | `unraid_gpu_memory_used_bytes`      | Gauge | name, index                | GPU memory used                              |
+|              | `unraid_gpu_memory_total_bytes`     | Gauge | name, index                | GPU memory total                             |
+|              | `unraid_gpu_power_watts`            | Gauge | name, index                | GPU power draw                               |
 
 #### Example Response
 

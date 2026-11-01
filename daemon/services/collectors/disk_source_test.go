@@ -258,7 +258,7 @@ func TestDiskSourceSpinDefaults(t *testing.T) {
 		}
 	}
 	// Also exercise the missing default on DTOs not constructed by the parser.
-	disk := &dto.DiskInfo{Device: "sd_issue296_nonexistent", Temperature: 35}
+	disk := &dto.DiskInfo{Device: "sd_issue296_nonexistent", Temperature: new(float64(35))}
 	(&DiskCollector{}).enrichWithSpinState(disk)
 	if disk.SpinState != "unknown" {
 		t.Errorf("spin state = %q, want unknown", disk.SpinState)

@@ -1091,3 +1091,46 @@ func TestHandleVMGuestList(t *testing.T) {
 		t.Errorf("got %+v", got)
 	}
 }
+
+func TestHandleSharesCapacityJSON(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		used *uint64
+		want bool
+	}{
+		{"unknown", nil, false}, {"known zero", new(uint64(0)), true}, {"measured", new(uint64(42)), true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			server, _ := setupTestServer()
+			shares := []dto.ShareInfo{{Name: "media", Used: tt.used, StorageUsed: 40, StorageFree: 60, StorageTotal: 100, StorageUsagePercent: 40, Free: 60, Total: 100, UsagePercent: 40}}
+			server.sharesCache.Store(&shares)
+			rr := httptest.NewRecorder()
+			server.router.ServeHTTP(rr, httptest.NewRequest("GET", "/api/v1/shares", nil))
+			if rr.Code != http.StatusOK {
+				t.Fatalf("status=%d", rr.Code)
+			}
+			var result []map[string]json.RawMessage
+			if err := json.Unmarshal(rr.Body.Bytes(), &result); err != nil {
+				t.Fatal(err)
+			}
+			if len(result) != 1 {
+				t.Fatalf("response=%s", rr.Body.String())
+			}
+			used, present := result[0]["used_bytes"]
+			if present != tt.want {
+				t.Fatalf("used_bytes presence=%v want %v", present, tt.want)
+			}
+			if tt.want {
+				var value uint64
+				if err := json.Unmarshal(used, &value); err != nil || value != *tt.used {
+					t.Errorf("used_bytes=%s", used)
+				}
+			}
+			for key, want := range map[string]string{"storage_used_bytes": "40", "storage_free_bytes": "60", "storage_total_bytes": "100", "storage_usage_percent": "40", "free_bytes": "60", "total_bytes": "100", "usage_percent": "40"} {
+				if got := string(result[0][key]); got != want {
+					t.Errorf("%s=%s want %s", key, got, want)
+				}
+			}
+		})
+	}
+}

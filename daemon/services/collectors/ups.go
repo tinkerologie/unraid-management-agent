@@ -296,7 +296,7 @@ func parseNUTUpscOutput(output string) (*dto.UPSStatus, error) {
 	return status, nil
 }
 
-// parseOptionalFloat parses a UPS reading. It returns nil when the value is not
+// parseOptionalFloat parses a numeric telemetry reading. It returns nil when the value is not
 // a finite number, so a reading that is missing or garbled stays unknown
 // instead of becoming 0.
 func parseOptionalFloat(value string) *float64 {

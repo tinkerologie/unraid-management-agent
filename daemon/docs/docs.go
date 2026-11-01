@@ -7317,6 +7317,11 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 0
                 },
+                "smart_exit_status": {
+                    "description": "SMARTExitStatus is the bitmask smartctl exited with (see the SMARTExit\nconstants), omitted when zero or when smartctl did not run to its own exit.",
+                    "type": "integer",
+                    "example": 32
+                },
                 "smart_status": {
                     "type": "string",
                     "example": "PASSED"
@@ -7353,7 +7358,9 @@ const docTemplate = `{
                     "example": 50
                 },
                 "temperature_celsius": {
+                    "description": "Null when not measured.",
                     "type": "number",
+                    "x-nullable": true,
                     "example": 35
                 },
                 "timestamp": {
@@ -8428,6 +8435,7 @@ const docTemplate = `{
                     "example": 45
                 },
                 "driver_version": {
+                    "description": "Intel: bound driver name plus module version when available.",
                     "type": "string",
                     "example": "535.183.01"
                 },
@@ -8452,11 +8460,15 @@ const docTemplate = `{
                     "example": 0
                 },
                 "memory_total_bytes": {
+                    "description": "Null when not measured.",
                     "type": "integer",
+                    "x-nullable": true,
                     "example": 10737418240
                 },
                 "memory_used_bytes": {
+                    "description": "Null when not measured.",
                     "type": "integer",
+                    "x-nullable": true,
                     "example": 6442450944
                 },
                 "name": {
@@ -8469,11 +8481,15 @@ const docTemplate = `{
                     "example": "0000:01:00.0"
                 },
                 "power_draw_watts": {
+                    "description": "Null when not measured.",
                     "type": "number",
+                    "x-nullable": true,
                     "example": 250.5
                 },
                 "temperature_celsius": {
+                    "description": "Null when not measured.",
                     "type": "number",
+                    "x-nullable": true,
                     "example": 55
                 },
                 "timestamp": {
@@ -8484,7 +8500,9 @@ const docTemplate = `{
                     "example": 75.5
                 },
                 "utilization_memory_percent": {
+                    "description": "Null when not measured.",
                     "type": "number",
+                    "x-nullable": true,
                     "example": 60.2
                 },
                 "uuid": {
@@ -11115,6 +11133,7 @@ const docTemplate = `{
                     "example": "cache"
                 },
                 "free_bytes": {
+                    "description": "Free is a deprecated alias of StorageFree.\nDeprecated: use storage_free_bytes.",
                     "type": "integer",
                     "example": 5368709120000
                 },
@@ -11180,14 +11199,36 @@ const docTemplate = `{
                     "type": "string",
                     "example": "cache+array"
                 },
+                "storage_free_bytes": {
+                    "description": "StorageFree is backing pool/array free space, shared by shares on that storage.",
+                    "type": "integer",
+                    "example": 5368709120000
+                },
+                "storage_total_bytes": {
+                    "description": "StorageTotal is backing pool/array capacity, shared by shares on that storage.",
+                    "type": "integer",
+                    "example": 10737418240000
+                },
+                "storage_usage_percent": {
+                    "description": "StorageUsagePercent is backing pool/array usage, shared by shares on that storage.",
+                    "type": "number",
+                    "example": 50
+                },
+                "storage_used_bytes": {
+                    "description": "StorageUsed is backing pool/array usage, shared by shares on that storage.",
+                    "type": "integer",
+                    "example": 5368709120000
+                },
                 "timestamp": {
                     "type": "string"
                 },
                 "total_bytes": {
+                    "description": "Total is a deprecated alias of StorageTotal.\nDeprecated: use storage_total_bytes.",
                     "type": "integer",
                     "example": 10737418240000
                 },
                 "usage_percent": {
+                    "description": "UsagePercent is a deprecated alias of StorageUsagePercent.\nDeprecated: use storage_usage_percent.",
                     "type": "number",
                     "example": 50
                 },
@@ -11197,6 +11238,7 @@ const docTemplate = `{
                     "example": "prefer"
                 },
                 "used_bytes": {
+                    "description": "Used is measured share content in bytes, including descendant filesystems.\nOmitted unless the cache-only share's assigned ZFS pool is known awake.",
                     "type": "integer",
                     "example": 5368709120000
                 }
@@ -12085,7 +12127,9 @@ const docTemplate = `{
                     "example": "6.1.64-Unraid"
                 },
                 "motherboard_temp_celsius": {
+                    "description": "Null when not measured.",
                     "type": "number",
+                    "x-nullable": true,
                     "example": 35
                 },
                 "openssl_version": {

@@ -332,7 +332,7 @@ func (c *Client) publishSystemDiscovery() {
 	c.publishHAEntity(haEntityOpts{
 		entityType: "sensor", stateTopic: topic,
 		id: "motherboard_temp", name: "System: Motherboard Temperature", unit: "°C",
-		icon: "mdi:thermometer", template: "{{ value_json.motherboard_temp_celsius | default(0) }}",
+		icon: "mdi:thermometer", template: optionalNumberTemplate("value_json", "motherboard_temp_celsius", -1),
 		deviceClass: "temperature", stateClass: "measurement",
 	})
 
@@ -806,7 +806,7 @@ func (c *Client) publishDiskEntities(topic, prefix, displayName, diskID string) 
 	c.publishHAEntity(haEntityOpts{
 		entityType: "sensor", stateTopic: topic,
 		id: prefix + "_temp", name: fmt.Sprintf("Disk: %s Temperature", displayName), unit: "°C",
-		icon: "mdi:thermometer", template: "{{ value_json.temperature_celsius }}",
+		icon: "mdi:thermometer", template: optionalNumberTemplate("value_json", "temperature_celsius", -1),
 		deviceClass: "temperature", stateClass: "measurement",
 	})
 	c.publishHAEntity(haEntityOpts{
@@ -1208,7 +1208,7 @@ func (c *Client) publishGPUEntities(topic, prefix, displayName string) []string 
 	c.publishHAEntity(haEntityOpts{
 		entityType: "sensor", stateTopic: topic,
 		id: prefix + "_temp", name: fmt.Sprintf("GPU: %s Temperature", displayName), unit: "°C",
-		icon: "mdi:thermometer", template: "{{ value_json.temperature_celsius }}",
+		icon: "mdi:thermometer", template: optionalNumberTemplate("value_json", "temperature_celsius", -1),
 		deviceClass: "temperature", stateClass: "measurement",
 	})
 	c.publishHAEntity(haEntityOpts{
@@ -1220,19 +1220,19 @@ func (c *Client) publishGPUEntities(topic, prefix, displayName string) []string 
 	c.publishHAEntity(haEntityOpts{
 		entityType: "sensor", stateTopic: topic,
 		id: prefix + "_mem_util", name: fmt.Sprintf("GPU: %s Memory Utilization", displayName), unit: "%",
-		icon: "mdi:expansion-card", template: "{{ value_json.utilization_memory_percent | round(1) }}",
+		icon: "mdi:expansion-card", template: optionalNumberTemplate("value_json", "utilization_memory_percent", 1),
 		stateClass: "measurement",
 	})
 	c.publishHAEntity(haEntityOpts{
 		entityType: "sensor", stateTopic: topic,
 		id: prefix + "_mem_used", name: fmt.Sprintf("GPU: %s Memory Used", displayName), unit: "B",
-		icon: "mdi:memory", template: "{{ value_json.memory_used_bytes }}",
+		icon: "mdi:memory", template: optionalNumberTemplate("value_json", "memory_used_bytes", -1),
 		deviceClass: "data_size", stateClass: "measurement",
 	})
 	c.publishHAEntity(haEntityOpts{
 		entityType: "sensor", stateTopic: topic,
 		id: prefix + "_power", name: fmt.Sprintf("GPU: %s Power Draw", displayName), unit: "W",
-		icon: "mdi:lightning-bolt", template: "{{ value_json.power_draw_watts | round(1) }}",
+		icon: "mdi:lightning-bolt", template: optionalNumberTemplate("value_json", "power_draw_watts", 1),
 		deviceClass: "power", stateClass: "measurement",
 	})
 	c.publishHAEntity(haEntityOpts{
@@ -1401,24 +1401,32 @@ func (c *Client) publishShareEntities(topic, prefix, displayName string) []strin
 		prefix + "_usage",
 		prefix + "_used",
 		prefix + "_free",
+		prefix + "_storage_used",
 	}
 
 	c.publishHAEntity(haEntityOpts{
 		entityType: "sensor", stateTopic: topic,
-		id: prefix + "_usage", name: fmt.Sprintf("Share: %s Usage", displayName), unit: "%",
-		icon: "mdi:folder", template: "{{ value_json.usage_percent | round(1) }}",
+		id: prefix + "_usage", name: fmt.Sprintf("Share: %s Storage Usage", displayName), unit: "%",
+		icon: "mdi:folder", template: "{{ value_json.storage_usage_percent | round(1) }}",
 		stateClass: "measurement",
 	})
 	c.publishHAEntity(haEntityOpts{
 		entityType: "sensor", stateTopic: topic,
 		id: prefix + "_used", name: fmt.Sprintf("Share: %s Used", displayName), unit: "B",
-		icon: "mdi:folder", template: "{{ value_json.used_bytes }}",
+		icon: "mdi:folder", template: optionalNumberTemplate("value_json", "used_bytes", -1),
 		deviceClass: "data_size", stateClass: "measurement",
 	})
 	c.publishHAEntity(haEntityOpts{
 		entityType: "sensor", stateTopic: topic,
-		id: prefix + "_free", name: fmt.Sprintf("Share: %s Free", displayName), unit: "B",
-		icon: "mdi:folder", template: "{{ value_json.free_bytes }}",
+		id: prefix + "_free", name: fmt.Sprintf("Share: %s Storage Free", displayName), unit: "B",
+		icon: "mdi:folder", template: "{{ value_json.storage_free_bytes }}",
+		deviceClass: "data_size", stateClass: "measurement",
+	})
+
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: prefix + "_storage_used", name: fmt.Sprintf("Share: %s Storage Used", displayName), unit: "B",
+		icon: "mdi:folder", template: "{{ value_json.storage_used_bytes }}",
 		deviceClass: "data_size", stateClass: "measurement",
 	})
 
