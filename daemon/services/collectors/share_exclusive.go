@@ -24,10 +24,11 @@ const defaultMntRoot = "/mnt"
 // fields fall back to the production defaults so a zero-value ShareCollector
 // keeps working; tests point them at fixture files.
 type sharePaths struct {
-	mntRoot   string
-	sharesIni string
-	varIni    string
-	disksIni  string
+	bootConfigDir string
+	mntRoot       string
+	sharesIni     string
+	varIni        string
+	disksIni      string
 }
 
 func (p sharePaths) mnt() string {
@@ -73,7 +74,7 @@ func (p sharePaths) disks() string {
 //
 // exportUnknown names shares whose config could not be read; on releases
 // where NFS export blocks exclusive access their eligibility stays unknown.
-func (p sharePaths) applyExclusiveState(shares []dto.ShareInfo, exportUnknown map[string]bool) {
+func (p sharePaths) applyExclusiveState(shares []dto.ShareInfo, exportUnknown map[string]bool, disks map[string]map[string]string) {
 	settings, supported := p.exclusiveSettings()
 	if !supported || !settings.userSharesMounted {
 		for i := range shares {
@@ -82,16 +83,6 @@ func (p sharePaths) applyExclusiveState(shares []dto.ShareInfo, exportUnknown ma
 		return
 	}
 
-	// disks.ini is read lazily: only needed for shares on FUSE and for the
-	// implicit pool on pools-only servers.
-	var disks map[string]map[string]string
-	disksRead := false
-	loadDisks := func() map[string]map[string]string {
-		if !disksRead {
-			disks, disksRead = p.readDisks(), true
-		}
-		return disks
-	}
 	var branches []storageBranch
 	for i := range shares {
 		share := &shares[i]
@@ -107,14 +98,13 @@ func (p sharePaths) applyExclusiveState(shares []dto.ShareInfo, exportUnknown ma
 		// being on the first pool (as the webGUI's share list does).
 		pool := share.CachePool
 		if pool == "" && settings.poolsOnly {
-			pool = firstPool(loadDisks())
+			pool = firstPool(disks)
 		}
 		poolOnly := pool != "" && share.CachePool2 == "" &&
 			(share.UseCache == "only" || settings.poolsOnly)
 		if poolOnly && !exclusive {
 			// A removed or renamed pool makes the assignment invalid rather
 			// than eligible; without the pool list eligibility is unknown.
-			disks := loadDisks()
 			if disks == nil {
 				continue
 			}
@@ -133,8 +123,8 @@ func (p sharePaths) applyExclusiveState(shares []dto.ShareInfo, exportUnknown ma
 		share.ExclusiveEligible = &eligible
 
 		if eligible && !exclusive {
-			if branches == nil && loadDisks() != nil {
-				branches = storageBranches(loadDisks(), settings)
+			if branches == nil && disks != nil {
+				branches = storageBranches(disks, settings)
 			}
 			if branches != nil { // nil: disks.ini unreadable, locations unknown
 				found, unchecked := p.shareLocations(branches, share.Name)
@@ -266,14 +256,7 @@ type storageBranch struct {
 // excluded from user shares. Pool member devices (cache2, ...) carry no
 // fsStatus and flash/parity entries have other types, so they never match.
 func storageBranches(sections map[string]map[string]string, settings exclusiveSettings) []storageBranch {
-	// Pool devices follow the pool entry in slot order, so a pool spans the
-	// idx range [idx, idx+slots).
-	spinning := map[int]bool{}
-	for _, kv := range sections {
-		if idx, err := strconv.Atoi(kv["idx"]); err == nil {
-			spinning[idx] = kv["spundown"] == "0"
-		}
-	}
+	spinning := diskSpinStates(sections)
 
 	branches := []storageBranch{}
 	for section, kv := range sections {
@@ -302,12 +285,27 @@ func storageBranches(sections map[string]map[string]string, settings exclusiveSe
 	return branches
 }
 
+// diskSpinStates snapshots the known spin state of each device slot.
+func diskSpinStates(sections map[string]map[string]string) map[int]bool {
+	spinning := map[int]bool{}
+	for _, kv := range sections {
+		if idx, err := strconv.Atoi(kv["idx"]); err == nil && idx >= 0 {
+			awake := kv["spundown"] == "0"
+			if _, duplicate := spinning[idx]; duplicate {
+				awake = false // ambiguous slot ownership is not known spinning
+			}
+			spinning[idx] = awake
+		}
+	}
+	return spinning
+}
+
 // branchAwake reports whether disks.ini shows the disk, or every device of
 // the pool, as spinning. Missing or unknown spin state, or a pool whose
 // device count is unknown, counts as not awake.
 func branchAwake(kv map[string]string, spinning map[int]bool, pool bool) bool {
 	idx, err := strconv.Atoi(kv["idx"])
-	if err != nil {
+	if err != nil || idx < 0 {
 		return false
 	}
 	slots := 1
@@ -316,8 +314,11 @@ func branchAwake(kv map[string]string, spinning map[int]bool, pool bool) bool {
 			return false
 		}
 	}
-	for i := idx; i < idx+slots; i++ {
-		if !spinning[i] {
+	if slots > len(spinning) {
+		return false
+	}
+	for offset := 0; offset < slots; offset++ {
+		if !spinning[idx+offset] {
 			return false
 		}
 	}

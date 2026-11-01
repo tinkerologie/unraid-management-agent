@@ -1,8 +1,10 @@
 package collectors
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/lib"
@@ -27,6 +29,18 @@ func TestFixturesParseAndValidate(t *testing.T) {
 		if ok, reason := validateRequiredKeys(parsed, "mdState", "mdNumDisks"); !ok {
 			t.Errorf("%s: var.ini failed validation: %s", d, reason)
 		}
+		content, err := os.ReadFile(filepath.Join(d, "disks.ini"))
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			t.Fatalf("%s: read disks.ini: %v", d, err)
+		}
+		disks, err := (&DiskCollector{}).parseDisksINIFrom(strings.NewReader(string(content)))
+		if err != nil || len(disks) == 0 {
+			t.Fatalf("%s: parse disks.ini: %d disks, error %v", d, len(disks), err)
+		}
+
 	}
 }
 

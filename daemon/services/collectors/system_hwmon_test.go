@@ -175,6 +175,48 @@ func TestHwmonChipDeviceIDsMissingSysfs(t *testing.T) {
 	}
 }
 
+func TestHwmonFanIdentityWithoutUSBIdentity(t *testing.T) {
+	root := buildFakeSysfs(t, []fakeHwmon{
+		{hwmon: "hwmon0", name: "octo", devRel: "virtual/0003:0C70:F011.0013"},
+		{hwmon: "hwmon1", name: "octo", devRel: "virtual/0003:0C70:F011.0014"},
+	})
+	first := filepath.Join(root, "class/hwmon/hwmon0")
+	second := filepath.Join(root, "class/hwmon/hwmon1")
+	physicalRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chip, identity := hwmonFanIdentity(first, root)
+	if chip != "octo-hid-3-13" || identity != "octo/"+filepath.Join(physicalRoot, "devices/virtual/0003:0C70:F011.0013") {
+		t.Fatalf("HID fallback identity = %q/%q; want chip and physical device path", chip, identity)
+	}
+	writeSensorFixture(t, filepath.Join(first, "fan1_input"), "1200")
+	writeSensorFixture(t, filepath.Join(first, "fan1_label"), "First")
+	writeSensorFixture(t, filepath.Join(second, "fan1_input"), "1500")
+	writeSensorFixture(t, filepath.Join(second, "fan1_label"), "Second")
+	c := &SystemCollector{sysfsRoot: root}
+	c.parseFanSpeeds("octo-hid-3-13\nfan1:\n  fan1_input: 56784\n", nil)
+	fans, err := c.readHwmonFanSpeeds()
+	if err != nil || len(fans) != 1 || fans["Second"] != 1500 {
+		t.Errorf("fans after HID quarantine = %v, %v; want only second device", fans, err)
+	}
+}
+
+func TestHwmonFanIdentityForDisappearedDevice(t *testing.T) {
+	root := t.TempDir()
+	// Dangling class links model devices removed during a sysfs scan.
+	for _, name := range []string{"hwmon0", "hwmon1"} {
+		dir := filepath.Join(root, name)
+		if err := os.Symlink(filepath.Join(root, "removed", name), dir); err != nil {
+			t.Fatal(err)
+		}
+		chip, identity := hwmonFanIdentity(dir, root)
+		if chip != "" || identity != "/"+dir {
+			t.Errorf("removed device identity = %q/%q; want no chip and original path /%s", chip, identity, dir)
+		}
+	}
+}
+
 func TestParseFanSpeedsChipIdentity(t *testing.T) {
 	c := NewSystemCollector(&domain.Context{Hub: domain.NewEventBus(10)})
 
