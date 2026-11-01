@@ -1017,6 +1017,12 @@ definitions:
       smart_errors:
         example: 0
         type: integer
+      smart_exit_status:
+        description: |-
+          SMARTExitStatus is the bitmask smartctl exited with (see the SMARTExit
+          constants), omitted when zero or when smartctl did not run to its own exit.
+        example: 32
+        type: integer
       smart_status:
         example: PASSED
         type: string

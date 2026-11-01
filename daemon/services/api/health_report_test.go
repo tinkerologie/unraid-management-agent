@@ -354,3 +354,36 @@ func TestHandleHealthReport_WithStoppedContainerInCache(t *testing.T) {
 		t.Error("expected start_container ActionRef for deadbeef1234 in report findings")
 	}
 }
+
+func TestSMARTFinding(t *testing.T) {
+	tests := []struct {
+		name     string
+		status   string
+		exit     int
+		severity string // empty means no finding
+	}{
+		{"no status", "", 0, ""},
+		{"healthy", "PASSED", 0, ""},
+		{"unreadable", "UNKNOWN", 2, "info"},
+		{"past threshold", "PASSED", 32, "info"},
+		{"past threshold and error log", "PASSED", 96, "info"},
+		{"self-test log", "PASSED", 128, "info"},
+		{"pre-fail now", "PASSED", 16, "warning"},
+		{"pre-fail now beats historic", "PASSED", 48, "warning"},
+		{"failed", "FAILED", 8, "critical"},
+		{"failed with historic bits", "FAILED", 40, "critical"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := smartFinding(dto.DiskInfo{Name: "disk1", SMARTStatus: tt.status, SMARTExitStatus: tt.exit})
+			switch {
+			case tt.severity == "" && f != nil:
+				t.Fatalf("unexpected finding: %+v", *f)
+			case tt.severity != "" && f == nil:
+				t.Fatalf("no finding, want severity %q", tt.severity)
+			case f != nil && f.Severity != tt.severity:
+				t.Errorf("severity = %q, want %q", f.Severity, tt.severity)
+			}
+		})
+	}
+}

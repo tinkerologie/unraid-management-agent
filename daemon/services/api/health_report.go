@@ -12,6 +12,43 @@ import (
 // diskTempWarning is the temperature threshold (°C) above which a disk finding is emitted as a warning.
 const diskTempWarning = 55.0
 
+// smartFinding returns the finding for a disk's SMART state, or nil when there
+// is nothing to report. Only a failing status is critical: UNKNOWN means the
+// status could not be read (a spun-down disk is the usual case), and a PASSED
+// disk can still carry smartctl's current or historic warning bits.
+func smartFinding(d dto.DiskInfo) *dto.HealthFinding {
+	label := diskLabel(d)
+	switch {
+	case d.SMARTStatus == "":
+		return nil
+	case d.SMARTStatus == "UNKNOWN":
+		return &dto.HealthFinding{
+			Severity: "info",
+			Title:    fmt.Sprintf("Disk %s SMART status unavailable", label),
+			Detail:   fmt.Sprintf("SMART status of disk %s could not be read. The disk may be spun down or may not support SMART.", label),
+		}
+	case d.SMARTStatus != "PASSED":
+		return &dto.HealthFinding{
+			Severity: "critical",
+			Title:    fmt.Sprintf("Disk %s SMART failure", label),
+			Detail:   fmt.Sprintf("Disk %s reported SMART status %q. Backup data and replace the disk.", label, d.SMARTStatus),
+		}
+	case d.SMARTExitStatus&dto.SMARTExitPrefailNow != 0:
+		return &dto.HealthFinding{
+			Severity: "warning",
+			Title:    fmt.Sprintf("Disk %s pre-fail attribute at threshold", label),
+			Detail:   fmt.Sprintf("Disk %s passed its SMART health check, but a pre-fail attribute is at or below its threshold now. Review its SMART attributes.", label),
+		}
+	case d.SMARTExitStatus&(dto.SMARTExitPastThreshold|dto.SMARTExitErrorLog|dto.SMARTExitSelfTestLog) != 0:
+		return &dto.HealthFinding{
+			Severity: "info",
+			Title:    fmt.Sprintf("Disk %s has historic SMART records", label),
+			Detail:   fmt.Sprintf("Disk %s passed its SMART health check. smartctl reports past threshold crossings or logged errors (exit status %d).", label, d.SMARTExitStatus),
+		}
+	}
+	return nil
+}
+
 // BuildHealthReport aggregates health signals from plain data and returns a
 // prioritised, ranked HealthReport. Keeping inputs as plain values makes the
 // function unit-testable without a running Server.
@@ -36,12 +73,8 @@ func BuildHealthReport(
 	// ── Disk health ───────────────────────────────────────────────────────────
 
 	for _, d := range disks {
-		if d.SMARTStatus != "" && d.SMARTStatus != "PASSED" {
-			findings = append(findings, dto.HealthFinding{
-				Severity: "critical",
-				Title:    fmt.Sprintf("Disk %s SMART failure", diskLabel(d)),
-				Detail:   fmt.Sprintf("Disk %s reported SMART status %q. Backup data and replace the disk.", diskLabel(d), d.SMARTStatus),
-			})
+		if f := smartFinding(d); f != nil {
+			findings = append(findings, *f)
 		}
 		if d.Temperature > diskTempWarning {
 			findings = append(findings, dto.HealthFinding{

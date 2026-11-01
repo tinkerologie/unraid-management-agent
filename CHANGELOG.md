@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Require Go 1.27.3 for builds to include the `crypto/x509` intermediate-certificate distrust
   update ([GO-2026-6809](https://pkg.go.dev/vuln/GO-2026-6809)), found during PSU validation.
 
+### Fixed
+
+- Disks whose `smartctl` exit status has only informational bits set no longer report
+  `smart_status: "UNKNOWN"` without attributes, and `system_health_report` no longer calls them
+  a critical SMART failure (#292). The exit status is decoded as a bitmask and exposed as
+  `smart_exit_status`. A disk with a pre-fail attribute at threshold now gets a warning, historic
+  records and an unreadable (`UNKNOWN`) status get an info finding.
+
 ## [2026.10.03] - 2026-10-27
 
 ### Changed
