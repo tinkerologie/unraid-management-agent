@@ -127,10 +127,10 @@ Since events lack a `type` field, clients must inspect the `data` structure to d
 | `gpu_update`            | Has `available` AND `driver_version` AND `utilization_gpu_percent` |
 | `network_list_update`   | Has `mac_address` AND `bytes_received`                             |
 | `container_list_update` | Has `image` AND `ports`                                            |
-| `vm_list_update`        | Has `state` AND `vcpus`                                            |
+| `vm_list_update`        | Has `state` AND `cpu_count`                                        |
 | `vm_guest_update`       | Has `vm_name` AND `agent_connected`                                |
 | `disk_list_update`      | Has `device` AND `mount_point`                                     |
-| `share_list_update`     | Has `name` AND `path` AND `size_bytes`                             |
+| `share_list_update`     | Has `name` AND `path` AND `storage_total_bytes`                    |
 
 ### Reference Implementation
 
@@ -172,7 +172,7 @@ def identify_event_type(data):
         return "container_list_update"
 
     # VM
-    if "state" in data and "vcpus" in data:
+    if "state" in data and "cpu_count" in data:
         return "vm_list_update"
 
     # VM guest agent
@@ -184,7 +184,7 @@ def identify_event_type(data):
         return "disk_list_update"
 
     # Share
-    if "name" in data and "path" AND "size_bytes" in data:
+    if "name" in data and "path" in data and "storage_total_bytes" in data:
         return "share_list_update"
 
     return "unknown"
@@ -249,6 +249,7 @@ def identify_event_type(data):
 | `temperature_celsius`    | float64 | °C      | 0-∞   | Yes      | Temperature     |
 | `smart_status`           | string  | -       | enum  | No       | SMART status    |
 | `smart_errors`           | int     | count   | ≥0    | No       | Error count     |
+| `smart_exit_status`      | int     | bitmask | 0-255 | Yes      | smartctl exit   |
 | `spindown_delay`         | int     | minutes | ≥0    | No       | Spindown delay  |
 | `filesystem`             | string  | -       | -     | No       | FS type         |
 | `mount_point`            | string  | -       | -     | No       | Mount path      |
@@ -281,19 +282,30 @@ def identify_event_type(data):
 
 ### VM Info Fields
 
-| Field                    | Type   | Unit  | Range | Nullable | Description     |
-| ------------------------ | ------ | ----- | ----- | -------- | --------------- |
-| `id`                     | string | -     | -     | No       | VM ID           |
-| `name`                   | string | -     | -     | No       | VM name         |
-| `state`                  | string | -     | enum  | No       | VM state        |
-| `vcpus`                  | int    | count | ≥1    | No       | Virtual CPUs    |
-| `memory_allocated_bytes` | int64  | bytes | ≥0    | No       | Allocated RAM   |
-| `memory_used_bytes`      | int64  | bytes | ≥0    | No       | Used RAM        |
-| `disk_path`              | string | -     | -     | No       | Disk path       |
-| `disk_size_bytes`        | int64  | bytes | ≥0    | No       | Disk size       |
-| `autostart`              | bool   | -     | -     | No       | Auto-start      |
-| `persistent`             | bool   | -     | -     | No       | Persistent      |
-| `timestamp`              | string | -     | -     | No       | Event timestamp |
+| Field                    | Type   | Unit  | Range | Nullable | Description                                             |
+| ------------------------ | ------ | ----- | ----- | -------- | ------------------------------------------------------- |
+| `id`                     | string | -     | -     | No       | VM ID                                                   |
+| `name`                   | string | -     | -     | No       | VM name                                                 |
+| `state`                  | string | -     | enum  | No       | VM state                                                |
+| `cpu_count`              | int    | count | ≥1    | No       | Virtual CPUs                                            |
+| `memory_allocated_bytes` | uint64 | bytes | ≥0    | No       | Maximum configured RAM                                  |
+| `memory_used_bytes`      | uint64 | bytes | ≥0    | No       | Guest usage, else QEMU RSS, else 0; 0 when not running  |
+| `disk_path`              | string | -     | -     | No       | Primary disk source; empty when unavailable             |
+| `disk_size_bytes`        | uint64 | bytes | ≥0    | No       | Primary disk guest-visible capacity; 0 when unavailable |
+| `autostart`              | bool   | -     | -     | No       | Auto-start                                              |
+| `persistent`             | bool   | -     | -     | No       | Persistent                                              |
+| `timestamp`              | string | -     | -     | No       | Event timestamp                                         |
+
+`memory_allocated_bytes` is the maximum configured memory. `memory_used_bytes` is 0 for non-running VMs.
+For running VMs it uses guest `available - unused` from libvirt balloon stats when both values are present
+and valid, otherwise host QEMU RSS (including QEMU overhead, which can exceed allocation), otherwise 0.
+Guest stats require a balloon driver providing stats; the collector does not configure the balloon stats period.
+Allocated memory is never used as usage. A running VM can report 0 when stats are unavailable or usage is zero.
+
+The primary disk is the first `device="disk"` entry with a source in domain XML order; CD-ROMs and floppies
+are skipped. `disk_path` is its source path or identifier (storage volumes are resolved to paths), or empty
+when unavailable. `disk_size_bytes` is its guest-visible virtual capacity in bytes, collected best effort
+for all VM states; 0 means unavailable. It is not host allocation or physical space used.
 
 ### UPS Status Fields
 
@@ -357,15 +369,24 @@ Nullable fields are `null` when the UPS does not report the value.
 
 ### Share Info Fields
 
-| Field           | Type    | Unit    | Range | Nullable | Description     |
-| --------------- | ------- | ------- | ----- | -------- | --------------- |
-| `name`          | string  | -       | -     | No       | Share name      |
-| `path`          | string  | -       | -     | No       | Share path      |
-| `size_bytes`    | int64   | bytes   | ≥0    | No       | Total size      |
-| `used_bytes`    | int64   | bytes   | ≥0    | No       | Used space      |
-| `free_bytes`    | int64   | bytes   | ≥0    | No       | Free space      |
-| `usage_percent` | float64 | percent | 0-100 | No       | Usage percent   |
-| `timestamp`     | string  | -       | -     | No       | Event timestamp |
+| Field                   | Type    | Unit    | Range | Nullable | Description                                                                     |
+| ----------------------- | ------- | ------- | ----- | -------- | ------------------------------------------------------------------------------- |
+| `name`                  | string  | -       | -     | No       | Share name                                                                      |
+| `path`                  | string  | -       | -     | No       | Share path                                                                      |
+| `used_bytes`            | uint64  | bytes   | ≥0    | Omitted  | Measured share content, including mounted descendants visible beneath the share |
+| `storage_used_bytes`    | uint64  | bytes   | ≥0    | No       | Backing-storage used space                                                      |
+| `storage_free_bytes`    | uint64  | bytes   | ≥0    | No       | Backing-storage free space                                                      |
+| `storage_total_bytes`   | uint64  | bytes   | ≥0    | No       | Backing-storage capacity                                                        |
+| `storage_usage_percent` | float64 | percent | 0-100 | No       | Backing-storage usage                                                           |
+| `free_bytes`            | uint64  | bytes   | ≥0    | No       | Deprecated alias of `storage_free_bytes`                                        |
+| `total_bytes`           | uint64  | bytes   | ≥0    | No       | Deprecated alias of `storage_total_bytes`                                       |
+| `usage_percent`         | float64 | percent | 0-100 | No       | Deprecated alias of `storage_usage_percent`                                     |
+| `timestamp`             | string  | -       | -     | No       | Event timestamp                                                                 |
+
+`used_bytes` is omitted when unknown, and `0` for a measured empty share. Measurement requires a cache-only
+share on its assigned mounted ZFS pool with all members known spinning. Descendants count only when mounted
+at or beneath the share dataset's mountpoint; unknown mount metadata leaves usage unknown.
+Storage figures are shared by all shares on the same backing storage.
 
 ---
 

@@ -52,7 +52,7 @@ func TestHandleMetrics(t *testing.T) {
 		Size:        4000000000000,
 		Used:        0,
 		Free:        0,
-		Temperature: 35.0,
+		Temperature: new(float64(35.0)),
 		SMARTStatus: "PASSED",
 		SpinState:   "active",
 		Timestamp:   time.Now(),
@@ -65,7 +65,7 @@ func TestHandleMetrics(t *testing.T) {
 			Size:        4000000000000,
 			Used:        2500000000000,
 			Free:        1500000000000,
-			Temperature: 32.0,
+			Temperature: new(float64(32.0)),
 			SMARTStatus: "PASSED",
 			SpinState:   "standby",
 			Timestamp:   time.Now(),
@@ -81,8 +81,8 @@ func TestHandleMetrics(t *testing.T) {
 		{ID: "2", Name: "Ubuntu", State: "shutoff"},
 	}
 	server.vmsCache.Store(&vmsVal)
-	sharesVal := []dto.ShareInfo{{Name: "appdata", Used: 50000000000},
-		{Name: "media", Used: 4000000000000},
+	sharesVal := []dto.ShareInfo{{Name: "appdata", Used: new(uint64(50000000000))},
+		{Name: "media", Used: new(uint64(4000000000000))},
 	}
 	server.sharesCache.Store(&sharesVal)
 	server.upsCache.Store(&dto.UPSStatus{
@@ -272,5 +272,106 @@ func TestRuntimeMetricsExposed(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Errorf("expected runtime metric %q in /metrics output", want)
 		}
+	}
+}
+
+func TestShareMetricsOptionalUsage(t *testing.T) {
+	server := NewServer(&domain.Context{Port: 8043})
+	scrape := func(shares []dto.ShareInfo) string {
+		server.sharesCache.Store(&shares)
+		rr := httptest.NewRecorder()
+		server.handleMetrics(rr, httptest.NewRequest("GET", "/metrics", nil))
+		if rr.Code != http.StatusOK {
+			t.Fatalf("status=%d", rr.Code)
+		}
+		return rr.Body.String()
+	}
+	for _, tt := range []struct {
+		name   string
+		used   *uint64
+		sample string
+	}{
+		{"measured", new(uint64(7)), "unraid_share_used_bytes{name=\"media\"} 7\n"},
+		{"known zero", new(uint64(0)), "unraid_share_used_bytes{name=\"media\"} 0\n"},
+		{"unknown", nil, ""},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			body := scrape([]dto.ShareInfo{{Name: "media", Used: tt.used, StorageUsed: 40, StorageFree: 60, StorageTotal: 100}})
+			if tt.sample == "" {
+				if strings.Contains(body, "unraid_share_used_bytes{name=\"media\"}") {
+					t.Error("unknown usage emitted")
+				}
+			} else if !strings.Contains(body, tt.sample) {
+				t.Errorf("missing %s", tt.sample)
+			}
+			for _, want := range []string{"unraid_share_storage_used_bytes{name=\"media\"} 40\n", "unraid_share_storage_free_bytes{name=\"media\"} 60\n", "unraid_share_storage_total_bytes{name=\"media\"} 100\n"} {
+				if !strings.Contains(body, want) {
+					t.Errorf("missing %s", want)
+				}
+			}
+		})
+	}
+	body := scrape([]dto.ShareInfo{})
+	for _, metric := range []string{"unraid_share_used_bytes{", "unraid_share_storage_used_bytes{", "unraid_share_storage_free_bytes{", "unraid_share_storage_total_bytes{"} {
+		if strings.Contains(body, metric) {
+			t.Errorf("stale series: %s", metric)
+		}
+	}
+}
+
+func TestMetricsNullableMeasurements(t *testing.T) {
+	server := newMetricsTestServer()
+	gpu := []*dto.GPUMetrics{{Name: "nullable", Temperature: new(0.0), MemoryUsed: new(uint64(0)), MemoryTotal: new(uint64(0)), PowerDraw: new(0.0)}}
+	disks := []dto.DiskInfo{{Name: "nullable", Device: "sda", Temperature: new(0.0)}}
+	server.gpuCache.Store(&gpu)
+	server.disksCache.Store(&disks)
+	names := []string{"unraid_gpu_temperature_celsius", "unraid_gpu_memory_used_bytes", "unraid_gpu_memory_total_bytes", "unraid_gpu_power_watts", "unraid_disk_temperature_celsius"}
+	body := getMetricsBody(t, server)
+	for _, name := range names {
+		if !strings.Contains(body, name+"{") {
+			t.Errorf("measured zero missing for %s", name)
+		}
+	}
+	gpu[0] = &dto.GPUMetrics{Name: "nullable"}
+	disks[0].Temperature = nil
+	body = getMetricsBody(t, server)
+	for _, name := range names {
+		if strings.Contains(body, name+"{") {
+			t.Errorf("unavailable series remains for %s", name)
+		}
+	}
+	// An inventory disappearing must clear the formerly available series too.
+	gpu[0].Temperature = new(40.0)
+	disks[0].Temperature = new(40.0)
+	getMetricsBody(t, server)
+	server.gpuCache.Store(nil)
+	server.disksCache.Store(nil)
+	body = getMetricsBody(t, server)
+	for _, name := range names {
+		if strings.Contains(body, name+"{") {
+			t.Errorf("stale inventory series remains for %s", name)
+		}
+	}
+}
+
+func TestHealthNullableDiskTemperature(t *testing.T) {
+	server := newMetricsTestServer()
+	disks := []dto.DiskInfo{
+		{Name: "standby", Status: "PASSED", SMARTStatus: "PASSED", SpinState: "standby"},
+		{Name: "hot", Status: "PASSED", SMARTStatus: "PASSED", Temperature: new(60.0)},
+	}
+	server.disksCache.Store(&disks)
+	health := server.GetHealthStatus()
+	if health["healthy_disks"] != 1 || health["warning_disks"] != 1 {
+		t.Fatalf("health=%v", health)
+	}
+	report := BuildHealthReport(nil, &dto.ArrayStatus{State: "Started"}, disks, nil)
+	for _, finding := range report.Findings {
+		if strings.Contains(finding.Title, "standby") {
+			t.Errorf("unknown temperature caused finding: %+v", finding)
+		}
+	}
+	if report.Warning != 1 {
+		t.Errorf("expected one hot-disk warning: %+v", report)
 	}
 }

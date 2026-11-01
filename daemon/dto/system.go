@@ -42,10 +42,10 @@ type SystemInfo struct {
 	Swappiness int `json:"swappiness" example:"60"`
 
 	// System Information
-	ServerModel     string  `json:"server_model" example:"Supermicro X11SCL-F"`
-	BIOSVersion     string  `json:"bios_version" example:"1.4"`
-	BIOSDate        string  `json:"bios_date" example:"12/25/2023"`
-	MotherboardTemp float64 `json:"motherboard_temp_celsius" example:"35.0"`
+	ServerModel     string   `json:"server_model" example:"Supermicro X11SCL-F"`
+	BIOSVersion     string   `json:"bios_version" example:"1.4"`
+	BIOSDate        string   `json:"bios_date" example:"12/25/2023"`
+	MotherboardTemp *float64 `json:"motherboard_temp_celsius" example:"35.0" extensions:"x-nullable"` // Null when not measured.
 
 	// Virtualization Features
 	HVMEnabled   bool `json:"hvm_enabled" example:"true"`
