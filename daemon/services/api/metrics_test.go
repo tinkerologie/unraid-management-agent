@@ -52,7 +52,7 @@ func TestHandleMetrics(t *testing.T) {
 		Size:        4000000000000,
 		Used:        0,
 		Free:        0,
-		Temperature: 35.0,
+		Temperature: new(float64(35.0)),
 		SMARTStatus: "PASSED",
 		SpinState:   "active",
 		Timestamp:   time.Now(),
@@ -65,7 +65,7 @@ func TestHandleMetrics(t *testing.T) {
 			Size:        4000000000000,
 			Used:        2500000000000,
 			Free:        1500000000000,
-			Temperature: 32.0,
+			Temperature: new(float64(32.0)),
 			SMARTStatus: "PASSED",
 			SpinState:   "standby",
 			Timestamp:   time.Now(),
@@ -272,5 +272,62 @@ func TestRuntimeMetricsExposed(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Errorf("expected runtime metric %q in /metrics output", want)
 		}
+	}
+}
+
+func TestMetricsNullableMeasurements(t *testing.T) {
+	server := newMetricsTestServer()
+	gpu := []*dto.GPUMetrics{{Name: "nullable", Temperature: new(0.0), MemoryUsed: new(uint64(0)), MemoryTotal: new(uint64(0)), PowerDraw: new(0.0)}}
+	disks := []dto.DiskInfo{{Name: "nullable", Device: "sda", Temperature: new(0.0)}}
+	server.gpuCache.Store(&gpu)
+	server.disksCache.Store(&disks)
+	names := []string{"unraid_gpu_temperature_celsius", "unraid_gpu_memory_used_bytes", "unraid_gpu_memory_total_bytes", "unraid_gpu_power_watts", "unraid_disk_temperature_celsius"}
+	body := getMetricsBody(t, server)
+	for _, name := range names {
+		if !strings.Contains(body, name+"{") {
+			t.Errorf("measured zero missing for %s", name)
+		}
+	}
+	gpu[0] = &dto.GPUMetrics{Name: "nullable"}
+	disks[0].Temperature = nil
+	body = getMetricsBody(t, server)
+	for _, name := range names {
+		if strings.Contains(body, name+"{") {
+			t.Errorf("unavailable series remains for %s", name)
+		}
+	}
+	// An inventory disappearing must clear the formerly available series too.
+	gpu[0].Temperature = new(40.0)
+	disks[0].Temperature = new(40.0)
+	getMetricsBody(t, server)
+	server.gpuCache.Store(nil)
+	server.disksCache.Store(nil)
+	body = getMetricsBody(t, server)
+	for _, name := range names {
+		if strings.Contains(body, name+"{") {
+			t.Errorf("stale inventory series remains for %s", name)
+		}
+	}
+}
+
+func TestHealthNullableDiskTemperature(t *testing.T) {
+	server := newMetricsTestServer()
+	disks := []dto.DiskInfo{
+		{Name: "standby", Status: "PASSED", SMARTStatus: "PASSED", SpinState: "standby"},
+		{Name: "hot", Status: "PASSED", SMARTStatus: "PASSED", Temperature: new(60.0)},
+	}
+	server.disksCache.Store(&disks)
+	health := server.GetHealthStatus()
+	if health["healthy_disks"] != 1 || health["warning_disks"] != 1 {
+		t.Fatalf("health=%v", health)
+	}
+	report := BuildHealthReport(nil, &dto.ArrayStatus{State: "Started"}, disks, nil)
+	for _, finding := range report.Findings {
+		if strings.Contains(finding.Title, "standby") {
+			t.Errorf("unknown temperature caused finding: %+v", finding)
+		}
+	}
+	if report.Warning != 1 {
+		t.Errorf("expected one hot-disk warning: %+v", report)
 	}
 }

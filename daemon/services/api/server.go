@@ -724,7 +724,7 @@ func (s *Server) GetHealthStatus() map[string]any {
 	healthyDisks := 0
 	warningDisks := 0
 	for _, disk := range disks {
-		if disk.Status == "PASSED" && disk.Temperature <= 50 {
+		if disk.Status == "PASSED" && (disk.Temperature == nil || *disk.Temperature <= 50) {
 			healthyDisks++
 		} else {
 			warningDisks++

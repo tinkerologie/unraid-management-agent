@@ -43,11 +43,11 @@ func BuildHealthReport(
 				Detail:   fmt.Sprintf("Disk %s reported SMART status %q. Backup data and replace the disk.", diskLabel(d), d.SMARTStatus),
 			})
 		}
-		if d.Temperature > diskTempWarning {
+		if d.Temperature != nil && *d.Temperature > diskTempWarning {
 			findings = append(findings, dto.HealthFinding{
 				Severity: "warning",
 				Title:    fmt.Sprintf("Disk %s high temperature", diskLabel(d)),
-				Detail:   fmt.Sprintf("Disk %s temperature is %.0f °C (threshold: %.0f °C). Improve airflow or reduce load.", diskLabel(d), d.Temperature, diskTempWarning),
+				Detail:   fmt.Sprintf("Disk %s temperature is %.0f °C (threshold: %.0f °C). Improve airflow or reduce load.", diskLabel(d), *d.Temperature, diskTempWarning),
 			})
 		}
 	}

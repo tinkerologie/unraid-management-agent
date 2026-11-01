@@ -5,7 +5,55 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
+
+func TestGetFansQuarantineSurvivesSysfsFallback(t *testing.T) {
+	root := buildFakeSysfs(t, []fakeHwmon{{hwmon: "hwmon0", name: "nct6793", devRel: "platform/nct6775.656"}})
+	hwmon := filepath.Join(root, "class", "hwmon", "hwmon0")
+	writeSensorFixture(t, filepath.Join(hwmon, "fan5_input"), "1448")
+	writeSensorFixture(t, filepath.Join(hwmon, "fan5_label"), "CPU Fan")
+	bin := t.TempDir()
+	output := filepath.Join(bin, "output")
+	writeSensorFixture(t, output, "nct6793-isa-0290\nfan5:\n  fan5_input: 56784\n")
+	if err := os.WriteFile(filepath.Join(bin, "sensors"), []byte("#!/bin/sh\n/bin/cat '"+output+"'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
+	now := time.Unix(1000, 0)
+	c := &SystemCollector{sysfsRoot: root, now: func() time.Time { return now }}
+	checks := []struct {
+		name   string
+		after  time.Duration
+		output string
+		fail   bool
+	}{
+		{"implausible sensors with plausible sysfs", 0, "nct6793-isa-0290\nfan5:\n  fan5_input: 56784\n", false},
+		{"plausible sensors still quarantined", time.Minute, "nct6793-isa-0290\nfan5:\n  fan5_input: 1448\n", false},
+		{"sensors absent during hold", time.Minute, "", false},
+		{"sensors command fails during hold", time.Minute, "", true},
+	}
+	for _, check := range checks {
+		t.Run(check.name, func(t *testing.T) {
+			now = now.Add(check.after)
+			writeSensorFixture(t, output, check.output)
+			if check.fail {
+				if err := os.Remove(filepath.Join(bin, "sensors")); err != nil {
+					t.Fatal(err)
+				}
+			}
+			fans, _ := c.getFans(nil)
+			if len(fans) != 0 {
+				t.Errorf("getFans() = %+v, want quarantined channel hidden", fans)
+			}
+		})
+	}
+	now = now.Add(fanQuarantineHold - 3*time.Minute)
+	fans, err := c.getFans(nil)
+	if err != nil || len(fans) != 1 || fans[0].RPM != 1448 {
+		t.Fatalf("getFans() after hold = %+v, %v, want recovered sysfs fan", fans, err)
+	}
+}
 
 func TestPlausibleFanRPM(t *testing.T) {
 	tests := []struct {
@@ -26,6 +74,59 @@ func TestPlausibleFanRPM(t *testing.T) {
 		if got := plausibleFanRPM(tt.value); got != tt.want {
 			t.Errorf("plausibleFanRPM(%v) = %v, want %v", tt.value, got, tt.want)
 		}
+	}
+}
+
+func TestFanQuarantineSharesDeviceAndChannelAcrossSources(t *testing.T) {
+	tests := []struct {
+		name, chip, otherChip string
+		devices               []fakeHwmon
+	}{
+		{"ISA", "nct6793-isa-0290", "nct6793-isa-0298", []fakeHwmon{
+			{hwmon: "hwmon0", name: "nct6793", devRel: "platform/nct6775.656"},
+			{hwmon: "hwmon1", name: "nct6793", devRel: "platform/nct6775.664"},
+		}},
+		{"I2C", "nct6793-i2c-0-2d", "nct6793-i2c-1-2d", []fakeHwmon{
+			{hwmon: "hwmon0", name: "nct6793", devRel: "i2c/0-002d"},
+			{hwmon: "hwmon1", name: "nct6793", devRel: "i2c/1-002d"},
+		}},
+		{"PCI", "nct6793-pci-0300", "nct6793-pci-0400", []fakeHwmon{
+			{hwmon: "hwmon0", name: "nct6793", devRel: "pci0000:00/0000:03:00.0"},
+			{hwmon: "hwmon1", name: "nct6793", devRel: "pci0000:00/0000:04:00.0"},
+		}},
+		{"HID", "nct6793-hid-3-13", "nct6793-hid-3-14", []fakeHwmon{
+			{hwmon: "hwmon0", name: "nct6793", devRel: "usb3/3-1/3-1:1.0/0003:0C70:F011.0013", usbRel: "usb3/3-1", usb: map[string]string{"idVendor": "0c70", "serial": "first"}},
+			{hwmon: "hwmon1", name: "nct6793", devRel: "usb3/3-2/3-2:1.0/0003:0C70:F011.0014", usbRel: "usb3/3-2", usb: map[string]string{"idVendor": "0c70", "serial": "second"}},
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := buildFakeSysfs(t, tt.devices)
+			first := filepath.Join(root, "class/hwmon/hwmon0")
+			second := filepath.Join(root, "class/hwmon/hwmon1")
+			writeSensorFixture(t, filepath.Join(first, "fan1_input"), "1200")
+			writeSensorFixture(t, filepath.Join(first, "fan1_label"), "Healthy channel")
+			writeSensorFixture(t, filepath.Join(first, "fan5_input"), "1448")
+			writeSensorFixture(t, filepath.Join(first, "fan5_label"), "Noisy channel")
+			writeSensorFixture(t, filepath.Join(second, "fan5_input"), "1500")
+			writeSensorFixture(t, filepath.Join(second, "fan5_label"), "Other device")
+			c := &SystemCollector{sysfsRoot: root}
+			c.parseFanSpeeds(tt.chip+"\nfan5:\n  fan5_input: 56784\n", hwmonChipDeviceIDs(root))
+			fans, err := c.readHwmonFanSpeeds()
+			if err != nil || len(fans) != 2 || fans["Healthy channel"] != 1200 || fans["Other device"] != 1500 {
+				t.Fatalf("sysfs after bad sensors channel = %v, %v; want healthy channel and other device", fans, err)
+			}
+			// The reverse transition must use the same identity too.
+			c = &SystemCollector{sysfsRoot: root}
+			writeSensorFixture(t, filepath.Join(first, "fan5_input"), "56784")
+			if _, err := c.readHwmonFanSpeeds(); err != nil {
+				t.Fatal(err)
+			}
+			got := c.parseFanSpeeds(tt.chip+"\nfan5:\n  fan5_input: 1448\n\n"+tt.otherChip+"\nfan5:\n  fan5_input: 1500\n", hwmonChipDeviceIDs(root))
+			if len(got) != 1 || got[0].Source != tt.otherChip || got[0].RPM != 1500 {
+				t.Errorf("sensors after bad sysfs channel = %+v, want only other device", got)
+			}
+		})
 	}
 }
 
@@ -57,8 +158,8 @@ fan7:
 			t.Errorf("unexpected fan %s=%d", f.Name, f.RPM)
 		}
 	}
-	if !c.droppedFans["nct6793_fan5"] || !c.droppedFans["nct6793_fan6"] || !c.droppedFans["nct6793_fan7"] {
-		t.Errorf("dropped channels not recorded: %v", c.droppedFans)
+	if len(c.fanQuarantine) != 3 {
+		t.Errorf("quarantined channels = %v", c.fanQuarantine)
 	}
 }
 
@@ -79,15 +180,6 @@ fan1:
 	got := c.parseFanSpeeds(output, nil)
 	if len(got) != 1 || got[0].Name != "octo-hid-3-13_fan1" || got[0].RPM != 1200 {
 		t.Errorf("parseFanSpeeds() = %+v, want only octo-hid-3-13_fan1 at 1200 RPM", got)
-	}
-}
-
-func TestLogDroppedFanOncePerChannel(t *testing.T) {
-	c := &SystemCollector{}
-	c.logDroppedFan("nct6793_fan5", 56784)
-	c.logDroppedFan("nct6793_fan5", 56784)
-	if len(c.droppedFans) != 1 {
-		t.Errorf("droppedFans = %v, want one entry", c.droppedFans)
 	}
 }
 
@@ -117,7 +209,7 @@ func TestReadHwmonFanSpeedsDropsImplausibleReadings(t *testing.T) {
 	if len(got) != 1 || got["CPU Fan"] != 1500 {
 		t.Errorf("readHwmonFanSpeeds() = %v, want only CPU Fan at 1500", got)
 	}
-	if !c.droppedFans["Fan 2"] {
-		t.Errorf("implausible sysfs reading not recorded as dropped: %v", c.droppedFans)
+	if len(c.fanQuarantine) != 1 {
+		t.Errorf("quarantined channels = %v", c.fanQuarantine)
 	}
 }

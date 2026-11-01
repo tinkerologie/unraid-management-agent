@@ -183,9 +183,9 @@ func newMockCacheProvider() *MockCacheProvider {
 			ParityValid:    true,
 		},
 		disks: []dto.DiskInfo{
-			{ID: "disk1", Name: "disk1", Device: "sda", Size: 4 * 1024 * 1024 * 1024 * 1024, Temperature: 35},
-			{ID: "disk2", Name: "disk2", Device: "sdb", Size: 4 * 1024 * 1024 * 1024 * 1024, Temperature: 36},
-			{ID: "parity", Name: "parity", Device: "sdc", Size: 4 * 1024 * 1024 * 1024 * 1024, Temperature: 34},
+			{ID: "disk1", Name: "disk1", Device: "sda", Size: 4 * 1024 * 1024 * 1024 * 1024, Temperature: new(float64(35))},
+			{ID: "disk2", Name: "disk2", Device: "sdb", Size: 4 * 1024 * 1024 * 1024 * 1024, Temperature: new(float64(36))},
+			{ID: "parity", Name: "parity", Device: "sdc", Size: 4 * 1024 * 1024 * 1024 * 1024, Temperature: new(float64(34))},
 		},
 		shares: []dto.ShareInfo{
 			{Name: "appdata", Path: "/mnt/user/appdata"},
@@ -208,7 +208,7 @@ func newMockCacheProvider() *MockCacheProvider {
 			LoadPercent:   new(25.0),
 		},
 		gpus: []*dto.GPUMetrics{
-			{Name: "NVIDIA RTX 3080", UtilizationGPU: 45, UtilizationMemory: 60, Temperature: 65, Vendor: "NVIDIA"},
+			{Name: "NVIDIA RTX 3080", UtilizationGPU: 45, UtilizationMemory: new(float64(60)), Temperature: new(float64(65)), Vendor: "NVIDIA"},
 		},
 		network: []dto.NetworkInfo{
 			{Name: "eth0", IPAddress: "192.168.1.100", Speed: 1000, State: "up"},

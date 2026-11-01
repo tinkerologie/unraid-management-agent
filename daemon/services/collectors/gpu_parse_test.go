@@ -29,24 +29,24 @@ func TestParseNvidiaGPUCSV(t *testing.T) {
 		if g.Name != "NVIDIA GeForce RTX 3080" {
 			t.Errorf("Name = %q", g.Name)
 		}
-		if g.Temperature != 55 {
+		if g.Temperature == nil || *g.Temperature != 55 {
 			t.Errorf("Temperature = %v, want 55", g.Temperature)
 		}
 		if g.UtilizationGPU != 30 {
 			t.Errorf("UtilizationGPU = %v, want 30", g.UtilizationGPU)
 		}
 		// 2048 MiB -> bytes
-		if g.MemoryUsed != 2048*1024*1024 {
-			t.Errorf("MemoryUsed = %d, want %d", g.MemoryUsed, 2048*1024*1024)
+		if g.MemoryUsed == nil || *g.MemoryUsed != 2048*1024*1024 {
+			t.Errorf("MemoryUsed = %v, want %d", g.MemoryUsed, 2048*1024*1024)
 		}
-		if g.MemoryTotal != 10240*1024*1024 {
-			t.Errorf("MemoryTotal = %d, want %d", g.MemoryTotal, 10240*1024*1024)
+		if g.MemoryTotal == nil || *g.MemoryTotal != 10240*1024*1024 {
+			t.Errorf("MemoryTotal = %v, want %d", g.MemoryTotal, 10240*1024*1024)
 		}
 		// 2048/10240 * 100 = 20
-		if g.UtilizationMemory != 20 {
+		if g.UtilizationMemory == nil || *g.UtilizationMemory != 20 {
 			t.Errorf("UtilizationMemory = %v, want 20", g.UtilizationMemory)
 		}
-		if g.PowerDraw != 220.5 {
+		if g.PowerDraw == nil || *g.PowerDraw != 220.5 {
 			t.Errorf("PowerDraw = %v, want 220.5", g.PowerDraw)
 		}
 		if g.FanSpeed != 40 {
@@ -86,7 +86,7 @@ func TestParseNvidiaGPUCSV(t *testing.T) {
 		}
 	})
 
-	t.Run("non-numeric and N/A fields leave zero values", func(t *testing.T) {
+	t.Run("non-numeric and N/A fields stay unknown", func(t *testing.T) {
 		out := "0, pci, uuid, Card, [N/A], [N/A], notanumber, 0, [N/A], [N/A]\n"
 		gpus, err := parseNvidiaGPUCSV(out)
 		if err != nil {
@@ -96,12 +96,12 @@ func TestParseNvidiaGPUCSV(t *testing.T) {
 			t.Fatalf("expected 1 GPU, got %d", len(gpus))
 		}
 		g := gpus[0]
-		if g.Temperature != 0 || g.UtilizationGPU != 0 || g.MemoryUsed != 0 || g.PowerDraw != 0 || g.FanSpeed != 0 {
-			t.Errorf("expected zeroed numeric fields, got %+v", g)
+		if g.Temperature != nil || g.UtilizationGPU != 0 || g.MemoryUsed != nil || g.PowerDraw != nil || g.FanSpeed != 0 {
+			t.Errorf("expected unknown optional measurements, got %+v", g)
 		}
-		// zero total memory must not divide by zero and leaves UtilizationMemory at 0
-		if g.MemoryTotal != 0 || g.UtilizationMemory != 0 {
-			t.Errorf("expected zero total/util memory, got total=%d util=%v", g.MemoryTotal, g.UtilizationMemory)
+		// A measured zero total is preserved; memory utilisation stays unknown.
+		if g.MemoryTotal == nil || *g.MemoryTotal != 0 || g.UtilizationMemory != nil {
+			t.Errorf("expected zero total and unknown utilisation, got total=%v util=%v", g.MemoryTotal, g.UtilizationMemory)
 		}
 	})
 

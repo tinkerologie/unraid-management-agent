@@ -4,18 +4,18 @@ import "time"
 
 // DiskInfo contains disk information
 type DiskInfo struct {
-	ID            string  `json:"id" example:"disk1"`
-	Device        string  `json:"device" example:"sda"`
-	Name          string  `json:"name" example:"Disk 1"`
-	Status        string  `json:"status" example:"OK"`
-	Size          uint64  `json:"size_bytes" example:"12000138625024"`
-	Used          uint64  `json:"used_bytes" example:"5400062381260"`
-	Free          uint64  `json:"free_bytes" example:"6600076243764"`
-	Temperature   float64 `json:"temperature_celsius" example:"35"`
-	SMARTStatus   string  `json:"smart_status" example:"PASSED"`
-	SMARTErrors   int     `json:"smart_errors" example:"0"`
-	SpindownDelay int     `json:"spindown_delay" example:"30"`
-	FileSystem    string  `json:"filesystem" example:"xfs"`
+	ID            string   `json:"id" example:"disk1"`
+	Device        string   `json:"device" example:"sda"`
+	Name          string   `json:"name" example:"Disk 1"`
+	Status        string   `json:"status" example:"OK"`
+	Size          uint64   `json:"size_bytes" example:"12000138625024"`
+	Used          uint64   `json:"used_bytes" example:"5400062381260"`
+	Free          uint64   `json:"free_bytes" example:"6600076243764"`
+	Temperature   *float64 `json:"temperature_celsius" example:"35" extensions:"x-nullable"` // Null when not measured.
+	SMARTStatus   string   `json:"smart_status" example:"PASSED"`
+	SMARTErrors   int      `json:"smart_errors" example:"0"`
+	SpindownDelay int      `json:"spindown_delay" example:"30"`
+	FileSystem    string   `json:"filesystem" example:"xfs"`
 
 	// Disk identification
 	SerialNumber string `json:"serial_number,omitempty" example:"WD-WMC4N0123456"`

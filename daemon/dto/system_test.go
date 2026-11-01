@@ -27,7 +27,7 @@ func TestSystemInfoJSON(t *testing.T) {
 		CPUTemp:         65.0,
 		CPUPowerWatts:   &cpuPower,
 		DRAMPowerWatts:  &dramPower,
-		MotherboardTemp: 45.0,
+		MotherboardTemp: new(float64(45.0)),
 		Fans: []FanInfo{
 			{Name: "CPU Fan", RPM: 1200},
 			{Name: "Case Fan", RPM: 800},
