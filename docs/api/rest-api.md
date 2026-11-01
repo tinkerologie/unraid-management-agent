@@ -1468,9 +1468,11 @@ List all user shares.
 ]
 ```
 
-`used_bytes` is optional measured share content (including descendant filesystems), available only for
+`used_bytes` is optional measured share content, including mounted descendant filesystems whose mountpoints
+are at or beneath the share dataset's mountpoint. It is available only for
 cache-only shares on their assigned mounted ZFS pool when every pool member is known spinning.
-It is omitted when unknown; a measured empty share reports `0`. No directory walks are performed.
+It is omitted when usage or mount metadata is unknown; a measured empty share reports `0`.
+No directory walks are performed.
 The `storage_*` figures describe backing storage and are shared by shares on the same storage.
 
 | Field | Description |

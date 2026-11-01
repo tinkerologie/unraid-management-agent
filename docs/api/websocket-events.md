@@ -475,13 +475,15 @@ UPSes have no load or power reading). They are never sent as a made-up `0`.
 
 - `name` - Share name
 - `path` - Mount path
-- `used_bytes` - Measured share content, including descendant filesystems; omitted when unknown, `0` when empty
+- `used_bytes` - Measured share content, including mounted descendants visible beneath the share;
+  omitted when unknown, `0` when empty
 - `storage_used_bytes`, `storage_free_bytes`, `storage_total_bytes` - Backing pool/array space in bytes
 - `storage_usage_percent` - Backing pool/array usage percentage
 - `free_bytes`, `total_bytes`, `usage_percent` - Deprecated aliases of the corresponding storage fields
 
 Measured usage is available only for cache-only shares on their assigned mounted ZFS pool when all members
-are known spinning. The storage figures are shared by shares on the same storage.
+are known spinning. Descendants count only when mounted at or beneath the share dataset's mountpoint;
+unknown mount metadata leaves usage unknown. The storage figures are shared by shares on the same storage.
 
 ---
 

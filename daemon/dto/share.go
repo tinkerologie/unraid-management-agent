@@ -6,7 +6,8 @@ import "time"
 type ShareInfo struct {
 	Name string `json:"name" example:"Media"`
 	Path string `json:"path" example:"/mnt/user/Media"`
-	// Used is measured share content in bytes, including descendant filesystems.
+	// Used is measured share content in bytes, including mounted descendant
+	// filesystems at or beneath the share dataset's mountpoint.
 	// Omitted unless the cache-only share's assigned ZFS pool is known awake.
 	Used *uint64 `json:"used_bytes,omitempty" example:"5368709120000"`
 	// StorageUsed is backing pool/array usage, shared by shares on that storage.

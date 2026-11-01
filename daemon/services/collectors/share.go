@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -267,9 +268,10 @@ func (c *ShareCollector) collectShares(ctx context.Context) ([]dto.ShareInfo, er
 			exportUnknown[shares[i].Name] = true
 		}
 	}
-	disks := c.paths.readDisks()
-	c.enrichShareUsage(ctx, shares, disks)
-	c.paths.applyExclusiveState(shares, exportUnknown, disks)
+	c.enrichShareUsage(ctx, shares)
+	// ZFS commands can block long enough for disks to spin down. Only a fresh
+	// snapshot may authorize the exclusive-state filesystem probes.
+	c.paths.applyExclusiveState(shares, exportUnknown, c.paths.readDisks())
 
 	logger.Debug("Share: Parsed %d shares successfully", len(shares))
 	return shares, nil
@@ -350,26 +352,14 @@ func (c *ShareCollector) isNFSExported(exportNFS string) bool {
 
 // enrichShareUsage queries each eligible, awake ZFS pool once. No filesystem
 // walks or probes of sleeping/unknown devices are used to measure share content.
-func (c *ShareCollector) enrichShareUsage(ctx context.Context, shares []dto.ShareInfo, disks map[string]map[string]string) {
+func (c *ShareCollector) enrichShareUsage(ctx context.Context, shares []dto.ShareInfo) {
 	if c.ctx.Intervals.ZFS <= 0 {
 		return
-	}
-	spinning := diskSpinStates(disks)
-	awake := map[string]bool{}
-	for section, kv := range disks {
-		name := kv["name"]
-		if name == "" {
-			name = section
-		}
-		if kv["type"] == "Cache" && kv["fsType"] == "zfs" &&
-			kv["fsStatus"] == "Mounted" && kv["shareEnabled"] != "no" {
-			awake[name] = branchAwake(kv, spinning, true)
-		}
 	}
 	pools := map[string][]int{}
 	for i, share := range shares {
 		if share.UseCache == "only" && share.CachePool2 == "" &&
-			validateShareName(share.Name) == nil && validateShareName(share.CachePool) == nil && awake[share.CachePool] {
+			validateShareName(share.Name) == nil && validateShareName(share.CachePool) == nil {
 			pools[share.CachePool] = append(pools[share.CachePool], i)
 		}
 	}
@@ -378,39 +368,85 @@ func (c *ShareCollector) enrichShareUsage(ctx context.Context, shares []dto.Shar
 		run = lib.ExecCommandOutputWithContext
 	}
 	for pool, indexes := range pools {
+		// A preceding pool query may have blocked for up to a minute. Refresh
+		// every member's spin state immediately before querying this pool.
+		disks := c.paths.readDisks()
+		spinning := diskSpinStates(disks)
+		awake := false
+		for section, kv := range disks {
+			name := kv["name"]
+			if name == "" {
+				name = section
+			}
+			if name == pool && kv["type"] == "Cache" && kv["fsType"] == "zfs" &&
+				kv["fsStatus"] == "Mounted" && kv["shareEnabled"] != "no" {
+				awake = branchAwake(kv, spinning, true)
+				break
+			}
+		}
+		if !awake {
+			continue
+		}
 		cmdCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
-		out, err := run(cmdCtx, "zfs", "list", "-Hp", "-t", "filesystem", "-o", "name,refer", "-r", pool)
+		out, err := run(cmdCtx, "zfs", "list", "-Hp", "-t", "filesystem", "-o", "name,refer,mounted,mountpoint", "-r", pool)
 		cancel()
 		if err != nil {
 			logger.Debug("Share: zfs list for pool %s failed: %v", pool, err)
 			continue
 		}
 		for _, i := range indexes {
-			dataset := pool + "/" + shares[i].Name
-			var total uint64
-			found, valid := false, true
-			for line := range strings.SplitSeq(out, "\n") {
-				fields := strings.Fields(line)
-				if len(fields) == 0 || (fields[0] != dataset && !strings.HasPrefix(fields[0], dataset+"/")) {
-					continue
-				}
-				if len(fields) != 2 {
-					valid = false
-					break
-				}
-				bytes, err := strconv.ParseUint(fields[1], 10, 64)
-				if err != nil || bytes > ^uint64(0)-total {
-					valid = false
-					break
-				}
-				total += bytes
-				found = found || fields[0] == dataset
-			}
-			if found && valid {
+			if total, valid := shareDatasetUsage(out, pool+"/"+shares[i].Name); valid {
 				shares[i].Used = &total
 			}
 		}
 	}
+}
+
+// shareDatasetUsage counts referenced bytes only for mounted filesystems at or
+// beneath the share dataset's mountpoint. Dataset ancestry alone does not imply
+// visibility. Missing or ambiguous mount metadata leaves usage unknown.
+func shareDatasetUsage(out, dataset string) (uint64, bool) {
+	var rows [][]string
+	var mountpoint string
+	for line := range strings.SplitSeq(out, "\n") {
+		// zfs list -H separates columns with tabs; mountpoints may contain spaces.
+		fields := strings.Split(line, "\t")
+		if fields[0] != dataset && !strings.HasPrefix(fields[0], dataset+"/") {
+			continue
+		}
+		if len(fields) != 4 {
+			return 0, false
+		}
+		if fields[0] == dataset {
+			if mountpoint != "" || fields[2] != "yes" || !path.IsAbs(fields[3]) {
+				return 0, false
+			}
+			mountpoint = path.Clean(fields[3])
+		}
+		rows = append(rows, fields)
+	}
+	if mountpoint == "" {
+		return 0, false
+	}
+	var total uint64
+	for _, fields := range rows {
+		if fields[2] == "no" {
+			continue
+		}
+		if fields[2] != "yes" || !path.IsAbs(fields[3]) {
+			return 0, false
+		}
+		childMountpoint := path.Clean(fields[3])
+		if childMountpoint != mountpoint && !strings.HasPrefix(childMountpoint, strings.TrimSuffix(mountpoint, "/")+"/") {
+			continue
+		}
+		bytes, err := strconv.ParseUint(fields[1], 10, 64)
+		if err != nil || bytes > ^uint64(0)-total {
+			return 0, false
+		}
+		total += bytes
+	}
+	return total, true
 }
 
 // determineMoverAction determines the mover action based on cache settings

@@ -361,7 +361,7 @@ Nullable fields are `null` when the UPS does not report the value.
 | --- | --- | --- | --- | --- | --- |
 | `name` | string | - | - | No | Share name |
 | `path` | string | - | - | No | Share path |
-| `used_bytes` | uint64 | bytes | ≥0 | Omitted | Measured share content, including descendant filesystems |
+| `used_bytes` | uint64 | bytes | ≥0 | Omitted | Measured share content, including mounted descendants visible beneath the share |
 | `storage_used_bytes` | uint64 | bytes | ≥0 | No | Backing-storage used space |
 | `storage_free_bytes` | uint64 | bytes | ≥0 | No | Backing-storage free space |
 | `storage_total_bytes` | uint64 | bytes | ≥0 | No | Backing-storage capacity |
@@ -372,8 +372,9 @@ Nullable fields are `null` when the UPS does not report the value.
 | `timestamp` | string | - | - | No | Event timestamp |
 
 `used_bytes` is omitted when unknown, and `0` for a measured empty share. Measurement requires a cache-only
-share on its assigned mounted ZFS pool with all members known spinning. Storage figures are shared by all
-shares on the same backing storage.
+share on its assigned mounted ZFS pool with all members known spinning. Descendants count only when mounted
+at or beneath the share dataset's mountpoint; unknown mount metadata leaves usage unknown.
+Storage figures are shared by all shares on the same backing storage.
 
 ---
 

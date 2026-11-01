@@ -3,9 +3,11 @@ package collectors
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -67,15 +69,26 @@ func TestShareMeasuredUsage(t *testing.T) {
 		err       error
 		want      *uint64
 	}{
-		{"descendants", "cache/media\t10\ncache/media/child\t20\ncache/media/child/grandchild\t3\ncache/mediabox\t999\nother/media\t888\ncache/media@snap\t999", nil, new(uint64(33))},
-		{"known zero", "cache/media\t0", nil, new(uint64(0))},
-		{"wrong pool", "other/media\t123", nil, nil},
-		{"missing direct", "cache/media/child\t123", nil, nil},
-		{"bad direct", "cache/media\tinvalid", nil, nil},
-		{"bad child", "cache/media\t1\ncache/media/child\tinvalid", nil, nil},
+		{"descendants", "cache/media\t10\tyes\t/mnt/cache/media\ncache/media/child\t20\tyes\t/mnt/cache/media/child\ncache/media/child/grandchild\t3\tyes\t/mnt/cache/media/child/grandchild\ncache/mediabox\t999\tyes\t/mnt/cache/mediabox\nother/media\t888\tyes\t/mnt/other/media\ncache/media@snap\t999", nil, new(uint64(33))},
+		{"known zero", "cache/media\t0\tyes\t/mnt/cache/media", nil, new(uint64(0))},
+		{"wrong pool", "other/media\t123\tyes\t/mnt/other/media", nil, nil},
+		{"missing direct", "cache/media/child\t123\tyes\t/mnt/cache/media/child", nil, nil},
+		{"bad direct", "cache/media\tinvalid\tyes\t/mnt/cache/media", nil, nil},
+		{"bad child", "cache/media\t1\tyes\t/mnt/cache/media\ncache/media/child\tinvalid\tyes\t/mnt/cache/media/child", nil, nil},
 		{"missing value", "cache/media", nil, nil},
 		{"extra column", "cache/media\t1\t2", nil, nil},
-		{"overflow", "cache/media\t18446744073709551615\ncache/media/child\t1", nil, nil},
+		{"overflow", "cache/media\t18446744073709551615\tyes\t/mnt/cache/media\ncache/media/child\t1\tyes\t/mnt/cache/media/child", nil, nil},
+		{"unmounted child", "cache/media\t10\tyes\t/mnt/cache/media\ncache/media/child\t20\tno\t/mnt/cache/media/child", nil, new(uint64(10))},
+		{"child mounted outside", "cache/media\t10\tyes\t/mnt/cache/media\ncache/media/archive\t20\tyes\t/mnt/cache/backups", nil, new(uint64(10))},
+		{"mountpoint prefix collision", "cache/media\t10\tyes\t/mnt/cache/media\ncache/media/child\t20\tyes\t/mnt/cache/mediabox", nil, new(uint64(10))},
+		{"same mountpoint", "cache/media\t10\tyes\t/mnt/cache/media\ncache/media/child\t20\tyes\t/mnt/cache/media", nil, new(uint64(30))},
+		{"unmounted direct", "cache/media\t10\tno\t/mnt/cache/media", nil, nil},
+		{"unknown mounted state", "cache/media\t10\tyes\t/mnt/cache/media\ncache/media/child\t20\t-\t/mnt/cache/media/child", nil, nil},
+		{"unknown child mountpoint", "cache/media\t10\tyes\t/mnt/cache/media\ncache/media/child\t20\tyes\t-", nil, nil},
+		{"unknown direct mountpoint", "cache/media\t10\tyes\t-", nil, nil},
+		{"missing metadata", "cache/media\t10\tyes\t/mnt/cache/media\ncache/media/child\t20", nil, nil},
+		{"mountpoint with spaces", "cache/media\t10\tyes\t/mnt/cache/media library\ncache/media/child\t20\tyes\t/mnt/cache/media library/child", nil, new(uint64(30))},
+		{"child listed first", "cache/media/child\t20\tyes\t/mnt/cache/media/child\ncache/media\t10\tyes\t/mnt/cache/media", nil, new(uint64(30))},
 		{"failed", "cache/media\t1", errors.New("failed"), nil},
 		{"timeout", "", context.DeadlineExceeded, nil},
 	} {
@@ -84,7 +97,7 @@ func TestShareMeasuredUsage(t *testing.T) {
 			calls := 0
 			c.runCommand = func(ctx context.Context, command string, args ...string) (string, error) {
 				calls++
-				want := []string{"list", "-Hp", "-t", "filesystem", "-o", "name,refer", "-r", "cache"}
+				want := []string{"list", "-Hp", "-t", "filesystem", "-o", "name,refer,mounted,mountpoint", "-r", "cache"}
 				if command != "zfs" || !reflect.DeepEqual(args, want) {
 					t.Errorf("command=%s %v", command, args)
 				}
@@ -180,7 +193,7 @@ func TestShareUsageConfigAndPoolBatching(t *testing.T) {
 	calls := 0
 	c.runCommand = func(context.Context, string, ...string) (string, error) {
 		calls++
-		return "cache/media\t42\ncache/empty\t0", nil
+		return "cache/media\t42\tyes\t/mnt/cache/media\ncache/empty\t0\tyes\t/mnt/cache/empty", nil
 	}
 	shares, err := c.collectShares(context.Background())
 	if err != nil {
@@ -191,8 +204,77 @@ func TestShareUsageConfigAndPoolBatching(t *testing.T) {
 	}
 }
 
-// A single snapshot must serve both usage enrichment and exclusive eligibility.
-func TestShareUsageUsesOneDiskSnapshot(t *testing.T) {
+func TestShareLocationsRefreshAfterUsageQuery(t *testing.T) {
+	for _, queryErr := range []error{nil, context.DeadlineExceeded} {
+		t.Run(fmt.Sprint(queryErr), func(t *testing.T) {
+			c := usageCollector(t, "[shareName=\"media\"]\nuseCache=only\ncachePool=cache\nexclusive=no")
+			c.paths.mntRoot = t.TempDir()
+			if err := os.MkdirAll(filepath.Join(c.paths.mntRoot, "disk1", "media"), 0700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(c.paths.vars(), []byte(startedVarIni), 0600); err != nil {
+				t.Fatal(err)
+			}
+			calls := 0
+			c.runCommand = func(context.Context, string, ...string) (string, error) {
+				calls++
+				disks, err := os.ReadFile(c.paths.disks())
+				if err != nil {
+					t.Fatal(err)
+				}
+				// disk1 spins down while zfs list is running.
+				disks = []byte(strings.Replace(string(disks), "type=\"Data\"\nspundown=\"0\"", "type=\"Data\"\nspundown=\"1\"", 1))
+				if err := os.WriteFile(c.paths.disks(), disks, 0600); err != nil {
+					t.Fatal(err)
+				}
+				return "cache/media\t7\tyes\t/mnt/cache/media", queryErr
+			}
+			shares, err := c.collectShares(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if calls != 1 || shares[0].Locations == nil {
+				t.Fatalf("calls=%d share=%+v", calls, shares[0])
+			}
+			if slices.Contains(*shares[0].Locations, "disk1") || !slices.Contains(shares[0].LocationsUnchecked, "disk1") {
+				t.Errorf("sleeping disk probed: locations=%v unchecked=%v", *shares[0].Locations, shares[0].LocationsUnchecked)
+			}
+		})
+	}
+}
+
+func TestShareUsageRefreshBeforeEachPoolQuery(t *testing.T) {
+	c := usageCollector(t, "[shareName=\"media\"]\nuseCache=only\ncachePool=cache\n[shareName=\"backup\"]\nuseCache=only\ncachePool=nvme")
+	disks, err := os.ReadFile(c.paths.disks())
+	if err != nil {
+		t.Fatal(err)
+	}
+	disks = []byte(strings.Replace(string(disks), "[\"nvme\"]", "[\"nvme\"]\nfsType=\"zfs\"", 1))
+	if err := os.WriteFile(c.paths.disks(), disks, 0600); err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	c.runCommand = func(context.Context, string, ...string) (string, error) {
+		calls++
+		// Whichever pool is queried first, the other spins down during it.
+		if err := os.WriteFile(c.paths.disks(), []byte(strings.ReplaceAll(string(disks), "spundown=\"0\"", "spundown=\"1\"")), 0600); err != nil {
+			t.Fatal(err)
+		}
+		return "cache/media\t7\tyes\t/mnt/cache/media\nnvme/backup\t8\tyes\t/mnt/nvme/backup", nil
+	}
+	shares, err := c.collectShares(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 {
+		t.Errorf("queried sleeping pool: calls=%d, want 1", calls)
+	}
+	if (shares[0].Used == nil) == (shares[1].Used == nil) {
+		t.Errorf("only the first pool should have usage: %+v", shares)
+	}
+}
+
+func TestShareUsageDisksUnavailableAfterQuery(t *testing.T) {
 	c := usageCollector(t, "[shareName=\"media\"]\nuseCache=only\ncachePool=cache\nexclusive=no")
 	if err := os.WriteFile(c.paths.vars(), []byte(startedVarIni), 0600); err != nil {
 		t.Fatal(err)
@@ -201,13 +283,13 @@ func TestShareUsageUsesOneDiskSnapshot(t *testing.T) {
 		if err := os.Remove(c.paths.disks()); err != nil {
 			t.Fatal(err)
 		}
-		return "cache/media\t7", nil
+		return "cache/media\t7\tyes\t/mnt/cache/media", nil
 	}
 	shares, err := c.collectShares(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if shares[0].Used == nil || shares[0].ExclusiveEligible == nil || !*shares[0].ExclusiveEligible {
-		t.Errorf("snapshot not reused: %+v", shares[0])
+	if shares[0].Used == nil || shares[0].ExclusiveEligible != nil || shares[0].Locations != nil {
+		t.Errorf("exclusive state used stale disks: %+v", shares[0])
 	}
 }
