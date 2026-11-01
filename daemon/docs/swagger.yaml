@@ -3852,6 +3852,9 @@ definitions:
         example: cache
         type: string
       free_bytes:
+        description: |-
+          Free is a deprecated alias of StorageFree.
+          Deprecated: use storage_free_bytes.
         example: 5368709120000
         type: integer
       locations:
@@ -3908,12 +3911,38 @@ definitions:
         description: '"cache", "array", "cache+array", or "unknown"'
         example: cache+array
         type: string
+      storage_free_bytes:
+        description: StorageFree is backing pool/array free space, shared by shares
+          on that storage.
+        example: 5368709120000
+        type: integer
+      storage_total_bytes:
+        description: StorageTotal is backing pool/array capacity, shared by shares
+          on that storage.
+        example: 10737418240000
+        type: integer
+      storage_usage_percent:
+        description: StorageUsagePercent is backing pool/array usage, shared by shares
+          on that storage.
+        example: 50
+        type: number
+      storage_used_bytes:
+        description: StorageUsed is backing pool/array usage, shared by shares on
+          that storage.
+        example: 5368709120000
+        type: integer
       timestamp:
         type: string
       total_bytes:
+        description: |-
+          Total is a deprecated alias of StorageTotal.
+          Deprecated: use storage_total_bytes.
         example: 10737418240000
         type: integer
       usage_percent:
+        description: |-
+          UsagePercent is a deprecated alias of StorageUsagePercent.
+          Deprecated: use storage_usage_percent.
         example: 50
         type: number
       use_cache:
@@ -3921,6 +3950,9 @@ definitions:
         example: prefer
         type: string
       used_bytes:
+        description: |-
+          Used is measured share content in bytes, including descendant filesystems.
+          Omitted unless the cache-only share's assigned ZFS pool is known awake.
         example: 5368709120000
         type: integer
     type: object

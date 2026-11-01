@@ -1433,7 +1433,11 @@ List all user shares.
 [
   {
     "name": "appdata",
-    "size_bytes": 100000000000,
+    "storage_used_bytes": 50000000000,
+    "storage_free_bytes": 50000000000,
+    "storage_total_bytes": 100000000000,
+    "storage_usage_percent": 50.0,
+    "total_bytes": 100000000000,
     "used_bytes": 50000000000,
     "free_bytes": 50000000000,
     "usage_percent": 50.0,
@@ -1446,7 +1450,11 @@ List all user shares.
   },
   {
     "name": "media",
-    "used_bytes": 2000000000000,
+    "storage_used_bytes": 2000000000000,
+    "storage_free_bytes": 1000000000000,
+    "storage_total_bytes": 3000000000000,
+    "storage_usage_percent": 66.7,
+    "total_bytes": 3000000000000,
     "free_bytes": 1000000000000,
     "usage_percent": 66.7,
     "use_cache": "only",
@@ -1459,6 +1467,22 @@ List all user shares.
   }
 ]
 ```
+
+`used_bytes` is optional measured share content (including descendant filesystems), available only for
+cache-only shares on their assigned mounted ZFS pool when every pool member is known spinning.
+It is omitted when unknown; a measured empty share reports `0`. No directory walks are performed.
+The `storage_*` figures describe backing storage and are shared by shares on the same storage.
+
+| Field | Description |
+| --- | --- |
+| `used_bytes` | Measured share content in bytes; omitted when unavailable |
+| `storage_used_bytes` | Backing pool/array used space in bytes |
+| `storage_free_bytes` | Backing pool/array free space in bytes |
+| `storage_total_bytes` | Backing pool/array capacity in bytes |
+| `storage_usage_percent` | Backing pool/array usage percentage |
+| `free_bytes` | Deprecated alias of `storage_free_bytes` |
+| `total_bytes` | Deprecated alias of `storage_total_bytes` |
+| `usage_percent` | Deprecated alias of `storage_usage_percent` |
 
 **Exclusive shares (Unraid 6.12+)**: with _Permit exclusive shares_ enabled,
 Unraid makes `/mnt/user/<share>` a symlink to `/mnt/<pool>/<share>` for shares
@@ -4070,7 +4094,10 @@ Prometheus exposition format endpoint for native Grafana integration.
 |              | `unraid_ups_battery_charge_percent` | Gauge | -                          | Battery charge percentage          |
 |              | `unraid_ups_load_percent`           | Gauge | -                          | UPS load percentage                |
 |              | `unraid_ups_runtime_seconds`        | Gauge | -                          | Remaining runtime                  |
-| **Shares**   | `unraid_share_used_bytes`           | Gauge | name                       | Share used space                   |
+| **Shares** | `unraid_share_used_bytes` | Gauge | name | Measured share content; omitted when unknown |
+| | `unraid_share_storage_used_bytes` | Gauge | name | Backing-storage used space |
+| | `unraid_share_storage_free_bytes` | Gauge | name | Backing-storage free space |
+| | `unraid_share_storage_total_bytes` | Gauge | name | Backing-storage capacity |
 |              | `unraid_shares_total`               | Gauge | -                          | Total number of shares             |
 | **Services** | `unraid_service_enabled`            | Gauge | service                    | Service enabled state              |
 |              | `unraid_service_running`            | Gauge | service                    | Service running state              |

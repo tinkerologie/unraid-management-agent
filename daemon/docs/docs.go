@@ -11113,6 +11113,7 @@ const docTemplate = `{
                     "example": "cache"
                 },
                 "free_bytes": {
+                    "description": "Free is a deprecated alias of StorageFree.\nDeprecated: use storage_free_bytes.",
                     "type": "integer",
                     "example": 5368709120000
                 },
@@ -11178,14 +11179,36 @@ const docTemplate = `{
                     "type": "string",
                     "example": "cache+array"
                 },
+                "storage_free_bytes": {
+                    "description": "StorageFree is backing pool/array free space, shared by shares on that storage.",
+                    "type": "integer",
+                    "example": 5368709120000
+                },
+                "storage_total_bytes": {
+                    "description": "StorageTotal is backing pool/array capacity, shared by shares on that storage.",
+                    "type": "integer",
+                    "example": 10737418240000
+                },
+                "storage_usage_percent": {
+                    "description": "StorageUsagePercent is backing pool/array usage, shared by shares on that storage.",
+                    "type": "number",
+                    "example": 50
+                },
+                "storage_used_bytes": {
+                    "description": "StorageUsed is backing pool/array usage, shared by shares on that storage.",
+                    "type": "integer",
+                    "example": 5368709120000
+                },
                 "timestamp": {
                     "type": "string"
                 },
                 "total_bytes": {
+                    "description": "Total is a deprecated alias of StorageTotal.\nDeprecated: use storage_total_bytes.",
                     "type": "integer",
                     "example": 10737418240000
                 },
                 "usage_percent": {
+                    "description": "UsagePercent is a deprecated alias of StorageUsagePercent.\nDeprecated: use storage_usage_percent.",
                     "type": "number",
                     "example": 50
                 },
@@ -11195,6 +11218,7 @@ const docTemplate = `{
                     "example": "prefer"
                 },
                 "used_bytes": {
+                    "description": "Used is measured share content in bytes, including descendant filesystems.\nOmitted unless the cache-only share's assigned ZFS pool is known awake.",
                     "type": "integer",
                     "example": 5368709120000
                 }

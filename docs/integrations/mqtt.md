@@ -208,6 +208,21 @@ mqtt:
       icon: mdi:shield-check
 ```
 
+### Share Discovery Sensors
+
+Each share publishes its state to `<prefix>/shares/<share_id>` and exposes these discovery sensors:
+
+| Sensor | JSON field | Notes |
+| --- | --- | --- |
+| Used | `used_bytes` | Measured share content; absent values render unknown, while measured zero stays zero |
+| Storage Usage | `storage_usage_percent` | Backing-storage percentage; retains the existing Usage unique ID |
+| Storage Free | `storage_free_bytes` | Backing-storage free bytes; retains the existing Free unique ID |
+| Storage Used | `storage_used_bytes` | Backing-storage used bytes; new sensor |
+
+Measured usage requires a cache-only share on its assigned mounted ZFS pool with all members known
+spinning. Storage figures are shared by shares on the same storage. The state payload retains
+`free_bytes`, `total_bytes` and `usage_percent` as deprecated storage aliases.
+
 ### Home Assistant Automation Examples
 
 #### Alert on High CPU

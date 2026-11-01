@@ -48,7 +48,7 @@ func (c *ConfigCollector) GetShareConfig(shareName string) (*dto.ShareConfig, er
 		return nil, err
 	}
 
-	configPath := fmt.Sprintf("/boot/config/shares/%s.cfg", shareName)
+	configPath := c.bootConfigPath(filepath.Join("shares", shareName+".cfg"))
 	logger.Debug("Config: Reading share config from %s", configPath)
 
 	// #nosec G304 - Path is validated by validateShareName() to prevent path traversal

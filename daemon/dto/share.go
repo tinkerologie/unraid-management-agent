@@ -4,11 +4,27 @@ import "time"
 
 // ShareInfo contains share information
 type ShareInfo struct {
-	Name         string  `json:"name" example:"Media"`
-	Path         string  `json:"path" example:"/mnt/user/Media"`
-	Used         uint64  `json:"used_bytes" example:"5368709120000"`
-	Free         uint64  `json:"free_bytes" example:"5368709120000"`
-	Total        uint64  `json:"total_bytes" example:"10737418240000"`
+	Name string `json:"name" example:"Media"`
+	Path string `json:"path" example:"/mnt/user/Media"`
+	// Used is measured share content in bytes, including descendant filesystems.
+	// Omitted unless the cache-only share's assigned ZFS pool is known awake.
+	Used *uint64 `json:"used_bytes,omitempty" example:"5368709120000"`
+	// StorageUsed is backing pool/array usage, shared by shares on that storage.
+	StorageUsed uint64 `json:"storage_used_bytes" example:"5368709120000"`
+	// StorageFree is backing pool/array free space, shared by shares on that storage.
+	StorageFree uint64 `json:"storage_free_bytes" example:"5368709120000"`
+	// StorageTotal is backing pool/array capacity, shared by shares on that storage.
+	StorageTotal uint64 `json:"storage_total_bytes" example:"10737418240000"`
+	// StorageUsagePercent is backing pool/array usage, shared by shares on that storage.
+	StorageUsagePercent float64 `json:"storage_usage_percent" example:"50"`
+	// Free is a deprecated alias of StorageFree.
+	// Deprecated: use storage_free_bytes.
+	Free uint64 `json:"free_bytes" example:"5368709120000"`
+	// Total is a deprecated alias of StorageTotal.
+	// Deprecated: use storage_total_bytes.
+	Total uint64 `json:"total_bytes" example:"10737418240000"`
+	// UsagePercent is a deprecated alias of StorageUsagePercent.
+	// Deprecated: use storage_usage_percent.
 	UsagePercent float64 `json:"usage_percent" example:"50"`
 
 	// Configuration fields from share config

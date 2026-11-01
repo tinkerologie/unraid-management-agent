@@ -209,6 +209,15 @@ var (
 		},
 		[]string{"name"},
 	)
+	shareStorageUsedBytes = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "unraid_share_storage_used_bytes", Help: "Share backing-storage used space in bytes",
+	}, []string{"name"})
+	shareStorageFreeBytes = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "unraid_share_storage_free_bytes", Help: "Share backing-storage free space in bytes",
+	}, []string{"name"})
+	shareStorageTotalBytes = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "unraid_share_storage_total_bytes", Help: "Share backing-storage capacity in bytes",
+	}, []string{"name"})
 	sharesTotal = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "unraid_shares_total",
 		Help: "Total number of shares",
@@ -368,6 +377,9 @@ func init() {
 		upsRuntime,
 		// Shares
 		shareUsedBytes,
+		shareStorageUsedBytes,
+		shareStorageFreeBytes,
+		shareStorageTotalBytes,
 		sharesTotal,
 		// Services
 		serviceEnabled,
@@ -586,8 +598,16 @@ func (s *Server) updateMetrics() {
 	// Update share metrics
 	if sharesSlice != nil {
 		shareUsedBytes.Reset()
+		shareStorageUsedBytes.Reset()
+		shareStorageFreeBytes.Reset()
+		shareStorageTotalBytes.Reset()
 		for _, share := range sharesSlice {
-			shareUsedBytes.WithLabelValues(share.Name).Set(float64(share.Used))
+			if share.Used != nil {
+				shareUsedBytes.WithLabelValues(share.Name).Set(float64(*share.Used))
+			}
+			shareStorageUsedBytes.WithLabelValues(share.Name).Set(float64(share.StorageUsed))
+			shareStorageFreeBytes.WithLabelValues(share.Name).Set(float64(share.StorageFree))
+			shareStorageTotalBytes.WithLabelValues(share.Name).Set(float64(share.StorageTotal))
 		}
 		sharesTotal.Set(float64(len(sharesSlice)))
 	}
