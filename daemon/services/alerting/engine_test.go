@@ -336,6 +336,63 @@ func TestEngineTrendFields(t *testing.T) {
 	}
 }
 
+func TestEngineDiskTemperatureTrendExpiresWithoutMeasurements(t *testing.T) {
+	provider := &mockDataProvider{disks: []dto.DiskInfo{{ID: "disk1"}, {ID: "disk2", Temperature: new(35.0)}}}
+	e := NewEngine(NewStore(t.TempDir()), provider)
+	base := time.Unix(1_700_000_000, 0)
+	for i := range 3 {
+		provider.disks[0].Temperature = new(30.0 + float64(i))
+		e.sampleHistory(base.Add(time.Duration(i) * time.Minute))
+	}
+	env := e.buildEnv()
+	e.overlayTrends(&env)
+	if env.MaxDiskTempSlopePerMin < 0.9 {
+		t.Fatalf("measured rising trend = %v, want about 1 C/min", env.MaxDiskTempSlopePerMin)
+	}
+	rules := []dto.AlertRule{
+		{ID: "rising", Expression: "MaxDiskTempSlopePerMin > 0.5", Enabled: true},
+		{ID: "sustained-rise", Expression: "MaxDiskTempSlopePerMin > 0.5", Enabled: true, DurationSeconds: 60},
+	}
+	if errs := e.evaluator.CompileRules(rules); len(errs) != 0 {
+		t.Fatal(errs)
+	}
+	e.evaluator.Evaluate(env, rules)
+	if e.evaluator.states["rising"].state != "firing" || e.evaluator.states["sustained-rise"].state != "pending" {
+		t.Fatal("rising measurements must fire the immediate rule and start the duration rule")
+	}
+	e.evaluator.states["sustained-rise"].pendingSince = time.Now().Add(-2 * time.Minute)
+	provider.disks[0].Temperature = nil
+	for _, elapsed := range []time.Duration{3 * time.Minute, time.Hour + time.Minute, time.Hour + 3*time.Minute} {
+		e.sampleHistory(base.Add(elapsed))
+		env = e.buildEnv()
+		e.overlayTrends(&env)
+		if env.MaxDiskTempSlopePerMin != 0 {
+			t.Errorf("after %v without temperature: slope = %v, want 0", elapsed, env.MaxDiskTempSlopePerMin)
+		}
+		e.evaluator.Evaluate(env, rules)
+		for _, status := range e.evaluator.GetStatuses(rules) {
+			if status.State != "ok" {
+				t.Errorf("after %v without temperature: rule %s is %s, want ok", elapsed, status.RuleID, status.State)
+			}
+		}
+		for _, s := range e.history.SeriesSnapshot("disk_temp", "disk1") {
+			if s.t.Before(base.Add(elapsed - time.Hour)) {
+				t.Errorf("after %v retained expired sample at %v", elapsed, s.t)
+			}
+		}
+	}
+	if got := e.QueryHistory("disk_temp", "disk1").Count; got != 0 {
+		t.Errorf("expired temperature history count = %d, want 0", got)
+	}
+	provider.disks[0].Temperature = new(34.0)
+	e.sampleHistory(base.Add(time.Hour + 4*time.Minute))
+	env = e.buildEnv()
+	e.overlayTrends(&env)
+	if env.MaxDiskTempSlopePerMin != 0 {
+		t.Errorf("one fresh measurement reused stale trend: %v", env.MaxDiskTempSlopePerMin)
+	}
+}
+
 func TestEngineEvaluateIntegration(t *testing.T) {
 	dir := t.TempDir()
 	store := NewStore(dir)

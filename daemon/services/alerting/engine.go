@@ -378,11 +378,18 @@ func (e *Engine) sampleHistory(now time.Time) {
 		}
 	}
 	e.history.pruneEntities("restart_count", containerIDs)
+	e.history.expire(now)
 }
 
 // overlayTrends computes trend/predictive fields from the MetricsHistory and
 // overlays them onto env. Called after buildEnv() each evaluation tick.
 func (e *Engine) overlayTrends(env *dto.AlertEnv) {
+	measuredDisks := make(map[string]bool)
+	for _, disk := range e.provider.GetDisksCache() {
+		if disk.Temperature != nil {
+			measuredDisks[disk.ID] = true
+		}
+	}
 	e.history.mu.RLock()
 	defer e.history.mu.RUnlock()
 
@@ -400,8 +407,8 @@ func (e *Engine) overlayTrends(env *dto.AlertEnv) {
 	// Per-disk series
 	var maxDiskTempSlope float64
 	var minDiskFillETA float64 // soonest (smallest positive) = worst-case
-	for _, s := range e.history.entitySeries["disk_temp"] {
-		if len(s) < 2 {
+	for id, s := range e.history.entitySeries["disk_temp"] {
+		if !measuredDisks[id] || len(s) < 2 {
 			continue
 		}
 		sl := e.history.slope(s) * 60

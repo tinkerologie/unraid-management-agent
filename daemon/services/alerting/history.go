@@ -82,6 +82,35 @@ func (h *MetricsHistory) pruneEntities(metric string, keep map[string]bool) {
 	}
 }
 
+// expire enforces the history window even when no new samples arrive.
+func (h *MetricsHistory) expire(now time.Time) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	cutoff := now.Add(-h.maxAge)
+	trim := func(s []sample) []sample {
+		start := 0
+		for start < len(s) && s[start].t.Before(cutoff) {
+			start++
+		}
+		if start == 0 {
+			return s
+		}
+		return append([]sample(nil), s[start:]...)
+	}
+	for metric, s := range h.globalSeries {
+		h.globalSeries[metric] = trim(s)
+	}
+	for _, entities := range h.entitySeries {
+		for id, s := range entities {
+			if s = trim(s); len(s) == 0 {
+				delete(entities, id)
+			} else {
+				entities[id] = s
+			}
+		}
+	}
+}
+
 // slope returns least-squares slope in value-units per SECOND. 0 if <2 points.
 func (h *MetricsHistory) slope(s []sample) float64 {
 	if len(s) < 2 {

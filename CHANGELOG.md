@@ -37,6 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unavailable series; health checks and MCP do not treat missing temperature as measured 0.
   Alert variables `MotherboardTemp`, `MaxDiskTemp`, `MaxGPUTemp` and `TotalGPUPower` are nullable:
   guard rules with `!= nil`. Unguarded nil evaluations preserve alert state and log the failure once.
+  Disk-temperature trends exclude unavailable readings; history expires after one hour even
+  without new measurements.
 - Intel GPU temperature and driver metadata are read from the detected PCI device. `driver_version`
   reports the bound driver name (`i915` or `xe`) plus the module version when available, replacing
   the unrelated kernel vermagic value. CPU temperature is kept separate from GPU temperature.

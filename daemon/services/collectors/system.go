@@ -713,7 +713,9 @@ func (c *SystemCollector) getFans(chipDeviceIDs map[string]string) ([]dto.FanInf
 	// interleave with the readings and corrupt the parse.
 	output, err := lib.ExecCommandStdout("sensors", "-u")
 	if err == nil {
-		if fans := c.parseFanSpeeds(output, chipDeviceIDs); len(fans) > 0 {
+		if fans := c.parseFanSpeeds(output, chipDeviceIDs); len(fans) > 0 || len(parseSensorsFanReadings(output)) > 0 {
+			// Filtered channels are present, not missing: do not retry them
+			// through sysfs and change their published names.
 			return fans, nil
 		}
 	}
@@ -793,11 +795,27 @@ func (c *SystemCollector) parseFanSpeeds(output string, chipDeviceIDs map[string
 
 	fans := make([]dto.FanInfo, 0, len(readings))
 	index := make(map[string]int, len(readings))
+	identities := hwmonFanIdentities(c.sysfsRoot)
 	for _, r := range readings {
 		name := prefixes[r.chip] + "_" + r.label
 		// Filter after naming, so a dropped reading does not change the
 		// names of the chip's other fans.
-		if !c.acceptFan("sensors/"+r.chip+"/"+r.label, r.value) {
+		identity := identities[r.chip]
+		if identity == "" {
+			// A unique chip model can still be matched when its bus does
+			// not expose a recognised lm-sensors address in sysfs.
+			if len(chipsByModel[chipModel(r.chip)]) == 1 {
+				identity = identities[chipModel(r.chip)]
+			}
+		}
+		if identity == "" {
+			if id := chipDeviceIDs[r.chip]; id != "" {
+				identity = chipModel(r.chip) + "/" + id
+			} else {
+				identity = r.chip
+			}
+		}
+		if !c.acceptFan(identity+"/"+r.label, r.value) {
 			continue
 		}
 		info := dto.FanInfo{
@@ -921,13 +939,8 @@ func (c *SystemCollector) readHwmonFanSpeeds() (map[string]int, error) {
 			}
 
 			chipDir := filepath.Dir(path)
-			// #nosec G304 -- chipDir is constructed from the hwmon class directory with bounded numeric indices.
-			chipName, _ := os.ReadFile(filepath.Join(chipDir, "name"))
-			devicePath, err := filepath.EvalSymlinks(filepath.Join(chipDir, "device"))
-			if err != nil {
-				devicePath = chipDir
-			}
-			key := fmt.Sprintf("sysfs/%s/%s/fan%d", strings.TrimSpace(string(chipName)), devicePath, j)
+			_, identity := hwmonFanIdentity(chipDir, c.sysfsRoot)
+			key := fmt.Sprintf("%s/fan%d", identity, j)
 			if !c.acceptFan(key, float64(value)) {
 				continue
 			}
