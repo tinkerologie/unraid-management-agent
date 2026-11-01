@@ -49,6 +49,7 @@ type mockDataProvider struct {
 	containers []dto.ContainerInfo
 	vms        []dto.VMInfo
 	ups        *dto.UPSStatus
+	gpus       []*dto.GPUMetrics
 
 	degradedCount int
 }
@@ -59,7 +60,7 @@ func (m *mockDataProvider) GetDisksCache() []dto.DiskInfo                { retur
 func (m *mockDataProvider) GetDockerCache() []dto.ContainerInfo          { return m.containers }
 func (m *mockDataProvider) GetVMsCache() []dto.VMInfo                    { return m.vms }
 func (m *mockDataProvider) GetUPSCache() *dto.UPSStatus                  { return m.ups }
-func (m *mockDataProvider) GetGPUCache() []*dto.GPUMetrics               { return nil }
+func (m *mockDataProvider) GetGPUCache() []*dto.GPUMetrics               { return m.gpus }
 func (m *mockDataProvider) GetZFSPoolsCache() []dto.ZFSPool              { return nil }
 func (m *mockDataProvider) GetNetworkCache() []dto.NetworkInfo           { return nil }
 func (m *mockDataProvider) GetNUTCache() *dto.NUTResponse                { return nil }
@@ -76,7 +77,7 @@ func newMockProvider() *mockDataProvider {
 			RAMTotal:        16000000000,
 			RAMFree:         8000000000,
 			CPUTemp:         55.0,
-			MotherboardTemp: 40.0,
+			MotherboardTemp: new(float64(40.0)),
 			Uptime:          86400,
 		},
 		array: &dto.ArrayStatus{
@@ -91,9 +92,9 @@ func newMockProvider() *mockDataProvider {
 			NumParityDisks:      1,
 		},
 		disks: []dto.DiskInfo{
-			{Temperature: 35.0, UsagePercent: 50.0, SMARTErrors: 0},
-			{Temperature: 42.0, UsagePercent: 75.0, SMARTErrors: 0},
-			{Temperature: 38.0, UsagePercent: 30.0, SMARTErrors: 2},
+			{Temperature: new(float64(35.0)), UsagePercent: 50.0, SMARTErrors: 0},
+			{Temperature: new(float64(42.0)), UsagePercent: 75.0, SMARTErrors: 0},
+			{Temperature: new(float64(38.0)), UsagePercent: 30.0, SMARTErrors: 2},
 		},
 		containers: []dto.ContainerInfo{
 			{State: "running"},
@@ -141,8 +142,8 @@ func TestEngineBuildEnv(t *testing.T) {
 	}
 
 	// Disk aggregates
-	if env.MaxDiskTemp != 42.0 {
-		t.Errorf("expected max disk temp 42, got %f", env.MaxDiskTemp)
+	if env.MaxDiskTemp == nil || *env.MaxDiskTemp != 42.0 {
+		t.Errorf("expected max disk temp 42, got %v", env.MaxDiskTemp)
 	}
 	if env.MaxDiskUsedPct != 75.0 {
 		t.Errorf("expected max disk used pct 75, got %f", env.MaxDiskUsedPct)
@@ -431,5 +432,73 @@ func TestEngineBuildEnvUPSMissingReadings(t *testing.T) {
 	}
 	if got := eval.states["runtime-low"].state; got != "firing" {
 		t.Errorf("runtime-low state = %q, want firing", got)
+	}
+}
+
+func TestEngineNullableSensorMeasurements(t *testing.T) {
+	provider := &mockDataProvider{
+		system: &dto.SystemInfo{},
+		disks:  []dto.DiskInfo{{ID: "standby"}},
+		gpus:   []*dto.GPUMetrics{nil, {Name: "unmeasured"}},
+	}
+	engine := NewEngine(NewStore(t.TempDir()), provider)
+	env := engine.buildEnv()
+	if env.MotherboardTemp != nil || env.MaxDiskTemp != nil || env.MaxGPUTemp != nil || env.TotalGPUPower != nil {
+		t.Fatalf("unknown readings became values: %+v", env)
+	}
+	engine.sampleHistory(time.Now())
+	if samples := engine.history.SeriesSnapshot("disk_temp", "standby"); len(samples) != 0 {
+		t.Errorf("unknown temperature added history: %v", samples)
+	}
+	// Aggregation skips missing readings and preserves measured zeros and negatives.
+	provider.system.MotherboardTemp = new(0.0)
+	provider.disks = append(provider.disks, dto.DiskInfo{Temperature: new(-2.0)})
+	provider.gpus = append(provider.gpus, &dto.GPUMetrics{Temperature: new(-3.0), PowerDraw: new(0.0)})
+	env = engine.buildEnv()
+	if env.MotherboardTemp == nil || *env.MotherboardTemp != 0 || env.MaxDiskTemp == nil || *env.MaxDiskTemp != -2 || env.MaxGPUTemp == nil || *env.MaxGPUTemp != -3 || env.TotalGPUPower == nil || *env.TotalGPUPower != 0 {
+		t.Fatalf("measured values lost: %+v", env)
+	}
+	provider.gpus = append(provider.gpus, &dto.GPUMetrics{Temperature: new(60.0), PowerDraw: new(12.0)})
+	env = engine.buildEnv()
+	if *env.MaxGPUTemp != 60 || *env.TotalGPUPower != 12 {
+		t.Errorf("GPU aggregation max=%v power=%v", *env.MaxGPUTemp, *env.TotalGPUPower)
+	}
+}
+
+func TestNullableSensorAlertRules(t *testing.T) {
+	for _, field := range []string{"MotherboardTemp", "MaxDiskTemp", "MaxGPUTemp", "TotalGPUPower"} {
+		t.Run(field, func(t *testing.T) {
+			provider := &mockDataProvider{system: &dto.SystemInfo{}}
+			engine := NewEngine(NewStore(t.TempDir()), provider)
+			eval := NewEvaluator()
+			rules := []dto.AlertRule{
+				{ID: "guarded", Expression: field + " != nil && " + field + " >= 0", Enabled: true},
+				{ID: "unguarded", Expression: field + " >= 0", Enabled: true},
+			}
+			if errs := eval.CompileRules(rules); len(errs) != 0 {
+				t.Fatal(errs)
+			}
+			if results := eval.Evaluate(engine.buildEnv(), rules); len(results) != 0 {
+				t.Fatalf("unknown readings fired alerts: %v", results)
+			}
+			if eval.states["unguarded"].lastEvalError == "" {
+				t.Error("nil comparison did not retain evaluation error")
+			}
+			// Repeated failures retain their error, rather than resolving alert state.
+			eval.Evaluate(engine.buildEnv(), rules)
+			provider.system.MotherboardTemp = new(0.0)
+			provider.disks = []dto.DiskInfo{{Temperature: new(0.0)}}
+			provider.gpus = []*dto.GPUMetrics{{Temperature: new(0.0), PowerDraw: new(0.0)}}
+			if results := eval.Evaluate(engine.buildEnv(), rules); len(results) != 2 {
+				t.Errorf("measured zero did not fire both rules: %v", results)
+			}
+			provider.system.MotherboardTemp = nil
+			provider.disks = nil
+			provider.gpus = nil
+			eval.Evaluate(engine.buildEnv(), rules)
+			if eval.states["unguarded"].state != "firing" || eval.states["unguarded"].lastEvalError == "" {
+				t.Errorf("unguarded alert lost state on nil: %+v", eval.states["unguarded"])
+			}
+		})
 	}
 }

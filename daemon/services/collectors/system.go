@@ -30,31 +30,85 @@ type SystemCollector struct {
 	// sysfsRoot is the sysfs mount point ("/sys"); replaceable for tests.
 	sysfsRoot string
 
-	// droppedFans records fan channels whose implausible reading was already
-	// logged, so each is logged once rather than on every collection (#262).
-	droppedFansMu sync.Mutex
-	droppedFans   map[string]bool
+	// Sensor state belongs to this collector and survives dynamic refreshes.
+	sensorMu      sync.Mutex
+	fanQuarantine map[string]time.Time
+	droppedTemps  map[string]bool
+	now           func() time.Time
 }
 
-// plausibleFanRPM reports whether v is a real fan speed: finite, not negative
-// and no higher than lib.MaxPlausibleRPM. Super I/O chips report values such as
-// 56784 for floating or noisy tach lines (#262).
+const fanQuarantineHold = 15 * time.Minute
+
 func plausibleFanRPM(v float64) bool {
 	return !math.IsNaN(v) && !math.IsInf(v, 0) && v >= 0 && v <= lib.MaxPlausibleRPM
 }
 
-// logDroppedFan logs an implausible fan reading once per channel.
-func (c *SystemCollector) logDroppedFan(name string, value float64) {
-	c.droppedFansMu.Lock()
-	defer c.droppedFansMu.Unlock()
-	if c.droppedFans == nil {
-		c.droppedFans = make(map[string]bool)
+func (c *SystemCollector) sensorTime() time.Time {
+	if c.now != nil {
+		return c.now()
 	}
-	if c.droppedFans[name] {
-		return
+	return time.Now()
+}
+
+// releaseExpiredFans also removes channels that disappeared from the inventory.
+func (c *SystemCollector) releaseExpiredFans() {
+	c.sensorMu.Lock()
+	defer c.sensorMu.Unlock()
+	now := c.sensorTime()
+	for key, last := range c.fanQuarantine {
+		if now.Sub(last) >= fanQuarantineHold {
+			delete(c.fanQuarantine, key)
+			logger.Debug("System: releasing fan channel %s from quarantine", key)
+		}
 	}
-	c.droppedFans[name] = true
-	logger.Debug("System: ignoring implausible fan reading %s=%v RPM (limit %d)", name, value, lib.MaxPlausibleRPM)
+}
+
+func (c *SystemCollector) acceptFan(key string, value float64) bool {
+	c.sensorMu.Lock()
+	defer c.sensorMu.Unlock()
+	now := c.sensorTime()
+	last, quarantined := c.fanQuarantine[key]
+	if !plausibleFanRPM(value) {
+		if c.fanQuarantine == nil {
+			c.fanQuarantine = make(map[string]time.Time)
+		}
+		c.fanQuarantine[key] = now
+		if !quarantined {
+			logger.Debug("System: quarantining implausible fan channel %s=%v RPM", key, value)
+		}
+		return false
+	}
+	return !quarantined || now.Sub(last) >= fanQuarantineHold
+}
+
+func plausibleTelemetryTemp(label string, value float64) bool {
+	if !lib.IsPlausibleTempC(value) {
+		return false
+	}
+	label = strings.ToUpper(strings.TrimSpace(label))
+	if strings.Contains(label, "PECI") && value <= 0 {
+		return false
+	}
+	if label == "SYSTIN" || strings.HasPrefix(label, "AUXTIN") {
+		return value <= 100
+	}
+	return true
+}
+
+func (c *SystemCollector) acceptTemperature(key, label string, value float64) bool {
+	if plausibleTelemetryTemp(label, value) {
+		return true
+	}
+	c.sensorMu.Lock()
+	defer c.sensorMu.Unlock()
+	if c.droppedTemps == nil {
+		c.droppedTemps = make(map[string]bool)
+	}
+	if !c.droppedTemps[key] {
+		c.droppedTemps[key] = true
+		logger.Debug("System: ignoring implausible temperature %s (%s)=%v C", key, label, value)
+	}
+	return false
 }
 
 // NewSystemCollector creates a new system information collector with the given context.
@@ -227,45 +281,7 @@ func (c *SystemCollector) collectSystemInfo() (*dto.SystemInfo, error) {
 	if err != nil {
 		logger.Warning("Failed to get temperatures: %v", err)
 	} else {
-		// Build full temperature readings list and extract CPU/MB temps
-		tempReadings := make([]dto.TemperatureReading, 0, len(temperatures))
-		for name, temp := range temperatures {
-			if !lib.IsPlausibleTempC(temp) {
-				continue
-			}
-
-			nameLower := strings.ToLower(name)
-
-			// Classify sensor type
-			sensorType := "other"
-			source := ""
-			if parts := strings.SplitN(name, "_", 2); len(parts) > 0 {
-				source = parts[0]
-			}
-
-			if strings.Contains(nameLower, "core") || strings.Contains(nameLower, "package") || strings.Contains(nameLower, "cputin") {
-				sensorType = "cpu"
-				if info.CPUTemp == 0 || temp > info.CPUTemp {
-					info.CPUTemp = temp
-				}
-			} else if strings.Contains(nameLower, "mb_temp") {
-				sensorType = "motherboard"
-				if info.MotherboardTemp == 0 || temp > info.MotherboardTemp {
-					info.MotherboardTemp = temp
-				}
-			} else if strings.Contains(nameLower, "pch") || strings.Contains(nameLower, "chipset") {
-				sensorType = "chipset"
-			}
-
-			tempReadings = append(tempReadings, dto.TemperatureReading{
-				Name:       name,
-				Value:      temp,
-				SensorType: sensorType,
-				Source:     source,
-				DeviceID:   chipDeviceIDs[source],
-			})
-		}
-		info.Temperatures = tempReadings
+		populateSystemTemperatures(info, temperatures, chipDeviceIDs)
 	}
 
 	// Get fan speeds
@@ -548,6 +564,49 @@ func (c *SystemCollector) getTemperatures() (map[string]float64, error) {
 	return temperatures, nil
 }
 
+// populateSystemTemperatures keeps CPU and motherboard classification unchanged.
+func populateSystemTemperatures(info *dto.SystemInfo, temperatures map[string]float64, chipDeviceIDs map[string]string) {
+	// Build full temperature readings list and extract CPU/MB temps
+	tempReadings := make([]dto.TemperatureReading, 0, len(temperatures))
+	for name, temp := range temperatures {
+		if !lib.IsPlausibleTempC(temp) {
+			continue
+		}
+
+		nameLower := strings.ToLower(name)
+
+		// Classify sensor type
+		sensorType := "other"
+		source := ""
+		if parts := strings.SplitN(name, "_", 2); len(parts) > 0 {
+			source = parts[0]
+		}
+
+		if strings.Contains(nameLower, "core") || strings.Contains(nameLower, "package") || strings.Contains(nameLower, "cputin") {
+			sensorType = "cpu"
+			if info.CPUTemp == 0 || temp > info.CPUTemp {
+				info.CPUTemp = temp
+			}
+		} else if strings.Contains(nameLower, "mb_temp") {
+			sensorType = "motherboard"
+			if info.MotherboardTemp == nil || temp > *info.MotherboardTemp {
+				info.MotherboardTemp = new(temp)
+			}
+		} else if strings.Contains(nameLower, "pch") || strings.Contains(nameLower, "chipset") {
+			sensorType = "chipset"
+		}
+
+		tempReadings = append(tempReadings, dto.TemperatureReading{
+			Name:       name,
+			Value:      temp,
+			SensorType: sensorType,
+			Source:     source,
+			DeviceID:   chipDeviceIDs[source],
+		})
+	}
+	info.Temperatures = tempReadings
+}
+
 func (c *SystemCollector) parseSensorsOutput(output string) map[string]float64 {
 	temperatures := make(map[string]float64)
 	lines := strings.Split(output, "\n")
@@ -586,6 +645,9 @@ func (c *SystemCollector) parseSensorsOutput(output string) map[string]float64 {
 				}
 				valueStr := strings.TrimSpace(parts[1])
 				if value, err := strconv.ParseFloat(valueStr, 64); err == nil {
+					if !c.acceptTemperature(currentChip+"/"+key, currentLabel, value) {
+						continue
+					}
 					// Create a friendly name using label if available, otherwise use key
 					var name string
 					if currentLabel != "" {
@@ -610,7 +672,7 @@ func (c *SystemCollector) readHwmonTemperatures() (map[string]float64, error) {
 	// Read from /sys/class/hwmon/hwmon*/temp*_input
 	for i := range 10 {
 		for j := 1; j < 20; j++ {
-			path := fmt.Sprintf("/sys/class/hwmon/hwmon%d/temp%d_input", i, j)
+			path := filepath.Join(c.sysfsRoot, "class", "hwmon", fmt.Sprintf("hwmon%d/temp%d_input", i, j))
 			// #nosec G304 -- path is constructed from /sys/class/hwmon using bounded numeric indices.
 			data, err := os.ReadFile(path)
 			if err != nil {
@@ -623,7 +685,7 @@ func (c *SystemCollector) readHwmonTemperatures() (map[string]float64, error) {
 			}
 
 			// Try to get label
-			labelPath := fmt.Sprintf("/sys/class/hwmon/hwmon%d/temp%d_label", i, j)
+			labelPath := filepath.Join(c.sysfsRoot, "class", "hwmon", fmt.Sprintf("hwmon%d/temp%d_label", i, j))
 			// #nosec G304 -- labelPath is constructed from /sys/class/hwmon using bounded numeric indices.
 			labelData, err := os.ReadFile(labelPath)
 			label := fmt.Sprintf("hwmon%d_temp%d", i, j)
@@ -631,7 +693,10 @@ func (c *SystemCollector) readHwmonTemperatures() (map[string]float64, error) {
 				label = strings.TrimSpace(string(labelData))
 			}
 
-			temperatures[label] = value / 1000.0 // Convert from millidegrees
+			value /= 1000.0 // Convert from millidegrees
+			if c.acceptTemperature(path, label, value) {
+				temperatures[label] = value
+			}
 		}
 	}
 
@@ -688,6 +753,7 @@ type sensorsFanReading struct {
 // suffix is the chip's stable device ID when it has one (see
 // hwmonChipDeviceIDs), otherwise the rest of the chip name.
 func (c *SystemCollector) parseFanSpeeds(output string, chipDeviceIDs map[string]string) []dto.FanInfo {
+	c.releaseExpiredFans()
 	readings := parseSensorsFanReadings(output)
 	if len(readings) == 0 {
 		return nil
@@ -731,8 +797,7 @@ func (c *SystemCollector) parseFanSpeeds(output string, chipDeviceIDs map[string
 		name := prefixes[r.chip] + "_" + r.label
 		// Filter after naming, so a dropped reading does not change the
 		// names of the chip's other fans.
-		if !plausibleFanRPM(r.value) {
-			c.logDroppedFan(name, r.value)
+		if !c.acceptFan("sensors/"+r.chip+"/"+r.label, r.value) {
 			continue
 		}
 		info := dto.FanInfo{
@@ -822,6 +887,7 @@ func chipModel(chip string) string {
 }
 
 func (c *SystemCollector) readHwmonFanSpeeds() (map[string]int, error) {
+	c.releaseExpiredFans()
 	fanSpeeds := make(map[string]int)
 	hwmonDir := filepath.Join(c.sysfsRoot, "class", "hwmon")
 
@@ -854,8 +920,15 @@ func (c *SystemCollector) readHwmonFanSpeeds() (map[string]int, error) {
 				label = strings.TrimSpace(string(labelData))
 			}
 
-			if !plausibleFanRPM(float64(value)) {
-				c.logDroppedFan(label, float64(value))
+			chipDir := filepath.Dir(path)
+			// #nosec G304 -- chipDir is constructed from the hwmon class directory with bounded numeric indices.
+			chipName, _ := os.ReadFile(filepath.Join(chipDir, "name"))
+			devicePath, err := filepath.EvalSymlinks(filepath.Join(chipDir, "device"))
+			if err != nil {
+				devicePath = chipDir
+			}
+			key := fmt.Sprintf("sysfs/%s/%s/fan%d", strings.TrimSpace(string(chipName)), devicePath, j)
+			if !c.acceptFan(key, float64(value)) {
 				continue
 			}
 			fanSpeeds[label] = value

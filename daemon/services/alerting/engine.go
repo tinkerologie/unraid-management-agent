@@ -343,7 +343,9 @@ func (e *Engine) sampleHistory(now time.Time) {
 			}
 			id := d.ID
 			diskIDs[id] = true
-			e.history.Record("disk_temp", id, d.Temperature, now)
+			if d.Temperature != nil {
+				e.history.Record("disk_temp", id, *d.Temperature, now)
+			}
 			e.history.Record("disk_used_pct", id, d.UsagePercent, now)
 			e.history.Record("disk_errors", id, float64(d.SMARTErrors), now)
 
@@ -533,7 +535,7 @@ func (e *Engine) buildEnv() dto.AlertEnv {
 	// Disks — aggregate max temp, max usage, total errors
 	if disks := e.provider.GetDisksCache(); disks != nil {
 		for _, d := range disks {
-			if d.Temperature > env.MaxDiskTemp {
+			if d.Temperature != nil && (env.MaxDiskTemp == nil || *d.Temperature > *env.MaxDiskTemp) {
 				env.MaxDiskTemp = d.Temperature
 			}
 			if d.UsagePercent > env.MaxDiskUsedPct {
@@ -585,13 +587,18 @@ func (e *Engine) buildEnv() dto.AlertEnv {
 				continue
 			}
 			env.GPUCount++
-			if g.Temperature > env.MaxGPUTemp {
+			if g.Temperature != nil && (env.MaxGPUTemp == nil || *g.Temperature > *env.MaxGPUTemp) {
 				env.MaxGPUTemp = g.Temperature
 			}
 			if g.UtilizationGPU > env.MaxGPUUtil {
 				env.MaxGPUUtil = g.UtilizationGPU
 			}
-			env.TotalGPUPower += g.PowerDraw
+			if g.PowerDraw != nil {
+				if env.TotalGPUPower == nil {
+					env.TotalGPUPower = new(0.0)
+				}
+				*env.TotalGPUPower += *g.PowerDraw
+			}
 		}
 	}
 

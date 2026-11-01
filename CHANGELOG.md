@@ -23,6 +23,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   model-specific interfaces, automatic discovery, implementation phases and validation requirements.
   This documents proposed work; it does not add runtime PSU monitoring.
 
+### Fixed
+
+- **Sensor plausibility and unknown measurements** (#297): apply a 100 °C ceiling only to `SYSTIN`
+  and `AUXTIN*` temperature labels, and drop readings at or below 0 °C only for PECI labels.
+  Other labels retain the global −40 °C < reading < 125 °C range. AUXTIN VRM readings above
+  100 °C are hidden as a trade-off. Implausible fan channels are quarantined for 15 minutes
+  after their last bad sample, with stable names and no fan DTO or safety/control-policy changes.
+- Unmeasured `motherboard_temp_celsius`, disk `temperature_celsius`, and GPU `temperature_celsius`,
+  `power_draw_watts`, `memory_total_bytes`, `memory_used_bytes` and `utilization_memory_percent`
+  now serialize as JSON `null` with keys retained (`x-nullable`), following UPS/NUT. Measured zeros
+  remain numbers. MQTT/Home Assistant numeric sensors render `None`; Prometheus omits and removes
+  unavailable series; health checks and MCP do not treat missing temperature as measured 0.
+  Alert variables `MotherboardTemp`, `MaxDiskTemp`, `MaxGPUTemp` and `TotalGPUPower` are nullable:
+  guard rules with `!= nil`. Unguarded nil evaluations preserve alert state and log the failure once.
+- Intel GPU temperature and driver metadata are read from the detected PCI device. `driver_version`
+  reports the bound driver name (`i915` or `xe`) plus the module version when available, replacing
+  the unrelated kernel vermagic value. CPU temperature is kept separate from GPU temperature.
+
 ### Security
 
 - Require Go 1.27.3 for builds to include the `crypto/x509` intermediate-certificate distrust

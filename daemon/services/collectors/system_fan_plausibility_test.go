@@ -57,8 +57,8 @@ fan7:
 			t.Errorf("unexpected fan %s=%d", f.Name, f.RPM)
 		}
 	}
-	if !c.droppedFans["nct6793_fan5"] || !c.droppedFans["nct6793_fan6"] || !c.droppedFans["nct6793_fan7"] {
-		t.Errorf("dropped channels not recorded: %v", c.droppedFans)
+	if len(c.fanQuarantine) != 3 {
+		t.Errorf("quarantined channels = %v", c.fanQuarantine)
 	}
 }
 
@@ -79,15 +79,6 @@ fan1:
 	got := c.parseFanSpeeds(output, nil)
 	if len(got) != 1 || got[0].Name != "octo-hid-3-13_fan1" || got[0].RPM != 1200 {
 		t.Errorf("parseFanSpeeds() = %+v, want only octo-hid-3-13_fan1 at 1200 RPM", got)
-	}
-}
-
-func TestLogDroppedFanOncePerChannel(t *testing.T) {
-	c := &SystemCollector{}
-	c.logDroppedFan("nct6793_fan5", 56784)
-	c.logDroppedFan("nct6793_fan5", 56784)
-	if len(c.droppedFans) != 1 {
-		t.Errorf("droppedFans = %v, want one entry", c.droppedFans)
 	}
 }
 
@@ -117,7 +108,7 @@ func TestReadHwmonFanSpeedsDropsImplausibleReadings(t *testing.T) {
 	if len(got) != 1 || got["CPU Fan"] != 1500 {
 		t.Errorf("readHwmonFanSpeeds() = %v, want only CPU Fan at 1500", got)
 	}
-	if !c.droppedFans["Fan 2"] {
-		t.Errorf("implausible sysfs reading not recorded as dropped: %v", c.droppedFans)
+	if len(c.fanQuarantine) != 1 {
+		t.Errorf("quarantined channels = %v", c.fanQuarantine)
 	}
 }
