@@ -117,7 +117,7 @@ Previously exported temperature series are removed when the reading becomes unav
 | `unraid_gpu_temperature_celsius` | Gauge | GPU temperature in Celsius |
 | `unraid_gpu_memory_used_bytes`   | Gauge | GPU memory used in bytes   |
 | `unraid_gpu_memory_total_bytes`  | Gauge | Total GPU memory in bytes  |
-| `unraid_gpu_power_watts`    | Gauge | GPU power draw in watts    |
+| `unraid_gpu_power_watts`         | Gauge | GPU power draw in watts    |
 
 **Labels**: `hostname`, `gpu_index`, `gpu_name`
 
