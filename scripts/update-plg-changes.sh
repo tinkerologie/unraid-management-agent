@@ -36,65 +36,58 @@ delimiters() {
 # <pre>, which keeps every line break, and its <p> is display:flex, which puts
 # each inline code span on its own line. So join wrapped lines and keep lists
 # tight, because a blank line around a bullet makes Markdown wrap it in <p>.
-# Code fences, tables and headings pass through unchanged.
+# Only plain paragraph lines join; every other line type is kept as it is.
 normalize_for_dialog() {
-    python3 - "$1" <<'NORMALIZE'
-import re
-import sys
+    awk '
+        function emit() { if (text != "") print text; text = "" }
+        function block_start() { emit(); if (blanks) print ""; blanks = 0; listing = 0 }
 
-ITEM = re.compile(r"\s*([-*+]|\d+\.)\s")
-out, current = [], None
-blank = listing = fenced = False
-
-
-def emit():
-    global current
-    if current is not None:
-        out.append(current)
-    current = None
-
-
-def start_block():
-    global blank, listing
-    emit()
-    if blank:
-        out.append("")
-    blank = listing = False
-
-
-with open(sys.argv[1], encoding="utf-8") as notes:
-    for line in notes.read().splitlines():
-        if line.lstrip().startswith("```"):
-            start_block()
-            out.append(line)
-            fenced = not fenced
-        elif fenced:
-            out.append(line)
-        elif not line.strip():
-            if not listing:
-                emit()
-            blank = True
-        elif line.startswith("#") or line.lstrip().startswith("|"):
-            start_block()
-            out.append(line)
-        elif ITEM.match(line):
+        fence != "" {
+            print
+            if ($0 ~ ("^ {0,3}" fence fence fence)) fence = ""
+            next
+        }
+        /^ {0,3}(```|~~~)/ {
+            block_start()
+            print
+            line = $0
+            sub(/^ +/, "", line)
+            fence = substr(line, 1, 1)
+            next
+        }
+        /^[[:space:]]*$/ { emit(); blanks = 1; next }
+        /^ {0,3}#/ || /^ {0,3}>/ || /^[[:space:]]*\|/ { block_start(); print; next }
+        # Thematic breaks and setext underlines.
+        /^ {0,3}(-[ -]*-[ -]*-[ -]*|_[ _]*_[ _]*_[ _]*|\*[ *]*\*[ *]*\*[ *]*|=+|-+)[[:space:]]*$/ {
+            block_start()
+            print
+            next
+        }
+        /^[[:space:]]*([-*+]|[0-9]+[.)])[[:space:]]/ {
             emit()
-            if blank and not listing:
-                out.append("")
-            blank, listing = False, True
-            current = line
-        elif listing and (not blank or line[0].isspace()):
-            # Text under a bullet, including an indented paragraph after a blank line.
-            current = f"{current} {line.strip()}"
-            blank = False
-        elif not listing and not blank and current is not None:
-            current = f"{current} {line.strip()}"
-        else:
-            start_block()
-            current = line
-emit()
-print("\n".join(out))
-NORMALIZE
+            if (blanks && !listing) print ""
+            blanks = 0
+            listing = 1
+            text = $0
+            next
+        }
+        # Only a plain continuation joins, and never across a hard break.
+        !blanks && text != "" && text !~ /(  |\\)$/ {
+            line = $0
+            sub(/^[[:space:]]+/, "", line)
+            text = text " " line
+            next
+        }
+        {
+            emit()
+            if (blanks) print ""
+            blanks = 0
+            if ($0 !~ /^[[:space:]]/) listing = 0
+            if (!listing && $0 ~ /^(    |\t)/) { print; next } # an indented code block
+            text = $0
+        }
+        END { emit() }
+    ' "$1"
 }
 
 [[ "$version" =~ ^[0-9A-Za-z.+-]+$ ]] || fail "Invalid release version: '$version'"

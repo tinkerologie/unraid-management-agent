@@ -37,66 +37,48 @@ else
     echo "SKIP: xmllint not installed; XML validation skipped"
 fi
 # The Plugins page dialog needs unwrapped lines and tight lists (#312).
-cat > "$work/wrapped" <<'EOF'
-Intro wrapped
-across two lines.
-
-### Fixed
-
-- First bullet with `code`
-  wrapped `more` here.
-
-- Second bullet in a loose list
-  - Nested item
-    wrapped too
-
-  Indented paragraph.
-- Third bullet
-
-Closing paragraph.
-
-| A | B |
-| - | - |
-
-```text
-keep
-  this  exactly
-
-```
-
-1. Numbered
-   item
-EOF
-cp "$PLG" "$work/wrapped.plg"
-bash "$UPDATE" "$version" "$work/wrapped" "$work/wrapped.plg" > /dev/null
-sed -n '/^<CHANGES>$/,/^<\/CHANGES>$/p' "$work/wrapped.plg" | sed '1,3d;$d' > "$work/got"
-cat > "$work/want" <<'EOF'
-Intro wrapped across two lines.
-
-### Fixed
-
-- First bullet with `code` wrapped `more` here.
-- Second bullet in a loose list
-  - Nested item wrapped too Indented paragraph.
-- Third bullet
-
-Closing paragraph.
-
-| A | B |
-| - | - |
-
-```text
-keep
-  this  exactly
-
-```
-
-1. Numbered item
-EOF
+normalized() {
+    cp "$PLG" "$work/normalized.plg"
+    bash "$UPDATE" "$version" "$1" "$work/normalized.plg" > /dev/null
+    sed -n '/^<CHANGES>$/,/^<\/CHANGES>$/p' "$work/normalized.plg" | sed '1,3d;$d' \
+        | sed -e 's/&gt;/>/g' -e 's/&lt;/</g' -e 's/&amp;/\&/g'
+}
+# shellcheck disable=SC2016 # literal Markdown backticks, not shell expansions
+{
+    printf 'Intro wrapped\nacross two lines.\n\n### Fixed\n\n'
+    printf -- '- First bullet with `code`\n  wrapped `more` here.\n\n'
+    printf -- '- Second bullet in a loose list\n  - Nested item\n    wrapped too\n\n'
+    printf '  Indented paragraph.\n- Third with a hard break  \n  kept line\\\n  and another\n\n'
+    printf 'Closing paragraph.\n\n| A | B |\n| - | - |\n\n> Quote\n> stays\n\nTitle\n=====\n\n---\n\n'
+    printf '```text\nkeep\n  this  exactly\n\n```\n\n~~~sh\nfirst command\nsecond command\n~~~\n\n'
+    printf '    indented code\n    stays\n\n1. Numbered\n   item\n2) Other\n'
+} > "$work/wrapped"
+# shellcheck disable=SC2016 # literal Markdown backticks, not shell expansions
+{
+    printf 'Intro wrapped across two lines.\n\n### Fixed\n\n'
+    printf -- '- First bullet with `code` wrapped `more` here.\n'
+    printf -- '- Second bullet in a loose list\n  - Nested item wrapped too\n\n'
+    printf '  Indented paragraph.\n- Third with a hard break  \n  kept line\\\n  and another\n\n'
+    printf 'Closing paragraph.\n\n| A | B |\n| - | - |\n\n> Quote\n> stays\n\nTitle\n=====\n\n---\n\n'
+    printf '```text\nkeep\n  this  exactly\n\n```\n\n~~~sh\nfirst command\nsecond command\n~~~\n\n'
+    printf '    indented code\n    stays\n\n1. Numbered item\n2) Other\n'
+} > "$work/want"
+normalized "$work/wrapped" > "$work/got"
 diff "$work/want" "$work/got" >&2 || fail "Notes were not normalized for the Plugins page dialog"
-cp "$work/wrapped.plg" "$work/wrapped-first.plg"
-bash "$UPDATE" "$version" "$work/wrapped" "$work/wrapped.plg" > /dev/null
-cmp -s "$work/wrapped-first.plg" "$work/wrapped.plg" || fail "Normalized update is not idempotent"
+normalized "$work/got" > "$work/again"
+cmp -s "$work/got" "$work/again" || fail "Normalized notes are not a fixed point"
+
+# The real notes keep every word, and no blank line sits between two bullets.
+bash "$REPO_ROOT/scripts/extract-release-notes.sh" "$version" "$REPO_ROOT/CHANGELOG.md" > "$work/real"
+normalized "$work/real" > "$work/real-got"
+[ "$(tr -s '[:space:]' '\n' < "$work/real")" = "$(tr -s '[:space:]' '\n' < "$work/real-got")" ] \
+    || fail "Normalizing changed the words in the real notes"
+if awk '/^- / && gap && item { found = 1 } /^$/ { gap = 1; next } { gap = 0; item = /^- / } END { exit !found }' "$work/real-got"; then
+    fail "A blank line remains between bullets in the real notes"
+fi
+if grep -qE '^  [^ -]' "$work/real-got"; then
+    fail "A wrapped bullet line remains in the real notes"
+fi
 cp "$work/updated.plg" "$work/first.plg"
 bash "$UPDATE" "$version" "$work/notes" "$work/updated.plg" > /dev/null
 cmp -s "$work/first.plg" "$work/updated.plg" || fail "Update is not idempotent"
