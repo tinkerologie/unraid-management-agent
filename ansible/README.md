@@ -45,6 +45,11 @@ when invoking Ansible from the repository root. Both transports use a separate
 `~/.ansible/uma-key/` socket directory, so old password sessions cannot mask an
 authentication problem.
 
+Define `ansible_user` in inventory and use `ansible_port` for a nonstandard
+port. The older `ansible_ssh_user` and `ansible_ssh_port` aliases are rejected
+before connecting so SSH and SCP use the same settings. Preflight validates
+every target in an inventory group and aborts the play if any target fails.
+
 Validate the connection before deploying:
 
 ```bash
