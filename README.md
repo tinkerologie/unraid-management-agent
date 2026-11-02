@@ -229,9 +229,13 @@ The [Ansible playbook](ansible/README.md) builds the plugin, deploys it to a ser
 endpoints:
 
 ```bash
-cp ansible/inventory.yml.example ansible/inventory.yml   # set the server address and credentials
+cp ansible/inventory.yml.example ansible/inventory.yml   # set the server address and SSH key path
+ansible-playbook -i ansible/inventory.yml ansible/ssh-check.yml
 ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --tags build,deploy,verify
 ```
+
+Use an authorized SSH key with owner-only permissions and a verified entry in
+`known_hosts`. The connection check validates SSH and SCP without changing the plugin.
 
 </details>
 

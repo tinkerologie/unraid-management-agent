@@ -1,0 +1,82 @@
+---
+# Controller checks must finish before any remote lifecycle task.
+- name: Validate controller SSH configuration
+  delegate_to: localhost
+  run_once: true
+  block:
+    - name: Reject stored SSH passwords
+      ansible.builtin.assert:
+        that:
+          - ansible_password is not defined
+          - ansible_ssh_pass is not defined
+          - ansible_ssh_password is not defined
+        fail_msg: Remove SSH password variables from inventory; use ansible_ssh_private_key_file.
+        quiet: true
+
+    - name: Require a private key setting
+      ansible.builtin.assert:
+        that:
+          - ansible_ssh_private_key_file | default('', true) | length > 0
+        fail_msg: Set ansible_ssh_private_key_file to an existing authorized SSH key.
+        quiet: true
+
+    - name: Inspect private key metadata without reading its contents
+      ansible.builtin.stat:
+        path: "{{ ansible_ssh_private_key_file | expanduser }}"
+        get_checksum: false
+        get_mime: false
+        get_attributes: false
+      register: uma_key_stat
+      no_log: true
+
+    - name: Require a readable private key with owner-only permissions
+      ansible.builtin.assert:
+        that:
+          - uma_key_stat.stat.isreg | default(false)
+          - uma_key_stat.stat.readable | default(false)
+          - (uma_key_stat.stat.mode | default('')) is match('^0[0-7]00$')
+        fail_msg: The SSH key must be a readable regular file with owner-only permissions (chmod 600).
+        quiet: true
+
+    - name: Require the shared SSH policy
+      ansible.builtin.assert:
+        that:
+          - hostvars[inventory_hostname].ansible_ssh_common_args == uma_ssh_common_args
+          - hostvars[inventory_hostname].ansible_ssh_args == '-C'
+          - hostvars[inventory_hostname].ansible_ssh_extra_args | default('') | length == 0
+          - hostvars[inventory_hostname].ansible_connection | default('ssh') == 'ssh'
+          - lookup('ansible.builtin.config', 'HOST_KEY_CHECKING') | bool
+          - uma_ssh_port | string is match('^[0-9]+$')
+          - uma_ssh_port | int >= 1 and uma_ssh_port | int <= 65535
+        fail_msg: Remove inventory SSH argument overrides and enable HOST_KEY_CHECKING; use a valid ansible_port.
+        quiet: true
+
+    - name: Check controller SSH tools
+      ansible.builtin.shell: command -v ssh && command -v scp && command -v ssh-keygen
+      changed_when: false
+
+    - name: Check the server has a verified known-hosts entry
+      ansible.builtin.command:
+        argv:
+          - ssh-keygen
+          - -F
+          - "{{ hostvars[inventory_hostname].ansible_host if uma_ssh_port | int == 22 else '[' ~ hostvars[inventory_hostname].ansible_host ~ ']:' ~ uma_ssh_port | string }}"
+          - -f
+          - "{{ uma_known_hosts_file | expanduser }}"
+      register: uma_known_host
+      changed_when: false
+      failed_when: false
+      no_log: true
+
+    - name: Require a verified known-hosts entry
+      ansible.builtin.assert:
+        that:
+          - uma_known_host.rc == 0
+        fail_msg: Add a verified host and port entry to uma_known_hosts_file before connecting.
+        quiet: true
+
+    - name: Create the separate key-authentication socket directory
+      ansible.builtin.file:
+        path: "{{ uma_ssh_control_dir | expanduser }}"
+        state: directory
+        mode: "0700"

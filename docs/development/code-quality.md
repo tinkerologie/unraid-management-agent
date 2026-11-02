@@ -220,9 +220,28 @@ CI and release publication install this tool and require valid XML before publis
 ```bash
 make deps              # Install/update dependencies
 make local             # Build for current architecture
-make release           # Build for Linux/amd64 (Unraid)
+make release           # Build static pure-Go Linux/amd64 (Unraid), GOAMD64=v1
 make clean             # Clean build artifacts
 ```
+
+### Build compatibility contract
+
+Release payloads require `CGO_ENABLED=0`, `GOOS=linux`, `GOARCH=amd64` and
+`GOAMD64=v1`. Their ELF headers must describe a little-endian 64-bit x86 binary,
+without an `INTERP` program header or `NEEDED` shared-library entries. Native
+cgo startup code inherited a C compiler CPU baseline that introduced AVX and
+caused the 2026.11.00 SIGILL regression on older processors (#315, #317).
+
+`make package` runs `scripts/check-package-artifact.sh check <bundle.tgz>` on
+the binary inside the final archive. Install `binutils` for `readelf`; on macOS
+use `brew install binutils` and `READELF=greadelf make package`.
+
+On Linux, `scripts/check-package-artifact.sh smoke <bundle.tgz>` also requires
+`qemu-user` and runs only `--help` under the non-AVX Nehalem CPU model, with a
+timeout and an empty environment. `QEMU` and `QEMU_CPU` override the emulator
+and CPU model for diagnosis. CI and release publication run this check before
+calculating checksums. `--help` reads Unraid's `dynamix.cfg` during package
+initialization when present; it does not start or reconfigure the service.
 
 ## Code Style Guidelines
 
