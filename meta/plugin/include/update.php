@@ -76,6 +76,14 @@ if (isset($_POST['WAN_IP_LOOKUP'])) {
 }
 unset($_POST['WAN_IP_LOOKUP_CB']);
 
+// Normalise the endpoint toggles: only "false" disables an endpoint (#273).
+foreach (['MCP_ENABLED', 'METRICS_ENABLED', 'WEBSOCKET_ENABLED'] as $endpointToggle) {
+    if (isset($_POST[$endpointToggle])) {
+        $_POST[$endpointToggle] = ($_POST[$endpointToggle] === 'false') ? 'false' : 'true';
+    }
+    unset($_POST[$endpointToggle . '_CB']);
+}
+
 // Normalise "Show all collectors" to exactly "true" or "false" (#261). It only
 // reveals settings rows; the daemon never reads it.
 if (isset($_POST['SHOW_ALL_COLLECTORS'])) {

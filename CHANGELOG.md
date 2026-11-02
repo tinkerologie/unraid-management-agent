@@ -35,22 +35,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Prometheus omits unknown share usage and adds storage gauges; Home Assistant discovery
   labels storage readings explicitly and preserves unknown versus measured-zero usage.
 
-### Added
-
-- Shared read-only PSU collector with exact-ID auto-detection for Corsair RMi/HXi USB PSUs
-  through the kernel `corsairpsu` hwmon interface (part of #61). Includes hardware gating,
-  independent hotplug inventory, Dynamic/Manual configuration and plugin settings, explicit
-  availability and nullable readings, derived DC load, REST/WebSocket/MCP, MQTT/Home Assistant
-  discovery, and Prometheus. Bounded, ordered discovery keeps slow MQTT brokers from blocking
-  other telemetry; regression tests cover startup delivery, cancellation and recovery.
-  The PSU endpoint is grouped with hardware monitoring routes.
-  AXi and other vendor backends remain separate follow-up work.
-- PSU telemetry feasibility research for #61, #194, #195, #196 and #197, covering
-  model-specific interfaces, automatic discovery, implementation phases and validation requirements.
-  This documents proposed work; it does not add runtime PSU monitoring.
-
-### Fixed
-
 - Container memory usage now excludes the `inactive_file` page cache from cgroup v2
   `memory.current`, clamped at zero. Missing or malformed `memory.stat` falls back to raw usage;
   memory percentages, displays and aggregates use the corrected value (#294).
@@ -72,18 +56,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reports the bound driver name (`i915` or `xe`) plus the module version when available, replacing
   the unrelated kernel vermagic value. CPU temperature is kept separate from GPU temperature.
 
-### Security
-
-- Require Go 1.27.3 for builds to include the `crypto/x509` intermediate-certificate distrust
-  update ([GO-2026-6809](https://pkg.go.dev/vuln/GO-2026-6809)), found during PSU validation.
-
-### Fixed
-
 - Disks whose `smartctl` exit status has only informational bits set no longer report
   `smart_status: "UNKNOWN"` without attributes, and `system_health_report` no longer calls them
   a critical SMART failure (#292). The exit status is decoded as a bitmask and exposed as
   `smart_exit_status`. A disk with a pre-fail attribute at threshold now gets a warning, historic
   records and an unreadable (`UNKNOWN`) status get an info finding.
+
+### Added
+
+- **Endpoint toggles** (#273) — `mcp_enabled`, `metrics_enabled` and `websocket_enabled`, each
+  available as a CLI flag, an environment variable, a `config.yml` key and a switch on the plugin
+  settings page. All default to on. A disabled endpoint returns 404 and does no background work, so
+  the agent can run as REST only. These switches limit exposure; they
+  are unlikely to lower CPU usage much.
+- Shared read-only PSU collector with exact-ID auto-detection for Corsair RMi/HXi USB PSUs
+  through the kernel `corsairpsu` hwmon interface (part of #61). Includes hardware gating,
+  independent hotplug inventory, Dynamic/Manual configuration and plugin settings, explicit
+  availability and nullable readings, derived DC load, REST/WebSocket/MCP, MQTT/Home Assistant
+  discovery, and Prometheus. Bounded, ordered discovery keeps slow MQTT brokers from blocking
+  other telemetry; regression tests cover startup delivery, cancellation and recovery.
+  The PSU endpoint is grouped with hardware monitoring routes.
+  AXi and other vendor backends remain separate follow-up work.
+- PSU telemetry feasibility research for #61, #194, #195, #196 and #197, covering
+  model-specific interfaces, automatic discovery, implementation phases and validation requirements.
+  This documents proposed work; it does not add runtime PSU monitoring.
+
+### Security
+
+- Require Go 1.27.3 for builds to include the `crypto/x509` intermediate-certificate distrust
+  update ([GO-2026-6809](https://pkg.go.dev/vuln/GO-2026-6809)), found during PSU validation.
 
 ## [2026.10.03] - 2026-10-27
 

@@ -112,13 +112,7 @@ func (o *Orchestrator) Run() error {
 	if err := mcpServer.Initialize(); err != nil {
 		logger.Error("Failed to initialize MCP server: %v", err)
 	} else {
-		// Mount exact /mcp, /mcp/, and optional /mcp/<secret> routes on the stateful StreamableHTTPHandler
-		apiServer.RegisterMCPRoutes(mcpServer.GetHTTPHandler())
-		if o.ctx.MCPConnectSecret != "" {
-			logger.Success("MCP server initialized at /mcp and /mcp/<redacted> (official SDK, per-session protocol negotiation: 2026-07-28, 2025-11-25, 2025-06-18, 2025-03-26, 2024-11-05)")
-		} else {
-			logger.Success("MCP server initialized at /mcp endpoint (official SDK, per-session protocol negotiation: 2026-07-28, 2025-11-25, 2025-06-18, 2025-03-26, 2024-11-05)")
-		}
+		o.mountHTTPMCP(apiServer, mcpServer)
 	}
 
 	// Initialize alerting engine
@@ -261,7 +255,7 @@ func (o *Orchestrator) Run() error {
 	if o.ctx.TLSEnabled() {
 		scheme = "https"
 	}
-	logger.Success("API server started on %s port %d (MCP endpoint: %s://<host>:%d/mcp)", scheme, o.ctx.Port, scheme, o.ctx.Port)
+	logger.Success("%s", o.startedMessage(scheme))
 	logger.Success("Agent startup complete")
 
 	// Wait for shutdown signal
@@ -274,6 +268,31 @@ func (o *Orchestrator) Run() error {
 	o.shutdown(apiServer, &wg)
 
 	return nil
+}
+
+// mountHTTPMCP serves the MCP server over HTTP unless MCP is disabled (#273). A
+// disabled server is still initialized: that starts no background work, and it
+// fills the tool catalog the settings page reads, so saved tool policies stay
+// editable and are not overwritten.
+func (o *Orchestrator) mountHTTPMCP(apiServer *api.Server, mcpServer *mcp.Server) {
+	if o.ctx.MCPDisabled {
+		return
+	}
+	// Mount exact /mcp, /mcp/, and optional /mcp/<secret> routes on the stateful StreamableHTTPHandler
+	apiServer.RegisterMCPRoutes(mcpServer.GetHTTPHandler())
+	if o.ctx.MCPConnectSecret != "" {
+		logger.Success("MCP server initialized at /mcp and /mcp/<redacted> (official SDK, per-session protocol negotiation: 2026-07-28, 2025-11-25, 2025-06-18, 2025-03-26, 2024-11-05)")
+	} else {
+		logger.Success("MCP server initialized at /mcp endpoint (official SDK, per-session protocol negotiation: 2026-07-28, 2025-11-25, 2025-06-18, 2025-03-26, 2024-11-05)")
+	}
+}
+
+// startedMessage returns the startup line for the API server.
+func (o *Orchestrator) startedMessage(scheme string) string {
+	if o.ctx.MCPDisabled {
+		return fmt.Sprintf("API server started on %s port %d", scheme, o.ctx.Port)
+	}
+	return fmt.Sprintf("API server started on %s port %d (MCP endpoint: %s://<host>:%d/mcp)", scheme, o.ctx.Port, scheme, o.ctx.Port)
 }
 
 // applyAlertFloors keeps, in Dynamic mode, the collectors enabled alert
@@ -549,6 +568,7 @@ func (o *Orchestrator) initializeDiscovery(ctx context.Context) {
 
 	svc := discovery.NewService(o.ctx.DiscoveryConfig, hostname, o.ctx.Port, o.ctx.Version, o.ctx.BindAddress, o.ctx.TLSEnabled())
 	svc.SetAuthEnabled(o.ctx.APIToken != "")
+	svc.SetMCPDisabled(o.ctx.MCPDisabled)
 	if err := svc.Start(ctx); err != nil {
 		logger.Warning("Discovery service disabled: %v", err)
 		return

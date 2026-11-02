@@ -576,3 +576,150 @@ func TestFanControlIntervalDefault(t *testing.T) {
 		})
 	}
 }
+
+func TestEndpointToggleSettings(t *testing.T) {
+	yes, no := true, false
+	toggles := []struct {
+		env  string
+		flag string
+		get  func(c *struct{ mcp, metrics, ws bool }) bool
+		file func(v *bool) *domain.FileConfig
+	}{
+		{"MCP_ENABLED", "--mcp-enabled", func(c *struct{ mcp, metrics, ws bool }) bool { return c.mcp }, func(v *bool) *domain.FileConfig { return &domain.FileConfig{MCPEnabled: v} }},
+		{"METRICS_ENABLED", "--metrics-enabled", func(c *struct{ mcp, metrics, ws bool }) bool { return c.metrics }, func(v *bool) *domain.FileConfig { return &domain.FileConfig{MetricsEnabled: v} }},
+		{"WEBSOCKET_ENABLED", "--websocket-enabled", func(c *struct{ mcp, metrics, ws bool }) bool { return c.ws }, func(v *bool) *domain.FileConfig { return &domain.FileConfig{WebSocketEnabled: v} }},
+	}
+	cases := []struct {
+		name string
+		env  *string
+		flag string
+		file *bool
+		want bool
+	}{
+		{name: "default is true", want: true},
+		{name: "flag false", flag: "=false", want: false},
+		{name: "env false", env: new("false"), want: false},
+		{name: "file false", file: &no, want: false},
+		{name: "omitted file key stays true", want: true},
+		{name: "file true", file: &yes, want: true},
+		{name: "env true beats file false", env: new("true"), file: &no, want: true},
+		{name: "flag true beats file false", flag: "=true", file: &no, want: true},
+		{name: "empty env keeps file false", env: new(""), file: &no, want: false},
+	}
+	for _, tg := range toggles {
+		for _, tc := range cases {
+			t.Run(tg.env+"/"+tc.name, func(t *testing.T) {
+				orig := cli
+				t.Cleanup(func() { cli = orig })
+				t.Setenv(tg.env, "")
+				if err := os.Unsetenv(tg.env); err != nil {
+					t.Fatal(err)
+				}
+				if tc.env != nil {
+					t.Setenv(tg.env, *tc.env)
+				}
+				args := []string{"boot"}
+				if tc.flag != "" {
+					args = []string{tg.flag + tc.flag, "boot"}
+				}
+				if _, _, err := parseCLI(args, kong.Exit(func(int) { t.Fatal("kong exited") })); err != nil {
+					t.Fatalf("parse %v: %v", args, err)
+				}
+				if tc.file != nil {
+					applyFileConfig(tg.file(tc.file))
+				}
+				got := struct{ mcp, metrics, ws bool }{cli.MCPEnabled, cli.MetricsEnabled, cli.WebSocketEnabled}
+				if tg.get(&got) != tc.want {
+					t.Errorf("%s = %v, want %v", tg.env, tg.get(&got), tc.want)
+				}
+			})
+		}
+	}
+}
+
+func TestResolveDisabledMCP(t *testing.T) {
+	const secret = "connect-secret-value" // pragma: allowlist secret
+	tests := []struct {
+		name               string
+		enabled, stdio     bool
+		secret, wantSecret string
+		wantDropped        bool
+		wantNotice         bool
+	}{
+		{name: "enabled keeps the secret", enabled: true, secret: secret, wantSecret: secret},
+		{name: "disabled clears the secret", secret: secret, wantDropped: true},
+		{name: "disabled without a secret"},
+		{name: "stdio keeps the secret with a notice", stdio: true, secret: secret, wantSecret: secret, wantNotice: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stderr strings.Builder
+			got := tt.secret
+			if dropped := resolveDisabledMCP(tt.enabled, tt.stdio, &got, &stderr); dropped != tt.wantDropped {
+				t.Errorf("dropped = %v, want %v", dropped, tt.wantDropped)
+			}
+			if got != tt.wantSecret {
+				t.Errorf("secret = %q, want %q", got, tt.wantSecret)
+			}
+			if (stderr.Len() > 0) != tt.wantNotice {
+				t.Errorf("stderr = %q, want notice %v", stderr.String(), tt.wantNotice)
+			}
+			if strings.Contains(stderr.String(), secret) {
+				t.Error("the notice must not contain the secret")
+			}
+		})
+	}
+}
+
+func TestMCPDisabledWarnings(t *testing.T) {
+	tests := []struct {
+		name    string
+		secret  bool
+		entries int
+		want    []string
+	}{
+		{name: "neither"},
+		{name: "secret", secret: true, want: []string{"connect secret"}},
+		{name: "tool policy", entries: 2, want: []string{"tool policy"}},
+		{name: "both", secret: true, entries: 1, want: []string{"connect secret", "tool policy"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := mcpDisabledWarnings(tt.secret, tt.entries)
+			if len(got) != len(tt.want) {
+				t.Fatalf("warnings = %q, want %d", got, len(tt.want))
+			}
+			for i, part := range tt.want {
+				if !strings.Contains(got[i], part) {
+					t.Errorf("warning %q does not mention %q", got[i], part)
+				}
+			}
+		})
+	}
+}
+
+func TestApplyEndpointToggles(t *testing.T) {
+	tests := []struct {
+		name             string
+		mcp, metrics, ws bool
+		wantLine         string
+	}{
+		{name: "all enabled", mcp: true, metrics: true, ws: true},
+		{name: "mcp off", metrics: true, ws: true, wantLine: "Disabled endpoints: /mcp"},
+		{name: "metrics off", mcp: true, ws: true, wantLine: "Disabled endpoints: /metrics"},
+		{name: "websocket off", mcp: true, metrics: true, wantLine: "Disabled endpoints: /api/v1/ws"},
+		{name: "all off", wantLine: "Disabled endpoints: /mcp, /metrics, /api/v1/ws"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			appCtx := &domain.Context{}
+			applyEndpointToggles(appCtx, tt.mcp, tt.metrics, tt.ws, true)
+			if appCtx.MCPDisabled == tt.mcp || appCtx.MetricsDisabled == tt.metrics || appCtx.WebSocketDisabled == tt.ws {
+				t.Errorf("context = %v %v %v for enabled %v %v %v", appCtx.MCPDisabled, appCtx.MetricsDisabled, appCtx.WebSocketDisabled, tt.mcp, tt.metrics, tt.ws)
+			}
+			if got := disabledEndpointsLine(appCtx); got != tt.wantLine {
+				t.Errorf("line = %q, want %q", got, tt.wantLine)
+			}
+		})
+	}
+}

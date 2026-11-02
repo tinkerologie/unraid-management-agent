@@ -102,7 +102,6 @@ func NewServerWithCollectorManager(ctx *domain.Context, cm CollectorManagerInter
 	s := &Server{
 		ctx:              ctx,
 		router:           mux.NewRouter(),
-		wsHub:            NewWSHub(),
 		cancelCtx:        cancelCtx,
 		cancelFunc:       cancelFunc,
 		ready:            make(chan struct{}),
@@ -111,9 +110,15 @@ func NewServerWithCollectorManager(ctx *domain.Context, cm CollectorManagerInter
 		networkAccess:    collectors.NewNetworkAccessDiscovery(ctx.WANIPLookup),
 	}
 
+	if !ctx.WebSocketDisabled {
+		s.wsHub = NewWSHub()
+	}
+
 	if dc, ok := cm.(dynamicCollectors); ok && dc.Dynamic() {
 		s.dynamic = dc
-		s.wsHub.demand = dc.Demand()
+		if s.wsHub != nil {
+			s.wsHub.demand = dc.Demand()
+		}
 	}
 
 	s.setupRoutes()
@@ -144,7 +149,9 @@ func (s *Server) setupRoutes() {
 	})
 
 	// Prometheus metrics endpoint (at root level, no /api/v1 prefix)
-	s.router.HandleFunc("/metrics", s.handleMetrics).Methods("GET")
+	if !s.ctx.MetricsDisabled {
+		s.router.HandleFunc("/metrics", s.handleMetrics).Methods("GET")
+	}
 
 	// Swagger UI endpoint (accessible at /swagger/index.html)
 	s.router.PathPrefix("/swagger/").Handler(httpSwagger.Handler(
@@ -400,7 +407,9 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/mcp/tool-policy", s.handleUpdateMCPToolPolicy).Methods(http.MethodPut)
 
 	// WebSocket endpoint
-	api.HandleFunc("/ws", s.handleWebSocket)
+	if s.wsHub != nil {
+		api.HandleFunc("/ws", s.handleWebSocket)
+	}
 }
 
 // RegisterMCPRoutes mounts the Streamable HTTP MCP handler at exact "/mcp",
@@ -424,17 +433,7 @@ func (s *Server) StartSubscriptions() {
 	logger.Info("Starting API server subscriptions...")
 
 	var subWg sync.WaitGroup
-	subWg.Add(2) // subscribeToEvents + broadcastEvents
-
-	// Start WebSocket hub
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LogPanicWithStack("WebSocket hub goroutine", r)
-			}
-		}()
-		s.wsHub.Run(s.cancelCtx)
-	}()
+	subWg.Add(1) // subscribeToEvents
 
 	// Subscribe to events and update cache
 	go func() {
@@ -446,15 +445,29 @@ func (s *Server) StartSubscriptions() {
 		s.subscribeToEvents(s.cancelCtx, &subWg)
 	}()
 
-	// Broadcast events to WebSocket clients
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LogPanicWithStack("WebSocket broadcast goroutine", r)
-			}
+	if s.wsHub != nil {
+		subWg.Add(1) // broadcastEvents
+
+		// Start WebSocket hub
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.LogPanicWithStack("WebSocket hub goroutine", r)
+				}
+			}()
+			s.wsHub.Run(s.cancelCtx)
 		}()
-		s.broadcastEvents(s.cancelCtx, &subWg)
-	}()
+
+		// Broadcast events to WebSocket clients
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.LogPanicWithStack("WebSocket broadcast goroutine", r)
+				}
+			}()
+			s.broadcastEvents(s.cancelCtx, &subWg)
+		}()
+	}
 
 	// Wait for all subscriptions to be registered, then signal readiness
 	go func() {

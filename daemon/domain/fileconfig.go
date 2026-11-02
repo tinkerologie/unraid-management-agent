@@ -48,6 +48,12 @@ type FileConfig struct {
 	// WANIPLookup enables the external WAN IP lookup (default true).
 	WANIPLookup *bool `yaml:"wan_ip_lookup,omitempty"`
 
+	// Endpoint toggles (default true): false makes the endpoint return 404 and
+	// skips its server, goroutines and subscriptions.
+	MCPEnabled       *bool `yaml:"mcp_enabled,omitempty"`
+	MetricsEnabled   *bool `yaml:"metrics_enabled,omitempty"`
+	WebSocketEnabled *bool `yaml:"websocket_enabled,omitempty"`
+
 	// MCPConnectSecret enables the secret-bearing MCP connect URL (/mcp/<secret>) when non-empty.
 	MCPConnectSecret *string `yaml:"mcp_connect_secret,omitempty"`
 

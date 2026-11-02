@@ -50,6 +50,15 @@ check WAN_IP_LOOKUP "" true
 check WAN_IP_LOOKUP "<absent>" "<unset>"
 echo "✓ WAN_IP_LOOKUP saves as true unless explicitly false; its checkbox field is dropped"
 
+for key in MCP_ENABLED METRICS_ENABLED WEBSOCKET_ENABLED; do
+    check "$key" true true
+    check "$key" false false
+    check "$key" yes true
+    check "$key" "" true
+    check "$key" "<absent>" "<unset>"
+done
+echo "✓ Endpoint toggles save as true unless explicitly false; their checkbox fields are dropped (#273)"
+
 # Unauthenticated writes: only an explicit "true" turns them on (default off).
 check ALLOW_UNAUTHENTICATED_WRITES true true
 check ALLOW_UNAUTHENTICATED_WRITES false false

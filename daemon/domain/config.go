@@ -65,6 +65,12 @@ type Config struct {
 	// ifconfig.me and icanhazip.com for the public IP. When false only
 	// Unraid's configured WANIP is used (#252).
 	WANIPLookup bool `json:"wan_ip_lookup,omitempty"`
+	// MCPDisabled, MetricsDisabled and WebSocketDisabled turn off /mcp, /metrics
+	// and /api/v1/ws (#273). They are negative so the zero value keeps every
+	// endpoint on.
+	MCPDisabled       bool `json:"mcp_disabled,omitempty"`
+	MetricsDisabled   bool `json:"metrics_disabled,omitempty"`
+	WebSocketDisabled bool `json:"websocket_disabled,omitempty"`
 	// TLSCertFile and TLSKeyFile point at a PEM certificate/key pair. When both
 	// are set the HTTP server (including the /mcp endpoint) is served over HTTPS;
 	// when either is empty the server stays on plain HTTP.
