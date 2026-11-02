@@ -36,6 +36,56 @@ if command -v xmllint >/dev/null 2>&1; then
 else
     echo "SKIP: xmllint not installed; XML validation skipped"
 fi
+# The Plugins page dialog needs unwrapped lines and tight lists (#312).
+normalized() {
+    cp "$PLG" "$work/normalized.plg"
+    bash "$UPDATE" "$version" "$1" "$work/normalized.plg" > /dev/null
+    sed -n '/^<CHANGES>$/,/^<\/CHANGES>$/p' "$work/normalized.plg" | sed '1,3d;$d' \
+        | sed -e 's/&gt;/>/g' -e 's/&lt;/</g' -e 's/&amp;/\&/g'
+}
+# shellcheck disable=SC2016 # literal Markdown backticks, not shell expansions
+{
+    printf 'Intro wrapped\nacross two lines.\n\n### Fixed\n\n'
+    printf -- '- First bullet with `code`\n  wrapped `more` here.\n\n'
+    printf -- '- Second bullet in a loose list\n  - Nested item\n    wrapped too\n\n'
+    printf '  Indented paragraph.\n- Third with a hard break  \n  kept line\\\n  and another\n\n'
+    printf 'Closing paragraph.\n\n| A | B |\n| - | - |\n\n> Quote\n> stays\n\nTitle\n=====\n\n---\n\n'
+    printf '```text\nkeep\n  this  exactly\n\n```\n\n~~~sh\nfirst command\nsecond command\n~~~\n\n'
+    printf '    indented code\n    stays\n\n1. Numbered\n   item\n2) Other\n'
+} > "$work/wrapped"
+# shellcheck disable=SC2016 # literal Markdown backticks, not shell expansions
+{
+    printf 'Intro wrapped across two lines.\n\n### Fixed\n\n'
+    printf -- '- First bullet with `code` wrapped `more` here.\n'
+    printf -- '- Second bullet in a loose list\n  - Nested item wrapped too\n\n'
+    printf '  Indented paragraph.\n- Third with a hard break  \n  kept line\\\n  and another\n\n'
+    printf 'Closing paragraph.\n\n| A | B |\n| - | - |\n\n> Quote\n> stays\n\nTitle\n=====\n\n---\n\n'
+    printf '```text\nkeep\n  this  exactly\n\n```\n\n~~~sh\nfirst command\nsecond command\n~~~\n\n'
+    printf '    indented code\n    stays\n\n1. Numbered item\n2) Other\n'
+} > "$work/want"
+normalized "$work/wrapped" > "$work/got"
+diff "$work/want" "$work/got" >&2 || fail "Notes were not normalized for the Plugins page dialog"
+normalized "$work/got" > "$work/again"
+cmp -s "$work/got" "$work/again" || fail "Normalized notes are not a fixed point"
+
+printf -- '- CRLF bullet\r\n  wrapped line\r\n' > "$work/crlf"
+printf -- '- Bullet\n\n      echo first\n      echo second\n- Next\n' > "$work/list-code"
+printf -- '- Bullet\n\n      echo first\n      echo second\n- Next\n' > "$work/list-code-want"
+normalized "$work/list-code" | diff "$work/list-code-want" - >&2 || fail "Indented code under a bullet was joined"
+printf -- '- Parent\n  - Child\n    ```sh\n    echo one\n    echo two\n    ```\n' > "$work/nested-fence"
+normalized "$work/nested-fence" | diff "$work/nested-fence" - >&2 || fail "A fence under a nested bullet was joined"
+printf '    first code\n    second code\n\nText\n' > "$work/leading-code"
+normalized "$work/leading-code" | diff "$work/leading-code" - >&2 || fail "Leading indented code was joined"
+[ "$(normalized "$work/crlf")" = "- CRLF bullet wrapped line" ] || fail "CRLF notes were not joined cleanly"
+
+# The real notes keep every word, and no blank line sits between two bullets.
+bash "$REPO_ROOT/scripts/extract-release-notes.sh" "$version" "$REPO_ROOT/CHANGELOG.md" > "$work/real"
+normalized "$work/real" > "$work/real-got"
+[ "$(tr -s '[:space:]' '\n' < "$work/real")" = "$(tr -s '[:space:]' '\n' < "$work/real-got")" ] \
+    || fail "Normalizing changed the words in the real notes"
+if awk '/^- / && gap && item { found = 1 } /^$/ { gap = 1; next } { gap = 0; item = /^- / } END { exit !found }' "$work/real-got"; then
+    fail "A blank line remains between bullets in the real notes"
+fi
 cp "$work/updated.plg" "$work/first.plg"
 bash "$UPDATE" "$version" "$work/notes" "$work/updated.plg" > /dev/null
 cmp -s "$work/first.plg" "$work/updated.plg" || fail "Update is not idempotent"

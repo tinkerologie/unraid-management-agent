@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Release notes on the Plugins page no longer break lines mid-sentence or put inline code on separate
+  lines (#312). The `.plg` notes now use unwrapped lines and tight lists; `CHANGELOG.md` and the GitHub
+  release notes are unchanged. This takes effect from the release after 2026.11.00.
+
 ## [2026.11.00] - 2026-11-02
 
 ### Fixed
