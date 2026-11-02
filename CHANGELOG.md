@@ -81,6 +81,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   model-specific interfaces, automatic discovery, implementation phases and validation requirements.
   This documents proposed work; it does not add runtime PSU monitoring.
 
+### Changed
+
+- `GET /api/v1/settings/network-services` now scans `/proc` once per request instead of once per service
+  (#306). The response is unchanged.
+
 ### Security
 
 - Require Go 1.27.3 for builds to include the `crypto/x509` intermediate-certificate distrust

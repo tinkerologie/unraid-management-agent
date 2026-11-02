@@ -1060,32 +1060,78 @@ func TestSettingsCollector_GetNetworkServicesStatus(t *testing.T) {
 	}
 }
 
-func TestSettingsCollector_isServiceRunning(t *testing.T) {
-	collector := NewSettingsCollector()
-
-	// Test with a known running process (init or systemd)
-	tests := []struct {
-		name        string
-		processName string
-		expectFound bool
-	}{
-		{
-			name:        "Non-existent process",
-			processName: "nonexistent_process_12345",
-			expectFound: false,
-		},
-		{
-			name:        "Empty process name",
-			processName: "",
-			expectFound: false,
-		},
+func TestScanProcessNames(t *testing.T) {
+	root := t.TempDir()
+	write := func(entry, comm string) {
+		t.Helper()
+		dir := filepath.Join(root, entry)
+		if err := os.MkdirAll(dir, 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "comm"), []byte(comm), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("1", "sshd\n")
+	write("22", "rpc.nfsd\n")
+	write("33", "\n")
+	write("self", "not-a-pid\n")
+	if err := os.MkdirAll(filepath.Join(root, "44"), 0o750); err != nil { // exited: no comm
+		t.Fatal(err)
 	}
 
+	got := scanProcessNames(root)
+	if len(got) != 2 {
+		t.Errorf("names = %v, want sshd and rpc.nfsd only", got)
+	}
+	if !processRunning(got, "sshd") || !processRunning(got, "nfsd", "rpc.nfsd") {
+		t.Errorf("names = %v, missing a running process", got)
+	}
+	if processRunning(got, "") || processRunning(got, "SSHD") || processRunning(got) {
+		t.Errorf("empty, wrong-case and no-name lookups must be false: %v", got)
+	}
+
+	if names := scanProcessNames(filepath.Join(root, "missing")); len(names) != 0 {
+		t.Errorf("unreadable root = %v, want empty", names)
+	}
+}
+
+func TestGetNetworkServicesStatusScansOnce(t *testing.T) {
+	tests := []struct {
+		name      string
+		processes []string
+		running   func(*dto.NetworkServicesStatus) bool
+		want      bool
+	}{
+		{"running", []string{"smbd"}, func(s *dto.NetworkServicesStatus) bool { return s.SMB.Running }, true},
+		{"stopped", []string{"other"}, func(s *dto.NetworkServicesStatus) bool { return s.SMB.Running }, false},
+		{"nfsd", []string{"nfsd"}, func(s *dto.NetworkServicesStatus) bool { return s.NFS.Running }, true},
+		{"rpc.nfsd alternative", []string{"rpc.nfsd"}, func(s *dto.NetworkServicesStatus) bool { return s.NFS.Running }, true},
+		{"nfs stopped", nil, func(s *dto.NetworkServicesStatus) bool { return s.NFS.Running }, false},
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := collector.isServiceRunning(tt.processName)
-			if result != tt.expectFound {
-				t.Errorf("isServiceRunning(%q) = %v, want %v", tt.processName, result, tt.expectFound)
+			scans := 0
+			c := &SettingsCollector{
+				readFile: func(string) ([]byte, error) { return nil, os.ErrNotExist },
+				listProcessNames: func() map[string]struct{} {
+					scans++
+					names := make(map[string]struct{})
+					for _, p := range tt.processes {
+						names[p] = struct{}{}
+					}
+					return names
+				},
+			}
+			status, err := c.GetNetworkServicesStatus()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if scans != 1 {
+				t.Errorf("scans = %d, want 1", scans)
+			}
+			if got := tt.running(status); got != tt.want {
+				t.Errorf("running = %v, want %v", got, tt.want)
 			}
 		})
 	}
