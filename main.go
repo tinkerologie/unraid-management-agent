@@ -94,6 +94,12 @@ var cli struct {
 	// for URL-only MCP clients (ha-mcp style onboarding) without exposing full REST API access.
 	MCPConnectSecret string `default:"" env:"MCP_CONNECT_SECRET" help:"optional URL-safe secret (>=32 chars) enabling the /mcp/<secret> connect URL without bearer headers"`
 
+	// Endpoint toggles (#273): a disabled endpoint returns 404 and its server,
+	// goroutines and subscriptions do not start.
+	MCPEnabled       bool `name:"mcp-enabled" default:"true" env:"MCP_ENABLED" help:"serve the HTTP MCP endpoint at /mcp (the mcp-stdio command ignores this)"`
+	MetricsEnabled   bool `name:"metrics-enabled" default:"true" env:"METRICS_ENABLED" help:"serve Prometheus metrics at /metrics"`
+	WebSocketEnabled bool `name:"websocket-enabled" default:"true" env:"WEBSOCKET_ENABLED" help:"serve the WebSocket endpoint at /api/v1/ws"`
+
 	// TLS: serve HTTPS (incl. the /mcp endpoint) when both files are provided
 	TLSCertFile string `default:"" env:"TLS_CERT_FILE" help:"path to a PEM TLS certificate file (enables HTTPS when set with --tls-key-file)"`
 	TLSKeyFile  string `default:"" env:"TLS_KEY_FILE" help:"path to a PEM TLS private key file (enables HTTPS when set with --tls-cert-file)"`
@@ -286,6 +292,8 @@ func main() {
 		logger.Info("API authentication enabled: requests require a bearer token (health endpoint and Swagger UI remain open)")
 	}
 
+	mcpSecretDropped := resolveDisabledMCP(cli.MCPEnabled, isStdio, &cli.MCPConnectSecret, os.Stderr)
+
 	// Validate the optional MCP connect secret. An invalid secret disables the
 	// secret connect URL and logs a warning without exposing the secret value,
 	// while keeping the agent and standard /mcp endpoint available.
@@ -456,6 +464,7 @@ func main() {
 	}
 	applyWriteAccess(appCtx, cli.APIToken, cli.AllowUnauthenticatedWrites)
 	applyWANIPLookup(appCtx, cli.WANIPLookup)
+	applyEndpointToggles(appCtx, cli.MCPEnabled || isStdio, cli.MetricsEnabled, cli.WebSocketEnabled, mcpSecretDropped)
 
 	// Warn about insecure MQTT TLS configuration
 	if appCtx.MQTTConfig.InsecureSkipVerify && appCtx.MQTTConfig.Enabled {
@@ -483,6 +492,73 @@ func applyWANIPLookup(appCtx *domain.Context, enabled bool) {
 	if !enabled {
 		logger.Info("WAN IP lookup disabled: network access URLs use only Unraid's configured WANIP")
 	}
+}
+
+// resolveDisabledMCP applies a disabled MCP toggle before the MCP settings are
+// logged and returns whether it dropped the connect secret (#273). HTTP mode
+// clears only the effective secret, so the saved URL works again when MCP is
+// re-enabled. mcp-stdio is an explicit local request for MCP, so it keeps its
+// settings and gets a notice on stderr: stdout carries JSON-RPC.
+func resolveDisabledMCP(enabled, stdio bool, secret *string, stderr io.Writer) bool {
+	if enabled {
+		return false
+	}
+	if stdio {
+		_, _ = fmt.Fprintln(stderr, "NOTICE: mcp_enabled=false applies to the HTTP endpoint; mcp-stdio still runs")
+		return false
+	}
+	dropped := *secret != ""
+	*secret = ""
+	return dropped
+}
+
+// mcpDisabledWarnings returns the startup warnings for MCP-only settings that
+// have no effect while the HTTP MCP endpoint is disabled (#273).
+func mcpDisabledWarnings(secretDropped bool, toolPolicyEntries int) []string {
+	var warnings []string
+	if secretDropped {
+		warnings = append(warnings, "MCP is disabled: ignoring the configured MCP connect secret")
+	}
+	if toolPolicyEntries > 0 {
+		warnings = append(warnings, "MCP is disabled: the configured tool policy has no effect until it is re-enabled")
+	}
+	return warnings
+}
+
+// applyEndpointToggles copies the endpoint toggles into the application context
+// and logs which endpoints are disabled and any MCP settings that have no effect (#273).
+func applyEndpointToggles(appCtx *domain.Context, mcpEnabled, metricsEnabled, webSocketEnabled, mcpSecretDropped bool) {
+	appCtx.MCPDisabled = !mcpEnabled
+	appCtx.MetricsDisabled = !metricsEnabled
+	appCtx.WebSocketDisabled = !webSocketEnabled
+	if line := disabledEndpointsLine(appCtx); line != "" {
+		logger.Info("%s", line)
+	}
+	if mcpEnabled {
+		return
+	}
+	for _, msg := range mcpDisabledWarnings(mcpSecretDropped, len(appCtx.ToolPolicy)) {
+		logger.Warning("%s", msg)
+	}
+}
+
+// disabledEndpointsLine returns the startup line listing disabled endpoints, or
+// "" when all are enabled.
+func disabledEndpointsLine(appCtx *domain.Context) string {
+	var disabled []string
+	if appCtx.MCPDisabled {
+		disabled = append(disabled, "/mcp")
+	}
+	if appCtx.MetricsDisabled {
+		disabled = append(disabled, "/metrics")
+	}
+	if appCtx.WebSocketDisabled {
+		disabled = append(disabled, "/api/v1/ws")
+	}
+	if len(disabled) == 0 {
+		return ""
+	}
+	return "Disabled endpoints: " + strings.Join(disabled, ", ")
 }
 
 // writeAccessWarning returns the startup warning for an empty API token, or ""
@@ -750,6 +826,9 @@ func applyFileConfig(cfg *domain.FileConfig) {
 	setStr(&cli.MCPConnectSecret, cfg.MCPConnectSecret)
 	setBool(&cli.AllowUnauthenticatedWrites, cfg.AllowUnauthenticatedWrites)
 	setBool(&cli.WANIPLookup, cfg.WANIPLookup)
+	setBool(&cli.MCPEnabled, cfg.MCPEnabled)
+	setBool(&cli.MetricsEnabled, cfg.MetricsEnabled)
+	setBool(&cli.WebSocketEnabled, cfg.WebSocketEnabled)
 	setStr(&cli.TLSCertFile, cfg.TLSCertFile)
 	setStr(&cli.TLSKeyFile, cfg.TLSKeyFile)
 

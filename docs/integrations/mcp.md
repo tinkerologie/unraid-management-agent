@@ -79,6 +79,9 @@ Set `MCP_CONNECT_SECRET` (32–256 characters of `[A-Za-z0-9_-]`) in the Unraid 
 
 > **Security Note:** `MCP_CONNECT_SECRET` authenticates `/mcp/<connect-secret>` only and is not equivalent to `API_TOKEN` (it never grants access to `/api/v1/*` REST routes). Because the secret is embedded in the URL path, it acts as a reusable credential that may be recorded by client configurations or intermediaries and transmitted in cleartext over plain HTTP. Use HTTPS (`TLS_CERT_FILE` / `TLS_KEY_FILE` or a TLS-terminating reverse proxy) for remote connections, and enable `READ_ONLY=true` (or per-tool policies) unless connected AI agents should be allowed to invoke state-changing tools.
 
+`/mcp` returns 404 when `mcp_enabled` is false. See
+[Endpoint toggles](../guides/configuration.md#endpoint-toggles-rest-only-mode).
+
 #### Option 2: Standard Bearer Token Header (`Authorization: Bearer <token>`)
 
 Clients that support custom HTTP headers can connect to `/mcp` with `Authorization: Bearer <API_TOKEN>`:
@@ -1006,6 +1009,19 @@ It is started via the `mcp-stdio` CLI subcommand:
 - **Collectors run internally** — the STDIO process starts its own data collectors so all tools return live data
 - **Graceful shutdown** — responds to SIGTERM/SIGINT with full collector cleanup
 - **Designed for process spawning** — MCP clients like Claude Desktop launch the process and manage its lifecycle
+
+## Open WebUI
+
+Add the agent to Open WebUI as an MCP server, following the
+[Open WebUI documentation](https://docs.openwebui.com/) for its menus and settings. The agent needs:
+
+- **Transport:** Streamable HTTP.
+- **URL:** one that the Open WebUI server can reach, which may differ from the one your browser uses
+  when Open WebUI runs in a container. Use HTTPS when traffic leaves a trusted network.
+- **Authentication:** set `API_TOKEN`, which is what protects `/mcp` and REST. Then send
+  `Authorization: Bearer <token>`, or for a client that takes only a URL, use `/mcp/<connect-secret>`
+  with `MCP_CONNECT_SECRET`. The connect secret authenticates only that URL: without `API_TOKEN`, `/mcp`
+  and REST stay readable without authentication.
 
 ## Client Compatibility Matrix
 

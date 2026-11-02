@@ -29,6 +29,8 @@ sanitize_csv() { echo "$1" | tr -cd 'a-zA-Z0-9,_-'; }
 sanitize_str() { echo "$1" | tr -d "'\"\`\$\\\\"; }
 # Validate boolean: only "true" passes, everything else is "false"
 sanitize_bool() { [ "$1" = "true" ] && echo "true" || echo "false"; }
+# Validate an opt-out boolean: only "false" passes, everything else is "true"
+sanitize_opt_out() { [ "$1" = "false" ] && echo "false" || echo "true"; }
 
 # ── Set defaults ──────────────────────────────────────────────
 PORT="${PORT:-8043}"
@@ -36,6 +38,9 @@ BIND_ADDRESS="${BIND_ADDRESS:-}"
 READ_ONLY="${READ_ONLY:-false}"
 ALLOW_UNAUTHENTICATED_WRITES="${ALLOW_UNAUTHENTICATED_WRITES:-false}"
 WAN_IP_LOOKUP="${WAN_IP_LOOKUP:-true}"
+MCP_ENABLED="${MCP_ENABLED:-true}"
+METRICS_ENABLED="${METRICS_ENABLED:-true}"
+WEBSOCKET_ENABLED="${WEBSOCKET_ENABLED:-true}"
 API_TOKEN="${API_TOKEN:-}"
 MCP_CONNECT_SECRET="${MCP_CONNECT_SECRET:-}"
 MCP_CONNECT_SECRET_DISABLED="${MCP_CONNECT_SECRET_DISABLED:-false}"
@@ -89,6 +94,9 @@ BIND_ADDRESS=$(echo "$BIND_ADDRESS" | tr -cd '0-9a-fA-F.:')
 READ_ONLY=$(sanitize_bool "$READ_ONLY")
 ALLOW_UNAUTHENTICATED_WRITES=$(sanitize_bool "$ALLOW_UNAUTHENTICATED_WRITES")
 WAN_IP_LOOKUP=$(sanitize_bool "$WAN_IP_LOOKUP")
+MCP_ENABLED=$(sanitize_opt_out "$MCP_ENABLED")
+METRICS_ENABLED=$(sanitize_opt_out "$METRICS_ENABLED")
+WEBSOCKET_ENABLED=$(sanitize_opt_out "$WEBSOCKET_ENABLED")
 MCP_CONNECT_SECRET=$(echo "$MCP_CONNECT_SECRET" | tr -cd 'A-Za-z0-9_-')
 MCP_CONNECT_SECRET_DISABLED=$(sanitize_bool "$MCP_CONNECT_SECRET_DISABLED")
 if [ "$MCP_CONNECT_SECRET_DISABLED" != "true" ] && [ "${#MCP_CONNECT_SECRET}" -lt 32 ]; then
@@ -180,6 +188,9 @@ nohup env \
   READ_ONLY="$READ_ONLY" \
   ALLOW_UNAUTHENTICATED_WRITES="$ALLOW_UNAUTHENTICATED_WRITES" \
   WAN_IP_LOOKUP="$WAN_IP_LOOKUP" \
+  MCP_ENABLED="$MCP_ENABLED" \
+  METRICS_ENABLED="$METRICS_ENABLED" \
+  WEBSOCKET_ENABLED="$WEBSOCKET_ENABLED" \
   API_TOKEN="$API_TOKEN" \
   MCP_CONNECT_SECRET="$MCP_CONNECT_SECRET" \
   TOOL_POLICY="$TOOL_POLICY" \

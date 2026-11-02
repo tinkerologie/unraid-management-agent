@@ -148,6 +148,19 @@ for var in "${INTERVALS[@]}"; do
 done
 echo "✓ configured intervals, including 0 (Disabled), reach the daemon unchanged"
 
+# Endpoint toggles (#273): only an exact "false" disables an endpoint.
+for var in MCP_ENABLED METRICS_ENABLED WEBSOCKET_ENABLED; do
+    for pair in "<absent>:true" "true:true" "false:false" "yes:true" ":true"; do
+        value=${pair%%:*}
+        want=${pair##*:}
+        cfg='PORT="8043"'
+        [ "$value" = "<absent>" ] || cfg+=$'\n'"$var=\"$value\""
+        got=$(unset "$var"; run_start "$cfg" "$var")
+        [ "$got" = "$want" ] || fail "$var='$value': daemon got '$got', want '$want'"
+    done
+done
+echo "✓ endpoint toggles reach the daemon as true unless explicitly false"
+
 # Invalid: non-digits are stripped before the value reaches the daemon.
 got=$(run_start $'PORT="8043"\nINTERVAL_FAN_CONTROL="15s"\nINTERVAL_MOVER="30;reboot"' INTERVAL_FAN_CONTROL INTERVAL_MOVER | paste -sd, -)
 [ "$got" = "15,30" ] || fail "invalid intervals: daemon got '$got', want '15,30'"

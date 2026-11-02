@@ -426,6 +426,22 @@ chmod +x /tmp/diagnostic-bundle.sh
 /tmp/diagnostic-bundle.sh
 ```
 
+## Measure High CPU Usage
+
+Sample the agent for a few minutes, because collectors run on different schedules. `top` shows the agent
+itself, not the commands it runs, so also watch for short-lived tools such as `smartctl`:
+
+```bash
+# Agent CPU, sampled every 10 seconds for 5 minutes
+top -b -d 10 -n 30 | grep unraid-management-agent
+
+# What each collector is doing and how often it runs
+curl -s -H "Authorization: Bearer YOUR_TOKEN" http://localhost:8043/api/v1/collectors/status
+```
+
+Change one thing at a time, then measure again. See
+[Where CPU usage comes from](../guides/configuration.md#where-cpu-usage-comes-from).
+
 ## Next Steps
 
 - [Common Issues](common-issues.md) - Solutions to frequent problems

@@ -78,6 +78,7 @@ type Service struct {
 	bindAddress string
 	tlsEnabled  bool
 	authEnabled bool
+	mcpDisabled bool
 
 	mu     sync.Mutex
 	server advertiser
@@ -102,6 +103,12 @@ func NewService(config domain.DiscoveryConfig, hostname string, port int, versio
 		bindAddress: bindAddress,
 		tlsEnabled:  tlsEnabled,
 	}
+}
+
+// SetMCPDisabled stops advertising MCP, whose endpoint is off (#273). Call it
+// before Start.
+func (s *Service) SetMCPDisabled(disabled bool) {
+	s.mcpDisabled = disabled
 }
 
 // SetAuthEnabled configures whether the agent requires bearer authentication
@@ -132,15 +139,20 @@ func (s *Service) txtRecords() []string {
 	if s.authEnabled {
 		mcpAuth = "bearer"
 	}
-	return []string{
+	records := []string{
 		"version=" + s.version,
 		"path=/api/v1",
 		"name=" + s.hostname,
 		"scheme=" + scheme,
+	}
+	if s.mcpDisabled {
+		return records
+	}
+	return append(records,
 		"mcp_path=/mcp",
 		"mcp_transport=streamable-http",
-		"mcp_auth=" + mcpAuth,
-	}
+		"mcp_auth="+mcpAuth,
+	)
 }
 
 // Start registers the mDNS service on one LAN interface with one address.

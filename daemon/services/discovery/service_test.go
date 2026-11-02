@@ -79,6 +79,20 @@ func TestInstanceName(t *testing.T) {
 	}
 }
 
+func TestTxtRecordsOmitMCPWhenDisabled(t *testing.T) {
+	s := NewService(domain.DiscoveryConfig{}, "tower", 8043, "1.0", "", false)
+	s.SetMCPDisabled(true)
+	got := s.txtRecords()
+	for _, rec := range got {
+		if strings.HasPrefix(rec, "mcp_") {
+			t.Errorf("txtRecords() = %v, must not advertise MCP", got)
+		}
+	}
+	if !slices.Contains(got, "path=/api/v1") {
+		t.Errorf("txtRecords() = %v, want the REST path", got)
+	}
+}
+
 func TestTxtRecords(t *testing.T) {
 	tests := []struct {
 		name        string

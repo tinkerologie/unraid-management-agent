@@ -25,6 +25,9 @@ log_level: debug
 read_only: true
 allow_unauthenticated_writes: true
 wan_ip_lookup: false
+mcp_enabled: false
+metrics_enabled: false
+websocket_enabled: false
 collection_mode: dynamic
 tool_policy:
   container_start: ask
@@ -63,6 +66,15 @@ intervals:
 		}
 		if cfg.WANIPLookup == nil || *cfg.WANIPLookup {
 			t.Errorf("WANIPLookup = %v, want explicit false", cfg.WANIPLookup)
+		}
+		if cfg.MCPEnabled == nil || *cfg.MCPEnabled {
+			t.Errorf("MCPEnabled = %v, want explicit false", cfg.MCPEnabled)
+		}
+		if cfg.MetricsEnabled == nil || *cfg.MetricsEnabled {
+			t.Errorf("MetricsEnabled = %v, want explicit false", cfg.MetricsEnabled)
+		}
+		if cfg.WebSocketEnabled == nil || *cfg.WebSocketEnabled {
+			t.Errorf("WebSocketEnabled = %v, want explicit false", cfg.WebSocketEnabled)
 		}
 		if cfg.CollectionMode == nil || *cfg.CollectionMode != CollectionModeDynamic {
 			t.Errorf("CollectionMode = %v, want dynamic", cfg.CollectionMode)

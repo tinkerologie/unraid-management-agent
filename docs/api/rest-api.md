@@ -4087,7 +4087,9 @@ curl http://192.168.20.21:8043/api/v1/health/report
 
 ### WebSocket /ws
 
-Real-time event stream.
+Real-time event stream. Set `websocket_enabled: false` to turn it off; it then returns 404. See
+[Endpoint toggles](../guides/configuration.md#endpoint-toggles-rest-only-mode). For how fresh other
+endpoints' data is, see [Cached REST reads](../guides/configuration.md#cached-rest-reads).
 
 **URL**: `ws://YOUR_UNRAID_IP:8043/api/v1/ws`
 

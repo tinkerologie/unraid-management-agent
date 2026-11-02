@@ -39,4 +39,8 @@ module.exports = async () => {
     ['COLLECTION_MODE="dynamic"', 'INTERVAL_SYSTEM="30"', 'INTERVAL_DOCKER="10"', 'INTERVAL_MOVER="120"', ''].join('\n'),
   );
   render('page-dynamic.html', dynamic);
+
+  const endpointsOff = path.join(out, 'config-endpoints-off.cfg');
+  fs.writeFileSync(endpointsOff, 'MCP_ENABLED="false"\nMETRICS_ENABLED="false"\nWEBSOCKET_ENABLED="false"\n');
+  render('page-endpoints-off.html', endpointsOff);
 };

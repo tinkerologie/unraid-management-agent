@@ -10,6 +10,9 @@ The agent exposes **41 metrics** in Prometheus format at the `/metrics` endpoint
 **Format**: Prometheus text format  
 **Update Frequency**: Real-time (current cached values)
 
+Set `metrics_enabled: false` to turn this endpoint off; it then returns 404. See
+[Endpoint toggles](../guides/configuration.md#endpoint-toggles-rest-only-mode).
+
 ## Scraping Configuration
 
 ### Prometheus Config
