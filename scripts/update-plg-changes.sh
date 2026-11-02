@@ -40,7 +40,7 @@ delimiters() {
 normalize_for_dialog() {
     awk '
         function emit() { if (text != "") print text; text = "" }
-        function block_start() { emit(); if (blanks) print ""; blanks = 0; listing = 0 }
+        function block_start() { emit(); if (blanks) print ""; blanks = 0; listing = 0; verbatim = 0 }
 
         { sub(/\r$/, "") }
         fence != "" {
@@ -68,6 +68,7 @@ normalize_for_dialog() {
             emit()
             if (blanks && !listing) print ""
             blanks = 0
+            verbatim = 0
             listing = 1
             text = $0
             next
@@ -81,10 +82,13 @@ normalize_for_dialog() {
         }
         {
             emit()
+            indented = ($0 ~ /^[[:space:]]/)
+            # An indented block after a blank line may be code, so it stays as it is.
+            verbatim = indented && (blanks || verbatim)
             if (blanks) print ""
             blanks = 0
-            if ($0 !~ /^[[:space:]]/) listing = 0
-            if (!listing && $0 ~ /^(    |\t)/) { print; next } # an indented code block
+            if (!indented) listing = 0
+            if (verbatim) { print; next }
             text = $0
         }
         END { emit() }

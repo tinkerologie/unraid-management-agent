@@ -69,6 +69,9 @@ normalized "$work/got" > "$work/again"
 cmp -s "$work/got" "$work/again" || fail "Normalized notes are not a fixed point"
 
 printf -- '- CRLF bullet\r\n  wrapped line\r\n' > "$work/crlf"
+printf -- '- Bullet\n\n      echo first\n      echo second\n- Next\n' > "$work/list-code"
+printf -- '- Bullet\n\n      echo first\n      echo second\n- Next\n' > "$work/list-code-want"
+normalized "$work/list-code" | diff "$work/list-code-want" - >&2 || fail "Indented code under a bullet was joined"
 [ "$(normalized "$work/crlf")" = "- CRLF bullet wrapped line" ] || fail "CRLF notes were not joined cleanly"
 
 # The real notes keep every word, and no blank line sits between two bullets.
@@ -78,9 +81,6 @@ normalized "$work/real" > "$work/real-got"
     || fail "Normalizing changed the words in the real notes"
 if awk '/^- / && gap && item { found = 1 } /^$/ { gap = 1; next } { gap = 0; item = /^- / } END { exit !found }' "$work/real-got"; then
     fail "A blank line remains between bullets in the real notes"
-fi
-if grep -qE '^  [^ -]' "$work/real-got"; then
-    fail "A wrapped bullet line remains in the real notes"
 fi
 cp "$work/updated.plg" "$work/first.plg"
 bash "$UPDATE" "$version" "$work/notes" "$work/updated.plg" > /dev/null
