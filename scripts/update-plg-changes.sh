@@ -32,6 +32,71 @@ delimiters() {
     ' "$1"
 }
 
+# Fit the notes to the Plugins page dialog (#312). It renders them inside a
+# <pre>, which keeps every line break, and its <p> is display:flex, which puts
+# each inline code span on its own line. So join wrapped lines and keep lists
+# tight, because a blank line around a bullet makes Markdown wrap it in <p>.
+# Code fences, tables and headings pass through unchanged.
+normalize_for_dialog() {
+    python3 - "$1" <<'NORMALIZE'
+import re
+import sys
+
+ITEM = re.compile(r"\s*([-*+]|\d+\.)\s")
+out, current = [], None
+blank = listing = fenced = False
+
+
+def emit():
+    global current
+    if current is not None:
+        out.append(current)
+    current = None
+
+
+def start_block():
+    global blank, listing
+    emit()
+    if blank:
+        out.append("")
+    blank = listing = False
+
+
+with open(sys.argv[1], encoding="utf-8") as notes:
+    for line in notes.read().splitlines():
+        if line.lstrip().startswith("```"):
+            start_block()
+            out.append(line)
+            fenced = not fenced
+        elif fenced:
+            out.append(line)
+        elif not line.strip():
+            if not listing:
+                emit()
+            blank = True
+        elif line.startswith("#") or line.lstrip().startswith("|"):
+            start_block()
+            out.append(line)
+        elif ITEM.match(line):
+            emit()
+            if blank and not listing:
+                out.append("")
+            blank, listing = False, True
+            current = line
+        elif listing and (not blank or line[0].isspace()):
+            # Text under a bullet, including an indented paragraph after a blank line.
+            current = f"{current} {line.strip()}"
+            blank = False
+        elif not listing and not blank and current is not None:
+            current = f"{current} {line.strip()}"
+        else:
+            start_block()
+            current = line
+emit()
+print("\n".join(out))
+NORMALIZE
+}
+
 [[ "$version" =~ ^[0-9A-Za-z.+-]+$ ]] || fail "Invalid release version: '$version'"
 [ -f "$plg" ] || fail "PLG not found: $plg"
 [ -f "$notes" ] || fail "Notes file not found: $notes"
@@ -55,9 +120,10 @@ awk '
     }
 ' "$notes" > "$work/notes"
 [ -s "$work/notes" ] || fail "Release notes are empty"
+normalize_for_dialog "$work/notes" > "$work/normalized"
 {
     printf '### %s\n\n' "$version"
-    cat "$work/notes"
+    cat "$work/normalized"
 } > "$work/expected"
 sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' "$work/expected" > "$work/escaped"
 {

@@ -36,6 +36,67 @@ if command -v xmllint >/dev/null 2>&1; then
 else
     echo "SKIP: xmllint not installed; XML validation skipped"
 fi
+# The Plugins page dialog needs unwrapped lines and tight lists (#312).
+cat > "$work/wrapped" <<'EOF'
+Intro wrapped
+across two lines.
+
+### Fixed
+
+- First bullet with `code`
+  wrapped `more` here.
+
+- Second bullet in a loose list
+  - Nested item
+    wrapped too
+
+  Indented paragraph.
+- Third bullet
+
+Closing paragraph.
+
+| A | B |
+| - | - |
+
+```text
+keep
+  this  exactly
+
+```
+
+1. Numbered
+   item
+EOF
+cp "$PLG" "$work/wrapped.plg"
+bash "$UPDATE" "$version" "$work/wrapped" "$work/wrapped.plg" > /dev/null
+sed -n '/^<CHANGES>$/,/^<\/CHANGES>$/p' "$work/wrapped.plg" | sed '1,3d;$d' > "$work/got"
+cat > "$work/want" <<'EOF'
+Intro wrapped across two lines.
+
+### Fixed
+
+- First bullet with `code` wrapped `more` here.
+- Second bullet in a loose list
+  - Nested item wrapped too Indented paragraph.
+- Third bullet
+
+Closing paragraph.
+
+| A | B |
+| - | - |
+
+```text
+keep
+  this  exactly
+
+```
+
+1. Numbered item
+EOF
+diff "$work/want" "$work/got" >&2 || fail "Notes were not normalized for the Plugins page dialog"
+cp "$work/wrapped.plg" "$work/wrapped-first.plg"
+bash "$UPDATE" "$version" "$work/wrapped" "$work/wrapped.plg" > /dev/null
+cmp -s "$work/wrapped-first.plg" "$work/wrapped.plg" || fail "Normalized update is not idempotent"
 cp "$work/updated.plg" "$work/first.plg"
 bash "$UPDATE" "$version" "$work/notes" "$work/updated.plg" > /dev/null
 cmp -s "$work/first.plg" "$work/updated.plg" || fail "Update is not idempotent"
