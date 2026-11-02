@@ -72,6 +72,10 @@ printf -- '- CRLF bullet\r\n  wrapped line\r\n' > "$work/crlf"
 printf -- '- Bullet\n\n      echo first\n      echo second\n- Next\n' > "$work/list-code"
 printf -- '- Bullet\n\n      echo first\n      echo second\n- Next\n' > "$work/list-code-want"
 normalized "$work/list-code" | diff "$work/list-code-want" - >&2 || fail "Indented code under a bullet was joined"
+printf -- '- Parent\n  - Child\n    ```sh\n    echo one\n    echo two\n    ```\n' > "$work/nested-fence"
+normalized "$work/nested-fence" | diff "$work/nested-fence" - >&2 || fail "A fence under a nested bullet was joined"
+printf '    first code\n    second code\n\nText\n' > "$work/leading-code"
+normalized "$work/leading-code" | diff "$work/leading-code" - >&2 || fail "Leading indented code was joined"
 [ "$(normalized "$work/crlf")" = "- CRLF bullet wrapped line" ] || fail "CRLF notes were not joined cleanly"
 
 # The real notes keep every word, and no blank line sits between two bullets.
