@@ -11,9 +11,21 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 	"github.com/tinkerologie/unraid-management-agent/daemon/platform"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/api"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/mcp"
 )
 
-func TestInitializeHTTPMCP(t *testing.T) {
+// newInitializedMCP sets up an MCP server the way Orchestrator.Run does.
+func newInitializedMCP(t *testing.T, ctx *domain.Context, srv *api.Server, store *domain.ToolPolicyStore) *mcp.Server {
+	t.Helper()
+	server := mcp.NewServer(ctx, srv)
+	server.SetToolPolicyStore(store)
+	if err := server.Initialize(); err != nil {
+		t.Fatal(err)
+	}
+	return server
+}
+
+func TestMountHTTPMCP(t *testing.T) {
 	secret := strings.Repeat("s", 32)
 	build := func(t *testing.T, disabled bool) (*Orchestrator, *api.Server, *domain.ToolPolicyStore) {
 		t.Helper()
@@ -35,9 +47,7 @@ func TestInitializeHTTPMCP(t *testing.T) {
 
 	t.Run("disabled mounts nothing but keeps the tool catalog", func(t *testing.T) {
 		o, srv, store := build(t, true)
-		if got := o.initializeHTTPMCP(srv, store); got == nil {
-			t.Fatal("the MCP server must still exist for the shared services")
-		}
+		o.mountHTTPMCP(srv, newInitializedMCP(t, o.ctx, srv, store))
 		for _, p := range paths {
 			if code := status(srv, p); code != http.StatusNotFound {
 				t.Errorf("%s returned %d, want 404", p, code)
@@ -50,7 +60,7 @@ func TestInitializeHTTPMCP(t *testing.T) {
 
 	t.Run("enabled mounts the routes", func(t *testing.T) {
 		o, srv, store := build(t, false)
-		o.initializeHTTPMCP(srv, store)
+		o.mountHTTPMCP(srv, newInitializedMCP(t, o.ctx, srv, store))
 		for _, p := range paths {
 			if code := status(srv, p); code == http.StatusNotFound {
 				t.Errorf("%s returned 404, want it mounted", p)
@@ -71,7 +81,7 @@ func TestDisabledMCPKeepsSavedToolPolicies(t *testing.T) {
 	t.Cleanup(srv.Stop)
 	store := domain.NewToolPolicyStore(t.TempDir(), map[string]domain.ToolPolicyValue{"system_reboot": "hidden"})
 	srv.SetToolPolicyStore(store)
-	CreateOrchestrator(ctx).initializeHTTPMCP(srv, store)
+	CreateOrchestrator(ctx).mountHTTPMCP(srv, newInitializedMCP(t, ctx, srv, store))
 
 	w := httptest.NewRecorder()
 	srv.GetRouter().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/mcp/tool-policy", nil))

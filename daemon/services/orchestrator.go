@@ -106,7 +106,14 @@ func (o *Orchestrator) Run() error {
 	}
 	apiServer.SetToolPolicyStore(toolPolicyStore)
 
-	mcpServer := o.initializeHTTPMCP(apiServer, toolPolicyStore)
+	mcpServer := mcp.NewServer(o.ctx, apiServer)
+	mcpServer.SetToolPolicyStore(toolPolicyStore)
+	mcpServer.SetNetworkWriteLock(o.ctx.WritesLocked())
+	if err := mcpServer.Initialize(); err != nil {
+		logger.Error("Failed to initialize MCP server: %v", err)
+	} else {
+		o.mountHTTPMCP(apiServer, mcpServer)
+	}
 
 	// Initialize alerting engine
 	alertStore := alerting.NewStore("")
@@ -263,26 +270,21 @@ func (o *Orchestrator) Run() error {
 	return nil
 }
 
-// initializeHTTPMCP builds the MCP server and, unless MCP is disabled, mounts it
-// (#273). A disabled server is still initialized: that starts no background
-// work, and it fills the tool catalog the settings page reads, so saved tool
-// policies stay editable and are not overwritten.
-func (o *Orchestrator) initializeHTTPMCP(apiServer *api.Server, toolPolicyStore *domain.ToolPolicyStore) *mcp.Server {
-	mcpServer := mcp.NewServer(o.ctx, apiServer)
-	mcpServer.SetToolPolicyStore(toolPolicyStore)
-	mcpServer.SetNetworkWriteLock(o.ctx.WritesLocked())
-	if err := mcpServer.Initialize(); err != nil {
-		logger.Error("Failed to initialize MCP server: %v", err)
-	} else if !o.ctx.MCPDisabled {
-		// Mount exact /mcp, /mcp/, and optional /mcp/<secret> routes on the stateful StreamableHTTPHandler
-		apiServer.RegisterMCPRoutes(mcpServer.GetHTTPHandler())
-		if o.ctx.MCPConnectSecret != "" {
-			logger.Success("MCP server initialized at /mcp and /mcp/<redacted> (official SDK, per-session protocol negotiation: 2026-07-28, 2025-11-25, 2025-06-18, 2025-03-26, 2024-11-05)")
-		} else {
-			logger.Success("MCP server initialized at /mcp endpoint (official SDK, per-session protocol negotiation: 2026-07-28, 2025-11-25, 2025-06-18, 2025-03-26, 2024-11-05)")
-		}
+// mountHTTPMCP serves the MCP server over HTTP unless MCP is disabled (#273). A
+// disabled server is still initialized: that starts no background work, and it
+// fills the tool catalog the settings page reads, so saved tool policies stay
+// editable and are not overwritten.
+func (o *Orchestrator) mountHTTPMCP(apiServer *api.Server, mcpServer *mcp.Server) {
+	if o.ctx.MCPDisabled {
+		return
 	}
-	return mcpServer
+	// Mount exact /mcp, /mcp/, and optional /mcp/<secret> routes on the stateful StreamableHTTPHandler
+	apiServer.RegisterMCPRoutes(mcpServer.GetHTTPHandler())
+	if o.ctx.MCPConnectSecret != "" {
+		logger.Success("MCP server initialized at /mcp and /mcp/<redacted> (official SDK, per-session protocol negotiation: 2026-07-28, 2025-11-25, 2025-06-18, 2025-03-26, 2024-11-05)")
+	} else {
+		logger.Success("MCP server initialized at /mcp endpoint (official SDK, per-session protocol negotiation: 2026-07-28, 2025-11-25, 2025-06-18, 2025-03-26, 2024-11-05)")
+	}
 }
 
 // startedMessage returns the startup line for the API server.

@@ -713,7 +713,7 @@ func TestApplyEndpointToggles(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			appCtx := &domain.Context{}
-			applyEndpointToggles(appCtx, tt.mcp, tt.metrics, tt.ws)
+			applyEndpointToggles(appCtx, tt.mcp, tt.metrics, tt.ws, true)
 			if appCtx.MCPDisabled == tt.mcp || appCtx.MetricsDisabled == tt.metrics || appCtx.WebSocketDisabled == tt.ws {
 				t.Errorf("context = %v %v %v for enabled %v %v %v", appCtx.MCPDisabled, appCtx.MetricsDisabled, appCtx.WebSocketDisabled, tt.mcp, tt.metrics, tt.ws)
 			}
@@ -722,10 +722,4 @@ func TestApplyEndpointToggles(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestLogMCPDisabledWarnings(t *testing.T) {
-	// Only exercises both paths; the text is covered by TestMCPDisabledWarnings.
-	logMCPDisabledWarnings(true, true, 1)
-	logMCPDisabledWarnings(false, true, 1)
 }
