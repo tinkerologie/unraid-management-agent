@@ -112,9 +112,7 @@ func (o *Orchestrator) Run() error {
 	alertStore := alerting.NewStore("")
 	alertEngine := alerting.NewEngine(alertStore, apiServer)
 	apiServer.SetAlertEngine(alertEngine, alertStore)
-	if mcpServer != nil {
-		mcpServer.SetAlertEngine(alertEngine, alertStore)
-	}
+	mcpServer.SetAlertEngine(alertEngine, alertStore)
 	// Set the event bus before launching Start so the goroutine's publishWake
 	// reads of the hub field don't race with a later SetEventBus write.
 	// Publishing to agent_wake with no subscriber (agent disabled) is a no-op.
@@ -135,9 +133,7 @@ func (o *Orchestrator) Run() error {
 	watchdogRunner := watchdog.NewRunner(watchdogStore)
 	watchdog.SetDockerProvider(apiServer)
 	apiServer.SetWatchdog(watchdogRunner, watchdogStore)
-	if mcpServer != nil {
-		mcpServer.SetWatchdog(watchdogRunner, watchdogStore)
-	}
+	mcpServer.SetWatchdog(watchdogRunner, watchdogStore)
 	// Set the event bus before launching Start to avoid racing with a later
 	// SetEventBus write. No-op publish if the agent is disabled.
 	watchdogRunner.SetEventBus(o.ctx.Hub)
@@ -163,9 +159,7 @@ func (o *Orchestrator) Run() error {
 			o.agentDocker = agentDocker
 			apiServer.SetAgent(agentSvc)
 			agentSvc.SetEventBus(o.ctx.Hub)
-			if mcpServer != nil {
-				mcpServer.SetAgent(agentSvc)
-			}
+			mcpServer.SetAgent(agentSvc)
 			wg.Go(func() {
 				defer func() {
 					if r := recover(); r != nil {
@@ -185,9 +179,7 @@ func (o *Orchestrator) Run() error {
 	} else {
 		o.fanController = fanCtrl
 		apiServer.SetFanController(fanCtrl)
-		if mcpServer != nil {
-			mcpServer.SetFanController(fanCtrl)
-		}
+		mcpServer.SetFanController(fanCtrl)
 		logger.Success("Fan controller initialized")
 	}
 
@@ -198,9 +190,7 @@ func (o *Orchestrator) Run() error {
 	} else {
 		o.cpuController = cpuCtrl
 		apiServer.SetCPUController(cpuCtrl)
-		if mcpServer != nil {
-			mcpServer.SetCPUController(cpuCtrl)
-		}
+		mcpServer.SetCPUController(cpuCtrl)
 		logger.Success("CPU controller initialized")
 	}
 
@@ -211,9 +201,7 @@ func (o *Orchestrator) Run() error {
 	} else {
 		o.tuningController = tuningCtrl
 		apiServer.SetTuningController(tuningCtrl)
-		if mcpServer != nil {
-			mcpServer.SetTuningController(tuningCtrl)
-		}
+		mcpServer.SetTuningController(tuningCtrl)
 		logger.Success("Tuning controller initialized")
 	}
 
@@ -260,11 +248,7 @@ func (o *Orchestrator) Run() error {
 	if o.ctx.TLSEnabled() {
 		scheme = "https"
 	}
-	if mcpServer != nil {
-		logger.Success("API server started on %s port %d (MCP endpoint: %s://<host>:%d/mcp)", scheme, o.ctx.Port, scheme, o.ctx.Port)
-	} else {
-		logger.Success("API server started on %s port %d", scheme, o.ctx.Port)
-	}
+	logger.Success("%s", o.startedMessage(scheme))
 	logger.Success("Agent startup complete")
 
 	// Wait for shutdown signal
@@ -279,18 +263,17 @@ func (o *Orchestrator) Run() error {
 	return nil
 }
 
-// initializeHTTPMCP builds and mounts the HTTP MCP server. It returns nil, with
-// nothing built or mounted, when MCP is disabled (#273).
+// initializeHTTPMCP builds the MCP server and, unless MCP is disabled, mounts it
+// (#273). A disabled server is still initialized: that starts no background
+// work, and it fills the tool catalog the settings page reads, so saved tool
+// policies stay editable and are not overwritten.
 func (o *Orchestrator) initializeHTTPMCP(apiServer *api.Server, toolPolicyStore *domain.ToolPolicyStore) *mcp.Server {
-	if o.ctx.MCPDisabled {
-		return nil
-	}
 	mcpServer := mcp.NewServer(o.ctx, apiServer)
 	mcpServer.SetToolPolicyStore(toolPolicyStore)
 	mcpServer.SetNetworkWriteLock(o.ctx.WritesLocked())
 	if err := mcpServer.Initialize(); err != nil {
 		logger.Error("Failed to initialize MCP server: %v", err)
-	} else {
+	} else if !o.ctx.MCPDisabled {
 		// Mount exact /mcp, /mcp/, and optional /mcp/<secret> routes on the stateful StreamableHTTPHandler
 		apiServer.RegisterMCPRoutes(mcpServer.GetHTTPHandler())
 		if o.ctx.MCPConnectSecret != "" {
@@ -300,6 +283,14 @@ func (o *Orchestrator) initializeHTTPMCP(apiServer *api.Server, toolPolicyStore 
 		}
 	}
 	return mcpServer
+}
+
+// startedMessage returns the startup line for the API server.
+func (o *Orchestrator) startedMessage(scheme string) string {
+	if o.ctx.MCPDisabled {
+		return fmt.Sprintf("API server started on %s port %d", scheme, o.ctx.Port)
+	}
+	return fmt.Sprintf("API server started on %s port %d (MCP endpoint: %s://<host>:%d/mcp)", scheme, o.ctx.Port, scheme, o.ctx.Port)
 }
 
 // applyAlertFloors keeps, in Dynamic mode, the collectors enabled alert

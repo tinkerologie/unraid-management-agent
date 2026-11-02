@@ -1018,9 +1018,10 @@ Add the agent to Open WebUI as an MCP server, following the
 - **Transport:** Streamable HTTP.
 - **URL:** one that the Open WebUI server can reach, which may differ from the one your browser uses
   when Open WebUI runs in a container. Use HTTPS when traffic leaves a trusted network.
-- **Authentication:** set `API_TOKEN` and send `Authorization: Bearer <token>`, or for a client that
-  takes only a URL, use `/mcp/<connect-secret>` with `MCP_CONNECT_SECRET`. The connect secret does not
-  authenticate REST.
+- **Authentication:** set `API_TOKEN`, which is what protects `/mcp` and REST. Then send
+  `Authorization: Bearer <token>`, or for a client that takes only a URL, use `/mcp/<connect-secret>`
+  with `MCP_CONNECT_SECRET`. The connect secret authenticates only that URL: without `API_TOKEN`, `/mcp`
+  and REST stay readable without authentication.
 
 ## Client Compatibility Matrix
 

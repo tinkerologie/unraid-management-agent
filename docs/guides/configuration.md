@@ -49,11 +49,12 @@ All three endpoints are on by default. Turn off the ones you do not use:
 The plugin settings page has a switch for each, under **Endpoints**. Precedence is the usual
 CLI flag > non-empty environment variable > `config.yml` > default.
 
-A disabled endpoint returns 404, and the startup log lists it. Its work does not start either: no MCP
-server, or no WebSocket hub and broadcast subscription. The cache that REST reads from keeps running.
+A disabled endpoint returns 404, and the startup log lists it. It does no background work either: MCP
+serves no routes, and WebSocket starts no hub or broadcast subscription. The cache that REST reads from keeps running.
 
 - **MCP-only settings:** with MCP off, a configured `mcp_connect_secret` or tool policy has no effect
   and the agent logs a warning. Saved values are kept, so they work again when you turn MCP back on.
+  You can still edit tool policies on the settings page.
 - **`mcp-stdio`:** this command is an explicit local request for MCP, so it ignores `mcp_enabled` and
   writes a notice to stderr.
 - **Home Assistant:** the integration uses WebSocket for live updates.

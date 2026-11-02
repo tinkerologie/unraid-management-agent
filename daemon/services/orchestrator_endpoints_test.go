@@ -1,12 +1,14 @@
 package services
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 	"github.com/tinkerologie/unraid-management-agent/daemon/platform"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/api"
 )
@@ -31,27 +33,68 @@ func TestInitializeHTTPMCP(t *testing.T) {
 		return w.Code
 	}
 
-	t.Run("disabled returns nil and mounts nothing", func(t *testing.T) {
+	t.Run("disabled mounts nothing but keeps the tool catalog", func(t *testing.T) {
 		o, srv, store := build(t, true)
-		if got := o.initializeHTTPMCP(srv, store); got != nil {
-			t.Fatal("the MCP server must not be built while disabled")
+		if got := o.initializeHTTPMCP(srv, store); got == nil {
+			t.Fatal("the MCP server must still exist for the shared services")
 		}
 		for _, p := range paths {
 			if code := status(srv, p); code != http.StatusNotFound {
 				t.Errorf("%s returned %d, want 404", p, code)
 			}
 		}
+		if len(store.GetCatalog(false)) == 0 {
+			t.Error("the tool catalog must stay filled, or Apply on the settings page erases saved policies")
+		}
 	})
 
 	t.Run("enabled mounts the routes", func(t *testing.T) {
 		o, srv, store := build(t, false)
-		if got := o.initializeHTTPMCP(srv, store); got == nil {
-			t.Fatal("the MCP server must be built while enabled")
-		}
+		o.initializeHTTPMCP(srv, store)
 		for _, p := range paths {
 			if code := status(srv, p); code == http.StatusNotFound {
 				t.Errorf("%s returned 404, want it mounted", p)
 			}
 		}
 	})
+}
+
+// The settings page rewrites tool_policy.json from this response, so saved
+// policies must survive while MCP is disabled.
+func TestDisabledMCPKeepsSavedToolPolicies(t *testing.T) {
+	ctx := &domain.Context{
+		Hub:      domain.NewEventBus(10),
+		Platform: platform.NewRegistry(),
+		Config:   domain.Config{MCPDisabled: true},
+	}
+	srv := api.NewServer(ctx)
+	t.Cleanup(srv.Stop)
+	store := domain.NewToolPolicyStore(t.TempDir(), map[string]domain.ToolPolicyValue{"system_reboot": "hidden"})
+	srv.SetToolPolicyStore(store)
+	CreateOrchestrator(ctx).initializeHTTPMCP(srv, store)
+
+	w := httptest.NewRecorder()
+	srv.GetRouter().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/mcp/tool-policy", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("tool policy returned %d", w.Code)
+	}
+	var got dto.MCPToolPolicyResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Policies["system_reboot"] != "hidden" {
+		t.Errorf("policies = %v, want the saved system_reboot=hidden", got.Policies)
+	}
+	if len(got.Tools) == 0 {
+		t.Error("the tool list must not be empty")
+	}
+}
+
+func TestStartedMessage(t *testing.T) {
+	for _, disabled := range []bool{false, true} {
+		o := CreateOrchestrator(&domain.Context{Config: domain.Config{Port: 8043, MCPDisabled: disabled}})
+		if got := strings.Contains(o.startedMessage("http"), "/mcp"); got == disabled {
+			t.Errorf("MCPDisabled=%v: message %q", disabled, o.startedMessage("http"))
+		}
+	}
 }

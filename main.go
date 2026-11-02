@@ -465,11 +465,7 @@ func main() {
 	applyWriteAccess(appCtx, cli.APIToken, cli.AllowUnauthenticatedWrites)
 	applyWANIPLookup(appCtx, cli.WANIPLookup)
 	applyEndpointToggles(appCtx, cli.MCPEnabled || isStdio, cli.MetricsEnabled, cli.WebSocketEnabled)
-	if !cli.MCPEnabled && !isStdio {
-		for _, msg := range mcpDisabledWarnings(mcpSecretDropped, len(toolPolicy)) {
-			logger.Warning("%s", msg)
-		}
-	}
+	logMCPDisabledWarnings(cli.MCPEnabled || isStdio, mcpSecretDropped, len(toolPolicy))
 
 	// Warn about insecure MQTT TLS configuration
 	if appCtx.MQTTConfig.InsecureSkipVerify && appCtx.MQTTConfig.Enabled {
@@ -525,9 +521,19 @@ func mcpDisabledWarnings(secretDropped bool, toolPolicyEntries int) []string {
 		warnings = append(warnings, "MCP is disabled: ignoring the configured MCP connect secret")
 	}
 	if toolPolicyEntries > 0 {
-		warnings = append(warnings, "MCP is disabled: the configured tool policy has no effect")
+		warnings = append(warnings, "MCP is disabled: the configured tool policy has no effect until it is re-enabled")
 	}
 	return warnings
+}
+
+// logMCPDisabledWarnings logs mcpDisabledWarnings while the HTTP endpoint is off.
+func logMCPDisabledWarnings(mcpEnabled, secretDropped bool, toolPolicyEntries int) {
+	if mcpEnabled {
+		return
+	}
+	for _, msg := range mcpDisabledWarnings(secretDropped, toolPolicyEntries) {
+		logger.Warning("%s", msg)
+	}
 }
 
 // applyEndpointToggles copies the endpoint toggles into the application context

@@ -723,3 +723,9 @@ func TestApplyEndpointToggles(t *testing.T) {
 		})
 	}
 }
+
+func TestLogMCPDisabledWarnings(t *testing.T) {
+	// Only exercises both paths; the text is covered by TestMCPDisabledWarnings.
+	logMCPDisabledWarnings(true, true, 1)
+	logMCPDisabledWarnings(false, true, 1)
+}

@@ -556,7 +556,7 @@ _(MCP endpoint)_:
   <input type="hidden" name="MCP_ENABLED" id="mcp_enabled_val" value="<?= $mcp_enabled ?>">
 
 <blockquote class="inline_help">
-Serves AI clients at <code>/mcp</code>. When off, <code>/mcp</code> returns 404; the connect URL and tool policy have no effect, and are kept for when you turn it back on.
+Serves AI clients at <code>/mcp</code>. When off, <code>/mcp</code> returns 404; the connect URL and tool policy have no effect, and are kept for when you turn it back on. You can still edit tool policies.
 </blockquote>
 
 _(Prometheus metrics)_:
