@@ -37,6 +37,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Endpoint toggles** (#273) — `mcp_enabled`, `metrics_enabled` and `websocket_enabled`, each
+  available as a CLI flag, an environment variable, a `config.yml` key and a switch on the plugin
+  settings page. All default to on. A disabled endpoint returns 404 and its server, goroutines and
+  subscriptions do not start, so the agent can run as REST only. These switches limit exposure; they
+  are unlikely to lower CPU usage much.
 - Shared read-only PSU collector with exact-ID auto-detection for Corsair RMi/HXi USB PSUs
   through the kernel `corsairpsu` hwmon interface (part of #61). Includes hardware gating,
   independent hotplug inventory, Dynamic/Manual configuration and plugin settings, explicit

@@ -167,6 +167,8 @@ to `/boot/config/plugins/unraid-management-agent/config.cfg`. Clicking **Apply**
 Longer intervals use less power. Every option, the `config.yml` file and command-line flags are covered
 in the [Configuration Guide](docs/guides/configuration.md).
 
+To run the agent as REST only, see [Endpoint toggles](docs/guides/configuration.md#endpoint-toggles-rest-only-mode).
+
 ## Integrations
 
 | Integration                          | How                                                                                                                                                                                 |

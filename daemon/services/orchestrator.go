@@ -106,26 +106,15 @@ func (o *Orchestrator) Run() error {
 	}
 	apiServer.SetToolPolicyStore(toolPolicyStore)
 
-	mcpServer := mcp.NewServer(o.ctx, apiServer)
-	mcpServer.SetToolPolicyStore(toolPolicyStore)
-	mcpServer.SetNetworkWriteLock(o.ctx.WritesLocked())
-	if err := mcpServer.Initialize(); err != nil {
-		logger.Error("Failed to initialize MCP server: %v", err)
-	} else {
-		// Mount exact /mcp, /mcp/, and optional /mcp/<secret> routes on the stateful StreamableHTTPHandler
-		apiServer.RegisterMCPRoutes(mcpServer.GetHTTPHandler())
-		if o.ctx.MCPConnectSecret != "" {
-			logger.Success("MCP server initialized at /mcp and /mcp/<redacted> (official SDK, per-session protocol negotiation: 2026-07-28, 2025-11-25, 2025-06-18, 2025-03-26, 2024-11-05)")
-		} else {
-			logger.Success("MCP server initialized at /mcp endpoint (official SDK, per-session protocol negotiation: 2026-07-28, 2025-11-25, 2025-06-18, 2025-03-26, 2024-11-05)")
-		}
-	}
+	mcpServer := o.initializeHTTPMCP(apiServer, toolPolicyStore)
 
 	// Initialize alerting engine
 	alertStore := alerting.NewStore("")
 	alertEngine := alerting.NewEngine(alertStore, apiServer)
 	apiServer.SetAlertEngine(alertEngine, alertStore)
-	mcpServer.SetAlertEngine(alertEngine, alertStore)
+	if mcpServer != nil {
+		mcpServer.SetAlertEngine(alertEngine, alertStore)
+	}
 	// Set the event bus before launching Start so the goroutine's publishWake
 	// reads of the hub field don't race with a later SetEventBus write.
 	// Publishing to agent_wake with no subscriber (agent disabled) is a no-op.
@@ -146,7 +135,9 @@ func (o *Orchestrator) Run() error {
 	watchdogRunner := watchdog.NewRunner(watchdogStore)
 	watchdog.SetDockerProvider(apiServer)
 	apiServer.SetWatchdog(watchdogRunner, watchdogStore)
-	mcpServer.SetWatchdog(watchdogRunner, watchdogStore)
+	if mcpServer != nil {
+		mcpServer.SetWatchdog(watchdogRunner, watchdogStore)
+	}
 	// Set the event bus before launching Start to avoid racing with a later
 	// SetEventBus write. No-op publish if the agent is disabled.
 	watchdogRunner.SetEventBus(o.ctx.Hub)
@@ -172,7 +163,9 @@ func (o *Orchestrator) Run() error {
 			o.agentDocker = agentDocker
 			apiServer.SetAgent(agentSvc)
 			agentSvc.SetEventBus(o.ctx.Hub)
-			mcpServer.SetAgent(agentSvc)
+			if mcpServer != nil {
+				mcpServer.SetAgent(agentSvc)
+			}
 			wg.Go(func() {
 				defer func() {
 					if r := recover(); r != nil {
@@ -192,7 +185,9 @@ func (o *Orchestrator) Run() error {
 	} else {
 		o.fanController = fanCtrl
 		apiServer.SetFanController(fanCtrl)
-		mcpServer.SetFanController(fanCtrl)
+		if mcpServer != nil {
+			mcpServer.SetFanController(fanCtrl)
+		}
 		logger.Success("Fan controller initialized")
 	}
 
@@ -203,7 +198,9 @@ func (o *Orchestrator) Run() error {
 	} else {
 		o.cpuController = cpuCtrl
 		apiServer.SetCPUController(cpuCtrl)
-		mcpServer.SetCPUController(cpuCtrl)
+		if mcpServer != nil {
+			mcpServer.SetCPUController(cpuCtrl)
+		}
 		logger.Success("CPU controller initialized")
 	}
 
@@ -214,7 +211,9 @@ func (o *Orchestrator) Run() error {
 	} else {
 		o.tuningController = tuningCtrl
 		apiServer.SetTuningController(tuningCtrl)
-		mcpServer.SetTuningController(tuningCtrl)
+		if mcpServer != nil {
+			mcpServer.SetTuningController(tuningCtrl)
+		}
 		logger.Success("Tuning controller initialized")
 	}
 
@@ -261,7 +260,11 @@ func (o *Orchestrator) Run() error {
 	if o.ctx.TLSEnabled() {
 		scheme = "https"
 	}
-	logger.Success("API server started on %s port %d (MCP endpoint: %s://<host>:%d/mcp)", scheme, o.ctx.Port, scheme, o.ctx.Port)
+	if mcpServer != nil {
+		logger.Success("API server started on %s port %d (MCP endpoint: %s://<host>:%d/mcp)", scheme, o.ctx.Port, scheme, o.ctx.Port)
+	} else {
+		logger.Success("API server started on %s port %d", scheme, o.ctx.Port)
+	}
 	logger.Success("Agent startup complete")
 
 	// Wait for shutdown signal
@@ -274,6 +277,29 @@ func (o *Orchestrator) Run() error {
 	o.shutdown(apiServer, &wg)
 
 	return nil
+}
+
+// initializeHTTPMCP builds and mounts the HTTP MCP server. It returns nil, with
+// nothing built or mounted, when MCP is disabled (#273).
+func (o *Orchestrator) initializeHTTPMCP(apiServer *api.Server, toolPolicyStore *domain.ToolPolicyStore) *mcp.Server {
+	if o.ctx.MCPDisabled {
+		return nil
+	}
+	mcpServer := mcp.NewServer(o.ctx, apiServer)
+	mcpServer.SetToolPolicyStore(toolPolicyStore)
+	mcpServer.SetNetworkWriteLock(o.ctx.WritesLocked())
+	if err := mcpServer.Initialize(); err != nil {
+		logger.Error("Failed to initialize MCP server: %v", err)
+	} else {
+		// Mount exact /mcp, /mcp/, and optional /mcp/<secret> routes on the stateful StreamableHTTPHandler
+		apiServer.RegisterMCPRoutes(mcpServer.GetHTTPHandler())
+		if o.ctx.MCPConnectSecret != "" {
+			logger.Success("MCP server initialized at /mcp and /mcp/<redacted> (official SDK, per-session protocol negotiation: 2026-07-28, 2025-11-25, 2025-06-18, 2025-03-26, 2024-11-05)")
+		} else {
+			logger.Success("MCP server initialized at /mcp endpoint (official SDK, per-session protocol negotiation: 2026-07-28, 2025-11-25, 2025-06-18, 2025-03-26, 2024-11-05)")
+		}
+	}
+	return mcpServer
 }
 
 // applyAlertFloors keeps, in Dynamic mode, the collectors enabled alert

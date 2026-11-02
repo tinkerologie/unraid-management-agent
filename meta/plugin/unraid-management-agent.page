@@ -31,6 +31,9 @@ $tls_cert_file = $config['TLS_CERT_FILE'] ?? '';
 $tls_key_file = $config['TLS_KEY_FILE'] ?? '';
 $read_only = $config['READ_ONLY'] ?? 'false';
 $wan_ip_lookup = (trim((string)($config['WAN_IP_LOOKUP'] ?? 'true'), "'\"") === 'false') ? 'false' : 'true';
+$mcp_enabled = (trim((string)($config['MCP_ENABLED'] ?? 'true'), "'\"") === 'false') ? 'false' : 'true';
+$metrics_enabled = (trim((string)($config['METRICS_ENABLED'] ?? 'true'), "'\"") === 'false') ? 'false' : 'true';
+$websocket_enabled = (trim((string)($config['WEBSOCKET_ENABLED'] ?? 'true'), "'\"") === 'false') ? 'false' : 'true';
 $allow_unauth_writes = (trim((string)($config['ALLOW_UNAUTHENTICATED_WRITES'] ?? 'false'), "'\"") === 'true') ? 'true' : 'false';
 $log_level = $config['LOG_LEVEL'] ?? 'info';
 $show_all_collectors = (trim((string)($config['SHOW_ALL_COLLECTORS'] ?? 'false'), "'\"") === 'true') ? 'true' : 'false';
@@ -486,8 +489,12 @@ function intervalOptions($selected, $type = 'standard', $auto = false) {
     ?>
     <div id="uma-endpoints" class="uma-endpoints" style="display: <?= $running ? 'block' : 'none' ?>;">
         <p><strong>API Endpoint:</strong> <?= $http_scheme ?>://<?= $addr_esc ?>:<?= $port_esc ?>/api/v1</p>
+<?php if ($websocket_enabled === 'true'): ?>
         <p><strong>WebSocket:</strong> <?= $ws_scheme ?>://<?= $addr_esc ?>:<?= $port_esc ?>/api/v1/ws</p>
+<?php endif; ?>
+<?php if ($mcp_enabled === 'true'): ?>
         <p><strong>MCP Endpoint:</strong> <span id="uma-mcp-endpoint-url"><?= $http_scheme ?>://<?= $addr_esc ?>:<?= $port_esc ?>/mcp</span></p>
+<?php endif; ?>
     </div>
 
     <div style="margin-top: 10px;">
@@ -537,6 +544,45 @@ _(WAN IP Lookup)_:
 When network access URLs are requested, the agent asks api.ipify.org, ifconfig.me and icanhazip.com, in that order,
 for this server's public (WAN) IP; those services see the server's public IP address. Turn this off to make no
 such requests: the WAN entry then uses the <code>WANIP</code> value from Unraid's network settings, if one is set.
+</blockquote>
+
+<div class="title"><span class="left"><i class="title fa fa-plug"></i>Endpoints</span></div>
+
+_(MCP endpoint)_:
+: <label class="uma-toggle-switch">
+    <input type="checkbox" name="MCP_ENABLED_CB" id="mcp_enabled" <?= ($mcp_enabled === 'true') ? 'checked' : '' ?> onchange="updateEndpointToggle('mcp_enabled')">
+    <span class="uma-toggle-slider"></span>
+  </label>
+  <input type="hidden" name="MCP_ENABLED" id="mcp_enabled_val" value="<?= $mcp_enabled ?>">
+
+<blockquote class="inline_help">
+Serves AI clients at <code>/mcp</code>. When off, <code>/mcp</code> returns 404; the connect URL and tool policy have no effect, and are kept for when you turn it back on.
+</blockquote>
+
+_(Prometheus metrics)_:
+: <label class="uma-toggle-switch">
+    <input type="checkbox" name="METRICS_ENABLED_CB" id="metrics_enabled" <?= ($metrics_enabled === 'true') ? 'checked' : '' ?> onchange="updateEndpointToggle('metrics_enabled')">
+    <span class="uma-toggle-slider"></span>
+  </label>
+  <input type="hidden" name="METRICS_ENABLED" id="metrics_enabled_val" value="<?= $metrics_enabled ?>">
+
+<blockquote class="inline_help">
+Serves <code>/metrics</code>. When off, it returns 404.
+</blockquote>
+
+_(WebSocket)_:
+: <label class="uma-toggle-switch">
+    <input type="checkbox" name="WEBSOCKET_ENABLED_CB" id="websocket_enabled" <?= ($websocket_enabled === 'true') ? 'checked' : '' ?> onchange="updateEndpointToggle('websocket_enabled')">
+    <span class="uma-toggle-slider"></span>
+  </label>
+  <input type="hidden" name="WEBSOCKET_ENABLED" id="websocket_enabled_val" value="<?= $websocket_enabled ?>">
+
+<blockquote class="inline_help">
+Serves live events at <code>/api/v1/ws</code>. When off, it returns 404. Clients that use WebSocket, such as the Home Assistant integration, lose live updates.
+</blockquote>
+
+<blockquote class="inline_help">
+These switches limit what the agent exposes. They are unlikely to lower CPU usage much, because these endpoints only do work while a client uses them. Collectors do most of the background work.
 </blockquote>
 
 <div class="title"><span class="left"><i class="title fa fa-key"></i>Authentication</span></div>
@@ -1132,6 +1178,10 @@ function noTokenPlaceholder() {
 function updateWanIpLookup() {
     var enabled = document.getElementById('wan_ip_lookup').checked;
     document.getElementById('wan_ip_lookup_val').value = enabled ? 'true' : 'false';
+}
+
+function updateEndpointToggle(id) {
+    document.getElementById(id + '_val').value = document.getElementById(id).checked ? 'true' : 'false';
 }
 
 function updateAllowUnauthWrites() {

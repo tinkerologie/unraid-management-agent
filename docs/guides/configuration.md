@@ -36,6 +36,31 @@ This file is created automatically after the first installation and persists acr
 | `--discovery-enabled`            | `true`   | Advertise the agent via mDNS for auto-discovery                                                                                                                        |
 | `--discovery-service-name`       | -        | Override the advertised mDNS instance name                                                                                                                             |
 
+### Endpoint toggles (REST-only mode)
+
+All three endpoints are on by default. Turn off the ones you do not use:
+
+| `config.yml` key    | Environment variable | CLI flag              | Default | Endpoint     |
+| ------------------- | -------------------- | --------------------- | ------- | ------------ |
+| `mcp_enabled`       | `MCP_ENABLED`        | `--mcp-enabled`       | `true`  | `/mcp*`      |
+| `metrics_enabled`   | `METRICS_ENABLED`    | `--metrics-enabled`   | `true`  | `/metrics`   |
+| `websocket_enabled` | `WEBSOCKET_ENABLED`  | `--websocket-enabled` | `true`  | `/api/v1/ws` |
+
+The plugin settings page has a switch for each, under **Endpoints**. Precedence is the usual
+CLI flag > non-empty environment variable > `config.yml` > default.
+
+A disabled endpoint returns 404, and the startup log lists it. Its work does not start either: no MCP
+server, or no WebSocket hub and broadcast subscription. The cache that REST reads from keeps running.
+
+- **MCP-only settings:** with MCP off, a configured `mcp_connect_secret` or tool policy has no effect
+  and the agent logs a warning. Saved values are kept, so they work again when you turn MCP back on.
+- **`mcp-stdio`:** this command is an explicit local request for MCP, so it ignores `mcp_enabled` and
+  writes a notice to stderr.
+- **Home Assistant:** the integration uses WebSocket for live updates.
+
+These toggles limit what the agent exposes. See [Where CPU usage comes from](#where-cpu-usage-comes-from)
+before using them to lower CPU usage.
+
 ### Collection Mode
 
 `--collection-mode` (env `COLLECTION_MODE`, `collection_mode` in `config.yml`) chooses who
@@ -573,13 +598,29 @@ dependency on the official Unraid API).
 
 ## Performance Tuning
 
-### CPU Impact
+### Where CPU usage comes from
 
-Collection intervals affect CPU usage:
+Collectors do most of the agent's background work, and CPU usage depends on your hardware and on how
+many disks, containers and VMs you have. Shorter intervals mean more work, so measure before and after
+a change ([how](../troubleshooting/diagnostics.md#measure-high-cpu-usage)).
 
-- **1-5 second intervals**: ~2-5% CPU usage
-- **10-30 second intervals**: ~1-2% CPU usage (recommended)
-- **60+ second intervals**: <1% CPU usage
+- **Dynamic mode** runs collectors on change events and when their data is used, with slow polling
+  otherwise. See [Collection Mode](#collection-mode).
+- **In Manual mode, intervals decide the load.** The plugin and the standalone daemon ship different
+  default intervals.
+- **`disable_collectors`** (`UNRAID_DISABLE_COLLECTORS`) turns off any collector except `system`.
+- **`low_power_mode`** multiplies positive intervals by four.
+- **No switch:** the alerting engine, the watchdog runner, the fan, CPU and tuning controllers, and the
+  capability refresher always run.
+- **Endpoint toggles** probably change little, because `/metrics`, MCP and WebSocket only do work while
+  a client uses them.
+
+### Cached REST reads
+
+Most REST endpoints return the cache the collectors fill, so collection intervals apply to the API. In
+Dynamic mode, a read of data older than its limit can also trigger one shared refresh first. REST
+responses carry `X-Cache-Updated-At`, and `X-Cache-Stale: true` when a refresh failed or was late. Some
+endpoints, such as `GET /api/v1/docker/{id}/size`, call a controller on each request instead.
 
 ### Memory Usage
 

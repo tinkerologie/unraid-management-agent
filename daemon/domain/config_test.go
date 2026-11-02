@@ -204,6 +204,13 @@ func TestContextFields(t *testing.T) {
 	}
 }
 
+func TestContextEndpointTogglesDefaultOn(t *testing.T) {
+	ctx := Context{}
+	if ctx.MCPDisabled || ctx.MetricsDisabled || ctx.WebSocketDisabled {
+		t.Errorf("zero-value context disables endpoints: %v %v %v", ctx.MCPDisabled, ctx.MetricsDisabled, ctx.WebSocketDisabled)
+	}
+}
+
 func TestConfigWritesLocked(t *testing.T) {
 	tests := []struct {
 		name     string
