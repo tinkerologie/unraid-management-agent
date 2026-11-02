@@ -64,6 +64,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **MCP tool policy panel** (#307) — an **All → Hidden** button, so you can hide every tool and then
+  re-enable only the ones you want. Tool descriptions now show in full, without hovering.
 - **Endpoint toggles** (#273) — `mcp_enabled`, `metrics_enabled` and `websocket_enabled`, each
   available as a CLI flag, an environment variable, a `config.yml` key and a switch on the plugin
   settings page. All default to on. A disabled endpoint returns 404 and does no background work, so

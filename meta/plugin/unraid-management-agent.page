@@ -733,6 +733,7 @@ Configure granular access policies for individual MCP tools. Available policies:
     <div style="display:flex; gap:6px; align-items:center;">
       <input type="button" value="All Write &rarr; Ask" onclick="bulkSetPolicy('write', 'ask')">
       <input type="button" value="All Write &rarr; Read-Only" onclick="bulkSetPolicy('write', 'read_only')">
+      <input type="button" value="All &rarr; Hidden" onclick="bulkSetPolicy('all', 'hidden')">
       <input type="button" value="Reset All" onclick="bulkSetPolicy('all', 'default')">
     </div>
   </div>
@@ -1600,7 +1601,7 @@ function renderToolPolicyTable() {
         html += '<td style="padding:6px 10px; font-family:monospace; font-weight:bold;">' + umaEscapeHtml(t.name) + '</td>';
         html += '<td style="padding:6px 10px; color:gray;">' + umaEscapeHtml(t.category || 'General') + '</td>';
         html += '<td style="padding:6px 10px;">' + typeBadge + '</td>';
-        html += '<td style="padding:6px 10px; font-size:11px; color:inherit; max-width:300px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="' + umaEscapeHtml(t.description || '') + '">' + umaEscapeHtml(t.description || '') + '</td>';
+        html += '<td style="padding:6px 10px; font-size:11px; color:inherit; white-space:normal; overflow-wrap:anywhere;" title="' + umaEscapeHtml(t.description || '') + '">' + umaEscapeHtml(t.description || '') + '</td>';
         html += '<td style="padding:6px 10px; text-align:right;">';
         html += '<select class="uma-policy-select' + (isCustom ? ' is-custom' : '') + '" onchange="onToolPolicyChange(\'' + umaEscapeHtml(t.name) + '\', this.value)">';
 
