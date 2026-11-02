@@ -568,6 +568,7 @@ func (o *Orchestrator) initializeDiscovery(ctx context.Context) {
 
 	svc := discovery.NewService(o.ctx.DiscoveryConfig, hostname, o.ctx.Port, o.ctx.Version, o.ctx.BindAddress, o.ctx.TLSEnabled())
 	svc.SetAuthEnabled(o.ctx.APIToken != "")
+	svc.SetMCPDisabled(o.ctx.MCPDisabled)
 	if err := svc.Start(ctx); err != nil {
 		logger.Warning("Discovery service disabled: %v", err)
 		return

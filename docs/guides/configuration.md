@@ -55,6 +55,7 @@ serves no routes, and WebSocket starts no hub or broadcast subscription. The cac
 - **MCP-only settings:** with MCP off, a configured `mcp_connect_secret` or tool policy has no effect
   and the agent logs a warning. Saved values are kept, so they work again when you turn MCP back on.
   You can still edit tool policies on the settings page.
+  mDNS discovery stops advertising MCP too.
 - **`mcp-stdio`:** this command is an explicit local request for MCP, so it ignores `mcp_enabled` and
   writes a notice to stderr.
 - **Home Assistant:** the integration uses WebSocket for live updates.
