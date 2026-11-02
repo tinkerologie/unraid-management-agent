@@ -32,6 +32,70 @@ delimiters() {
     ' "$1"
 }
 
+# Fit the notes to the Plugins page dialog (#312). It renders them inside a
+# <pre>, which keeps every line break, and its <p> is display:flex, which puts
+# each inline code span on its own line. So join wrapped lines and keep lists
+# tight, because a blank line around a bullet makes Markdown wrap it in <p>.
+# Only plain paragraph lines join; every other line type is kept as it is.
+normalize_for_dialog() {
+    awk '
+        function emit() { if (text != "") print text; text = "" }
+        function block_start() { emit(); if (blanks) print ""; blanks = 0; listing = 0; verbatim = 0 }
+
+        BEGIN { verbatim = 1 } # an indented first line may be code
+        { sub(/\r$/, "") }
+        fence != "" {
+            print
+            if ($0 ~ ("^[[:space:]]*" fence fence fence)) fence = ""
+            next
+        }
+        /^[[:space:]]*(```|~~~)/ {
+            block_start()
+            print
+            line = $0
+            sub(/^[[:space:]]+/, "", line)
+            fence = substr(line, 1, 1)
+            next
+        }
+        /^[[:space:]]*$/ { emit(); blanks = 1; next }
+        /^ {0,3}#/ || /^ {0,3}>/ || /^[[:space:]]*\|/ { block_start(); print; next }
+        # Thematic breaks and setext underlines.
+        /^ {0,3}(-[ -]*-[ -]*-[ -]*|_[ _]*_[ _]*_[ _]*|\*[ *]*\*[ *]*\*[ *]*|=+|-+)[[:space:]]*$/ {
+            block_start()
+            print
+            next
+        }
+        /^[[:space:]]*([-*+]|[0-9]+[.)])[[:space:]]/ {
+            emit()
+            if (blanks && !listing) print ""
+            blanks = 0
+            verbatim = 0
+            listing = 1
+            text = $0
+            next
+        }
+        # Only a plain continuation joins, and never across a hard break.
+        !blanks && text != "" && text !~ /(  |\\)$/ {
+            line = $0
+            sub(/^[[:space:]]+/, "", line)
+            text = text " " line
+            next
+        }
+        {
+            emit()
+            indented = ($0 ~ /^[[:space:]]/)
+            # An indented block after a blank line may be code, so it stays as it is.
+            verbatim = indented && (blanks || verbatim)
+            if (blanks) print ""
+            blanks = 0
+            if (!indented) listing = 0
+            if (verbatim) { print; next }
+            text = $0
+        }
+        END { emit() }
+    ' "$1"
+}
+
 [[ "$version" =~ ^[0-9A-Za-z.+-]+$ ]] || fail "Invalid release version: '$version'"
 [ -f "$plg" ] || fail "PLG not found: $plg"
 [ -f "$notes" ] || fail "Notes file not found: $notes"
@@ -55,9 +119,10 @@ awk '
     }
 ' "$notes" > "$work/notes"
 [ -s "$work/notes" ] || fail "Release notes are empty"
+normalize_for_dialog "$work/notes" > "$work/normalized"
 {
     printf '### %s\n\n' "$version"
-    cat "$work/notes"
+    cat "$work/normalized"
 } > "$work/expected"
 sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' "$work/expected" > "$work/escaped"
 {
