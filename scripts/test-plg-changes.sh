@@ -68,6 +68,9 @@ diff "$work/want" "$work/got" >&2 || fail "Notes were not normalized for the Plu
 normalized "$work/got" > "$work/again"
 cmp -s "$work/got" "$work/again" || fail "Normalized notes are not a fixed point"
 
+printf -- '- CRLF bullet\r\n  wrapped line\r\n' > "$work/crlf"
+[ "$(normalized "$work/crlf")" = "- CRLF bullet wrapped line" ] || fail "CRLF notes were not joined cleanly"
+
 # The real notes keep every word, and no blank line sits between two bullets.
 bash "$REPO_ROOT/scripts/extract-release-notes.sh" "$version" "$REPO_ROOT/CHANGELOG.md" > "$work/real"
 normalized "$work/real" > "$work/real-got"

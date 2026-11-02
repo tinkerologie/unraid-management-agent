@@ -42,6 +42,7 @@ normalize_for_dialog() {
         function emit() { if (text != "") print text; text = "" }
         function block_start() { emit(); if (blanks) print ""; blanks = 0; listing = 0 }
 
+        { sub(/\r$/, "") }
         fence != "" {
             print
             if ($0 ~ ("^ {0,3}" fence fence fence)) fence = ""
