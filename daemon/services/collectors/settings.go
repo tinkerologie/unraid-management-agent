@@ -24,6 +24,9 @@ type SettingsCollector struct {
 	// readFile reads /etc/inetd.conf and the /proc/net/tcp tables for the FTP
 	// status. Nil means os.ReadFile; tests inject a fake.
 	readFile func(name string) ([]byte, error)
+	// listProcessNames returns the names of the running processes. Nil means
+	// scanning /proc; tests inject a fake.
+	listProcessNames func() map[string]struct{}
 }
 
 // NewSettingsCollector creates a new settings collector
@@ -811,11 +814,17 @@ func (c *SettingsCollector) GetNetworkServicesStatus() (*dto.NetworkServicesStat
 	// Merge settings (var.ini takes precedence as it's runtime state)
 	mergedSettings := c.mergeNetworkSettings(varIniSettings, identSettings, tipsSettings)
 
+	listProcesses := c.listProcessNames
+	if listProcesses == nil {
+		listProcesses = func() map[string]struct{} { return scanProcessNames("/proc") }
+	}
+	processes := listProcesses()
+
 	// SMB (Samba)
 	status.SMB = dto.NetworkServiceInfo{
 		Name:        "SMB",
 		Enabled:     mergedSettings["shareSMBEnabled"] == "yes",
-		Running:     c.isServiceRunning("smbd"),
+		Running:     processRunning(processes, "smbd"),
 		Port:        445,
 		Description: "Windows/SMB file sharing",
 	}
@@ -824,7 +833,7 @@ func (c *SettingsCollector) GetNetworkServicesStatus() (*dto.NetworkServicesStat
 	status.NFS = dto.NetworkServiceInfo{
 		Name:        "NFS",
 		Enabled:     mergedSettings["shareNFSEnabled"] == "yes",
-		Running:     c.isServiceRunning("nfsd") || c.isServiceRunning("rpc.nfsd"),
+		Running:     processRunning(processes, "nfsd", "rpc.nfsd"),
 		Port:        2049,
 		Description: "NFS file sharing",
 	}
@@ -833,7 +842,7 @@ func (c *SettingsCollector) GetNetworkServicesStatus() (*dto.NetworkServicesStat
 	status.AFP = dto.NetworkServiceInfo{
 		Name:        "AFP",
 		Enabled:     false, // AFP is deprecated, rarely used
-		Running:     c.isServiceRunning("netatalk") || c.isServiceRunning("afpd"),
+		Running:     processRunning(processes, "netatalk", "afpd"),
 		Port:        548,
 		Description: "Apple Filing Protocol (legacy)",
 	}
@@ -863,7 +872,7 @@ func (c *SettingsCollector) GetNetworkServicesStatus() (*dto.NetworkServicesStat
 	status.SSH = dto.NetworkServiceInfo{
 		Name:        "SSH",
 		Enabled:     mergedSettings["USE_SSH"] == "yes",
-		Running:     c.isServiceRunning("sshd"),
+		Running:     processRunning(processes, "sshd"),
 		Port:        sshPort,
 		Description: "Secure Shell remote access",
 	}
@@ -876,7 +885,7 @@ func (c *SettingsCollector) GetNetworkServicesStatus() (*dto.NetworkServicesStat
 	status.Telnet = dto.NetworkServiceInfo{
 		Name:        "Telnet",
 		Enabled:     mergedSettings["USE_TELNET"] == "yes",
-		Running:     c.isServiceRunning("telnetd") || c.isServiceRunning("in.telnetd"),
+		Running:     processRunning(processes, "telnetd", "in.telnetd"),
 		Port:        telnetPort,
 		Description: "Telnet remote access (insecure)",
 	}
@@ -885,7 +894,7 @@ func (c *SettingsCollector) GetNetworkServicesStatus() (*dto.NetworkServicesStat
 	status.Avahi = dto.NetworkServiceInfo{
 		Name:        "Avahi",
 		Enabled:     mergedSettings["shareAvahiEnabled"] == "yes",
-		Running:     c.isServiceRunning("avahi-daemon"),
+		Running:     processRunning(processes, "avahi-daemon"),
 		Port:        5353,
 		Description: "mDNS/DNS-SD service discovery",
 	}
@@ -894,7 +903,7 @@ func (c *SettingsCollector) GetNetworkServicesStatus() (*dto.NetworkServicesStat
 	status.NetBIOS = dto.NetworkServiceInfo{
 		Name:        "NetBIOS",
 		Enabled:     mergedSettings["USE_NETBIOS"] == "yes",
-		Running:     c.isServiceRunning("nmbd"),
+		Running:     processRunning(processes, "nmbd"),
 		Port:        137,
 		Description: "NetBIOS name service",
 	}
@@ -903,7 +912,7 @@ func (c *SettingsCollector) GetNetworkServicesStatus() (*dto.NetworkServicesStat
 	status.WSD = dto.NetworkServiceInfo{
 		Name:        "WSD",
 		Enabled:     mergedSettings["USE_WSD"] == "yes",
-		Running:     c.isServiceRunning("wsdd") || c.isServiceRunning("wsdd2"),
+		Running:     processRunning(processes, "wsdd", "wsdd2"),
 		Port:        3702,
 		Description: "Web Services Discovery for Windows",
 	}
@@ -921,7 +930,7 @@ func (c *SettingsCollector) GetNetworkServicesStatus() (*dto.NetworkServicesStat
 	status.UPNP = dto.NetworkServiceInfo{
 		Name:        "UPnP",
 		Enabled:     mergedSettings["USE_UPNP"] == "yes",
-		Running:     c.isServiceRunning("upnpd") || c.isServiceRunning("miniupnpd"),
+		Running:     processRunning(processes, "upnpd", "miniupnpd"),
 		Port:        1900,
 		Description: "UPnP/IGD port forwarding",
 	}
@@ -930,7 +939,7 @@ func (c *SettingsCollector) GetNetworkServicesStatus() (*dto.NetworkServicesStat
 	status.NTP = dto.NetworkServiceInfo{
 		Name:        "NTP",
 		Enabled:     mergedSettings["USE_NTP"] == "yes",
-		Running:     c.isServiceRunning("ntpd") || c.isServiceRunning("chronyd"),
+		Running:     processRunning(processes, "ntpd", "chronyd"),
 		Port:        123,
 		Description: "Network Time Protocol",
 	}
@@ -939,7 +948,7 @@ func (c *SettingsCollector) GetNetworkServicesStatus() (*dto.NetworkServicesStat
 	status.SyslogServer = dto.NetworkServiceInfo{
 		Name:        "Syslog",
 		Enabled:     c.isSyslogServerEnabled(),
-		Running:     c.isServiceRunning("rsyslogd"),
+		Running:     processRunning(processes, "rsyslogd"),
 		Port:        514,
 		Description: "Syslog daemon",
 	}
@@ -1074,18 +1083,20 @@ func (c *SettingsCollector) mergeNetworkSettings(varIni, identCfg, tips map[stri
 	return merged
 }
 
-// isServiceRunning checks if a service is running by looking at /proc
-func (c *SettingsCollector) isServiceRunning(processName string) bool {
-	// Read /proc to find running processes
-	procDir, err := os.Open("/proc")
+// scanProcessNames returns the name of every process under root, a /proc
+// directory. An unreadable root gives an empty set; a process that exits during
+// the scan is skipped.
+func scanProcessNames(root string) map[string]struct{} {
+	names := make(map[string]struct{})
+	procDir, err := os.Open(root) // #nosec G304 -- root is /proc, or a temp directory in tests
 	if err != nil {
-		return false
+		return names
 	}
 	defer procDir.Close() //nolint:errcheck
 
 	entries, err := procDir.Readdirnames(-1)
 	if err != nil {
-		return false
+		return names
 	}
 
 	for _, entry := range entries {
@@ -1094,19 +1105,27 @@ func (c *SettingsCollector) isServiceRunning(processName string) bool {
 			continue
 		}
 
-		commPath := filepath.Join("/proc", entry, "comm")
-		// #nosec G304 -- commPath is constructed from numeric /proc entries discovered from the local filesystem.
-		commBytes, err := os.ReadFile(commPath)
+		// #nosec G304 -- the path is built from root and a numeric directory entry
+		commBytes, err := os.ReadFile(filepath.Join(root, entry, "comm"))
 		if err != nil {
 			continue
 		}
 
-		comm := strings.TrimSpace(string(commBytes))
-		if comm == processName {
-			return true
+		if comm := strings.TrimSpace(string(commBytes)); comm != "" {
+			names[comm] = struct{}{}
 		}
 	}
 
+	return names
+}
+
+// processRunning reports whether any of the names is in the process set.
+func processRunning(processes map[string]struct{}, names ...string) bool {
+	for _, name := range names {
+		if _, ok := processes[name]; ok {
+			return true
+		}
+	}
 	return false
 }
 
