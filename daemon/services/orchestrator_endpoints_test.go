@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -106,5 +107,17 @@ func TestStartedMessage(t *testing.T) {
 		if got := strings.Contains(o.startedMessage("http"), "/mcp"); got == disabled {
 			t.Errorf("MCPDisabled=%v: message %q", disabled, o.startedMessage("http"))
 		}
+	}
+}
+
+// initializeDiscovery must never fail startup, with MCP on or off. Discovery
+// tolerates a network with no usable interface, as on some CI runners.
+func TestInitializeDiscoveryWithMCPDisabled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	o := CreateOrchestrator(&domain.Context{Config: domain.Config{Port: 18043, MCPDisabled: true}})
+	o.initializeDiscovery(ctx)
+	if o.discoveryService != nil {
+		t.Cleanup(o.discoveryService.Shutdown)
 	}
 }
