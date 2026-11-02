@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.11.00] - 2026-11-02
+
 ### Fixed
 
 - CPU usage now uses one `/proc/stat` snapshot per collection for aggregate and per-core readings,
