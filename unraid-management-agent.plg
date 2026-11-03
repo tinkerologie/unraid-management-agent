@@ -10,8 +10,8 @@
     <!ENTITY launch      "Settings/unraid-management-agent">
     <!ENTITY bundle      "&name;-&version;.tgz">
     <!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
-    <!ENTITY md5         "b7ce8a6ae956a0df776c77803f1e57c6"> <!-- pragma: allowlist secret -->
-    <!ENTITY sha256      "f3394e32ef79a01ccf98a1bba6bc86e0595c583be60d1d61f643e0c61361e31a"> <!-- pragma: allowlist secret -->
+    <!ENTITY md5         "97570b1aa072d94faa55491c4b8957e6"> <!-- pragma: allowlist secret -->
+    <!ENTITY sha256      "ec11aa63adbbbc6f57e29220e0ee78137a39ceb72653b233b76c966d35ee78c6"> <!-- pragma: allowlist secret -->
 ]>
 
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" icon="server" min="7.2.0" pluginURL="&pluginURL;" support="&supportURL;" project="&gitURL;" readme="&gitURL;#readme">
@@ -21,91 +21,16 @@ Monitor and control your Unraid system via REST API, WebSocket, MCP, Prometheus,
 </DESCRIPTION>
 
 <CHANGES>
-### 2026.11.00
-
-### Fixed
-
-- CPU usage now uses one `/proc/stat` snapshot per collection for aggregate and per-core readings,
-  without sampling sleeps (#298). Readings cover the interval since the previous successful collection;
-  the first reading is the since-boot average. Counter resets and decreases are handled safely,
-  and zero deltas retain the previous reading and baseline.
-- VM telemetry now reports guest memory usage, then QEMU RSS, then zero for running VMs,
-  and zero for non-running VMs (#295). The Home Assistant "Memory Used" sensor now shows
-  real or zero usage instead of allocated memory. Primary disk source and guest-visible virtual
-  capacity are collected best effort through native libvirt for all VM states.
-- Read disk filesystem, spin state, boot flash role and filesystem capacity from `disks.ini` (#296).
-  Use `fsType` rather than partition format and `spundown` rather than temperature or device probes.
-  Preserve KiB-based `fsFree`/`fsUsed`/`fsSize`, including zero free space, without statfs or ZFS overrides;
-  use `fsSize` for ZFS pool totals and for other filesystems when used plus free exceeds physical size.
-  Keep existing capacity fallbacks for disks without valid `fsFree`. Boot flash reports role `flash` and
-  its own Prometheus `Flash` type label. Source-field collection performs no disk-waking queries.
-- Separate share content from backing-storage usage (#293): add `storage_used_bytes`,
-  `storage_free_bytes`, `storage_total_bytes` and `storage_usage_percent`; retain
-  `free_bytes`, `total_bytes` and `usage_percent` as deprecated storage aliases.
-  `used_bytes` is now omitted unless measured from the assigned, cache-only ZFS pool
-  with every member known spinning. Include only mounted descendant filesystems at or beneath
-  the share dataset's mountpoint, without directory walks; omit usage when mount metadata is unknown.
-  Refresh spin state before each pool query and after queries before checking share locations.
-  Prometheus omits unknown share usage and adds storage gauges; Home Assistant discovery
-  labels storage readings explicitly and preserves unknown versus measured-zero usage.
-
-- Container memory usage now excludes the `inactive_file` page cache from cgroup v2
-  `memory.current`, clamped at zero. Missing or malformed `memory.stat` falls back to raw usage;
-  memory percentages, displays and aggregates use the corrected value (#294).
-- **Sensor plausibility and unknown measurements** (#297): apply a 100 °C ceiling only to `SYSTIN`
-  and `AUXTIN*` temperature labels, and drop readings at or below 0 °C only for PECI and DIMM labels.
-  Other labels retain the global −40 °C &lt; reading &lt; 125 °C range. AUXTIN VRM readings above
-  100 °C are hidden as a trade-off. Implausible fan channels are quarantined for 15 minutes
-  after their last bad sample, with stable names and no fan DTO or safety/control-policy changes.
-- Unmeasured `motherboard_temp_celsius`, disk `temperature_celsius`, and GPU `temperature_celsius`,
-  `power_draw_watts`, `memory_total_bytes`, `memory_used_bytes` and `utilization_memory_percent`
-  now serialize as JSON `null` with keys retained (`x-nullable`), following UPS/NUT. Measured zeros
-  remain numbers. MQTT/Home Assistant numeric sensors render `None`; Prometheus omits and removes
-  unavailable series; health checks and MCP do not treat missing temperature as measured 0.
-  Alert variables `MotherboardTemp`, `MaxDiskTemp`, `MaxGPUTemp` and `TotalGPUPower` are nullable:
-  guard rules with `!= nil`. Unguarded nil evaluations preserve alert state and log the failure once.
-  Disk-temperature trends exclude unavailable readings; history expires after one hour even
-  without new measurements.
-- Intel GPU temperature and driver metadata are read from the detected PCI device. `driver_version`
-  reports the bound driver name (`i915` or `xe`) plus the module version when available, replacing
-  the unrelated kernel vermagic value. CPU temperature is kept separate from GPU temperature.
-
-- Disks whose `smartctl` exit status has only informational bits set no longer report
-  `smart_status: "UNKNOWN"` without attributes, and `system_health_report` no longer calls them
-  a critical SMART failure (#292). The exit status is decoded as a bitmask and exposed as
-  `smart_exit_status`. A disk with a pre-fail attribute at threshold now gets a warning, historic
-  records and an unreadable (`UNKNOWN`) status get an info finding.
-
-### Added
-
-- **MCP tool policy panel** (#307) — an **All → Hidden** button, so you can hide every tool and then
-  re-enable only the ones you want. Tool descriptions now show in full, without hovering.
-- **Endpoint toggles** (#273) — `mcp_enabled`, `metrics_enabled` and `websocket_enabled`, each
-  available as a CLI flag, an environment variable, a `config.yml` key and a switch on the plugin
-  settings page. All default to on. A disabled endpoint returns 404 and does no background work, so
-  the agent can run as REST only. These switches limit exposure; they
-  are unlikely to lower CPU usage much.
-- Shared read-only PSU collector with exact-ID auto-detection for Corsair RMi/HXi USB PSUs
-  through the kernel `corsairpsu` hwmon interface (part of #61). Includes hardware gating,
-  independent hotplug inventory, Dynamic/Manual configuration and plugin settings, explicit
-  availability and nullable readings, derived DC load, REST/WebSocket/MCP, MQTT/Home Assistant
-  discovery, and Prometheus. Bounded, ordered discovery keeps slow MQTT brokers from blocking
-  other telemetry; regression tests cover startup delivery, cancellation and recovery.
-  The PSU endpoint is grouped with hardware monitoring routes.
-  AXi and other vendor backends remain separate follow-up work.
-- PSU telemetry feasibility research for #61, #194, #195, #196 and #197, covering
-  model-specific interfaces, automatic discovery, implementation phases and validation requirements.
-  This documents proposed work; it does not add runtime PSU monitoring.
+### 2026.11.01
 
 ### Changed
 
-- `GET /api/v1/settings/network-services` now scans `/proc` once per request instead of once per service
-  (#306). The response is unchanged.
+- Ansible deployment now uses SSH keys for SSH and SCP, with shared strict host verification and separate key-session sockets (#316). Controller preflight rejects password inventories, ambiguous SSH user/port aliases and unusable keys for every target before remote changes. Added a non-destructive `ssh-check.yml` transport check and `make test-ansible`.
 
-### Security
+### Fixed
 
-- Require Go 1.27.3 for builds to include the `crypto/x509` intermediate-certificate distrust
-  update ([GO-2026-6809](https://pkg.go.dev/vuln/GO-2026-6809)), found during PSU validation.
+- Fix the 2026.11.00 startup illegal-instruction crash on x86-64 CPUs without AVX (#315, #317). Releases now use static pure-Go builds with an x86-64-v1 baseline. Packaging checks the shipped binary's build settings and ELF linkage; CI and release publication also test it on an emulated older CPU.
+- Release notes on the Plugins page no longer break lines mid-sentence or put inline code on separate lines (#312). The `.plg` notes now use unwrapped lines and tight lists; `CHANGELOG.md` and the GitHub release notes are unchanged. This takes effect from the release after 2026.11.00.
 </CHANGES>
 
 <!--
