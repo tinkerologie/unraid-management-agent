@@ -89,10 +89,16 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Install XML validation tooling
-        run: sudo apt-get update && sudo apt-get install -y libxml2-utils
+      - name: Install packaging and Ansible validation tooling
+        run: sudo apt-get update && sudo apt-get install -y libxml2-utils ansible-core binutils qemu-user
+
+      - name: Check key-only Ansible authentication
+        run: make test-ansible
 
       # Builds the bundle, checks every entry is 0/0, then runs the .plg
       # extraction command as root against a uid-1001 archive (#242)
       - name: Run packaging tests
         run: make test-packaging
+
+      - name: Smoke test on older CPU (Nehalem)
+        run: bash scripts/check-package-artifact.sh smoke "build/unraid-management-agent-$(cat VERSION).tgz"

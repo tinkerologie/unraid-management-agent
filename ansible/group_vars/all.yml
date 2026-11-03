@@ -12,5 +12,33 @@ plugin_dir: "/usr/local/emhttp/plugins/{{ plugin_name }}"
 config_dir: "/boot/config/plugins/{{ plugin_name }}"
 api_port: "{{ hostvars[inventory_hostname].api_port | default(8043) }}"
 
+# Loaded for root-directory invocations as well as from ansible/. SSH and SCP
+# share a policy and a socket namespace separate from former password sessions.
+uma_ssh_port: "{{ hostvars[inventory_hostname].ansible_port | default(22) }}"
+uma_known_hosts_file: "~/.ssh/known_hosts"
+uma_ssh_control_dir: "~/.ansible/uma-key"
+uma_ssh_options:
+  - BatchMode=yes
+  - IdentitiesOnly=yes
+  - PubkeyAuthentication=yes
+  - PreferredAuthentications=publickey
+  - PasswordAuthentication=no
+  - KbdInteractiveAuthentication=no
+  - StrictHostKeyChecking=yes
+  - "UserKnownHostsFile={{ uma_known_hosts_file | expanduser }}"
+  - ConnectTimeout=10
+  - ControlMaster=auto
+  - ControlPersist=60s
+  - "ControlPath={{ uma_ssh_control_dir | expanduser }}/%C"
+uma_ssh_option_argv: "{{ ['-o'] | product(uma_ssh_options) | flatten }}"
+uma_ssh_common_args: "{{ uma_ssh_option_argv | map('quote') | join(' ') }}"
+ansible_ssh_common_args: "{{ uma_ssh_common_args }}"
+ansible_ssh_args: "-C"
+uma_scp_argv: >-
+  {{ ['scp', '-i', hostvars[inventory_hostname].ansible_ssh_private_key_file | expanduser,
+      '-P', uma_ssh_port | string] + uma_ssh_option_argv }}
+uma_ssh_target: >-
+  {{ hostvars[inventory_hostname].ansible_user }}@{{ '[' ~ hostvars[inventory_hostname].ansible_host ~ ']' if ':' in hostvars[inventory_hostname].ansible_host else hostvars[inventory_hostname].ansible_host }}
+
 # curl argument that sends the API token when one is configured (#245).
 curl_auth: '{{ (''-H "Authorization: Bearer '' ~ api_token ~ ''"'') if (api_token | default('''') | length > 0) else '''' }}'

@@ -5,7 +5,7 @@ PLUGIN_DIR := meta/plugin
 DATE := $(shell date '+%Y.%m.%d')
 HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo "dev")
 
-.PHONY: all local release package clean test test-packaging test-ui test-coverage deps swagger pre-commit-install pre-commit-run lint security-check
+.PHONY: all local release package clean test test-ansible test-packaging test-ui test-coverage deps swagger pre-commit-install pre-commit-run lint security-check
 
 all: test local
 
@@ -33,7 +33,7 @@ local: deps swagger
 
 release: deps swagger
 	@echo "Building for Linux/amd64..."
-	GOOS=linux GOARCH=amd64 go build -ldflags "-X main.Version=$(VERSION)" -o $(BUILD_DIR)/$(BINARY)
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1 go build -ldflags "-X main.Version=$(VERSION)" -o $(BUILD_DIR)/$(BINARY)
 
 package: release
 	@echo "Creating plugin package..."
@@ -45,11 +45,15 @@ package: release
 	@# Archive entries must be owned by root so extraction never chowns system dirs (#242)
 	OWNER_FLAGS=$$(sh scripts/tar-owner-flags.sh) && \
 		cd $(BUILD_DIR) && COPYFILE_DISABLE=1 tar $$OWNER_FLAGS -czf $(BINARY)-$(VERSION).tgz usr/
+	bash scripts/check-package-artifact.sh check $(BUILD_DIR)/$(BINARY)-$(VERSION).tgz
 	@echo "Package created: $(BUILD_DIR)/$(BINARY)-$(VERSION).tgz"
 
 test:
 	@echo "Running tests..."
 	go test -v ./...
+
+test-ansible:
+	bash scripts/test-ansible-ssh-auth.sh
 
 # Playwright tests for the plugin settings page (needs Node.js and the PHP CLI)
 test-ui:
@@ -60,6 +64,7 @@ test-packaging: package
 	@echo "Running bundle packaging tests..."
 	bash scripts/test-bundle-extraction.sh check-tar-flags
 	bash scripts/test-bundle-extraction.sh check-owners $(BUILD_DIR)/$(BINARY)-$(VERSION).tgz
+	bash scripts/test-check-package-artifact.sh $(BUILD_DIR)/$(BINARY)-$(VERSION).tgz
 	sudo bash scripts/test-bundle-extraction.sh
 	bash scripts/test-secure-defaults-migration.sh
 	bash scripts/test-auto-intervals-migration.sh

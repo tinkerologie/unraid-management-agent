@@ -9,7 +9,7 @@ skip_list:
   # Justified: curl required for MCP SSE protocol and WebSocket upgrade
   - command-instead-of-shell
   - risky-shell-pipe
-  # Justified: sshpass SCP required for Python-less host file transfer
+  # Justified: raw commands required for Python-less host operations
   - no-free-form
 
 warn_list:

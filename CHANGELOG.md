@@ -9,7 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Ansible deployment now uses SSH keys for SSH and SCP, with shared strict host
+  verification and separate key-session sockets (#316). Controller preflight
+  rejects password inventories, ambiguous SSH user/port aliases and unusable keys
+  for every target before remote changes. Added a
+  non-destructive `ssh-check.yml` transport check and `make test-ansible`.
+
 ### Fixed
+
+- Fix the 2026.11.00 startup illegal-instruction crash on x86-64 CPUs without
+  AVX (#315, #317). Releases now use static pure-Go builds with an x86-64-v1
+  baseline. Packaging checks the shipped binary's build settings and ELF
+  linkage; CI and release publication also test it on an emulated older CPU.
 
 - Release notes on the Plugins page no longer break lines mid-sentence or put inline code on separate
   lines (#312). The `.plg` notes now use unwrapped lines and tight lists; `CHANGELOG.md` and the GitHub

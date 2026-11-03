@@ -16,9 +16,10 @@
 #   --skip-tags tests — Skip endpoint verification tests
 #
 # Prerequisites:
-#   brew install ansible sshpass   (macOS)
+#   brew install ansible           (macOS)
 #   pip install ansible            (Linux)
 #   cp ansible/inventory.yml.example ansible/inventory.yml
+#   Set the SSH key and verify the server's entry in known_hosts.
 
 - name: Deploy Unraid Management Agent
   hosts: unraid
@@ -30,6 +31,9 @@
       headers: "{{ {'Authorization': 'Bearer ' ~ api_token} if (api_token | default('') | length > 0) else {} }}"
 
   roles:
+    - role: preflight
+      tags: [always, preflight]
+
     - role: build
       tags: [build, redeploy]
 

@@ -1,0 +1,76 @@
+---
+# Transport validation only: no service, plugin configuration or API operations.
+- name: Check SSH-key access without deploying
+  hosts: unraid
+  gather_facts: false
+  roles:
+    - role: preflight
+      tags: [always, preflight]
+  tasks:
+    - name: Validate SSH and an SCP round trip
+      tags: [ssh-check]
+      block:
+        - name: Check read-only SSH access
+          ansible.builtin.raw: printf 'SSH-key connection OK\n'
+          changed_when: false
+
+        - name: Create controller scratch directory
+          delegate_to: localhost
+          ansible.builtin.tempfile:
+            state: directory
+            prefix: uma-ssh-check-
+          register: uma_local_probe
+
+        - name: Write transport probe
+          delegate_to: localhost
+          ansible.builtin.copy:
+            content: "Unraid Management Agent SSH-key transport check\n"
+            dest: "{{ uma_local_probe.path }}/upload"
+            mode: "0600"
+
+        - name: Create remote scratch directory
+          ansible.builtin.raw: mktemp -d /tmp/uma-ssh-check.XXXXXXXX
+          register: uma_remote_probe
+          changed_when: true
+
+        - name: Upload transport probe
+          delegate_to: localhost
+          ansible.builtin.command:
+            argv: "{{ uma_scp_argv + [uma_local_probe.path ~ '/upload', uma_ssh_target ~ ':' ~ (uma_remote_probe.stdout | trim) ~ '/probe'] }}"
+          changed_when: true
+
+        - name: Download transport probe
+          delegate_to: localhost
+          ansible.builtin.command:
+            argv: "{{ uma_scp_argv + [uma_ssh_target ~ ':' ~ (uma_remote_probe.stdout | trim) ~ '/probe', uma_local_probe.path ~ '/download'] }}"
+          changed_when: true
+
+        - name: Compute round-trip checksums
+          delegate_to: localhost
+          ansible.builtin.stat:
+            path: "{{ uma_local_probe.path }}/{{ item }}"
+            checksum_algorithm: sha256
+          loop: [upload, download]
+          register: uma_probe_checksums
+
+        - name: Verify round-trip content
+          ansible.builtin.assert:
+            that:
+              - uma_probe_checksums.results[0].stat.checksum == uma_probe_checksums.results[1].stat.checksum
+            success_msg: SSH-key probe and SCP round-trip checksum passed.
+            quiet: true
+
+      always:
+        - name: Remove remote scratch files
+          when: uma_remote_probe is defined and uma_remote_probe.rc | default(1) == 0
+          ansible.builtin.raw: >-
+            rm -f {{ ((uma_remote_probe.stdout | trim) ~ '/probe') | quote }} &&
+            rmdir {{ (uma_remote_probe.stdout | trim) | quote }}
+          changed_when: true
+
+        - name: Remove controller scratch directory
+          when: uma_local_probe is defined and uma_local_probe.path is defined
+          delegate_to: localhost
+          ansible.builtin.file:
+            path: "{{ uma_local_probe.path }}"
+            state: absent

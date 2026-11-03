@@ -143,8 +143,8 @@ jobs:
 
           cache: false
 
-      - name: Install XML validation tooling
-        run: sudo apt-get update && sudo apt-get install -y libxml2-utils
+      - name: Install package validation tooling
+        run: sudo apt-get update && sudo apt-get install -y libxml2-utils binutils qemu-user
 
       - name: Verify VERSION file matches tag
         env:
@@ -190,6 +190,13 @@ jobs:
           DETECT_VERSION: ${{ needs.detect.outputs.version }}
         run: |
           bash scripts/test-bundle-extraction.sh check-owners \
+            "build/unraid-management-agent-${DETECT_VERSION}.tgz"
+
+      - name: Smoke test on older CPU (Nehalem)
+        env:
+          DETECT_VERSION: ${{ needs.detect.outputs.version }}
+        run: |
+          bash scripts/check-package-artifact.sh smoke \
             "build/unraid-management-agent-${DETECT_VERSION}.tgz"
 
       - name: Calculate checksums

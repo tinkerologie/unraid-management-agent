@@ -222,6 +222,11 @@ make pre-commit-install  # Install pre-commit hooks
 make pre-commit-run      # Run all pre-commit checks
 ```
 
+Release builds must stay pure Go (`CGO_ENABLED=0`) with `GOAMD64=v1` for broad
+x86-64 compatibility. Choose dependencies that support this build without cgo.
+`scripts/check-package-artifact.sh` checks the archived binary's build settings
+and static ELF linkage; CI and release jobs also run its Nehalem CPU smoke test.
+
 ### Running the Agent
 
 ```bash
@@ -236,8 +241,11 @@ make pre-commit-run      # Run all pre-commit checks
 
 ```bash
 # Prerequisites (one-time)
-brew install ansible sshpass           # macOS
-cp ansible/inventory.yml.example ansible/inventory.yml  # Add server IP + password
+brew install ansible                   # macOS
+cp ansible/inventory.yml.example ansible/inventory.yml  # Set server address + SSH key path
+
+# Validate the existing authorized key and verified known_hosts entry
+ansible-playbook -i ansible/inventory.yml ansible/ssh-check.yml
 
 # Full deploy: build → deploy → verify
 ansible-playbook -i ansible/inventory.yml ansible/deploy.yml
@@ -256,6 +264,11 @@ ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --tags redeploy
 ```
 
 See `ansible/README.md` for full documentation including backup options and tag reference.
+
+Use SSH keys for deployment and keep inventories free of SSH passwords. Keep private
+key material out of diffs, issues and logs. On the maintainer's server, use
+`ssh-check.yml` for transport validation; run a deployment only when the maintainer
+has explicitly authorized it.
 
 ## Code Style and Conventions
 

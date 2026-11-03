@@ -9,11 +9,10 @@ all:
     unraid:
       ansible_host: 192.168.1.100
       ansible_user: root
-      ansible_password: "your-password-here"
-      ansible_ssh_common_args: >-
-        -o StrictHostKeyChecking=no
-        -o PubkeyAuthentication=no
-        -o PreferredAuthentications=password
+      ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+      # ansible_port: 22
+      # uma_known_hosts_file: ~/.ssh/known_hosts
+      # SSH options come from group_vars/all.yml; remove old inventory overrides.
       api_port: 8043
       # API token the deploy role writes to config.cfg and the verify role sends.
       # Required for the write tests: without a token the agent refuses network
