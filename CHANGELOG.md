@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.11.01] - 2026-11-03
+
 ### Changed
 
 - Ansible deployment now uses SSH keys for SSH and SCP, with shared strict host
