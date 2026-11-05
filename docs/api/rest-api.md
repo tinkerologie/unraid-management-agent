@@ -3678,7 +3678,7 @@ Return the cached SAS storage topology. Collected by the `storage_topology` back
 collector (`INTERVAL_STORAGE_TOPOLOGY`; disabled by default, 5 min recommended when enabled) from two optional, read-only sources:
 
 - **storcli** (Broadcom/LSI MegaRAID controllers and HBAs; `/sbin/storcli` and other common
-  paths): controllers, PCIe link, HBA phys/ports, enclosures and per-drive paths, link
+  paths, including `/usr/local/bin/storcli` from the storcli64 plugin): controllers, PCIe link, HBA phys/ports, enclosures and per-drive paths, link
   speeds and error counters. Calls are sequential, always use `J nolog`, and each is
   bounded by a timeout; a storcli process that does not exit after being killed blocks
   further storcli calls until it is reaped.
