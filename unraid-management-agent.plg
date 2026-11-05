@@ -10,8 +10,8 @@
     <!ENTITY launch      "Settings/unraid-management-agent">
     <!ENTITY bundle      "&name;-&version;.tgz">
     <!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
-    <!ENTITY md5         "97570b1aa072d94faa55491c4b8957e6"> <!-- pragma: allowlist secret -->
-    <!ENTITY sha256      "ec11aa63adbbbc6f57e29220e0ee78137a39ceb72653b233b76c966d35ee78c6"> <!-- pragma: allowlist secret -->
+    <!ENTITY md5         "e8da1daaa9b37d5818e2a196cf8856ec"> <!-- pragma: allowlist secret -->
+    <!ENTITY sha256      "759b63a322d642a7cf1ae03d58a3acc3bfce2d791c63be8917ca243ace818902"> <!-- pragma: allowlist secret -->
 ]>
 
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" icon="server" min="7.2.0" pluginURL="&pluginURL;" support="&supportURL;" project="&gitURL;" readme="&gitURL;#readme">
@@ -21,16 +21,11 @@ Monitor and control your Unraid system via REST API, WebSocket, MCP, Prometheus,
 </DESCRIPTION>
 
 <CHANGES>
-### 2026.11.01
-
-### Changed
-
-- Ansible deployment now uses SSH keys for SSH and SCP, with shared strict host verification and separate key-session sockets (#316). Controller preflight rejects password inventories, ambiguous SSH user/port aliases and unusable keys for every target before remote changes. Added a non-destructive `ssh-check.yml` transport check and `make test-ansible`.
+### 2026.11.02
 
 ### Fixed
 
-- Fix the 2026.11.00 startup illegal-instruction crash on x86-64 CPUs without AVX (#315, #317). Releases now use static pure-Go builds with an x86-64-v1 baseline. Packaging checks the shipped binary's build settings and ELF linkage; CI and release publication also test it on an emulated older CPU.
-- Release notes on the Plugins page no longer break lines mid-sentence or put inline code on separate lines (#312). The `.plg` notes now use unwrapped lines and tight lists; `CHANGELOG.md` and the GitHub release notes are unchanged. This takes effect from the release after 2026.11.00.
+- Find storcli installed by the storcli64 Unraid plugin, which puts it in `/usr/local/bin` (#319). The storage topology collector, its MCP tool and the hardware probe now also look for `/usr/local/bin/storcli`, `/usr/local/bin/storcli64` and `/usr/bin/storcli64`.
 </CHANGES>
 
 <!--
