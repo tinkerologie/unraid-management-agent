@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Find storcli installed by the storcli64 Unraid plugin, which puts it in
+  `/usr/local/bin` (#319). The storage topology collector, its MCP tool and the
+  hardware probe now also look for `/usr/local/bin/storcli`,
+  `/usr/local/bin/storcli64` and `/usr/bin/storcli64`.
+
 ## [2026.11.01] - 2026-11-03
 
 ### Changed

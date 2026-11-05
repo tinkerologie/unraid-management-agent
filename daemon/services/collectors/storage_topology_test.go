@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -278,5 +279,25 @@ func TestStorageTopologyGatherFromFixtures(t *testing.T) {
 		DrivesWithOtherErrors: 24, EnclosuresWithProblems: 1}
 	if topo.Summary != want {
 		t.Errorf("summary = %+v, want %+v", topo.Summary, want)
+	}
+}
+
+// TestStorcliFoundAtPluginPath covers #319: the storcli64 plugin installs
+// storcli in /usr/local/bin, which is not in the sbin directories.
+func TestStorcliFoundAtPluginPath(t *testing.T) {
+	c := NewStorageTopologyCollector(&domain.Context{})
+	if !slices.Contains(c.StorcliCandidates, "/usr/local/bin/storcli") {
+		t.Fatalf("default candidates %v miss the plugin path", c.StorcliCandidates)
+	}
+	c.IsExecutable = func(p string) bool { return p == "/usr/local/bin/storcli" }
+	if got := c.findBinary(c.StorcliCandidates); got != "/usr/local/bin/storcli" {
+		t.Fatalf("findBinary = %q, want /usr/local/bin/storcli", got)
+	}
+	// A storcli found before #319 still wins over the plugin's
+	c.IsExecutable = func(p string) bool {
+		return p == "/usr/local/bin/storcli" || p == "/opt/MegaRAID/storcli/storcli64"
+	}
+	if got := c.findBinary(c.StorcliCandidates); got != "/opt/MegaRAID/storcli/storcli64" {
+		t.Fatalf("findBinary = %q, want /opt/MegaRAID/storcli/storcli64", got)
 	}
 }
