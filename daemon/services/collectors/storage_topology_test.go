@@ -293,4 +293,11 @@ func TestStorcliFoundAtPluginPath(t *testing.T) {
 	if got := c.findBinary(c.StorcliCandidates); got != "/usr/local/bin/storcli" {
 		t.Fatalf("findBinary = %q, want /usr/local/bin/storcli", got)
 	}
+	// A storcli found before #319 still wins over the plugin's
+	c.IsExecutable = func(p string) bool {
+		return p == "/usr/local/bin/storcli" || p == "/opt/MegaRAID/storcli/storcli64"
+	}
+	if got := c.findBinary(c.StorcliCandidates); got != "/opt/MegaRAID/storcli/storcli64" {
+		t.Fatalf("findBinary = %q, want /opt/MegaRAID/storcli/storcli64", got)
+	}
 }

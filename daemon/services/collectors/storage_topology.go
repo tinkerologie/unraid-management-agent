@@ -77,10 +77,10 @@ func NewStorageTopologyCollector(ctx *domain.Context) *StorageTopologyCollector 
 		SysfsRoot: "/sys",
 		StorcliCandidates: []string{
 			"/sbin/storcli", "/usr/sbin/storcli", "/usr/local/sbin/storcli", "/usr/bin/storcli",
-			// The storcli64 Unraid plugin installs /usr/local/bin/storcli (#319)
-			"/usr/local/bin/storcli",
 			"/opt/MegaRAID/storcli/storcli64", "/usr/local/sbin/storcli64", "/usr/sbin/storcli64",
-			"/usr/local/bin/storcli64", "/usr/bin/storcli64",
+			// The storcli64 Unraid plugin installs /usr/local/bin/storcli (#319).
+			// Listed last so a server that already had storcli keeps using it.
+			"/usr/local/bin/storcli", "/usr/local/bin/storcli64", "/usr/bin/storcli64",
 		},
 		SgSesCandidates: []string{"/usr/bin/sg_ses", "/usr/sbin/sg_ses", "/bin/sg_ses", "/sbin/sg_ses"},
 		IsExecutable:    isExecutableFile,
