@@ -72,12 +72,15 @@ All AI coding assistants (Claude Code, Gemini, GitHub Copilot, Cursor, Roo, Devi
 
 ### Event-Driven PubSub Design
 
-```
-Collectors → Event Bus (github.com/cskr/pubsub) → API Server Cache → REST Endpoints
-                                                 ↓                   ↓
-                                          WebSocket Hub        MCP Server → AI Agents
-                                                 ↓
-                                          Connected Clients
+```mermaid
+flowchart LR
+    C[Collectors] --> B[Internal event bus]
+    B --> A[API subscriptions]
+    A --> S[Shared cache]
+    S --> R[REST]
+    S --> M[MCP]
+    A --> W[WebSocket hub]
+    B --> Q[MQTT subscriber]
 ```
 
 ### Critical Initialization Order
@@ -85,7 +88,7 @@ Collectors → Event Bus (github.com/cskr/pubsub) → API Server Cache → REST 
 In `daemon/services/orchestrator.go`:
 
 1. API server creates subscriptions via `Hub.Sub()` **FIRST**
-2. 100ms delay ensures subscriptions are ready
+2. Wait for `apiServer.Ready()` to confirm subscriptions are wired
 3. Then collectors start publishing via `Hub.Pub(data, "topic_name")`
 
 **Never change this order** — collectors publishing before subscriptions causes lost events.
@@ -157,8 +160,8 @@ Each collector:
 
 #### API Server (`daemon/services/api/`)
 
-- **server.go**: In-memory cache, event subscriptions, WebSocket broadcasts. Uses `sync.RWMutex`.
-- **handlers.go**: REST endpoint handlers. **Always use RLock/RUnlock** for cache reads.
+- **server.go**: Event subscriptions and WebSocket broadcasts; embeds `CacheStore` for shared monitoring data.
+- **handlers.go**: REST endpoint handlers. Read monitoring data through the `CacheStore` getters.
 - **websocket.go**: WebSocket hub with client registration and ping/pong health checks.
 - **middleware.go**: CORS, logging, and recovery middleware.
 
@@ -345,9 +348,7 @@ func (c *Collector) Start(ctx context.Context, interval time.Duration) {
 ### Cache Access (Thread-Safe)
 
 ```go
-s.cacheMutex.RLock()   // Read lock for GET handlers
-data := s.someCache
-s.cacheMutex.RUnlock()
+data := s.GetSystemCache() // CacheStore getter uses an atomic pointer load
 respondJSON(w, http.StatusOK, data)
 ```
 
@@ -367,9 +368,7 @@ func (c *DockerController) StartContainer(id string) error {
 
 ```go
 func (s *Server) handleNew(w http.ResponseWriter, _ *http.Request) {
-    s.cacheMutex.RLock()
-    data := s.newCache
-    s.cacheMutex.RUnlock()
+    data := s.GetSystemCache()
     respondJSON(w, http.StatusOK, data)
 }
 ```
@@ -521,7 +520,6 @@ See `docs/api/` for complete endpoint documentation.
 | Package                              | Purpose                         |
 | ------------------------------------ | ------------------------------- |
 | `github.com/alecthomas/kong`         | CLI framework                   |
-| `github.com/cskr/pubsub`             | Event bus (PubSub pattern)      |
 | `github.com/gorilla/mux`             | HTTP router                     |
 | `github.com/gorilla/websocket`       | WebSocket implementation        |
 | `github.com/moby/moby/client`        | Docker Engine SDK               |
@@ -535,7 +533,7 @@ See `docs/api/` for complete endpoint documentation.
 - **DO NOT** use `exec.Command` directly — use `lib.ExecCommand()` / `lib.ExecCommandOutput()`
 - **DO NOT** change the initialization order in `orchestrator.go` (subscriptions before collectors)
 - **DO NOT** skip input validation for user-provided values
-- **DO NOT** read cache without `RLock`/`RUnlock` or write without `Lock`/`Unlock`
+- **DO NOT** bypass `CacheStore` getters and atomic stores when reading or replacing collector cache values
 - **DO NOT** create collectors without panic recovery wrappers
 - **DO NOT** skip CHANGELOG.md updates — every change must be documented
 - **DO NOT** commit secrets, credentials, or `.env` files
@@ -545,7 +543,7 @@ See `docs/api/` for complete endpoint documentation.
 ## Important Notes
 
 - **Initialization order is critical** — API subscriptions before collectors in orchestrator.go
-- **Always use mutex locks** — RLock/RUnlock for cache reads, Lock/Unlock for writes
+- **Cache synchronization** — use `CacheStore` atomic getters/stores for collector values; protect other shared mutable state with its own synchronization
 - **Always validate user input** — use `lib.Validate*()` functions
 - **Test on actual Unraid** — local development differs from production
 - **Context cancellation** — respect `ctx.Done()` in goroutines for graceful shutdown

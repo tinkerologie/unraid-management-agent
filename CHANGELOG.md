@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add a domain glossary and five retrospective architecture decision records, with source references; align related guidance with the implemented architecture.
+
 - Configure engineering agent skills with GitHub Issues, the default triage label mapping, and a single-context domain documentation layout.
 
 ## [2026.11.02] - 2026-11-05
