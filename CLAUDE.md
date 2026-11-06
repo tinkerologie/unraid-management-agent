@@ -119,8 +119,12 @@ The `.github/prompts/` directory contains step-by-step task guides:
 
 ### Issue tracker
 
-GitHub Issues in this repository. See `docs/agents/issue-tracker.md`.
+Track work in this repository's GitHub Issues. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the five default triage labels. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
-single-context. See `docs/agents/domain.md`.
+Use the single-context layout. Before exploring domain concepts or decisions, read `docs/agents/domain.md`.
