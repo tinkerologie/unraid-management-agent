@@ -8,17 +8,17 @@ Reference: [`AGENTS.md`](../../AGENTS.md) for full project context.
 
 ## Cache Access
 
-**Always use mutex locks for cache reads in handlers:**
+Read collected monitoring values through the `CacheStore` getters:
 
 ```go
-s.cacheMutex.RLock()
-data := s.someCache
-s.cacheMutex.RUnlock()
+data := s.GetSystemCache()
 respondJSON(w, http.StatusOK, data)
 ```
 
-- `RLock`/`RUnlock` for GET handlers (read-only)
-- `Lock`/`Unlock` for cache writes (in subscription handler)
+- Collector cache values use atomic pointer loads and stores, not a server-wide cache mutex.
+- Install replacement values through the existing subscription and cache-update paths.
+- Keep separate synchronization for other shared mutable state.
+- See [the shared-telemetry decision](../../docs/adr/0001-shared-telemetry-cache-and-best-effort-events.md).
 
 ## Response Helpers
 
