@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -43,15 +44,7 @@ func syntheticContract(c contractCapture) contractCapture {
 }
 
 func producerContractCases() []contractCapture {
-	return slicesOfContracts(networkAndPoolContracts(), powerContracts(), notificationContracts(), shareAndHealthContracts())
-}
-
-func slicesOfContracts(groups ...[]contractCapture) []contractCapture {
-	var cases []contractCapture
-	for _, group := range groups {
-		cases = append(cases, group...)
-	}
-	return cases
+	return slices.Concat(networkAndPoolContracts(), powerContracts(), notificationContracts(), shareAndHealthContracts())
 }
 
 func networkAndPoolContracts() []contractCapture {
@@ -72,9 +65,9 @@ func networkAndPoolContracts() []contractCapture {
 		TotalServices: 13, EnabledServices: 2, RunningServices: 2, Timestamp: contractTime,
 	}
 	pools := []dto.ZFSPool{
-		{Name: "sample", Health: "DEGRADED", CorruptedFiles: []string{"/mnt/sample/example.bin"}},
-		{Name: "empty", Health: "ONLINE", CorruptedFiles: []string{}},
-		{Name: "unknown", Health: "ONLINE"},
+		{Name: "sample", Health: "DEGRADED", Timestamp: contractTime, CorruptedFiles: []string{"/mnt/sample/example.bin"}},
+		{Name: "empty", Health: "ONLINE", Timestamp: contractTime, CorruptedFiles: []string{}},
+		{Name: "unknown", Health: "ONLINE", Timestamp: contractTime},
 	}
 	setPools := func(s *Server) { s.zfsPoolsCache.Store(&pools) }
 	setManager := func(s *Server) {

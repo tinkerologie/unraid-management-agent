@@ -24,7 +24,7 @@
       "/mnt/sample/example.bin"
     ],
     "is_boot_pool": false,
-    "timestamp": "0001-01-01T00:00:00Z"
+    "timestamp": "2026-01-01T00:00:00Z"
   },
   {
     "name": "empty",
@@ -49,7 +49,7 @@
     "checksum_errors": 0,
     "corrupted_files": [],
     "is_boot_pool": false,
-    "timestamp": "0001-01-01T00:00:00Z"
+    "timestamp": "2026-01-01T00:00:00Z"
   },
   {
     "name": "unknown",
@@ -74,6 +74,6 @@
     "checksum_errors": 0,
     "corrupted_files": null,
     "is_boot_pool": false,
-    "timestamp": "0001-01-01T00:00:00Z"
+    "timestamp": "2026-01-01T00:00:00Z"
   }
 ]

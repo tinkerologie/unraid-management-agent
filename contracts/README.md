@@ -16,5 +16,6 @@ and run offline. No Unraid host or Go toolchain is required for replay.
 Run `go test ./daemon/services/api -run '^TestProducerContract'` to verify the
 corpus. The regular Go test suite also runs these checks. For an intentional
 wire change, run `make contract-fixtures`, review the generated diff and update
-the changelog. Delete a retired fixture explicitly when removing its case.
+the changelog. If Detect Secrets flags a new manifest checksum, verify it
+against the fixture and audit that manifest entry in `.secrets.baseline`. Delete a retired fixture explicitly when removing its case.
 The generator rejects extra files and non-regular entries in the fixture directory.

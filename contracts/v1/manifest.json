@@ -425,7 +425,7 @@
       ],
       "origin": "producer-reachable",
       "fixture": "zfs-pool.json",
-      "sha256": "d816890529d0b636c91369e1ce6c3e969b46d6e21ee87a2ed91e19d9ebe03827"
+      "sha256": "c4b90b73bd3f33cf6fa2d46a1d6e0a5d79945176c958a244b2119acd87feee61"
     },
     {
       "id": "zfs-pool-missing",
@@ -459,7 +459,7 @@
       ],
       "origin": "dto-constructed",
       "fixture": "zfs-pools.json",
-      "sha256": "09a0f165cc1bc37fb2d7788f9e2661707294ff61ed544943449731eeed06faa3"
+      "sha256": "64ae0355946bb20e459167b638256509fa06aa4cda66742bc09a01373b8855d2"
     },
     {
       "id": "zfs-pools-event",
@@ -474,7 +474,7 @@
       ],
       "origin": "dto-constructed",
       "fixture": "zfs-pools-event.json",
-      "sha256": "18413fd805ea7fcaddb8fb6c072e0a14ee98c784095651ad8dfd0d911c89449a"
+      "sha256": "b54747de67f9b285b4a884ddc5970ae180f81f7e1901d74975250568bc16f670"
     }
   ]
 }
