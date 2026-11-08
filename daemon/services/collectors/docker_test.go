@@ -349,3 +349,15 @@ func TestDockerRefreshCancelsWithoutPublishing(t *testing.T) {
 		})
 	}
 }
+
+func TestDockerCancelledRefreshDoesNotOpenClient(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	c := NewDockerCollector(&domain.Context{Hub: domain.NewEventBus(1)})
+	if err := c.Refresh(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Refresh = %v, want cancellation", err)
+	}
+	if c.dockerClient != nil {
+		t.Fatal("cancelled refresh opened a Docker client")
+	}
+}

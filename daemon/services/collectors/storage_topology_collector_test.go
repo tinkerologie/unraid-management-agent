@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -326,4 +327,47 @@ func TestStorageTopologyHelpers(t *testing.T) {
 			t.Error("isTimeout misclassifies errors")
 		}
 	})
+}
+
+func TestStorageTopologyLifetimePublishesAndJoinsCommands(t *testing.T) {
+	runner := newFakeRunner(t)
+	reaped := make(chan struct{})
+	release := sync.OnceFunc(func() { close(reaped) })
+	defer release()
+	const key = "storcli show J nolog"
+	runner.pending[key] = reaped
+	runner.errs[key] = context.DeadlineExceeded
+	c := newFixtureCollector(t, runner, "/sbin/storcli", "/usr/bin/sg_ses")
+	hub := domain.NewEventBus(10)
+	c.appCtx = &domain.Context{Hub: hub}
+	events := hub.Sub(constants.TopicStorageTopologyUpdate.Name)
+	defer hub.Unsub(events)
+	if err := c.Open(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Refresh(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-events:
+	default:
+		t.Fatal("refresh did not publish a partial snapshot")
+	}
+
+	done := make(chan struct{})
+	go func() { c.Close(); close(done) }()
+	select {
+	case <-done:
+		t.Fatal("Close returned while storcli was still alive")
+	case <-time.After(25 * time.Millisecond):
+	}
+	release()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("Close did not return after storcli exited")
+	}
+	if len(c.inflight) != 0 {
+		t.Fatal("Close retained reaped commands")
+	}
 }

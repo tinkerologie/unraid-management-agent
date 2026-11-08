@@ -49,11 +49,12 @@ func TestNotificationOpenSurvivesMkdirFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	notificationsDir, notificationsArchiveDir = filepath.Join(blocker, "unread"), filepath.Join(blocker, "archive")
-	c := &NotificationCollector{ctx: &domain.Context{Hub: domain.NewEventBus(1)}}
+	c := &NotificationCollector{WatchManualEvents: true, ctx: &domain.Context{Hub: domain.NewEventBus(1)}}
 	// Open logs the failure and still succeeds: the collector polls whatever it can read.
 	if err := c.Open(context.Background()); err != nil {
 		t.Fatalf("Open = %v, want nil", err)
 	}
+	c.Close()
 }
 
 func TestNotificationOpenResolvesDefaultDirs(t *testing.T) {
