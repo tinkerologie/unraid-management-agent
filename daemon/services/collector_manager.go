@@ -367,7 +367,7 @@ func (cm *CollectorManager) DisableCollector(name string) error {
 	}
 	mc.Gated, mc.Auto = false, false // manual control ends hardware gating
 
-	if mc.Status != "running" {
+	if !mc.Enabled && mc.Status != "running" {
 		if name == "psu" {
 			cm.announcePSULocked(dto.PSUStateDisabled)
 		}
@@ -770,7 +770,9 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 
 	// Notification collector
 	cm.Register("notification", func(ctx *domain.Context) Collector {
-		return collectors.NewNotificationCollector(ctx)
+		c := collectors.NewNotificationCollector(ctx)
+		c.WatchManualEvents = !cm.dynamic
+		return c
 	}, intervals.Notification, false)
 
 	// Registration collector

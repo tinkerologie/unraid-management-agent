@@ -180,13 +180,22 @@ func TestNotificationManualEvents(t *testing.T) {
 	unread, archive, cleanup := setupNotificationCollectorTestDirs(t)
 	defer cleanup()
 	c := NewNotificationCollector(&domain.Context{Hub: domain.NewEventBus(1)})
+	c.WatchManualEvents = true
 	ctx, cancel := context.WithCancel(t.Context())
+	// A bad archive path must not prevent the unread directory being watched.
+	if err := os.Remove(archive); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(archive, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
 	if err := c.Open(ctx); err != nil {
 		t.Fatal(err)
 	}
 	defer c.Close()
-	// A missing directory must not prevent the other directory being watched.
-	if err := os.Remove(archive); err != nil {
+	// The event happens before Refresh or the event goroutine can run.
+	file := filepath.Join(unread, "manual.notification")
+	if err := os.WriteFile(file, []byte("title=manual\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	triggered := make(chan struct{}, 1)
@@ -201,19 +210,9 @@ func TestNotificationManualEvents(t *testing.T) {
 		})
 	}()
 	defer func() { cancel(); <-done }()
-
-	file := filepath.Join(unread, "manual.notification")
-	deadline := time.After(5 * time.Second)
-	for {
-		if err := os.WriteFile(file, []byte("title=manual\n"), 0o600); err != nil {
-			t.Fatal(err)
-		}
-		select {
-		case <-triggered:
-			return
-		case <-deadline:
-			t.Fatal("no manual event for notification file")
-		case <-time.After(10 * time.Millisecond):
-		}
+	select {
+	case <-triggered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("notification watch was not installed by Open")
 	}
 }

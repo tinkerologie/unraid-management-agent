@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
+
 	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
 	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
 	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
@@ -58,10 +60,13 @@ func ResolveNotificationDirs(cfgPath string) (unread, archive string) {
 
 // NotificationCollector collects Unraid notifications
 type NotificationCollector struct {
-	ctx            *domain.Context
-	unreadDir      string
-	archiveDir     string
-	dynamixCfgPath string // path to dynamix.cfg; injectable for tests
+	// WatchManualEvents installs the legacy directory watches before the first refresh.
+	WatchManualEvents bool
+	manualWatcher     *fsnotify.Watcher
+	ctx               *domain.Context
+	unreadDir         string
+	archiveDir        string
+	dynamixCfgPath    string // path to dynamix.cfg; injectable for tests
 }
 
 // NewNotificationCollector creates a new notification collector

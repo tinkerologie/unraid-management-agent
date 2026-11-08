@@ -88,6 +88,13 @@ func (c *DockerCollector) reportDockerSourceFailure(reason string, err error) {
 
 // Collect gathers Docker container information using the SDK and publishes to event bus
 func (c *DockerCollector) Collect() {
+	_ = c.collect(context.Background())
+}
+
+func (c *DockerCollector) collect(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	startTotal := time.Now()
 	logger.Debug("Collecting docker data via SDK...")
 
@@ -97,19 +104,20 @@ func (c *DockerCollector) Collect() {
 		c.reportDockerSourceFailure("Docker client initialization failed", err)
 		// Publish empty list
 		domain.Publish(c.appCtx.Hub, constants.TopicContainerListUpdate, []*dto.ContainerInfo{})
-		return
+		return nil
 	}
-
-	ctx := context.Background()
 
 	// List all containers (including stopped) - SDK is much faster than CLI
 	startList := time.Now()
 	result, err := c.dockerClient.ContainerList(ctx, client.ContainerListOptions{All: true})
 	if err != nil {
+		if cancelled := ctx.Err(); cancelled != nil {
+			return cancelled
+		}
 		logger.Debug("Failed to list containers via SDK: %v", err)
 		c.reportDockerSourceFailure("Docker daemon unreachable (ContainerList failed)", err)
 		domain.Publish(c.appCtx.Hub, constants.TopicContainerListUpdate, []*dto.ContainerInfo{})
-		return
+		return nil
 	}
 	apiContainers := result.Items
 	logger.Debug("Docker SDK: ContainerList took %v for %d containers", time.Since(startList), len(apiContainers))
@@ -159,6 +167,9 @@ func (c *DockerCollector) Collect() {
 			shortID := apiContainer.ID[:12]
 			inspectResult, err := c.dockerClient.ContainerInspect(ctx, apiContainer.ID, client.ContainerInspectOptions{})
 			if err != nil {
+				if cancelled := ctx.Err(); cancelled != nil {
+					return cancelled
+				}
 				logger.Debug("Docker SDK: Failed to inspect container %s: %v", shortID, err)
 				continue
 			}
@@ -249,6 +260,10 @@ func (c *DockerCollector) Collect() {
 		logger.Debug("Docker SDK: Inspect + cgroup stats took %v for %d containers", time.Since(startInspect), len(runningContainers))
 	}
 
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	// Prune stale CPU snapshots for containers that no longer exist
 	c.pruneStaleSnapshots(runningContainers)
 
@@ -266,6 +281,7 @@ func (c *DockerCollector) Collect() {
 	// Publish event
 	domain.Publish(c.appCtx.Hub, constants.TopicContainerListUpdate, containers)
 	logger.Debug("Docker SDK: Total collection took %v, published %d containers", time.Since(startTotal), len(containers))
+	return nil
 }
 
 // getMemoryFromCgroups reads memory stats directly from cgroup v2 filesystem

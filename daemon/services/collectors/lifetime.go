@@ -22,6 +22,9 @@ func (c *NotificationCollector) Open(context.Context) error {
 			logger.Warning("Failed to create notifications directory %s: %v", dir, err)
 		}
 	}
+	if c.WatchManualEvents {
+		c.openManualWatcher()
+	}
 	return nil
 }
 
@@ -31,21 +34,33 @@ func (c *NotificationCollector) Refresh(context.Context) error {
 	return nil
 }
 
-// Close does nothing: the runner owns the directory watchers.
-func (c *NotificationCollector) Close() {}
+// Close releases Manual mode's watcher after the event loop returns.
+func (c *NotificationCollector) Close() {
+	if c.manualWatcher != nil {
+		_ = c.manualWatcher.Close()
+		c.manualWatcher = nil
+	}
+}
 
-// ManualEvents preserves immediate create, remove and write triggers.
-func (c *NotificationCollector) ManualEvents(ctx context.Context, trigger func()) {
+func (c *NotificationCollector) openManualWatcher() {
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
 		logger.Warning("Notification collector: cannot create watcher: %v", err)
 		return
 	}
-	defer func() { _ = w.Close() }()
+	c.manualWatcher = w
 	for _, dir := range []string{c.unreadDir, c.archiveDir} {
 		if err := w.Add(dir); err != nil {
 			logger.Warning("Notification collector: cannot watch %s: %v", dir, err)
 		}
+	}
+}
+
+// ManualEvents forwards events from the watches installed by Open.
+func (c *NotificationCollector) ManualEvents(ctx context.Context, trigger func()) {
+	w := c.manualWatcher
+	if w == nil {
+		return
 	}
 	for {
 		select {
@@ -98,9 +113,8 @@ func (c *ZFSCollector) Close() {}
 func (c *DockerCollector) Open(context.Context) error { return nil }
 
 // Refresh collects and publishes the containers once.
-func (c *DockerCollector) Refresh(context.Context) error {
-	c.Collect()
-	return nil
+func (c *DockerCollector) Refresh(ctx context.Context) error {
+	return c.collect(ctx)
 }
 
 // Close closes the Docker client on exit. The SDK's Close

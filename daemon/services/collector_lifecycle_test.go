@@ -169,7 +169,7 @@ func TestCollectorOpenFailureCleansUpBothModes(t *testing.T) {
 				cm := NewCollectorManager(app, &wg)
 				closed := make(chan struct{})
 				refreshes, closes := 0, 0
-				cm.Register("system", func(*domain.Context) Collector {
+				cm.Register("docker", func(*domain.Context) Collector {
 					return recordingCollector{
 						open: func(context.Context) error {
 							if panics {
@@ -180,13 +180,20 @@ func TestCollectorOpenFailureCleansUpBothModes(t *testing.T) {
 						refresh: func(context.Context) error { refreshes++; return nil },
 						close:   func() { closes++; close(closed) },
 					}
-				}, 10, true)
+				}, 10, false)
 				cm.StartAll()
 				waitChan(t, closed, "cleanup after failed Open")
 				wg.Wait()
-				if refreshes != 0 || closes != 1 || mustStatus(t, cm, "system").Status != "stopped" {
-					t.Fatalf("refreshes=%d closes=%d status=%+v", refreshes, closes, mustStatus(t, cm, "system"))
+				if refreshes != 0 || closes != 1 || mustStatus(t, cm, "docker").Status != "stopped" {
+					t.Fatalf("refreshes=%d closes=%d status=%+v", refreshes, closes, mustStatus(t, cm, "docker"))
 				}
+				if err := cm.DisableCollector("docker"); err != nil {
+					t.Fatal(err)
+				}
+				if st := mustStatus(t, cm, "docker"); st.Enabled || cm.StartAll() != 0 {
+					t.Fatalf("disabled collector remains eligible for restart: %+v", st)
+				}
+
 			})
 		}
 	}
