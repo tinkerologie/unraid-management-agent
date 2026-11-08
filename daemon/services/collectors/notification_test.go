@@ -1,7 +1,6 @@
 package collectors
 
 import (
-	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -72,12 +71,10 @@ func TestNotificationCollectorInit(t *testing.T) {
 	}
 
 	// Watcher should be nil until Start is called
-	if collector.watcher != nil {
-		t.Error("Watcher should be nil before Start() is called")
-	}
+
 }
 
-func TestNotificationCollectorStart(t *testing.T) {
+func TestNotificationCollectorRefresh(t *testing.T) {
 	tmpDir := t.TempDir()
 	tmpUnread := filepath.Join(tmpDir, "unread")
 	tmpArchive := filepath.Join(tmpDir, "archive")
@@ -104,25 +101,20 @@ func TestNotificationCollectorStart(t *testing.T) {
 	ch := hub.Sub("notifications_update")
 	defer hub.Unsub(ch, "notifications_update")
 
-	// Create a context that cancels after a short delay
-	testCtx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
-	defer cancel()
-
-	// Run collector in goroutine (it will return when context is cancelled)
-	go collector.Start(testCtx, 10*time.Millisecond)
-
-	// Wait for an event or timeout
+	if err := collector.Open(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	defer collector.Close()
+	if err := collector.Refresh(t.Context()); err != nil {
+		t.Fatal(err)
+	}
 	select {
 	case msg := <-ch:
-		if notifList, ok := msg.(*dto.NotificationList); ok {
-			if notifList == nil {
-				t.Error("Expected NotificationList, got nil")
-			}
-		} else {
-			t.Errorf("Expected *dto.NotificationList, got %T", msg)
+		if list, ok := msg.(*dto.NotificationList); !ok || list == nil {
+			t.Fatalf("expected a notification snapshot, got %v", msg)
 		}
-	case <-testCtx.Done():
-		// Context expired - this is expected behavior when testing Start()
+	default:
+		t.Fatal("Refresh did not publish a notification snapshot")
 	}
 }
 
@@ -410,32 +402,6 @@ func TestResolveNotificationDirsEmptyPath(t *testing.T) {
 	const base = "/boot/config/plugins/dynamix/notifications"
 	if unread != base+"/unread" {
 		t.Errorf("empty path= should fall back; got %q, want %q", unread, base+"/unread")
-	}
-}
-
-func TestNotificationCollectorPanic(t *testing.T) {
-	hub := domain.NewEventBus(10)
-	ctx := &domain.Context{Hub: hub}
-	collector := NewNotificationCollector(ctx)
-
-	testCtx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer cancel()
-
-	// Should complete without panicking
-	panicOccurred := false
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				panicOccurred = true
-			}
-		}()
-		collector.Start(testCtx, 100*time.Millisecond)
-	}()
-
-	<-testCtx.Done()
-
-	if panicOccurred {
-		t.Error("Unexpected panic occurred")
 	}
 }
 

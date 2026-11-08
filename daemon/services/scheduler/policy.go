@@ -63,7 +63,7 @@ func withEvents(p Policy) Policy {
 	return p
 }
 
-// delayed sets a policy's InitialDelay: the startup stagger its Start uses.
+// delayed sets a policy's InitialDelay: the startup stagger shared by both modes.
 func delayed(d time.Duration, p Policy) Policy {
 	p.InitialDelay = d
 	return p

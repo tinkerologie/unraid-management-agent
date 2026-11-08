@@ -1,9 +1,13 @@
 package collectors
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +15,7 @@ import (
 	"testing/iotest"
 	"time"
 
+	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
 	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
 	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 	"github.com/tinkerologie/unraid-management-agent/daemon/lib/testutil"
@@ -286,5 +291,73 @@ func TestDockerFormatMemoryDisplay(t *testing.T) {
 				t.Errorf("dockerFormatMemoryDisplay(%d, %d) = %s, expected %s", tt.used, tt.limit, result, tt.expected)
 			}
 		})
+	}
+}
+
+func TestDockerRefreshCancelsWithoutPublishing(t *testing.T) {
+	for _, target := range []string{"list", "inspect"} {
+		t.Run(target, func(t *testing.T) {
+			entered := make(chan struct{})
+			release := make(chan struct{})
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch {
+				case strings.HasSuffix(r.URL.Path, "/_ping"):
+					w.Header().Set("API-Version", "1.51")
+					w.WriteHeader(http.StatusOK)
+				case target == "inspect" && strings.HasSuffix(r.URL.Path, "/containers/json"):
+					w.Header().Set("Content-Type", "application/json")
+					_, _ = io.WriteString(w, `[{"Id":"abcdef1234567890","Names":["/synthetic"],"Image":"image","State":"running"}]`)
+				default:
+					close(entered)
+					select {
+					case <-r.Context().Done():
+					case <-release:
+					}
+				}
+			}))
+			defer server.Close()
+			defer close(release)
+			t.Setenv("DOCKER_HOST", server.URL)
+			hub := domain.NewEventBus(10)
+			updates := hub.Sub(constants.TopicContainerListUpdate.Name)
+			defer hub.Unsub(updates)
+			c := NewDockerCollector(&domain.Context{Hub: hub})
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			result := make(chan error, 1)
+			go func() { result <- c.Refresh(ctx) }()
+			select {
+			case <-entered:
+			case <-time.After(5 * time.Second):
+				t.Fatalf("Docker did not enter the %s request", target)
+			}
+			cancel()
+			select {
+			case err := <-result:
+				if !errors.Is(err, context.Canceled) {
+					t.Fatalf("Refresh = %v, want cancellation", err)
+				}
+			case <-time.After(5 * time.Second):
+				t.Fatal("Docker refresh hung after cancellation")
+			}
+			c.Close()
+			select {
+			case <-updates:
+				t.Fatal("cancelled refresh overwrote the cached snapshot")
+			default:
+			}
+		})
+	}
+}
+
+func TestDockerCancelledRefreshDoesNotOpenClient(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	c := NewDockerCollector(&domain.Context{Hub: domain.NewEventBus(1)})
+	if err := c.Refresh(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Refresh = %v, want cancellation", err)
+	}
+	if c.dockerClient != nil {
+		t.Fatal("cancelled refresh opened a Docker client")
 	}
 }

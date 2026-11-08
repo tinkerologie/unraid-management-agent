@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -376,4 +377,52 @@ func TestFileWatcher_RunIgnoresRemove(t *testing.T) {
 		t.Fatal(err)
 	}
 	rec.none(t, 150*time.Millisecond)
+}
+
+func TestFileWatcherJoinsInFlightAndCancelsPendingCallbacks(t *testing.T) {
+	fw, err := NewFileWatcher(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = fw.Close() }()
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		fw.Run(ctx, nil, func() {})
+	}()
+	started, release, pending := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	unblock := sync.OnceFunc(func() { close(release) })
+	defer func() { cancel(); unblock(); <-done }()
+	fw.debouncedCallback("in-flight", func() {
+		close(started)
+		<-release
+	})
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("debounce callback did not start")
+	}
+	fw.debounce = time.Hour
+	fw.debouncedCallback("pending", func() { close(pending) })
+	cancel()
+	select {
+	case <-done:
+		t.Fatal("watcher returned with callback in flight")
+	default:
+	}
+	unblock()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("watcher did not join the active callback")
+	}
+	if len(fw.timers) != 0 {
+		t.Fatal("watcher retained timers after cancellation")
+	}
+	select {
+	case <-pending:
+		t.Fatal("pending callback fired after cancellation")
+	default:
+	}
 }

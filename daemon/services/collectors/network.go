@@ -2,7 +2,6 @@ package collectors
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"io"
 	"net"
@@ -37,42 +36,6 @@ type NetworkCollector struct {
 // NewNetworkCollector creates a new network interface collector with the given context.
 func NewNetworkCollector(ctx *domain.Context) *NetworkCollector {
 	return &NetworkCollector{ctx: ctx, prevStats: make(map[string]prevNetStats)}
-}
-
-// Start begins the network collector's periodic data collection.
-// It runs in a goroutine and publishes network interface updates at the specified interval until the context is cancelled.
-func (c *NetworkCollector) Start(ctx context.Context, interval time.Duration) {
-	logger.Info("Starting network collector (interval: %v)", interval)
-
-	// Run once immediately with panic recovery
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LogPanicWithStack("Network collector", r)
-			}
-		}()
-		collectWithWatchdog(ctx, "Network", interval, c.Collect)
-	}()
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("Network collector stopping due to context cancellation")
-			return
-		case <-ticker.C:
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						logger.LogPanicWithStack("Network collector", r)
-					}
-				}()
-				collectWithWatchdog(ctx, "Network", interval, c.Collect)
-			}()
-		}
-	}
 }
 
 // Collect gathers network interface information and publishes it to the event bus.

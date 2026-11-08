@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -246,62 +247,6 @@ func TestStorageTopologyCollectPublishes(t *testing.T) {
 	}
 }
 
-func TestStorageTopologyStart(t *testing.T) {
-	t.Run("collects, recovers from panics and stops on cancel", func(t *testing.T) {
-		hub := domain.NewEventBus(10)
-		ch := hub.Sub(constants.TopicStorageTopologyUpdate.Name)
-		defer hub.Unsub(ch, constants.TopicStorageTopologyUpdate.Name)
-
-		runner := newFakeRunner(t)
-		c := newFixtureCollector(t, runner, "/usr/bin/sg_ses")
-		c.appCtx = &domain.Context{Hub: hub}
-		c.Stagger = 0
-		calls := 0
-		c.RunFn = func(ctx context.Context, timeout time.Duration, name string, args ...string) (string, <-chan struct{}, error) {
-			calls++
-			if calls == 1 {
-				panic("boom")
-			}
-			return runner.run(ctx, timeout, name, args...)
-		}
-
-		ctx, cancel := context.WithCancel(context.Background())
-		done := make(chan struct{})
-		go func() {
-			c.Start(ctx, 20*time.Millisecond)
-			close(done)
-		}()
-		select {
-		case <-ch:
-		case <-time.After(5 * time.Second):
-			t.Fatal("no topology published after a panicking cycle")
-		}
-		cancel()
-		select {
-		case <-done:
-		case <-time.After(5 * time.Second):
-			t.Fatal("Start did not return after cancel")
-		}
-	})
-
-	t.Run("returns during the startup stagger", func(t *testing.T) {
-		c := newFixtureCollector(t, newFakeRunner(t))
-		c.Stagger = time.Hour
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
-		finished := make(chan struct{})
-		go func() {
-			c.Start(ctx, time.Minute)
-			close(finished)
-		}()
-		select {
-		case <-finished:
-		case <-time.After(5 * time.Second):
-			t.Fatal("Start ignored cancellation during the stagger")
-		}
-	})
-}
-
 func TestStorageTopologyHelpers(t *testing.T) {
 	t.Run("isExecutableFile", func(t *testing.T) {
 		dir := t.TempDir()
@@ -382,4 +327,47 @@ func TestStorageTopologyHelpers(t *testing.T) {
 			t.Error("isTimeout misclassifies errors")
 		}
 	})
+}
+
+func TestStorageTopologyLifetimePublishesAndJoinsCommands(t *testing.T) {
+	runner := newFakeRunner(t)
+	reaped := make(chan struct{})
+	release := sync.OnceFunc(func() { close(reaped) })
+	defer release()
+	const key = "storcli show J nolog"
+	runner.pending[key] = reaped
+	runner.errs[key] = context.DeadlineExceeded
+	c := newFixtureCollector(t, runner, "/sbin/storcli", "/usr/bin/sg_ses")
+	hub := domain.NewEventBus(10)
+	c.appCtx = &domain.Context{Hub: hub}
+	events := hub.Sub(constants.TopicStorageTopologyUpdate.Name)
+	defer hub.Unsub(events)
+	if err := c.Open(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Refresh(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-events:
+	default:
+		t.Fatal("refresh did not publish a partial snapshot")
+	}
+
+	done := make(chan struct{})
+	go func() { c.Close(); close(done) }()
+	select {
+	case <-done:
+		t.Fatal("Close returned while storcli was still alive")
+	case <-time.After(25 * time.Millisecond):
+	}
+	release()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("Close did not return after storcli exited")
+	}
+	if len(c.inflight) != 0 {
+		t.Fatal("Close retained reaped commands")
+	}
 }

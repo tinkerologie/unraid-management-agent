@@ -1,7 +1,6 @@
 package collectors
 
 import (
-	"context"
 	"encoding/xml"
 	"fmt"
 	"net/url"
@@ -38,47 +37,6 @@ func NewVMCollector(ctx *domain.Context) *VMCollector {
 	return &VMCollector{
 		appCtx:        ctx,
 		previousStats: make(map[string]*vmCPUStats),
-	}
-}
-
-// Start begins the VM collector's periodic data collection
-func (c *VMCollector) Start(ctx context.Context, interval time.Duration) {
-	logger.Info("Starting VM collector (interval: %v)", interval)
-
-	if len(c.appCtx.VMGuest.VMs) > 0 {
-		var guests sync.WaitGroup
-		guests.Go(func() { newVMGuestPoller(c.appCtx.VMGuest, c.appCtx.Hub).Start(ctx) })
-		defer guests.Wait()
-	}
-
-	// Run once immediately with panic recovery
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LogPanicWithStack("VM collector", r)
-			}
-		}()
-		c.Collect()
-	}()
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("VM collector stopping due to context cancellation")
-			return
-		case <-ticker.C:
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						logger.LogPanicWithStack("VM collector", r)
-					}
-				}()
-				c.Collect()
-			}()
-		}
 	}
 }
 

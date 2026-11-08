@@ -2,7 +2,6 @@
 package collectors
 
 import (
-	"context"
 	"time"
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
@@ -20,37 +19,6 @@ type FanControlCollector struct {
 // NewFanControlCollector creates a new fan control collector.
 func NewFanControlCollector(ctx *domain.Context) *FanControlCollector {
 	return &FanControlCollector{ctx: ctx}
-}
-
-// Start begins the periodic fan status collection loop with panic recovery.
-func (c *FanControlCollector) Start(ctx context.Context, interval time.Duration) {
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LogPanicWithStack("Fan control collector", r)
-			}
-		}()
-		c.Collect()
-	}()
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						logger.LogPanicWithStack("Fan control collector", r)
-					}
-				}()
-				c.Collect()
-			}()
-		}
-	}
 }
 
 // Collect reads the current fan status and publishes it to the event bus.

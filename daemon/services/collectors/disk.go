@@ -2,7 +2,6 @@ package collectors
 
 import (
 	"bufio"
-	"context"
 	"errors"
 	"io"
 	"os"
@@ -46,71 +45,6 @@ func NewDiskCollector(ctx *domain.Context) *DiskCollector {
 	return &DiskCollector{
 		ctx:         ctx,
 		prevIOTicks: make(map[string]uint64),
-	}
-}
-
-// Start begins the disk collector's periodic data collection.
-// It runs in a goroutine and publishes disk information updates at the specified interval until the context is cancelled.
-func (c *DiskCollector) Start(ctx context.Context, interval time.Duration) {
-	logger.Info("Starting disk collector (interval: %v)", interval)
-
-	// Run once immediately with panic recovery
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LogPanicWithStack("Disk collector", r)
-			}
-		}()
-		collectWithWatchdog(ctx, "Disk", interval, c.Collect)
-	}()
-
-	// Set up fsnotify watcher for instant state updates on disks.ini changes
-	watchedFiles := []string{constants.DisksIni}
-	fw, err := NewFileWatcher(500 * time.Millisecond)
-	if err != nil {
-		logger.Warning("Disk collector: failed to create file watcher, using ticker only: %v", err)
-	} else {
-		for _, f := range watchedFiles {
-			if watchErr := fw.WatchFile(f); watchErr != nil {
-				logger.Warning("Disk collector: failed to watch %s: %v", f, watchErr)
-			}
-		}
-		// Close is deferred inside the goroutine to avoid racing with fw.Run()
-		go func() {
-			defer func() { _ = fw.Close() }()
-			fw.Run(ctx, watchedFiles, func() {
-				func() {
-					defer func() {
-						if r := recover(); r != nil {
-							logger.LogPanicWithStack("Disk collector (fsnotify)", r)
-						}
-					}()
-					logger.Debug("Disk collector: disks.ini changed, collecting immediately")
-					collectWithWatchdog(ctx, "Disk", interval, c.Collect)
-				}()
-			})
-		}()
-		logger.Info("Disk collector: fsnotify watching %v for instant updates", watchedFiles)
-	}
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("Disk collector stopping due to context cancellation")
-			return
-		case <-ticker.C:
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						logger.LogPanicWithStack("Disk collector", r)
-					}
-				}()
-				collectWithWatchdog(ctx, "Disk", interval, c.Collect)
-			}()
-		}
 	}
 }
 

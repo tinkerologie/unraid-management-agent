@@ -1,7 +1,6 @@
 package collectors
 
 import (
-	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -12,10 +11,6 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
 )
-
-// dockerNetworksStartupStagger delays the first collection so it does not
-// pile onto boot alongside every other collector.
-const dockerNetworksStartupStagger = 5 * time.Second
 
 // DockerNetworksCollector periodically lists Docker networks and publishes the
 // result. Networks change rarely so the default interval is 60 seconds.
@@ -34,46 +29,6 @@ type DockerNetworksCollector struct {
 func NewDockerNetworksCollector(ctx *domain.Context) *DockerNetworksCollector {
 	return &DockerNetworksCollector{
 		appCtx: ctx,
-	}
-}
-
-// Start begins the periodic network listing after a startup stagger.
-func (c *DockerNetworksCollector) Start(ctx context.Context, interval time.Duration) {
-	logger.Info("Starting docker_networks collector (interval: %v)", interval)
-
-	select {
-	case <-ctx.Done():
-		return
-	case <-time.After(dockerNetworksStartupStagger):
-	}
-
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LogPanicWithStack("DockerNetworks collector", r)
-			}
-		}()
-		c.Collect()
-	}()
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("DockerNetworks collector stopping due to context cancellation")
-			return
-		case <-ticker.C:
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						logger.LogPanicWithStack("DockerNetworks collector", r)
-					}
-				}()
-				c.Collect()
-			}()
-		}
 	}
 }
 

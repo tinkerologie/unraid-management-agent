@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
 	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
@@ -227,24 +226,17 @@ func TestPSUCapabilityAndCancellation(t *testing.T) {
 		t.Fatal("cancelled run published")
 	default:
 	}
-	active, stop := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	go func() { c.Start(active, time.Millisecond); close(done) }()
-	select {
-	case <-updates:
-	case <-time.After(time.Second):
-		t.Fatal("no startup snapshot")
+	if err := c.Open(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	if err := c.Refresh(t.Context()); err != nil {
+		t.Fatal(err)
 	}
 	select {
 	case <-updates:
-	case <-time.After(time.Second):
-		t.Fatal("no periodic snapshot")
-	}
-	stop()
-	select {
-	case <-done:
-	case <-time.After(time.Second):
-		t.Fatal("collector did not stop")
+	default:
+		t.Fatal("no snapshot after refresh")
 	}
 }
 
@@ -268,27 +260,7 @@ func TestPSURepeatedSerialsAndGuard(t *testing.T) {
 	if !called {
 		t.Fatal("publication guard was bypassed")
 	}
-	// A collection exception must not terminate future manual polls.
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	completed := make(chan struct{})
-	calls := 0
-	c.PublishGuard = func(context.Context, *dto.PSUStatus) {
-		calls++
-		if calls == 1 {
-			panic("test publication fault")
-		}
-		cancel()
-	}
-	go func() { c.Start(ctx, time.Millisecond); close(completed) }()
-	select {
-	case <-completed:
-	case <-time.After(time.Second):
-		t.Fatal("panic recovery lost collector")
-	}
-	if calls < 2 {
-		t.Fatal("poll after panic was not run")
-	}
+
 }
 
 func TestPSUUevents(t *testing.T) {
@@ -364,8 +336,6 @@ func TestPSUInventoryAndBindingErrors(t *testing.T) {
 	}
 	cancelled, cancel := context.WithCancel(context.Background())
 	cancel()
-	c.Start(cancelled, time.Second)
-	c.Start(context.Background(), 0)
 	// A cancelled device read skips acquisition and never invents a measurement.
 	dev, _ := readPSUDevice(cancelled, psuSource{device: dto.PSUDevice{ID: "psu-cancelled", Sensors: []dto.PSUSensor{}}, hwmonPath: root})
 	for _, sensor := range dev.Sensors {

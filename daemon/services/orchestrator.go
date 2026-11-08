@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
 	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
@@ -66,7 +67,7 @@ func (o *Orchestrator) Run() error {
 	defer stop()
 
 	// Initialize collector manager
-	o.collectorManager = NewCollectorManager(o.ctx, &wg)
+	o.collectorManager = NewCollectorManager(o.ctx, &sync.WaitGroup{})
 
 	// OS-resilience: detect capabilities (OS sources and hardware, #261) and
 	// wire the status-change notifier to the bus.
@@ -351,27 +352,32 @@ func (o *Orchestrator) startCapabilityRefresher(ctx context.Context, wg *sync.Wa
 
 // shutdown performs graceful shutdown of all running subsystems and waits for background goroutines.
 func (o *Orchestrator) shutdown(apiServer *api.Server, wg *sync.WaitGroup) {
-	// 1. Stop fan controller (restores fans to automatic mode)
+	// Stop accepting API requests before controllers restore hardware state.
+	if apiServer != nil {
+		apiServer.Stop()
+	}
+
+	// Stop fan controller (restores fans to automatic mode)
 	if o.fanController != nil {
 		o.fanController.Shutdown()
 		logger.Info("Fan controller shut down")
 	}
 
-	// 2. Stop CPU controller (restores original governor)
+	// Stop CPU controller (restores original governor)
 	if o.cpuController != nil {
 		o.cpuController.Shutdown()
 		o.cpuController = nil
 		logger.Info("CPU controller shut down")
 	}
 
-	// 3. Stop tuning controller (restores original parameters)
+	// Stop tuning controller (restores original parameters)
 	if o.tuningController != nil {
 		o.tuningController.Shutdown()
 		o.tuningController = nil
 		logger.Info("Tuning controller shut down")
 	}
 
-	// 4. Close the agent's Docker controller if it was started
+	// Close the agent's Docker controller if it was started
 	if o.agentDocker != nil {
 		if err := o.agentDocker.Close(); err != nil {
 			logger.Warning("Agent Docker controller close failed: %v", err)
@@ -380,7 +386,7 @@ func (o *Orchestrator) shutdown(apiServer *api.Server, wg *sync.WaitGroup) {
 		logger.Info("Agent Docker controller closed")
 	}
 
-	// 5. Stop advertising via mDNS (sends goodbye packets) before other
+	// Stop advertising via mDNS (sends goodbye packets) before other
 	// services wind down so discovery clients drop the entry promptly.
 	if o.discoveryService != nil {
 		o.discoveryService.Shutdown()
@@ -388,29 +394,34 @@ func (o *Orchestrator) shutdown(apiServer *api.Server, wg *sync.WaitGroup) {
 		logger.Info("Discovery service stopped")
 	}
 
-	// 6. Stop MQTT client if running
+	// Stop MQTT client if running
 	if o.mqttClient != nil {
 		o.mqttClient.Disconnect()
 		logger.Info("MQTT client disconnected")
 	}
 
-	// 7. Stop all collectors via manager
+	// Stop all collectors via manager
 	if o.collectorManager != nil {
-		o.collectorManager.StopAll()
+		o.shutdownCollectors()
 	}
 
-	// 8. Stop API server (which also cancels its internal goroutines)
-	if apiServer != nil {
-		apiServer.Stop()
-	}
-
-	// 9. Wait for all goroutines to complete
+	// Wait for all goroutines to complete
 	if wg != nil {
 		logger.Info("Waiting for all goroutines to complete...")
 		wg.Wait()
 	}
 
 	logger.Success("Shutdown complete")
+}
+
+// shutdownCollectors bounds the wait for collector-owned resources. The
+// orchestrator's separate worker group can still finish normally on timeout.
+func (o *Orchestrator) shutdownCollectors() {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if stopping := o.collectorManager.Shutdown(ctx); len(stopping) != 0 {
+		logger.Warning("Collector shutdown timed out while stopping: %v", stopping)
+	}
 }
 
 // RunMCPStdio starts the agent with MCP over STDIO transport for local AI client integration.
@@ -425,7 +436,7 @@ func (o *Orchestrator) RunMCPStdio() error {
 	defer cancel()
 
 	// Initialize collector manager and register all collectors
-	o.collectorManager = NewCollectorManager(o.ctx, &wg)
+	o.collectorManager = NewCollectorManager(o.ctx, &sync.WaitGroup{})
 
 	// OS-resilience: detect capabilities (OS sources and hardware, #261) and
 	// wire the status-change notifier to the bus.
@@ -451,8 +462,8 @@ func (o *Orchestrator) RunMCPStdio() error {
 	toolPolicyStore := domain.NewToolPolicyStore("", o.ctx.ToolPolicy)
 	if err := toolPolicyStore.Load(); err != nil {
 		cancel()
-		o.collectorManager.StopAll()
 		apiServer.Stop()
+		o.shutdownCollectors()
 		wg.Wait()
 		return fmt.Errorf("failed to load tool policy: %w", err)
 	}
@@ -462,8 +473,8 @@ func (o *Orchestrator) RunMCPStdio() error {
 	mcpServer.SetToolPolicyStore(toolPolicyStore)
 	if err := mcpServer.Initialize(); err != nil {
 		cancel()
-		o.collectorManager.StopAll()
 		apiServer.Stop()
+		o.shutdownCollectors()
 		wg.Wait()
 		return fmt.Errorf("failed to initialize MCP server: %w", err)
 	}
@@ -549,8 +560,8 @@ func (o *Orchestrator) RunMCPStdio() error {
 	if o.fanController != nil {
 		o.fanController.Shutdown()
 	}
-	o.collectorManager.StopAll()
 	apiServer.Stop()
+	o.shutdownCollectors()
 	wg.Wait()
 	logger.Info("MCP STDIO shutdown complete")
 

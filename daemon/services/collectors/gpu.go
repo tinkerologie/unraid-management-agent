@@ -1,7 +1,6 @@
 package collectors
 
 import (
-	"context"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -42,42 +41,6 @@ func (c *GPUCollector) runNvidia(args ...string) (string, error) {
 		return c.nvidiaExec("nvidia-smi", args...)
 	}
 	return lib.ExecCommandOutput("nvidia-smi", args...)
-}
-
-// Start begins the GPU collector's periodic data collection.
-// It runs in a goroutine and publishes GPU metrics updates at the specified interval until the context is cancelled.
-func (c *GPUCollector) Start(ctx context.Context, interval time.Duration) {
-	logger.Info("Starting gpu collector (interval: %v)", interval)
-
-	// Run once immediately with panic recovery
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LogPanicWithStack("GPU collector", r)
-			}
-		}()
-		collectWithWatchdog(ctx, "GPU", interval, c.Collect)
-	}()
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("GPU collector stopping due to context cancellation")
-			return
-		case <-ticker.C:
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						logger.LogPanicWithStack("GPU collector", r)
-					}
-				}()
-				collectWithWatchdog(ctx, "GPU", interval, c.Collect)
-			}()
-		}
-	}
 }
 
 // Collect gathers GPU metrics from all available GPUs and publishes them to the event bus.

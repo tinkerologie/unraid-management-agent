@@ -2,7 +2,6 @@ package collectors
 
 import (
 	"bufio"
-	"context"
 	"os"
 	"path/filepath"
 	"slices"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+
 	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
 	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
 	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
@@ -60,9 +60,13 @@ func ResolveNotificationDirs(cfgPath string) (unread, archive string) {
 
 // NotificationCollector collects Unraid notifications
 type NotificationCollector struct {
-	ctx            *domain.Context
-	watcher        *fsnotify.Watcher
-	dynamixCfgPath string // path to dynamix.cfg; injectable for tests
+	// WatchManualEvents installs the legacy directory watches before the first refresh.
+	WatchManualEvents bool
+	manualWatcher     *fsnotify.Watcher
+	ctx               *domain.Context
+	unreadDir         string
+	archiveDir        string
+	dynamixCfgPath    string // path to dynamix.cfg; injectable for tests
 }
 
 // NewNotificationCollector creates a new notification collector
@@ -70,104 +74,14 @@ func NewNotificationCollector(ctx *domain.Context) *NotificationCollector {
 	return &NotificationCollector{ctx: ctx, dynamixCfgPath: constants.DynamixCfg}
 }
 
-// Start begins collecting notification data
-func (c *NotificationCollector) Start(ctx context.Context, interval time.Duration) {
-	// Top-level safety net for startup preamble panics
-	defer func() {
-		if r := recover(); r != nil {
-			logger.LogPanicWithStack("Notification collector (top-level)", r)
-		}
-	}()
-
-	// Resolve actual notification path from dynamix.cfg unless tests have already
-	// overridden the package-level vars via setupNotificationCollectorTestDirs.
-	if notificationsDir == defaultNotificationsBase+"/unread" {
-		notificationsDir, notificationsArchiveDir = ResolveNotificationDirs(c.dynamixCfgPath)
-	}
-
-	// Initialize file watcher
-	var err error
-	c.watcher, err = fsnotify.NewWatcher()
-	if err != nil {
-		logger.Error("Failed to create file watcher: %v", err)
-		return
-	}
-	defer func() {
-		if err := c.watcher.Close(); err != nil {
-			logger.Error("Failed to close file watcher: %v", err)
-		}
-	}()
-
-	// Ensure directories exist
-	// #nosec G301 - Unraid standard permissions (0755 for directories)
-	if err := os.MkdirAll(notificationsDir, 0755); err != nil {
-		logger.Warning("Failed to create notifications directory: %v", err)
-	}
-	// #nosec G301 - Unraid standard permissions (0755 for directories)
-	if err := os.MkdirAll(notificationsArchiveDir, 0755); err != nil {
-		logger.Warning("Failed to create notifications archive directory: %v", err)
-	}
-
-	// Watch notification directories
-	if err := c.watcher.Add(notificationsDir); err != nil {
-		logger.Warning("Failed to watch notifications directory: %v", err)
-	}
-	if err := c.watcher.Add(notificationsArchiveDir); err != nil {
-		logger.Warning("Failed to watch notifications archive directory: %v", err)
-	}
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	// Initial collection with panic recovery
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LogPanicWithStack("Notification collector", r)
-			}
-		}()
-		c.collect()
-	}()
-
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("Notification collector stopped")
-			return
-		case <-ticker.C:
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						logger.LogPanicWithStack("Notification collector", r)
-					}
-				}()
-				c.collect()
-			}()
-		case event := <-c.watcher.Events:
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						logger.LogPanicWithStack("Notification collector (watcher)", r)
-					}
-				}()
-				// Trigger immediate collection on file changes
-				if event.Op&fsnotify.Create == fsnotify.Create ||
-					event.Op&fsnotify.Remove == fsnotify.Remove ||
-					event.Op&fsnotify.Write == fsnotify.Write {
-					logger.Debug("Notification file change detected: %s", event.Name)
-					c.collect()
-				}
-			}()
-		case err := <-c.watcher.Errors:
-			logger.Error("File watcher error: %v", err)
-		}
-	}
-}
-
 // collect gathers all notifications and publishes to event bus
 func (c *NotificationCollector) collect() {
-	unread := c.collectNotifications(notificationsDir, "unread")
-	archived := c.collectNotifications(notificationsArchiveDir, "archive")
+	unreadDir, archiveDir := c.unreadDir, c.archiveDir
+	if unreadDir == "" {
+		unreadDir, archiveDir = notificationsDir, notificationsArchiveDir
+	}
+	unread := c.collectNotifications(unreadDir, "unread")
+	archived := c.collectNotifications(archiveDir, "archive")
 
 	overview := c.calculateOverview(unread, archived)
 

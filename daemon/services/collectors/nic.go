@@ -1,7 +1,6 @@
 package collectors
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -20,8 +19,6 @@ import (
 )
 
 const (
-	// nicStartupStagger delays the first collection so it does not pile onto boot.
-	nicStartupStagger = 10 * time.Second
 	// lspciTimeout bounds one lspci call.
 	lspciTimeout = 10 * time.Second
 )
@@ -62,8 +59,6 @@ type NICCollector struct {
 	LspciFn func(addr string) (string, error)
 	// Now returns the current time; replaceable for tests.
 	Now func() time.Time
-	// Stagger delays the first collection after Start.
-	Stagger time.Duration
 
 	// names caches lspci names per PCI function (they never change at runtime).
 	names    map[string]pciNames
@@ -80,42 +75,8 @@ func NewNICCollector(ctx *domain.Context) *NICCollector {
 		LspciFn: func(addr string) (string, error) {
 			return lib.ExecCommandOutputWithTimeout(lspciTimeout, "lspci", "-Dmm", "-s", addr)
 		},
-		Now:     time.Now,
-		Stagger: nicStartupStagger,
-		names:   map[string]pciNames{},
-	}
-}
-
-// Start runs the collector until ctx is cancelled.
-func (c *NICCollector) Start(ctx context.Context, interval time.Duration) {
-	logger.Info("Starting NIC collector (interval: %v)", interval)
-
-	select {
-	case <-ctx.Done():
-		return
-	case <-time.After(c.Stagger):
-	}
-
-	run := func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LogPanicWithStack("NIC collector", r)
-			}
-		}()
-		collectWithWatchdog(ctx, "NIC", interval, c.Collect)
-	}
-	run()
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("NIC collector stopping due to context cancellation")
-			return
-		case <-ticker.C:
-			run()
-		}
+		Now:   time.Now,
+		names: map[string]pciNames{},
 	}
 }
 

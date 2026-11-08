@@ -309,41 +309,15 @@ All user-provided input must be validated using functions in `daemon/lib/validat
 
 ## Core Patterns
 
-### Panic Recovery in Collectors
+### Collector Lifetime
 
-**All collector loops MUST wrap work in defer/recover:**
-
-```go
-func (c *Collector) Start(ctx context.Context, interval time.Duration) {
-    func() {
-        defer func() {
-            if r := recover(); r != nil {
-                logger.Error("Collector PANIC on startup: %v", r)
-            }
-        }()
-        c.Collect()
-    }()
-
-    ticker := time.NewTicker(interval)
-    defer ticker.Stop()
-
-    for {
-        select {
-        case <-ctx.Done():
-            return
-        case <-ticker.C:
-            func() {
-                defer func() {
-                    if r := recover(); r != nil {
-                        logger.Error("Collector PANIC in loop: %v", r)
-                    }
-                }()
-                c.Collect()
-            }()
-        }
-    }
-}
-```
+Manual and Dynamic scheduling use the same collector lifetime. Register a single
+collection function for a stateless collector. A resource-owning collector
+implements `Open(ctx)`, `Refresh(ctx)`, and `Close()`. The manager serializes
+those calls, recovers panics, and cancels and joins event sources before closing
+resources. A queued enable or interval restart waits for cleanup. Public
+collector status keeps its existing values and a restart retains the cached
+snapshot.
 
 ### Cache Access (Thread-Safe)
 

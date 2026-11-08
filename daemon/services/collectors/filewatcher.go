@@ -19,6 +19,7 @@ type FileWatcher struct {
 	mu         sync.Mutex
 	debounce   time.Duration
 	timers     map[string]*time.Timer
+	callbacks  sync.WaitGroup
 	callbackMu sync.Mutex // guards the in-flight callback to prevent overlapping executions
 }
 
@@ -123,6 +124,7 @@ func dirEntryChanged(dir, glob, abs string, op fsnotify.Op) bool {
 // loop passes each event and its absolute path to handle until the context is
 // cancelled, the watcher is closed or handle returns false.
 func (fw *FileWatcher) loop(ctx context.Context, handle func(event fsnotify.Event, abs string) bool) {
+	defer fw.stopCallbacks()
 	for {
 		select {
 		case <-ctx.Done():
@@ -166,17 +168,39 @@ func (fw *FileWatcher) debouncedCallback(key string, cb func()) {
 	fw.mu.Lock()
 	defer fw.mu.Unlock()
 
-	if t, exists := fw.timers[key]; exists {
-		t.Stop()
+	if previous := fw.timers[key]; previous != nil && previous.Stop() {
+		fw.callbacks.Done()
 	}
-	fw.timers[key] = time.AfterFunc(fw.debounce, func() {
-		// Guard against overlapping callback executions: if the previous callback
-		// is still running, skip this firing rather than queuing behind it.
+	fw.callbacks.Add(1)
+	var timer *time.Timer
+	timer = time.AfterFunc(fw.debounce, func() {
+		defer fw.callbacks.Done()
+		fw.mu.Lock()
+		if fw.timers[key] != timer {
+			fw.mu.Unlock()
+			return
+		}
+		delete(fw.timers, key)
+		fw.mu.Unlock()
 		if !fw.callbackMu.TryLock() {
-			logger.Warning("FileWatcher: callback for %s skipped — previous run still in progress; change will be re-read on next collector tick", key)
+			logger.Warning("FileWatcher: callback for %s skipped because another callback is active", key)
 			return
 		}
 		defer fw.callbackMu.Unlock()
 		cb()
 	})
+	fw.timers[key] = timer
+}
+
+// stopCallbacks cancels pending timers and joins callbacks that already started.
+func (fw *FileWatcher) stopCallbacks() {
+	fw.mu.Lock()
+	for _, timer := range fw.timers {
+		if timer.Stop() {
+			fw.callbacks.Done()
+		}
+	}
+	clear(fw.timers)
+	fw.mu.Unlock()
+	fw.callbacks.Wait()
 }

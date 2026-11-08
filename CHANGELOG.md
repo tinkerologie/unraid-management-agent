@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Configure engineering agent skills with GitHub Issues, the default triage label mapping, and a single-context domain documentation layout.
 
+### Fixed
+
+- Serialize collector shutdown and restart across Manual and Dynamic modes.
+  A replacement waits for the previous collection and cleanup to finish (#323).
+
 ## [2026.11.02] - 2026-11-05
 
 ### Fixed

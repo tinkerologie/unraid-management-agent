@@ -389,15 +389,19 @@ func TestVMCollectorGetCPUUsage(t *testing.T) {
 	}
 }
 
-// TestVMCollector_StartWithGuestAgent checks Start launches the guest agent
+// TestVMCollector_GuestAgentLifetime checks Open launches the guest agent
 // reads when VMs are configured and stops when the context is cancelled.
-func TestVMCollector_StartWithGuestAgent(t *testing.T) {
+func TestVMCollector_GuestAgentLifetime(t *testing.T) {
 	hub := domain.NewEventBus(100)
 	sub := hub.Sub("vm_guest_update")
 	ctx := &domain.Context{Hub: hub, VMGuest: domain.VMGuestConfig{VMs: []string{"Windows 11"}, Interval: 30}}
 	runCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	c := NewVMCollector(ctx)
+	if err := c.Open(runCtx); err != nil {
+		t.Fatal(err)
+	}
 	done := make(chan struct{})
-	go func() { NewVMCollector(ctx).Start(runCtx, time.Hour); close(done) }()
 
 	select {
 	case <-sub:
@@ -405,10 +409,11 @@ func TestVMCollector_StartWithGuestAgent(t *testing.T) {
 		t.Fatal("no vm_guest_update published")
 	}
 	cancel()
+	go func() { c.Close(); close(done) }()
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
-		t.Fatal("Start did not return after cancel")
+		t.Fatal("Close did not return after cancel")
 	}
 }
 

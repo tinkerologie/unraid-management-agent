@@ -827,3 +827,35 @@ func TestNewZFSCollectorChecksDisksIni(t *testing.T) {
 		t.Errorf("spinStates() = %v, want sdy spun down", got)
 	}
 }
+
+func TestZFSCloseWaitsForRemovedDisksSmartctl(t *testing.T) {
+	clock := time.Now()
+	reaped := make(chan struct{})
+	release := sync.OnceFunc(func() { close(reaped) })
+	defer release()
+	runner := &fakeSmartctl{
+		outputs:  map[string]string{"sdb": readSmartctlFixture(t, "scsi.json")},
+		inflight: map[string]chan struct{}{"sdb": reaped},
+	}
+	cache := newTestCache(t, runner, &clock)
+	cache.lookup(refs("sdb"))
+	cache.lookup(nil)
+	if len(cache.entries) != 0 {
+		t.Fatal("removed disk is still in the SMART cache")
+	}
+
+	done := make(chan struct{})
+	c := &ZFSCollector{driveHealth: cache}
+	go func() { c.Close(); close(done) }()
+	select {
+	case <-done:
+		t.Fatal("Close returned before smartctl exited")
+	case <-time.After(25 * time.Millisecond):
+	}
+	release()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("Close did not return after smartctl exited")
+	}
+}

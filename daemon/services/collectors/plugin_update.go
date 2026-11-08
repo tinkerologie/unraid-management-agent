@@ -13,10 +13,6 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
 )
 
-// pluginUpdateStartupStagger delays the first scheduled check so plugin update
-// detection does not pile onto boot alongside every other collector.
-const pluginUpdateStartupStagger = 30 * time.Second
-
 // pluginUpdateCheckTimeout bounds a full plugin update check. The check shells
 // out to `plugin check`, which downloads update metadata; on networks without
 // outbound internet access (issue #123) it must fail fast instead of wedging
@@ -51,46 +47,6 @@ func NewPluginUpdateCollector(ctx *domain.Context) *PluginUpdateCollector {
 	return &PluginUpdateCollector{
 		appCtx:        ctx,
 		prevAvailable: make(map[string]bool),
-	}
-}
-
-// Start begins the periodic plugin update check after a startup stagger.
-func (c *PluginUpdateCollector) Start(ctx context.Context, interval time.Duration) {
-	logger.Info("Starting plugin_update collector (interval: %v)", interval)
-
-	select {
-	case <-ctx.Done():
-		return
-	case <-time.After(pluginUpdateStartupStagger):
-	}
-
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LogPanicWithStack("PluginUpdate collector", r)
-			}
-		}()
-		c.Collect(ctx)
-	}()
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("PluginUpdate collector stopping due to context cancellation")
-			return
-		case <-ticker.C:
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						logger.LogPanicWithStack("PluginUpdate collector", r)
-					}
-				}()
-				c.Collect(ctx)
-			}()
-		}
 	}
 }
 

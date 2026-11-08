@@ -8,46 +8,25 @@ Reference: [`AGENTS.md`](../../AGENTS.md) for full project context.
 
 ## Pattern
 
-Every collector is an independent goroutine that:
+Manual mode uses fixed intervals and existing change triggers. Dynamic mode
+uses the shared scheduler policy for demand, floors, and event triggers.
+Both publish results on the event bus.
 
-1. Runs at a fixed interval (defined in `daemon/constants/const.go`)
-2. Collects data from system sources (native APIs or shell commands)
-3. Publishes results to the PubSub event bus via `ctx.Hub.Pub(data, topic)`
+## Resource lifetime
 
-## Panic Recovery (Required)
+The collector manager runs one generation per collector. Resource-owning
+collectors implement `Open(ctx)`, `Refresh(ctx)`, and `Close()`. Keep
+construction free of resources that require cleanup. `Open` starts
+context-bound workers. `Refresh` collects and publishes once. `Close` releases
+resources and joins workers after cancellation, including after a failed or
+panicking `Open`. The manager serializes refreshes, recovers and logs panics,
+and joins event sources before calling `Close`. Use a function adapter for a
+collector with no resource setup or teardown.
 
-**All collector loops MUST wrap work in defer/recover:**
-
-```go
-func (c *Collector) Start(ctx context.Context, interval time.Duration) {
-    func() {
-        defer func() {
-            if r := recover(); r != nil {
-                logger.Error("Collector PANIC on startup: %v", r)
-            }
-        }()
-        c.Collect()
-    }()
-
-    ticker := time.NewTicker(interval)
-    defer ticker.Stop()
-    for {
-        select {
-        case <-ctx.Done():
-            return
-        case <-ticker.C:
-            func() {
-                defer func() {
-                    if r := recover(); r != nil {
-                        logger.Error("Collector PANIC in loop: %v", r)
-                    }
-                }()
-                c.Collect()
-            }()
-        }
-    }
-}
-```
+Disabling or restarting a collector requests cancellation. A replacement
+waits until the previous generation closes, and shutdown reports generations
+still stopping at its deadline. Preserve the existing status values and
+cached snapshots during a restart.
 
 ## Registration
 

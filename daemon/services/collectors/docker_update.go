@@ -13,10 +13,6 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
 )
 
-// dockerUpdateStartupStagger delays the first scheduled check so update
-// detection does not pile onto boot alongside every other collector.
-const dockerUpdateStartupStagger = 45 * time.Second
-
 // dockerUpdateCheckTimeout bounds a full update-check run. Registry calls hang
 // on networks without outbound internet access (issue #123), so the check must
 // fail fast instead of wedging the collector for minutes per cycle.
@@ -50,46 +46,6 @@ func NewDockerUpdateCollector(ctx *domain.Context) *DockerUpdateCollector {
 	return &DockerUpdateCollector{
 		appCtx:        ctx,
 		prevAvailable: make(map[string]bool),
-	}
-}
-
-// Start begins the periodic update check after a startup stagger.
-func (c *DockerUpdateCollector) Start(ctx context.Context, interval time.Duration) {
-	logger.Info("Starting docker_update collector (interval: %v)", interval)
-
-	select {
-	case <-ctx.Done():
-		return
-	case <-time.After(dockerUpdateStartupStagger):
-	}
-
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LogPanicWithStack("DockerUpdate collector", r)
-			}
-		}()
-		c.Collect(ctx)
-	}()
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("DockerUpdate collector stopping due to context cancellation")
-			return
-		case <-ticker.C:
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						logger.LogPanicWithStack("DockerUpdate collector", r)
-					}
-				}()
-				c.Collect(ctx)
-			}()
-		}
 	}
 }
 

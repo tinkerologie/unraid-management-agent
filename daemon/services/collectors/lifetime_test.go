@@ -11,7 +11,7 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
 )
 
-func TestNotificationDynamicContract(t *testing.T) {
+func TestNotificationLifetimeContract(t *testing.T) {
 	unread, archive, cleanup := setupNotificationCollectorTestDirs(t)
 	defer cleanup()
 	// Open recreates missing directories.
@@ -49,11 +49,12 @@ func TestNotificationOpenSurvivesMkdirFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	notificationsDir, notificationsArchiveDir = filepath.Join(blocker, "unread"), filepath.Join(blocker, "archive")
-	c := &NotificationCollector{ctx: &domain.Context{Hub: domain.NewEventBus(1)}}
+	c := &NotificationCollector{WatchManualEvents: true, ctx: &domain.Context{Hub: domain.NewEventBus(1)}}
 	// Open logs the failure and still succeeds: the collector polls whatever it can read.
 	if err := c.Open(context.Background()); err != nil {
 		t.Fatalf("Open = %v, want nil", err)
 	}
+	c.Close()
 }
 
 func TestNotificationOpenResolvesDefaultDirs(t *testing.T) {
@@ -69,12 +70,15 @@ func TestNotificationOpenResolvesDefaultDirs(t *testing.T) {
 	if err := c.Open(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if notificationsDir == defaultNotificationsBase+"/unread" {
-		t.Fatal("Open should resolve the notification dirs from dynamix.cfg")
+	if c.unreadDir != filepath.Join(tmp, "n", "unread") || c.archiveDir != filepath.Join(tmp, "n", "archive") {
+		t.Fatalf("Open resolved %q and %q", c.unreadDir, c.archiveDir)
+	}
+	if notificationsDir != defaultNotificationsBase+"/unread" {
+		t.Fatal("Open changed package defaults")
 	}
 }
 
-func TestUnassignedDynamicContract(t *testing.T) {
+func TestUnassignedLifetimeContract(t *testing.T) {
 	hub := domain.NewEventBus(10)
 	ch := hub.Sub("unassigned_devices_update")
 	c := NewUnassignedCollector(&domain.Context{Hub: hub})
@@ -97,7 +101,7 @@ func TestUnassignedDynamicContract(t *testing.T) {
 	c.Close()
 }
 
-func TestZFSDynamicContract(t *testing.T) {
+func TestZFSLifetimeContract(t *testing.T) {
 	c := NewZFSCollector(&domain.Context{Hub: domain.NewEventBus(10)})
 	c.execOutput = func(string, ...string) (string, error) { return "", errors.New("no zfs") }
 	if err := c.Open(context.Background()); err != nil {
@@ -109,7 +113,7 @@ func TestZFSDynamicContract(t *testing.T) {
 	c.Close()
 }
 
-func TestDockerDynamicContract(t *testing.T) {
+func TestDockerLifetimeContract(t *testing.T) {
 	t.Setenv("DOCKER_HOST", "unix://"+filepath.Join(t.TempDir(), "missing.sock"))
 	hub := domain.NewEventBus(10)
 	ch := hub.Sub("container_list_update")
@@ -129,7 +133,7 @@ func TestDockerDynamicContract(t *testing.T) {
 	(&DockerCollector{}).Close()
 }
 
-func TestVMDynamicContract(t *testing.T) {
+func TestVMLifetimeContract(t *testing.T) {
 	c := NewVMCollector(&domain.Context{Hub: domain.NewEventBus(10)})
 	if err := c.Open(context.Background()); err != nil {
 		t.Fatal(err)
@@ -158,7 +162,7 @@ func TestVMDynamicContract(t *testing.T) {
 	}
 }
 
-func TestVMDynamicRefresh(t *testing.T) {
+func TestVMRefresh(t *testing.T) {
 	c := NewVMCollector(&domain.Context{Hub: domain.NewEventBus(10)})
 	if err := c.Refresh(context.Background()); err != nil {
 		t.Fatal(err)
@@ -170,5 +174,46 @@ func TestCollectWithWatchdogExported(t *testing.T) {
 	CollectWithWatchdog(context.Background(), "test", time.Second, func() { ran = true })
 	if !ran {
 		t.Fatal("collect should run")
+	}
+}
+
+func TestNotificationManualEvents(t *testing.T) {
+	unread, archive, cleanup := setupNotificationCollectorTestDirs(t)
+	defer cleanup()
+	c := NewNotificationCollector(&domain.Context{Hub: domain.NewEventBus(1)})
+	c.WatchManualEvents = true
+	ctx, cancel := context.WithCancel(t.Context())
+	// A bad archive path must not prevent the unread directory being watched.
+	if err := os.Remove(archive); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(archive, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Open(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	// The event happens before Refresh or the event goroutine can run.
+	file := filepath.Join(unread, "manual.notification")
+	if err := os.WriteFile(file, []byte("title=manual\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	triggered := make(chan struct{}, 1)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		c.ManualEvents(ctx, func() {
+			select {
+			case triggered <- struct{}{}:
+			default:
+			}
+		})
+	}()
+	defer func() { cancel(); <-done }()
+	select {
+	case <-triggered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("notification watch was not installed by Open")
 	}
 }

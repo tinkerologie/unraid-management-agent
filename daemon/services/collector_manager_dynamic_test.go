@@ -31,7 +31,7 @@ func newDynamicManager(t *testing.T) (*CollectorManager, map[string]*fakeDynamic
 	for _, name := range []string{"docker", "gpu", "ups", "system"} {
 		f := newFakeDynamic()
 		fakes[name] = f
-		cm.Register(name, func(*domain.Context) Collector { return dynCollect{f} }, 0, name == "system")
+		cm.Register(name, func(*domain.Context) Collector { return f }, 0, name == "system")
 	}
 	t.Cleanup(func() {
 		cm.StopAll()
@@ -188,19 +188,14 @@ func TestDynamicApplyHardwareState(t *testing.T) {
 	_ = fakes
 }
 
-func TestDynamicStartWithoutContract(t *testing.T) {
+func TestDynamicStartWithoutPolicy(t *testing.T) {
 	ctx := &domain.Context{Hub: domain.NewEventBus(10), CollectionMode: domain.CollectionModeDynamic}
 	var wg sync.WaitGroup
 	cm := NewCollectorManager(ctx, &wg)
-	cm.Register("nopolicy", func(*domain.Context) Collector { return startOnly{} }, 10, false)
-	cm.Register("system", func(*domain.Context) Collector { return startOnly{} }, 10, true)
-	if n := cm.StartAll(); n != 2 {
-		t.Fatalf("StartAll counted %d", n)
-	}
-	for _, name := range []string{"nopolicy", "system"} {
-		if st := mustStatus(t, cm, name); st.Status == "running" {
-			t.Fatalf("%s should not run: %+v", name, st)
-		}
+	cm.Register("nopolicy", func(*domain.Context) Collector { return newMockCollector() }, 10, false)
+	cm.StartAll()
+	if st := mustStatus(t, cm, "nopolicy"); st.Status == "running" {
+		t.Fatalf("collector without policy should not run: %+v", st)
 	}
 	cm.StopAll()
 	wg.Wait()
