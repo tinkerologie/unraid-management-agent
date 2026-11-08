@@ -1,0 +1,480 @@
+{
+  "schema_revision": 1,
+  "generator": "TestProducerContractFixtures",
+  "generator_revision": 1,
+  "base_path": "/api/v1",
+  "fixture_encoding": "JSON, two-space indentation, trailing LF",
+  "timestamp_sentinel": "2000-01-01T00:00:00Z",
+  "cases": [
+    {
+      "id": "capabilities",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/capabilities",
+      "status": 200,
+      "model": "dto.Capabilities",
+      "case": "Present, absent and unknown capability states",
+      "semantics": [
+        "object",
+        "list"
+      ],
+      "origin": "producer-reachable",
+      "fixture": "capabilities.json",
+      "sha256": "979317c96b59eabed64e6d08f45a00d2eac2a0e3a3e22d8d28cb0028363799cf"
+    },
+    {
+      "id": "collector-state-event",
+      "transport": "websocket",
+      "event": "update",
+      "envelope": "dto.WSEvent",
+      "model": "dto.CollectorStateEvent",
+      "case": "Partial collector update in generic envelope",
+      "semantics": [
+        "partial",
+        "distinct-model"
+      ],
+      "origin": "dto-constructed",
+      "fixture": "collector-state-event.json",
+      "sha256": "ca9fa093719985e5c212c87196d5ae28bfafd87347a236b5f46b47109d685ab4"
+    },
+    {
+      "id": "collector-status",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/collectors/disk",
+      "status": 200,
+      "model": "dto.CollectorResponse",
+      "case": "Full collector status object",
+      "semantics": [
+        "object",
+        "distinct-model"
+      ],
+      "origin": "producer-reachable",
+      "fixture": "collector-status.json",
+      "sha256": "875ad6747702d4e42c80c52c5c60e17bcaaf2484a3c83bf06183cd9cf2d5dbd2",
+      "normalized_fields": [
+        "/timestamp"
+      ]
+    },
+    {
+      "id": "collector-status-list",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/collectors/status",
+      "status": 200,
+      "model": "dto.CollectorsStatusResponse",
+      "case": "Full collector status list",
+      "semantics": [
+        "object",
+        "distinct-model"
+      ],
+      "origin": "producer-reachable",
+      "fixture": "collector-status-list.json",
+      "sha256": "53c2af02a63134ed1adf084a42847a311a781bbecef36f73255fe3c2a95ec184"
+    },
+    {
+      "id": "network-services",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/settings/network-services",
+      "status": 200,
+      "model": "dto.NetworkServicesStatus",
+      "case": "Syslog wire key, counts and omitted port",
+      "semantics": [
+        "object",
+        "alias",
+        "omitted"
+      ],
+      "origin": "dto-constructed",
+      "fixture": "network-services.json",
+      "sha256": "d1409900c9c4f5de9bc640f5218e1ba3a3538dbf28dcd35bde07c680b0450179"
+    },
+    {
+      "id": "network-services-error",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/settings/network-services",
+      "status": 500,
+      "model": "dto.Response",
+      "case": "Provider failure",
+      "semantics": [
+        "object"
+      ],
+      "origin": "producer-reachable",
+      "fixture": "network-services-error.json",
+      "sha256": "0f64a650b7ab4ae95951ee4cdf5880fe9c6195690c760f03b9d77f9aee364dc4",
+      "normalized_fields": [
+        "/timestamp"
+      ]
+    },
+    {
+      "id": "notification-missing",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/notifications/missing",
+      "status": 404,
+      "model": "dto.Response",
+      "case": "Unknown notification",
+      "semantics": [
+        "object"
+      ],
+      "origin": "producer-reachable",
+      "fixture": "notification-missing.json",
+      "sha256": "f270365c004904f593229bc43c16f9419745fb1ea1d98c7af8cb1c132f119a25",
+      "normalized_fields": [
+        "/timestamp"
+      ]
+    },
+    {
+      "id": "notifications",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/notifications",
+      "status": 200,
+      "model": "dto.NotificationList",
+      "case": "List and overview with omitted title and link",
+      "semantics": [
+        "object",
+        "omitted",
+        "zero"
+      ],
+      "origin": "producer-reachable",
+      "fixture": "notifications.json",
+      "sha256": "41899c90b688b14d000bb26b37bf04f2fa0008980c7875e85828f257a5a2b999"
+    },
+    {
+      "id": "notifications-collected-empty",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/notifications",
+      "status": 200,
+      "model": "dto.NotificationList",
+      "case": "Collected nil list",
+      "semantics": [
+        "null"
+      ],
+      "origin": "producer-reachable",
+      "fixture": "notifications-collected-empty.json",
+      "sha256": "6b8c2acf0528b6542a4b681694bcf8a59efffcc2f9c85f303cb7fbd5cb36ef9f"
+    },
+    {
+      "id": "notifications-event",
+      "transport": "websocket",
+      "event": "notifications_update",
+      "envelope": "dto.WSEvent",
+      "model": "*dto.NotificationList",
+      "case": "List envelope contains overview",
+      "semantics": [
+        "object"
+      ],
+      "origin": "producer-reachable",
+      "fixture": "notifications-event.json",
+      "sha256": "e52f54584ec1fce230d8338e8da78ddc1398ba0998025c3ae6170a59eb949c65"
+    },
+    {
+      "id": "notifications-fallback",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/notifications",
+      "status": 200,
+      "model": "dto.NotificationList",
+      "case": "Fallback empty list",
+      "semantics": [
+        "list"
+      ],
+      "origin": "producer-reachable",
+      "fixture": "notifications-fallback.json",
+      "sha256": "1c1e84fcb7f01c876128193d71ed63bb2a4474674cfd5d79d4dd594e922d09f3",
+      "normalized_fields": [
+        "/timestamp"
+      ]
+    },
+    {
+      "id": "notifications-overview",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/notifications/overview",
+      "status": 200,
+      "model": "dto.NotificationOverview",
+      "case": "Overview and zero archive counts",
+      "semantics": [
+        "object",
+        "zero"
+      ],
+      "origin": "producer-reachable",
+      "fixture": "notifications-overview.json",
+      "sha256": "ad1a3d69652587d62ed49f236426e754c7fdb6740a1e5932646eab36bc9055a1"
+    },
+    {
+      "id": "notifications-unread",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/notifications/unread",
+      "status": 200,
+      "model": "notification wrapper",
+      "case": "Unread list and count wrapper",
+      "semantics": [
+        "object"
+      ],
+      "origin": "producer-reachable",
+      "fixture": "notifications-unread.json",
+      "sha256": "8e4636e9502b0fd65cfa60964df30fe3d338d058594bcf5140fb32cab00e2a92"
+    },
+    {
+      "id": "nut-event",
+      "transport": "websocket",
+      "event": "nut_status_update",
+      "envelope": "dto.WSEvent",
+      "model": "*dto.NUTResponse",
+      "case": "NUT response distinct from UPS event",
+      "semantics": [
+        "distinct-model"
+      ],
+      "origin": "producer-reachable",
+      "fixture": "nut-event.json",
+      "sha256": "3471534c948151b608d4ac7e96345130b4f08e3a384f0a2f4ab438254f606d1d"
+    },
+    {
+      "id": "nut-not-installed",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/nut",
+      "status": 200,
+      "model": "dto.NUTResponse",
+      "case": "NUT unavailable",
+      "semantics": [
+        "omitted"
+      ],
+      "origin": "producer-reachable",
+      "fixture": "nut-not-installed.json",
+      "sha256": "f0f078f1cc9744633d6737a953db32e89d2c46460284bbfa76b97111a3471dbc",
+      "normalized_fields": [
+        "/timestamp"
+      ]
+    },
+    {
+      "id": "nut-running",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/nut",
+      "status": 200,
+      "model": "dto.NUTResponse",
+      "case": "Multiple NUT devices and primary alias",
+      "semantics": [
+        "alias",
+        "list",
+        "null"
+      ],
+      "origin": "producer-reachable",
+      "fixture": "nut-running.json",
+      "sha256": "3bfbb2b7b27c2921386112a5f6a48c067c6acd638917a346e9e5e2f7ba81299a"
+    },
+    {
+      "id": "nut-stopped",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/nut",
+      "status": 200,
+      "model": "dto.NUTResponse",
+      "case": "NUT installed but stopped",
+      "semantics": [
+        "omitted"
+      ],
+      "origin": "producer-reachable",
+      "fixture": "nut-stopped.json",
+      "sha256": "2668b4a861eefdaf5ac8c727b8123c8fe5946bc3e1b9924ec450e42a7f6b499a"
+    },
+    {
+      "id": "shares-empty",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/shares",
+      "status": 200,
+      "model": "[]dto.ShareInfo",
+      "case": "No collected shares",
+      "semantics": [
+        "list"
+      ],
+      "origin": "producer-reachable",
+      "fixture": "shares-empty.json",
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    {
+      "id": "shares-null-event",
+      "transport": "websocket",
+      "event": "share_list_update",
+      "envelope": "dto.WSEvent",
+      "model": "[]dto.ShareInfo",
+      "case": "Nil slice produces null data",
+      "semantics": [
+        "null"
+      ],
+      "origin": "dto-constructed",
+      "fixture": "shares-null-event.json",
+      "sha256": "56b24433ff0869cc4e5f933402bafc85b7ad4c4509ca50b95344d84b32f26a36"
+    },
+    {
+      "id": "shares-usage",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/shares",
+      "status": 200,
+      "model": "[]dto.ShareInfo",
+      "case": "Measured, zero and omitted usage beside backing values",
+      "semantics": [
+        "list",
+        "zero",
+        "omitted",
+        "alias"
+      ],
+      "origin": "dto-constructed",
+      "fixture": "shares-usage.json",
+      "sha256": "440da66d87331c46498bf58abb76ed8d5253dd16871b8a55d1f46ebde34bf349"
+    },
+    {
+      "id": "source-health",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/diagnostics/self-test",
+      "status": 200,
+      "model": "selfTestResponse",
+      "case": "Healthy, unavailable and disabled sources",
+      "semantics": [
+        "object",
+        "list"
+      ],
+      "origin": "producer-reachable",
+      "fixture": "source-health.json",
+      "sha256": "b47814bb8ed850b2a32c0f250b05bff741667b07750d9bdde98084f115042633",
+      "normalized_fields": [
+        "/timestamp"
+      ]
+    },
+    {
+      "id": "source-health-event",
+      "transport": "websocket",
+      "event": "source_status_changed",
+      "envelope": "dto.WSEvent",
+      "model": "dto.SourceStatus",
+      "case": "Degraded source-health event",
+      "semantics": [
+        "object"
+      ],
+      "origin": "dto-constructed",
+      "fixture": "source-health-event.json",
+      "sha256": "c6c6e010a2b07b9275e64161130a5418e123f8d953db7a31d9a456e043dd4e0e"
+    },
+    {
+      "id": "ups-empty",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/ups",
+      "status": 200,
+      "model": "dto.UPSStatus",
+      "case": "Disconnected fallback",
+      "semantics": [
+        "null"
+      ],
+      "origin": "producer-reachable",
+      "fixture": "ups-empty.json",
+      "sha256": "c30a19802c0158f9eb54e2afa87d43ce6cc6fab032c1171325604df927f802de",
+      "normalized_fields": [
+        "/timestamp"
+      ]
+    },
+    {
+      "id": "ups-event",
+      "transport": "websocket",
+      "event": "ups_status_update",
+      "envelope": "dto.WSEvent",
+      "model": "*dto.UPSStatus",
+      "case": "Basic UPS event",
+      "semantics": [
+        "distinct-model"
+      ],
+      "origin": "producer-reachable",
+      "fixture": "ups-event.json",
+      "sha256": "9a326bec207bff434225f660cb11dd6857294b3e08156fd898fe40e9f790670c"
+    },
+    {
+      "id": "ups-measurements",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/ups",
+      "status": 200,
+      "model": "dto.UPSStatus",
+      "case": "Zero and unknown measurements",
+      "semantics": [
+        "zero",
+        "null"
+      ],
+      "origin": "producer-reachable",
+      "fixture": "ups-measurements.json",
+      "sha256": "0e036aff24dda21833c5d0c0dee8dbe9ed9890fd9822501ff29099b2970d68ba"
+    },
+    {
+      "id": "zfs-pool",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/zfs/pools/sample",
+      "status": 200,
+      "model": "dto.ZFSPool",
+      "case": "One pool object",
+      "semantics": [
+        "object"
+      ],
+      "origin": "producer-reachable",
+      "fixture": "zfs-pool.json",
+      "sha256": "c4b90b73bd3f33cf6fa2d46a1d6e0a5d79945176c958a244b2119acd87feee61"
+    },
+    {
+      "id": "zfs-pool-missing",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/zfs/pools/missing",
+      "status": 404,
+      "model": "dto.Response",
+      "case": "Unknown pool",
+      "semantics": [
+        "object"
+      ],
+      "origin": "producer-reachable",
+      "fixture": "zfs-pool-missing.json",
+      "sha256": "7f449fab07d3938253268572d24ce49d384d333f3326f8170f0e097c89fda723",
+      "normalized_fields": [
+        "/timestamp"
+      ]
+    },
+    {
+      "id": "zfs-pools",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/zfs/pools",
+      "status": 200,
+      "model": "[]dto.ZFSPool",
+      "case": "Corrupted files populated, empty and null",
+      "semantics": [
+        "list",
+        "null"
+      ],
+      "origin": "dto-constructed",
+      "fixture": "zfs-pools.json",
+      "sha256": "64ae0355946bb20e459167b638256509fa06aa4cda66742bc09a01373b8855d2"
+    },
+    {
+      "id": "zfs-pools-event",
+      "transport": "websocket",
+      "event": "zfs_pools_update",
+      "envelope": "dto.WSEvent",
+      "model": "[]dto.ZFSPool",
+      "case": "Array-valued pool event",
+      "semantics": [
+        "list",
+        "null"
+      ],
+      "origin": "dto-constructed",
+      "fixture": "zfs-pools-event.json",
+      "sha256": "b54747de67f9b285b4a884ddc5970ae180f81f7e1901d74975250568bc16f670"
+    }
+  ]
+}

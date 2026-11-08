@@ -1,0 +1,19 @@
+{
+  "connected": true,
+  "status": "OL",
+  "load_percent": 0,
+  "battery_charge_percent": null,
+  "runtime_left_seconds": null,
+  "power_watts": null,
+  "nominal_power_watts": null,
+  "input_voltage": null,
+  "output_voltage": null,
+  "battery_voltage": null,
+  "line_frequency": null,
+  "temperature_celsius": null,
+  "time_on_battery_seconds": null,
+  "cumulative_time_on_battery_seconds": null,
+  "transfer_count": null,
+  "model": "",
+  "timestamp": "2026-01-01T00:00:00Z"
+}

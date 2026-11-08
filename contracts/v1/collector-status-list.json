@@ -1,0 +1,25 @@
+{
+  "collectors": [
+    {
+      "name": "disk",
+      "enabled": true,
+      "interval_seconds": 30,
+      "status": "running",
+      "last_run": "2026-01-01T00:00:00Z",
+      "error_count": 0,
+      "required": false,
+      "hardware_gated": false,
+      "auto": false,
+      "mode": "dynamic",
+      "effective_interval_seconds": 30,
+      "reason": "active",
+      "event_driven": false,
+      "publish_count": 2
+    }
+  ],
+  "mode": "dynamic",
+  "total": 1,
+  "enabled_count": 1,
+  "disabled_count": 0,
+  "timestamp": "2026-01-01T00:00:00Z"
+}

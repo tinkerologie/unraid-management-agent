@@ -53,15 +53,16 @@ type SystemControllerInterface interface {
 // Server represents the HTTP API server that handles REST endpoints and WebSocket connections.
 // It maintains an in-memory cache of data from collectors and broadcasts updates to WebSocket clients.
 type Server struct {
-	ctx              *domain.Context
-	networkAccess    *collectors.NetworkAccessDiscovery
-	httpServer       *http.Server
-	router           *mux.Router
-	wsHub            *WSHub
-	cancelCtx        context.Context
-	cancelFunc       context.CancelFunc
-	ready            chan struct{} // closed when subscriptions are fully wired
-	collectorManager CollectorManagerInterface
+	ctx                   *domain.Context
+	networkAccess         *collectors.NetworkAccessDiscovery
+	networkServicesStatus func() (*dto.NetworkServicesStatus, error)
+	httpServer            *http.Server
+	router                *mux.Router
+	wsHub                 *WSHub
+	cancelCtx             context.Context
+	cancelFunc            context.CancelFunc
+	ready                 chan struct{} // closed when subscriptions are fully wired
+	collectorManager      CollectorManagerInterface
 	// dynamic is the collector manager in Dynamic collection mode, nil in
 	// Manual mode: reads refresh stale data and record demand (#280).
 	dynamic          dynamicCollectors

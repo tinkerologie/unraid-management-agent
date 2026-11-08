@@ -2975,8 +2975,11 @@ func (s *Server) handleFlashHealth(w http.ResponseWriter, _ *http.Request) {
 func (s *Server) handleNetworkServices(w http.ResponseWriter, _ *http.Request) {
 	logger.Debug("API: Getting network services status")
 
-	settingsCollector := collectors.NewSettingsCollector()
-	status, err := settingsCollector.GetNetworkServicesStatus()
+	provider := s.networkServicesStatus
+	if provider == nil {
+		provider = collectors.NewSettingsCollector().GetNetworkServicesStatus
+	}
+	status, err := provider()
 
 	if err != nil {
 		logger.Error("API: Failed to get network services status: %v", err)

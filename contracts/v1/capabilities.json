@@ -1,0 +1,22 @@
+{
+  "unraid_version": "7.3.1",
+  "items": [
+    {
+      "name": "hardware.gpu",
+      "available": true,
+      "state": "present"
+    },
+    {
+      "name": "hardware.nut",
+      "available": false,
+      "state": "absent"
+    },
+    {
+      "name": "hardware.psu",
+      "available": false,
+      "state": "unknown",
+      "detail": "synthetic probe timeout"
+    }
+  ],
+  "checked_at": "2026-01-01T00:00:00Z"
+}

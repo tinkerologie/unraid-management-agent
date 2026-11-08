@@ -27,6 +27,7 @@ type broadcastMessage struct {
 // WSHub manages WebSocket client connections and broadcasts messages to all connected clients.
 // It handles client registration, unregistration, and message broadcasting in a thread-safe manner.
 type WSHub struct {
+	now        func() time.Time
 	clients    map[*WSClient]bool
 	broadcast  chan broadcastMessage
 	register   chan *WSClient
@@ -59,6 +60,7 @@ type WSClient struct {
 // The hub is ready to accept client connections and broadcast messages.
 func NewWSHub() *WSHub {
 	return &WSHub{
+		now:        time.Now,
 		clients:    make(map[*WSClient]bool),
 		broadcast:  make(chan broadcastMessage, constants.WSBufferSize),
 		register:   make(chan *WSClient),
@@ -110,7 +112,7 @@ func (h *WSHub) Run(ctx context.Context) {
 		case msg := <-h.broadcast:
 			event := dto.WSEvent{
 				Event:     msg.Topic,
-				Timestamp: time.Now(),
+				Timestamp: h.now(),
 				Data:      msg.Data,
 			}
 

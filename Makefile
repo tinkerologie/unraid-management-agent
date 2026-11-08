@@ -143,3 +143,7 @@ security-check:
 	fi
 	@echo "→ Running go mod verify..."
 	@go mod verify
+
+.PHONY: contract-fixtures
+contract-fixtures:
+	UPDATE_CONTRACT_FIXTURES=1 go test ./daemon/services/api -run '^TestProducerContractFixtures$$' -count=1
