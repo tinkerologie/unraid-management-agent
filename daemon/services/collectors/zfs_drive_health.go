@@ -149,7 +149,8 @@ type driveHealthCache struct {
 	timeout time.Duration
 	// slots bounds the smartctl processes alive at once. A slot is held until
 	// the process has been reaped, not just until it timed out.
-	slots chan struct{}
+	slots   chan struct{}
+	reapers sync.WaitGroup
 	// spinStates returns Unraid's current spin states (see unraidSpinStates).
 	// It is checked again right before each smartctl run, so a disk spun
 	// down while its read waited for a slot is not read. nil skips the check.
@@ -268,12 +269,12 @@ func (c *driveHealthCache) refresh(disks []diskRef, now time.Time) {
 				}
 			}
 			out, done, runErr := c.run(c.timeout, ref.name, ref.smartType)
-			go func() {
+			c.reapers.Go(func() {
 				if done != nil {
 					<-done
 				}
 				<-c.slots
-			}()
+			})
 			health, standby, err := parseSmartctlJSON(out, now)
 			if err != nil {
 				logger.Debug("ZFS: SMART read of %s failed: %v (smartctl: %v)", ref.name, err, runErr)

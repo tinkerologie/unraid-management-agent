@@ -92,6 +92,23 @@ func isExecutableFile(path string) bool {
 	return err == nil && info.Mode().IsRegular() && info.Mode().Perm()&0o111 != 0
 }
 
+// Open does nothing because commands start inside Refresh.
+func (c *StorageTopologyCollector) Open(context.Context) error { return nil }
+
+// Refresh gathers and publishes one topology snapshot.
+func (c *StorageTopologyCollector) Refresh(ctx context.Context) error {
+	c.Collect(ctx)
+	return ctx.Err()
+}
+
+// Close joins timed-out hardware commands before another generation can start.
+func (c *StorageTopologyCollector) Close() {
+	for _, done := range c.inflight {
+		<-done
+	}
+	clear(c.inflight)
+}
+
 // Collect gathers the topology and publishes it.
 func (c *StorageTopologyCollector) Collect(ctx context.Context) {
 	topo := c.Gather(ctx)

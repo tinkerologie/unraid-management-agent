@@ -106,8 +106,12 @@ func (c *ZFSCollector) Refresh(context.Context) error {
 	return nil
 }
 
-// Close does nothing.
-func (c *ZFSCollector) Close() {}
+// Close waits for any timed-out SMART processes to be reaped.
+func (c *ZFSCollector) Close() {
+	if c.driveHealth != nil {
+		c.driveHealth.reapers.Wait()
+	}
+}
 
 // Open does nothing: Collect creates the Docker client on first use.
 func (c *DockerCollector) Open(context.Context) error { return nil }

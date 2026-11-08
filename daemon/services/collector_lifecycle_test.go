@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/collectors"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/scheduler"
 )
 
@@ -354,4 +355,54 @@ func TestRunnerCancelledBeforeOpenFailsPendingRequest(t *testing.T) {
 	if got := waitChan(t, result, "cancelled request"); !errors.Is(got, errRunnerStopped) {
 		t.Fatalf("pending request: %v", got)
 	}
+}
+
+func TestStorageTopologyRetainsStalledCommandAcrossRestart(t *testing.T) {
+	var wg sync.WaitGroup
+	app := createTestContext()
+	cm := NewCollectorManager(app, &wg)
+	clock := scheduler.NewFakeClock(runnerEpoch)
+	cm.clock = clock
+	commandStarted := make(chan struct{})
+	commandReturned := make(chan struct{})
+	reaped := make(chan struct{})
+	release := sync.OnceFunc(func() { close(reaped) })
+	replacement := make(chan struct{}, 1)
+	sysRoot := t.TempDir()
+	t.Cleanup(func() { release(); cm.StopAll(); wg.Wait() })
+	factory := func(ctx *domain.Context) Collector {
+		select {
+		case <-commandStarted:
+			replacement <- struct{}{}
+			return newMockCollector()
+		default:
+		}
+		c := collectors.NewStorageTopologyCollector(ctx)
+		c.SysfsRoot = sysRoot
+		c.StorcliCandidates = []string{"/synthetic/storcli"}
+		c.IsExecutable = func(path string) bool { return path == c.StorcliCandidates[0] }
+		c.RunFn = func(ctx context.Context, _ time.Duration, _ string, _ ...string) (string, <-chan struct{}, error) {
+			close(commandStarted)
+			<-ctx.Done()
+			close(commandReturned)
+			return "", reaped, ctx.Err()
+		}
+		return c
+	}
+	cm.Register("storage_topology", factory, 30, false)
+	cm.StartAll()
+	eventually(t, "storage stagger", func() bool { return len(clock.Pending()) == 1 })
+	clock.Advance(20 * time.Second)
+	waitChan(t, commandStarted, "hardware command")
+	if err := cm.UpdateInterval("storage_topology", 120); err != nil {
+		t.Fatal(err)
+	}
+	waitChan(t, commandReturned, "cancelled command returned")
+	select {
+	case <-replacement:
+		t.Fatal("replacement started while hardware command was still alive")
+	case <-time.After(25 * time.Millisecond):
+	}
+	release()
+	waitChan(t, replacement, "replacement after command exit")
 }

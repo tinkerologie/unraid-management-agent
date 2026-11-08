@@ -890,7 +890,7 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 	// Storage topology collector — storcli (Broadcom/LSI) and sg_ses (SES enclosures).
 	// Read-only queries, run sequentially; a no-op on systems without either tool.
 	cm.Register("storage_topology", func(ctx *domain.Context) Collector {
-		return collectFunc(collectors.NewStorageTopologyCollector(ctx).Collect)
+		return collectors.NewStorageTopologyCollector(ctx)
 	}, intervals.StorageTopology, false)
 
 	// Shared PSU collector, initially using the passive Corsair hwmon backend.
