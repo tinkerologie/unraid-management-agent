@@ -1,0 +1,21 @@
+{
+  "success": true,
+  "message": "collector disk status retrieved",
+  "collector": {
+    "name": "disk",
+    "enabled": true,
+    "interval_seconds": 30,
+    "status": "running",
+    "last_run": "2026-01-01T00:00:00Z",
+    "error_count": 0,
+    "required": false,
+    "hardware_gated": false,
+    "auto": false,
+    "mode": "dynamic",
+    "effective_interval_seconds": 30,
+    "reason": "active",
+    "event_driven": false,
+    "publish_count": 2
+  },
+  "timestamp": "2000-01-01T00:00:00Z"
+}

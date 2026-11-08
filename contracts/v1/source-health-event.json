@@ -1,0 +1,10 @@
+{
+  "event": "source_status_changed",
+  "timestamp": "2026-01-01T00:00:00Z",
+  "data": {
+    "subsystem": "shares",
+    "state": "degraded",
+    "reason": "synthetic incomplete sample",
+    "last_checked": "2026-01-01T00:00:00Z"
+  }
+}

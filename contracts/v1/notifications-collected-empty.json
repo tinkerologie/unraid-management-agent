@@ -1,0 +1,18 @@
+{
+  "overview": {
+    "unread": {
+      "info": 0,
+      "warning": 0,
+      "alert": 0,
+      "total": 0
+    },
+    "archive": {
+      "info": 0,
+      "warning": 0,
+      "alert": 0,
+      "total": 0
+    }
+  },
+  "notifications": null,
+  "timestamp": "2026-01-01T00:00:00Z"
+}

@@ -1,0 +1,55 @@
+[
+  {
+    "name": "measured",
+    "path": "",
+    "used_bytes": 25,
+    "storage_used_bytes": 60,
+    "storage_free_bytes": 40,
+    "storage_total_bytes": 100,
+    "storage_usage_percent": 60,
+    "free_bytes": 40,
+    "total_bytes": 100,
+    "usage_percent": 60,
+    "smb_export": false,
+    "nfs_export": false,
+    "storage": "",
+    "exclusive": true,
+    "timestamp": "2026-01-01T00:00:00Z"
+  },
+  {
+    "name": "zero",
+    "path": "",
+    "used_bytes": 0,
+    "storage_used_bytes": 0,
+    "storage_free_bytes": 0,
+    "storage_total_bytes": 0,
+    "storage_usage_percent": 0,
+    "free_bytes": 0,
+    "total_bytes": 0,
+    "usage_percent": 0,
+    "smb_export": false,
+    "nfs_export": false,
+    "storage": "",
+    "exclusive": false,
+    "locations": [],
+    "locations_unchecked": [
+      "disk1"
+    ],
+    "timestamp": "2026-01-01T00:00:00Z"
+  },
+  {
+    "name": "unknown",
+    "path": "",
+    "storage_used_bytes": 0,
+    "storage_free_bytes": 0,
+    "storage_total_bytes": 0,
+    "storage_usage_percent": 0,
+    "free_bytes": 0,
+    "total_bytes": 0,
+    "usage_percent": 0,
+    "smb_export": false,
+    "nfs_export": false,
+    "storage": "",
+    "timestamp": "2026-01-01T00:00:00Z"
+  }
+]

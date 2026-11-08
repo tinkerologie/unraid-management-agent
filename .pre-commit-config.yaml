@@ -139,7 +139,7 @@ repos:
         name: Prettier
         description: Format Markdown, YAML, JSON, and XML files
         types_or: [markdown, yaml, json, xml]
-        exclude: '^(\.claude/|\.secrets\.baseline|daemon/docs/swagger\.(json|yaml)|\.devcontainer/)'
+        exclude: '^(\.claude/|\.secrets\.baseline|daemon/docs/swagger\.(json|yaml)|\.devcontainer/|contracts/v1/)'
         additional_dependencies:
           - prettier@3.5.3
           - "@prettier/plugin-xml@3.4.1"
@@ -170,7 +170,8 @@ repos:
     hooks:
       - id: detect-secrets
         name: Detect Secrets
-        args: ["--baseline", ".secrets.baseline"]
+        # Generated fixture checksums are public content identifiers.
+        args: ["--baseline", ".secrets.baseline", "--exclude-lines", '^\s*"sha256": "[a-f0-9]{64}",?$']
         exclude: '^(go\.sum|.*\.lock|daemon/services/collectors/testdata/storage_topology/.*)$'
 
   # Spell checking
