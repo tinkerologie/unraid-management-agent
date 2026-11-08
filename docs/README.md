@@ -95,6 +95,8 @@ Use [ASD-STE100 Issue 9](https://www.asd-ste100.org/STE_downloads.html) for main
 
 ### Issue 9 review scope
 
+The [documentation review](development/documentation-review.md) lists the files, sources, and checks for #326.
+
 | Area                        | Files                                                                              |
 | --------------------------- | ---------------------------------------------------------------------------------- |
 | Project overview and policy | `README.md`, `docs/README.md`, `CONTRIBUTING.md`, `SECURITY.md`                    |
