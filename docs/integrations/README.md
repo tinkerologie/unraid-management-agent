@@ -21,7 +21,7 @@ platforms. Pick by client.
   how to use them well.
 - **ChatGPT:** use **ChatGPT Actions** (it does not consume MCP/Skills).
 - **Home Assistant:** use the **MQTT** integration and/or the dedicated HA
-  integration. (The agent also advertises itself via mDNS as
+  integration. (The agent also advertises itself through mDNS as
   `_unraid-mgmt-agent._tcp.local.` for auto-discovery.)
 - **Metrics/dashboards:** use **Prometheus/Grafana**.
 

@@ -37,7 +37,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 // handleSystem godoc
 //
 //	@Summary		Get system information
-//	@Description	Retrieve comprehensive system metrics including CPU, RAM, temperatures, and uptime
+//	@Description	Read system metrics for CPU, RAM, temperatures, and uptime
 //	@Tags			System
 //	@Produce		json
 //	@Success		200	{object}	dto.SystemInfo	"System information"
@@ -60,7 +60,7 @@ func (s *Server) handleSystem(w http.ResponseWriter, _ *http.Request) {
 // handleSystemReboot godoc
 //
 //	@Summary		Reboot system
-//	@Description	Initiate a system reboot
+//	@Description	Reboot the system
 //	@Tags			System
 //	@Produce		json
 //	@Success		200	{object}	dto.Response	"Reboot initiated"
@@ -74,7 +74,7 @@ func (s *Server) getSystemController() SystemControllerInterface {
 // handleSystemReboot godoc
 //
 //	@Summary		Reboot system
-//	@Description	Initiate a system reboot
+//	@Description	Reboot the system
 //	@Tags			System
 //	@Produce		json
 //	@Success		200	{object}	dto.Response	"Reboot initiated"
@@ -106,7 +106,7 @@ func (s *Server) handleSystemReboot(w http.ResponseWriter, _ *http.Request) {
 // handleSystemShutdown godoc
 //
 //	@Summary		Shutdown system
-//	@Description	Initiate a system shutdown
+//	@Description	Shut down the system
 //	@Tags			System
 //	@Produce		json
 //	@Success		200	{object}	dto.Response	"Shutdown initiated"
@@ -138,7 +138,7 @@ func (s *Server) handleSystemShutdown(w http.ResponseWriter, _ *http.Request) {
 // handleArray godoc
 //
 //	@Summary		Get array status
-//	@Description	Retrieve Unraid array status including parity information
+//	@Description	Read Unraid array status including parity information
 //	@Tags			Array
 //	@Produce		json
 //	@Success		200	{object}	dto.ArrayStatus	"Array status"
@@ -160,7 +160,7 @@ func (s *Server) handleArray(w http.ResponseWriter, _ *http.Request) {
 // handleDisks godoc
 //
 //	@Summary		Get all disks
-//	@Description	Retrieve information about all disks including SMART data
+//	@Description	Read information about all disks including SMART data
 //	@Tags			Disks
 //	@Produce		json
 //	@Success		200	{array}	dto.DiskInfo	"List of disks"
@@ -179,7 +179,7 @@ func (s *Server) handleDisks(w http.ResponseWriter, _ *http.Request) {
 // handleDisk godoc
 //
 //	@Summary		Get specific disk
-//	@Description	Retrieve information about a specific disk by ID, device name, or name
+//	@Description	Read information about a specific disk by ID, device name, or name
 //	@Tags			Disks
 //	@Produce		json
 //	@Param			id	path		string	true	"Disk ID, device name (e.g., sda), or disk name (e.g., disk1)"
@@ -212,7 +212,7 @@ func (s *Server) handleDisk(w http.ResponseWriter, r *http.Request) {
 // handleShares godoc
 //
 //	@Summary		Get all shares
-//	@Description	Retrieve information about all user shares
+//	@Description	Read information about all user shares
 //	@Tags			Shares
 //	@Produce		json
 //	@Success		200	{array}	dto.ShareInfo	"List of shares"
@@ -231,7 +231,7 @@ func (s *Server) handleShares(w http.ResponseWriter, _ *http.Request) {
 // handleDockerList godoc
 //
 //	@Summary		Get all Docker containers
-//	@Description	Retrieve information about all Docker containers including stats
+//	@Description	Read information about all Docker containers including statistics
 //	@Tags			Docker
 //	@Produce		json
 //	@Success		200	{array}	dto.ContainerInfo	"List of containers"
@@ -250,7 +250,7 @@ func (s *Server) handleDockerList(w http.ResponseWriter, _ *http.Request) {
 // handleDockerInfo godoc
 //
 //	@Summary		Get specific Docker container
-//	@Description	Retrieve information about a specific Docker container by ID or name
+//	@Description	Read information about a specific Docker container by ID or name
 //	@Tags			Docker
 //	@Produce		json
 //	@Param			id	path		string	true	"Container ID or name"
@@ -283,7 +283,7 @@ func (s *Server) handleDockerInfo(w http.ResponseWriter, r *http.Request) {
 // handleVMList godoc
 //
 //	@Summary		Get all VMs
-//	@Description	Retrieve information about all virtual machines
+//	@Description	Read information about all virtual machines
 //	@Tags			VMs
 //	@Produce		json
 //	@Success		200	{array}	dto.VMInfo	"List of VMs"
@@ -302,7 +302,7 @@ func (s *Server) handleVMList(w http.ResponseWriter, _ *http.Request) {
 // handleVMGuestList godoc
 //
 //	@Summary		Get data read inside VMs
-//	@Description	Retrieve GPU, disk, filesystem and custom sensor readings from inside the VMs listed in the vm_guest_agent configuration, read through the QEMU guest agent. While a VM is off, its last-known GPUs, disks and sensors are listed with null readings.
+//	@Description	Read GPU, disk, filesystem, and custom sensor data through the QEMU guest agent. The vm_guest_agent setting lists the VMs to read. If a VM is off, its last known GPUs, disks, and sensors have null readings.
 //	@Tags			VMs
 //	@Produce		json
 //	@Success		200	{array}	dto.VMGuestInfo	"Guest data per configured VM"
@@ -318,7 +318,7 @@ func (s *Server) handleVMGuestList(w http.ResponseWriter, _ *http.Request) {
 // handleVMInfo godoc
 //
 //	@Summary		Get specific VM
-//	@Description	Retrieve information about a specific virtual machine by ID or name
+//	@Description	Read information about a specific virtual machine by ID or name
 //	@Tags			VMs
 //	@Produce		json
 //	@Param			id	path		string	true	"VM ID or name"
@@ -351,7 +351,7 @@ func (s *Server) handleVMInfo(w http.ResponseWriter, r *http.Request) {
 // handleUPS godoc
 //
 //	@Summary		Get UPS status
-//	@Description	Retrieve UPS status information from apcupsd
+//	@Description	Read UPS status information from apcupsd
 //	@Tags			UPS
 //	@Produce		json
 //	@Success		200	{object}	dto.UPSStatus	"UPS status"
@@ -373,7 +373,7 @@ func (s *Server) handleUPS(w http.ResponseWriter, _ *http.Request) {
 // handleNUT godoc
 //
 //	@Summary		Get NUT status
-//	@Description	Retrieve Network UPS Tools (NUT) status information
+//	@Description	Read Network UPS Tools (NUT) status information
 //	@Tags			UPS
 //	@Produce		json
 //	@Success		200	{object}	dto.NUTResponse	"NUT status"
@@ -396,7 +396,7 @@ func (s *Server) handleNUT(w http.ResponseWriter, _ *http.Request) {
 // handleGPU godoc
 //
 //	@Summary		Get GPU metrics
-//	@Description	Retrieve GPU metrics for NVIDIA and AMD GPUs
+//	@Description	Read GPU metrics for NVIDIA and AMD GPUs
 //	@Tags			GPU
 //	@Produce		json
 //	@Success		200	{array}	dto.GPUMetrics	"List of GPU metrics"
@@ -415,7 +415,7 @@ func (s *Server) handleGPU(w http.ResponseWriter, _ *http.Request) {
 // handleNetwork godoc
 //
 //	@Summary		Get network interfaces
-//	@Description	Retrieve information about all network interfaces
+//	@Description	Read information about all network interfaces
 //	@Tags			Network
 //	@Produce		json
 //	@Success		200	{array}	dto.NetworkInfo	"List of network interfaces"
@@ -683,10 +683,10 @@ func (s *Server) handleDockerPortConflicts(w http.ResponseWriter, _ *http.Reques
 // handleDockerStart godoc
 //
 //	@Summary		Start Docker container
-//	@Description	Start a specific Docker container by ID or name
+//	@Description	Start the Docker container with the specified ID
 //	@Tags			Docker
 //	@Produce		json
-//	@Param			id	path		string	true	"Container ID or name"
+//	@Param			id	path		string	true	"Container ID (12 or 64 hexadecimal characters)"
 //	@Success		200	{object}	dto.Response	"Container started"
 //	@Failure		400	{object}	dto.Response	"Invalid container ID"
 //	@Failure		500	{object}	dto.Response	"Failed to start container"
@@ -699,10 +699,10 @@ func (s *Server) handleDockerStart(w http.ResponseWriter, r *http.Request) {
 // handleDockerStop godoc
 //
 //	@Summary		Stop Docker container
-//	@Description	Stop a specific Docker container by ID or name
+//	@Description	Stop the Docker container with the specified ID
 //	@Tags			Docker
 //	@Produce		json
-//	@Param			id	path		string	true	"Container ID or name"
+//	@Param			id	path		string	true	"Container ID (12 or 64 hexadecimal characters)"
 //	@Success		200	{object}	dto.Response	"Container stopped"
 //	@Failure		400	{object}	dto.Response	"Invalid container ID"
 //	@Failure		500	{object}	dto.Response	"Failed to stop container"
@@ -715,10 +715,10 @@ func (s *Server) handleDockerStop(w http.ResponseWriter, r *http.Request) {
 // handleDockerRestart godoc
 //
 //	@Summary		Restart Docker container
-//	@Description	Restart a specific Docker container by ID or name
+//	@Description	Restart the Docker container with the specified ID
 //	@Tags			Docker
 //	@Produce		json
-//	@Param			id	path		string	true	"Container ID or name"
+//	@Param			id	path		string	true	"Container ID (12 or 64 hexadecimal characters)"
 //	@Success		200	{object}	dto.Response	"Container restarted"
 //	@Failure		400	{object}	dto.Response	"Invalid container ID"
 //	@Failure		500	{object}	dto.Response	"Failed to restart container"
@@ -731,10 +731,10 @@ func (s *Server) handleDockerRestart(w http.ResponseWriter, r *http.Request) {
 // handleDockerPause godoc
 //
 //	@Summary		Pause Docker container
-//	@Description	Pause a specific Docker container by ID or name
+//	@Description	Pause the Docker container with the specified ID
 //	@Tags			Docker
 //	@Produce		json
-//	@Param			id	path		string	true	"Container ID or name"
+//	@Param			id	path		string	true	"Container ID (12 or 64 hexadecimal characters)"
 //	@Success		200	{object}	dto.Response	"Container paused"
 //	@Failure		400	{object}	dto.Response	"Invalid container ID"
 //	@Failure		500	{object}	dto.Response	"Failed to pause container"
@@ -747,10 +747,10 @@ func (s *Server) handleDockerPause(w http.ResponseWriter, r *http.Request) {
 // handleDockerUnpause godoc
 //
 //	@Summary		Unpause Docker container
-//	@Description	Unpause a specific Docker container by ID or name
+//	@Description	Unpause the Docker container with the specified ID
 //	@Tags			Docker
 //	@Produce		json
-//	@Param			id	path		string	true	"Container ID or name"
+//	@Param			id	path		string	true	"Container ID (12 or 64 hexadecimal characters)"
 //	@Success		200	{object}	dto.Response	"Container unpaused"
 //	@Failure		400	{object}	dto.Response	"Invalid container ID"
 //	@Failure		500	{object}	dto.Response	"Failed to unpause container"
@@ -1136,7 +1136,7 @@ func (s *Server) handleParityCheckResume(w http.ResponseWriter, _ *http.Request)
 // handleParityCheckHistory godoc
 //
 //	@Summary		Get parity check history
-//	@Description	Retrieve the history of parity check operations
+//	@Description	Read the history of parity check operations
 //	@Tags			Array
 //	@Produce		json
 //	@Success		200	{object}	dto.ParityCheckHistory	"Parity check history"
@@ -1164,7 +1164,7 @@ func (s *Server) handleParityCheckHistory(w http.ResponseWriter, _ *http.Request
 // handleClearDiskStats godoc
 //
 //	@Summary		Clear disk statistics
-//	@Description	Clear all array disk I/O statistics system-wide. Uses the same mechanism as the Unraid WebUI "Clear Stats" button (emhttpd clearStatistics). The operation is safe and reversible — counters reset to zero and accumulate again normally. Requires the emhttpd socket to be available.
+//	@Description	Clear the I/O counters for all array disks. This uses emhttpd clearStatistics, as does the "Clear Stats" button in Unraid. The counters start again from zero. The operation requires the emhttpd socket.
 //	@Tags			Array
 //	@Produce		json
 //	@Success		200	{object}	dto.Response	"Disk statistics cleared"
@@ -1282,7 +1282,7 @@ func (s *Server) handleDiskSpin(w http.ResponseWriter, r *http.Request, up bool)
 // handleShareConfig godoc
 //
 //	@Summary		Get share configuration
-//	@Description	Retrieve configuration for a specific user share
+//	@Description	Read configuration for a specific user share
 //	@Tags			Configuration
 //	@Produce		json
 //	@Param			name	path		string	true	"Share name"
@@ -1325,7 +1325,7 @@ func (s *Server) handleShareConfig(w http.ResponseWriter, r *http.Request) {
 // handleNetworkConfig godoc
 //
 //	@Summary		Get network interface configuration
-//	@Description	Retrieve configuration for a specific network interface
+//	@Description	Read configuration for a specific network interface
 //	@Tags			Configuration
 //	@Produce		json
 //	@Param			interface	path		string	true	"Interface name (e.g., eth0, bond0)"
@@ -1356,7 +1356,7 @@ func (s *Server) handleNetworkConfig(w http.ResponseWriter, r *http.Request) {
 // handleSystemSettings godoc
 //
 //	@Summary		Get system settings
-//	@Description	Retrieve Unraid system settings
+//	@Description	Read Unraid system settings
 //	@Tags			Configuration
 //	@Produce		json
 //	@Success		200	{object}	dto.SystemSettings	"System settings"
@@ -1384,7 +1384,7 @@ func (s *Server) handleSystemSettings(w http.ResponseWriter, _ *http.Request) {
 // handleDockerSettings godoc
 //
 //	@Summary		Get Docker settings
-//	@Description	Retrieve Docker daemon settings
+//	@Description	Read Docker daemon settings
 //	@Tags			Configuration
 //	@Produce		json
 //	@Success		200	{object}	dto.DockerSettings	"Docker settings"
@@ -1412,7 +1412,7 @@ func (s *Server) handleDockerSettings(w http.ResponseWriter, _ *http.Request) {
 // handleVMSettings godoc
 //
 //	@Summary		Get VM settings
-//	@Description	Retrieve virtual machine manager settings
+//	@Description	Read virtual machine manager settings
 //	@Tags			Configuration
 //	@Produce		json
 //	@Success		200	{object}	dto.VMSettings	"VM settings"
@@ -1440,7 +1440,7 @@ func (s *Server) handleVMSettings(w http.ResponseWriter, _ *http.Request) {
 // handleDiskSettings godoc
 //
 //	@Summary		Get disk settings
-//	@Description	Retrieve disk configuration settings
+//	@Description	Read disk configuration settings
 //	@Tags			Configuration
 //	@Produce		json
 //	@Success		200	{object}	dto.DiskSettings	"Disk settings"
@@ -1571,7 +1571,7 @@ func (s *Server) handleUpdateSystemSettings(w http.ResponseWriter, r *http.Reque
 // handleUserScripts godoc
 //
 //	@Summary		Get user scripts
-//	@Description	Retrieve a list of all available user scripts
+//	@Description	List all available user scripts
 //	@Tags			User Scripts
 //	@Produce		json
 //	@Success		200	{array}		dto.UserScriptInfo	"List of user scripts"
@@ -1595,7 +1595,7 @@ func (s *Server) handleUserScripts(w http.ResponseWriter, _ *http.Request) {
 // handleUserScriptExecute godoc
 //
 //	@Summary		Execute user script
-//	@Description	Execute a user script by name
+//	@Description	Run a user script by name
 //	@Tags			User Scripts
 //	@Accept			json
 //	@Produce		json
@@ -1630,7 +1630,7 @@ func (s *Server) handleUserScriptExecute(w http.ResponseWriter, r *http.Request)
 // handleHardwareFull godoc
 //
 //	@Summary		Get full hardware information
-//	@Description	Retrieve complete hardware information including BIOS, CPU, and memory
+//	@Description	Read complete hardware information including BIOS, CPU, and memory
 //	@Tags			Hardware
 //	@Produce		json
 //	@Success		200	{object}	dto.HardwareInfo	"Hardware information"
@@ -1650,7 +1650,7 @@ func (s *Server) handleHardwareFull(w http.ResponseWriter, _ *http.Request) {
 // handleHardwareBIOS godoc
 //
 //	@Summary		Get BIOS information
-//	@Description	Retrieve BIOS information from DMI data
+//	@Description	Read BIOS information from DMI data
 //	@Tags			Hardware
 //	@Produce		json
 //	@Success		200	{object}	dto.BIOSInfo		"BIOS information"
@@ -1670,7 +1670,7 @@ func (s *Server) handleHardwareBIOS(w http.ResponseWriter, _ *http.Request) {
 // handleHardwareBaseboard godoc
 //
 //	@Summary		Get baseboard information
-//	@Description	Retrieve motherboard/baseboard information from DMI data
+//	@Description	Read motherboard/baseboard information from DMI data
 //	@Tags			Hardware
 //	@Produce		json
 //	@Success		200	{object}	dto.BaseboardInfo	"Baseboard information"
@@ -1690,7 +1690,7 @@ func (s *Server) handleHardwareBaseboard(w http.ResponseWriter, _ *http.Request)
 // handleHardwareCPU godoc
 //
 //	@Summary		Get CPU hardware information
-//	@Description	Retrieve CPU hardware information from DMI data
+//	@Description	Read CPU hardware information from DMI data
 //	@Tags			Hardware
 //	@Produce		json
 //	@Success		200	{object}	dto.CPUHardwareInfo		"CPU information"
@@ -1710,7 +1710,7 @@ func (s *Server) handleHardwareCPU(w http.ResponseWriter, _ *http.Request) {
 // handleHardwareCache godoc
 //
 //	@Summary		Get CPU cache information
-//	@Description	Retrieve CPU cache hierarchy information from DMI data
+//	@Description	Read CPU cache hierarchy information from DMI data
 //	@Tags			Hardware
 //	@Produce		json
 //	@Success		200	{array}		dto.CPUCacheInfo		"CPU cache information"
@@ -1730,7 +1730,7 @@ func (s *Server) handleHardwareCache(w http.ResponseWriter, _ *http.Request) {
 // handleHardwareMemoryArray godoc
 //
 //	@Summary		Get memory array information
-//	@Description	Retrieve physical memory array information from DMI data
+//	@Description	Read physical memory array information from DMI data
 //	@Tags			Hardware
 //	@Produce		json
 //	@Success		200	{object}	dto.MemoryArrayInfo	"Memory array information"
@@ -1750,7 +1750,7 @@ func (s *Server) handleHardwareMemoryArray(w http.ResponseWriter, _ *http.Reques
 // handleHardwareMemoryDevices godoc
 //
 //	@Summary		Get memory device information
-//	@Description	Retrieve individual memory device (DIMM) information from DMI data
+//	@Description	Read individual memory device (DIMM) information from DMI data
 //	@Tags			Hardware
 //	@Produce		json
 //	@Success		200	{array}		dto.MemoryDeviceInfo	"Memory device information"
@@ -1770,7 +1770,7 @@ func (s *Server) handleHardwareMemoryDevices(w http.ResponseWriter, _ *http.Requ
 // handleRegistration godoc
 //
 //	@Summary		Get registration status
-//	@Description	Retrieve Unraid license/registration information
+//	@Description	Read Unraid license/registration information
 //	@Tags			System
 //	@Produce		json
 //	@Success		200	{object}	dto.Registration	"Registration information"
@@ -1832,7 +1832,7 @@ func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
 // handleLogFile godoc
 //
 //	@Summary		Get specific log file
-//	@Description	Retrieve a specific log file by filename with optional pagination
+//	@Description	Read a specific log file by filename with optional pagination
 //	@Tags			Logs
 //	@Produce		json
 //	@Param			filename	path		string	true	"Log filename"
@@ -1918,7 +1918,7 @@ func respondWithError(w http.ResponseWriter, status int, message string) {
 // handleNotifications godoc
 //
 //	@Summary		Get all notifications
-//	@Description	Retrieve all notifications with overview counts, optionally filtered by importance
+//	@Description	Read all notifications with overview counts, optionally filtered by importance
 //	@Tags			Notifications
 //	@Produce		json
 //	@Param			importance	query		string	false	"Filter by importance level (alert, warning, normal)"
@@ -1956,7 +1956,7 @@ func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
 // handleNotificationsUnread godoc
 //
 //	@Summary		Get unread notifications
-//	@Description	Retrieve only unread notifications
+//	@Description	Read only unread notifications
 //	@Tags			Notifications
 //	@Produce		json
 //	@Success		200	{object}	map[string]interface{}	"Unread notifications with count"
@@ -1988,7 +1988,7 @@ func (s *Server) handleNotificationsUnread(w http.ResponseWriter, _ *http.Reques
 // handleNotificationsArchive godoc
 //
 //	@Summary		Get archived notifications
-//	@Description	Retrieve only archived notifications
+//	@Description	Read only archived notifications
 //	@Tags			Notifications
 //	@Produce		json
 //	@Success		200	{object}	map[string]interface{}	"Archived notifications with count"
@@ -2020,7 +2020,7 @@ func (s *Server) handleNotificationsArchive(w http.ResponseWriter, _ *http.Reque
 // handleNotificationsOverview godoc
 //
 //	@Summary		Get notification counts
-//	@Description	Retrieve only the notification overview counts
+//	@Description	Read only the notification overview counts
 //	@Tags			Notifications
 //	@Produce		json
 //	@Success		200	{object}	dto.NotificationOverview	"Notification counts by category"
@@ -2042,7 +2042,7 @@ func (s *Server) handleNotificationsOverview(w http.ResponseWriter, _ *http.Requ
 // handleNotificationByID godoc
 //
 //	@Summary		Get notification by ID
-//	@Description	Retrieve a specific notification by its ID
+//	@Description	Read a specific notification by its ID
 //	@Tags			Notifications
 //	@Produce		json
 //	@Param			id	path		string	true	"Notification ID"
@@ -2209,7 +2209,7 @@ func (s *Server) handleArchiveAllNotifications(w http.ResponseWriter, _ *http.Re
 // handleUnassignedDevices godoc
 //
 //	@Summary		Get all unassigned devices
-//	@Description	Retrieve all unassigned devices and remote shares
+//	@Description	Read all unassigned devices and remote shares
 //	@Tags			Unassigned Devices
 //	@Produce		json
 //	@Success		200	{object}	dto.UnassignedDeviceList	"Unassigned devices and remote shares"
@@ -2232,7 +2232,7 @@ func (s *Server) handleUnassignedDevices(w http.ResponseWriter, _ *http.Request)
 // handleUnassignedDevicesList godoc
 //
 //	@Summary		Get unassigned devices only
-//	@Description	Retrieve only unassigned devices (excludes remote shares)
+//	@Description	Read only unassigned devices (excludes remote shares)
 //	@Tags			Unassigned Devices
 //	@Produce		json
 //	@Success		200	{object}	map[string]interface{}	"Unassigned devices"
@@ -2257,7 +2257,7 @@ func (s *Server) handleUnassignedDevicesList(w http.ResponseWriter, _ *http.Requ
 // handleUnassignedRemoteShares godoc
 //
 //	@Summary		Get remote shares only
-//	@Description	Retrieve only remote shares (excludes local unassigned devices)
+//	@Description	Read only remote shares (excludes local unassigned devices)
 //	@Tags			Unassigned Devices
 //	@Produce		json
 //	@Success		200	{object}	map[string]interface{}	"Remote shares"
@@ -2282,7 +2282,7 @@ func (s *Server) handleUnassignedRemoteShares(w http.ResponseWriter, _ *http.Req
 // handleMountRemoteShare godoc
 //
 //	@Summary		Mount a remote share
-//	@Description	Mount an Unassigned Devices SMB/NFS remote share that is configured in the plugin. The source must match a value from the remote_shares list: "//server/share" for SMB or "server:/export" for NFS.
+//	@Description	Mount an SMB or NFS share from the Unassigned Devices configuration. Use a source from remote_shares. Use "//server/share" for SMB or "server:/export" for NFS.
 //	@Tags			Unassigned Devices
 //	@Accept			json
 //	@Produce		json
@@ -2298,7 +2298,7 @@ func (s *Server) handleMountRemoteShare(w http.ResponseWriter, r *http.Request) 
 // handleUnmountRemoteShare godoc
 //
 //	@Summary		Unmount a remote share
-//	@Description	Unmount an Unassigned Devices SMB/NFS remote share that is currently mounted. The source must match a value from the remote_shares list: "//server/share" for SMB or "server:/export" for NFS.
+//	@Description	Unmount an SMB or NFS share that Unassigned Devices mounted. Use a source from remote_shares. Use "//server/share" for SMB or "server:/export" for NFS.
 //	@Tags			Unassigned Devices
 //	@Accept			json
 //	@Produce		json
@@ -2375,7 +2375,7 @@ func (s *Server) handleRemoteShareAction(w http.ResponseWriter, r *http.Request,
 // handleZFSPools godoc
 //
 //	@Summary		Get all ZFS pools
-//	@Description	Retrieve information about all ZFS pools
+//	@Description	Read information about all ZFS pools
 //	@Tags			ZFS
 //	@Produce		json
 //	@Success		200	{array}	dto.ZFSPool	"List of ZFS pools"
@@ -2393,7 +2393,7 @@ func (s *Server) handleZFSPools(w http.ResponseWriter, _ *http.Request) {
 // handleZFSPool godoc
 //
 //	@Summary		Get specific ZFS pool
-//	@Description	Retrieve information about a specific ZFS pool by name
+//	@Description	Read information about a specific ZFS pool by name
 //	@Tags			ZFS
 //	@Produce		json
 //	@Param			name	path		string	true	"Pool name"
@@ -2425,7 +2425,7 @@ func (s *Server) handleZFSPool(w http.ResponseWriter, r *http.Request) {
 // handleZFSDatasets godoc
 //
 //	@Summary		Get all ZFS datasets
-//	@Description	Retrieve information about all ZFS datasets
+//	@Description	Read information about all ZFS datasets
 //	@Tags			ZFS
 //	@Produce		json
 //	@Success		200	{array}	dto.ZFSDataset	"List of ZFS datasets"
@@ -2443,7 +2443,7 @@ func (s *Server) handleZFSDatasets(w http.ResponseWriter, _ *http.Request) {
 // handleZFSSnapshots godoc
 //
 //	@Summary		Get all ZFS snapshots
-//	@Description	Retrieve information about all ZFS snapshots
+//	@Description	Read information about all ZFS snapshots
 //	@Tags			ZFS
 //	@Produce		json
 //	@Success		200	{array}	dto.ZFSSnapshot	"List of ZFS snapshots"
@@ -2461,7 +2461,7 @@ func (s *Server) handleZFSSnapshots(w http.ResponseWriter, _ *http.Request) {
 // handleZFSARC godoc
 //
 //	@Summary		Get ZFS ARC statistics
-//	@Description	Retrieve ZFS Adaptive Replacement Cache (ARC) statistics
+//	@Description	Read ZFS Adaptive Replacement Cache (ARC) statistics
 //	@Tags			ZFS
 //	@Produce		json
 //	@Success		200	{object}	dto.ZFSARCStats	"ZFS ARC statistics"
@@ -2481,7 +2481,7 @@ func (s *Server) handleZFSARC(w http.ResponseWriter, _ *http.Request) {
 // handleCollectorsStatus godoc
 //
 //	@Summary		Get all collectors status
-//	@Description	Retrieve status of all data collectors including enabled state and intervals
+//	@Description	Read status of all data collectors including enabled state and intervals
 //	@Tags			Collectors
 //	@Produce		json
 //	@Success		200	{object}	dto.CollectorsStatusResponse	"Collectors status"
@@ -2564,7 +2564,7 @@ func (s *Server) handleCollectorsStatus(w http.ResponseWriter, _ *http.Request) 
 // handleCollectorStatus godoc
 //
 //	@Summary		Get specific collector status
-//	@Description	Retrieve status of a specific collector by name
+//	@Description	Read status of a specific collector by name
 //	@Tags			Collectors
 //	@Produce		json
 //	@Param			name	path		string	true	"Collector name (e.g., system, docker, vm)"
@@ -2758,7 +2758,7 @@ func (s *Server) handleCollectorInterval(w http.ResponseWriter, r *http.Request)
 // handleDiskSettingsExtended godoc
 //
 //	@Summary		Get extended disk settings with temperature thresholds
-//	@Description	Retrieve disk configuration settings including global temperature thresholds for HDD and SSD
+//	@Description	Read disk configuration settings including global temperature thresholds for HDD and SSD
 //	@Tags			Configuration
 //	@Produce		json
 //	@Success		200	{object}	dto.DiskSettingsExtended	"Extended disk settings with temp thresholds"
@@ -2786,7 +2786,7 @@ func (s *Server) handleDiskSettingsExtended(w http.ResponseWriter, _ *http.Reque
 // handleMoverSettings godoc
 //
 //	@Summary		Get mover schedule and status
-//	@Description	Retrieve mover configuration, schedule, and current running status
+//	@Description	Read mover configuration, schedule, and current running status
 //	@Tags			Configuration
 //	@Produce		json
 //	@Success		200	{object}	dto.MoverSettings	"Mover settings and status"
@@ -2814,7 +2814,7 @@ func (s *Server) handleMoverSettings(w http.ResponseWriter, _ *http.Request) {
 // handleParitySchedule godoc
 //
 //	@Summary		Get parity check schedule
-//	@Description	Retrieve parity check schedule configuration
+//	@Description	Read parity check schedule configuration
 //	@Tags			Array
 //	@Produce		json
 //	@Success		200	{object}	dto.ParitySchedule	"Parity check schedule"
@@ -2842,7 +2842,7 @@ func (s *Server) handleParitySchedule(w http.ResponseWriter, _ *http.Request) {
 // handleServiceStatus godoc
 //
 //	@Summary		Get Docker and VM service enabled status
-//	@Description	Retrieve whether Docker and VM Manager services are enabled in Unraid settings
+//	@Description	Read whether Docker and VM Manager services are enabled in Unraid settings
 //	@Tags			Configuration
 //	@Produce		json
 //	@Success		200	{object}	dto.ServiceStatus	"Service enabled status"
@@ -2870,7 +2870,7 @@ func (s *Server) handleServiceStatus(w http.ResponseWriter, _ *http.Request) {
 // handlePluginList godoc
 //
 //	@Summary		Get installed plugins list
-//	@Description	Retrieve list of installed plugins with their versions and update status
+//	@Description	Read list of installed plugins with their versions and update status
 //	@Tags			Plugins
 //	@Produce		json
 //	@Success		200	{object}	dto.PluginList	"List of installed plugins"
@@ -2898,7 +2898,7 @@ func (s *Server) handlePluginList(w http.ResponseWriter, _ *http.Request) {
 // handleUpdateStatus godoc
 //
 //	@Summary		Get update availability status
-//	@Description	Retrieve Unraid OS and plugin update availability information
+//	@Description	Read Unraid OS and plugin update availability information
 //	@Tags			Updates
 //	@Produce		json
 //	@Success		200	{object}	dto.UpdateStatus	"Update availability status"
@@ -2938,7 +2938,7 @@ func (s *Server) handleUpdateStatus(w http.ResponseWriter, _ *http.Request) {
 // handleFlashHealth godoc
 //
 //	@Summary		Get USB flash drive health
-//	@Description	Retrieve health information for the USB flash boot drive
+//	@Description	Read health information for the USB flash boot drive
 //	@Tags			System
 //	@Produce		json
 //	@Success		200	{object}	dto.FlashDriveHealth	"Flash drive health information"
@@ -2966,7 +2966,7 @@ func (s *Server) handleFlashHealth(w http.ResponseWriter, _ *http.Request) {
 // handleNetworkServices godoc
 //
 //	@Summary		Get network services status
-//	@Description	Retrieve status of all network services including SMB, NFS, FTP, SSH, Telnet, Avahi, WireGuard, etc.
+//	@Description	Read status of all network services including SMB, NFS, FTP, SSH, Telnet, Avahi, WireGuard, etc.
 //	@Tags			Configuration
 //	@Produce		json
 //	@Success		200	{object}	dto.NetworkServicesStatus	"Network services status"
@@ -3001,7 +3001,7 @@ func (s *Server) handleNetworkServices(w http.ResponseWriter, _ *http.Request) {
 // handleMQTTStatus godoc
 //
 //	@Summary		Get MQTT status
-//	@Description	Retrieve MQTT connection status and configuration
+//	@Description	Read MQTT connection status and configuration
 //	@Tags			MQTT
 //	@Produce		json
 //	@Success		200	{object}	dto.MQTTStatus	"MQTT status"
@@ -3666,7 +3666,7 @@ func (s *Server) handleVMRestoreSnapshot(w http.ResponseWriter, r *http.Request)
 // handleDockerLogs godoc
 //
 //	@Summary		Get Docker container logs
-//	@Description	Retrieve stdout/stderr logs from a specific Docker container (equivalent to docker logs)
+//	@Description	Read stdout/stderr logs from a specific Docker container (equivalent to docker logs)
 //	@Tags			Docker
 //	@Produce		json
 //	@Param			id			path		string				true	"Container ID or name"
@@ -3896,7 +3896,7 @@ func (s *Server) handleProcessIO(w http.ResponseWriter, r *http.Request) {
 // handleListAlertRules godoc
 //
 //	@Summary		List all alert rules
-//	@Description	Retrieve all configured alert rules
+//	@Description	Read all configured alert rules
 //	@Tags			Alerts
 //	@Produce		json
 //	@Success		200	{array}	dto.AlertRule	"List of alert rules"
@@ -3912,7 +3912,7 @@ func (s *Server) handleListAlertRules(w http.ResponseWriter, _ *http.Request) {
 // handleGetAlertRule godoc
 //
 //	@Summary		Get a specific alert rule
-//	@Description	Retrieve a single alert rule by ID
+//	@Description	Read a single alert rule by ID
 //	@Tags			Alerts
 //	@Produce		json
 //	@Param			id	path		string	true	"Alert rule ID"
@@ -4152,7 +4152,7 @@ func (s *Server) handleFiringAlerts(w http.ResponseWriter, _ *http.Request) {
 // handleAlertTemplates godoc
 //
 //	@Summary		List alert rule templates
-//	@Description	Retrieve curated, disabled-by-default alert rule templates using trend/predictive metrics
+//	@Description	Read curated, disabled-by-default alert rule templates using trend/predictive metrics
 //	@Tags			Alerts
 //	@Produce		json
 //	@Success		200	{array}	dto.AlertRule	"List of alert rule templates"
@@ -4164,7 +4164,7 @@ func (s *Server) handleAlertTemplates(w http.ResponseWriter, _ *http.Request) {
 // handleEnableAlertTemplate godoc
 //
 //	@Summary		Enable an alert rule template
-//	@Description	Enable a template by ID, creating or updating the corresponding alert rule. Idempotent: calling multiple times updates the same rule. Optional JSON body may specify channels; defaults to ["unraid"].
+//	@Description	Enable the alert template with the specified ID. The agent creates its rule or updates the same rule on subsequent calls. Set channels in the JSON body if necessary. The default is ["unraid"].
 //	@Tags			Alerts
 //	@Accept			json
 //	@Produce		json
@@ -4225,7 +4225,7 @@ func (s *Server) handleEnableAlertTemplate(w http.ResponseWriter, r *http.Reques
 // handleMetricHistory godoc
 //
 //	@Summary		Query metric history
-//	@Description	Return in-memory ring-buffer samples and summary stats (slope, min, max, avg, last) for a named metric series. Pass entity for per-disk or per-container metrics.
+//	@Description	Return in-memory ring-buffer samples and summary statistics (slope, min, max, avg, last) for a named metric series. Pass entity for per-disk or per-container metrics.
 //	@Tags			Alerts
 //	@Produce		json
 //	@Param			metric	query		string					true	"Metric name (e.g. cpu_temp, array_used_pct, disk_temp)"
@@ -4483,7 +4483,7 @@ func (s *Server) handleRunHealthCheck(w http.ResponseWriter, r *http.Request) {
 // handleFanControl godoc
 //
 //	@Summary		Get fan control status
-//	@Description	Retrieve current fan speeds, modes, profiles, and configuration
+//	@Description	Read current fan speeds, modes, profiles, and configuration
 //	@Tags			Fans
 //	@Produce		json
 //	@Success		200	{object}	dto.FanControlStatus	"Fan control status"
@@ -4801,7 +4801,7 @@ func (s *Server) handleSetCPUGovernor(w http.ResponseWriter, r *http.Request) {
 
 // handleDockerStats godoc
 //
-//	@Summary		Get Docker aggregate stats
+//	@Summary		Get Docker aggregate statistics
 //	@Description	Returns aggregate CPU and memory statistics across all running containers
 //	@Tags			Docker
 //	@Produce		json
@@ -4856,7 +4856,7 @@ func (s *Server) handleTemperatures(w http.ResponseWriter, _ *http.Request) {
 // handleTuning godoc
 //
 //	@Summary		Get system tuning parameters
-//	@Description	Retrieve current kernel tuning parameters (turbo boost, disk cache, inotify, NIC offloads, ring buffers)
+//	@Description	Read current kernel tuning parameters (turbo boost, disk cache, inotify, NIC offloads, ring buffers)
 //	@Tags			Tuning
 //	@Produce		json
 //	@Success		200	{object}	dto.TuningInfo	"Tuning parameters"
@@ -5024,7 +5024,7 @@ func (s *Server) handleSetInotifyLimits(w http.ResponseWriter, r *http.Request) 
 // handleOSUpdate godoc
 //
 //	@Summary		Get OS update availability
-//	@Description	Returns the cached OS update status. No outbound network calls are made; the result is based on local files only. Returns an "unknown" sentinel when no local latest-version data is available.
+//	@Description	Read the cached OS update status. The agent uses only local files. If local data has no latest version, the status is "unknown".
 //	@Tags			OS
 //	@Produce		json
 //	@Success		200	{object}	dto.OSUpdateStatus	"OS update status"
@@ -5066,7 +5066,7 @@ func (s *Server) handleMover(w http.ResponseWriter, _ *http.Request) {
 // handleStorageTopology godoc
 //
 //	@Summary		Get SAS storage topology
-//	@Description	Returns the cached SAS storage topology collected with storcli (Broadcom/LSI controllers) and sg_ses (SCSI Enclosure Services): controllers with PCIe link and HBA ports, enclosures with power supplies, fans, temperature/voltage/current sensors, I/O modules, firmware and cabling, and per-drive paths, link speeds and error counters. State is "pending" until the first collection, and "unsupported" when neither storcli nor SES devices with sg_ses are available.
+//	@Description	Read the cached SAS storage topology. The collector uses storcli for Broadcom and LSI controllers and sg_ses for SCSI Enclosure Services. Controller data includes PCIe links and HBA ports. Enclosure data includes power supplies, fans, temperature, voltage, current, I/O modules, firmware, and cabling. Drive data includes paths, link speeds, and error counters. The state is "pending" before the first collection. It is "unsupported" if the collector has neither storcli nor SES devices with sg_ses.
 //	@Tags			Storage
 //	@Produce		json
 //	@Success		200	{object}	dto.StorageTopology	"Storage topology"
@@ -5082,7 +5082,7 @@ func (s *Server) handleStorageTopology(w http.ResponseWriter, _ *http.Request) {
 // handleNetworkCards godoc
 //
 //	@Summary		Get network cards
-//	@Description	Returns the cached physical (PCI) network cards collected by the nic collector: one entry per PCI slot with vendor, model, driver, firmware and hwmon temperatures (ASIC, PHY, MAC, module cages), and per port the link state and the plugged optic's identity and digital diagnostics (SFF-8472/SFF-8636: module temperature and voltage, per-lane laser bias and TX/RX power, alarm/warning flags and thresholds). Vendor serial numbers are never reported. State is "pending" until the first collection.
+//	@Description	Read the cached PCI network card data from the nic collector. Each PCI slot has vendor, model, driver, firmware, and hwmon temperatures for the ASIC, PHY, MAC, and module cages. Each port has a link state and optic data, when available. SFF-8472 and SFF-8636 diagnostics include module temperature and voltage, per-lane laser bias and TX/RX power, alarm and warning flags, and thresholds. The response omits vendor serial numbers. The state is "pending" before the first collection.
 //	@Tags			Network
 //	@Produce		json
 //	@Success		200	{object}	dto.NICList	"Network cards"

@@ -1,8 +1,8 @@
 # PSU telemetry
 
-The shared `psu` collector monitors host-visible Corsair RMi/HXi USB power supplies through
-the Linux `corsair-psu` driver. Its hwmon chip name is `corsairpsu`. No separate Corsair plugin,
-userspace PSU tool or raw HID polling is required.
+The `psu` collector reads Corsair RMi and HXi USB power supplies that the host can see.
+It uses the Linux `corsair-psu` driver and the `corsairpsu` hwmon interface.
+This feature needs no separate Corsair plugin, userspace PSU tool, or raw HID polling.
 
 ## Requirements and compatibility
 

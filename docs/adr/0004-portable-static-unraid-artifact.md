@@ -2,11 +2,10 @@
 
 Existing decision, recorded 2026-11-07.
 
-Release builds target Linux/amd64 with cgo disabled and the x86-64-v1 instruction baseline, rather than
-depending on the build host's CPU features or shared C libraries. This preserves compatibility with older
-x86-64 Unraid hardware and avoids runtime linker dependencies in the installed plugin.
-Packaging verifies the shipped executable's build settings and static ELF linkage, and CI smoke-tests the
-packaged artifact on an emulated Nehalem CPU.
+Release builds target Linux/amd64 and use the x86-64-v1 instruction baseline. The builds disable cgo.
+The executable runs on older x86-64 Unraid hardware without shared C libraries at runtime.
+The packaging check examines the executable's build settings and static ELF linkage.
+CI runs a smoke test on an emulated Nehalem CPU.
 
 ## Consequences
 

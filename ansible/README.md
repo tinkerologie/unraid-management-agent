@@ -1,6 +1,6 @@
 # Ansible Deploy for Unraid Management Agent
 
-Primary workflow for local build, deploy, uninstall, and live verification. Uses a **single persistent SSH connection** via ControlPersist, eliminating the "Too many authentication failures" problem.
+Use Ansible to build, install, remove, or check the plugin. Ansible and SCP use ControlPersist to keep the key-authenticated SSH connection open.
 
 ## Prerequisites
 
@@ -33,8 +33,8 @@ Keep the private key on the controller with mode `0600`; never put key material
 or SSH passwords in the repository. For a passphrase-protected key, unlock it
 in your SSH agent before running Ansible.
 
-Verify the server's SSH host-key fingerprint through a trusted channel, then
-add its key to `~/.ssh/known_hosts`. For a nonstandard port, the entry must use
+Use a trusted channel to check the server's SSH host-key fingerprint.
+Add the host key to `~/.ssh/known_hosts`. For a nonstandard port, the entry must use
 `[host]:port`. Set `uma_known_hosts_file` to use a different file. Ansible and
 SCP both enforce this file and reject unknown or changed keys.
 

@@ -61,7 +61,7 @@ func (s *Server) handleAgentStartSession(w http.ResponseWriter, r *http.Request)
 // handleAgentListSessions returns all agent sessions, newest-first.
 //
 //	@Summary		List agent sessions
-//	@Description	Retrieve all agent sessions, newest first
+//	@Description	Read all agent sessions, newest first
 //	@Tags			Agent
 //	@Produce		json
 //	@Success		200	{array}		dto.AgentSession	"List of sessions"
@@ -80,7 +80,7 @@ func (s *Server) handleAgentListSessions(w http.ResponseWriter, _ *http.Request)
 // handleAgentGetSession returns a single agent session by ID.
 //
 //	@Summary		Get agent session
-//	@Description	Retrieve a single agent session by ID
+//	@Description	Read a single agent session by ID
 //	@Tags			Agent
 //	@Produce		json
 //	@Param			id	path		string				true	"Session ID"
@@ -200,7 +200,7 @@ func (s *Server) handleAgentSendMessage(w http.ResponseWriter, r *http.Request) 
 // handleAgentMemory returns the agent's episodic incidents and learned preferences.
 //
 //	@Summary		Get agent memory
-//	@Description	Retrieve the agent's recorded incidents and learned preferences
+//	@Description	Read the agent's recorded incidents and learned preferences
 //	@Tags			Agent
 //	@Produce		json
 //	@Success		200	{object}	object{incidents=[]dto.AgentIncident,preferences=[]dto.AgentPreference}	"Agent memory"

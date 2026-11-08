@@ -2,17 +2,14 @@
 
 Existing decision, recorded 2026-11-07.
 
-Without an API token, network monitoring remains available but network control operations are locked unless
-unauthenticated writes are explicitly allowed. MCP read-only mode and per-tool policies are additional
-restrictions on MCP tool use, rather than a substitute for network authentication or a REST-wide read-only
-setting. Local MCP over standard input/output does not acquire the HTTP network write lock, while the
-global MCP read-only setting still applies to its tools.
+Without an API token, clients can monitor the agent. The agent blocks network control unless you explicitly permit unauthenticated writes.
+MCP read-only mode and per-tool policies add restrictions to MCP tool use. REST uses the separate network access rules.
+Local MCP over standard input/output operates outside the HTTP write lock. The global MCP read-only setting still applies to its tools.
 
 ## Consequences
 
-Disabling MCP writes does not establish a read-only REST deployment. A client must evaluate its transport's
-authentication and write-access rules as well as the effective policy of the tool it wants to use;
-the local and network transports deliberately have different trust boundaries.
+REST still uses its network access rules when you disable MCP writes.
+Check the authentication and write-access rules for the transport. Check the policy of the tool before you call it.
 
 ## Evidence
 

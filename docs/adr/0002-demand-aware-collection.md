@@ -2,11 +2,10 @@
 
 Existing decision, recorded 2026-11-07.
 
-Dynamic mode lets the Management Agent choose collector timing from resource policies, consumer demand,
-event sources, and alert requirements instead of polling every enabled subsystem at a fixed rate.
-Demand includes subscribed WebSocket clients, connected MQTT consumers for their published collectors,
-and recent REST or MCP reads; alert floors keep required monitoring active independently of client demand.
-Manual mode retains configured intervals, and changing those intervals while Dynamic mode manages them is rejected.
+In Dynamic mode, the agent uses resource policies, consumer demand, change events, and alert requirements to set collector timing.
+Subscribed WebSocket clients and recent REST or MCP reads add demand. Connected MQTT consumers add demand for the collectors that publish their data.
+Alert floors keep the necessary monitoring active without client demand.
+Manual mode uses the configured intervals. The agent rejects interval changes in Dynamic mode.
 
 ## Consequences
 
@@ -18,5 +17,5 @@ collector is not the same as a disabled collector, and hardware gating remains a
 
 - [Collection modes](../../daemon/domain/context.go)
 - [Demand accounting](../../daemon/services/scheduler/demand.go)
-- [Dynamic collector lifecycle](../../daemon/services/collector_manager_dynamic.go)
+- [Collector lifecycle](../../daemon/services/collector_manager.go)
 - [Alert floors](../../daemon/services/orchestrator.go)

@@ -1,13 +1,8 @@
 # Claude Integration
 
-Two ways to give Claude knowledge of and control over your Unraid server:
-
-1. **Agent Skill** — a portable knowledge pack that teaches Claude how to use the
-   agent's tools effectively. Works in Claude Code, Claude Desktop, and claude.ai.
-2. **MCP connection** — the live tool/data connection to your running server.
-
-You typically want **both**: the skill teaches _how_, the MCP connection provides
-the _live tools_.
+The agent skill gives Claude instructions for using the agent's tools.
+The MCP connection lets Claude call tools on the running server.
+Use both if you want the instructions and a live connection.
 
 ## 1. Install the Agent Skill
 
@@ -66,7 +61,7 @@ that IP as a Subject Alternative Name.
 > [#131](https://github.com/tinkerologie/unraid-management-agent/issues/131).
 
 To use a custom connector you must expose the agent over **public HTTPS with a
-trusted cert**, via either:
+trusted cert**, through either:
 
 - **Native HTTPS** — point the agent at a trusted certificate (e.g. Unraid's
   `myunraid.net` cert) with `--tls-cert-file` / `--tls-key-file` (see

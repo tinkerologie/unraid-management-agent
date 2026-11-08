@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Apply ASD-STE100 Issue 9 guidance across the maintained guides and Swagger prose.
+  Correct installation, configuration, authentication, and integration instructions (#326).
+
 ### Added
 
 - Publish versioned REST and WebSocket producer contract fixtures with a drift check and pinned consumption instructions (#324).

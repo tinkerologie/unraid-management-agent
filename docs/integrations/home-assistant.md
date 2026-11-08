@@ -1,40 +1,43 @@
 # Home Assistant Integration
 
-Complete guide for integrating Unraid Management Agent with Home Assistant for smart home automation.
+Use MQTT to connect the agent to Home Assistant. For REST and WebSocket setup, see the [Home Assistant integration](https://github.com/tinkerologie/ha-unraid-management-agent).
 
 ## Overview
 
-The Unraid Management Agent enables deep Home Assistant integration via MQTT, allowing you to:
+Use the agent with Home Assistant to:
 
 - **Monitor** server health, array status, and resource usage
 - **Control** Docker containers and VMs from HA dashboards
 - **Automate** actions based on server events (high CPU, parity errors, UPS status)
-- **Alert** on critical conditions via HA notification systems
+- **Send** Home Assistant notifications for critical conditions
 
 ## Prerequisites
 
 - **Home Assistant** 2024.1+ running
 - **MQTT Broker** (Mosquitto recommended)
 - **Unraid Management Agent** with MQTT enabled
-- **MQTT Integration** installed in Home Assistant
+- The [MQTT integration](https://www.home-assistant.io/integrations/mqtt/) in Home Assistant
 
 ## Quick Setup
 
 ### 1. Install MQTT Broker
 
-Add Mosquitto via Home Assistant Add-ons:
+On Home Assistant OS, use the [Mosquitto broker app](https://www.home-assistant.io/integrations/mqtt/#setting-up-a-broker).
 
-1. **Settings** → **Add-ons** → **Add-on Store**
-2. Search for "Mosquitto broker"
-3. Click **Install** → **Start** → Enable **Start on boot**
+1. Open **Settings → Apps → Install app**.
+2. Search for **Mosquitto broker**.
+3. Click **Install**.
+4. Click **Start**.
+5. If the broker must start with Home Assistant, turn on **Start on boot**.
 
 ### 2. Configure Unraid Agent
 
-Edit `/boot/config/plugins/unraid-management-agent/unraid-management-agent.cfg`:
+Edit `/boot/config/plugins/unraid-management-agent/config.cfg`:
 
 ```bash
 MQTT_ENABLED=true
-MQTT_BROKER=tcp://homeassistant.local:1883
+MQTT_BROKER=homeassistant.local
+MQTT_PORT=1883
 MQTT_USERNAME=unraid
 MQTT_PASSWORD=your_secure_password
 MQTT_TOPIC_PREFIX=unraid
@@ -43,16 +46,18 @@ MQTT_TOPIC_PREFIX=unraid
 Restart the agent:
 
 ```bash
-/etc/rc.d/rc.unraid-management-agent restart
+/usr/local/emhttp/plugins/unraid-management-agent/scripts/stop
+/usr/local/emhttp/plugins/unraid-management-agent/scripts/start
 ```
 
 ### 3. Configure Home Assistant
 
-Add MQTT integration:
+If Home Assistant has no MQTT integration, add it:
 
-1. **Settings** → **Devices & Services** → **Add Integration**
-2. Search for "MQTT"
-3. Enter broker details:
+1. Open **Settings → Devices & services**.
+2. Select **Add Integration**.
+3. Select **MQTT**.
+4. Enter the broker details:
    - **Broker**: `homeassistant.local` (or broker IP)
    - **Port**: `1883`
    - **Username**: `unraid`

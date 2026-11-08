@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document provides detailed technical documentation of the WebSocket event structure used by the Unraid Management Agent. It covers the envelope format, data type definitions, field specifications, and validation rules.
+Use this reference to read the WebSocket envelope and payload fields.
 
 **Target Audience**: Developers integrating with the WebSocket API  
 **Version**: 1.1.0  
@@ -26,7 +26,7 @@ This document provides detailed technical documentation of the WebSocket event s
 
 ### Base Event Format
 
-All WebSocket events are wrapped in a standard envelope defined by the `WSEvent` DTO:
+The agent wraps each WebSocket event in a `WSEvent` envelope:
 
 ```go
 // daemon/dto/websocket.go
@@ -41,15 +41,15 @@ type WSEvent struct {
 
 | Field       | Type              | Required | Description                             |
 | ----------- | ----------------- | -------- | --------------------------------------- |
-| `event`     | string            | Yes      | Always "update" for all event types     |
+| `event`     | string            | Yes      | Topic name or `update` fallback         |
 | `timestamp` | string (ISO 8601) | Yes      | Server timestamp when event was created |
-| `data`      | object/array      | Yes      | Event-specific payload (varies by type) |
+| `data`      | object/array/null | Yes      | Event payload                           |
 
 ### Example Envelope
 
 ```json
 {
-  "event": "update",
+  "event": "system_update",
   "timestamp": "2025-10-02T14:02:59.850035377+10:00",
   "data": {
     "hostname": "Tower",
@@ -61,10 +61,10 @@ type WSEvent struct {
 
 ### Important Notes
 
-1. **No Type Field**: Events do NOT include a `type` field in the envelope
-2. **Type Identification**: Event types are determined by inspecting the `data` structure
-3. **Timestamp Format**: RFC3339Nano format with timezone offset
-4. **Data Variability**: The `data` field can be an object or array depending on event type
+1. The envelope has no `type` field.
+2. Read `event` first. If it is `update`, read `data.event` when present.
+3. Read `timestamp` as RFC3339Nano.
+4. Check the event definition for the shape of `data`.
 5. **Subscriptions drive collection**: In Dynamic collection mode a client's topic filter
    (`{"subscribe": ["container_list_update", ...]}`) decides which collectors run at their active
    rate. A client that never subscribes receives every topic, so it keeps every collector active;
@@ -108,85 +108,31 @@ type WSEvent struct {
 
 ### Identification Algorithm
 
-Since events lack a `type` field, clients must inspect the `data` structure to determine the event type:
+Read the envelope's `event` field first. Use the payload only for the generic `update` fallback:
 
 ```
-1. Check if data is an array or object
-2. If array, inspect first element (or return "empty_list" if empty)
-3. Check for unique field combinations that identify each event type
-4. Return event type or "unknown" if no match
+1. Use the event field if it names a known topic.
+2. For update, check for a known event name in the payload.
+3. Skip unknown event names.
 ```
 
 ### Identification Rules
 
-| Event Type              | Identification Rule                                                |
-| ----------------------- | ------------------------------------------------------------------ |
-| `system_update`         | Has `hostname` AND `cpu_usage_percent`                             |
-| `array_status_update`   | Has `state` AND `parity_check_status` AND `num_disks`              |
-| `ups_status_update`     | Has `connected` AND `battery_charge_percent`                       |
-| `gpu_update`            | Has `available` AND `driver_version` AND `utilization_gpu_percent` |
-| `network_list_update`   | Has `mac_address` AND `bytes_received`                             |
-| `container_list_update` | Has `image` AND `ports`                                            |
-| `vm_list_update`        | Has `state` AND `cpu_count`                                        |
-| `vm_guest_update`       | Has `vm_name` AND `agent_connected`                                |
-| `disk_list_update`      | Has `device` AND `mount_point`                                     |
-| `share_list_update`     | Has `name` AND `path` AND `storage_total_bytes`                    |
+For example, `system_update` identifies a system snapshot. `share_list_update` identifies a share snapshot,
+even when its payload is null. The collector state event has `event: "update"` and
+`data.event: "collector_state_change"`. See [producer fixtures](../../contracts/README.md) for wire examples.
 
 ### Reference Implementation
 
 ```python
-def identify_event_type(data):
-    """Identify event type from data structure."""
-    # Handle arrays - check first element
-    if isinstance(data, list):
-        if not data:
-            return "empty_list"
-        data = data[0]
-
-    # Must be a dict to identify
-    if not isinstance(data, dict):
-        return "unknown"
-
-    # System update
-    if "hostname" in data and "cpu_usage_percent" in data:
-        return "system_update"
-
-    # Array status
-    if "state" in data and "parity_check_status" in data and "num_disks" in data:
-        return "array_status_update"
-
-    # UPS status
-    if "connected" in data and "battery_charge_percent" in data:
-        return "ups_status_update"
-
-    # GPU metrics
-    if "available" in data and "driver_version" in data and "utilization_gpu_percent" in data:
-        return "gpu_update"
-
-    # Network interface
-    if "mac_address" in data and "bytes_received" in data:
-        return "network_list_update"
-
-    # Container
-    if "image" in data and "ports" in data:
-        return "container_list_update"
-
-    # VM
-    if "state" in data and "cpu_count" in data:
-        return "vm_list_update"
-
-    # VM guest agent
-    if "vm_name" in data and "agent_connected" in data:
-        return "vm_guest_update"
-
-    # Disk
-    if "device" in data and "mount_point" in data:
-        return "disk_list_update"
-
-    # Share
-    if "name" in data and "path" in data and "storage_total_bytes" in data:
-        return "share_list_update"
-
+def identify_event_type(envelope):
+    """Read the topic or the subtype of a generic event."""
+    topic = envelope.get("event")
+    payload = envelope.get("data")
+    if topic == "update" and isinstance(payload, dict):
+        topic = payload.get("event")
+    if isinstance(topic, str) and topic and topic != "update":
+        return topic
     return "unknown"
 ```
 
@@ -644,10 +590,6 @@ def parse_event(raw_event: dict) -> Optional[WSEvent]:
             logger.error("Missing required fields in event")
             return None
 
-        # Validate event type
-        if raw_event['event'] != 'update':
-            logger.warning(f"Unknown event type: {raw_event['event']}")
-
         # Parse timestamp
         try:
             timestamp = datetime.fromisoformat(raw_event['timestamp'].replace('Z', '+00:00'))
@@ -655,11 +597,7 @@ def parse_event(raw_event: dict) -> Optional[WSEvent]:
             logger.error(f"Invalid timestamp format: {e}")
             return None
 
-        # Identify event type
-        event_type = identify_event_type(raw_event['data'])
-        if event_type == 'unknown':
-            logger.warning("Could not identify event type")
-
+        # Keep the wire envelope intact. Resolve its type when dispatching.
         return WSEvent(
             event=raw_event['event'],
             timestamp=raw_event['timestamp'],
@@ -693,7 +631,7 @@ event_type = data['type']  # This field doesn't exist!
 ✅ **Correct**:
 
 ```python
-event_type = identify_event_type(data['data'])
+event_type = identify_event_type(data)
 ```
 
 ### 2. Not Checking Array vs Object
@@ -809,41 +747,23 @@ The server maintains backward compatibility by:
 
 ```python
 import unittest
-from datetime import datetime
 
 class TestEventParsing(unittest.TestCase):
+    def test_system_topic(self):
+        event = {"event": "system_update", "data": {"hostname": "Tower"}}
+        self.assertEqual(identify_event_type(event), "system_update")
 
-    def test_system_update_identification(self):
-        """Test system update event identification."""
-        data = {
-            "hostname": "Tower",
-            "cpu_usage_percent": 12.5,
-            "ram_usage_percent": 45.2
-        }
-        event_type = identify_event_type(data)
-        self.assertEqual(event_type, "system_update")
+    def test_null_share_payload(self):
+        event = {"event": "share_list_update", "data": None}
+        self.assertEqual(identify_event_type(event), "share_list_update")
 
-    def test_array_event_identification(self):
-        """Test array event identification."""
-        data = [{
-            "device": "sda",
-            "mount_point": "/mnt/disk1",
-            "size_bytes": 4000000000000
-        }]
-        event_type = identify_event_type(data)
-        self.assertEqual(event_type, "disk_list_update")
+    def test_collector_state_subtype(self):
+        event = {"event": "update", "data": {"event": "collector_state_change"}}
+        self.assertEqual(identify_event_type(event), "collector_state_change")
 
-    def test_empty_array_handling(self):
-        """Test empty array handling."""
-        data = []
-        event_type = identify_event_type(data)
-        self.assertEqual(event_type, "empty_list")
+    def test_missing_topic(self):
+        self.assertEqual(identify_event_type({"data": {}}), "unknown")
 
-    def test_unknown_event_handling(self):
-        """Test unknown event handling."""
-        data = {"unknown_field": "value"}
-        event_type = identify_event_type(data)
-        self.assertEqual(event_type, "unknown")
 ```
 
 ### Integration Test Example
@@ -854,7 +774,7 @@ async def test_websocket_event_flow():
     async with aiohttp.ClientSession() as session:
         async with session.ws_connect('ws://localhost:8043/api/v1/ws') as ws:
             # Wait for first event
-            msg = await ws.receive()
+            msg = await ws.receive(timeout=10)
             assert msg.type == aiohttp.WSMsgType.TEXT
 
             # Parse event
@@ -862,10 +782,9 @@ async def test_websocket_event_flow():
             assert 'event' in event
             assert 'timestamp' in event
             assert 'data' in event
-            assert event['event'] == 'update'
 
             # Identify event type
-            event_type = identify_event_type(event['data'])
+            event_type = identify_event_type(event)
             assert event_type != 'unknown'
 
             print(f"✅ Received valid {event_type} event")
@@ -875,12 +794,8 @@ async def test_websocket_event_flow():
 
 ## Reference Implementation
 
-Complete reference implementations are available in:
-
-1. **Python**: `ha-unraid-management-agent/custom_components/unraid_management_agent/websocket_client.py`
-2. **Go (Server)**: `daemon/services/api/websocket.go`
-3. **Test Script**: `test_websocket.py`
-4. **Multi-Client Test**: `test_multiple_connections.py`
+See the [WebSocket server](../../daemon/services/api/websocket.go) and [producer fixtures](../../contracts/README.md).
+For the Home Assistant client, see the [integration repository](https://github.com/tinkerologie/ha-unraid-management-agent).
 
 ---
 

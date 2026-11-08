@@ -30,7 +30,7 @@ type selfTestResponse struct {
 // handleSelfTest godoc
 //
 //	@Summary		Run agent self-test
-//	@Description	Returns the detected Unraid version, overall data-source health, probed capabilities, and per-subsystem source status (healthy/degraded/unavailable).
+//	@Description	Read the detected Unraid version, source health, and capability results. The response includes the status of each data source.
 //	@Tags			Diagnostics
 //	@Produce		json
 //	@Success		200	{object}	selfTestResponse
@@ -56,7 +56,7 @@ func (s *Server) handleSelfTest(w http.ResponseWriter, _ *http.Request) {
 // handleDiagnosticsBundle godoc
 //
 //	@Summary		Download diagnostics bundle
-//	@Description	Collects a redacted diagnostics bundle (system state, array, containers, VMs, network, recent agent/syslog logs, and redacted configuration) and returns it as a downloadable ZIP archive. Safe to attach to bug reports — secrets (MQTT credentials, etc.) are redacted. Enable Debug Logging first for richer agent logs in the bundle.
+//	@Description	Download a diagnostics ZIP with system, array, container, VM, and network data. The ZIP also contains recent agent and system logs, and redacted configuration. Examine the contents before you share the ZIP. To include more agent log detail, turn on Debug Logging first.
 //	@Tags			Diagnostics
 //	@Produce		application/zip
 //	@Success		200	{string}	binary	"ZIP archive (binary)"

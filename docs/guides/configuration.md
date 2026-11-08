@@ -1,16 +1,16 @@
 # Configuration Guide
 
-Complete guide to configuring the Unraid Management Agent.
+Change the settings for the Unraid Management Agent.
 
 ## Overview
 
-The agent uses command-line arguments for configuration, managed automatically by the plugin system. Most settings can be adjusted without editing files.
+Use the plugin settings page to change most settings. The plugin launcher passes these settings to the agent.
 
 ## Configuration File Location
 
-**Primary Config**: `/boot/config/plugins/unraid-management-agent/unraid-management-agent.cfg`
+**Primary Config**: `/boot/config/plugins/unraid-management-agent/config.cfg`
 
-This file is created automatically after the first installation and persists across reboots (stored on USB flash).
+The plugin creates this file on the boot flash device. The settings stay in the file after a reboot.
 
 ## Command-Line Options
 
@@ -29,11 +29,12 @@ This file is created automatically after the first installation and persists acr
 | `--mcp-connect-secret`           | -        | Optional 32–256 char (`[A-Za-z0-9_-]`) secret enabling header-free MCP onboarding at `/mcp/<secret>` (`MCP_CONNECT_SECRET`)                                            |
 | `--debug`                        | `false`  | Enable debug logging                                                                                                                                                   |
 | `--mqtt-enabled`                 | `false`  | Enable MQTT publishing                                                                                                                                                 |
-| `--mqtt-broker`                  | -        | MQTT broker address (e.g., `tcp://localhost:1883`)                                                                                                                     |
+| `--mqtt-broker`                  | -        | MQTT broker hostname or IP address                                                                                                                                     |
+| `--mqtt-port`                    | `1883`   | MQTT broker port                                                                                                                                                       |
 | `--mqtt-topic-prefix`            | `unraid` | MQTT topic prefix                                                                                                                                                      |
 | `--mqtt-username`                | -        | MQTT username (optional)                                                                                                                                               |
 | `--mqtt-password`                | -        | MQTT password (optional)                                                                                                                                               |
-| `--discovery-enabled`            | `true`   | Advertise the agent via mDNS for auto-discovery                                                                                                                        |
+| `--discovery-enabled`            | `true`   | Use mDNS to advertise the agent                                                                                                                                        |
 | `--discovery-service-name`       | -        | Override the advertised mDNS instance name                                                                                                                             |
 
 ### Endpoint toggles (REST-only mode)
@@ -239,22 +240,24 @@ while the hardware is present. To keep a fixed interval, choose it (or
 
 ## Configuration Methods
 
-### Method 1: Plugin Settings UI (Coming Soon)
+### Method 1: Plugin Settings UI
 
-Future versions will include a web UI for configuration.
+1. Open **Settings → Utilities → Unraid Management Agent**.
+2. Change the necessary settings.
+3. Click **Apply** to save the settings. If the service is running, the plugin restarts it.
 
 ### Method 2: Edit Config File
 
 1. **Stop the service**:
 
    ```bash
-   /etc/rc.d/rc.unraid-management-agent stop
+   /usr/local/emhttp/plugins/unraid-management-agent/scripts/stop
    ```
 
 2. **Edit config**:
 
    ```bash
-   nano /boot/config/plugins/unraid-management-agent/unraid-management-agent.cfg
+   nano /boot/config/plugins/unraid-management-agent/config.cfg
    ```
 
 3. **Example configuration**:
@@ -281,7 +284,8 @@ Future versions will include a web UI for configuration.
 
    # MQTT Settings
    MQTT_ENABLED=true
-   MQTT_BROKER=tcp://mqtt.local:1883
+   MQTT_BROKER=mqtt.local
+   MQTT_PORT=1883
    MQTT_USERNAME=unraid
    MQTT_PASSWORD=your_password
    MQTT_TOPIC_PREFIX=unraid
@@ -300,7 +304,7 @@ Future versions will include a web UI for configuration.
 4. **Start the service**:
 
    ```bash
-   /etc/rc.d/rc.unraid-management-agent start
+   /usr/local/emhttp/plugins/unraid-management-agent/scripts/start
    ```
 
 ### Method 3: Command Line (Testing)
@@ -309,10 +313,10 @@ For temporary changes or testing:
 
 ```bash
 # Stop service
-/etc/rc.d/rc.unraid-management-agent stop
+/usr/local/emhttp/plugins/unraid-management-agent/scripts/stop
 
 # Run with custom settings
-/usr/local/bin/unraid-management-agent boot \
+/usr/local/emhttp/plugins/unraid-management-agent/unraid-management-agent boot \
   --port 8043 \
   --debug \
   --interval-system 10 \
@@ -399,7 +403,8 @@ Enable MQTT for Home Assistant:
 
 ```bash
 MQTT_ENABLED=true
-MQTT_BROKER=tcp://homeassistant.local:1883
+MQTT_BROKER=homeassistant.local
+MQTT_PORT=1883
 MQTT_USERNAME=mqtt_user
 MQTT_PASSWORD=secure_password
 MQTT_TOPIC_PREFIX=unraid/tower
@@ -411,14 +416,16 @@ MQTT_TOPIC_PREFIX=unraid/tower
 
 ```bash
 MQTT_ENABLED=true
-MQTT_BROKER=tcp://192.168.1.100:1883
+MQTT_BROKER=192.168.1.100
+MQTT_PORT=1883
 ```
 
 ### With Authentication
 
 ```bash
 MQTT_ENABLED=true
-MQTT_BROKER=tcp://mqtt.example.com:1883
+MQTT_BROKER=mqtt.example.com
+MQTT_PORT=1883
 MQTT_USERNAME=unraid_agent
 MQTT_PASSWORD=your_secure_password
 ```
@@ -438,8 +445,13 @@ Topics will be:
 
 ### TLS/SSL (if broker requires)
 
+For a standalone daemon, set these environment variables before you run `boot`:
+
 ```bash
-MQTT_BROKER=ssl://mqtt.example.com:8883
+export MQTT_ENABLED=true
+export MQTT_BROKER=mqtt.example.com
+export MQTT_PORT=8883
+export MQTT_USE_TLS=true
 ```
 
 ## VM Guest Agent
@@ -774,9 +786,9 @@ or the opt-out, to keep write access.
 
 The easiest way to configure authentication is through the Unraid WebGUI:
 
-1. Go to **Settings** $\rightarrow$ **Unraid Management Agent**.
+1. Open **Settings → Utilities → Unraid Management Agent**.
 2. Scroll to the **Authentication** section.
-3. Click **Generate** to create a secure 64-character token via the browser's cryptographic API.
+3. Click **Generate** to create a 64-character token.
 4. Click **Copy** to copy the token to your clipboard.
 5. Click **Apply** at the bottom of the page. The plugin saves the token and restarts the service automatically.
 
@@ -843,9 +855,8 @@ Use `https://` wherever the agent has TLS configured (see
 clear text and is readable by anything on the path. On a trusted LAN with TLS
 disabled, substitute `http://`.
 
-The token is never sanitised or rewritten: the value you configure is the value
-compared. Via the `API_TOKEN` environment variable or `--api-token`, any
-character is safe to use; via `config.cfg` the quoting table above applies.
+The agent compares the token as configured. Use the quoting table above if you set the token in `config.cfg`.
+Use the same token value in the client and the agent.
 Anything that would make the effective token differ from the configured one is
 a startup error rather than a silent change: control characters, leading or
 trailing whitespace (the server trims what a client sends, per normal HTTP
@@ -908,10 +919,11 @@ server {
 
 ```bash
 # Restart service
-/etc/rc.d/rc.unraid-management-agent restart
+/usr/local/emhttp/plugins/unraid-management-agent/scripts/stop
+/usr/local/emhttp/plugins/unraid-management-agent/scripts/start
 
 # Verify config
-cat /boot/config/plugins/unraid-management-agent/unraid-management-agent.cfg
+cat /boot/config/plugins/unraid-management-agent/config.cfg
 ```
 
 ### Invalid Configuration

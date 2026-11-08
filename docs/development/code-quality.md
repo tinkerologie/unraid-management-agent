@@ -4,7 +4,7 @@ Complete guide to maintaining code quality in the Unraid Management Agent projec
 
 ## Overview
 
-This project uses automated code quality checks via **pre-commit hooks** to ensure consistency, security, and best practices before code is committed.
+The **pre-commit hooks** check code format, lint rules, and security issues before a commit.
 
 ## Quick Setup
 
@@ -22,7 +22,7 @@ cd unraid-management-agent
 This script:
 
 1. Installs Python and pip (if needed)
-2. Installs pre-commit via pip
+2. Uses `pip` to install pre-commit
 3. Configures pre-commit hooks
 4. Verifies the installation
 
@@ -201,6 +201,10 @@ make pre-commit-install # Install pre-commit hooks
 ```
 
 ### Testing Commands
+
+For a documentation change, check relative links. Run `make pre-commit-run`.
+If you change Swagger annotations, run `make swagger`. Compare the generated schema with the original schema.
+Check that paths, methods, parameters, defaults, and response schemas have the same values.
 
 ```bash
 make test              # Run all tests with race detection
@@ -420,7 +424,7 @@ linters-settings:
 
 ### Test Coverage
 
-Test coverage is tracked via `go test` and reported through Codecov. Note that Go's coverage tool reports statement coverage, whereas Codecov calculates line coverage from uploaded profiles.
+Run `go test` with coverage options to measure statement coverage. Codecov uses the uploaded profiles to calculate line coverage.
 
 Target milestones:
 
@@ -479,9 +483,9 @@ func TestValidateContainerID(t *testing.T) {
 
 ## Next Steps
 
-- [Contributing Guide](contributing.md) - Contribution workflow
-- [Testing Guide](testing.md) - Comprehensive testing guide
-- [Architecture](architecture.md) - System architecture overview
+- [Contributing Guide](../../CONTRIBUTING.md) - Contribution workflow
+- [Testing Guide](#testing-commands) - Comprehensive testing guide
+- [Architecture](../adr/README.md) - System architecture overview
 
 ---
 

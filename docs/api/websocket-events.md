@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Unraid Management Agent provides real-time updates via WebSocket connections. This document details all available events, their data structures, frequencies, and usage patterns.
+The agent sends collector events over WebSocket connections. This guide describes common events and their payloads.
 
 **WebSocket Endpoint**: `ws://<host>:<port>/api/v1/ws`  
 **Default Port**: 8043  
@@ -15,16 +15,17 @@ The Unraid Management Agent provides real-time updates via WebSocket connections
 ### Event Flow
 
 ```
-Collector → Event Bus (pubsub) → API Server Cache → WebSocket Hub → Connected Clients
+Collector → Event Bus → API Server Cache
+                      → WebSocket Hub → Connected Clients
 ```
 
 ### Event Structure
 
-All WebSocket events follow this structure:
+The `event` field usually contains the topic name. This example shows a system update.
 
 ```json
 {
-  "event": "update",
+  "event": "system_update",
   "timestamp": "2025-10-02T14:02:59.850035377+10:00",
   "data": { ... }
 }
@@ -32,15 +33,17 @@ All WebSocket events follow this structure:
 
 ### Event Identification
 
-Events do NOT have a `type` field. Event types are identified by inspecting the `data` structure and checking for specific field combinations.
+Read `event` to select the event handler. If the agent sends `update`, check the payload for its own event name. The collector state event uses this format.
 
 ---
 
-## Available Events (9 Types)
+## Available Events
+
+The agent sends events when collectors publish data. The rate depends on the collection mode, collector settings,
+and change events. See [Collection Mode](../guides/configuration.md#collection-mode) for scheduling.
 
 ### 1. System Update (`system_update`)
 
-**Frequency**: Every 5 seconds  
 **Collector**: `SystemCollector`  
 **Topic**: `system_update`
 
@@ -96,7 +99,6 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 
 ### 2. Array Status Update (`array_status_update`)
 
-**Frequency**: Every 10 seconds  
 **Collector**: `ArrayCollector`  
 **Topic**: `array_status_update`
 
@@ -130,7 +132,6 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 
 ### 3. Disk List Update (`disk_list_update`)
 
-**Frequency**: Every 30 seconds  
 **Collector**: `DiskCollector`  
 **Topic**: `disk_list_update`
 
@@ -179,7 +180,6 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 
 ### 4. Container List Update (`container_list_update`)
 
-**Frequency**: Every 10 seconds  
 **Collector**: `DockerCollector`  
 **Topic**: `container_list_update`
 
@@ -223,7 +223,6 @@ Events do NOT have a `type` field. Event types are identified by inspecting the 
 
 ### 5. VM List Update (`vm_list_update`)
 
-**Frequency**: Every 10 seconds  
 **Collector**: `VMCollector`  
 **Topic**: `vm_list_update`
 
@@ -330,7 +329,6 @@ for all VM states; 0 means unavailable. It is not host allocation or physical sp
 
 ### 6. UPS Status Update (`ups_status_update`)
 
-**Frequency**: Every 10 seconds  
 **Collector**: `UPSCollector`  
 **Topic**: `ups_status_update`
 
@@ -384,9 +382,8 @@ UPSes have no load or power reading). They are never sent as a made-up `0`.
 
 ---
 
-### 7. GPU Update (`gpu_update`)
+### 7. GPU Update (`gpu_metrics_update`)
 
-**Frequency**: Every 10 seconds  
 **Collector**: `GPUCollector`  
 **Topic**: `gpu_metrics_update`
 
@@ -428,7 +425,6 @@ with keys retained. Measured zero values remain numbers. CPU temperature is sepa
 
 ### 8. Network List Update (`network_list_update`)
 
-**Frequency**: Every 15 seconds  
 **Collector**: `NetworkCollector`  
 **Topic**: `network_list_update`
 
@@ -466,7 +462,6 @@ with keys retained. Measured zero values remain numbers. CPU temperature is sepa
 
 ### 9. Share List Update (`share_list_update`)
 
-**Frequency**: Every 60 seconds  
 **Collector**: `ShareCollector`  
 **Topic**: `share_list_update`
 
@@ -510,25 +505,9 @@ unknown mount metadata leaves usage unknown. The storage figures are shared by s
 
 ## Event Frequency Summary
 
-The intervals below are example Manual-mode intervals; see the Configuration Guide for the
-current defaults. In Dynamic collection mode the agent sets each
-collector's rate from change events and from which topics clients subscribe to; see the
-[Configuration Guide](../guides/configuration.md#collection-mode).
-
-| Event Type              | Interval                               | Collector                |
-| ----------------------- | -------------------------------------- | ------------------------ |
-| system_update           | 5s                                     | SystemCollector          |
-| array_status_update     | 10s                                    | ArrayCollector           |
-| disk_list_update        | 30s                                    | DiskCollector            |
-| container_list_update   | 10s                                    | DockerCollector          |
-| vm_list_update          | 10s                                    | VMCollector              |
-| vm_guest_update         | 30s and on each custom sensor run      | VMCollector              |
-| ups_status_update       | 10s                                    | UPSCollector             |
-| gpu_update              | 10s                                    | GPUCollector             |
-| network_list_update     | 15s                                    | NetworkCollector         |
-| share_list_update       | 60s                                    | ShareCollector           |
-| storage_topology_update | Disabled by default; 300s when enabled | StorageTopologyCollector |
-| nic_update              | Disabled by default; 60s when enabled  | NICCollector             |
+In Manual mode, collector settings determine polling intervals. Some collectors also run on change events.
+In Dynamic mode, collector policies, consumer demand, and change events determine the schedule.
+See [Collection Mode](../guides/configuration.md#collection-mode) for the schedules.
 
 ---
 
@@ -565,21 +544,8 @@ async def monitor_events():
             async for msg in ws:
                 if msg.type == aiohttp.WSMsgType.TEXT:
                     data = msg.json()
-                    event_type = identify_event_type(data['data'])
-                    print(f"Event: {event_type}")
+                    print(f"Event: {data['event']}")
                     print(f"Data: {data['data']}")
-
-def identify_event_type(data):
-    if isinstance(data, list):
-        data = data[0] if data else {}
-
-    if "hostname" in data and "cpu_usage_percent" in data:
-        return "system_update"
-    elif "state" in data and "parity_check_status" in data:
-        return "array_status_update"
-    # ... (see websocket_client.py for full implementation)
-
-    return "unknown"
 
 asyncio.run(monitor_events())
 ```
@@ -591,65 +557,20 @@ const ws = new WebSocket("ws://192.168.1.100:8043/api/v1/ws");
 
 ws.onmessage = (event) => {
   const message = JSON.parse(event.data);
-  const eventType = identifyEventType(message.data);
-  console.log(`Event: ${eventType}`, message.data);
+  console.log(`Event: ${message.event}`, message.data);
 };
-
-function identifyEventType(data) {
-  if (Array.isArray(data)) data = data[0] || {};
-
-  if (data.hostname && data.cpu_usage_percent) return "system_update";
-  if (data.state && data.parity_check_status) return "array_status_update";
-  // ... (add other checks)
-
-  return "unknown";
-}
 ```
 
 ---
 
 ## Testing & Monitoring
 
-### Test Script
+### Check the event stream
 
-A Python test script is available at `test_websocket.py`:
+Use the WebSocket client examples above or connect with `wscat`. If the agent requires a token,
+send the bearer header. See [Authentication](../guides/configuration.md#authentication).
 
-```bash
-python test_websocket.py ws://192.168.1.100:8043/api/v1/ws 120
-```
-
-This will:
-
-- Connect to the WebSocket
-- Monitor events for 120 seconds
-- Count event types
-- Save examples to `websocket_test_results.json`
-
-### Expected Event Counts (2 minutes)
-
-- system_update: ~24 events (every 5s)
-- array_status_update: ~12 events (every 10s)
-- disk_list_update: ~4 events (every 30s)
-- container_list_update: ~12 events (every 10s)
-- vm_list_update: ~12 events (every 10s)
-- ups_status_update: ~12 events (every 10s)
-- gpu_update: ~12 events (every 10s)
-- network_list_update: ~8 events (every 15s)
-- share_list_update: ~2 events (every 60s)
-
----
-
-## Status
-
-✅ **All 9 event types documented**  
-✅ **Event identification logic defined**  
-✅ **Data structures documented**  
-✅ **Frequencies documented**  
-✅ **Usage examples provided**  
-✅ **Testing procedures documented**
-
-**Last Updated**: 2025-10-02  
-**Version**: 1.1.0
+The number of events depends on the collection mode, collector settings, and activity on the server.
 
 ## PSU telemetry updates
 

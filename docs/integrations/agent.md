@@ -5,11 +5,8 @@
 > suggest-not-mutate learning (preference + runbook proposals), multi-turn chat
 > (`SendMessage`), and new REST / MCP surfaces for memory and preferences.
 
-The Unraid Management Agent includes an embedded autonomous operator ("Agent Core")
-that can reason about your Unraid server and take actions on your behalf using a
-large language model (LLM). Unlike the [MCP integration](mcp.md) — which turns your
-server into a tool for an external AI client — the Agent Core runs **inside the daemon**
-and drives its own reasoning loop without an external orchestrator.
+Agent Core runs inside the daemon. It uses a large language model (LLM) and agent tools to work on a goal.
+The [MCP integration](mcp.md) gives external clients access to tools. Agent Core manages its own tool calls.
 
 ## Overview
 
@@ -46,11 +43,11 @@ Sessions can also start **automatically** when an alert fires or a health check 
 Tools are assigned one of three **risk tiers**. The tier determines whether the agent
 can execute a tool automatically or must refuse it:
 
-| Tier        | Examples                                                        | Agent behaviour                                             |
-| ----------- | --------------------------------------------------------------- | ----------------------------------------------------------- |
-| `read_only` | `get_system_info`, `get_array_status`, `list_docker_containers` | Auto-executes                                               |
-| `low`       | `restart_container`                                             | Auto-executes                                               |
-| `high`      | Array start/stop, system reboot                                 | Pauses session — operator must approve via REST or MCP tool |
+| Tier        | Examples                                                        | Agent behaviour                                                 |
+| ----------- | --------------------------------------------------------------- | --------------------------------------------------------------- |
+| `read_only` | `get_system_info`, `get_array_status`, `list_docker_containers` | Auto-executes                                                   |
+| `low`       | `restart_container`                                             | Auto-executes                                                   |
+| `high`      | Array start/stop, system reboot                                 | Pauses session — operator must approve with REST or an MCP tool |
 
 The `autonomy` map in `agent_config.json` (see below) lets you override the default
 behaviour per tier (`"auto"`, `"approve"`, or `"forbid"`).
@@ -111,7 +108,8 @@ setup.
 ### 3. Restart the daemon
 
 ```bash
-/etc/rc.d/rc.unraid-management-agent restart
+/usr/local/emhttp/plugins/unraid-management-agent/scripts/stop
+/usr/local/emhttp/plugins/unraid-management-agent/scripts/start
 ```
 
 After restart, call `GET /api/v1/agent/sessions` to confirm the agent is enabled
@@ -166,7 +164,7 @@ disabled or misconfigured).
 | `max_incidents`           | int               | `200`     | Maximum number of incident records retained in `agent_memory.json`                     |
 | `recall_top_k`            | int               | `3`       | Number of past incidents injected as context at the start of each session              |
 
-The API key is **never stored in the config file**. It must be provided via the
+The API key is **never stored in the config file**. It must be provided through the
 `UMA_AGENT_API_KEY` environment variable.
 
 ---
@@ -210,7 +208,7 @@ deeper investigation step.
 | ------------------- | -------------------------------------------------- |
 | `agent_memory.json` | Episodic incidents (up to `max_incidents` entries) |
 
-Inspect and clear via:
+Use these requests to examine or clear it:
 
 ```bash
 # View current memory via REST
@@ -258,7 +256,7 @@ proposal store; they never change any configuration or execute any action.
 
 ### Confirming a preference
 
-Pending preferences are confirmed via REST or MCP:
+Use REST or MCP to confirm pending preferences:
 
 ```bash
 # List pending preferences
@@ -268,7 +266,7 @@ curl -s http://<unraid-ip>:8043/api/v1/agent/memory | jq '.preferences[] | selec
 curl -s -X POST http://<unraid-ip>:8043/api/v1/agent/preferences/01J3XK.../confirm
 ```
 
-Or via MCP tool `agent_confirm_preference`:
+Or use the `agent_confirm_preference` MCP tool:
 
 ```json
 {
@@ -464,7 +462,7 @@ These are enforced in the gate layer, not the autonomy config, so they cannot be
 overridden by setting `autonomy.high = "auto"`. The agent will describe what it
 would have done and explain why it cannot proceed.
 
-You can extend the forbid-list with additional tool names via the `forbid_list` field
+You can extend the forbid-list with additional tool names in the `forbid_list` field
 in `agent_config.json` (merged with the built-in defaults at startup).
 
 ---
@@ -479,7 +477,7 @@ read the API key from the `UMA_AGENT_API_KEY` environment variable.
 | `anthropic`  | Anthropic API (default)                                                    | Uses the Messages API                           |
 | `openai`     | `https://api.openai.com/v1/chat/completions`                               | Any OpenAI-compatible endpoint                  |
 | `openrouter` | `https://openrouter.ai/api/v1/chat/completions`                            | Routes to many providers; free models available |
-| `gemini`     | `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions` | Gemini via its OpenAI-compatible API            |
+| `gemini`     | `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions` | OpenAI-compatible Gemini API                    |
 
 Override `endpoint` to point to a self-hosted or proxy endpoint. Example using
 OpenRouter with a free model:
@@ -767,7 +765,7 @@ agents and MCP clients:
 
 ## WebSocket events
 
-Agent activity is broadcast on the `agent_stream` topic via the `/ws` WebSocket
+Agent activity is broadcast on the `agent_stream` topic through the `/ws` WebSocket
 endpoint. Each message is a standard `dto.WSEvent`:
 
 ```json
@@ -824,5 +822,5 @@ enhancements include:
 ## Related documentation
 
 - [MCP Integration](mcp.md)
-- [REST API Reference](../api/API_REFERENCE.md)
-- [WebSocket Events](../websocket/WEBSOCKET_EVENTS_DOCUMENTATION.md)
+- [REST API Reference](../api/rest-api.md)
+- [WebSocket Events](../api/websocket-events.md)

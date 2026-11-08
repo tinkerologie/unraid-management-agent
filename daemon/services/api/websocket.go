@@ -240,20 +240,20 @@ func (h *WSHub) Broadcast(topic string, data any) {
 // handleWebSocket godoc
 //
 //	@Summary		WebSocket connection
-//	@Description	Establish a WebSocket connection for real-time system updates
+//	@Description	Open a WebSocket connection to receive system events.
 //	@Description
 //	@Description	**Connection:** `ws://localhost:8043/api/v1/ws`
 //	@Description
 //	@Description	**Event Format:**
 //	@Description	```json
 //	@Description	{
-//	@Description	  "event": "update",
+//	@Description	  "event": "system_update",
 //	@Description	  "timestamp": "2025-01-01T00:00:00Z",
 //	@Description	  "data": { ... }
 //	@Description	}
 //	@Description	```
 //	@Description
-//	@Description	**Supported Events:**
+//	@Description	**Examples of event topics:**
 //	@Description	- system_update: System metrics (CPU, RAM, temps)
 //	@Description	- array_status_update: Array status changes
 //	@Description	- disk_list_update: Disk information updates

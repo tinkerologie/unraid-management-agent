@@ -4,7 +4,7 @@ Publish Unraid server events to MQTT brokers for IoT integration and Home Assist
 
 ## Overview
 
-The Unraid Management Agent can publish system events to MQTT brokers in real-time, enabling:
+The agent can publish system events to an MQTT broker. The broker distributes these messages to clients:
 
 - **Home Assistant** integration for smart home automation
 - **IoT dashboards** like Node-RED
@@ -23,14 +23,15 @@ GPU power and memory utilisation keep one decimal place when measured.
 
 ### Enable MQTT
 
-Edit `/boot/config/plugins/unraid-management-agent/unraid-management-agent.cfg`:
+Edit `/boot/config/plugins/unraid-management-agent/config.cfg`:
 
 ```bash
 # Enable MQTT publishing
 MQTT_ENABLED=true
 
 # MQTT broker address (required)
-MQTT_BROKER=tcp://192.168.1.100:1883
+MQTT_BROKER=192.168.1.100
+MQTT_PORT=1883
 
 # Optional: Authentication
 MQTT_USERNAME=unraid_agent
@@ -43,20 +44,17 @@ MQTT_TOPIC_PREFIX=homelab/unraid
 MQTT_CLIENT_ID=unraid-agent-tower
 ```
 
-The broker allows one connection per client ID, so each server needs its own.
-The default `unraid-management-agent` (or an empty value) is sent as
-`unraid-management-agent-<hostname>`, which keeps several servers on one broker
-apart without configuration. Any other value is used exactly as set. Old
-MQTT 3.1 brokers accept at most 23 characters and reject longer IDs with
-"identifier rejected"; set a short `MQTT_CLIENT_ID` for those. The agent logs
-the client ID it connects with. The same
-setting is `mqtt.client_id` in `config.yml` and `client_id` in the MQTT config
-REST endpoint.
+Use a different client ID for each server on a broker.
+For an empty value or the default `unraid-management-agent`, the agent sends `unraid-management-agent-<hostname>`.
+The agent sends any other value as you set it. It records the client ID in the log.
+If an MQTT 3.1 broker returns "identifier rejected", set `MQTT_CLIENT_ID` to at most 23 characters.
+Use `mqtt.client_id` in `config.yml` or `client_id` at the MQTT configuration REST endpoint.
 
 ### Restart Service
 
 ```bash
-/etc/rc.d/rc.unraid-management-agent restart
+/usr/local/emhttp/plugins/unraid-management-agent/scripts/stop
+/usr/local/emhttp/plugins/unraid-management-agent/scripts/start
 ```
 
 ### Verify Connection
@@ -385,11 +383,13 @@ curl -X POST http://localhost:8043/api/v1/mqtt/publish \
 
 ### TLS/SSL
 
-For secure MQTT connections:
+For a standalone daemon, set these environment variables before you run `boot`:
 
 ```bash
-# Use ssl:// instead of tcp://
-MQTT_BROKER=ssl://mqtt.example.com:8883
+export MQTT_ENABLED=true
+export MQTT_BROKER=mqtt.example.com
+export MQTT_PORT=8883
+export MQTT_USE_TLS=true
 ```
 
 **Note**: TLS certificate validation is performed. Ensure valid certificates or configure your broker accordingly.
@@ -524,7 +524,7 @@ Impact on MQTT broker:
 
 - [Home Assistant Integration](home-assistant.md) - Complete HA setup
 - [Grafana Integration](grafana.md) - Monitoring dashboards
-- [REST API Reference](../api/rest-api.md) - Control via API
+- [REST API Reference](../api/rest-api.md) - Control through API
 - [Configuration Guide](../guides/configuration.md) - Customize settings
 
 ---

@@ -1,8 +1,7 @@
 # OpenAPI 3.0 schema for ChatGPT Custom GPT "Actions".
 #
-# This is a CURATED subset (~30 of the agent's 148 REST endpoints) chosen for
-# conversational usefulness and reliable GPT action selection. The full REST API
-# is documented at http://<your-unraid-ip>:8043/swagger/.
+# This schema lists a subset of the agent's REST operations.
+# Open http://<your-unraid-ip>:8043/swagger/ for the generated REST reference.
 #
 # Setup: see README.md in this directory.
 # All state-changing operations are marked x-openai-isConsequential: true so
@@ -13,8 +12,8 @@ info:
   description: Monitor and control an Unraid server — system, array, disks, Docker, VMs, GPU, UPS, parity, and more.
   version: "1.0.0"
 servers:
-  # Replace with your Unraid server's address. The agent listens on port 8043 by
-  # default and has no authentication, so expose it only on a trusted LAN/VPN.
+  # For GPT Actions, use a reachable HTTPS URL. Configure bearer authentication
+  # in the GPT editor. See README.md.
   - url: http://your-unraid-ip:8043/api/v1
 paths:
   /system:
@@ -159,7 +158,13 @@ paths:
       summary: Start a container
       x-openai-isConsequential: true
       parameters:
-        - { name: id, in: path, required: true, schema: { type: string }, description: Container id or name }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string },
+            description: Container ID (12 or 64 hexadecimal characters),
+          }
       responses:
         "200": { description: Started }
   /docker/{id}/stop:
@@ -168,7 +173,13 @@ paths:
       summary: Stop a container
       x-openai-isConsequential: true
       parameters:
-        - { name: id, in: path, required: true, schema: { type: string }, description: Container id or name }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string },
+            description: Container ID (12 or 64 hexadecimal characters),
+          }
       responses:
         "200": { description: Stopped }
   /docker/{id}/restart:
@@ -177,7 +188,13 @@ paths:
       summary: Restart a container
       x-openai-isConsequential: true
       parameters:
-        - { name: id, in: path, required: true, schema: { type: string }, description: Container id or name }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string },
+            description: Container ID (12 or 64 hexadecimal characters),
+          }
       responses:
         "200": { description: Restarted }
   /docker/{id}/update:

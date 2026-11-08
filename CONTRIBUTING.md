@@ -16,6 +16,12 @@ To maintain code quality, protect maintainer capacity, and prevent maintainer bu
 
 ---
 
+## Documentation
+
+Use [ASD-STE100 Issue 9](docs/README.md#documentation-standards) for maintained technical prose.
+Check procedures against the implementation. Keep exact UI labels, commands, and API identifiers.
+For Swagger, edit the Go annotations and run `make swagger`.
+
 ## Development Workflow
 
 All contributions—whether submitted by humans or AI agents—must adhere to this step-by-step workflow:

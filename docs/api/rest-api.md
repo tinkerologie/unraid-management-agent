@@ -1,22 +1,13 @@
 # API Reference Guide
 
-Complete reference for all Unraid Management Agent API endpoints.
+Use this guide to send requests to the Unraid Management Agent. Open `/swagger/` on the agent for the generated REST reference.
 
-**Base URL**: `http://YOUR_UNRAID_IP:8043/api/v1`  
-**Version**: 1.0.0  
-**Total Endpoints**: 66
+**Base URL**: `http://YOUR_UNRAID_IP:8043/api/v1`
 
 ---
 
 ## Table of Contents
 
-- [Authentication](#authentication)
-- [Response Format](#response-format)
-- [Error Handling](#error-handling)
-- [Code Examples](#code-examples)
-  - [Python Examples](#python-examples)
-  - [JavaScript Examples](#javascript-examples)
-  - [TypeScript Examples](#typescript-examples)
 - [Authentication](#authentication)
 - [Response Format](#response-format)
 - [Error Handling](#error-handling)
@@ -47,7 +38,9 @@ Complete reference for all Unraid Management Agent API endpoints.
 
 ## Authentication
 
-When `API_TOKEN` is set, every request (except `/api/v1/health` and `/swagger/`) must send `Authorization: Bearer <token>`. Without a token, `GET`, `HEAD` and `OPTIONS` requests work unauthenticated and every `POST`, `PUT`, `PATCH` and `DELETE` request returns `403 Forbidden`, unless `ALLOW_UNAUTHENTICATED_WRITES` is enabled. See [Configuration → Authentication](../guides/configuration.md#authentication).
+If you set `API_TOKEN`, send `Authorization: Bearer <token>` on protected requests. The agent keeps `/api/v1/health` and `/swagger/` open.
+
+Without a token, the agent permits `GET`, `HEAD`, and `OPTIONS` requests. It returns `403 Forbidden` for network writes unless you enable `ALLOW_UNAUTHENTICATED_WRITES`. See [Authentication](../guides/configuration.md#authentication). For request examples that omit the header, add it before you send a protected request.
 
 **Security Note**: Use HTTPS when sending a token over untrusted networks, and keep the API on trusted networks.
 
@@ -57,12 +50,8 @@ When `API_TOKEN` is set, every request (except `/api/v1/health` and `/swagger/`)
 
 ### Success Response
 
-```json
-{
-  "data": { ... },
-  "timestamp": "2025-10-03T13:41:13.631962129+10:00"
-}
-```
+The response shape depends on the route. For example, `GET /api/v1/health` returns an object and `GET /api/v1/shares` returns an array.
+See [the versioned producer fixtures](../../contracts/README.md) for wire examples.
 
 ### Error Response
 
@@ -990,7 +979,7 @@ curl -X POST http://192.168.20.21:8043/api/v1/system/shutdown
 
 - Home Assistant integration for scheduled server shutdowns
 - Power-saving automation (shutdown during off-peak hours)
-- Emergency shutdown via remote access
+- Emergency shutdown with remote access
 
 ---
 
@@ -1767,9 +1756,9 @@ Start a Docker container.
 
 **Path Parameters**:
 
-| Parameter | Type   | Required | Description          | Examples                          |
-| --------- | ------ | -------- | -------------------- | --------------------------------- |
-| `id`      | string | Yes      | Container ID or name | `jackett`, `plex`, `fedcb3e1ba1f` |
+| Parameter | Type   | Required | Description                        | Examples       |
+| --------- | ------ | -------- | ---------------------------------- | -------------- |
+| `id`      | string | Yes      | 12- or 64-character hexadecimal ID | `fedcb3e1ba1f` |
 
 **Response (Success)**:
 
@@ -1797,7 +1786,7 @@ Start a Docker container.
 **Example**:
 
 ```bash
-curl -X POST http://192.168.20.21:8043/api/v1/docker/jackett/start
+curl -X POST http://192.168.20.21:8043/api/v1/docker/fedcb3e1ba1f/start
 ```
 
 ---
@@ -1808,9 +1797,9 @@ Stop a Docker container.
 
 **Path Parameters**:
 
-| Parameter | Type   | Required | Description          | Examples                          |
-| --------- | ------ | -------- | -------------------- | --------------------------------- |
-| `id`      | string | Yes      | Container ID or name | `jackett`, `plex`, `fedcb3e1ba1f` |
+| Parameter | Type   | Required | Description                        | Examples       |
+| --------- | ------ | -------- | ---------------------------------- | -------------- |
+| `id`      | string | Yes      | 12- or 64-character hexadecimal ID | `fedcb3e1ba1f` |
 
 **Response (Success)**:
 
@@ -1838,7 +1827,7 @@ Stop a Docker container.
 **Example**:
 
 ```bash
-curl -X POST http://192.168.20.21:8043/api/v1/docker/jackett/stop
+curl -X POST http://192.168.20.21:8043/api/v1/docker/fedcb3e1ba1f/stop
 ```
 
 ---
@@ -1849,9 +1838,9 @@ Restart a Docker container.
 
 **Path Parameters**:
 
-| Parameter | Type   | Required | Description          | Examples                          |
-| --------- | ------ | -------- | -------------------- | --------------------------------- |
-| `id`      | string | Yes      | Container ID or name | `jackett`, `plex`, `fedcb3e1ba1f` |
+| Parameter | Type   | Required | Description                        | Examples       |
+| --------- | ------ | -------- | ---------------------------------- | -------------- |
+| `id`      | string | Yes      | 12- or 64-character hexadecimal ID | `fedcb3e1ba1f` |
 
 **Response (Success)**:
 
@@ -1868,7 +1857,7 @@ Restart a Docker container.
 **Example**:
 
 ```bash
-curl -X POST http://192.168.20.21:8043/api/v1/docker/jackett/restart
+curl -X POST http://192.168.20.21:8043/api/v1/docker/fedcb3e1ba1f/restart
 ```
 
 ---
@@ -1879,9 +1868,9 @@ Pause a Docker container.
 
 **Path Parameters**:
 
-| Parameter | Type   | Required | Description          | Examples                          |
-| --------- | ------ | -------- | -------------------- | --------------------------------- |
-| `id`      | string | Yes      | Container ID or name | `jackett`, `plex`, `fedcb3e1ba1f` |
+| Parameter | Type   | Required | Description                        | Examples       |
+| --------- | ------ | -------- | ---------------------------------- | -------------- |
+| `id`      | string | Yes      | 12- or 64-character hexadecimal ID | `fedcb3e1ba1f` |
 
 **Response (Success)**:
 
@@ -1898,7 +1887,7 @@ Pause a Docker container.
 **Example**:
 
 ```bash
-curl -X POST http://192.168.20.21:8043/api/v1/docker/jackett/pause
+curl -X POST http://192.168.20.21:8043/api/v1/docker/fedcb3e1ba1f/pause
 ```
 
 ---
@@ -1909,9 +1898,9 @@ Unpause a Docker container.
 
 **Path Parameters**:
 
-| Parameter | Type   | Required | Description          | Examples                          |
-| --------- | ------ | -------- | -------------------- | --------------------------------- |
-| `id`      | string | Yes      | Container ID or name | `jackett`, `plex`, `fedcb3e1ba1f` |
+| Parameter | Type   | Required | Description                        | Examples       |
+| --------- | ------ | -------- | ---------------------------------- | -------------- |
+| `id`      | string | Yes      | 12- or 64-character hexadecimal ID | `fedcb3e1ba1f` |
 
 **Response (Success)**:
 
@@ -1928,7 +1917,7 @@ Unpause a Docker container.
 **Example**:
 
 ```bash
-curl -X POST http://192.168.20.21:8043/api/v1/docker/jackett/unpause
+curl -X POST http://192.168.20.21:8043/api/v1/docker/fedcb3e1ba1f/unpause
 ```
 
 ---
@@ -3200,7 +3189,7 @@ Get mover schedule, thresholds, and current running status.
 | ---------------------- | ------ | ---------------------------------------------------- |
 | `schedule`             | string | Cron-style schedule expression                       |
 | `enabled`              | bool   | Whether scheduled mover runs are enabled             |
-| `running`              | bool   | Whether mover is currently running                   |
+| `running`              | bool   | Whether mover is running                             |
 | `fill_up_threshold`    | int    | Percentage threshold to trigger cache->array moves   |
 | `age_days`             | int    | Move files older than this many days (0 = all files) |
 | `action_on_share_fill` | string | Action when share fills up                           |
@@ -3337,8 +3326,8 @@ Get comprehensive status of all Unraid network services.
 | ------------- | ------ | ------------------------------------ |
 | `name`        | string | Service display name                 |
 | `enabled`     | bool   | Whether service is enabled in config |
-| `running`     | bool   | Whether service is currently running |
-| `port`        | int    | Primary network port (if applicable) |
+| `running`     | bool   | Whether service is running           |
+| `port`        | int    | Primary network port (if necessary)  |
 | `description` | string | Human-readable service description   |
 
 **Summary Fields**:
@@ -3347,7 +3336,7 @@ Get comprehensive status of all Unraid network services.
 | ------------------ | ---- | ------------------------------------ |
 | `total_services`   | int  | Total number of monitored services   |
 | `enabled_services` | int  | Number of services enabled in config |
-| `running_services` | int  | Number of services currently running |
+| `running_services` | int  | Number of services running           |
 
 **Use Case**: Monitor network service availability, build status dashboards, detect service outages.
 
@@ -3653,7 +3642,7 @@ Refreshed by the `mover` background collector (`INTERVAL_MOVER`, default 5 min).
 
 | Field                       | Type   | Description                                           |
 | --------------------------- | ------ | ----------------------------------------------------- |
-| `active`                    | bool   | Whether the mover is currently running                |
+| `active`                    | bool   | Whether the mover is running                          |
 | `schedule`                  | string | Cron expression from `var.ini` (`shareMoverSchedule`) |
 | `last_run_start`            | string | ISO-8601 timestamp when the last run began            |
 | `last_run_finish`           | string | ISO-8601 timestamp when the last run ended            |
@@ -4117,7 +4106,7 @@ endpoints' data is, see [Cached REST reads](../guides/configuration.md#cached-re
 }
 ```
 
-See [WebSocket Events Documentation](../WEBSOCKET_EVENTS_DOCUMENTATION.md) for complete details.
+See [WebSocket Events Documentation](websocket-events.md) for complete details.
 
 ---
 
@@ -4532,7 +4521,7 @@ Before deploying to production:
 - [ ] **Reverse proxy configured** - nginx, Caddy, or Traefik
 - [ ] **Rate limiting enabled** - Protect against abuse
 - [ ] **IP whitelisting** - Restrict to known IPs if possible
-- [ ] **Authentication added** - At minimum, basic auth via reverse proxy
+- [ ] **Authentication added** - At minimum, basic authentication at a reverse proxy
 - [ ] **CORS configured** - Only allow trusted origins
 - [ ] **Firewall rules** - Block direct access to port 8043
 - [ ] **Monitoring enabled** - Track API usage and errors
