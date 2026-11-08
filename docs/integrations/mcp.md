@@ -535,20 +535,17 @@ Add to your Cursor MCP configuration (Settings → MCP → Add Server):
 
 ### Using with Claude Desktop
 
-**Option A: Remote (Streamable HTTP)** — when Claude Desktop runs on a different machine:
+**Custom connector (Streamable HTTP)**
 
-Use the Claude.ai web UI:
+Claude connects from Anthropic's cloud. Use a publicly reachable HTTPS endpoint with a trusted certificate.
+For example, enter `https://<your-domain>/mcp/<connect-secret>` if you enabled a Connect URL.
+See the [Claude connector requirements](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp).
 
-1. Go to [claude.ai/settings/connectors](https://claude.ai/settings/connectors)
-2. Click **"Add Connector"**
-3. Enter the URL: `http://your-unraid-ip:8043/mcp`
+**Local network (stdio bridge)**
 
-> **Note:** Claude Desktop does **not** connect to remote servers configured
-> directly through `claude_desktop_config.json` — that file is only for local
-> servers using the stdio transport. Remote servers must be added through
-> Settings → Connectors.
+For an agent on your LAN, use the stdio bridge in the [Claude integration guide](claude/README.md).
 
-**Option B: Local (STDIO)** — when Claude Desktop runs directly on the Unraid server:
+**On the Unraid server (stdio)**
 
 Add to `claude_desktop_config.json`:
 

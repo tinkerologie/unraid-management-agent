@@ -23,7 +23,7 @@ func (s *Server) SetCapabilityRefresher(r CapabilityRefresher) {
 // handleCapabilities godoc
 //
 //	@Summary		Get detected capabilities
-//	@Description	Read the capability snapshot for OS paths, binaries, and detected hardware. Hardware classes include hardware.psu, hardware.nic_optics, hardware.storage_topology, hardware.gpu, hardware.ups, hardware.nut, hardware.zfs, and hardware.fan_control. Each result includes a state (present, absent, or unknown), a reason, and the time of the check. The agent checks PSU inventory every 30 seconds and on USB or hwmon events. It checks other capabilities every 15 minutes. Use refresh=true to request a new check. The agent uses the cached snapshot if the previous check was less than 30 seconds ago. Automatic collectors follow the hardware state.
+//	@Description	Read the capability snapshot for OS paths, binaries, and detected hardware. Hardware classes include hardware.psu, hardware.nic_optics, hardware.storage_topology, hardware.gpu, hardware.ups, hardware.nut, hardware.zfs, and hardware.fan_control. A result can include a state (present, absent, or unknown) and a detail that explains the result. The snapshot checked_at field gives the time of the check. The agent checks PSU inventory every 30 seconds and on USB or hwmon events. It checks other capabilities every 15 minutes. Use refresh=true to request a new check. The agent uses the cached snapshot if the previous check was less than 30 seconds ago. Automatic collectors follow the hardware state.
 //	@Tags			Diagnostics
 //	@Produce		json
 //	@Param			refresh	query		bool	false	"Re-check capabilities now (rate-limited)"
