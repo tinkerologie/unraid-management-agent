@@ -24,7 +24,7 @@ We take security vulnerabilities seriously and appreciate responsible disclosure
 
 ### Preferred Method: GitHub Security Advisories (Private Disclosure)
 
-Report security vulnerabilities privately via GitHub Security Advisories:
+Use GitHub Security Advisories to report security vulnerabilities privately:
 
 **🔒 <https://github.com/tinkerologie/unraid-management-agent/security/advisories/new>**
 
@@ -32,7 +32,7 @@ This allows us to work on a fix before public disclosure, protecting users from 
 
 ### Alternative Method: GitHub Issues (Public Disclosure)
 
-If you prefer public disclosure or the issue is low severity, you can report via GitHub Issues:
+If you prefer public disclosure or the issue is low severity, use GitHub Issues:
 
 **📋 <https://github.com/tinkerologie/unraid-management-agent/issues>**
 
@@ -69,7 +69,7 @@ When you report a vulnerability, you can expect:
 3. **Testing**: The fix is thoroughly tested to ensure it resolves the issue without introducing regressions
 4. **Release**: A security patch release is published with updated version number
 5. **Disclosure**: Security advisory is published with details and credit to the reporter
-6. **Notification**: Users are notified via GitHub release notes and plugin changelog
+6. **Notification**: GitHub release notes and the plugin changelog tell users about the release
 
 ## Recognition
 

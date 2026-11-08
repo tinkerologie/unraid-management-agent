@@ -5,8 +5,8 @@ package docs
 //
 //	@title						Unraid Management Agent API
 //	@version					2025.12.1
-//	@description				REST API and WebSocket interface for comprehensive Unraid system monitoring and control.
-//	@description				This is a third-party community plugin providing an alternative/complement to the official Unraid GraphQL API.
+//	@description				Monitor and control Unraid through the REST API. Receive updates through WebSocket.
+//	@description				This community plugin can run alongside the official Unraid GraphQL API.
 //
 //	@contact.name				GitHub Issues
 //	@contact.url				https://github.com/tinkerologie/unraid-management-agent/issues
@@ -19,7 +19,7 @@ package docs
 //	@schemes					http https
 //
 //	@tag.name					System
-//	@tag.description			System monitoring and control endpoints (CPU, RAM, temps, reboot/shutdown)
+//	@tag.description			System monitoring and control endpoints (CPU, RAM, temperatures, reboot/shutdown)
 //	@tag.name					Array
 //	@tag.description			Unraid array status and parity check control
 //	@tag.name					Disks
@@ -33,7 +33,7 @@ package docs
 //	@tag.name					Shares
 //	@tag.description			User share information and configuration
 //	@tag.name					Hardware
-//	@tag.description			Hardware information (BIOS, CPU, Memory) via DMI
+//	@tag.description			Hardware information (BIOS, CPU, Memory) through DMI
 //	@tag.name					UPS
 //	@tag.description			UPS/NUT status monitoring
 //	@tag.name					GPU
@@ -53,7 +53,7 @@ package docs
 //	@tag.name					CPU
 //	@tag.description			CPU power management and scaling governor control
 //	@tag.name					WebSocket
-//	@tag.description			Real-time event streaming via WebSocket
+//	@tag.description			Real-time event streaming through WebSocket
 //	@tag.name					Unassigned Devices
 //	@tag.description			Unassigned devices and remote shares
 //	@tag.name					Plugins
@@ -70,4 +70,4 @@ package docs
 //	@securityDefinitions.apikey	BearerAuth
 //	@in							header
 //	@name						Authorization
-//	@description				Optional bearer-token authentication. Disabled by default; enabled by setting API_TOKEN. When enabled, send "Bearer <token>" on every request. /api/v1/health and /swagger/ stay open, so uptime monitoring and this documentation UI keep working.
+//	@description				Bearer authentication is optional. To require it, set API_TOKEN. Send "Bearer <token>" on each protected request. The agent keeps /api/v1/health and /swagger/ open.

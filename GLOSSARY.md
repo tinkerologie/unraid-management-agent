@@ -21,7 +21,7 @@ Measurements taken inside a configured virtual machine, distinct from the host's
 ### Collection and source health
 
 **Collector**:
-A Management Agent monitoring subsystem responsible for one area of server state, such as disks, containers, or UPS devices.
+A part of the Management Agent that collects one class of data, such as disk, container, or UPS data.
 
 **Collection mode**:
 The server-wide choice between Dynamic mode and Manual mode for scheduling collectors.
@@ -47,7 +47,7 @@ A detected server facility, such as a required binary, operating-system source, 
 Its presence can be confirmed, absent, or unknown.
 
 **Source health**:
-The condition of the underlying source supplying a monitoring subsystem's data.
+The condition of the source that gives a collector its data.
 A source may be healthy, degraded, unavailable, or intentionally disabled.
 _Avoid_: Hardware presence, overall server health.
 
@@ -58,7 +58,7 @@ Unraid's collection of assigned data disks and any parity disks, distinct from n
 _Avoid_: Pool, all server storage.
 
 **Pool**:
-A named Unraid storage resource separate from the array; a pool may use ZFS or another supported filesystem.
+A named Unraid storage resource separate from the array. A pool can use ZFS or another supported filesystem.
 _Avoid_: Array, cache when no particular pool is meant.
 
 **Parity disk**:
@@ -74,7 +74,7 @@ A named Unraid view of files stored on its assigned pool or array storage.
 _Avoid_: Remote share, storage pool.
 
 **Share content usage**:
-The measured space occupied by a user share's contents; an unavailable measurement is different from zero usage.
+The measured space that the contents of a user share use. A zero value records a measurement of zero bytes. An unavailable value means there is no measurement.
 _Avoid_: Backing storage usage, share capacity.
 
 **Backing storage usage**:

@@ -4,7 +4,7 @@ Set up monitoring and visualization for your Unraid server using Grafana and Pro
 
 ## Overview
 
-This guide shows you how to create a comprehensive Grafana dashboard for the Unraid Management Agent using the Prometheus metrics endpoint.
+Connect Prometheus to the agent. Then add Prometheus as a Grafana data source.
 
 ## Prerequisites
 
@@ -382,8 +382,8 @@ For now, use the panel configurations above to build your custom dashboard.
 
 ## Next Steps
 
-- [Prometheus Metrics Reference](prometheus.md) - Complete metrics list
-- [REST API Reference](rest-api.md) - API documentation
+- [Prometheus Metrics Reference](../api/prometheus.md) - Complete metrics list
+- [REST API Reference](../api/rest-api.md) - API documentation
 - [Configuration Guide](../guides/configuration.md) - Adjust settings
 
 ---

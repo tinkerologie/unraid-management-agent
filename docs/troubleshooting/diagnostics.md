@@ -1,6 +1,6 @@
 # Diagnostic Commands
 
-Essential commands for diagnosing issues with the Unraid Management Agent.
+Use these commands to check the service, network, and collectors.
 
 ## Service Status
 
@@ -359,7 +359,8 @@ There are two primary ways to export diagnostics depending on whether you are sh
 
 ### 1. Redacted Diagnostics Bundle (Recommended for Bug Reports)
 
-The agent provides a built-in diagnostic bundling service that exports a ZIP archive with known sensitive values (API tokens, MCP connect secret, MQTT credentials, and passwords) redacted. Review the archive for sensitive data before attaching it to GitHub issues and bug reports.
+Use the agent to download a diagnostics ZIP. The agent removes known sensitive values, such as API tokens, MCP Connect Secrets, and MQTT credentials.
+Examine the ZIP for other sensitive data before you attach it to a bug report.
 
 **Via HTTP API:**
 
@@ -369,7 +370,9 @@ curl -OJ http://localhost:8043/api/v1/diagnostics/bundle
 ```
 
 **Via WebGUI:**
-Navigate to the Unraid Management Agent settings page in the Unraid WebGUI and click **Download Diagnostics**.
+
+1. Open **Settings → Utilities → Unraid Management Agent**.
+2. Click **Download Diagnostics**.
 
 **Via CLI:**
 
@@ -444,8 +447,8 @@ Change one thing at a time, then measure again. See
 
 ## Next Steps
 
-- [Common Issues](common-issues.md) - Solutions to frequent problems
-- [Hardware Compatibility](hardware-compatibility.md) - Hardware-specific guidance
+- [Configuration Troubleshooting](../guides/configuration.md#troubleshooting) - Solutions to frequent problems
+- [Hardware Compatibility](../guides/system-requirements.md#hardware-compatibility) - Hardware-specific guidance
 - [System Requirements](../guides/system-requirements.md) - Verify requirements
 
 ---

@@ -24,7 +24,7 @@ const docTemplate = `{
     "paths": {
         "/agent/memory": {
             "get": {
-                "description": "Retrieve the agent's recorded incidents and learned preferences",
+                "description": "Read the agent's recorded incidents and learned preferences",
                 "produces": [
                     "application/json"
                 ],
@@ -105,7 +105,7 @@ const docTemplate = `{
         },
         "/agent/sessions": {
             "get": {
-                "description": "Retrieve all agent sessions, newest first",
+                "description": "Read all agent sessions, newest first",
                 "produces": [
                     "application/json"
                 ],
@@ -189,7 +189,7 @@ const docTemplate = `{
         },
         "/agent/sessions/{id}": {
             "get": {
-                "description": "Retrieve a single agent session by ID",
+                "description": "Read a single agent session by ID",
                 "produces": [
                     "application/json"
                 ],
@@ -433,7 +433,7 @@ const docTemplate = `{
         },
         "/alerts/rules": {
             "get": {
-                "description": "Retrieve all configured alert rules",
+                "description": "Read all configured alert rules",
                 "produces": [
                     "application/json"
                 ],
@@ -506,7 +506,7 @@ const docTemplate = `{
         },
         "/alerts/rules/{id}": {
             "get": {
-                "description": "Retrieve a single alert rule by ID",
+                "description": "Read a single alert rule by ID",
                 "produces": [
                     "application/json"
                 ],
@@ -657,7 +657,7 @@ const docTemplate = `{
         },
         "/alerts/templates": {
             "get": {
-                "description": "Retrieve curated, disabled-by-default alert rule templates using trend/predictive metrics",
+                "description": "Read curated, disabled-by-default alert rule templates using trend/predictive metrics",
                 "produces": [
                     "application/json"
                 ],
@@ -680,7 +680,7 @@ const docTemplate = `{
         },
         "/alerts/templates/{id}/enable": {
             "post": {
-                "description": "Enable a template by ID, creating or updating the corresponding alert rule. Idempotent: calling multiple times updates the same rule. Optional JSON body may specify channels; defaults to [\"unraid\"].",
+                "description": "Enable the alert template with the specified ID. The agent creates its rule or updates the same rule on subsequent calls. Set channels in the JSON body if necessary. The default is [\"unraid\"].",
                 "consumes": [
                     "application/json"
                 ],
@@ -738,7 +738,7 @@ const docTemplate = `{
         },
         "/array": {
             "get": {
-                "description": "Retrieve Unraid array status including parity information",
+                "description": "Read Unraid array status including parity information",
                 "produces": [
                     "application/json"
                 ],
@@ -758,7 +758,7 @@ const docTemplate = `{
         },
         "/array/clear-disk-stats": {
             "post": {
-                "description": "Clear all array disk I/O statistics system-wide. Uses the same mechanism as the Unraid WebUI \"Clear Stats\" button (emhttpd clearStatistics). The operation is safe and reversible — counters reset to zero and accumulate again normally. Requires the emhttpd socket to be available.",
+                "description": "Clear the I/O counters for all array disks. This uses emhttpd clearStatistics, as does the \"Clear Stats\" button in Unraid. The counters start again from zero. The operation requires the emhttpd socket.",
                 "produces": [
                     "application/json"
                 ],
@@ -784,7 +784,7 @@ const docTemplate = `{
         },
         "/array/parity-check/history": {
             "get": {
-                "description": "Retrieve the history of parity check operations",
+                "description": "Read the history of parity check operations",
                 "produces": [
                     "application/json"
                 ],
@@ -862,7 +862,7 @@ const docTemplate = `{
         },
         "/array/parity-check/schedule": {
             "get": {
-                "description": "Retrieve parity check schedule configuration",
+                "description": "Read parity check schedule configuration",
                 "produces": [
                     "application/json"
                 ],
@@ -1000,7 +1000,7 @@ const docTemplate = `{
         },
         "/capabilities": {
             "get": {
-                "description": "Returns the capability snapshot: OS paths and binaries plus detected hardware classes (hardware.psu, hardware.nic_optics, hardware.storage_topology, hardware.gpu, hardware.ups, hardware.nut, hardware.zfs, hardware.fan_control), each with state present/absent/unknown and a detail reason, and when the snapshot was checked. PSU inventory also refreshes on USB/hwmon events and every 30 seconds. Other capabilities are re-checked every 15 minutes; refresh=true re-checks now (at most every 30 seconds, otherwise the cached snapshot is returned). Collectors in automatic mode follow the hardware state.",
+                "description": "Read the capability snapshot for OS paths, binaries, and detected hardware. Hardware classes include hardware.psu, hardware.nic_optics, hardware.storage_topology, hardware.gpu, hardware.ups, hardware.nut, hardware.zfs, and hardware.fan_control. A result can include a state (present, absent, or unknown) and a detail that explains the result. The snapshot checked_at field gives the time of the check. The agent checks PSU inventory every 30 seconds and on USB or hwmon events. It checks other capabilities every 15 minutes. Use refresh=true to request a new check. The agent uses the cached snapshot if the previous check was less than 30 seconds ago. Automatic collectors follow the hardware state.",
                 "produces": [
                     "application/json"
                 ],
@@ -1040,7 +1040,7 @@ const docTemplate = `{
         },
         "/collectors/status": {
             "get": {
-                "description": "Retrieve status of all data collectors including enabled state and intervals",
+                "description": "Read status of all data collectors including enabled state and intervals",
                 "produces": [
                     "application/json"
                 ],
@@ -1060,7 +1060,7 @@ const docTemplate = `{
         },
         "/collectors/{name}": {
             "get": {
-                "description": "Retrieve status of a specific collector by name",
+                "description": "Read status of a specific collector by name",
                 "produces": [
                     "application/json"
                 ],
@@ -1306,7 +1306,7 @@ const docTemplate = `{
         },
         "/diagnostics/bundle": {
             "get": {
-                "description": "Collects a redacted diagnostics bundle (system state, array, containers, VMs, network, recent agent/syslog logs, and redacted configuration) and returns it as a downloadable ZIP archive. Safe to attach to bug reports — secrets (MQTT credentials, etc.) are redacted. Enable Debug Logging first for richer agent logs in the bundle.",
+                "description": "Download a diagnostics ZIP with system, array, container, VM, and network data. The ZIP also contains recent agent and system logs, and redacted configuration. Examine the contents before you share the ZIP. To include more agent log detail, turn on Debug Logging first.",
                 "produces": [
                     "application/zip"
                 ],
@@ -1332,7 +1332,7 @@ const docTemplate = `{
         },
         "/diagnostics/self-test": {
             "get": {
-                "description": "Returns the detected Unraid version, overall data-source health, probed capabilities, and per-subsystem source status (healthy/degraded/unavailable).",
+                "description": "Read the detected Unraid version, source health, and capability results. The response includes the status of each data source.",
                 "produces": [
                     "application/json"
                 ],
@@ -1352,7 +1352,7 @@ const docTemplate = `{
         },
         "/disks": {
             "get": {
-                "description": "Retrieve information about all disks including SMART data",
+                "description": "Read information about all disks including SMART data",
                 "produces": [
                     "application/json"
                 ],
@@ -1375,7 +1375,7 @@ const docTemplate = `{
         },
         "/disks/{id}": {
             "get": {
-                "description": "Retrieve information about a specific disk by ID, device name, or name",
+                "description": "Read information about a specific disk by ID, device name, or name",
                 "produces": [
                     "application/json"
                 ],
@@ -1492,7 +1492,7 @@ const docTemplate = `{
         },
         "/docker": {
             "get": {
-                "description": "Retrieve information about all Docker containers including stats",
+                "description": "Read information about all Docker containers including statistics",
                 "produces": [
                     "application/json"
                 ],
@@ -1571,7 +1571,7 @@ const docTemplate = `{
                 "tags": [
                     "Docker"
                 ],
-                "summary": "Get Docker aggregate stats",
+                "summary": "Get Docker aggregate statistics",
                 "responses": {
                     "200": {
                         "description": "Aggregate stats",
@@ -1662,7 +1662,7 @@ const docTemplate = `{
         },
         "/docker/{id}": {
             "get": {
-                "description": "Retrieve information about a specific Docker container by ID or name",
+                "description": "Read information about a specific Docker container by ID or name",
                 "produces": [
                     "application/json"
                 ],
@@ -1791,7 +1791,7 @@ const docTemplate = `{
         },
         "/docker/{id}/logs": {
             "get": {
-                "description": "Retrieve stdout/stderr logs from a specific Docker container (equivalent to docker logs)",
+                "description": "Read stdout/stderr logs from a specific Docker container (equivalent to docker logs)",
                 "produces": [
                     "application/json"
                 ],
@@ -1850,7 +1850,7 @@ const docTemplate = `{
         },
         "/docker/{id}/pause": {
             "post": {
-                "description": "Pause a specific Docker container by ID or name",
+                "description": "Pause the Docker container with the specified ID",
                 "produces": [
                     "application/json"
                 ],
@@ -1861,7 +1861,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Container ID or name",
+                        "description": "Container ID (12 or 64 hexadecimal characters)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -1944,7 +1944,7 @@ const docTemplate = `{
         },
         "/docker/{id}/restart": {
             "post": {
-                "description": "Restart a specific Docker container by ID or name",
+                "description": "Restart the Docker container with the specified ID",
                 "produces": [
                     "application/json"
                 ],
@@ -1955,7 +1955,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Container ID or name",
+                        "description": "Container ID (12 or 64 hexadecimal characters)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -2026,7 +2026,7 @@ const docTemplate = `{
         },
         "/docker/{id}/start": {
             "post": {
-                "description": "Start a specific Docker container by ID or name",
+                "description": "Start the Docker container with the specified ID",
                 "produces": [
                     "application/json"
                 ],
@@ -2037,7 +2037,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Container ID or name",
+                        "description": "Container ID (12 or 64 hexadecimal characters)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -2067,7 +2067,7 @@ const docTemplate = `{
         },
         "/docker/{id}/stop": {
             "post": {
-                "description": "Stop a specific Docker container by ID or name",
+                "description": "Stop the Docker container with the specified ID",
                 "produces": [
                     "application/json"
                 ],
@@ -2078,7 +2078,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Container ID or name",
+                        "description": "Container ID (12 or 64 hexadecimal characters)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -2108,7 +2108,7 @@ const docTemplate = `{
         },
         "/docker/{id}/unpause": {
             "post": {
-                "description": "Unpause a specific Docker container by ID or name",
+                "description": "Unpause the Docker container with the specified ID",
                 "produces": [
                     "application/json"
                 ],
@@ -2119,7 +2119,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Container ID or name",
+                        "description": "Container ID (12 or 64 hexadecimal characters)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -2190,7 +2190,7 @@ const docTemplate = `{
         },
         "/fans": {
             "get": {
-                "description": "Retrieve current fan speeds, modes, profiles, and configuration",
+                "description": "Read current fan speeds, modes, profiles, and configuration",
                 "produces": [
                     "application/json"
                 ],
@@ -2498,7 +2498,7 @@ const docTemplate = `{
         },
         "/gpu": {
             "get": {
-                "description": "Retrieve GPU metrics for NVIDIA and AMD GPUs",
+                "description": "Read GPU metrics for NVIDIA and AMD GPUs",
                 "produces": [
                     "application/json"
                 ],
@@ -2521,7 +2521,7 @@ const docTemplate = `{
         },
         "/hardware/baseboard": {
             "get": {
-                "description": "Retrieve motherboard/baseboard information from DMI data",
+                "description": "Read motherboard/baseboard information from DMI data",
                 "produces": [
                     "application/json"
                 ],
@@ -2550,7 +2550,7 @@ const docTemplate = `{
         },
         "/hardware/bios": {
             "get": {
-                "description": "Retrieve BIOS information from DMI data",
+                "description": "Read BIOS information from DMI data",
                 "produces": [
                     "application/json"
                 ],
@@ -2579,7 +2579,7 @@ const docTemplate = `{
         },
         "/hardware/cache": {
             "get": {
-                "description": "Retrieve CPU cache hierarchy information from DMI data",
+                "description": "Read CPU cache hierarchy information from DMI data",
                 "produces": [
                     "application/json"
                 ],
@@ -2611,7 +2611,7 @@ const docTemplate = `{
         },
         "/hardware/cpu": {
             "get": {
-                "description": "Retrieve CPU hardware information from DMI data",
+                "description": "Read CPU hardware information from DMI data",
                 "produces": [
                     "application/json"
                 ],
@@ -2640,7 +2640,7 @@ const docTemplate = `{
         },
         "/hardware/full": {
             "get": {
-                "description": "Retrieve complete hardware information including BIOS, CPU, and memory",
+                "description": "Read complete hardware information including BIOS, CPU, and memory",
                 "produces": [
                     "application/json"
                 ],
@@ -2660,7 +2660,7 @@ const docTemplate = `{
         },
         "/hardware/memory-array": {
             "get": {
-                "description": "Retrieve physical memory array information from DMI data",
+                "description": "Read physical memory array information from DMI data",
                 "produces": [
                     "application/json"
                 ],
@@ -2689,7 +2689,7 @@ const docTemplate = `{
         },
         "/hardware/memory-devices": {
             "get": {
-                "description": "Retrieve individual memory device (DIMM) information from DMI data",
+                "description": "Read individual memory device (DIMM) information from DMI data",
                 "produces": [
                     "application/json"
                 ],
@@ -2744,7 +2744,7 @@ const docTemplate = `{
         },
         "/health/report": {
             "get": {
-                "description": "Aggregate health signals from array, disks, containers, and firing alerts into a prioritized list of findings with recommended actions",
+                "description": "Read health findings from the array, disks, containers, and active alerts. The report lists findings by priority and gives possible actions.",
                 "produces": [
                     "application/json"
                 ],
@@ -3068,7 +3068,7 @@ const docTemplate = `{
         },
         "/logs/{filename}": {
             "get": {
-                "description": "Retrieve a specific log file by filename with optional pagination",
+                "description": "Read a specific log file by filename with optional pagination",
                 "produces": [
                     "application/json"
                 ],
@@ -3211,7 +3211,7 @@ const docTemplate = `{
         },
         "/metrics/history": {
             "get": {
-                "description": "Return in-memory ring-buffer samples and summary stats (slope, min, max, avg, last) for a named metric series. Pass entity for per-disk or per-container metrics.",
+                "description": "Return in-memory ring-buffer samples and summary statistics (slope, min, max, avg, last) for a named metric series. Pass entity for per-disk or per-container metrics.",
                 "produces": [
                     "application/json"
                 ],
@@ -3324,7 +3324,7 @@ const docTemplate = `{
         },
         "/mqtt/status": {
             "get": {
-                "description": "Retrieve MQTT connection status and configuration",
+                "description": "Read MQTT connection status and configuration",
                 "produces": [
                     "application/json"
                 ],
@@ -3370,7 +3370,7 @@ const docTemplate = `{
         },
         "/network": {
             "get": {
-                "description": "Retrieve information about all network interfaces",
+                "description": "Read information about all network interfaces",
                 "produces": [
                     "application/json"
                 ],
@@ -3413,7 +3413,7 @@ const docTemplate = `{
         },
         "/network/cards": {
             "get": {
-                "description": "Returns the cached physical (PCI) network cards collected by the nic collector: one entry per PCI slot with vendor, model, driver, firmware and hwmon temperatures (ASIC, PHY, MAC, module cages), and per port the link state and the plugged optic's identity and digital diagnostics (SFF-8472/SFF-8636: module temperature and voltage, per-lane laser bias and TX/RX power, alarm/warning flags and thresholds). Vendor serial numbers are never reported. State is \"pending\" until the first collection.",
+                "description": "Read the cached PCI network card data from the nic collector. Each PCI slot has vendor, model, driver, firmware, and hwmon temperatures for the ASIC, PHY, MAC, and module cages. Each port has a link state and optic data, when available. SFF-8472 and SFF-8636 diagnostics include module temperature and voltage, per-lane laser bias and TX/RX power, alarm and warning flags, and thresholds. The response omits vendor serial numbers. The state is \"pending\" before the first collection.",
                 "produces": [
                     "application/json"
                 ],
@@ -3433,7 +3433,7 @@ const docTemplate = `{
         },
         "/network/{interface}/config": {
             "get": {
-                "description": "Retrieve configuration for a specific network interface",
+                "description": "Read configuration for a specific network interface",
                 "produces": [
                     "application/json"
                 ],
@@ -3468,7 +3468,7 @@ const docTemplate = `{
         },
         "/notifications": {
             "get": {
-                "description": "Retrieve all notifications with overview counts, optionally filtered by importance",
+                "description": "Read all notifications with overview counts, optionally filtered by importance",
                 "produces": [
                     "application/json"
                 ],
@@ -3566,7 +3566,7 @@ const docTemplate = `{
         },
         "/notifications/archive": {
             "get": {
-                "description": "Retrieve only archived notifications",
+                "description": "Read only archived notifications",
                 "produces": [
                     "application/json"
                 ],
@@ -3619,7 +3619,7 @@ const docTemplate = `{
         },
         "/notifications/overview": {
             "get": {
-                "description": "Retrieve only the notification overview counts",
+                "description": "Read only the notification overview counts",
                 "produces": [
                     "application/json"
                 ],
@@ -3639,7 +3639,7 @@ const docTemplate = `{
         },
         "/notifications/unread": {
             "get": {
-                "description": "Retrieve only unread notifications",
+                "description": "Read only unread notifications",
                 "produces": [
                     "application/json"
                 ],
@@ -3660,7 +3660,7 @@ const docTemplate = `{
         },
         "/notifications/{id}": {
             "get": {
-                "description": "Retrieve a specific notification by its ID",
+                "description": "Read a specific notification by its ID",
                 "produces": [
                     "application/json"
                 ],
@@ -3825,7 +3825,7 @@ const docTemplate = `{
         },
         "/nut": {
             "get": {
-                "description": "Retrieve Network UPS Tools (NUT) status information",
+                "description": "Read Network UPS Tools (NUT) status information",
                 "produces": [
                     "application/json"
                 ],
@@ -3845,7 +3845,7 @@ const docTemplate = `{
         },
         "/os/update": {
             "get": {
-                "description": "Returns the cached OS update status. No outbound network calls are made; the result is based on local files only. Returns an \"unknown\" sentinel when no local latest-version data is available.",
+                "description": "Read the cached OS update status. The agent uses only local files. If local data has no latest version, the status is \"unknown\".",
                 "produces": [
                     "application/json"
                 ],
@@ -3865,7 +3865,7 @@ const docTemplate = `{
         },
         "/plugins": {
             "get": {
-                "description": "Retrieve list of installed plugins with their versions and update status",
+                "description": "Read list of installed plugins with their versions and update status",
                 "produces": [
                     "application/json"
                 ],
@@ -4011,7 +4011,7 @@ const docTemplate = `{
         },
         "/psu": {
             "get": {
-                "description": "Read host-visible PSU interfaces and per-device monitoring state. Corsair RMi/HXi use kernel hwmon. Output power is DC watts; unsupported AC input power and efficiency are null. Load is derived from verified capacity. No control operations.",
+                "description": "Read host-visible PSU interfaces and the monitoring state of each PSU. The agent reads Corsair RMi and HXi devices through kernel hwmon. Output power is in DC watts. Unsupported AC input power and efficiency are null. The agent uses verified capacity to calculate load. This route gives telemetry only.",
                 "produces": [
                     "application/json"
                 ],
@@ -4031,7 +4031,7 @@ const docTemplate = `{
         },
         "/registration": {
             "get": {
-                "description": "Retrieve Unraid license/registration information",
+                "description": "Read Unraid license/registration information",
                 "produces": [
                     "application/json"
                 ],
@@ -4120,7 +4120,7 @@ const docTemplate = `{
         },
         "/settings/disk-thresholds": {
             "get": {
-                "description": "Retrieve disk configuration settings including global temperature thresholds for HDD and SSD",
+                "description": "Read disk configuration settings including global temperature thresholds for HDD and SSD",
                 "produces": [
                     "application/json"
                 ],
@@ -4146,7 +4146,7 @@ const docTemplate = `{
         },
         "/settings/disks": {
             "get": {
-                "description": "Retrieve disk configuration settings",
+                "description": "Read disk configuration settings",
                 "produces": [
                     "application/json"
                 ],
@@ -4172,7 +4172,7 @@ const docTemplate = `{
         },
         "/settings/docker": {
             "get": {
-                "description": "Retrieve Docker daemon settings",
+                "description": "Read Docker daemon settings",
                 "produces": [
                     "application/json"
                 ],
@@ -4198,7 +4198,7 @@ const docTemplate = `{
         },
         "/settings/mover": {
             "get": {
-                "description": "Retrieve mover configuration, schedule, and current running status",
+                "description": "Read mover configuration, schedule, and current running status",
                 "produces": [
                     "application/json"
                 ],
@@ -4224,7 +4224,7 @@ const docTemplate = `{
         },
         "/settings/network-services": {
             "get": {
-                "description": "Retrieve status of all network services including SMB, NFS, FTP, SSH, Telnet, Avahi, WireGuard, etc.",
+                "description": "Read status of all network services including SMB, NFS, FTP, SSH, Telnet, Avahi, WireGuard, etc.",
                 "produces": [
                     "application/json"
                 ],
@@ -4250,7 +4250,7 @@ const docTemplate = `{
         },
         "/settings/services": {
             "get": {
-                "description": "Retrieve whether Docker and VM Manager services are enabled in Unraid settings",
+                "description": "Read whether Docker and VM Manager services are enabled in Unraid settings",
                 "produces": [
                     "application/json"
                 ],
@@ -4276,7 +4276,7 @@ const docTemplate = `{
         },
         "/settings/system": {
             "get": {
-                "description": "Retrieve Unraid system settings",
+                "description": "Read Unraid system settings",
                 "produces": [
                     "application/json"
                 ],
@@ -4346,7 +4346,7 @@ const docTemplate = `{
         },
         "/settings/vm": {
             "get": {
-                "description": "Retrieve virtual machine manager settings",
+                "description": "Read virtual machine manager settings",
                 "produces": [
                     "application/json"
                 ],
@@ -4372,7 +4372,7 @@ const docTemplate = `{
         },
         "/shares": {
             "get": {
-                "description": "Retrieve information about all user shares",
+                "description": "Read information about all user shares",
                 "produces": [
                     "application/json"
                 ],
@@ -4395,7 +4395,7 @@ const docTemplate = `{
         },
         "/shares/{name}/config": {
             "get": {
-                "description": "Retrieve configuration for a specific user share",
+                "description": "Read configuration for a specific user share",
                 "produces": [
                     "application/json"
                 ],
@@ -4487,7 +4487,7 @@ const docTemplate = `{
         },
         "/storage/topology": {
             "get": {
-                "description": "Returns the cached SAS storage topology collected with storcli (Broadcom/LSI controllers) and sg_ses (SCSI Enclosure Services): controllers with PCIe link and HBA ports, enclosures with power supplies, fans, temperature/voltage/current sensors, I/O modules, firmware and cabling, and per-drive paths, link speeds and error counters. State is \"pending\" until the first collection, and \"unsupported\" when neither storcli nor SES devices with sg_ses are available.",
+                "description": "Read the cached SAS storage topology. The collector uses storcli for Broadcom and LSI controllers and sg_ses for SCSI Enclosure Services. Controller data includes PCIe links and HBA ports. Enclosure data includes power supplies, fans, temperature, voltage, current, I/O modules, firmware, and cabling. Drive data includes paths, link speeds, and error counters. The state is \"pending\" before the first collection. It is \"unsupported\" if the collector has neither storcli nor SES devices with sg_ses.",
                 "produces": [
                     "application/json"
                 ],
@@ -4507,7 +4507,7 @@ const docTemplate = `{
         },
         "/system": {
             "get": {
-                "description": "Retrieve comprehensive system metrics including CPU, RAM, temperatures, and uptime",
+                "description": "Read system metrics for CPU, RAM, temperatures, and uptime",
                 "produces": [
                     "application/json"
                 ],
@@ -4527,7 +4527,7 @@ const docTemplate = `{
         },
         "/system/flash": {
             "get": {
-                "description": "Retrieve health information for the USB flash boot drive",
+                "description": "Read health information for the USB flash boot drive",
                 "produces": [
                     "application/json"
                 ],
@@ -4553,7 +4553,7 @@ const docTemplate = `{
         },
         "/system/reboot": {
             "post": {
-                "description": "Initiate a system reboot",
+                "description": "Reboot the system",
                 "produces": [
                     "application/json"
                 ],
@@ -4579,7 +4579,7 @@ const docTemplate = `{
         },
         "/system/shutdown": {
             "post": {
-                "description": "Initiate a system shutdown",
+                "description": "Shut down the system",
                 "produces": [
                     "application/json"
                 ],
@@ -4634,7 +4634,7 @@ const docTemplate = `{
         },
         "/tuning": {
             "get": {
-                "description": "Retrieve current kernel tuning parameters (turbo boost, disk cache, inotify, NIC offloads, ring buffers)",
+                "description": "Read current kernel tuning parameters (turbo boost, disk cache, inotify, NIC offloads, ring buffers)",
                 "produces": [
                     "application/json"
                 ],
@@ -4816,7 +4816,7 @@ const docTemplate = `{
         },
         "/unassigned": {
             "get": {
-                "description": "Retrieve all unassigned devices and remote shares",
+                "description": "Read all unassigned devices and remote shares",
                 "produces": [
                     "application/json"
                 ],
@@ -4836,7 +4836,7 @@ const docTemplate = `{
         },
         "/unassigned/devices": {
             "get": {
-                "description": "Retrieve only unassigned devices (excludes remote shares)",
+                "description": "Read only unassigned devices (excludes remote shares)",
                 "produces": [
                     "application/json"
                 ],
@@ -4857,7 +4857,7 @@ const docTemplate = `{
         },
         "/unassigned/remote-shares": {
             "get": {
-                "description": "Retrieve only remote shares (excludes local unassigned devices)",
+                "description": "Read only remote shares (excludes local unassigned devices)",
                 "produces": [
                     "application/json"
                 ],
@@ -4878,7 +4878,7 @@ const docTemplate = `{
         },
         "/unassigned/remote-shares/mount": {
             "post": {
-                "description": "Mount an Unassigned Devices SMB/NFS remote share that is configured in the plugin. The source must match a value from the remote_shares list: \"//server/share\" for SMB or \"server:/export\" for NFS.",
+                "description": "Mount an SMB or NFS share from the Unassigned Devices configuration. Use a source from remote_shares. Use \"//server/share\" for SMB or \"server:/export\" for NFS.",
                 "consumes": [
                     "application/json"
                 ],
@@ -4924,7 +4924,7 @@ const docTemplate = `{
         },
         "/unassigned/remote-shares/unmount": {
             "post": {
-                "description": "Unmount an Unassigned Devices SMB/NFS remote share that is currently mounted. The source must match a value from the remote_shares list: \"//server/share\" for SMB or \"server:/export\" for NFS.",
+                "description": "Unmount an SMB or NFS share that Unassigned Devices mounted. Use a source from remote_shares. Use \"//server/share\" for SMB or \"server:/export\" for NFS.",
                 "consumes": [
                     "application/json"
                 ],
@@ -4970,7 +4970,7 @@ const docTemplate = `{
         },
         "/updates": {
             "get": {
-                "description": "Retrieve Unraid OS and plugin update availability information",
+                "description": "Read Unraid OS and plugin update availability information",
                 "produces": [
                     "application/json"
                 ],
@@ -4996,7 +4996,7 @@ const docTemplate = `{
         },
         "/ups": {
             "get": {
-                "description": "Retrieve UPS status information from apcupsd",
+                "description": "Read UPS status information from apcupsd",
                 "produces": [
                     "application/json"
                 ],
@@ -5016,7 +5016,7 @@ const docTemplate = `{
         },
         "/user-scripts": {
             "get": {
-                "description": "Retrieve a list of all available user scripts",
+                "description": "List all available user scripts",
                 "produces": [
                     "application/json"
                 ],
@@ -5045,7 +5045,7 @@ const docTemplate = `{
         },
         "/user-scripts/{name}/execute": {
             "post": {
-                "description": "Execute a user script by name",
+                "description": "Run a user script by name",
                 "consumes": [
                     "application/json"
                 ],
@@ -5091,7 +5091,7 @@ const docTemplate = `{
         },
         "/vm": {
             "get": {
-                "description": "Retrieve information about all virtual machines",
+                "description": "Read information about all virtual machines",
                 "produces": [
                     "application/json"
                 ],
@@ -5114,7 +5114,7 @@ const docTemplate = `{
         },
         "/vm/guest": {
             "get": {
-                "description": "Retrieve GPU, disk, filesystem and custom sensor readings from inside the VMs listed in the vm_guest_agent configuration, read through the QEMU guest agent. While a VM is off, its last-known GPUs, disks and sensors are listed with null readings.",
+                "description": "Read GPU, disk, filesystem, and custom sensor data through the QEMU guest agent. The vm_guest_agent setting lists the VMs to read. If a VM is off, its last known GPUs, disks, and sensors have null readings.",
                 "produces": [
                     "application/json"
                 ],
@@ -5137,7 +5137,7 @@ const docTemplate = `{
         },
         "/vm/{id}": {
             "get": {
-                "description": "Retrieve information about a specific virtual machine by ID or name",
+                "description": "Read information about a specific virtual machine by ID or name",
                 "produces": [
                     "application/json"
                 ],
@@ -5751,7 +5751,7 @@ const docTemplate = `{
         },
         "/ws": {
             "get": {
-                "description": "Establish a WebSocket connection for real-time system updates\n\n**Connection:** ` + "`" + `ws://localhost:8043/api/v1/ws` + "`" + `\n\n**Event Format:**\n` + "`" + `` + "`" + `` + "`" + `json\n{\n\"event\": \"update\",\n\"timestamp\": \"2025-01-01T00:00:00Z\",\n\"data\": { ... }\n}\n` + "`" + `` + "`" + `` + "`" + `\n\n**Supported Events:**\n- system_update: System metrics (CPU, RAM, temps)\n- array_status_update: Array status changes\n- disk_list_update: Disk information updates\n- container_list_update: Docker container updates\n- vm_list_update: VM status updates\n- ups_status_update: UPS status updates\n- gpu_metrics_update: GPU metrics updates\n- network_list_update: Network interface updates\n- hardware_update: Hardware information updates\n- notifications_update: Notification updates\n- zfs_pools_update: ZFS pool updates",
+                "description": "Open a WebSocket connection to receive system events.\n\n**Connection:** ` + "`" + `ws://localhost:8043/api/v1/ws` + "`" + `\n\n**Event Format:**\n` + "`" + `` + "`" + `` + "`" + `json\n{\n\"event\": \"system_update\",\n\"timestamp\": \"2025-01-01T00:00:00Z\",\n\"data\": { ... }\n}\n` + "`" + `` + "`" + `` + "`" + `\n\n**Examples of event topics:**\n- system_update: System metrics (CPU, RAM, temps)\n- array_status_update: Array status changes\n- disk_list_update: Disk information updates\n- container_list_update: Docker container updates\n- vm_list_update: VM status updates\n- ups_status_update: UPS status updates\n- gpu_metrics_update: GPU metrics updates\n- network_list_update: Network interface updates\n- hardware_update: Hardware information updates\n- notifications_update: Notification updates\n- zfs_pools_update: ZFS pool updates",
                 "tags": [
                     "WebSocket"
                 ],
@@ -5761,7 +5761,7 @@ const docTemplate = `{
         },
         "/zfs/arc": {
             "get": {
-                "description": "Retrieve ZFS Adaptive Replacement Cache (ARC) statistics",
+                "description": "Read ZFS Adaptive Replacement Cache (ARC) statistics",
                 "produces": [
                     "application/json"
                 ],
@@ -5781,7 +5781,7 @@ const docTemplate = `{
         },
         "/zfs/datasets": {
             "get": {
-                "description": "Retrieve information about all ZFS datasets",
+                "description": "Read information about all ZFS datasets",
                 "produces": [
                     "application/json"
                 ],
@@ -5804,7 +5804,7 @@ const docTemplate = `{
         },
         "/zfs/pools": {
             "get": {
-                "description": "Retrieve information about all ZFS pools",
+                "description": "Read information about all ZFS pools",
                 "produces": [
                     "application/json"
                 ],
@@ -5827,7 +5827,7 @@ const docTemplate = `{
         },
         "/zfs/pools/{name}": {
             "get": {
-                "description": "Retrieve information about a specific ZFS pool by name",
+                "description": "Read information about a specific ZFS pool by name",
                 "produces": [
                     "application/json"
                 ],
@@ -5862,7 +5862,7 @@ const docTemplate = `{
         },
         "/zfs/snapshots": {
             "get": {
-                "description": "Retrieve information about all ZFS snapshots",
+                "description": "Read information about all ZFS snapshots",
                 "produces": [
                     "application/json"
                 ],
@@ -11238,7 +11238,7 @@ const docTemplate = `{
                     "example": "prefer"
                 },
                 "used_bytes": {
-                    "description": "Used is measured share content in bytes, including descendant filesystems.\nOmitted unless the cache-only share's assigned ZFS pool is known awake.",
+                    "description": "Used is measured share content in bytes, including mounted descendant\nfilesystems at or beneath the share dataset's mountpoint.\nOmitted unless the cache-only share's assigned ZFS pool is known awake.",
                     "type": "integer",
                     "example": 5368709120000
                 }
@@ -13605,7 +13605,7 @@ const docTemplate = `{
     },
     "securityDefinitions": {
         "BearerAuth": {
-            "description": "Optional bearer-token authentication. Disabled by default; enabled by setting API_TOKEN. When enabled, send \"Bearer \u003ctoken\u003e\" on every request. /api/v1/health and /swagger/ stay open, so uptime monitoring and this documentation UI keep working.",
+            "description": "Bearer authentication is optional. To require it, set API_TOKEN. Send \"Bearer \u003ctoken\u003e\" on each protected request. The agent keeps /api/v1/health and /swagger/ open.",
             "type": "apiKey",
             "name": "Authorization",
             "in": "header"
@@ -13613,7 +13613,7 @@ const docTemplate = `{
     },
     "tags": [
         {
-            "description": "System monitoring and control endpoints (CPU, RAM, temps, reboot/shutdown)",
+            "description": "System monitoring and control endpoints (CPU, RAM, temperatures, reboot/shutdown)",
             "name": "System"
         },
         {
@@ -13641,7 +13641,7 @@ const docTemplate = `{
             "name": "Shares"
         },
         {
-            "description": "Hardware information (BIOS, CPU, Memory) via DMI",
+            "description": "Hardware information (BIOS, CPU, Memory) through DMI",
             "name": "Hardware"
         },
         {
@@ -13681,7 +13681,7 @@ const docTemplate = `{
             "name": "CPU"
         },
         {
-            "description": "Real-time event streaming via WebSocket",
+            "description": "Real-time event streaming through WebSocket",
             "name": "WebSocket"
         },
         {
@@ -13710,7 +13710,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/api/v1",
 	Schemes:          []string{"http", "https"},
 	Title:            "Unraid Management Agent API",
-	Description:      "REST API and WebSocket interface for comprehensive Unraid system monitoring and control.\nThis is a third-party community plugin providing an alternative/complement to the official Unraid GraphQL API.",
+	Description:      "Monitor and control Unraid through the REST API. Receive updates through WebSocket.\nThis community plugin can run alongside the official Unraid GraphQL API.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

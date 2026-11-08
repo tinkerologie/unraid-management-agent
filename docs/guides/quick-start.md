@@ -1,22 +1,21 @@
 # Quick Start Guide
 
-Get up and running with the Unraid Management Agent in under 5 minutes.
+Install the agent and make your first API requests.
 
 ## Installation
 
 ### Via Plugin URL (Recommended)
 
-1. Open Unraid Web UI
-2. Navigate to **Plugins** → **Install Plugin**
-3. Paste plugin URL:
+1. Open the Unraid web UI.
+2. Open **Plugins → Install Plugin**.
+3. Paste this URL:
 
    ```
    https://raw.githubusercontent.com/tinkerologie/unraid-management-agent/main/unraid-management-agent.plg
    ```
 
-4. Click **Install**
-5. Wait for installation to complete
-6. Service starts automatically on port 8043
+4. Click **Install**.
+5. Wait until the installation is complete. The service uses port 8043 by default.
 
 ## Verify Installation
 
@@ -31,6 +30,9 @@ tail -f /var/log/unraid-management-agent.log
 ```
 
 ### Test API
+
+If you set an API token, send the bearer header on protected requests. See
+[Authentication](configuration.md#authentication). The health endpoint is open.
 
 ```bash
 # Health check
@@ -123,43 +125,51 @@ ws.run_forever()
 
 ## Common Operations
 
+Set an API token before you send a control request. Use the silent prompt below to read the token into a shell variable:
+
+```bash
+read -rs UMA_TOKEN && export UMA_TOKEN
+```
+
 ### Start/Stop Docker Container
+
+Use the ID from the Docker list. Replace the example ID with a 12- or 64-character hexadecimal ID.
 
 ```bash
 # Start container
-curl -X POST http://localhost:8043/api/v1/docker/nginx/start
+curl -X POST -H "Authorization: Bearer ${UMA_TOKEN}" http://localhost:8043/api/v1/docker/fedcb3e1ba1f/start
 
 # Stop container
-curl -X POST http://localhost:8043/api/v1/docker/nginx/stop
+curl -X POST -H "Authorization: Bearer ${UMA_TOKEN}" http://localhost:8043/api/v1/docker/fedcb3e1ba1f/stop
 
 # Restart container
-curl -X POST http://localhost:8043/api/v1/docker/nginx/restart
+curl -X POST -H "Authorization: Bearer ${UMA_TOKEN}" http://localhost:8043/api/v1/docker/fedcb3e1ba1f/restart
 ```
 
 ### Control Virtual Machines
 
 ```bash
 # Start VM
-curl -X POST http://localhost:8043/api/v1/vm/Ubuntu/start
+curl -X POST -H "Authorization: Bearer ${UMA_TOKEN}" http://localhost:8043/api/v1/vm/Ubuntu/start
 
 # Stop VM
-curl -X POST http://localhost:8043/api/v1/vm/Ubuntu/stop
+curl -X POST -H "Authorization: Bearer ${UMA_TOKEN}" http://localhost:8043/api/v1/vm/Ubuntu/stop
 
 # Pause VM
-curl -X POST http://localhost:8043/api/v1/vm/Ubuntu/pause
+curl -X POST -H "Authorization: Bearer ${UMA_TOKEN}" http://localhost:8043/api/v1/vm/Ubuntu/pause
 ```
 
 ### Array Operations
 
 ```bash
 # Start array
-curl -X POST http://localhost:8043/api/v1/array/start
+curl -X POST -H "Authorization: Bearer ${UMA_TOKEN}" http://localhost:8043/api/v1/array/start
 
 # Stop array
-curl -X POST http://localhost:8043/api/v1/array/stop
+curl -X POST -H "Authorization: Bearer ${UMA_TOKEN}" http://localhost:8043/api/v1/array/stop
 
 # Start parity check
-curl -X POST http://localhost:8043/api/v1/array/parity-check/start
+curl -X POST -H "Authorization: Bearer ${UMA_TOKEN}" http://localhost:8043/api/v1/array/parity-check/start
 ```
 
 ## Prometheus Metrics
@@ -174,17 +184,18 @@ curl http://localhost:8043/metrics
 
 ### Change Port
 
-1. Navigate to **Settings** → **Unraid Management Agent**
-2. Change **Port** setting
-3. Click **Apply** (service restarts automatically)
+1. Open **Settings → Utilities → Unraid Management Agent**.
+2. Change **API Port**.
+3. Click **Apply**. The plugin restarts a running service.
 
 ### Adjust Collection Intervals
 
-1. Navigate to **Settings** → **Unraid Management Agent**
-2. Adjust intervals for each collector type
-3. Click **Apply**
+1. Open **Settings → Utilities → Unraid Management Agent**.
+2. If you want to set intervals, turn off **Dynamic collection**.
+3. Set the collector intervals.
+4. Click **Apply**.
 
-Lower intervals = more frequent updates but higher CPU/power usage.
+Shorter intervals increase the update rate. They can also increase CPU and power use.
 
 ## Troubleshooting
 

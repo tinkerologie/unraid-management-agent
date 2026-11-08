@@ -1,35 +1,36 @@
 # Installation Guide
 
-Complete installation instructions for the Unraid Management Agent.
+Install the Unraid Management Agent on your Unraid server.
 
 ## Overview
 
-The Unraid Management Agent is installed as a **Community Applications** plugin and provides a REST API, WebSocket events, MQTT publishing, Prometheus metrics, and Model Context Protocol (MCP) integration for monitoring and controlling your Unraid server.
+The Unraid Management Agent runs as an Unraid plugin. The plugin gives you a REST API, WebSocket events, MQTT, Prometheus metrics, and Model Context Protocol (MCP) tools.
 
 ## Prerequisites
 
-- Unraid OS 6.8.0 or newer (6.12.0+ recommended)
-- Community Applications plugin installed
-- Network connectivity
-- Basic understanding of REST APIs (optional)
+- Unraid OS 7.2 or later on Linux/amd64
+- Network access to the plugin download
+- Community Applications for the **Apps** installation method
 
 ## Installation Methods
 
 ### Method 1: Community Applications (Recommended)
 
-1. **Open Unraid Web UI** → **Plugins** → **Community Applications**
+1. Open **Apps** in the Unraid web UI.
 
-2. **Search** for "Unraid Management Agent"
+2. Search for **Unraid Management Agent**.
 
-3. **Click Install** and wait for completion
+3. Click **Install**.
 
-4. **Verify Installation**:
+4. Wait until the installation is complete.
+
+5. Check that the service is running:
 
    ```bash
    ps aux | grep unraid-management-agent
    ```
 
-5. **Access API**:
+6. Check the health endpoint:
 
    ```bash
    curl http://localhost:8043/api/v1/health
@@ -40,7 +41,7 @@ The Unraid Management Agent is installed as a **Community Applications** plugin 
 1. **Download the .plg file** from the repository:
 
    ```bash
-   wget https://raw.githubusercontent.com/tinkerologie/unraid-management-agent/main/unraid-management-agent.plg
+   wget https://raw.githubusercontent.com/tinkerologie/unraid-management-agent/main/unraid-management-agent.plg -O /boot/config/plugins/unraid-management-agent.plg
    ```
 
 2. **Install via command line**:
@@ -49,10 +50,10 @@ The Unraid Management Agent is installed as a **Community Applications** plugin 
    /usr/local/emhttp/plugins/dynamix.plugin.manager/scripts/plugin install /boot/config/plugins/unraid-management-agent.plg
    ```
 
-3. **Start the service**:
+3. If the service is stopped, start it:
 
    ```bash
-   /etc/rc.d/rc.unraid-management-agent start
+   /usr/local/emhttp/plugins/unraid-management-agent/scripts/start
    ```
 
 ### Method 3: Development Build
@@ -102,13 +103,13 @@ Expected response:
 
 ### 2. Configuration
 
-The plugin is configured via command-line arguments (managed by the plugin system). Default settings:
+The plugin starts with these defaults:
 
 - **Port**: 8043
 - **Debug Mode**: Off
 - **Collection Intervals**: See [Configuration Guide](configuration.md)
 
-To customize, edit `/boot/config/plugins/unraid-management-agent/unraid-management-agent.cfg` (created after first install).
+Open **Settings → Utilities → Unraid Management Agent** to change the settings. The plugin saves them in `/boot/config/plugins/unraid-management-agent/config.cfg`.
 
 ### 3. Network Access
 
@@ -119,18 +120,20 @@ The API listens on **port 8043**. To access from other machines:
 curl http://YOUR_UNRAID_IP:8043/api/v1/health
 ```
 
-**Firewall**: Port 8043 should be accessible by default on Unraid.
+If a firewall blocks access, permit connections from the clients that use the API.
 
 ### 4. Security Considerations
 
-- The API currently has **no authentication**
-- Recommended for **internal networks only**
-- Use **VPN** (WireGuard) or **reverse proxy** with authentication for external access
-- Future versions will include authentication options
+- Keep the API on a trusted network. Use a VPN for remote access.
+- Set an API token for network control. The agent permits reads without a token by default and blocks network writes.
+- Use HTTPS when you send a token across an untrusted network. See [Authentication](configuration.md#authentication).
 
 ## Verification
 
 ### Quick Test
+
+If you set an API token, send the bearer header on protected requests. See
+[Authentication](configuration.md#authentication). The health endpoint is open.
 
 ```bash
 # System info
@@ -194,7 +197,7 @@ wget https://raw.githubusercontent.com/tinkerologie/unraid-management-agent/main
 
 ```bash
 # Stop service
-/etc/rc.d/rc.unraid-management-agent stop
+/usr/local/emhttp/plugins/unraid-management-agent/scripts/stop
 
 # Remove plugin
 /usr/local/emhttp/plugins/dynamix.plugin.manager/scripts/plugin remove unraid-management-agent
@@ -211,8 +214,8 @@ rm -rf /boot/config/plugins/unraid-management-agent
 # Check logs
 tail -f /var/log/unraid-management-agent.log
 
-# Try manual start
-/usr/local/bin/unraid-management-agent boot --debug --port 8043
+# Start the installed plugin
+/usr/local/emhttp/plugins/unraid-management-agent/scripts/start
 ```
 
 ### Port Already in Use
@@ -222,7 +225,7 @@ tail -f /var/log/unraid-management-agent.log
 lsof -i :8043
 
 # Change port (if needed)
-# Edit /boot/config/plugins/unraid-management-agent/unraid-management-agent.cfg
+# Edit /boot/config/plugins/unraid-management-agent/config.cfg
 ```
 
 ### API Not Responding
@@ -242,7 +245,7 @@ grep ERROR /var/log/unraid-management-agent.log
 
 ```bash
 # Ensure executable permissions
-chmod +x /usr/local/bin/unraid-management-agent
+chmod +x /usr/local/emhttp/plugins/unraid-management-agent/unraid-management-agent
 
 # Check log file permissions
 ls -la /var/log/unraid-management-agent.log
@@ -260,8 +263,3 @@ ls -la /var/log/unraid-management-agent.log
 - **GitHub Issues**: <https://github.com/tinkerologie/unraid-management-agent/issues>
 - **Documentation**: <https://github.com/tinkerologie/unraid-management-agent/tree/main/docs>
 - **Community**: Unraid Forums
-
----
-
-**Last Updated**: January 2026  
-**Plugin Version**: 2025.11.0+

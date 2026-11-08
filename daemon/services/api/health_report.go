@@ -211,7 +211,7 @@ func diskLabel(d dto.DiskInfo) string {
 // handleHealthReport godoc
 //
 //	@Summary		Get system health report
-//	@Description	Aggregate health signals from array, disks, containers, and firing alerts into a prioritized list of findings with recommended actions
+//	@Description	Read health findings from the array, disks, containers, and active alerts. The report lists findings by priority and gives possible actions.
 //	@Tags			System
 //	@Produce		json
 //	@Success		200	{object}	dto.HealthReport	"Health report"

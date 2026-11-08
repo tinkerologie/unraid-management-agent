@@ -5,12 +5,12 @@
 [![Codecov](https://codecov.io/gh/tinkerologie/unraid-management-agent/branch/main/graph/badge.svg)](https://codecov.io/gh/tinkerologie/unraid-management-agent)
 [![License: MIT](https://img.shields.io/github/license/tinkerologie/unraid-management-agent)](LICENSE)
 
-Monitor and control your Unraid server over a REST API, WebSocket events, Prometheus metrics, MQTT and
-the Model Context Protocol (MCP), from a single lightweight Go plugin.
+Use the Unraid Management Agent to monitor and control your Unraid server.
+The plugin serves a REST API, WebSocket events, Prometheus metrics, MQTT, and Model Context Protocol (MCP) tools.
 
-The agent reads system state directly from Unraid, `/proc`, `/sys`, the Docker Engine API and libvirt,
-caches it, and serves it to dashboards, Home Assistant, monitoring stacks and AI assistants. It can also
-act: start and stop containers, VMs, the array and parity checks, spin disks, and more.
+The agent reads data from Unraid, `/proc`, `/sys`, the Docker Engine API, and libvirt.
+Dashboards, Home Assistant, and other clients read the latest data from the agent.
+Control actions can start or stop containers, VMs, the array, and parity checks.
 
 > [!NOTE]
 > This is a community plugin, not an official Lime Technology product. Unraid 7.2 and later ship an
@@ -85,8 +85,8 @@ See [System Requirements](docs/guides/system-requirements.md) for details.
 https://raw.githubusercontent.com/tinkerologie/unraid-management-agent/main/unraid-management-agent.plg
 ```
 
-The service starts on port 8043. Open **Settings → Unraid Management Agent** to configure it. See the
-[Installation Guide](docs/guides/installation.md) for upgrades and removal.
+The service uses port 8043 by default. Open **Settings → Utilities → Unraid Management Agent**.
+See the [Installation Guide](docs/guides/installation.md) to update or remove the plugin.
 
 ## Quick start
 
@@ -150,8 +150,9 @@ Details: [Configuration → Security](docs/guides/configuration.md#security) and
 
 ## Configuration
 
-Most settings live on the plugin settings page (**Settings → Unraid Management Agent**) and are saved
-to `/boot/config/plugins/unraid-management-agent/config.cfg`. Clicking **Apply** restarts the service.
+Open **Settings → Utilities → Unraid Management Agent** to change plugin settings.
+The plugin saves the settings in `/boot/config/plugins/unraid-management-agent/config.cfg`.
+Click **Apply** to save the settings and restart a running service.
 
 | Setting                  | Purpose                                                             |
 | ------------------------ | ------------------------------------------------------------------- |
@@ -208,9 +209,9 @@ Requires Go (the version in [`go.mod`](go.mod)) and `make`.
 ```bash
 git clone https://github.com/tinkerologie/unraid-management-agent.git
 cd unraid-management-agent
-make deps            # install dependencies and tools
+make deps            # download and check Go dependencies
 make local           # build for this machine
-make test            # run the tests with the race detector
+make test            # run the Go tests
 make pre-commit-run  # lint, format and security checks
 make package         # build the Unraid plugin bundle
 make test-packaging  # bundle, migration, checksum and release-note regression tests (uses sudo)

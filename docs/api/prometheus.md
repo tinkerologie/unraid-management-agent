@@ -1,10 +1,10 @@
 # Prometheus Metrics
 
-Complete reference for Prometheus metrics exposed by the Unraid Management Agent.
+Collect agent metrics with Prometheus. Use Grafana to show them.
 
 ## Overview
 
-The agent exposes **41 metrics** in Prometheus format at the `/metrics` endpoint, suitable for scraping by Prometheus and visualization in Grafana.
+The agent serves Prometheus metrics at `/metrics`. The available series depend on the collectors and their data.
 
 **Endpoint**: `http://<unraid-ip>:8043/metrics`  
 **Format**: Prometheus text format  
@@ -88,8 +88,8 @@ volumes:
 
 **Labels**: `hostname`, `disk_id`, `disk_name`, `device`
 
-Disk temperature series are omitted while the reading is unavailable (including standby disks).
-Previously exported temperature series are removed when the reading becomes unavailable; measured 0 °C is exported.
+The agent omits a disk temperature series if the reading is unavailable. This can occur when the disk is in standby.
+The agent removes an existing series if its reading becomes unavailable. A measured 0 °C remains a sample.
 
 ### Container Metrics (Docker)
 
@@ -124,8 +124,8 @@ Previously exported temperature series are removed when the reading becomes unav
 
 **Labels**: `hostname`, `gpu_index`, `gpu_name`
 
-GPU temperature, memory used, memory total and power series are omitted when their readings are unavailable.
-Previously exported series are removed when readings become unavailable. Measured zero values remain exported.
+The agent omits GPU temperature, used memory, total memory, and power series if the readings are unavailable.
+It removes existing series if their readings become unavailable. Measured zero values remain samples.
 
 ### UPS Metrics
 
@@ -222,7 +222,7 @@ count(unraid_disk_smart_status{hostname="$hostname"} == 0)
 
 ## Grafana Integration
 
-See [Grafana Dashboard Guide](grafana.md) for:
+See [Grafana Dashboard Guide](../integrations/grafana.md) for:
 
 - Pre-built dashboard JSON
 - Dashboard setup instructions
@@ -293,7 +293,7 @@ Check collector intervals in plugin settings. Increase scrape frequency or decre
 
 ## Next Steps
 
-- [Grafana Dashboard](grafana.md) - Set up visualization
+- [Grafana Dashboard](../integrations/grafana.md) - Set up visualization
 - [REST API Reference](rest-api.md) - API endpoints
 - [Configuration](../guides/configuration.md) - Adjust intervals
 

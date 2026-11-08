@@ -2,12 +2,11 @@
 
 Existing decision, recorded 2026-11-07.
 
-The Management Agent reports capability presence separately from the health of the sources supplying
-monitoring data, rather than treating every empty response as missing hardware or a broken server.
-Capability probes distinguish present, absent, and unknown; hardware policy leaves an existing decision
-unchanged on an unknown result and requires repeated absence before stopping a previously seen gated collector.
-Source health separately distinguishes healthy, degraded, unavailable, and intentionally disabled sources,
-with an intentionally disabled service excluded from degraded-source counts.
+The agent reports capability presence and source health separately. An empty response can have several causes.
+Capability probes report present, absent, or unknown. An unknown result leaves the hardware eligibility decision in effect.
+The policy stops a previously detected hardware-gated collector only after repeated absent results.
+Source health distinguishes healthy, degraded, unavailable, and intentionally disabled sources.
+Degraded-source counts exclude intentionally disabled services.
 
 ## Consequences
 

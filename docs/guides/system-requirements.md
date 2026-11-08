@@ -2,21 +2,19 @@
 
 ## Overview
 
-The Unraid Management Agent is a lightweight Go-based plugin with **NO external plugin dependencies**. It collects data directly from system sources using native Go libraries and Linux kernel interfaces.
+The agent uses Go libraries and Linux kernel interfaces to collect system data. Core monitoring needs no other Unraid plugins.
 
 ## Minimum Requirements
 
 ### Operating System
 
-- **Unraid OS**: Version 6.9 or higher
-- **Architecture**: Linux/amd64 (x86_64)
-- **Kernel**: Linux 4.4+ (included in Unraid 6.9+)
+- **Unraid OS**: 7.2 or later
+- **Architecture**: Linux/amd64 (x86-64-v1)
 
 ### Hardware
 
 - **CPU**: Any x64 processor (Intel or AMD)
-- **RAM**: 50MB available memory
-- **Storage**: 20MB disk space for plugin files
+- **Memory and storage**: Allow space for the plugin files, logs, and collector data. Use varies with the system and active collectors.
 - **Network**: 1 available TCP port (default: 8043)
 
 ### Tested Configurations
@@ -55,7 +53,7 @@ These features require additional Unraid plugins or hardware:
 | **GPU Metrics**        | NVIDIA GPU + drivers      | Uses `nvidia-smi` command       |
 | **UPS Status**         | apcupsd or NUT plugin     | Reads UPS daemon status         |
 | **ZFS**                | ZFS support enabled       | Uses `zfs` and `zpool` commands |
-| **User Scripts**       | User Scripts plugin       | Executes scripts via plugin     |
+| **User Scripts**       | User Scripts plugin       | Runs scripts with the plugin    |
 | **Unassigned Devices** | Unassigned Devices plugin | Reads plugin config files       |
 
 ## Port Requirements
@@ -84,9 +82,9 @@ The agent runs with standard Unraid plugin permissions and requires:
 
 ### Firewall Considerations
 
-- Agent listens on `0.0.0.0` (all interfaces) by default
-- Access control via network firewall/router recommended
-- No built-in authentication (trust network-based security)
+- The agent listens on all interfaces by default. Set a bind address to limit access.
+- Use firewall rules to restrict access to trusted clients.
+- Set an API token for network control. Without a token, the agent permits reads and blocks network writes by default.
 
 ### Recommended Security
 
@@ -98,23 +96,9 @@ The agent runs with standard Unraid plugin permissions and requires:
 
 ### Resource Usage
 
-- **Idle CPU**: <0.5% on modern systems
-- **Memory**: ~50MB RSS
-- **Network**: Minimal (<1KB/s average)
-- **Disk I/O**: Negligible (mostly reads)
-
-### Collection Intervals
-
-Default intervals optimize for low power consumption:
-
-| Category     | Default | Impact                       |
-| ------------ | ------- | ---------------------------- |
-| **Fast**     | 15s     | System metrics               |
-| **Standard** | 30s     | Array, disk, containers, VMs |
-| **Moderate** | 60s     | UPS, GPU, shares             |
-| **Slow**     | 5min    | Hardware info, license       |
-
-⚡ **Power Note**: Aggressive intervals (5-10s) can increase idle power by 15-20W on Intel systems with many Docker containers.
+Collection costs depend on the hardware and enabled collectors. Short Manual intervals can increase CPU and power use.
+Dynamic mode adjusts the cadence from demand, change events, and alert floors.
+See [Collection Mode](configuration.md#collection-mode) for the two modes.
 
 ## Hardware Compatibility
 
@@ -140,8 +124,8 @@ The plugin may not work correctly with:
 
 Hardware variations can cause compatibility problems. See:
 
-- [Hardware Compatibility Guide](../troubleshooting/hardware-compatibility.md)
-- [Contributing Guide](../development/contributing.md) - Help improve compatibility
+- [Diagnostic Commands](../troubleshooting/diagnostics.md)
+- [Contributing Guide](../../CONTRIBUTING.md) - Help improve compatibility
 
 ## Diagnostic Tools
 
@@ -178,7 +162,7 @@ A: No. They can coexist. This plugin is a third-party alternative.
 A: Those endpoints return empty/unavailable. No errors occur.
 
 **Q: Can I disable certain collectors?**  
-A: Yes. Set collection interval to 0 in plugin settings.
+A: Yes. In Manual mode, set the collector interval to 0. In Dynamic mode, use `UNRAID_DISABLE_COLLECTORS` or the collector control API.
 
 **Q: Does this work on ARM systems?**  
 A: No. Currently only Linux/amd64 (x86_64) is supported.

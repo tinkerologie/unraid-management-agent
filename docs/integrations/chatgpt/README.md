@@ -1,7 +1,6 @@
 # ChatGPT Custom GPT Integration
 
-Give ChatGPT the ability to monitor and control your Unraid server by importing
-the Unraid Management Agent's REST API as a Custom GPT **Action**.
+Import the agent's REST API as an **Action** to let a custom GPT monitor or control your Unraid server.
 
 > ChatGPT consumes REST **Actions** (OpenAPI), not the Agent Skills / MCP that
 > Claude Code uses. For Claude and other MCP clients, see
@@ -11,11 +10,9 @@ the Unraid Management Agent's REST API as a Custom GPT **Action**.
 
 - The Unraid Management Agent plugin running on your Unraid server.
 - A ChatGPT plan that supports building **Custom GPTs** (GPT Builder).
-- Network reachability from ChatGPT to your server. The agent has **no
-  authentication** and listens on HTTP, so the practical options are:
-  - A reverse proxy exposing it over HTTPS on your domain (recommended), or
-  - A tunnel (Cloudflare Tunnel, Tailscale Funnel) to reach the LAN service.
-  - ChatGPT Actions cannot reach a private `192.168.x.x` address directly.
+- An HTTPS URL that ChatGPT can reach. A reverse proxy or tunnel can supply the URL.
+- An agent API token. Set the token before making the endpoint reachable to external clients.
+  See [Authentication](../../guides/configuration.md#authentication).
 
 ## Steps
 
@@ -24,10 +21,11 @@ the Unraid Management Agent's REST API as a Custom GPT **Action**.
    [`openapi-actions.yaml`](openapi-actions.yaml), or host it and use "Import from URL".
 3. **Set the server URL.** Edit the `servers[0].url` in the schema to your
    reachable address, e.g. `https://unraid.example.com/api/v1`.
-4. **Authentication:** choose **None** for a trusted/tunnelled deployment. If you
-   put the agent behind a reverse proxy that adds auth (e.g. an API key header or
-   basic auth), configure that here instead.
-5. **Save** the action. ChatGPT will list the imported operations
+4. In the GPT editor, set **Authentication Type** to **API Key**.
+5. Set **Auth Type** to **Bearer**.
+6. Enter the raw agent token in **API Key**. The action sends `Authorization: Bearer <token>`.
+   See [GPT Action authentication](https://developers.openai.com/api/docs/actions/authentication).
+7. **Save** the action. ChatGPT will list the imported operations
    (`getSystemInfo`, `listContainers`, `startContainer`, …).
 
 ## Recommended GPT instructions
@@ -41,7 +39,8 @@ You manage an Unraid server via the connected Actions.
 - Before any state-changing action (start/stop/restart, update, reboot, shutdown,
   stop array, execute script), summarize exactly what will happen and ask the user
   to confirm. These are marked consequential and ChatGPT will also prompt.
-- To act on a container or VM, first list/get it to resolve the correct id/name.
+- Before you control a container, list containers to get its 12- or 64-character hexadecimal ID.
+- Before you control a VM, list VMs to get its name.
 - Never call stopArray, rebootSystem, shutdownSystem, or executeUserScript without
   explicit user confirmation in the conversation.
 - Report results concisely; surface errors verbatim.
@@ -56,16 +55,16 @@ You manage an Unraid server via the connected Actions.
 
 ## Troubleshooting
 
-| Symptom                           | Fix                                                                            |
-| --------------------------------- | ------------------------------------------------------------------------------ |
-| "Action not found" / not callable | Re-import the schema; ensure each `operationId` is unique                      |
-| Network/timeout errors            | ChatGPT can't reach a LAN IP — use a public HTTPS reverse proxy or tunnel      |
-| CORS errors                       | Set `--cors-origin` / `CORS_ORIGIN` on the agent (or handle CORS at the proxy) |
-| Calls succeed but do nothing      | Check the `servers[0].url` includes the `/api/v1` base path                    |
-| GPT acts without asking           | Confirm the operation has `x-openai-isConsequential: true` in the schema       |
+| Symptom                           | Fix                                                                       |
+| --------------------------------- | ------------------------------------------------------------------------- |
+| "Action not found" / not callable | Re-import the schema; ensure each `operationId` is unique                 |
+| Network/timeout errors            | ChatGPT can't reach a LAN IP — use a public HTTPS reverse proxy or tunnel |
+| CORS errors                       | Check the origin rules at the reverse proxy                               |
+| Calls succeed but do nothing      | Check the `servers[0].url` includes the `/api/v1` base path               |
+| GPT acts without asking           | Confirm the operation has `x-openai-isConsequential: true` in the schema  |
 
 ## Notes
 
 This schema is a curated subset (~30 endpoints) for reliable action selection.
-The complete REST API (148 paths) is at `http://<your-unraid-ip>:8043/swagger/`;
+The agent serves its generated REST reference at `http://<your-unraid-ip>:8043/swagger/`;
 add more operations to the schema as needed, keeping `operationId`s unique.

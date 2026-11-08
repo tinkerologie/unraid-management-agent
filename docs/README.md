@@ -28,17 +28,14 @@ Welcome to the Unraid Management Agent documentation. This directory contains co
 
 ### Development
 
-- [Contributing Guide](development/contributing.md) - How to contribute to the project
-- [Development Setup](development/setup.md) - Set up your development environment
-- [Code Quality Standards](development/code-quality.md) - Pre-commit hooks and standards
-- [Testing Guide](development/testing.md) - Writing and running tests
-- [Architecture Overview](development/architecture.md) - System design and architecture
+- [Contributing Guide](../CONTRIBUTING.md) - Contribution steps and project checks
+- [Code Quality Standards](development/code-quality.md) - Setup, tests, and packaging
+- [Architecture Decisions](adr/README.md) - Decisions and links to the source
+- [Glossary](../GLOSSARY.md) - Project terms
 
 ### Troubleshooting
 
-- [Diagnostic Commands](troubleshooting/diagnostics.md) - Commands for diagnosing issues
-- [Common Issues](troubleshooting/common-issues.md) - Solutions to frequently encountered problems
-- [Hardware Compatibility](troubleshooting/hardware-compatibility.md) - Hardware-specific guidance
+- [Diagnostic Commands](troubleshooting/diagnostics.md) - Check the agent and prepare a report
 
 ### Reference
 
@@ -85,15 +82,32 @@ Found an error or want to improve the docs? Contributions are welcome!
 2. Follow the existing formatting style
 3. Submit a pull request with your changes
 
-## 📝 Documentation Standards
+## Documentation Standards
 
-All documentation follows these standards:
+Use [ASD-STE100 Issue 9](https://www.asd-ste100.org/STE_downloads.html) for maintained technical prose.
 
-- **Clear Headers**: Use descriptive section headers
-- **Code Examples**: Include practical, working examples
-- **Links**: Use relative links within documentation
-- **Formatting**: Follow Markdown best practices
-- **Up-to-date**: Keep version numbers and features current
+- Use each approved word with its approved meaning and part of speech.
+- Use active voice. Give one instruction per step. Put a condition before its instruction.
+- Use at most 20 words per procedural sentence and 25 per descriptive sentence.
+- Use the [project glossary](../GLOSSARY.md) for technical terms. For example, use _collector_, _source health_, and _hardware gating_ consistently.
+- Keep exact interface labels, API and configuration identifiers, command examples, error messages, and product names.
+- Preserve historical release notes, attributed excerpts, and required governance text.
+
+### Issue 9 review scope
+
+The [documentation review](development/documentation-review.md) lists the files, sources, and checks for #326.
+
+| Area                        | Files                                                                              |
+| --------------------------- | ---------------------------------------------------------------------------------- |
+| Project overview and policy | `README.md`, `docs/README.md`, `CONTRIBUTING.md`, `SECURITY.md`                    |
+| Setup and operation         | `docs/guides/*.md`, `docs/troubleshooting/diagnostics.md`                          |
+| API and integration         | `docs/api/*.md`, `docs/integrations/*.md`, Claude and ChatGPT guides               |
+| Domain and architecture     | `GLOSSARY.md`, `docs/adr/*.md`                                                     |
+| Build and deployment        | `docs/development/code-quality.md`, `ansible/README.md`                            |
+| Generated API reference     | `daemon/docs/swagger.go`, API handler annotations, and the generated Swagger files |
+
+Keep dated design notes, issue forms, templates, and agent instructions in their original roles.
+For generated Swagger prose, edit the source annotations. Run `make swagger`. Check the generated schema for contract changes.
 
 ## 💬 Need Help?
 
