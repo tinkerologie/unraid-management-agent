@@ -768,13 +768,16 @@ class TestEventParsing(unittest.TestCase):
 
 ### Integration Test Example
 
+The server sends no initial snapshot. Set `event_timeout` in seconds.
+Use a value greater than the [system collector interval](../guides/configuration.md#collection-intervals) on the test server.
+
 ```python
-async def test_websocket_event_flow():
-    """Test complete WebSocket event flow."""
+async def test_websocket_event_flow(event_timeout=30):
+    """Test receipt of a WebSocket event."""
     async with aiohttp.ClientSession() as session:
         async with session.ws_connect('ws://localhost:8043/api/v1/ws') as ws:
             # Wait for first event
-            msg = await ws.receive(timeout=10)
+            msg = await ws.receive(timeout=event_timeout)
             assert msg.type == aiohttp.WSMsgType.TEXT
 
             # Parse event
