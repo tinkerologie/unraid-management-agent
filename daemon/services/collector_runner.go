@@ -12,12 +12,10 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/scheduler"
 )
 
-// DynamicCollector is the optional contract a collector implements to run
-// under Dynamic collection mode (#280). Open runs once before the first
-// Refresh, Refresh gathers and publishes once, and Close runs after the last
-// Refresh. The runner never calls them concurrently. Collectors whose plain
-// Collect method needs no setup are adapted by dynamicCollectorFor instead.
-type DynamicCollector interface {
+// Collector owns the resources for one generation. Open and Refresh share its
+// cancellation context. Calls are serialized and Close runs once after Open
+// is attempted, after Refresh and the event sources have returned.
+type Collector interface {
 	Open(ctx context.Context) error
 	Refresh(ctx context.Context) error
 	Close()
@@ -47,27 +45,17 @@ func (f collectFunc) Refresh(ctx context.Context) error {
 // Close does nothing: the adapted collector needs no teardown.
 func (f collectFunc) Close() {}
 
-// dynamicCollectorFor returns the Dynamic-mode contract of a collector.
-func dynamicCollectorFor(c Collector) (DynamicCollector, error) {
-	switch v := c.(type) {
-	case DynamicCollector:
-		return v, nil
-	case interface{ Collect() }:
-		return collectFunc(func(context.Context) { v.Collect() }), nil
-	case interface{ Collect(context.Context) }:
-		return collectFunc(v.Collect), nil
-	default:
-		return nil, fmt.Errorf("collector %T has no Dynamic-mode contract", c)
-	}
+// collectOnce adapts a stateless collection method that has no context parameter.
+func collectOnce(collect func()) collectFunc {
+	return func(context.Context) { collect() }
 }
 
-// collectorRunner runs one collector in Dynamic mode. A single goroutine
-// serialises scheduled runs, event triggers and refresh requests, so runs
-// never overlap; concurrent refresh requests share one run.
+// collectorRunner serializes one collector generation's scheduled runs
+// and event triggers. In Dynamic mode concurrent requests share one run.
 type collectorRunner struct {
 	name     string
 	policy   scheduler.Policy
-	coll     DynamicCollector
+	coll     Collector
 	clock    scheduler.Clock
 	lowPower bool
 	active   func() bool
@@ -102,7 +90,7 @@ type runnerState struct {
 }
 
 // newCollectorRunner returns a runner for one collector, inactive and with no floor until set.
-func newCollectorRunner(name string, policy scheduler.Policy, coll DynamicCollector, clock scheduler.Clock) *collectorRunner {
+func newCollectorRunner(name string, policy scheduler.Policy, coll Collector, clock scheduler.Clock) *collectorRunner {
 	return &collectorRunner{
 		name:    name,
 		policy:  policy,
@@ -160,32 +148,56 @@ func (r *collectorRunner) snapshot() runnerState {
 	}
 }
 
-// run is the runner goroutine. It returns once ctx is cancelled, after the
-// event sources have stopped and Close has run.
+// run serves the demand scheduler over the shared collector lifetime.
 func (r *collectorRunner) run(ctx context.Context) {
-	if err := r.coll.Open(ctx); err != nil {
-		logger.Warning("Collector %s: open failed, it still runs on its poll: %v", r.name, err)
+	r.runLifetime(ctx, r.runDynamicSchedule)
+}
+
+// runLifetime joins all sources before releasing collector-owned resources.
+func (r *collectorRunner) runLifetime(parent context.Context, schedule func(context.Context, func())) {
+	ctx, cancel := context.WithCancel(parent)
+	var sources sync.WaitGroup
+	defer r.recoverPanic("lifetime")
+	if ctx.Err() != nil {
+		cancel()
+		r.stop()
+		return
 	}
 	defer r.coll.Close()
-
-	var sources sync.WaitGroup
-	defer sources.Wait()
-	for _, s := range r.sources {
-		sources.Go(func() {
-			defer func() {
-				if rec := recover(); rec != nil {
-					logger.LogPanicWithStack(fmt.Sprintf("Collector %s event source", r.name), rec)
-				}
-			}()
-			s.Run(ctx, r.Trigger)
-		})
-	}
+	defer func() {
+		cancel()
+		sources.Wait()
+	}()
 	defer r.stop()
+	if err := r.coll.Open(ctx); err != nil {
+		logger.Warning("Collector %s: open failed: %v", r.name, err)
+		return
+	}
+	if ctx.Err() != nil {
+		return
+	}
+	startSources := func() {
+		for _, source := range r.sources {
+			sources.Go(func() {
+				defer r.recoverPanic("event source")
+				source.Run(ctx, r.Trigger)
+			})
+		}
+	}
+	schedule(ctx, startSources)
+}
 
-	r.mu.Lock()
+func (r *collectorRunner) recoverPanic(stage string) {
+	if rec := recover(); rec != nil {
+		logger.LogPanicWithStack(fmt.Sprintf("Collector %s (%s)", r.name, stage), rec)
+	}
+}
+
+func (r *collectorRunner) runDynamicSchedule(ctx context.Context, startSources func()) {
+	startSources()
 	r.started = r.clock.Now()
-	r.decideLocked()
-	r.mu.Unlock()
+	r.updateDecision()
+
 	timer := r.clock.NewTimer(r.policy.InitialDelay)
 	defer timer.Stop()
 
@@ -194,6 +206,9 @@ func (r *collectorRunner) run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-timer.C():
+			if ctx.Err() != nil {
+				return
+			}
 			r.collect(ctx)
 		case <-r.trigger:
 			r.setPending(false)
@@ -201,11 +216,7 @@ func (r *collectorRunner) run(ctx context.Context) {
 			r.setPending(true)
 		case <-r.wake:
 		}
-		r.mu.Lock()
-		r.decideLocked()
-		delay := r.delayLocked()
-		r.mu.Unlock()
-		timer.Reset(delay)
+		timer.Reset(r.updateDecision())
 	}
 }
 
@@ -220,14 +231,18 @@ func (r *collectorRunner) setPending(request bool) {
 	r.mu.Unlock()
 }
 
-// decideLocked recomputes the cadence from the current demand and floor.
-func (r *collectorRunner) decideLocked() {
+// updateDecision recomputes cadence without holding the lock around callbacks.
+func (r *collectorRunner) updateDecision() time.Duration {
+	active, floor := r.active(), r.floor()
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.decision = scheduler.Decide(r.policy, scheduler.Inputs{
-		Active:   r.active(),
-		Floor:    r.floor(),
+		Active:   active,
+		Floor:    floor,
 		LowPower: r.lowPower,
 		LastRun:  r.lastAttempt,
 	})
+	return r.delayLocked()
 }
 
 // delayLocked returns the time until the next run: the decided next run, or

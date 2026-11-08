@@ -1,7 +1,6 @@
 package collectors
 
 import (
-	"context"
 	"strconv"
 	"strings"
 	"time"
@@ -22,41 +21,6 @@ type RegistrationCollector struct {
 // NewRegistrationCollector creates a new registration collector
 func NewRegistrationCollector(ctx *domain.Context) *RegistrationCollector {
 	return &RegistrationCollector{ctx: ctx, varIniPath: constants.VarIni}
-}
-
-// Start begins collecting registration information at the specified interval
-func (c *RegistrationCollector) Start(ctx context.Context, interval time.Duration) {
-	logger.Info("Starting registration collector (interval: %v)", interval)
-
-	// Run once immediately with panic recovery
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LogPanicWithStack("Registration collector", r)
-			}
-		}()
-		c.Collect()
-	}()
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("Registration collector stopping due to context cancellation")
-			return
-		case <-ticker.C:
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						logger.LogPanicWithStack("Registration collector", r)
-					}
-				}()
-				c.Collect()
-			}()
-		}
-	}
 }
 
 // Collect gathers registration information

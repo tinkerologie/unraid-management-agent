@@ -12,7 +12,6 @@ import (
 // mockCollector is a simple collector for testing
 type mockCollector struct {
 	started   bool
-	interval  time.Duration
 	startChan chan struct{}
 	doneChan  chan struct{}
 	mu        sync.Mutex
@@ -25,10 +24,9 @@ func newMockCollector() *mockCollector {
 	}
 }
 
-func (m *mockCollector) Start(ctx context.Context, interval time.Duration) {
+func (m *mockCollector) Open(context.Context) error {
 	m.mu.Lock()
 	m.started = true
-	m.interval = interval
 	m.mu.Unlock()
 
 	select {
@@ -36,9 +34,12 @@ func (m *mockCollector) Start(ctx context.Context, interval time.Duration) {
 	default:
 	}
 
-	// Wait for context cancellation
-	<-ctx.Done()
+	return nil
+}
 
+func (m *mockCollector) Refresh(context.Context) error { return nil }
+
+func (m *mockCollector) Close() {
 	m.mu.Lock()
 	m.started = false
 	m.mu.Unlock()
@@ -558,48 +559,6 @@ func TestCollectorManager_IdempotentDisable(t *testing.T) {
 	status, _ := cm.GetStatus("test")
 	if status.Status != "stopped" {
 		t.Errorf("expected status 'stopped', got '%s'", status.Status)
-	}
-}
-
-func TestCollectorManager_DisableCollectorClearsRuntimeState(t *testing.T) {
-	ctx := createTestContext()
-	var wg sync.WaitGroup
-
-	cm := NewCollectorManager(ctx, &wg)
-	mock := newMockCollector()
-	cm.Register("test", func(ctx *domain.Context) Collector {
-		return mock
-	}, 30, false)
-
-	if err := cm.EnableCollector("test"); err != nil {
-		t.Fatalf("EnableCollector failed: %v", err)
-	}
-
-	mock.waitStarted(t)
-
-	cm.mu.RLock()
-	mc := cm.collectors["test"]
-	if mc.cancel == nil {
-		t.Fatal("expected cancel function to be set while collector is running")
-	}
-	if mc.ctx == nil {
-		t.Fatal("expected context to be set while collector is running")
-	}
-	cm.mu.RUnlock()
-
-	if err := cm.DisableCollector("test"); err != nil {
-		t.Fatalf("DisableCollector failed: %v", err)
-	}
-
-	mock.waitDone(t)
-
-	cm.mu.RLock()
-	defer cm.mu.RUnlock()
-	if mc.cancel != nil {
-		t.Error("expected cancel function to be cleared after disable")
-	}
-	if mc.ctx != nil {
-		t.Error("expected context to be cleared after disable")
 	}
 }
 

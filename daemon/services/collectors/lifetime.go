@@ -5,19 +5,18 @@ import (
 	"os"
 	"sync"
 
+	"github.com/fsnotify/fsnotify"
+
 	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
 )
 
-// The Open, Refresh and Close methods below are the Dynamic-mode contract
-// (#280) of the collectors whose Start does setup or teardown around Collect.
-// The Dynamic runner calls them from one goroutine; Manual mode keeps Start.
-
-// Open resolves the notification directories and creates them, as Start does.
+// Open resolves and creates the directories for this generation.
 func (c *NotificationCollector) Open(context.Context) error {
-	if notificationsDir == defaultNotificationsBase+"/unread" {
-		notificationsDir, notificationsArchiveDir = ResolveNotificationDirs(c.dynamixCfgPath)
+	c.unreadDir, c.archiveDir = notificationsDir, notificationsArchiveDir
+	if c.unreadDir == defaultNotificationsBase+"/unread" {
+		c.unreadDir, c.archiveDir = ResolveNotificationDirs(c.dynamixCfgPath)
 	}
-	for _, dir := range []string{notificationsDir, notificationsArchiveDir} {
+	for _, dir := range []string{c.unreadDir, c.archiveDir} {
 		// #nosec G301 - Unraid standard permissions (0755 for directories)
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			logger.Warning("Failed to create notifications directory %s: %v", dir, err)
@@ -35,7 +34,40 @@ func (c *NotificationCollector) Refresh(context.Context) error {
 // Close does nothing: the runner owns the directory watchers.
 func (c *NotificationCollector) Close() {}
 
-// Open binds mount-churn checks to the runner's lifetime, as Start does.
+// ManualEvents preserves immediate create, remove and write triggers.
+func (c *NotificationCollector) ManualEvents(ctx context.Context, trigger func()) {
+	w, err := fsnotify.NewWatcher()
+	if err != nil {
+		logger.Warning("Notification collector: cannot create watcher: %v", err)
+		return
+	}
+	defer func() { _ = w.Close() }()
+	for _, dir := range []string{c.unreadDir, c.archiveDir} {
+		if err := w.Add(dir); err != nil {
+			logger.Warning("Notification collector: cannot watch %s: %v", dir, err)
+		}
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case event, ok := <-w.Events:
+			if !ok {
+				return
+			}
+			if event.Op&(fsnotify.Create|fsnotify.Remove|fsnotify.Write) != 0 {
+				trigger()
+			}
+		case err, ok := <-w.Errors:
+			if !ok {
+				return
+			}
+			logger.Warning("Notification watcher: %v", err)
+		}
+	}
+}
+
+// Open binds mount-churn checks to the runner's lifetime.
 func (c *UnassignedCollector) Open(ctx context.Context) error {
 	c.runCtx = ctx
 	return nil
@@ -71,15 +103,17 @@ func (c *DockerCollector) Refresh(context.Context) error {
 	return nil
 }
 
-// Close closes the Docker client, as Start does on exit. The SDK's Close
+// Close closes the Docker client on exit. The SDK's Close
 // only drops idle connections and never fails.
 func (c *DockerCollector) Close() {
 	if c.dockerClient != nil {
 		_ = c.dockerClient.Close()
+		c.dockerClient = nil
+		c.initialized = false
 	}
 }
 
-// Open starts the guest-agent poller for the configured VMs, as Start does.
+// Open starts the guest-agent poller for the configured VMs.
 // It keeps its own cadence and stops with ctx.
 func (c *VMCollector) Open(ctx context.Context) error {
 	if len(c.appCtx.VMGuest.VMs) == 0 {
@@ -100,5 +134,18 @@ func (c *VMCollector) Refresh(context.Context) error {
 func (c *VMCollector) Close() {
 	if c.guests != nil {
 		c.guests.Wait()
+		c.guests = nil
 	}
 }
+
+// Open does nothing because PSU reads do not retain resources across polls.
+func (c *PSUCollector) Open(context.Context) error { return nil }
+
+// Refresh reads and publishes the PSU snapshot once.
+func (c *PSUCollector) Refresh(ctx context.Context) error {
+	c.Collect(ctx)
+	return nil
+}
+
+// Close does nothing because Refresh owns and releases its reads.
+func (c *PSUCollector) Close() {}

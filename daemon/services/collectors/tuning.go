@@ -1,7 +1,6 @@
 package collectors
 
 import (
-	"context"
 	"net"
 	"strings"
 	"time"
@@ -21,39 +20,6 @@ type TuningCollector struct {
 // NewTuningCollector creates a new tuning parameter collector.
 func NewTuningCollector(ctx *domain.Context) *TuningCollector {
 	return &TuningCollector{ctx: ctx}
-}
-
-// Start begins the tuning collector's periodic data collection.
-func (c *TuningCollector) Start(ctx context.Context, interval time.Duration) {
-	logger.Info("Starting tuning collector (interval: %v)", interval)
-
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LogPanicWithStack("Tuning collector", r)
-			}
-		}()
-		c.Collect()
-	}()
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						logger.LogPanicWithStack("Tuning collector", r)
-					}
-				}()
-				c.Collect()
-			}()
-		}
-	}
 }
 
 // Collect gathers all tuning parameters and publishes to the event bus.

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -22,11 +23,6 @@ import (
 // ErrDynamicMode is returned by UpdateInterval in Dynamic collection mode,
 // where the agent decides each collector's interval.
 var ErrDynamicMode = domain.ErrDynamicCollectionMode
-
-// Collector is the interface that all collectors must implement for runtime management
-type Collector interface {
-	Start(ctx context.Context, interval time.Duration)
-}
 
 // CollectorFactory is a function that creates a new collector instance
 type CollectorFactory func(ctx *domain.Context) Collector
@@ -49,17 +45,22 @@ type ManagedCollector struct {
 	configured int
 
 	// Runtime management
-	ctx       context.Context
-	cancel    context.CancelFunc
-	factory   CollectorFactory
-	domainCtx *domain.Context
-	wg        *sync.WaitGroup
-	// runner runs the collector in Dynamic mode while it is running.
+	factory    CollectorFactory
+	generation *collectorGeneration
+	// runner is available for refresh requests only in active Dynamic mode.
 	runner *collectorRunner
+}
+
+// collectorGeneration owns one lifetime until its sources and Close finish.
+type collectorGeneration struct {
+	cancel   context.CancelFunc
+	done     chan struct{}
+	stopping bool
 }
 
 // CollectorManager manages runtime enable/disable of collectors
 type CollectorManager struct {
+	shuttingDown bool
 	psuPresent   bool
 	psuAnnounced string
 	mu           sync.RWMutex
@@ -77,7 +78,7 @@ type CollectorManager struct {
 }
 
 func (cm *CollectorManager) stopCollectorLocked(mc *ManagedCollector) {
-	wasRunning := mc.cancel != nil
+	wasRunning := mc.Status == "running"
 	cm.cancelCollectorLocked(mc)
 	if mc.Name == "psu" && wasRunning {
 		state := dto.PSUStateDisabled
@@ -91,11 +92,10 @@ func (cm *CollectorManager) stopCollectorLocked(mc *ManagedCollector) {
 // cancelCollectorLocked also serves immediate restarts. Preserve the last
 // snapshot across a restart so HA discovery is not withdrawn and recreated.
 func (cm *CollectorManager) cancelCollectorLocked(mc *ManagedCollector) {
-	if mc.cancel != nil {
-		mc.cancel()
-		mc.cancel = nil
+	if g := mc.generation; g != nil && !g.stopping {
+		g.stopping = true
+		g.cancel()
 	}
-	mc.ctx = nil
 	mc.runner = nil
 }
 
@@ -182,6 +182,10 @@ func (cm *CollectorManager) Register(name string, factory CollectorFactory, inte
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
+	if old := cm.collectors[name]; old != nil && old.generation != nil {
+		logger.Warning("Cannot register collector %s during an active lifetime", name)
+		return
+	}
 	enabled := interval > 0
 	if cm.dynamic {
 		// INTERVAL_* values are kept but unused: only the disable list turns
@@ -213,8 +217,6 @@ func (cm *CollectorManager) Register(name string, factory CollectorFactory, inte
 		Auto:       auto,
 		configured: interval,
 		factory:    factory,
-		domainCtx:  cm.domainCtx,
-		wg:         cm.wg,
 	}
 
 	logger.Debug("Registered collector: %s (interval: %ds, required: %v, gated: %v, auto: %v)", name, interval, required, gated, auto)
@@ -225,6 +227,9 @@ func (cm *CollectorManager) StartAll() int {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
+	if cm.shuttingDown {
+		return 0
+	}
 	enabledCount := 0
 	for name, mc := range cm.collectors {
 		if mc.Enabled && (mc.Interval > 0 || cm.dynamic) {
@@ -239,36 +244,71 @@ func (cm *CollectorManager) StartAll() int {
 // startCollectorLocked starts a collector (must hold lock)
 func (cm *CollectorManager) startCollectorLocked(name string) {
 	mc, exists := cm.collectors[name]
-	if !exists || mc.Status == "running" {
+	if !exists || cm.shuttingDown || mc.Status == "running" {
 		return
 	}
-	if cm.dynamic {
-		cm.startRunnerLocked(mc)
+	policy, known := scheduler.PolicyFor(name)
+	if cm.dynamic && !known {
+		logger.Error("Collector %s has no Dynamic-mode policy, not started", name)
 		return
 	}
-
-	// Create new context for this collector
-	// #nosec G118 -- cancel is stored on ManagedCollector and released by DisableCollector, UpdateInterval, StopAll, and collector exit.
-	ctx, cancel := context.WithCancel(context.Background())
-	mc.ctx = ctx
-	mc.cancel = cancel
-
-	// Create collector instance
-	collector := mc.factory(mc.domainCtx)
-	interval := time.Duration(mc.Interval) * time.Second
-
-	// Start the collector goroutine
-	mc.wg.Go(func() {
-		defer cancel()
-		collector.Start(ctx, interval)
-	})
-
 	mc.Status = "running"
 	mc.Enabled = true
-	now := time.Now()
-	mc.LastRun = &now
+	if mc.generation != nil {
+		// The retiring generation will start the latest requested configuration.
+		return
+	}
 
-	logger.Info("Started collector: %s (interval: %ds)", name, mc.Interval)
+	ctx, cancel := context.WithCancel(context.Background())
+	g := &collectorGeneration{cancel: cancel, done: make(chan struct{})}
+	mc.generation = g
+	interval := time.Duration(mc.Interval) * time.Second
+	r := newCollectorRunner(name, policy, nil, cm.clock)
+	if cm.dynamic {
+		r.lowPower = cm.domainCtx.LowPowerMode
+		r.active = func() bool { return cm.demand.Active(name) }
+		r.floor = func() bool { return cm.floorRequired(name) }
+		mc.runner = r
+	} else {
+		now := cm.clock.Now()
+		mc.LastRun = &now
+	}
+
+	cm.wg.Go(func() {
+		defer cm.finishGeneration(mc, g)
+		defer cancel()
+		// Factories may do setup and must never run while holding the manager lock.
+		defer r.recoverPanic("generation")
+		defer r.stop()
+		if ctx.Err() != nil {
+			return
+		}
+		r.coll = mc.factory(cm.domainCtx)
+		if cm.dynamic {
+			if cm.eventSources != nil {
+				r.sources = cm.eventSources(name)
+			}
+			r.run(ctx)
+			return
+		}
+		r.sources = manualEventSources(name, r.coll)
+		r.runManual(ctx, interval)
+	})
+}
+
+// finishGeneration releases the slot only after cleanup and honors a queued restart.
+func (cm *CollectorManager) finishGeneration(mc *ManagedCollector, g *collectorGeneration) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	defer close(g.done)
+	mc.generation = nil
+	mc.runner = nil
+	if mc.Status == "running" {
+		mc.Status = "stopped"
+		if g.stopping && mc.Enabled {
+			cm.startCollectorLocked(mc.Name)
+		}
+	}
 }
 
 // EnableCollector enables a collector at runtime
@@ -280,6 +320,10 @@ func (cm *CollectorManager) EnableCollector(name string) error {
 	if !exists {
 		cm.mu.Unlock()
 		return fmt.Errorf("unknown collector: %s", name)
+	}
+	if cm.shuttingDown {
+		cm.mu.Unlock()
+		return errRunnerStopped
 	}
 	mc.Gated, mc.Auto = false, false // manual control ends hardware gating
 
@@ -375,8 +419,6 @@ func (cm *CollectorManager) UpdateInterval(name string, intervalSeconds int) err
 	if wasRunning {
 		cm.cancelCollectorLocked(mc)
 		mc.Status = "stopped"
-		// Give time for graceful stop
-		time.Sleep(100 * time.Millisecond)
 	}
 
 	// Update interval
@@ -401,7 +443,7 @@ func (cm *CollectorManager) UpdateInterval(name string, intervalSeconds int) err
 func (cm *CollectorManager) ApplyHardwareState(name string, present bool, autoInterval int) bool {
 	cm.mu.Lock()
 	mc, exists := cm.collectors[name]
-	if !exists || !mc.Gated {
+	if !exists || !mc.Gated || cm.shuttingDown {
 		cm.mu.Unlock()
 		return false
 	}
@@ -563,18 +605,47 @@ func (cm *CollectorManager) GetCollectorNames() []string {
 	return names
 }
 
-// StopAll stops all running collectors
+// StopAll requests stop for every collector, retaining its configured enablement.
 func (cm *CollectorManager) StopAll() {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
+	cm.stopAllLocked()
+}
 
+func (cm *CollectorManager) stopAllLocked() map[string]<-chan struct{} {
+	generations := make(map[string]<-chan struct{})
 	for name, mc := range cm.collectors {
-		if mc.cancel != nil {
+		if g := mc.generation; g != nil {
 			cm.stopCollectorLocked(mc)
 			mc.Status = "stopped"
-			logger.Debug("Stopped collector: %s", name)
+			generations[name] = g.done
 		}
 	}
+	return generations
+}
+
+// Shutdown prevents new generations and waits for cleanup up to ctx's deadline.
+// The returned names are still stopping and continue to own their resources.
+func (cm *CollectorManager) Shutdown(ctx context.Context) []string {
+	cm.mu.Lock()
+	cm.shuttingDown = true
+	generations := cm.stopAllLocked()
+	cm.mu.Unlock()
+
+	var stopping []string
+	for name, done := range generations {
+		select {
+		case <-done:
+		case <-ctx.Done():
+			select {
+			case <-done:
+			default:
+				stopping = append(stopping, name)
+			}
+		}
+	}
+	slices.Sort(stopping)
+	return stopping
 }
 
 // buildStateEvent creates a CollectorStateEvent snapshot. Must be called while cm.mu is held.
@@ -632,17 +703,17 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 
 	// System collector is required
 	cm.Register("system", func(ctx *domain.Context) Collector {
-		return collectors.NewSystemCollector(ctx)
+		return collectOnce(collectors.NewSystemCollector(ctx).Collect)
 	}, intervals.System, true)
 
 	// Array collector
 	cm.Register("array", func(ctx *domain.Context) Collector {
-		return collectors.NewArrayCollector(ctx)
+		return collectOnce(collectors.NewArrayCollector(ctx).Collect)
 	}, intervals.Array, false)
 
 	// Disk collector
 	cm.Register("disk", func(ctx *domain.Context) Collector {
-		return collectors.NewDiskCollector(ctx)
+		return collectOnce(collectors.NewDiskCollector(ctx).Collect)
 	}, intervals.Disk, false)
 
 	// Docker collector - uses Docker SDK for fast container info collection
@@ -657,12 +728,12 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 
 	// UPS collector
 	cm.Register("ups", func(ctx *domain.Context) Collector {
-		return collectors.NewUPSCollector(ctx)
+		return collectOnce(collectors.NewUPSCollector(ctx).Collect)
 	}, intervals.UPS, false)
 
 	// NUT collector
 	cm.Register("nut", func(ctx *domain.Context) Collector {
-		return collectors.NewNUTCollector(ctx)
+		return collectOnce(collectors.NewNUTCollector(ctx).Collect)
 	}, intervals.NUT, false)
 
 	// NUT requires UPS to be enabled — UPS collector handles MQTT publishing
@@ -674,22 +745,22 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 
 	// GPU collector
 	cm.Register("gpu", func(ctx *domain.Context) Collector {
-		return collectors.NewGPUCollector(ctx)
+		return collectOnce(collectors.NewGPUCollector(ctx).Collect)
 	}, intervals.GPU, false)
 
 	// Share collector
 	cm.Register("shares", func(ctx *domain.Context) Collector {
-		return collectors.NewShareCollector(ctx)
+		return collectFunc(collectors.NewShareCollector(ctx).Collect)
 	}, intervals.Shares, false)
 
 	// Network collector
 	cm.Register("network", func(ctx *domain.Context) Collector {
-		return collectors.NewNetworkCollector(ctx)
+		return collectOnce(collectors.NewNetworkCollector(ctx).Collect)
 	}, intervals.Network, false)
 
 	// Hardware collector
 	cm.Register("hardware", func(ctx *domain.Context) Collector {
-		return collectors.NewHardwareCollector(ctx)
+		return collectOnce(collectors.NewHardwareCollector(ctx).Collect)
 	}, intervals.Hardware, false)
 
 	// ZFS collector
@@ -704,7 +775,7 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 
 	// Registration collector
 	cm.Register("registration", func(ctx *domain.Context) Collector {
-		return collectors.NewRegistrationCollector(ctx)
+		return collectOnce(collectors.NewRegistrationCollector(ctx).Collect)
 	}, intervals.Registration, false)
 
 	// Unassigned collector
@@ -714,12 +785,12 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 
 	// Fan control collector
 	cm.Register("fancontrol", func(ctx *domain.Context) Collector {
-		return collectors.NewFanControlCollector(ctx)
+		return collectOnce(collectors.NewFanControlCollector(ctx).Collect)
 	}, intervals.FanControl, false)
 
 	// Tuning collector (kernel parameters, NIC offloads, ring buffers)
 	cm.Register("tuning", func(ctx *domain.Context) Collector {
-		return collectors.NewTuningCollector(ctx)
+		return collectOnce(collectors.NewTuningCollector(ctx).Collect)
 	}, intervals.Tuning, false)
 
 	// DockerUpdate collector — checks container images for available updates.
@@ -743,7 +814,7 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 				logger.Warning("docker_update: failed to create notification: %v", err)
 			}
 		}
-		return c
+		return collectFunc(c.Collect)
 	}, intervals.DockerUpdate, false)
 
 	// DockerNetworks collector — lists all Docker networks.
@@ -756,7 +827,7 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 			defer func() { _ = dc.Close() }()
 			return dc.ListNetworks()
 		}
-		return c
+		return collectOnce(c.Collect)
 	}, intervals.DockerNetworks, false)
 
 	// PluginUpdate collector — checks installed plugins for available updates.
@@ -787,7 +858,7 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 				logger.Warning("plugin_update: failed to create notification: %v", err)
 			}
 		}
-		return c
+		return collectFunc(c.Collect)
 	}, intervals.PluginUpdate, false)
 
 	// OSUpdate collector — best-effort local-file-only OS update availability check.
@@ -806,18 +877,18 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 				logger.Warning("os_update: failed to create notification: %v", err)
 			}
 		}
-		return c
+		return collectOnce(c.Collect)
 	}, intervals.OSUpdate, false)
 
 	// Mover collector — reads var.ini state + /var/log/mover.log (local files only).
 	cm.Register("mover", func(ctx *domain.Context) Collector {
-		return collectors.NewMoverCollector(ctx)
+		return collectOnce(collectors.NewMoverCollector(ctx).Collect)
 	}, intervals.Mover, false)
 
 	// Storage topology collector — storcli (Broadcom/LSI) and sg_ses (SES enclosures).
 	// Read-only queries, run sequentially; a no-op on systems without either tool.
 	cm.Register("storage_topology", func(ctx *domain.Context) Collector {
-		return collectors.NewStorageTopologyCollector(ctx)
+		return collectFunc(collectors.NewStorageTopologyCollector(ctx).Collect)
 	}, intervals.StorageTopology, false)
 
 	// Shared PSU collector, initially using the passive Corsair hwmon backend.
@@ -829,6 +900,6 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 
 	// NIC collector — PCI network cards and optic diagnostics.
 	cm.Register("nic", func(ctx *domain.Context) Collector {
-		return collectors.NewNICCollector(ctx)
+		return collectOnce(collectors.NewNICCollector(ctx).Collect)
 	}, intervals.NIC, false)
 }

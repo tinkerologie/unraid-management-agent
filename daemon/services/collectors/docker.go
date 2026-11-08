@@ -86,48 +86,6 @@ func (c *DockerCollector) reportDockerSourceFailure(reason string, err error) {
 	c.appCtx.Platform.Report("docker", dto.SourceUnavailable, reason, err)
 }
 
-// Start begins the Docker collector's periodic data collection
-func (c *DockerCollector) Start(ctx context.Context, interval time.Duration) {
-	logger.Info("Starting docker collector (interval: %v)", interval)
-
-	// Run once immediately with panic recovery
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LogPanicWithStack("Docker collector", r)
-			}
-		}()
-		collectWithWatchdog(ctx, "Docker", interval, c.Collect)
-	}()
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	defer func() {
-		if c.dockerClient != nil {
-			if err := c.dockerClient.Close(); err != nil {
-				logger.Debug("Docker: Error closing client: %v", err)
-			}
-		}
-	}()
-
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("Docker collector stopping due to context cancellation")
-			return
-		case <-ticker.C:
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						logger.LogPanicWithStack("Docker collector", r)
-					}
-				}()
-				collectWithWatchdog(ctx, "Docker", interval, c.Collect)
-			}()
-		}
-	}
-}
-
 // Collect gathers Docker container information using the SDK and publishes to event bus
 func (c *DockerCollector) Collect() {
 	startTotal := time.Now()

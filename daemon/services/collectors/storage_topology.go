@@ -19,8 +19,6 @@ import (
 )
 
 const (
-	// storageTopologyStartupStagger delays the first collection so it does not pile onto boot.
-	storageTopologyStartupStagger = 20 * time.Second
 	// storcliTimeout bounds one storcli call. storcli normally answers in well
 	// under a second, but MegaRAID firmware has been observed to take ~40 s
 	// while busy, so the limit is generous.
@@ -60,8 +58,6 @@ type StorageTopologyCollector struct {
 	DiskstatsPath string
 	// Now returns the current time; replaceable for tests.
 	Now func() time.Time
-	// Stagger delays the first collection after Start.
-	Stagger time.Duration
 
 	inflight map[string]<-chan struct{}
 	lastErrs string
@@ -86,7 +82,6 @@ func NewStorageTopologyCollector(ctx *domain.Context) *StorageTopologyCollector 
 		IsExecutable:    isExecutableFile,
 		DiskstatsPath:   "/proc/diskstats",
 		Now:             time.Now,
-		Stagger:         storageTopologyStartupStagger,
 		inflight:        map[string]<-chan struct{}{},
 	}
 }
@@ -95,39 +90,6 @@ func NewStorageTopologyCollector(ctx *domain.Context) *StorageTopologyCollector 
 func isExecutableFile(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.Mode().IsRegular() && info.Mode().Perm()&0o111 != 0
-}
-
-// Start runs the collector until ctx is cancelled.
-func (c *StorageTopologyCollector) Start(ctx context.Context, interval time.Duration) {
-	logger.Info("Starting storage topology collector (interval: %v)", interval)
-
-	select {
-	case <-ctx.Done():
-		return
-	case <-time.After(c.Stagger):
-	}
-
-	run := func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LogPanicWithStack("Storage topology collector", r)
-			}
-		}()
-		collectWithWatchdog(ctx, "StorageTopology", interval, func() { c.Collect(ctx) })
-	}
-	run()
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("Storage topology collector stopping due to context cancellation")
-			return
-		case <-ticker.C:
-			run()
-		}
-	}
 }
 
 // Collect gathers the topology and publishes it.

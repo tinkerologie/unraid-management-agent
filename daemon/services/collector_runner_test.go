@@ -17,10 +17,9 @@ const testWait = 5 * time.Second
 
 var runnerEpoch = time.Date(2026, 10, 18, 12, 0, 0, 0, time.UTC)
 
-// fakeDynamic is a DynamicCollector whose Refresh calls are observable and,
+// fakeDynamic is a Collector whose Refresh calls are observable and,
 // with block set, held until a value is sent on release.
 type fakeDynamic struct {
-	openErr    error
 	refreshErr error
 	panicMsg   string
 	block      bool
@@ -41,7 +40,7 @@ func newFakeDynamic() *fakeDynamic {
 
 func (f *fakeDynamic) Open(context.Context) error {
 	f.opened.Store(true)
-	return f.openErr
+	return nil
 }
 
 func (f *fakeDynamic) Refresh(context.Context) error {
@@ -330,7 +329,6 @@ func TestRunnerEventSourcesAndStopOrder(t *testing.T) {
 	var order []string
 	coll := newFakeDynamic()
 	coll.orderMu, coll.order = &mu, &order
-	coll.openErr = errors.New("open failed")
 
 	fire := make(chan struct{})
 	h := startRunner(t, testPolicy, coll, func(r *collectorRunner) {
@@ -343,7 +341,7 @@ func TestRunnerEventSourcesAndStopOrder(t *testing.T) {
 	if got := h.clock.Pending(); len(got) != 1 || got[0] != time.Hour {
 		t.Fatalf("pending timers after an early event = %v, want [1h]", got)
 	}
-	// The scheduled first run happens despite the Open error.
+	// The initial run is still anchored to the original delay.
 	h.clock.Advance(time.Hour)
 	coll.waitCall(t)
 	h.idleWith(t, 1, 60*time.Second)
@@ -365,50 +363,4 @@ func TestRunnerEventSourcesAndStopOrder(t *testing.T) {
 	// Late signals after stop are harmless.
 	h.r.Trigger()
 	h.r.Wake()
-}
-
-// Collector types for dynamicCollectorFor.
-type plainCollect struct{ n *atomic.Int32 }
-
-func (plainCollect) Start(context.Context, time.Duration) {}
-func (p plainCollect) Collect()                           { p.n.Add(1) }
-
-type ctxCollect struct{ n *atomic.Int32 }
-
-func (ctxCollect) Start(context.Context, time.Duration) {}
-func (p ctxCollect) Collect(context.Context)            { p.n.Add(1) }
-
-type dynCollect struct{ *fakeDynamic }
-
-func (dynCollect) Start(context.Context, time.Duration) {}
-
-type startOnly struct{}
-
-func (startOnly) Start(context.Context, time.Duration) {}
-
-func TestDynamicCollectorFor(t *testing.T) {
-	var n atomic.Int32
-	for _, c := range []Collector{plainCollect{&n}, ctxCollect{&n}} {
-		d, err := dynamicCollectorFor(c)
-		if err != nil {
-			t.Fatalf("%T: %v", c, err)
-		}
-		if err := d.Open(context.Background()); err != nil {
-			t.Fatal(err)
-		}
-		if err := d.Refresh(context.Background()); err != nil {
-			t.Fatal(err)
-		}
-		d.Close()
-	}
-	if n.Load() != 2 {
-		t.Fatalf("Collect called %d times, want 2", n.Load())
-	}
-	f := dynCollect{newFakeDynamic()}
-	if d, err := dynamicCollectorFor(f); err != nil || d != DynamicCollector(f) {
-		t.Fatalf("a DynamicCollector should be used as is: %v", err)
-	}
-	if _, err := dynamicCollectorFor(startOnly{}); err == nil {
-		t.Fatal("a Start-only collector has no Dynamic contract")
-	}
 }

@@ -1,7 +1,6 @@
 package collectors
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"strconv"
@@ -27,36 +26,6 @@ type UPSCollector struct {
 // NewUPSCollector creates a new UPS status collector with the given context.
 func NewUPSCollector(ctx *domain.Context) *UPSCollector {
 	return &UPSCollector{ctx: ctx}
-}
-
-// Start begins the UPS collector's periodic data collection.
-// It runs in a goroutine and publishes UPS status updates at the specified interval until the context is cancelled.
-func (c *UPSCollector) Start(ctx context.Context, interval time.Duration) {
-	logger.Info("Starting ups collector (interval: %v)", interval)
-
-	runCollectSafely := func(phase string) {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LogPanicWithStack("UPS collector ("+phase+")", r)
-			}
-		}()
-		collectWithWatchdog(ctx, "UPS", interval, c.Collect)
-	}
-
-	runCollectSafely("startup")
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("UPS collector stopping due to context cancellation")
-			return
-		case <-ticker.C:
-			runCollectSafely("periodic collection")
-		}
-	}
 }
 
 // Collect gathers UPS status information and publishes it to the event bus.

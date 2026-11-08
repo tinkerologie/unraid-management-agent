@@ -1,7 +1,6 @@
 package collectors
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -175,7 +174,6 @@ func newTestNICCollector(t *testing.T, s sysfsTree) (*NICCollector, *int) {
 	lspciCalls := 0
 	c := NewNICCollector(&domain.Context{Hub: domain.NewEventBus(10)})
 	c.SysfsRoot = s.root
-	c.Stagger = 0
 	c.LspciFn = func(addr string) (string, error) {
 		lspciCalls++
 		switch addr {
@@ -346,7 +344,7 @@ func TestNICCollectorWithoutSysfs(t *testing.T) {
 
 func TestNICCollectorDefaults(t *testing.T) {
 	c := NewNICCollector(&domain.Context{})
-	if c.SysfsRoot != "/sys" || c.ReadModuleFn == nil || c.FirmwareFn == nil || c.Now == nil || c.Stagger != nicStartupStagger {
+	if c.SysfsRoot != "/sys" || c.ReadModuleFn == nil || c.FirmwareFn == nil || c.Now == nil {
 		t.Errorf("defaults: %+v", c)
 	}
 	// The default lspci runner returns output or an error, never panics.
@@ -369,61 +367,6 @@ func TestNICCollectorCollectPublishes(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("nothing published")
 	}
-}
-
-func TestNICCollectorStart(t *testing.T) {
-	t.Run("collects, recovers from panics and stops on cancel", func(t *testing.T) {
-		hub := domain.NewEventBus(10)
-		ch := hub.Sub(constants.TopicNICUpdate.Name)
-		defer hub.Unsub(ch, constants.TopicNICUpdate.Name)
-
-		c, _ := newTestNICCollector(t, newNICTree(t))
-		c.appCtx = &domain.Context{Hub: hub}
-		read := c.ReadModuleFn
-		calls := 0
-		c.ReadModuleFn = func(ifname string) (*lib.ModuleEEPROM, error) {
-			calls++
-			if calls == 1 {
-				panic("boom")
-			}
-			return read(ifname)
-		}
-
-		ctx, cancel := context.WithCancel(context.Background())
-		done := make(chan struct{})
-		go func() {
-			c.Start(ctx, 20*time.Millisecond)
-			close(done)
-		}()
-		select {
-		case <-ch:
-		case <-time.After(5 * time.Second):
-			t.Fatal("nothing published after a panicking cycle")
-		}
-		cancel()
-		select {
-		case <-done:
-		case <-time.After(5 * time.Second):
-			t.Fatal("Start did not return after cancel")
-		}
-	})
-
-	t.Run("returns during the startup stagger", func(t *testing.T) {
-		c := NewNICCollector(&domain.Context{})
-		c.Stagger = time.Hour
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
-		finished := make(chan struct{})
-		go func() {
-			c.Start(ctx, time.Minute)
-			close(finished)
-		}()
-		select {
-		case <-finished:
-		case <-time.After(5 * time.Second):
-			t.Fatal("Start ignored cancellation during the stagger")
-		}
-	})
 }
 
 func TestParseLspciMachine(t *testing.T) {

@@ -3,7 +3,6 @@ package collectors
 
 import (
 	"bufio"
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -125,42 +124,6 @@ func NewSystemCollector(ctx *domain.Context) *SystemCollector {
 	return &SystemCollector{
 		ctx: ctx, sysfsRoot: defaultSysfsRoot,
 		openCPUStat: func() (io.ReadCloser, error) { return os.Open("/proc/stat") },
-	}
-}
-
-// Start begins the system collector's periodic data collection.
-// It runs in a goroutine and publishes system information updates at the specified interval until the context is cancelled.
-func (c *SystemCollector) Start(ctx context.Context, interval time.Duration) {
-	logger.Info("Starting system collector (interval: %v)", interval)
-
-	// Run once immediately with panic recovery
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LogPanicWithStack("System collector", r)
-			}
-		}()
-		c.Collect()
-	}()
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("System collector stopping due to context cancellation")
-			return
-		case <-ticker.C:
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						logger.LogPanicWithStack("System collector", r)
-					}
-				}()
-				c.Collect()
-			}()
-		}
 	}
 }
 

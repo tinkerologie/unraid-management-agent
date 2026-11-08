@@ -11,7 +11,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
@@ -304,50 +303,4 @@ func (c *PSUCollector) Collect(ctx context.Context) {
 		logger.Warning("PSU collector: %s", errText)
 	}
 	c.lastErrors = errText
-}
-
-// Start runs passive collection until cancelled, guarding both startup and polls.
-func (c *PSUCollector) Start(ctx context.Context, interval time.Duration) {
-	if ctx.Err() != nil || interval <= 0 {
-		return
-	}
-	// Manual mode also reacts to a late hwmon bind, without waiting for a
-	// potentially long configured interval. Dynamic mode uses its event source.
-	changed := make(chan struct{}, 1)
-	var sources sync.WaitGroup
-	sources.Go(func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LogPanicWithStack("PSU collector events", r)
-			}
-		}()
-		NewUeventSource(PSUDeviceUevent).Run(ctx, func() {
-			select {
-			case changed <- struct{}{}:
-			default:
-			}
-		})
-	})
-	defer sources.Wait()
-	run := func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LogPanicWithStack("PSU collector", r)
-			}
-		}()
-		c.Collect(ctx)
-	}
-	run()
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			run()
-		case <-changed:
-			run()
-		}
-	}
 }

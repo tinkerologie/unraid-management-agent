@@ -1,7 +1,6 @@
 package collectors
 
 import (
-	"context"
 	"time"
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
@@ -20,42 +19,6 @@ type HardwareCollector struct {
 // NewHardwareCollector creates a new hardware information collector with the given context.
 func NewHardwareCollector(ctx *domain.Context) *HardwareCollector {
 	return &HardwareCollector{ctx: ctx}
-}
-
-// Start begins the hardware collector's periodic data collection.
-// It runs in a goroutine and publishes hardware information updates at the specified interval until the context is cancelled.
-func (c *HardwareCollector) Start(ctx context.Context, interval time.Duration) {
-	logger.Info("Starting hardware collector (interval: %v)", interval)
-
-	// Run once immediately with panic recovery
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LogPanicWithStack("Hardware collector", r)
-			}
-		}()
-		collectWithWatchdog(ctx, "Hardware", interval, c.Collect)
-	}()
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("Hardware collector stopping due to context cancellation")
-			return
-		case <-ticker.C:
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						logger.LogPanicWithStack("Hardware collector", r)
-					}
-				}()
-				collectWithWatchdog(ctx, "Hardware", interval, c.Collect)
-			}()
-		}
-	}
 }
 
 // Collect gathers hardware information from DMI tables and publishes it to the event bus.

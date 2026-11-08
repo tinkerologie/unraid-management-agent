@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
 	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
@@ -66,7 +67,7 @@ func (o *Orchestrator) Run() error {
 	defer stop()
 
 	// Initialize collector manager
-	o.collectorManager = NewCollectorManager(o.ctx, &wg)
+	o.collectorManager = NewCollectorManager(o.ctx, &sync.WaitGroup{})
 
 	// OS-resilience: detect capabilities (OS sources and hardware, #261) and
 	// wire the status-change notifier to the bus.
@@ -396,7 +397,7 @@ func (o *Orchestrator) shutdown(apiServer *api.Server, wg *sync.WaitGroup) {
 
 	// 7. Stop all collectors via manager
 	if o.collectorManager != nil {
-		o.collectorManager.StopAll()
+		o.shutdownCollectors()
 	}
 
 	// 8. Stop API server (which also cancels its internal goroutines)
@@ -413,6 +414,16 @@ func (o *Orchestrator) shutdown(apiServer *api.Server, wg *sync.WaitGroup) {
 	logger.Success("Shutdown complete")
 }
 
+// shutdownCollectors bounds the wait for collector-owned resources. The
+// orchestrator's separate worker group can still finish normally on timeout.
+func (o *Orchestrator) shutdownCollectors() {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if stopping := o.collectorManager.Shutdown(ctx); len(stopping) != 0 {
+		logger.Warning("Collector shutdown timed out while stopping: %v", stopping)
+	}
+}
+
 // RunMCPStdio starts the agent with MCP over STDIO transport for local AI client integration.
 // It starts collectors and the API server's cache (for data) but does NOT start the HTTP server.
 // The MCP server communicates exclusively via stdin/stdout using newline-delimited JSON.
@@ -425,7 +436,7 @@ func (o *Orchestrator) RunMCPStdio() error {
 	defer cancel()
 
 	// Initialize collector manager and register all collectors
-	o.collectorManager = NewCollectorManager(o.ctx, &wg)
+	o.collectorManager = NewCollectorManager(o.ctx, &sync.WaitGroup{})
 
 	// OS-resilience: detect capabilities (OS sources and hardware, #261) and
 	// wire the status-change notifier to the bus.
@@ -451,7 +462,7 @@ func (o *Orchestrator) RunMCPStdio() error {
 	toolPolicyStore := domain.NewToolPolicyStore("", o.ctx.ToolPolicy)
 	if err := toolPolicyStore.Load(); err != nil {
 		cancel()
-		o.collectorManager.StopAll()
+		o.shutdownCollectors()
 		apiServer.Stop()
 		wg.Wait()
 		return fmt.Errorf("failed to load tool policy: %w", err)
@@ -462,7 +473,7 @@ func (o *Orchestrator) RunMCPStdio() error {
 	mcpServer.SetToolPolicyStore(toolPolicyStore)
 	if err := mcpServer.Initialize(); err != nil {
 		cancel()
-		o.collectorManager.StopAll()
+		o.shutdownCollectors()
 		apiServer.Stop()
 		wg.Wait()
 		return fmt.Errorf("failed to initialize MCP server: %w", err)
@@ -549,7 +560,7 @@ func (o *Orchestrator) RunMCPStdio() error {
 	if o.fanController != nil {
 		o.fanController.Shutdown()
 	}
-	o.collectorManager.StopAll()
+	o.shutdownCollectors()
 	apiServer.Stop()
 	wg.Wait()
 	logger.Info("MCP STDIO shutdown complete")

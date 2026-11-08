@@ -2,7 +2,6 @@ package collectors
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"math"
 	"os"
@@ -46,41 +45,6 @@ func NewZFSCollector(ctx *domain.Context) *ZFSCollector {
 	}
 	c.driveHealth.spinStates = func() map[string]bool { return unraidSpinStates(c.disksIni) }
 	return c
-}
-
-// Start begins the ZFS collection loop
-func (c *ZFSCollector) Start(ctx context.Context, interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	logger.Info("ZFS collector started (interval: %v)", interval)
-
-	// Collect immediately on start with panic recovery
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LogPanicWithStack("ZFS collector", r)
-			}
-		}()
-		collectWithWatchdog(ctx, "ZFS", interval, c.collect)
-	}()
-
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("ZFS collector stopped")
-			return
-		case <-ticker.C:
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						logger.LogPanicWithStack("ZFS collector", r)
-					}
-				}()
-				collectWithWatchdog(ctx, "ZFS", interval, c.collect)
-			}()
-		}
-	}
 }
 
 // collect gathers all ZFS data and publishes events

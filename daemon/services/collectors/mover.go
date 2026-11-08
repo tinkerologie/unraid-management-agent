@@ -2,7 +2,6 @@ package collectors
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -21,9 +20,6 @@ import (
 // (not a constant) so that tests can override it with a fixture file path.
 var moverLogPath = "/var/log/mover.log"
 
-// moverStartupStagger delays the first collection so it does not pile onto boot.
-const moverStartupStagger = 10 * time.Second
-
 // MoverCollector periodically reads mover state from var.ini and last-run
 // statistics from /var/log/mover.log. It publishes on TopicMoverUpdate whenever
 // the active flag, finish time, or file count changes (dedupe).
@@ -40,46 +36,6 @@ func NewMoverCollector(ctx *domain.Context) *MoverCollector {
 	c := &MoverCollector{appCtx: ctx}
 	c.CheckFn = c.defaultCheck
 	return c
-}
-
-// Start begins the periodic mover status collection after a startup stagger.
-func (c *MoverCollector) Start(ctx context.Context, interval time.Duration) {
-	logger.Info("Starting mover collector (interval: %v)", interval)
-
-	select {
-	case <-ctx.Done():
-		return
-	case <-time.After(moverStartupStagger):
-	}
-
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LogPanicWithStack("Mover collector", r)
-			}
-		}()
-		collectWithWatchdog(ctx, "Mover", interval, c.Collect)
-	}()
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("Mover collector stopping due to context cancellation")
-			return
-		case <-ticker.C:
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						logger.LogPanicWithStack("Mover collector", r)
-					}
-				}()
-				collectWithWatchdog(ctx, "Mover", interval, c.Collect)
-			}()
-		}
-	}
 }
 
 // Collect runs a mover status check and publishes the result only when the

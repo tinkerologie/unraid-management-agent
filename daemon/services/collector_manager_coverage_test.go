@@ -8,7 +8,6 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
 	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
 	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
-	"github.com/tinkerologie/unraid-management-agent/daemon/services/collectors"
 )
 
 func TestGetDefaultInterval_AllNames(t *testing.T) {
@@ -145,6 +144,12 @@ func TestCollectorManager_RegisterAllCollectors(t *testing.T) {
 			t.Errorf("Missing collector: %q", expected)
 		}
 	}
+	for name, mc := range cm.collectors {
+		if mc.factory(ctx) == nil {
+			t.Errorf("registered factory for %s returned nil", name)
+		}
+	}
+
 }
 
 func TestRegisterAllCollectors_IncludesDockerUpdate(t *testing.T) {
@@ -218,9 +223,6 @@ func TestCollectorManager_StorageTopologyFactory(t *testing.T) {
 	if mc.Required {
 		t.Error("storage_topology must be optional")
 	}
-	if _, ok := mc.factory(ctx).(*collectors.StorageTopologyCollector); !ok {
-		t.Errorf("factory returned %T", mc.factory(ctx))
-	}
 	if got := cm.getDefaultInterval("storage_topology"); got != constants.IntervalStorageTopology {
 		t.Errorf("default interval = %d, want %d", got, constants.IntervalStorageTopology)
 	}
@@ -238,9 +240,6 @@ func TestCollectorManager_NICFactory(t *testing.T) {
 	}
 	if mc.Required {
 		t.Error("nic must be optional")
-	}
-	if _, ok := mc.factory(ctx).(*collectors.NICCollector); !ok {
-		t.Errorf("factory returned %T", mc.factory(ctx))
 	}
 	if got := cm.getDefaultInterval("nic"); got != constants.IntervalNIC {
 		t.Errorf("default interval = %d, want %d", got, constants.IntervalNIC)

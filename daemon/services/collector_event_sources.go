@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
+	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/collectors"
 )
 
@@ -133,4 +134,44 @@ func (c *contentChanges) digest() [sha256.Size]byte {
 		}
 	}
 	return sha256.Sum256(kept.Bytes())
+}
+
+type eventSourceFunc func(context.Context, func())
+
+func (f eventSourceFunc) Run(ctx context.Context, trigger func()) { f(ctx, trigger) }
+
+// manualEventSources keeps the legacy trigger set and debounce behavior.
+func manualEventSources(name string, coll Collector) []eventSource {
+	switch name {
+	case "array":
+		return []eventSource{manualFileEvents(constants.VarIni, constants.DisksIni)}
+	case "disk":
+		return []eventSource{manualFileEvents(constants.DisksIni)}
+	case "shares":
+		return []eventSource{manualFileEvents(constants.SharesIni)}
+	case "notification":
+		if notification, ok := coll.(*collectors.NotificationCollector); ok {
+			return []eventSource{eventSourceFunc(notification.ManualEvents)}
+		}
+	case "psu":
+		return []eventSource{collectors.NewUeventSource(collectors.PSUDeviceUevent)}
+	}
+	return nil
+}
+
+func manualFileEvents(paths ...string) eventSource {
+	return eventSourceFunc(func(ctx context.Context, trigger func()) {
+		w, err := collectors.NewFileWatcher(fileEventDebounce)
+		if err != nil {
+			logger.Warning("Manual collector watcher: %v", err)
+			return
+		}
+		defer func() { _ = w.Close() }()
+		for _, path := range paths {
+			if err := w.WatchFile(path); err != nil {
+				logger.Warning("Manual collector watcher cannot watch %s: %v", path, err)
+			}
+		}
+		w.Run(ctx, paths, trigger)
+	})
 }

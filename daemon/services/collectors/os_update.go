@@ -2,7 +2,6 @@ package collectors
 
 import (
 	"bufio"
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -14,10 +13,6 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
 )
-
-// osUpdateStartupStagger delays the first check so it does not pile onto boot
-// alongside every other collector.
-const osUpdateStartupStagger = 60 * time.Second
 
 // osUpdateCandidatePaths is the ordered list of local files that may contain
 // the "latest available" Unraid OS version.  Tests override this package-level
@@ -67,46 +62,6 @@ func NewOSUpdateCollector(ctx *domain.Context) *OSUpdateCollector {
 	c := &OSUpdateCollector{appCtx: ctx}
 	c.CheckFn = c.defaultCheck
 	return c
-}
-
-// Start begins the periodic OS update check after a startup stagger.
-func (c *OSUpdateCollector) Start(ctx context.Context, interval time.Duration) {
-	logger.Info("Starting os_update collector (interval: %v)", interval)
-
-	select {
-	case <-ctx.Done():
-		return
-	case <-time.After(osUpdateStartupStagger):
-	}
-
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LogPanicWithStack("OSUpdate collector", r)
-			}
-		}()
-		c.Collect()
-	}()
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("OSUpdate collector stopping due to context cancellation")
-			return
-		case <-ticker.C:
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						logger.LogPanicWithStack("OSUpdate collector", r)
-					}
-				}()
-				c.Collect()
-			}()
-		}
-	}
 }
 
 // Collect runs an OS update check and publishes the result only if it changed

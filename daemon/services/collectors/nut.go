@@ -2,7 +2,6 @@ package collectors
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -58,41 +57,6 @@ func (c *NUTCollector) statPath(name string) (os.FileInfo, error) {
 // NewNUTCollector creates a new NUT status collector with the given context.
 func NewNUTCollector(ctx *domain.Context) *NUTCollector {
 	return &NUTCollector{ctx: ctx}
-}
-
-// Start begins the NUT collector's periodic data collection.
-func (c *NUTCollector) Start(ctx context.Context, interval time.Duration) {
-	logger.Info("Starting NUT collector (interval: %v)", interval)
-
-	// Run once immediately
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LogPanicWithStack("NUT collector", r)
-			}
-		}()
-		collectWithWatchdog(ctx, "NUT", interval, c.Collect)
-	}()
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("NUT collector stopping due to context cancellation")
-			return
-		case <-ticker.C:
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						logger.LogPanicWithStack("NUT collector", r)
-					}
-				}()
-				collectWithWatchdog(ctx, "NUT", interval, c.Collect)
-			}()
-		}
-	}
 }
 
 // Collect gathers NUT status information and publishes it to the event bus.

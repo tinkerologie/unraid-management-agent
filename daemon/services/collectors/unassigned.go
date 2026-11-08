@@ -57,49 +57,6 @@ func (c *UnassignedCollector) CollectUnassignedDevices() []dto.UnassignedDevice 
 	return c.collectUnassignedDevices()
 }
 
-// Start begins collecting unassigned device information
-func (c *UnassignedCollector) Start(ctx context.Context, interval time.Duration) {
-	// Top-level safety net for startup preamble panics
-	defer func() {
-		if r := recover(); r != nil {
-			logger.LogPanicWithStack("Unassigned collector (top-level)", r)
-		}
-	}()
-
-	c.runCtx = ctx
-	logger.Info("Starting unassigned devices collector (interval: %v)", interval)
-
-	// Initial collection with panic recovery
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LogPanicWithStack("Unassigned collector", r)
-			}
-		}()
-		collectWithWatchdog(ctx, "Unassigned", interval, c.collect)
-	}()
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("Stopping unassigned devices collector")
-			return
-		case <-ticker.C:
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						logger.LogPanicWithStack("Unassigned collector", r)
-					}
-				}()
-				collectWithWatchdog(ctx, "Unassigned", interval, c.collect)
-			}()
-		}
-	}
-}
-
 // collect gathers unassigned device information
 func (c *UnassignedCollector) collect() {
 	devices := c.collectUnassignedDevices()

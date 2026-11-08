@@ -2,7 +2,6 @@
 package collectors
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -20,9 +19,6 @@ import (
 // meaningful output. Their absence indicates a degraded (but not unavailable) source.
 var arrayRequiredKeys = []string{"mdState", "mdNumDisks"}
 
-// watchedArrayFiles are the INI files the array collector monitors for changes.
-var watchedArrayFiles = []string{constants.VarIni, constants.DisksIni}
-
 // ArrayCollector collects Unraid array status information including state, parity status, and disk assignments.
 // It publishes array status updates to the event bus at regular intervals.
 type ArrayCollector struct {
@@ -32,71 +28,6 @@ type ArrayCollector struct {
 // NewArrayCollector creates a new array status collector with the given context.
 func NewArrayCollector(ctx *domain.Context) *ArrayCollector {
 	return &ArrayCollector{ctx: ctx}
-}
-
-// Start begins the array collector's periodic data collection.
-// It runs in a goroutine and publishes array status updates at the specified interval until the context is cancelled.
-func (c *ArrayCollector) Start(ctx context.Context, interval time.Duration) {
-	logger.Info("Starting array collector (interval: %v)", interval)
-
-	// Run once immediately with panic recovery
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.LogPanicWithStack("Array collector", r)
-			}
-		}()
-		collectWithWatchdog(ctx, "Array", interval, c.Collect)
-	}()
-
-	// Set up fsnotify watcher for instant state updates on INI file changes
-	fw, err := NewFileWatcher(500 * time.Millisecond)
-	if err != nil {
-		logger.Warning("Array collector: failed to create file watcher, using ticker only: %v", err)
-	} else {
-		for _, f := range watchedArrayFiles {
-			if watchErr := fw.WatchFile(f); watchErr != nil {
-				logger.Warning("Array collector: failed to watch %s: %v", f, watchErr)
-			}
-		}
-		// Run watcher in background goroutine — triggers Collect on file changes
-		// Close is deferred inside the goroutine to avoid racing with fw.Run()
-		go func() {
-			defer func() { _ = fw.Close() }()
-			fw.Run(ctx, watchedArrayFiles, func() {
-				func() {
-					defer func() {
-						if r := recover(); r != nil {
-							logger.LogPanicWithStack("Array collector (fsnotify)", r)
-						}
-					}()
-					logger.Debug("Array collector: INI file changed, collecting immediately")
-					collectWithWatchdog(ctx, "Array", interval, c.Collect)
-				}()
-			})
-		}()
-		logger.Info("Array collector: fsnotify watching %v for instant updates", watchedArrayFiles)
-	}
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("Array collector stopping due to context cancellation")
-			return
-		case <-ticker.C:
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						logger.LogPanicWithStack("Array collector", r)
-					}
-				}()
-				collectWithWatchdog(ctx, "Array", interval, c.Collect)
-			}()
-		}
-	}
 }
 
 // Collect gathers current array status information and publishes it to the event bus.

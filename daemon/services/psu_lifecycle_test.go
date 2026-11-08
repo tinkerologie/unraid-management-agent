@@ -102,8 +102,10 @@ func TestPSULifecycleGatingAndInvalidation(t *testing.T) {
 
 type psuLifecycleMock struct{}
 
-func (psuLifecycleMock) Start(ctx context.Context, _ time.Duration) { <-ctx.Done() }
-func (psuLifecycleMock) Collect()                                   {}
+func (psuLifecycleMock) Open(context.Context) error    { return nil }
+func (psuLifecycleMock) Refresh(context.Context) error { return nil }
+func (psuLifecycleMock) Close()                        {}
+func (psuLifecycleMock) Collect()                      {}
 
 type psuInventoryEvent struct{ started chan<- struct{} }
 
@@ -330,12 +332,25 @@ func TestPSUAndFullRefreshHooksAreSerialized(t *testing.T) {
 	}
 }
 
+type psuContextCollector struct {
+	*mockCollector
+	opened chan context.Context
+}
+
+func (c psuContextCollector) Open(ctx context.Context) error {
+	c.opened <- ctx
+	return c.mockCollector.Open(ctx)
+}
+
 func TestPSUIntervalRestartPreservesAvailability(t *testing.T) {
 	hub := domain.NewEventBus(10)
 	app := &domain.Context{Hub: hub}
 	var wg sync.WaitGroup
 	cm := NewCollectorManager(app, &wg)
-	cm.Register("psu", func(*domain.Context) Collector { return newMockCollector() }, 60, false)
+	opened := make(chan context.Context, 2)
+	cm.Register("psu", func(*domain.Context) Collector {
+		return psuContextCollector{mockCollector: newMockCollector(), opened: opened}
+	}, 60, false)
 	updates := hub.Sub(constants.TopicPSUStatusUpdate.Name)
 	defer hub.Unsub(updates)
 	defer wg.Wait()
@@ -343,7 +358,7 @@ func TestPSUIntervalRestartPreservesAvailability(t *testing.T) {
 	if err := cm.EnableCollector("psu"); err != nil {
 		t.Fatal(err)
 	}
-	oldCtx := cm.collectors["psu"].ctx
+	oldCtx := waitChan(t, opened, "PSU generation")
 	working := &dto.PSUStatus{State: dto.PSUStateOK, Devices: []dto.PSUDevice{{ID: "psu-a"}}}
 	cm.publishPSU(oldCtx, working)
 	<-updates
