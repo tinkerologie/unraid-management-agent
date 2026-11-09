@@ -10,8 +10,8 @@
     <!ENTITY launch      "Settings/unraid-management-agent">
     <!ENTITY bundle      "&name;-&version;.tgz">
     <!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
-    <!ENTITY md5         "e8da1daaa9b37d5818e2a196cf8856ec"> <!-- pragma: allowlist secret -->
-    <!ENTITY sha256      "759b63a322d642a7cf1ae03d58a3acc3bfce2d791c63be8917ca243ace818902"> <!-- pragma: allowlist secret -->
+    <!ENTITY md5         "4e8f24556eefa3b3bd459c7213e3f634"> <!-- pragma: allowlist secret -->
+    <!ENTITY sha256      "c85a5bc2d5481bd9bf6f2ca2032a6427af6a88ffcdf4a6ea19a9e1e1281ad2bb"> <!-- pragma: allowlist secret -->
 ]>
 
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" icon="server" min="7.2.0" pluginURL="&pluginURL;" support="&supportURL;" project="&gitURL;" readme="&gitURL;#readme">
@@ -21,11 +21,21 @@ Monitor and control your Unraid system via REST API, WebSocket, MCP, Prometheus,
 </DESCRIPTION>
 
 <CHANGES>
-### 2026.11.02
+### 2026.11.03
+
+### Changed
+
+- Apply ASD-STE100 Issue 9 guidance across the maintained guides and Swagger prose. Correct installation, configuration, authentication, and integration instructions (#326).
+
+### Added
+
+- Publish versioned REST and WebSocket producer contract fixtures with a drift check and pinned consumption instructions (#324).
+- Add a domain glossary and five retrospective architecture decision records, with source references; align related guidance with the implemented architecture.
+- Configure engineering agent skills with GitHub Issues, the default triage label mapping, and a single-context domain documentation layout.
 
 ### Fixed
 
-- Find storcli installed by the storcli64 Unraid plugin, which puts it in `/usr/local/bin` (#319). The storage topology collector, its MCP tool and the hardware probe now also look for `/usr/local/bin/storcli`, `/usr/local/bin/storcli64` and `/usr/bin/storcli64`.
+- Serialize collector shutdown and restart across Manual and Dynamic modes. A replacement waits for the previous collection and cleanup to finish (#323).
 </CHANGES>
 
 <!--
