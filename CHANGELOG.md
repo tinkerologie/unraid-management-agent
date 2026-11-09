@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.11.03] - 2026-11-09
+
 ### Changed
 
 - Apply ASD-STE100 Issue 9 guidance across the maintained guides and Swagger prose.
