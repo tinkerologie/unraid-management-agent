@@ -427,6 +427,16 @@ func (s *Server) RegisterMCPRoutes(handler http.Handler) {
 	}
 }
 
+const mcpStatelessPath = "/mcp-stateless"
+
+// RegisterMCPStatelessRoute mounts the sessionless MCP endpoint outside the
+// connect-secret path. The router applies its normal bearer authentication.
+func (s *Server) RegisterMCPStatelessRoute(handler http.Handler) {
+	if handler != nil {
+		s.router.Handle(mcpStatelessPath, handler)
+	}
+}
+
 // StartSubscriptions initializes event subscriptions and WebSocket hub.
 // This should be called before collectors start to avoid race conditions.
 // After calling this, use <-server.Ready() to block until subscriptions are fully wired.

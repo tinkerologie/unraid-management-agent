@@ -66,12 +66,12 @@ func isAuthExempt(u *url.URL) bool {
 	return u.Path == healthPath || strings.HasPrefix(u.Path, swaggerPathPrefix)
 }
 
-// isMCPPath reports whether the URL targets the MCP endpoint or a sub-path.
+// isMCPPath reports whether the URL targets a Streamable HTTP MCP endpoint.
 func isMCPPath(u *url.URL) bool {
 	if u == nil {
 		return false
 	}
-	return u.Path == "/mcp" || strings.HasPrefix(u.Path, "/mcp/")
+	return u.Path == mcpStatelessPath || u.Path == "/mcp" || strings.HasPrefix(u.Path, "/mcp/")
 }
 
 // isMCPConnectSecretExempt reports whether u.Path is the exact single-segment

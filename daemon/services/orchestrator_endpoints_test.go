@@ -39,7 +39,7 @@ func TestMountHTTPMCP(t *testing.T) {
 		t.Cleanup(srv.Stop)
 		return CreateOrchestrator(ctx), srv, domain.NewToolPolicyStore(t.TempDir(), nil)
 	}
-	paths := []string{"/mcp", "/mcp/", "/mcp/" + secret}
+	paths := []string{"/mcp", "/mcp/", "/mcp/" + secret, "/mcp-stateless"}
 	status := func(srv *api.Server, path string) int {
 		w := httptest.NewRecorder()
 		srv.GetRouter().ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))

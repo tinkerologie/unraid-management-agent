@@ -750,6 +750,9 @@ func TestWriteLockMiddleware(t *testing.T) {
 		{"locked MCP endpoint passes", true, http.MethodPost, "/mcp", true},
 		{"locked MCP trailing slash passes", true, http.MethodPost, "/mcp/", true},
 		{"locked MCP connect secret passes", true, http.MethodPost, "/mcp/some-connect-secret", true},
+		{"locked stateless MCP endpoint passes", true, http.MethodPost, "/mcp-stateless", true},
+		{"locked stateless MCP lookalike is refused", true, http.MethodPost, "/mcp-statelessx", false},
+		{"locked stateless MCP subpath is refused", true, http.MethodPost, "/mcp-stateless/x", false},
 		{"locked MCP lookalike is refused", true, http.MethodPost, "/mcpfoo", false},
 		{"unlocked POST passes", false, http.MethodPost, "/api/v1/system/reboot", true},
 	}

@@ -2,9 +2,8 @@
 
 Import the agent's REST API as an **Action** to let a custom GPT monitor or control your Unraid server.
 
-> ChatGPT consumes REST **Actions** (OpenAPI), not the Agent Skills / MCP that
-> Claude Code uses. For Claude and other MCP clients, see
-> [`../claude/`](../claude/) and [`../mcp.md`](../mcp.md).
+> To connect a ChatGPT custom MCP server, use the
+> [stateless MCP endpoint through Secure MCP Tunnel](../mcp.md#chatgpt-through-secure-mcp-tunnel).
 
 ## Prerequisites
 

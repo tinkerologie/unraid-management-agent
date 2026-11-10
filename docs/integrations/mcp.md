@@ -2,7 +2,8 @@
 
 > **Status: Production-Ready (GA)** — Built on the
 > [official MCP Go SDK](https://github.com/modelcontextprotocol/go-sdk) v1.8.0
-> with per-session protocol negotiation (`2026-07-28`, `2025-11-25`, `2025-06-18`, `2025-03-26`, `2024-11-05`).
+> with stateful Streamable HTTP through `2025-11-25` at `/mcp`.
+> The sessionless endpoint at `/mcp-stateless` also supports `2026-07-28` and `server/discover`.
 
 The agent serves [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) by default.
 The daemon serves MCP and REST from the same HTTP server.
@@ -34,6 +35,27 @@ claude mcp add --transport http unraid "http://<unraid-ip>:8043/mcp/<connect-sec
 - **Safe log redaction**: The secret value in `/mcp/<segment>` is never written to log files or diagnostic bundles; logs record the redacted path `/mcp/<redacted>`.
 - **Revocation**: Clicking **Regenerate** or **Clear** takes effect after clicking **Apply** and restarting the daemon. The old URL then returns `404 Not Found`.
 
+## ChatGPT through Secure MCP Tunnel
+
+1. Enable MCP in the agent settings.
+2. Configure an agent API token.
+3. For monitoring-only access, enable MCP read-only mode.
+4. Set up the tunnel with the [OpenAI Secure MCP Tunnel guide](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels).
+5. Set the tunnel's private upstream URL to the agent's `/mcp-stateless` endpoint.
+6. Set `MCP_EXTRA_HEADERS` to `Authorization: env:UNRAID_MCP_AUTHORIZATION` in the tunnel client's environment.
+   Supply the complete `Bearer <agent-api-token>` value through the secret environment variable.
+   See the [tunnel client header settings](https://github.com/openai/tunnel-client/blob/master/docs/configuration.md).
+7. In ChatGPT, add a custom MCP server with **Tunnel** as the connection type.
+8. Select the configured tunnel.
+9. Verify that ChatGPT lists the tools.
+10. Call `get_system_info` to verify read access.
+
+This endpoint has no connect-secret URL.
+
+The stateless endpoint uses the same MCP read-only mode, tool policies, and network write lock as `/mcp`.
+It accepts MCP requests via POST without a `Mcp-Session-Id`. GET and DELETE return `405 Method Not Allowed`.
+Server-to-client requests are unavailable on this transport.
+
 ## Overview
 
 MCP is an open protocol that standardizes how AI applications can securely connect to external data sources and services. With MCP support, you can:
@@ -48,8 +70,7 @@ MCP is an open protocol that standardizes how AI applications can securely conne
 > - **Claude (skill):** install the [Agent Skill](claude/README.md) so Claude
 >   knows how to use these tools effectively — works in Claude Code, Claude
 >   Desktop, claude.ai, Cursor, Copilot, and Gemini CLI.
-> - **ChatGPT:** ChatGPT consumes REST **Actions**, not MCP — see the
->   [ChatGPT Custom GPT guide](chatgpt/README.md).
+> - **ChatGPT Custom GPTs:** See the [REST Actions guide](chatgpt/README.md).
 > - See the [integrations index](README.md) for all options (MQTT, Home
 >   Assistant, Grafana, …) and the [MCP Onboarding Design Doc](../design/mcp-onboarding.md).
 
@@ -967,10 +988,11 @@ _Note: If `tool_policy.json` exists on disk, it takes precedence over `TOOL_POLI
 | **Streamable HTTP** ⭐ | Remote AI clients over the network | Request/response, SSE streaming, session management     |
 | **STDIO**              | Local AI clients on the server     | Newline-delimited JSON over stdin/stdout, zero overhead |
 
-### Streamable HTTP Transport Details (`2026-07-28` / `2025-11-25` / `2025-06-18` / `2025-03-26` / `2024-11-05`)
+### Stateful Streamable HTTP Transport
 
 Built on the [official MCP Go SDK](https://github.com/modelcontextprotocol/go-sdk) v1.8.0,
-the Streamable HTTP transport at `/mcp` (and `/mcp/<connect-secret>`) supports:
+the stateful transport at `/mcp` and `/mcp/<connect-secret>` supports versions
+`2025-11-25`, `2025-06-18`, `2025-03-26`, and `2024-11-05`. It accepts:
 
 - **POST**: Send JSON-RPC requests and notifications
   - Requests return `Content-Type: text/event-stream` (SSE-framed JSON-RPC) or `application/json`

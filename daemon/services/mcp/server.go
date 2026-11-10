@@ -5,10 +5,8 @@
 // highest mutually-supported protocol version per connection. The default stateful transport keeps
 // Mcp-Session-Id sessions and currently negotiates up to 2025-11-25.
 //
-// The sessionless 2026-07-28 protocol (server/discover, per-request metadata) can be enabled with
-// StreamableHTTPOptions.Stateless = true: each request gets a temporary session, GET/DELETE return
-// 405, and server->client requests are rejected (in-request notifications still work). It is left
-// off here so existing session-based clients are unaffected.
+// The /mcp-stateless endpoint also supports 2026-07-28 discovery and per-request metadata.
+// Each request gets a temporary session. GET, DELETE, and server-to-client requests are unsupported.
 // GetHTTPHandler wraps the stateful SDK handler to return an explicitly framed 405 Method Not Allowed
 // (Allow: POST, DELETE) for sessionless GET probes and clears server read/write deadlines via
 // http.ResponseController for valid-session SSE GET streams so long-lived streams do not time out.
@@ -106,6 +104,7 @@ type Server struct {
 	ctx                     *domain.Context
 	mcpServer               *mcp.Server
 	httpHandler             *mcp.StreamableHTTPHandler
+	statelessHTTPHandler    *mcp.StreamableHTTPHandler
 	cacheProvider           CacheProvider
 	alertEngine             *alerting.Engine
 	alertStore              *alerting.Store
@@ -286,6 +285,12 @@ func (s *Server) Initialize() error {
 					if id := sess.ID(); id != "" {
 						sessKey = id
 					} else {
+						// Stateless HTTP creates a session per request. Skip the
+						// log deduplication entry and its session-wait goroutine.
+						if extra := req.GetExtra(); extra != nil && extra.Header != nil {
+							logger.Debug("MCP stateless tools/list completed: visible_tools=%d category=tools_list_ok", visibleCount)
+							return res, nil
+						}
 						sessKey = sess
 					}
 				}
@@ -327,15 +332,10 @@ func (s *Server) Initialize() error {
 	s.registerCPUControlTools()
 	s.registerTuningTools()
 
-	// Create the Streamable HTTP handler. Stateful sessions are used so existing
-	// session-based clients keep working; the SDK still negotiates the highest
-	// mutually-supported protocol version per connection. Set
-	// StreamableHTTPOptions.Stateless = true to serve the sessionless 2026-07-28
-	// protocol (SEP-2567).
-	s.httpHandler = mcp.NewStreamableHTTPHandler(
-		func(_ *http.Request) *mcp.Server { return s.mcpServer },
-		nil,
-	)
+	// Both HTTP transports share the same tool registry and policy middleware.
+	serverForRequest := func(_ *http.Request) *mcp.Server { return s.mcpServer }
+	s.httpHandler = mcp.NewStreamableHTTPHandler(serverForRequest, nil)
+	s.statelessHTTPHandler = mcp.NewStreamableHTTPHandler(serverForRequest, &mcp.StreamableHTTPOptions{Stateless: true})
 
 	logger.Info("MCP server initialized with official SDK (streamable HTTP with version negotiation), tools, resources, and prompts")
 	return nil
@@ -425,6 +425,16 @@ func (s *Server) GetHTTPHandler() http.Handler {
 		}
 		handler.ServeHTTP(w, r)
 	})
+}
+
+// GetStatelessHTTPHandler returns the sessionless Streamable HTTP handler.
+func (s *Server) GetStatelessHTTPHandler() http.Handler {
+	if s.statelessHTTPHandler == nil {
+		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, "MCP server not initialized", http.StatusInternalServerError)
+		})
+	}
+	return s.statelessHTTPHandler
 }
 
 // GetMCPServer returns the underlying MCP server instance.

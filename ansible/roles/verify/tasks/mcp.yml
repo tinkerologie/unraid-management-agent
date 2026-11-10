@@ -1,6 +1,44 @@
 ---
-# MCP protocol compliance tests — verify JSON-RPC protocol at /mcp
+# MCP protocol compliance tests — verify both Streamable HTTP transports
 # MCP requires Accept header with both application/json and text/event-stream
+
+- name: "MCP: Discover stateless protocol versions"
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/mcp-stateless"
+    method: POST
+    follow_redirects: none
+    headers: >-
+      {{ {'Accept': 'application/json, text/event-stream',
+          'Mcp-Method': 'server/discover',
+          'Mcp-Protocol-Version': '2026-07-28'} |
+          combine({'Authorization': 'Bearer ' ~ api_token} if (api_token | default('') | length > 0) else {}) }}
+    body_format: json
+    body:
+      jsonrpc: "2.0"
+      id: 1
+      method: server/discover
+      params:
+        _meta:
+          io.modelcontextprotocol/protocolVersion: "2026-07-28"
+          io.modelcontextprotocol/clientCapabilities: {}
+    return_content: true
+    timeout: 10
+  register: mcp_stateless_discover
+  no_log: true
+
+- name: "MCP: Verify stateless discovery"
+  vars:
+    mcp_discovery: >-
+      {{ mcp_stateless_discover.json | default(
+          mcp_stateless_discover.content | regex_findall('(?m)^data:[ \t]*(\{.*\})') |
+          first | default('{}') | from_json) }}
+  ansible.builtin.assert:
+    that:
+      - "'2026-07-28' in (mcp_discovery.result.supportedVersions | default([]))"
+      - mcp_stateless_discover.mcp_session_id is not defined
+    fail_msg: "MCP stateless discovery must advertise 2026-07-28 without a session ID"
+    success_msg: "MCP stateless discovery advertises 2026-07-28"
 
 - name: "MCP: Initialize session"
   delegate_to: localhost
@@ -48,7 +86,7 @@
     that:
       - mcp_session_id | length > 0
       - mcp_init_data.result is defined
-      - mcp_init_data.result.protocolVersion in ['2026-07-28', '2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05']
+      - mcp_init_data.result.protocolVersion in ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05']
       - mcp_init_data.result.capabilities.tools is defined
     fail_msg: "MCP initialize missing Mcp-Session-Id or invalid protocol/capabilities"
     success_msg: "MCP initialize negotiated protocol {{ mcp_init_data.result.protocolVersion }} (session {{ mcp_session_id }})"
@@ -275,5 +313,5 @@
 - name: "MCP: Protocol compliance summary"
   ansible.builtin.debug:
     msg: >-
-      MCP Protocol Tests: initialize ✓, tools/list ✓, resources/list ✓,
+      MCP Protocol Tests: stateless discovery ✓, initialize ✓, tools/list ✓, resources/list ✓,
       prompts/list ✓, tools/call ✓, resources/read ✓

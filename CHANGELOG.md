@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Serve MCP `2026-07-28` discovery at `/mcp-stateless` for ChatGPT Secure MCP Tunnel clients.
+  The endpoint uses the existing API authentication and MCP tool access policies (#331).
+
 ## [2026.11.03] - 2026-11-09
 
 ### Changed
