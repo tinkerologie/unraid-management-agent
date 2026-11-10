@@ -39,12 +39,18 @@ claude mcp add --transport http unraid "http://<unraid-ip>:8043/mcp/<connect-sec
 
 ### Configure the agent
 
-If the agent has no token, [set an API token](../../README.md#set-an-api-token).
-
 1. Open **Settings → Utilities → Unraid Management Agent**.
 2. Under **Endpoints**, turn on **MCP endpoint**.
 3. For monitoring-only access, turn on **Read-Only Mode**.
 4. Click **Apply**.
+
+> [!CAUTION]
+> Before you apply a token, prepare to update clients that use protected endpoints without one.
+> **Apply** restarts a running service. Clients without the bearer header can then receive HTTP 401.
+> An API token disables the network write lock. Set **Read-Only Mode** or tool policies first to preserve MCP write restrictions.
+
+If the agent has no token, [set an API token](../../README.md#set-an-api-token) after you apply the required MCP tool restrictions.
+The existing MCP connect URL still uses its path secret.
 
 ### Configure the tunnel
 

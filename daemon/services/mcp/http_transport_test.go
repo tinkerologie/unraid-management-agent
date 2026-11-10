@@ -322,6 +322,15 @@ func TestMCPHTTPDiscoveryVersions(t *testing.T) {
 	}
 }
 
+func TestMCPStatelessHTTPBeforeInitialize(t *testing.T) {
+	server := NewServer(&domain.Context{}, newMockCacheProvider())
+	response := httptest.NewRecorder()
+	server.GetStatelessHTTPHandler().ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/mcp-stateless", nil))
+	if response.Code != http.StatusInternalServerError || strings.TrimSpace(response.Body.String()) != "MCP server not initialized" {
+		t.Errorf("POST before initialization returned %d and %q", response.Code, response.Body.String())
+	}
+}
+
 func TestMCPStatelessHTTPRoutes(t *testing.T) {
 	const token = "test-api-token"
 	ts, _ := newMountedMCPTestServer(t, token, strings.Repeat("s", 32))
@@ -391,16 +400,19 @@ func doMCPHTTPRequest(t *testing.T, client *http.Client, method, endpoint, token
 
 func decodeMCPEvent(t *testing.T, resp *http.Response, result any) {
 	t.Helper()
-	reader := bufio.NewScanner(resp.Body)
-	for reader.Scan() {
-		if data, ok := strings.CutPrefix(reader.Text(), "data: "); ok {
-			if err := json.Unmarshal([]byte(data), result); err != nil {
+	reader := bufio.NewReader(resp.Body)
+	for {
+		line, err := reader.ReadString('\n')
+		if data, ok := strings.CutPrefix(line, "data:"); ok {
+			if err := json.Unmarshal([]byte(strings.TrimSpace(data)), result); err != nil {
 				t.Fatalf("decode MCP event: %v", err)
 			}
 			return
 		}
+		if err != nil {
+			t.Fatalf("no MCP event in response (read error: %v)", err)
+		}
 	}
-	t.Fatalf("no MCP event in response (read error: %v)", reader.Err())
 }
 
 type mcpBearerTransport struct {
