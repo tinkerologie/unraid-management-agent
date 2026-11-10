@@ -355,21 +355,30 @@ cat /usr/local/emhttp/plugins/unraid-management-agent/VERSION
 
 ## Export Diagnostics
 
-There are two primary ways to export diagnostics depending on whether you are sharing information externally or inspecting the host locally:
+The agent provides a redacted diagnostics ZIP for reports. An administrator can collect unredacted data for local checks.
 
 ### 1. Redacted Diagnostics Bundle (Recommended for Bug Reports)
 
-Use the agent to download a diagnostics ZIP. The agent removes known sensitive values, such as API tokens, MCP Connect Secrets, and MQTT credentials.
-Examine the ZIP for other sensitive data before you attach it to a bug report.
+The agent removes known sensitive values, such as API tokens and MCP connect secrets.
+
+> [!WARNING]
+> Examine the ZIP before you attach it to a report.
+> The ZIP can contain private information about your server.
 
 **Via HTTP API:**
 
+If the agent has an API token, first [set the request header](../guides/quick-start.md#set-the-request-header).
+On the Unraid server, download the ZIP:
+
 ```bash
-# Download redacted bundle directly from the agent
-curl -OJ http://localhost:8043/api/v1/diagnostics/bundle
+curl --fail --remote-name --remote-header-name \
+  -H "Authorization: Bearer ${UMA_TOKEN}" \
+  http://localhost:8043/api/v1/diagnostics/bundle
 ```
 
-**Via WebGUI:**
+If the agent has no API token, omit the bearer header.
+
+**Via the Unraid web UI:**
 
 1. Open **Settings → Utilities → Unraid Management Agent**.
 2. Click **Download Diagnostics**.
@@ -385,10 +394,11 @@ For API endpoint details and response format, see the [Diagnostics API Reference
 
 ### 2. Local Unredacted Shell Diagnostic Bundle (Host Admin Analysis)
 
-For immediate, deep debugging by the system administrator directly on the Unraid server, you can generate an unredacted diagnostic text dump (`uma-diagnostics` shell script).
+The shell script below collects a local diagnostic report on the Unraid server.
 
 > [!WARNING]
-> The shell diagnostic script captures raw configuration files (including `config.cfg`), which may contain unmasked passwords or API tokens. **This shell dump is unredacted** and intended strictly for local administrator inspection. Do **not** post this file to public forums or GitHub without manual redaction.
+> Do not share the unredacted report.
+> The script copies `config.cfg`, which can contain passwords and API tokens.
 
 ```bash
 # Create comprehensive unredacted local diagnostic output

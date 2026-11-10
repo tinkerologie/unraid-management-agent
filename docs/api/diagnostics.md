@@ -14,31 +14,32 @@ Checks the health of all platform data sources and capabilities.
 
 - **Method**: `GET`
 - **Path**: `/api/v1/diagnostics/self-test`
-- **Authentication**: Not required (or Bearer token if configured)
+- **Authentication**: Bearer token if the agent has an API token
 - **Response Format**: `application/json`
 
 #### Response (`200 OK`)
 
 ```json
 {
-  "unraid_version": "6.12.10",
+  "unraid_version": "7.3.4",
   "overall_state": "healthy",
   "capabilities": {
-    "docker": true,
-    "vms": true,
-    "zfs": true,
-    "ups": true,
-    "gpu": true
+    "unraid_version": "7.3.4",
+    "items": [
+      {
+        "name": "docker",
+        "available": true,
+        "state": "present",
+        "target": "/usr/bin/docker"
+      }
+    ],
+    "checked_at": "2026-10-10T05:00:00Z"
   },
   "subsystems": [
     {
-      "name": "system",
+      "subsystem": "system",
       "state": "healthy",
-      "last_healthy": "2026-10-10T05:00:00Z"
-    },
-    {
-      "name": "array",
-      "state": "healthy",
+      "last_checked": "2026-10-10T05:00:00Z",
       "last_healthy": "2026-10-10T05:00:00Z"
     }
   ],
@@ -50,8 +51,12 @@ Checks the health of all platform data sources and capabilities.
 
 ### 2. Download Diagnostics Bundle
 
-Download a ZIP with host metrics, disk, container, and VM status, recent system logs, and configuration.
-The agent removes known sensitive values. Examine the ZIP before you share it.
+The ZIP contains host metrics, component status, recent system logs, and configuration.
+The agent removes known sensitive values.
+
+> [!WARNING]
+> Examine the ZIP before you share it.
+> It can contain private information about your server.
 
 - **Method**: `GET`
 - **Path**: `/api/v1/diagnostics/bundle`
@@ -79,16 +84,13 @@ The agent removes known sensitive values. Examine the ZIP before you share it.
 
 ### 3. Detected Capabilities
 
-Returns the capability snapshot: the OS paths and binaries the agent depends
-on, plus the detected hardware classes that gate the hardware-dependent
-collectors ([#261](https://github.com/tinkerologie/unraid-management-agent/issues/261)).
+The snapshot contains OS paths, executable files, and detected hardware classes.
+The agent uses the hardware classes to decide which automatic collectors can run.
 See [Hardware Auto-Detection](../guides/configuration.md#hardware-auto-detection).
 
 - **Method**: `GET`
 - **Path**: `/api/v1/capabilities`
-- **Query**: `refresh=true` re-checks now; within 30 seconds of the last check
-  the cached snapshot is returned. Capabilities are also re-checked every
-  15 minutes.
+- **Query**: `refresh=true` requests a new check. Within 30 seconds of the last check, the agent returns the cached snapshot.
 - **Authentication**: Bearer token (if configured)
 - **Response Format**: `application/json`
 
@@ -116,9 +118,8 @@ See [Hardware Auto-Detection](../guides/configuration.md#hardware-auto-detection
 }
 ```
 
-`state` is `present`, `absent` or `unknown`; `available` is `true` only when
-`present`. The self-test's `capabilities` object has the same shape, so it also
-gains the additive `state` and `checked_at` fields.
+`state` is `present`, `absent`, or `unknown`. `available` is `true` only when the state is `present`.
+`checked_at` gives the time of the check.
 
 #### Error Responses
 

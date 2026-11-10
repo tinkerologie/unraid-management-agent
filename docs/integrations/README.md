@@ -28,9 +28,8 @@ platforms. Pick by client.
 
 ## Real-time vs polling
 
-- **MCP / WebSocket / MQTT:** push or cached — near real-time, low overhead.
-- **REST / Prometheus:** request/scrape — fine for scripts and dashboards; don't
-  hot-loop the REST API when a push channel is available.
+- **MCP, WebSocket, and MQTT** provide current or cached data. WebSocket and MQTT send updates to subscribers.
+- **REST and Prometheus** return data on request. Set a polling interval for scripts and dashboards.
 
 ## See also
 

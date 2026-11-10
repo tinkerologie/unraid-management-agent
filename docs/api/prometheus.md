@@ -10,7 +10,7 @@ The agent serves Prometheus metrics at `/metrics`. The available series depend o
 **Format**: Prometheus text format  
 **Update Frequency**: Real-time (current cached values)
 
-Set `metrics_enabled: false` to turn this endpoint off; it then returns 404. See
+Set `metrics_enabled: false` to disable this endpoint. The agent then returns `404 Not Found`. See
 [Endpoint toggles](../guides/configuration.md#endpoint-toggles-rest-only-mode).
 
 ## Scraping Configuration

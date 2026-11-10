@@ -23,10 +23,11 @@ validation remain necessary before treating a particular model/host combination 
 
 ## Automatic detection
 
-The agent matches exact USB vendor/product IDs, verifies the HID driver binding, correlates
-the physical USB device with a `corsairpsu` hwmon child, and supports multiple devices. Device IDs hash the model and serial,
-falling back to a USB port path for missing or duplicate serials; raw serial numbers are not published. Port-derived IDs change
-when a PSU is moved to another port.
+The agent matches the USB vendor and product IDs. It checks the HID driver and finds the matching `corsairpsu` hwmon device.
+The agent supports multiple devices.
+
+The agent calculates a device ID from the model and serial number. If the serial number is missing or duplicated, it uses the USB port path.
+The agent does not publish raw serial numbers. A device ID that uses the port path changes when you move the PSU to another port.
 
 A separate inventory watcher checks USB/hwmon hotplug events and rescans every 30 seconds even
 when hardware gating has stopped telemetry. An enumerated PSU without hwmon is reported as
@@ -37,16 +38,18 @@ kernel driver owns the device.
 The snapshot `state` is `pending`, `not_detected`, `driver_unavailable`, `ok`, `partial`, `error`
 or `disabled`. Each device has its own state and message. `not_detected` means no recognized
 host-visible telemetry interface, not that the server physically lacks a PSU. Access/read errors
-remain distinct from absence. A disappearance clears current measurements immediately on inventory
-detection; the existing hardware policy stops the collector after two absence observations.
+remain distinct from absence. When the inventory watcher detects that a PSU is absent, it clears the current measurements.
+The hardware policy stops the collector after two consecutive absent results.
 
 ## Configuration and collection modes
 
-In the plugin's Manual collection settings, **PSU Telemetry** defaults to **Automatic**: it runs
-at the existing five-minute automatic interval while detected. A numeric interval overrides this
-cadence; **Disabled** keeps it off. The daemon used directly defaults to 60 seconds and remains
-hardware-gated. `--interval-psu` or `INTERVAL_PSU` sets its Manual interval; the valid enabled
-range is 5–86400 seconds. Low-power mode multiplies collection intervals by four.
+In the plugin's Manual collection settings, **PSU Telemetry** defaults to **Automatic**.
+The collector runs every five minutes when the agent detects a supported PSU.
+A numeric interval replaces the automatic interval. **Disabled** stops the collector.
+
+The daemon without the plugin uses a default interval of 60 seconds. It still requires supported hardware.
+The `--interval-psu` flag or `INTERVAL_PSU` variable sets the Manual interval.
+The available range is 5 to 86400 seconds. Low-power mode multiplies collection intervals by four.
 
 YAML configuration:
 
@@ -94,11 +97,13 @@ readings do not become zero. Discovery configurations are cleaned up when measur
 
 ## Troubleshooting
 
-If the PSU is not detected, check the data cable, USB passthrough and exact model. If it is
-`driver_unavailable`, check the running kernel's driver configuration, supported IDs and bound
-hwmon interface. The agent reports these conditions without attempting to repair kernel/device
-ownership. `partial` or `error` identifies unavailable channels; inspect the snapshot's messages
-and errors alongside the host's kernel logs.
+| State                | Checks                                                           |
+| -------------------- | ---------------------------------------------------------------- |
+| `not_detected`       | Check the data cable, USB passthrough, and PSU model.            |
+| `driver_unavailable` | Check the kernel driver, supported USB IDs, and hwmon interface. |
+| `partial` or `error` | Compare the snapshot messages with the kernel logs.              |
+
+The agent reports these conditions. It does not change which driver controls the device.
 
 Further hardware requirements and channel semantics are documented by the
 [Linux driver](https://docs.kernel.org/hwmon/corsair-psu.html).

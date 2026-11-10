@@ -22,7 +22,7 @@ The plugin creates this file on the boot flash device. The settings stay in the 
 | `--bind-address`                 | -        | IP to bind the HTTP server to (empty = all). mDNS advertises it. Loopback rejected; invalid → all.                                                                     |
 | `--read-only`                    | `false`  | Block state-changing MCP tools (AI agents read-only; REST API unaffected)                                                                                              |
 | `--tool-policy`                  | -        | Comma-separated per-tool MCP policies (`tool=policy`), e.g. `system_reboot=ask,container_action=read_only`. If `tool_policy.json` exists on disk, it takes precedence. |
-| `--api-token`                    | -        | Require `Authorization: Bearer <token>` on the HTTP API and `/mcp` (empty = unauthenticated reads, network writes refused)                                             |
+| `--api-token`                    | -        | Require `Authorization: Bearer <token>` on protected HTTP routes.                                                                                                      |
 | `--allow-unauthenticated-writes` | `false`  | Allow network writes without an API token (not recommended; `ALLOW_UNAUTHENTICATED_WRITES`)                                                                            |
 | `--wan-ip-lookup`                | `true`   | Ask api.ipify.org, ifconfig.me and icanhazip.com for the WAN IP on request (`WAN_IP_LOOKUP`; `false` uses only Unraid's `WANIP`)                                       |
 | `--vm-guest-agent`               | -        | Comma-separated VMs to read through the QEMU guest agent (`VM_GUEST_AGENT`); see [VM guest agent](#vm-guest-agent)                                                     |
@@ -41,25 +41,26 @@ The plugin creates this file on the boot flash device. The settings stay in the 
 
 All three endpoints are on by default. Turn off the ones you do not use:
 
-| `config.yml` key    | Environment variable | CLI flag              | Default | Endpoint     |
-| ------------------- | -------------------- | --------------------- | ------- | ------------ |
-| `mcp_enabled`       | `MCP_ENABLED`        | `--mcp-enabled`       | `true`  | `/mcp*`      |
-| `metrics_enabled`   | `METRICS_ENABLED`    | `--metrics-enabled`   | `true`  | `/metrics`   |
-| `websocket_enabled` | `WEBSOCKET_ENABLED`  | `--websocket-enabled` | `true`  | `/api/v1/ws` |
+| `config.yml` key    | Environment variable | CLI flag              | Default | Endpoint                                                   |
+| ------------------- | -------------------- | --------------------- | ------- | ---------------------------------------------------------- |
+| `mcp_enabled`       | `MCP_ENABLED`        | `--mcp-enabled`       | `true`  | `/mcp`, `/mcp/`, `/mcp/<connect-secret>`, `/mcp-stateless` |
+| `metrics_enabled`   | `METRICS_ENABLED`    | `--metrics-enabled`   | `true`  | `/metrics`                                                 |
+| `websocket_enabled` | `WEBSOCKET_ENABLED`  | `--websocket-enabled` | `true`  | `/api/v1/ws`                                               |
 
-The plugin settings page has a switch for each, under **Endpoints**. Precedence is the usual
-CLI flag > non-empty environment variable > `config.yml` > default.
+The **Endpoints** section on the plugin settings page has a switch for each service.
+The agent uses the first available setting in this order:
 
-A disabled endpoint returns 404, and the startup log lists it. It does no background work either: MCP
-serves no routes, and WebSocket starts no hub or broadcast subscription. The cache that REST reads from keeps running.
+1. CLI flag.
+2. Non-empty environment variable.
+3. `config.yml` value.
+4. Default value.
 
-- **MCP-only settings:** with MCP off, a configured `mcp_connect_secret` or tool policy has no effect
-  and the agent logs a warning. Saved values are kept, so they work again when you turn MCP back on.
-  You can still edit tool policies on the settings page.
-  mDNS discovery stops advertising MCP too.
-- **`mcp-stdio`:** this command is an explicit local request for MCP, so it ignores `mcp_enabled` and
-  writes a notice to stderr.
-- **Home Assistant:** the integration uses WebSocket for live updates.
+The agent returns `404 Not Found` for disabled endpoints. The startup log lists the disabled services.
+REST continues to use the shared cache.
+
+- When HTTP MCP is off, the agent does not advertise MCP over mDNS. It retains the saved tool policies and connect secret.
+- The `mcp-stdio` command serves local MCP. It ignores `mcp_enabled` and writes a notice to stderr.
+- Home Assistant uses WebSocket events for live updates.
 
 These toggles limit what the agent exposes. See [Where CPU usage comes from](#where-cpu-usage-comes-from)
 before using them to lower CPU usage.
@@ -753,17 +754,18 @@ Claude Desktop.
 
 ### Authentication
 
-Set an API token to require `Authorization: Bearer <token>`. When the token is
-empty (the default) network clients can read data without authentication, but
-every state-changing request is refused:
+Set an API token to require `Authorization: Bearer <token>` on protected routes.
+The health endpoint and Swagger UI do not require a token.
+The optional MCP connect URL uses its path secret.
+
+Without a token, network clients can read data. The network write lock applies unless you enable **Allow Write Access Without a Token**:
 
 - REST `POST`, `PUT`, `PATCH` and `DELETE` requests return `403 Forbidden` with
   `{"error": "Write access is disabled because no API token is configured. Set API_TOKEN in the plugin settings (or the API_TOKEN environment variable) and send it as 'Authorization: Bearer <token>'."}`
-- HTTP MCP (`/mcp` and `/mcp/<connect-secret>`) treats every write tool as
-  read-only. STDIO MCP (`mcp-stdio`) runs locally and is not affected.
+- All HTTP MCP routes block write tools. This includes `/mcp`, the connect URL, and `/mcp-stateless`.
+- Local MCP through `mcp-stdio` operates outside the network write lock.
 
-`GET`, `HEAD` and `OPTIONS` requests, WebSocket subscriptions and MCP read tools
-keep working, so monitoring clients need no token.
+The lock permits `GET`, `HEAD`, and `OPTIONS` requests. It also permits WebSocket subscriptions and MCP read tools.
 
 #### Allow write access without a token (not recommended)
 
@@ -790,7 +792,9 @@ The easiest way to configure authentication is through the Unraid WebGUI:
 2. Scroll to the **Authentication** section.
 3. Click **Generate** to create a 64-character token.
 4. Click **Copy** to copy the token to your clipboard.
-5. Click **Apply** at the bottom of the page. The plugin saves the token and restarts the service automatically.
+5. Click **Apply** at the bottom of the page.
+
+The plugin saves the token and restarts a running service.
 
 Clicking **Clear** and then **Apply** removes the token. Network access then
 becomes read-only again, unless **Allow Write Access Without a Token**
