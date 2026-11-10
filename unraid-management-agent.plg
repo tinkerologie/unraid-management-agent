@@ -10,8 +10,8 @@
     <!ENTITY launch      "Settings/unraid-management-agent">
     <!ENTITY bundle      "&name;-&version;.tgz">
     <!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
-    <!ENTITY md5         "4e8f24556eefa3b3bd459c7213e3f634"> <!-- pragma: allowlist secret -->
-    <!ENTITY sha256      "c85a5bc2d5481bd9bf6f2ca2032a6427af6a88ffcdf4a6ea19a9e1e1281ad2bb"> <!-- pragma: allowlist secret -->
+    <!ENTITY md5         "fd2d8420a0dae99981791754d8acdaf4"> <!-- pragma: allowlist secret -->
+    <!ENTITY sha256      "508982a82bf14df6d5482cef896c5515ad44bdaf39cdc27a60be53d31d09bcf7"> <!-- pragma: allowlist secret -->
 ]>
 
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" icon="server" min="7.2.0" pluginURL="&pluginURL;" support="&supportURL;" project="&gitURL;" readme="&gitURL;#readme">
@@ -21,21 +21,18 @@ Monitor and control your Unraid system via REST API, WebSocket, MCP, Prometheus,
 </DESCRIPTION>
 
 <CHANGES>
-### 2026.11.03
-
-### Changed
-
-- Apply ASD-STE100 Issue 9 guidance across the maintained guides and Swagger prose. Correct installation, configuration, authentication, and integration instructions (#326).
-
-### Added
-
-- Publish versioned REST and WebSocket producer contract fixtures with a drift check and pinned consumption instructions (#324).
-- Add a domain glossary and five retrospective architecture decision records, with source references; align related guidance with the implemented architecture.
-- Configure engineering agent skills with GitHub Issues, the default triage label mapping, and a single-context domain documentation layout.
+### 2026.11.04
 
 ### Fixed
 
-- Serialize collector shutdown and restart across Manual and Dynamic modes. A replacement waits for the previous collection and cleanup to finish (#323).
+- Serve MCP `2026-07-28` discovery at `/mcp-stateless` for ChatGPT Secure MCP Tunnel clients. The endpoint uses the existing API authentication and MCP tool access policies (#331).
+- Enforce Agent Core's `forbid` mode for tool calls and saved approvals, including calls with confirmed auto-approve preferences.
+- Resume the remaining Agent Core tool calls after an approval decision. Send Claude one message with all results from the turn.
+
+### Changed
+
+- Apply ASD-STE100 Issue 9 guidance to the README and related setup, security, API, and integration guides (#331).
+- List the built-in Agent Core tools and show how to approve a Docker container restart with REST API authentication.
 </CHANGES>
 
 <!--
