@@ -228,30 +228,32 @@ def identify_event_type(envelope):
 
 ### VM Info Fields
 
-| Field                    | Type   | Unit  | Range | Nullable | Description                                             |
-| ------------------------ | ------ | ----- | ----- | -------- | ------------------------------------------------------- |
-| `id`                     | string | -     | -     | No       | VM ID                                                   |
-| `name`                   | string | -     | -     | No       | VM name                                                 |
-| `state`                  | string | -     | enum  | No       | VM state                                                |
-| `cpu_count`              | int    | count | ≥1    | No       | Virtual CPUs                                            |
-| `memory_allocated_bytes` | uint64 | bytes | ≥0    | No       | Maximum configured RAM                                  |
-| `memory_used_bytes`      | uint64 | bytes | ≥0    | No       | Guest usage, else QEMU RSS, else 0; 0 when not running  |
-| `disk_path`              | string | -     | -     | No       | Primary disk source; empty when unavailable             |
-| `disk_size_bytes`        | uint64 | bytes | ≥0    | No       | Primary disk guest-visible capacity; 0 when unavailable |
-| `autostart`              | bool   | -     | -     | No       | Auto-start                                              |
-| `persistent`             | bool   | -     | -     | No       | Persistent                                              |
-| `timestamp`              | string | -     | -     | No       | Event timestamp                                         |
+| Field                    | Type   | Unit  | Range | Nullable | Description                                                                        |
+| ------------------------ | ------ | ----- | ----- | -------- | ---------------------------------------------------------------------------------- |
+| `id`                     | string | -     | -     | No       | VM ID                                                                              |
+| `name`                   | string | -     | -     | No       | VM name                                                                            |
+| `state`                  | string | -     | enum  | No       | VM state                                                                           |
+| `cpu_count`              | int    | count | ≥1    | No       | Virtual CPUs                                                                       |
+| `memory_allocated_bytes` | uint64 | bytes | ≥0    | No       | Maximum configured RAM                                                             |
+| `memory_used_bytes`      | uint64 | bytes | ≥0    | No       | Guest memory use or host QEMU RSS. A value of 0 can mean that data is unavailable. |
+| `disk_path`              | string | -     | -     | No       | Primary disk source; empty when unavailable                                        |
+| `disk_size_bytes`        | uint64 | bytes | ≥0    | No       | Primary disk guest-visible capacity; 0 when unavailable                            |
+| `autostart`              | bool   | -     | -     | No       | Auto-start                                                                         |
+| `persistent`             | bool   | -     | -     | No       | Persistent                                                                         |
+| `timestamp`              | string | -     | -     | No       | Event timestamp                                                                    |
 
-`memory_allocated_bytes` is the maximum configured memory. `memory_used_bytes` is 0 for non-running VMs.
-For running VMs it uses guest `available - unused` from libvirt balloon stats when both values are present
-and valid, otherwise host QEMU RSS (including QEMU overhead, which can exceed allocation), otherwise 0.
-Guest stats require a balloon driver providing stats; the collector does not configure the balloon stats period.
-Allocated memory is never used as usage. A running VM can report 0 when stats are unavailable or usage is zero.
+`memory_allocated_bytes` gives the configured maximum. `memory_used_bytes` is 0 when the VM does not run.
+For a running VM, the collector uses `available - unused` if both guest balloon values are valid.
+If guest values are unavailable, the collector uses the host QEMU resident set size (RSS) or reports 0.
+QEMU overhead can make RSS larger than the configured maximum.
+Guest values require a balloon driver that reports statistics. The collector does not set the statistics interval.
 
-The primary disk is the first `device="disk"` entry with a source in domain XML order; CD-ROMs and floppies
-are skipped. `disk_path` is its source path or identifier (storage volumes are resolved to paths), or empty
-when unavailable. `disk_size_bytes` is its guest-visible virtual capacity in bytes, collected best effort
-for all VM states; 0 means unavailable. It is not host allocation or physical space used.
+The primary disk is the first `device="disk"` entry with a source in the domain XML.
+The collector skips CD-ROM and floppy devices.
+`disk_path` gives the source path or identifier. The collector resolves storage volumes to paths when possible.
+If the source is unavailable, `disk_path` is empty.
+`disk_size_bytes` gives the virtual capacity that the guest sees, in bytes.
+The collector tries to read capacity in all VM states. A value of 0 means that capacity is unavailable.
 
 ### UPS Status Fields
 

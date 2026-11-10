@@ -19,7 +19,8 @@ platforms. Pick by client.
 - **AI agent that speaks MCP (Claude, Cursor, Copilot, Gemini):** use the **MCP**
   connection for live tools, and install the **Agent Skill** so the agent knows
   how to use them well.
-- **ChatGPT:** use **ChatGPT Actions** (it does not consume MCP/Skills).
+- **ChatGPT:** use [Secure MCP Tunnel](mcp.md#chatgpt-through-secure-mcp-tunnel) for a custom MCP server.
+  Use [REST Actions](chatgpt/README.md) for a Custom GPT.
 - **Home Assistant:** use the **MQTT** integration and/or the dedicated HA
   integration. (The agent also advertises itself through mDNS as
   `_unraid-mgmt-agent._tcp.local.` for auto-discovery.)
@@ -27,9 +28,8 @@ platforms. Pick by client.
 
 ## Real-time vs polling
 
-- **MCP / WebSocket / MQTT:** push or cached — near real-time, low overhead.
-- **REST / Prometheus:** request/scrape — fine for scripts and dashboards; don't
-  hot-loop the REST API when a push channel is available.
+- **MCP, WebSocket, and MQTT** provide current or cached data. WebSocket and MQTT send updates to subscribers.
+- **REST and Prometheus** return data on request. Set a polling interval for scripts and dashboards.
 
 ## See also
 

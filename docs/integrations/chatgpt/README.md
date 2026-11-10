@@ -2,9 +2,8 @@
 
 Import the agent's REST API as an **Action** to let a custom GPT monitor or control your Unraid server.
 
-> ChatGPT consumes REST **Actions** (OpenAPI), not the Agent Skills / MCP that
-> Claude Code uses. For Claude and other MCP clients, see
-> [`../claude/`](../claude/) and [`../mcp.md`](../mcp.md).
+> To connect a ChatGPT custom MCP server, use the
+> [stateless MCP endpoint through Secure MCP Tunnel](../mcp.md#chatgpt-through-secure-mcp-tunnel).
 
 ## Prerequisites
 
@@ -16,17 +15,17 @@ Import the agent's REST API as an **Action** to let a custom GPT monitor or cont
 
 ## Steps
 
-1. **ChatGPT → Explore GPTs → Create → Configure → Create new action.**
-2. **Import the schema.** Paste the contents of
-   [`openapi-actions.yaml`](openapi-actions.yaml), or host it and use "Import from URL".
-3. **Set the server URL.** Edit the `servers[0].url` in the schema to your
-   reachable address, e.g. `https://unraid.example.com/api/v1`.
-4. In the GPT editor, set **Authentication Type** to **API Key**.
+1. In ChatGPT, open **Explore GPTs → Create → Configure → Create new action**.
+2. Paste the contents of [`openapi-actions.yaml`](openapi-actions.yaml) into the schema field.
+3. Set `servers[0].url` to your HTTPS address, for example `https://unraid.example.com/api/v1`.
+4. Set **Authentication Type** to **API Key**.
 5. Set **Auth Type** to **Bearer**.
-6. Enter the raw agent token in **API Key**. The action sends `Authorization: Bearer <token>`.
-   See [GPT Action authentication](https://developers.openai.com/api/docs/actions/authentication).
-7. **Save** the action. ChatGPT will list the imported operations
-   (`getSystemInfo`, `listContainers`, `startContainer`, …).
+6. Enter the agent token in **API Key**.
+7. Save the action.
+
+ChatGPT lists the imported operations, such as `getSystemInfo` and `listContainers`.
+The action sends the token in an `Authorization: Bearer <token>` header.
+See [GPT Action authentication](https://developers.openai.com/api/docs/actions/authentication).
 
 ## Recommended GPT instructions
 
@@ -57,7 +56,7 @@ You manage an Unraid server via the connected Actions.
 
 | Symptom                           | Fix                                                                       |
 | --------------------------------- | ------------------------------------------------------------------------- |
-| "Action not found" / not callable | Re-import the schema; ensure each `operationId` is unique                 |
+| "Action not found" / not callable | Check for duplicate `operationId` values. Then import the schema again.   |
 | Network/timeout errors            | ChatGPT can't reach a LAN IP — use a public HTTPS reverse proxy or tunnel |
 | CORS errors                       | Check the origin rules at the reverse proxy                               |
 | Calls succeed but do nothing      | Check the `servers[0].url` includes the `/api/v1` base path               |
@@ -65,6 +64,7 @@ You manage an Unraid server via the connected Actions.
 
 ## Notes
 
-This schema is a curated subset (~30 endpoints) for reliable action selection.
-The agent serves its generated REST reference at `http://<your-unraid-ip>:8043/swagger/`;
-add more operations to the schema as needed, keeping `operationId`s unique.
+The Actions schema contains a subset of the REST operations.
+The agent serves the full REST reference at `http://<your-unraid-ip>:8043/swagger/`.
+
+If you add an operation, give it a unique `operationId`.

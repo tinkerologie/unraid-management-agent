@@ -2,12 +2,13 @@
 
 > **Status: Production-Ready (GA)** — Built on the
 > [official MCP Go SDK](https://github.com/modelcontextprotocol/go-sdk) v1.8.0
-> with per-session protocol negotiation (`2026-07-28`, `2025-11-25`, `2025-06-18`, `2025-03-26`, `2024-11-05`).
+> with stateful Streamable HTTP through `2025-11-25` at `/mcp`.
+> The sessionless endpoint at `/mcp-stateless` also supports `2026-07-28` and `server/discover`.
 
 The agent serves [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) by default.
 The daemon serves MCP and REST from the same HTTP server.
 
-## Quick Start (2-Step Zero-Config Onboarding)
+## Connect with an MCP connect URL
 
 Use the Connect URL if your client accepts a server URL without custom headers:
 
@@ -31,8 +32,49 @@ claude mcp add --transport http unraid "http://<unraid-ip>:8043/mcp/<connect-sec
 ```
 
 - **No custom headers required**: Works in clients that only accept a single server URL.
-- **Safe log redaction**: The secret value in `/mcp/<segment>` is never written to log files or diagnostic bundles; logs record the redacted path `/mcp/<redacted>`.
+- **Log redaction.** The agent records `/mcp/<redacted>` in place of the secret path in its logs and diagnostics bundles.
 - **Revocation**: Clicking **Regenerate** or **Clear** takes effect after clicking **Apply** and restarting the daemon. The old URL then returns `404 Not Found`.
+
+## ChatGPT through Secure MCP Tunnel
+
+### Configure the agent
+
+1. Open **Settings → Utilities → Unraid Management Agent**.
+2. Under **Endpoints**, turn on **MCP endpoint**.
+3. For monitoring-only access, turn on **Read-Only Mode**.
+4. Click **Apply**.
+
+> [!CAUTION]
+> Before you apply a token, prepare to update clients that use protected endpoints without one.
+> **Apply** restarts a running service. Clients without the bearer header can then receive HTTP 401.
+> An API token disables the network write lock. Set **Read-Only Mode** or tool policies first to preserve MCP write restrictions.
+
+If the agent has no token, [set an API token](../../README.md#set-an-api-token) after you apply the required MCP tool restrictions.
+The existing MCP connect URL still uses its path secret.
+
+### Configure the tunnel
+
+Use the [OpenAI Secure MCP Tunnel guide](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels) to create a tunnel.
+
+1. Set the private upstream URL to the agent's `/mcp-stateless` endpoint.
+2. Set `UNRAID_MCP_AUTHORIZATION` to `Bearer <agent-api-token>` in the tunnel client's secret environment.
+3. Set `MCP_EXTRA_HEADERS` to `Authorization: env:UNRAID_MCP_AUTHORIZATION`.
+4. Start the tunnel client.
+
+The [tunnel client header settings](https://github.com/openai/tunnel-client/blob/master/docs/configuration.md) describe secret references.
+
+### Connect from ChatGPT
+
+1. Add a custom MCP server with **Tunnel** as the connection type.
+2. Select the configured tunnel.
+3. Make sure that ChatGPT lists the tools.
+4. Call `get_system_info` to verify read access.
+
+This endpoint has no connect-secret URL.
+
+The stateless endpoint uses the same MCP read-only mode, tool policies, and network write lock as `/mcp`.
+It accepts MCP requests via POST without a `Mcp-Session-Id`. GET and DELETE return `405 Method Not Allowed`.
+Server-to-client requests are unavailable on this transport.
 
 ## Overview
 
@@ -48,43 +90,49 @@ MCP is an open protocol that standardizes how AI applications can securely conne
 > - **Claude (skill):** install the [Agent Skill](claude/README.md) so Claude
 >   knows how to use these tools effectively — works in Claude Code, Claude
 >   Desktop, claude.ai, Cursor, Copilot, and Gemini CLI.
-> - **ChatGPT:** ChatGPT consumes REST **Actions**, not MCP — see the
->   [ChatGPT Custom GPT guide](chatgpt/README.md).
+> - **ChatGPT Custom GPTs:** See the [REST Actions guide](chatgpt/README.md).
 > - See the [integrations index](README.md) for all options (MQTT, Home
 >   Assistant, Grafana, …) and the [MCP Onboarding Design Doc](../design/mcp-onboarding.md).
 
 ## Transports
 
-The MCP server supports two transports — use the one that fits your deployment:
-
-| Transport              | Endpoint / Command                                          | Best For                                               |
-| ---------------------- | ----------------------------------------------------------- | ------------------------------------------------------ |
-| **Streamable HTTP** ⭐ | `http(s)://<unraid-ip>:8043/mcp` or `/mcp/<connect-secret>` | Remote connections from any machine on the network     |
-| **STDIO**              | `unraid-management-agent mcp-stdio`                         | Local AI clients running directly on the Unraid server |
-
-> **Which transport should I use?**
->
-> - Use **Streamable HTTP** if the AI client (Claude Code, Cursor, VS Code, Codex, Gemini CLI) runs on your workstation or another machine on the LAN/Tailnet.
-> - Use **STDIO** if the AI client runs locally on the Unraid server itself — it has zero network overhead and requires no authentication.
+| Transport                 | Endpoint or command                 | Use                                                             |
+| ------------------------- | ----------------------------------- | --------------------------------------------------------------- |
+| Stateful Streamable HTTP  | `/mcp` or `/mcp/<connect-secret>`   | Clients that use MCP sessions                                   |
+| Stateless Streamable HTTP | `/mcp-stateless`                    | ChatGPT through Secure MCP Tunnel and other sessionless clients |
+| STDIO                     | `unraid-management-agent mcp-stdio` | Clients that run on the Unraid server                           |
 
 ### Authentication Options
 
-Over HTTP, MCP write tools need an API token. While `API_TOKEN` is empty (and `ALLOW_UNAUTHENTICATED_WRITES` is off), every write tool on `/mcp` and `/mcp/<connect-secret>` is blocked as read-only and returns the token message below; read tools keep working. The local STDIO transport is not affected. See [Configuration → Authentication](../guides/configuration.md#authentication).
+The network write lock blocks MCP write tools on all HTTP routes when no API token is set.
+The lock permits MCP read tools. Local MCP through STDIO operates outside the network write lock.
+The setting `ALLOW_UNAUTHENTICATED_WRITES` disables the lock.
+See [Authentication](../guides/configuration.md#authentication).
 
-When `API_TOKEN` is configured, you can authenticate MCP clients using either:
+When you set `API_TOKEN`, use the method for your MCP route.
 
 #### Option 1: Single-URL Connect Secret (`/mcp/<connect-secret>`) — Recommended
 
-Set `MCP_CONNECT_SECRET` (32–256 characters of `[A-Za-z0-9_-]`) in the Unraid WebGUI or environment. Requests to `http(s)://<unraid-ip>:8043/mcp/<connect-secret>` are authenticated in constant time without needing an `Authorization` header, while plain `/mcp` still enforces `Authorization: Bearer <API_TOKEN>` and any unknown `/mcp/<other>` path returns `404 Not Found`.
+Set `MCP_CONNECT_SECRET` in the Unraid web UI or environment. Use 32 to 256 characters from `[A-Za-z0-9_-]`.
 
-> **Security Note:** `MCP_CONNECT_SECRET` authenticates `/mcp/<connect-secret>` only and is not equivalent to `API_TOKEN` (it never grants access to `/api/v1/*` REST routes). Because the secret is embedded in the URL path, it acts as a reusable credential that may be recorded by client configurations or intermediaries and transmitted in cleartext over plain HTTP. Use HTTPS (`TLS_CERT_FILE` / `TLS_KEY_FILE` or a TLS-terminating reverse proxy) for remote connections, and enable `READ_ONLY=true` (or per-tool policies) unless connected AI agents should be allowed to invoke state-changing tools.
+The agent checks the secret in the URL. An unknown `/mcp/<other>` path returns `404 Not Found`.
+When you set an API token, both `/mcp` and `/mcp-stateless` require its bearer header.
 
-`/mcp` returns 404 when `mcp_enabled` is false. See
+> [!WARNING]
+> Keep the MCP connect URL private.
+> A client or proxy can record the secret in its configuration or logs.
+> Use HTTPS for remote connections. HTTP sends the secret in cleartext.
+
+The connect secret grants access only to its MCP URL. Enable **Read-Only Mode** to block MCP write tools.
+Use tool policies to set access for individual tools.
+
+All MCP HTTP routes return `404 Not Found` when `mcp_enabled` is false. See
 [Endpoint toggles](../guides/configuration.md#endpoint-toggles-rest-only-mode).
 
 #### Option 2: Standard Bearer Token Header (`Authorization: Bearer <token>`)
 
-Clients that support custom HTTP headers can connect to `/mcp` with `Authorization: Bearer <API_TOKEN>`:
+Clients can send `Authorization: Bearer <API_TOKEN>` to `/mcp` or `/mcp-stateless`.
+This example uses the stateful route:
 
 ```json
 {
@@ -957,8 +1005,8 @@ _Note: If `tool_policy.json` exists on disk, it takes precedence over `TOOL_POLI
 
 ## Limitations
 
-- Real-time updates should use WebSocket (`/ws`) in addition to MCP for push notifications
-- Some operations may take time to complete; poll status endpoints for updates
+- Use the WebSocket endpoint at `/api/v1/ws` for real-time events.
+- To check the progress of a long operation, read its status endpoint.
 
 ## Transport Types
 
@@ -967,16 +1015,19 @@ _Note: If `tool_policy.json` exists on disk, it takes precedence over `TOOL_POLI
 | **Streamable HTTP** ⭐ | Remote AI clients over the network | Request/response, SSE streaming, session management     |
 | **STDIO**              | Local AI clients on the server     | Newline-delimited JSON over stdin/stdout, zero overhead |
 
-### Streamable HTTP Transport Details (`2026-07-28` / `2025-11-25` / `2025-06-18` / `2025-03-26` / `2024-11-05`)
+### Stateful Streamable HTTP Transport
 
 Built on the [official MCP Go SDK](https://github.com/modelcontextprotocol/go-sdk) v1.8.0,
-the Streamable HTTP transport at `/mcp` (and `/mcp/<connect-secret>`) supports:
+the stateful transport at `/mcp` and `/mcp/<connect-secret>` supports versions
+`2025-11-25`, `2025-06-18`, `2025-03-26`, and `2024-11-05`. It accepts:
 
 - **POST**: Send JSON-RPC requests and notifications
   - Requests return `Content-Type: text/event-stream` (SSE-framed JSON-RPC) or `application/json`
   - Notifications return `202 Accepted` with no body
-- **GET (without `Mcp-Session-Id`)**: Immediately returns `405 Method Not Allowed` with `Allow: POST, DELETE` and `Content-Length` (`< 5 ms`). Per the MCP Streamable HTTP specification, clients that probe `GET /mcp` for standalone SSE support before `initialize` receive an immediate `405` and fall back cleanly to `POST /mcp` without hanging.
-- **GET (with valid `Mcp-Session-Id`)**: Opens a long-lived server-to-client SSE stream (`Content-Type: text/event-stream`), immediately flushes the initial `: ok\n\n` frame, and clears per-request HTTP `ReadDeadline` / `WriteDeadline` so the stream stays open across the session lifetime.
+- **GET without `Mcp-Session-Id`** returns `405 Method Not Allowed` with `Allow: POST, DELETE` and `Content-Length`.
+  The client can then send `initialize` with POST.
+- **GET with a valid `Mcp-Session-Id`** opens a server-to-client SSE stream.
+  The agent sends the first `: ok\n\n` frame immediately. It clears the HTTP read and write deadlines for the stream.
 - **DELETE**: Terminate the session (requires `Mcp-Session-Id` header)
 - **OPTIONS**: CORS preflight handling
 

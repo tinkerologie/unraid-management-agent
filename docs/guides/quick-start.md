@@ -4,7 +4,9 @@ Install the agent and make your first API requests.
 
 ## Installation
 
-### Via Plugin URL (Recommended)
+The [installation guide](installation.md) describes the recommended Community Applications method.
+
+### Via Plugin URL
 
 1. Open the Unraid web UI.
 2. Open **Plugins → Install Plugin**.
@@ -15,7 +17,9 @@ Install the agent and make your first API requests.
    ```
 
 4. Click **Install**.
-5. Wait until the installation is complete. The service uses port 8043 by default.
+5. Wait until the installation is complete.
+
+The service uses port `8043` by default.
 
 ## Verify Installation
 
@@ -31,55 +35,68 @@ tail -f /var/log/unraid-management-agent.log
 
 ### Test API
 
-If you set an API token, send the bearer header on protected requests. See
-[Authentication](configuration.md#authentication). The health endpoint is open.
+1. Send a request to the health endpoint:
 
-```bash
-# Health check
-curl http://localhost:8043/api/v1/health
+   ```bash
+   curl --fail --silent --show-error http://localhost:8043/api/v1/health
+   ```
 
-# System information
-curl http://localhost:8043/api/v1/system
+2. Make sure that the response contains `"status":"ok"`.
 
-# Array status
-curl http://localhost:8043/api/v1/array
-```
-
-Expected response:
-
-```json
-{
-  "status": "ok"
-}
-```
+The health endpoint does not require an API token. If you set a token, protected requests require it.
+See [Authentication](configuration.md#authentication).
 
 ## First API Calls
+
+Run these examples on the Unraid server. If the agent listens on a different address, replace `localhost`.
+
+### Set the request header
+
+> [!WARNING]
+> Do not send an API token over an untrusted network without HTTPS.
+> A device on the network can read the token in an HTTP request.
+
+If you set an API token, use these steps to read it into a Bash variable.
+
+1. Run this command in Bash:
+
+   ```bash
+   read -rs UMA_TOKEN
+   ```
+
+2. Paste the API token.
+3. Press Enter.
+
+The examples that follow use this token. If the agent has no API token, omit the bearer header for read requests.
 
 ### Get System Information
 
 ```bash
-curl http://localhost:8043/api/v1/system | jq
+curl -H "Authorization: Bearer ${UMA_TOKEN}" http://localhost:8043/api/v1/system
 ```
 
 ### List Docker Containers
 
 ```bash
-curl http://localhost:8043/api/v1/docker | jq
+curl -H "Authorization: Bearer ${UMA_TOKEN}" http://localhost:8043/api/v1/docker
 ```
 
 ### View Network Interfaces
 
 ```bash
-curl http://localhost:8043/api/v1/network | jq
+curl -H "Authorization: Bearer ${UMA_TOKEN}" http://localhost:8043/api/v1/network
 ```
 
 ### Check Disk Health
 
 ```bash
-curl http://localhost:8043/api/v1/disks | jq
+curl -H "Authorization: Bearer ${UMA_TOKEN}" http://localhost:8043/api/v1/disks
 ```
 
 ## WebSocket Connection
+
+These examples use an agent without an API token. For an authenticated connection, see
+[Authentication](configuration.md#authentication).
 
 ### JavaScript Example
 
@@ -125,15 +142,12 @@ ws.run_forever()
 
 ## Common Operations
 
-Set an API token before you send a control request. Use the silent prompt below to read the token into a shell variable:
-
-```bash
-read -rs UMA_TOKEN && export UMA_TOKEN
-```
+Before you send a control request, set an API token. Use the token from [Set the request header](#set-the-request-header).
 
 ### Start/Stop Docker Container
 
-Use the ID from the Docker list. Replace the example ID with a 12- or 64-character hexadecimal ID.
+Replace the example container ID with the ID from the Docker list.
+Use a hexadecimal ID with 12 or 64 characters.
 
 ```bash
 # Start container
@@ -174,10 +188,10 @@ curl -X POST -H "Authorization: Bearer ${UMA_TOKEN}" http://localhost:8043/api/v
 
 ## Prometheus Metrics
 
-Access metrics for Grafana:
+Read the metrics that the agent provides for Prometheus and Grafana:
 
 ```bash
-curl http://localhost:8043/metrics
+curl -H "Authorization: Bearer ${UMA_TOKEN}" http://localhost:8043/metrics
 ```
 
 ## Configuration
@@ -186,7 +200,9 @@ curl http://localhost:8043/metrics
 
 1. Open **Settings → Utilities → Unraid Management Agent**.
 2. Change **API Port**.
-3. Click **Apply**. The plugin restarts a running service.
+3. Click **Apply**.
+
+The plugin restarts a running service.
 
 ### Adjust Collection Intervals
 
@@ -215,9 +231,9 @@ tail -100 /var/log/unraid-management-agent.log
 
 ### Empty Data Returned
 
-- Wait 30-60 seconds after install for first data collection
-- Check collector intervals in settings
-- Verify permissions: `ls -l /var/run/docker.sock`
+1. Wait for the collector to complete its first cycle.
+2. Check the collector interval in the settings.
+3. For Docker data, check the socket permissions with `ls -l /var/run/docker.sock`.
 
 ### Port Already in Use
 
@@ -230,17 +246,13 @@ netstat -tulpn | grep 8043
 
 ## Next Steps
 
-- [REST API Reference](../api/rest-api.md) - Complete API documentation
-- [WebSocket Events](../api/websocket-events.md) - Real-time events guide
-- [Integrations](../integrations/mcp.md) - Connect with other tools
-- [Configuration Guide](configuration.md) - Advanced settings
+- [REST API reference](../api/rest-api.md)
+- [WebSocket events](../api/websocket-events.md)
+- [Integrations](../integrations/README.md)
+- [Configuration guide](configuration.md)
 
 ## Need Help?
 
 - **Issues**: [GitHub Issues](https://github.com/tinkerologie/unraid-management-agent/issues)
 - **Documentation**: [Full Documentation](../README.md)
 - **Community**: Unraid Community Forums
-
----
-
-**Last Updated**: January 2026

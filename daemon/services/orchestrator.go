@@ -98,7 +98,7 @@ func (o *Orchestrator) Run() error {
 		o.initializeDiscovery(ctx)
 	}
 
-	// Initialize MCP server with Streamable HTTP transport (MCP spec 2025-06-18)
+	// Initialize the MCP server for both Streamable HTTP transports
 	// Uses the official MCP Go SDK for protocol compliance with Claude, ChatGPT, Cursor, Copilot, etc.
 	toolPolicyStore := domain.NewToolPolicyStore("", o.ctx.ToolPolicy)
 	if err := toolPolicyStore.Load(); err != nil {
@@ -281,11 +281,13 @@ func (o *Orchestrator) mountHTTPMCP(apiServer *api.Server, mcpServer *mcp.Server
 	}
 	// Mount exact /mcp, /mcp/, and optional /mcp/<secret> routes on the stateful StreamableHTTPHandler
 	apiServer.RegisterMCPRoutes(mcpServer.GetHTTPHandler())
+	apiServer.RegisterMCPStatelessRoute(mcpServer.GetStatelessHTTPHandler())
 	if o.ctx.MCPConnectSecret != "" {
-		logger.Success("MCP server initialized at /mcp and /mcp/<redacted> (official SDK, per-session protocol negotiation: 2026-07-28, 2025-11-25, 2025-06-18, 2025-03-26, 2024-11-05)")
+		logger.Success("MCP server initialized at /mcp and /mcp/<redacted> (stateful through 2025-11-25)")
 	} else {
-		logger.Success("MCP server initialized at /mcp endpoint (official SDK, per-session protocol negotiation: 2026-07-28, 2025-11-25, 2025-06-18, 2025-03-26, 2024-11-05)")
+		logger.Success("MCP server initialized at /mcp (stateful through 2025-11-25)")
 	}
+	logger.Success("MCP server initialized at /mcp-stateless (includes 2026-07-28 discovery)")
 }
 
 // startedMessage returns the startup line for the API server.

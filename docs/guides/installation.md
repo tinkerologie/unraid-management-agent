@@ -82,18 +82,25 @@ ssh root@YOUR_UNRAID_IP "/usr/local/bin/unraid-management-agent boot --help"
 
 ### 1. Verify Service Status
 
-```bash
-# Check if running
-ps aux | grep unraid-management-agent
+1. Check the service process:
 
-# Check logs
-tail -f /var/log/unraid-management-agent.log
+   ```bash
+   pidof unraid-management-agent
+   ```
 
-# Test API endpoint
-curl http://localhost:8043/api/v1/health
-```
+2. Read the last 100 lines of the agent log:
 
-Expected response:
+   ```bash
+   tail -n 100 /var/log/unraid-management-agent.log
+   ```
+
+3. Send a request to the health endpoint:
+
+   ```bash
+   curl --fail --silent --show-error http://localhost:8043/api/v1/health
+   ```
+
+The health endpoint returns this response:
 
 ```json
 {
@@ -109,11 +116,15 @@ The plugin starts with these defaults:
 - **Debug Mode**: Off
 - **Collection Intervals**: See [Configuration Guide](configuration.md)
 
-Open **Settings → Utilities → Unraid Management Agent** to change the settings. The plugin saves them in `/boot/config/plugins/unraid-management-agent/config.cfg`.
+To change the settings, open **Settings → Utilities → Unraid Management Agent**.
+
+The plugin saves its settings in `/boot/config/plugins/unraid-management-agent/config.cfg`.
 
 ### 3. Network Access
 
-The API listens on **port 8043**. To access from other machines:
+The default API port is `8043`.
+
+From another machine, send a request to the health endpoint:
 
 ```bash
 # Test from another device
@@ -132,27 +143,13 @@ If a firewall blocks access, permit connections from the clients that use the AP
 
 ### Quick Test
 
-If you set an API token, send the bearer header on protected requests. See
-[Authentication](configuration.md#authentication). The health endpoint is open.
-
-```bash
-# System info
-curl http://localhost:8043/api/v1/system
-
-# Array status
-curl http://localhost:8043/api/v1/array
-
-# Docker containers
-curl http://localhost:8043/api/v1/docker
-
-# Prometheus metrics
-curl http://localhost:8043/metrics
-
-# Swagger UI
-open http://localhost:8043/swagger/
-```
+Use the [quick start examples](quick-start.md#first-api-calls) to read system, disk, network, and container data.
+For a list of available operations, open `http://localhost:8043/swagger/` in a browser on the server.
 
 ### WebSocket Test
+
+This example uses an agent without an API token. If you set a token, send the bearer header.
+See [Authentication](configuration.md#authentication).
 
 ```bash
 # Install wscat (if not installed)
@@ -168,43 +165,39 @@ wscat -c ws://localhost:8043/api/v1/ws
 
 ### Via Community Applications
 
-1. **Plugins** → **Check for Updates**
-2. If update available, click **Update**
-3. Plugin will restart automatically
+1. Open **Plugins**.
+2. Click **Check for Updates**.
+3. If an update is available, click **Update**.
 
-### Manual Update
-
-```bash
-# Download latest .plg
-wget https://raw.githubusercontent.com/tinkerologie/unraid-management-agent/main/unraid-management-agent.plg -O /boot/config/plugins/unraid-management-agent.plg
-
-# Remove old version
-/usr/local/emhttp/plugins/dynamix.plugin.manager/scripts/plugin remove unraid-management-agent
-
-# Reinstall
-/usr/local/emhttp/plugins/dynamix.plugin.manager/scripts/plugin install /boot/config/plugins/unraid-management-agent.plg
-```
+The plugin restarts a running service after the update.
+The update procedure keeps the plugin settings.
 
 ## Uninstallation
 
-### Via Web UI
+> [!CAUTION]
+> Back up the plugin settings before you uninstall the plugin.
+> Both procedures below delete `/boot/config/plugins/unraid-management-agent`.
+> The backup can contain credentials. Keep it private.
 
-1. **Plugins** → **Installed Plugins**
-2. Find "Unraid Management Agent"
-3. Click **Uninstall**
+### Via the Unraid web UI
+
+1. Open **Plugins → Installed Plugins**.
+2. Find **Unraid Management Agent**.
+3. Click **Uninstall**.
 
 ### Manual Removal
 
-```bash
-# Stop service
-/usr/local/emhttp/plugins/unraid-management-agent/scripts/stop
+1. Stop the service:
 
-# Remove plugin
-/usr/local/emhttp/plugins/dynamix.plugin.manager/scripts/plugin remove unraid-management-agent
+   ```bash
+   /usr/local/emhttp/plugins/unraid-management-agent/scripts/stop
+   ```
 
-# Remove config (optional)
-rm -rf /boot/config/plugins/unraid-management-agent
-```
+2. Remove the plugin:
+
+   ```bash
+   /usr/local/emhttp/plugins/dynamix.plugin.manager/scripts/plugin remove unraid-management-agent
+   ```
 
 ## Troubleshooting
 

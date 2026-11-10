@@ -1,93 +1,67 @@
 # Documentation
 
-Welcome to the Unraid Management Agent documentation. This directory contains comprehensive guides for installation, API usage, integration, and development.
+These guides describe how to install, configure, and use the Unraid Management Agent.
 
-## 📚 Table of Contents
+## Setup
 
-### Getting Started
+- [System requirements](guides/system-requirements.md)
+- [Installation and removal](guides/installation.md)
+- [Quick start](guides/quick-start.md)
+- [Configuration](guides/configuration.md)
 
-- [System Requirements & Dependencies](guides/system-requirements.md) - Prerequisites and compatibility information
-- [Installation Guide](guides/installation.md) - Step-by-step installation instructions
-- [Quick Start](guides/quick-start.md) - Get up and running in minutes
-- [Configuration](guides/configuration.md) - Configure the agent for your needs
+## API reference
 
-### API Documentation
+- [REST API](api/rest-api.md)
+- [Diagnostics API](api/diagnostics.md)
+- [WebSocket events](api/websocket-events.md)
+- [WebSocket event structure](api/websocket-structure.md)
+- [Prometheus metrics](api/prometheus.md)
 
-- [REST API Reference](api/rest-api.md) - Complete REST API endpoint documentation
-- [Diagnostics API Reference](api/diagnostics.md) - Diagnostic bundles, self-test and detected capabilities endpoints
-- [WebSocket Events](api/websocket-events.md) - Real-time event streaming documentation
-- [WebSocket Event Structure](api/websocket-structure.md) - Technical event structure details
-- [Prometheus Metrics](api/prometheus.md) - Metrics endpoint documentation
+## Integrations
 
-### Integrations
+- [Integration index](integrations/README.md)
+- [Model Context Protocol (MCP)](integrations/mcp.md)
+- [ChatGPT through Secure MCP Tunnel](integrations/mcp.md#chatgpt-through-secure-mcp-tunnel)
+- [ChatGPT Custom GPT Actions](integrations/chatgpt/README.md)
+- [Home Assistant](integrations/home-assistant.md)
+- [MQTT](integrations/mqtt.md)
+- [Grafana](integrations/grafana.md)
 
-- [Model Context Protocol (MCP)](integrations/mcp.md) - AI agent integration guide
-- [MQTT Integration](integrations/mqtt.md) - MQTT broker integration
-- [Grafana Dashboard](integrations/grafana.md) - Monitoring with Grafana
-- [Home Assistant](integrations/home-assistant.md) - Home automation integration
+## Troubleshooting
 
-### Development
+- [Diagnostic commands](troubleshooting/diagnostics.md)
+- [Security policy](../SECURITY.md)
+- [GitHub issues](https://github.com/tinkerologie/unraid-management-agent/issues)
 
-- [Contributing Guide](../CONTRIBUTING.md) - Contribution steps and project checks
-- [Code Quality Standards](development/code-quality.md) - Setup, tests, and packaging
-- [Architecture Decisions](adr/README.md) - Decisions and links to the source
-- [Glossary](../GLOSSARY.md) - Project terms
+## Development
 
-### Troubleshooting
+- [Contribution guide](../CONTRIBUTING.md)
+- [Build and test procedures](development/code-quality.md)
+- [Architecture decisions](adr/README.md)
+- [Project glossary](../GLOSSARY.md)
+- [Changelog](../CHANGELOG.md)
+- [License](../LICENSE)
 
-- [Diagnostic Commands](troubleshooting/diagnostics.md) - Check the agent and prepare a report
+## Endpoint addresses
 
-### Reference
+These examples use the default port. The host name `tower.local` represents the Unraid server address.
 
-- [Changelog](../CHANGELOG.md) - Version history and release notes
-- [Security Policy](../SECURITY.md) - Security practices and reporting
-- [License](../LICENSE) - MIT License details
-
-## 🚀 Quick Links
-
-- **REST API Base URL**: `http://<unraid-ip>:8043/api/v1`
-- **WebSocket Endpoint**: `ws://<unraid-ip>:8043/api/v1/ws`
-- **MCP Endpoint**: `http://<unraid-ip>:8043/mcp`
-- **Prometheus Metrics**: `http://<unraid-ip>:8043/metrics`
-
-## 📖 Documentation Organization
-
-This documentation is organized into the following sections:
-
-### Getting Started
-
-Essential information for new users including installation, configuration, and first steps.
-
-### API Documentation
-
-Complete technical reference for all API interfaces (REST, WebSocket, Prometheus).
-
-### Integrations
-
-Guides for connecting the agent with external systems (MQTT, Grafana, Home Assistant, AI agents).
-
-### Development
-
-Resources for developers contributing to or extending the project.
-
-### Troubleshooting
-
-Diagnostic tools and solutions for common problems.
-
-## 🤝 Contributing to Documentation
-
-Found an error or want to improve the docs? Contributions are welcome!
-
-1. Edit the relevant markdown file
-2. Follow the existing formatting style
-3. Submit a pull request with your changes
+| Interface     | Address                                 |
+| ------------- | --------------------------------------- |
+| REST API      | `http://tower.local:8043/api/v1`        |
+| WebSocket     | `ws://tower.local:8043/api/v1/ws`       |
+| Stateful MCP  | `http://tower.local:8043/mcp`           |
+| Stateless MCP | `http://tower.local:8043/mcp-stateless` |
+| Prometheus    | `http://tower.local:8043/metrics`       |
+| Swagger UI    | `http://tower.local:8043/swagger/`      |
 
 ## Documentation Standards
 
 Use [ASD-STE100 Issue 9](https://www.asd-ste100.org/STE_downloads.html) for maintained technical prose.
 
 - Use each approved word with its approved meaning and part of speech.
-- Use active voice. Give one instruction per step. Put a condition before its instruction.
+- Use active voice. Start instructions with a command verb. Give one instruction per step.
+- Put a condition before its instruction. Keep notes separate from instructions.
 - Use at most 20 words per procedural sentence and 25 per descriptive sentence.
 - Use the [project glossary](../GLOSSARY.md) for technical terms. For example, use _collector_, _source health_, and _hardware gating_ consistently.
 - Keep exact interface labels, API and configuration identifiers, command examples, error messages, and product names.
@@ -107,15 +81,8 @@ The [documentation review](development/documentation-review.md) lists the files,
 | Generated API reference     | `daemon/docs/swagger.go`, API handler annotations, and the generated Swagger files |
 
 Keep dated design notes, issue forms, templates, and agent instructions in their original roles.
-For generated Swagger prose, edit the source annotations. Run `make swagger`. Check the generated schema for contract changes.
+For changes to generated Swagger prose:
 
-## 💬 Need Help?
-
-- **Issues**: [GitHub Issues](https://github.com/tinkerologie/unraid-management-agent/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/tinkerologie/unraid-management-agent/discussions)
-- **Community**: Unraid Community Forums
-
----
-
-**Version**: 2025.11.0  
-**Last Updated**: February 2026
+1. Edit the source annotations.
+2. Run `make swagger`.
+3. Compare the generated schema with the previous schema.

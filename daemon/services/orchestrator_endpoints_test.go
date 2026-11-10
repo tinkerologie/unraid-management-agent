@@ -28,18 +28,18 @@ func newInitializedMCP(t *testing.T, ctx *domain.Context, srv *api.Server, store
 
 func TestMountHTTPMCP(t *testing.T) {
 	secret := strings.Repeat("s", 32)
-	build := func(t *testing.T, disabled bool) (*Orchestrator, *api.Server, *domain.ToolPolicyStore) {
+	build := func(t *testing.T, disabled bool, connectSecret string) (*Orchestrator, *api.Server, *domain.ToolPolicyStore) {
 		t.Helper()
 		ctx := &domain.Context{
 			Hub:      domain.NewEventBus(10),
 			Platform: platform.NewRegistry(),
-			Config:   domain.Config{MCPDisabled: disabled, MCPConnectSecret: secret},
+			Config:   domain.Config{MCPDisabled: disabled, MCPConnectSecret: connectSecret},
 		}
 		srv := api.NewServer(ctx)
 		t.Cleanup(srv.Stop)
 		return CreateOrchestrator(ctx), srv, domain.NewToolPolicyStore(t.TempDir(), nil)
 	}
-	paths := []string{"/mcp", "/mcp/", "/mcp/" + secret}
+	paths := []string{"/mcp", "/mcp/", "/mcp/" + secret, "/mcp-stateless"}
 	status := func(srv *api.Server, path string) int {
 		w := httptest.NewRecorder()
 		srv.GetRouter().ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
@@ -47,7 +47,7 @@ func TestMountHTTPMCP(t *testing.T) {
 	}
 
 	t.Run("disabled mounts nothing but keeps the tool catalog", func(t *testing.T) {
-		o, srv, store := build(t, true)
+		o, srv, store := build(t, true, secret)
 		o.mountHTTPMCP(srv, newInitializedMCP(t, o.ctx, srv, store))
 		for _, p := range paths {
 			if code := status(srv, p); code != http.StatusNotFound {
@@ -60,12 +60,25 @@ func TestMountHTTPMCP(t *testing.T) {
 	})
 
 	t.Run("enabled mounts the routes", func(t *testing.T) {
-		o, srv, store := build(t, false)
+		o, srv, store := build(t, false, secret)
 		o.mountHTTPMCP(srv, newInitializedMCP(t, o.ctx, srv, store))
 		for _, p := range paths {
 			if code := status(srv, p); code == http.StatusNotFound {
 				t.Errorf("%s returned 404, want it mounted", p)
 			}
+		}
+	})
+
+	t.Run("enabled without a connect secret mounts both transports", func(t *testing.T) {
+		o, srv, store := build(t, false, "")
+		o.mountHTTPMCP(srv, newInitializedMCP(t, o.ctx, srv, store))
+		for _, path := range []string{"/mcp", "/mcp/", "/mcp-stateless"} {
+			if code := status(srv, path); code != http.StatusMethodNotAllowed {
+				t.Errorf("GET %s returned %d, want 405 from the mounted transport", path, code)
+			}
+		}
+		if code := status(srv, "/mcp/"+secret); code != http.StatusNotFound {
+			t.Errorf("unconfigured connect URL returned %d, want 404", code)
 		}
 	})
 }

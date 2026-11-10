@@ -750,6 +750,9 @@ func TestWriteLockMiddleware(t *testing.T) {
 		{"locked MCP endpoint passes", true, http.MethodPost, "/mcp", true},
 		{"locked MCP trailing slash passes", true, http.MethodPost, "/mcp/", true},
 		{"locked MCP connect secret passes", true, http.MethodPost, "/mcp/some-connect-secret", true},
+		{"locked stateless MCP endpoint passes", true, http.MethodPost, "/mcp-stateless", true},
+		{"locked stateless MCP lookalike is refused", true, http.MethodPost, "/mcp-statelessx", false},
+		{"locked stateless MCP subpath is refused", true, http.MethodPost, "/mcp-stateless/x", false},
 		{"locked MCP lookalike is refused", true, http.MethodPost, "/mcpfoo", false},
 		{"unlocked POST passes", false, http.MethodPost, "/api/v1/system/reboot", true},
 	}
@@ -824,5 +827,35 @@ func TestWriteLockWiring(t *testing.T) {
 				t.Errorf("status = %d, want %d", rr.Code, tt.wantStatus)
 			}
 		})
+	}
+}
+
+// Verify the exact stateless route through the router while REST writes are locked.
+func TestRegisterMCPStatelessRoute(t *testing.T) {
+	server := NewServer(&domain.Context{})
+	t.Cleanup(server.Stop)
+
+	postStatus := func(path string) int {
+		t.Helper()
+		response := httptest.NewRecorder()
+		server.GetRouter().ServeHTTP(response, httptest.NewRequest(http.MethodPost, path, nil))
+		return response.Code
+	}
+
+	server.RegisterMCPStatelessRoute(nil)
+	if status := postStatus("/mcp-stateless"); status != http.StatusNotFound {
+		t.Fatalf("nil handler registered the route: got %d, want 404", status)
+	}
+
+	server.RegisterMCPStatelessRoute(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	if status := postStatus("/mcp-stateless"); status != http.StatusNoContent {
+		t.Errorf("stateless POST under the network write lock: got %d, want 204", status)
+	}
+	for _, path := range []string{"/mcp-stateless/", "/mcp-stateless/example", "/mcp-statelessx"} {
+		if status := postStatus(path); status != http.StatusNotFound {
+			t.Errorf("POST %s: got %d, want 404", path, status)
+		}
 	}
 }
