@@ -78,18 +78,20 @@ func (a *AnthropicProvider) Chat(ctx context.Context, req ChatRequest) (*ChatRes
 	}
 
 	body := anthropicReq{Model: a.model, MaxTokens: maxTokens, System: req.System}
-	for _, m := range req.Messages {
+	var toolResults []map[string]any
+	for i, m := range req.Messages {
 		switch m.Role {
 		case "tool":
-			// Tool results are sent as a user message with a tool_result content block.
-			body.Messages = append(body.Messages, anthropicMessage{
-				Role: "user",
-				Content: []map[string]any{{
-					"type":        "tool_result",
-					"tool_use_id": m.ToolCallID,
-					"content":     m.Content,
-				}},
+			toolResults = append(toolResults, map[string]any{
+				"type":        "tool_result",
+				"tool_use_id": m.ToolCallID,
+				"content":     m.Content,
 			})
+			// Claude expects all results for the turn in the next user message.
+			if i+1 == len(req.Messages) || req.Messages[i+1].Role != "tool" {
+				body.Messages = append(body.Messages, anthropicMessage{Role: "user", Content: toolResults})
+				toolResults = nil
+			}
 		case "assistant":
 			if len(m.ToolCalls) > 0 {
 				blocks := make([]map[string]any, 0, len(m.ToolCalls)+1)

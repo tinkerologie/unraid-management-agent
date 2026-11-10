@@ -9,14 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.11.04] - 2026-11-11
+
 ### Fixed
 
 - Serve MCP `2026-07-28` discovery at `/mcp-stateless` for ChatGPT Secure MCP Tunnel clients.
   The endpoint uses the existing API authentication and MCP tool access policies (#331).
+- Enforce Agent Core's `forbid` mode for tool calls and saved approvals, including calls with confirmed auto-approve preferences.
+- Resume the remaining Agent Core tool calls after an approval decision. Send Claude one message with all results from the turn.
 
 ### Changed
 
 - Apply ASD-STE100 Issue 9 guidance to the README and related setup, security, API, and integration guides (#331).
+- List the built-in Agent Core tools and show how to approve a Docker container restart with REST API authentication.
 
 ## [2026.11.03] - 2026-11-09
 

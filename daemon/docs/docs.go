@@ -230,7 +230,7 @@ const docTemplate = `{
         },
         "/agent/sessions/{id}/approve": {
             "post": {
-                "description": "Approve or reject a pending high-risk tool call, resuming the session",
+                "description": "Approve or deny a pending tool call and resume the session.",
                 "consumes": [
                     "application/json"
                 ],

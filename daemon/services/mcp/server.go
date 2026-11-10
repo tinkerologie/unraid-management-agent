@@ -2701,7 +2701,7 @@ func (s *Server) registerAgentTools() {
 	addWriteTool(s, &mcp.Tool{
 		Name: "agent_start_session",
 		Description: "Start an autonomous agent session to investigate or remediate a goal. " +
-			"May return status 'awaiting_approval' if a high-risk action is proposed.",
+			"May return status 'awaiting_approval' if the agent requests approval for a tool call.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, args startArgs) (*mcp.CallToolResult, any, error) {
 		if s.agentSvc == nil || !s.agentSvc.Enabled() {
 			return textResult("Agent is disabled."), nil, nil
@@ -2752,7 +2752,7 @@ func (s *Server) registerAgentTools() {
 	}
 	addWriteTool(s, &mcp.Tool{
 		Name:        "agent_approve_action",
-		Description: "Approve or deny a high-risk action a session is awaiting, then resume it.",
+		Description: "Approve or deny a pending Agent Core tool call and resume its session.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, args approveArgs) (*mcp.CallToolResult, any, error) {
 		if s.agentSvc == nil || !s.agentSvc.Enabled() {
 			return textResult("Agent is disabled."), nil, nil

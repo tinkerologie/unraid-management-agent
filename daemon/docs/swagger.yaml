@@ -5985,7 +5985,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: Approve or reject a pending high-risk tool call, resuming the session
+      description: Approve or deny a pending tool call and resume the session.
       parameters:
       - description: Session ID
         in: path

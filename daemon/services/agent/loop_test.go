@@ -21,6 +21,13 @@ type fakeDocker struct{}
 
 func (fakeDocker) Restart(string) error { return nil }
 
+type recordingDocker struct{ restarts []string }
+
+func (d *recordingDocker) Restart(id string) error {
+	d.restarts = append(d.restarts, id)
+	return nil
+}
+
 type capturingBroadcaster struct{ events int }
 
 func (c *capturingBroadcaster) BroadcastAgentEvent(dto.WSEvent) { c.events++ }
@@ -219,6 +226,69 @@ func TestLoopForbidListRefusesEvenIfAuto(t *testing.T) {
 	if sess.Status != dto.SessionCompleted {
 		t.Fatalf("status=%q want completed (loop continues after refusal)", sess.Status)
 	}
+}
+
+func TestLoopForbidTierRefusesToolCall(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		autoPreference bool
+	}{
+		{name: "without preference"},
+		{name: "with confirmed auto-approve preference", autoPreference: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			const toolName = "restart_container"
+			p := llm.NewMockProvider(
+				&llm.ChatResponse{Text: "[]"},
+				&llm.ChatResponse{ToolCalls: []llm.ToolCall{{ID: "restart-1", Name: toolName, Args: `{"container_id":"0123456789ab"}`}}},
+				&llm.ChatResponse{Text: "The restart was blocked."},
+			)
+			cfg := dto.DefaultAgentConfig()
+			cfg.Enabled = true
+			cfg.Autonomy[dto.RiskLow] = dto.ModeForbid
+			docker := &recordingDocker{}
+			mem := memory.NewStore(t.TempDir(), 0)
+			svc := NewService(cfg, p, tools.BuildDefault(fakeState{}, docker), NewStore(t.TempDir()), mem, nil)
+			if tc.autoPreference {
+				mem.AddPreference(dto.AgentPreference{ID: "p1", Kind: "auto_approve_tool", Subject: toolName, Status: dto.PreferencePending})
+				if err := svc.ConfirmPreference("p1"); err != nil {
+					t.Fatalf("confirm preference: %v", err)
+				}
+			}
+
+			sess, err := svc.StartSession(context.Background(), "restart plex")
+			if err != nil {
+				t.Fatalf("start: %v", err)
+			}
+			if len(docker.restarts) != 0 {
+				t.Fatalf("forbidden restart reached Docker: %v", docker.restarts)
+			}
+			if sess.Status != dto.SessionCompleted || sess.PendingApproval != nil {
+				t.Fatalf("want completed without pending approval, got %q / %+v", sess.Status, sess.PendingApproval)
+			}
+			if len(sess.Steps) == 0 {
+				t.Fatal("expected a step with the recorded refusal")
+			}
+			calls := sess.Steps[0].ToolCalls
+			if len(calls) != 1 || calls[0].Error != "forbidden" {
+				t.Fatalf("want a recorded refusal, got %+v", calls)
+			}
+			assertForbiddenToolResult(t, sess, "restart-1")
+		})
+	}
+}
+
+func assertForbiddenToolResult(t *testing.T, sess dto.AgentSession, callID string) {
+	t.Helper()
+	for _, msg := range sess.Transcript {
+		if msg.Role == "tool" && msg.ToolCallID == callID {
+			if !strings.Contains(msg.Content, "forbidden") {
+				t.Fatalf("want a forbidden tool result, got %q", msg.Content)
+			}
+			return
+		}
+	}
+	t.Fatalf("missing tool result for %q", callID)
 }
 
 func TestLoopAutoThenApprovalPreservesFirstResult(t *testing.T) {

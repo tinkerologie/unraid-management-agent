@@ -107,7 +107,7 @@ func (s *Server) handleAgentGetSession(w http.ResponseWriter, r *http.Request) {
 // handleAgentApprove resolves a pending approval and resumes the session.
 //
 //	@Summary		Approve or reject a pending agent action
-//	@Description	Approve or reject a pending high-risk tool call, resuming the session
+//	@Description	Approve or deny a pending tool call and resume the session.
 //	@Tags			Agent
 //	@Accept			json
 //	@Produce		json

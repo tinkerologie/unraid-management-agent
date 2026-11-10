@@ -37,6 +37,8 @@ type Service struct {
 	seq     int
 	prefSeq int
 
+	approvalTransitions sync.Map // session IDs with an approval or cancellation in progress
+
 	hub        *domain.EventBus
 	wakeMu     sync.Mutex
 	lastWake   map[string]time.Time
@@ -152,7 +154,7 @@ func (s *Service) StartSession(ctx context.Context, goal string) (dto.AgentSessi
 		appendTranscript(&sess, llm.Message{Role: "system", Content: planSummary(steps)})
 	}
 	s.emit(&sess, "session_started", nil)
-	s.runLoop(ctx, &sess)
+	s.runLoop(ctx, &sess, nil)
 	s.finalize(&sess)
 	s.store.Put(sess)
 	if err := s.store.Save(); err != nil {
@@ -163,6 +165,11 @@ func (s *Service) StartSession(ctx context.Context, goal string) (dto.AgentSessi
 
 // ApproveAction resolves a pending approval and resumes the session loop.
 func (s *Service) ApproveAction(ctx context.Context, sessionID, actionID string, approve bool) (dto.AgentSession, error) {
+	if _, busy := s.approvalTransitions.LoadOrStore(sessionID, struct{}{}); busy {
+		return dto.AgentSession{}, fmt.Errorf("session %q has an approval or cancellation in progress", sessionID)
+	}
+	defer s.approvalTransitions.Delete(sessionID)
+
 	sess, ok := s.store.Get(sessionID)
 	if !ok {
 		return dto.AgentSession{}, fmt.Errorf("session %q not found", sessionID)
@@ -174,28 +181,7 @@ func (s *Service) ApproveAction(ctx context.Context, sessionID, actionID string,
 		return dto.AgentSession{}, fmt.Errorf("action_id %q does not match the pending approval", actionID)
 	}
 
-	pending := sess.PendingApproval
-	sess.PendingApproval = nil
-	sess.Status = dto.SessionRunning
-
-	var result string
-	switch {
-	case !approve:
-		result = "Action denied by operator."
-	case s.isForbidden(pending.ToolName):
-		result = fmt.Sprintf("Action %q is on the forbidden list and cannot be executed even with approval.", pending.ToolName)
-	default:
-		tool, found := s.tools.Get(pending.ToolName)
-		if !found {
-			result = fmt.Sprintf("Error: tool %q no longer exists.", pending.ToolName)
-		} else {
-			rec := s.invokeTool(ctx, tool, llm.ToolCall{ID: pending.ActionID, Name: pending.ToolName, Args: pending.Args})
-			result = rec.Result
-			s.emit(&sess, "tool_called", rec)
-		}
-	}
-	appendTranscript(&sess, llm.Message{Role: "tool", ToolCallID: pending.ActionID, Content: result})
-	s.runLoop(ctx, &sess)
+	s.runLoop(ctx, &sess, &approve)
 	s.finalize(&sess)
 
 	s.store.Put(sess)
@@ -242,7 +228,7 @@ func (s *Service) startAutonomousSession(ctx context.Context, ev dto.AgentWakeEv
 	sess.Transcript = []dto.AgentMessage{{Role: "user", Content: goal}}
 	s.injectRecall(&sess)
 	s.emit(&sess, "session_started", nil)
-	s.runLoop(ctx, &sess)
+	s.runLoop(ctx, &sess, nil)
 	s.finalize(&sess)
 	s.store.Put(sess)
 	if err := s.store.Save(); err != nil {
@@ -271,7 +257,7 @@ func (s *Service) SendMessage(ctx context.Context, sessionID, message string) (d
 	sess.EndedAt = nil
 	appendTranscript(&sess, llm.Message{Role: "user", Content: message})
 	s.emit(&sess, "message_received", nil)
-	s.runLoop(ctx, &sess)
+	s.runLoop(ctx, &sess, nil)
 	s.finalize(&sess)
 	s.store.Put(sess)
 	if err := s.store.Save(); err != nil {
@@ -282,6 +268,11 @@ func (s *Service) SendMessage(ctx context.Context, sessionID, message string) (d
 
 // CancelSession marks a session cancelled and clears any pending approval.
 func (s *Service) CancelSession(sessionID string) (dto.AgentSession, error) {
+	if _, busy := s.approvalTransitions.LoadOrStore(sessionID, struct{}{}); busy {
+		return dto.AgentSession{}, fmt.Errorf("session %q has an approval or cancellation in progress", sessionID)
+	}
+	defer s.approvalTransitions.Delete(sessionID)
+
 	sess, ok := s.store.Get(sessionID)
 	if !ok {
 		return dto.AgentSession{}, fmt.Errorf("session %q not found", sessionID)

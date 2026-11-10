@@ -12,8 +12,8 @@ The [MCP integration](mcp.md) gives external clients access to tools. Agent Core
 
 The Agent Core implements a bounded **ReAct** (Reason + Act) loop:
 
-1. The operator receives a natural-language goal (e.g. "Check whether any containers
-   have stopped unexpectedly and restart them if safe to do so").
+1. The operator gives the agent a goal in plain language. For example, "Check which
+   Docker containers have stopped."
 2. It reasons step-by-step using an LLM, calling registered tools to gather data
    and take actions.
 3. It returns a final answer once the goal is satisfied, the iteration cap is reached,
@@ -28,7 +28,7 @@ Sessions can also start **automatically** when an alert fires or a health check 
 | ------------------------------- | --------- |
 | Read-only tool execution        | Supported |
 | Low-risk action execution       | Supported |
-| High-risk approval gate         | Supported |
+| Tool approval                   | Supported |
 | Approval pause/resume (restart) | Supported |
 | Event-driven triggers (alerts)  | Supported |
 | Forbid-list (irreversible ops)  | Supported |
@@ -38,19 +38,35 @@ Sessions can also start **automatically** when an alert fires or a health check 
 | Suggest-not-mutate learning     | Supported |
 | Multi-turn chat (SendMessage)   | Supported |
 
+### Built-in tools
+
+Agent Core uses these tools during a session. External MCP clients use the separate
+[`agent_*` tools](#mcp-tools) to manage sessions and preferences.
+
+| Tool                     | Risk tier   | Function                                     |
+| ------------------------ | ----------- | -------------------------------------------- |
+| `get_system_info`        | `read_only` | Read cached system information.              |
+| `get_array_status`       | `read_only` | Read cached array status and capacity.       |
+| `list_docker_containers` | `read_only` | Read the cached Docker container list.       |
+| `propose_preference`     | `read_only` | Save a preference for operator confirmation. |
+| `propose_runbook`        | `read_only` | Save a runbook proposal for operator review. |
+| `restart_container`      | `low`       | Restart a Docker container by ID.            |
+
+The built-in registry has no tools in the `high` tier.
+
 ### Safety model
 
-Tools are assigned one of three **risk tiers**. The tier determines whether the agent
-can execute a tool automatically or must refuse it:
+The `autonomy` map in `agent_config.json` sets the mode for each risk tier.
+The defaults are `auto` for `read_only` and `low`, and `approve` for `high`.
 
-| Tier        | Examples                                                        | Agent behaviour                                                 |
-| ----------- | --------------------------------------------------------------- | --------------------------------------------------------------- |
-| `read_only` | `get_system_info`, `get_array_status`, `list_docker_containers` | Auto-executes                                                   |
-| `low`       | `restart_container`                                             | Auto-executes                                                   |
-| `high`      | Array start/stop, system reboot                                 | Pauses session — operator must approve with REST or an MCP tool |
+| Mode      | Agent behaviour                                                                |
+| --------- | ------------------------------------------------------------------------------ |
+| `auto`    | Run the tool without operator approval.                                        |
+| `approve` | Pause the session for approval unless a confirmed preference allows the tool.  |
+| `forbid`  | Refuse the call immediately. Continue the session without asking for approval. |
 
-The `autonomy` map in `agent_config.json` (see below) lets you override the default
-behaviour per tier (`"auto"`, `"approve"`, or `"forbid"`).
+The agent checks the current tier and the [forbid-list](#forbid-list) before
+it runs a tool. These limits also apply when an operator approves a saved action.
 
 ### Safety caps
 
@@ -138,7 +154,7 @@ disabled or misconfigured).
   "wake_cooldown_secs": 300,
   "max_concurrent_sessions": 2,
   "approval_ttl_secs": 3600,
-  "forbid_list": [],
+  "forbid_list": ["format_disk", "clear_parity", "disable_parity", "partition_disk", "delete_array_disk"],
   "memory_enabled": true,
   "max_incidents": 200,
   "recall_top_k": 3
@@ -159,7 +175,7 @@ disabled or misconfigured).
 | `wake_cooldown_secs`      | int               | `300`     | Minimum time (seconds) between autonomous sessions for the same subsystem              |
 | `max_concurrent_sessions` | int               | `2`       | Maximum number of autonomous sessions that may run simultaneously                      |
 | `approval_ttl_secs`       | int               | `3600`    | Seconds before an unresolved pending approval is automatically denied                  |
-| `forbid_list`             | []string          | `[]`      | Additional tool names to block unconditionally (merged with the built-in forbid-list)  |
+| `forbid_list`             | []string          | see above | Tool names to block in every mode. A custom list replaces the default list.            |
 | `memory_enabled`          | bool              | `true`    | Enable episodic memory recording and recall across sessions                            |
 | `max_incidents`           | int               | `200`     | Maximum number of incident records retained in `agent_memory.json`                     |
 | `recall_top_k`            | int               | `3`       | Number of past incidents injected as context at the start of each session              |
@@ -238,21 +254,8 @@ session budget.
 
 ## Learning (suggest-not-mutate)
 
-The agent can propose new preferences and runbooks during a session, but it can
-never activate them by itself. All proposals are `PENDING` until an operator
-explicitly confirms them.
-
-### How proposals work
-
-During a session the agent may call:
-
-| Tool                 | What it does                                                            |
-| -------------------- | ----------------------------------------------------------------------- |
-| `propose_preference` | Records a pending preference (e.g. `auto_approve_tool` for a tool name) |
-| `propose_runbook`    | Records a proposed remediation runbook in `agent_runbooks.json`         |
-
-Both tools are read-only from the system perspective — they only write to the
-proposal store; they never change any configuration or execute any action.
+The agent can save a runbook proposal or a pending preference during a session.
+The operator confirms a preference before it takes effect.
 
 ### Confirming a preference
 
@@ -277,19 +280,15 @@ Or use the `agent_confirm_preference` MCP tool:
 
 ### Effect of a confirmed `auto_approve_tool` preference
 
-When a preference with `kind = "auto_approve_tool"` is confirmed, the
-policy gate treats calls to that tool (identified by `subject`) as if the tier
-were `auto`, bypassing the pause-for-approval step.
-
-> **Important:** the forbid-list always wins. A confirmed `auto_approve_tool`
-> preference for a forbidden tool has no effect.
+Confirm an `auto_approve_tool` preference to let the tool named in `subject`
+run automatically in `approve` mode. The `forbid` mode and the forbid-list
+take precedence over confirmed preferences.
 
 ### Runbook proposals
 
-Proposed runbooks are persisted to
-`/boot/config/plugins/unraid-management-agent/agent_runbooks.json` alongside the
-built-in static runbook catalogue. They can be inspected, edited, or deleted
-manually. The `list_runbooks` MCP tool includes proposed runbooks in its output.
+To review proposals, open
+`/boot/config/plugins/unraid-management-agent/agent_runbooks.json`.
+The `list_runbooks` MCP tool lists the built-in remediation runbooks.
 
 ---
 
@@ -301,23 +300,24 @@ message to the existing transcript and re-runs the ReAct loop.
 
 ### Continuing a session via REST
 
+Set `API_TOKEN` in your local shell to the token for the Management Agent API.
+
 ```bash
-curl -s -X POST http://<unraid-ip>:8043/api/v1/agent/sessions/01J3XKZP2V8N4DRHMGT5W6QA00/messages \
+curl -s -X POST "http://<unraid-ip>:8043/api/v1/agent/sessions/sess-1/messages" \
+  -H "Authorization: Bearer ${API_TOKEN}" \
   -H "Content-Type: application/json" \
-  -d '{"message": "Can you also check whether the disk temperatures are normal?"}'
+  -d '{"message": "How much free space is in the array?"}'
 ```
 
-**Example response (200 OK):**
+**Response excerpt (200 OK):**
 
 ```json
 {
-  "id": "01J3XKZP2V8N4DRHMGT5W6QA00",
+  "id": "sess-1",
   "goal": "Check whether any containers have exited and restart them.",
   "status": "completed",
-  "iterations": 7,
-  "total_tokens": 5840,
-  "final_answer": "All containers are running. Disk temperatures are within normal range (max 38 °C).",
-  "steps": ["..."]
+  "tokens_used": 5840,
+  "answer": "The array has 4 TB of free space."
 }
 ```
 
@@ -331,8 +331,8 @@ session object. You can retrieve the full transcript at any time with
 {
   "name": "agent_send_message",
   "arguments": {
-    "session_id": "01J3XKZP2V8N4DRHMGT5W6QA00",
-    "message": "Can you also check disk temperatures?"
+    "session_id": "sess-1",
+    "message": "How much free space is in the array?"
   }
 }
 ```
@@ -370,47 +370,55 @@ and remediate if safe to do so.").
 
 ## Approval workflow
 
-When a session needs to call a `high`-risk tool and the `autonomy.high` tier is set
-to `"approve"` (the default in Phase 2), the session **pauses** with status
-`awaiting_approval`.
+Set `autonomy.low` to `"approve"` to require operator approval for
+`restart_container` unless a confirmed preference permits the tool.
+When Agent Core asks for approval, the session status changes to `awaiting_approval`.
 
 ### What the session exposes while paused
 
 ```json
 {
-  "id": "01J3XKZP2V8N4DRHMGT5W6QA00",
+  "id": "sess-1",
   "status": "awaiting_approval",
   "pending_approval": {
-    "action_id": "act_01J3XKZP2V8N4DRHMGT5W6QA01",
-    "tool": "start_array",
-    "args": {},
-    "risk_tier": "high",
-    "reason": "The agent needs to start the array to complete the goal."
+    "action_id": "restart-1",
+    "tool_name": "restart_container",
+    "args": "{\"container_id\":\"0123456789ab\"}",
+    "risk_tier": "low",
+    "reason": "The container stopped.",
+    "requested_at": "2026-06-01T14:22:01Z"
   }
 }
 ```
 
-The session transcript is persisted to disk so it survives a daemon restart — when
-the daemon comes back up, an approval or denial will resume the loop from exactly
-where it left off.
+Agent Core saves the session and its transcript to disk. After a daemon restart,
+approve or deny the saved request to resume the session.
 
 ### Approving or denying via REST
 
+Set the local shell variable `API_TOKEN` to the token for the Management Agent API.
+Use the session ID and action ID from the pending request.
+
 ```bash
 # Approve
-curl -s -X POST http://<unraid-ip>:8043/api/v1/agent/sessions/01J3XKZP2V8N4DRHMGT5W6QA00/approve \
+curl -s -X POST "http://<unraid-ip>:8043/api/v1/agent/sessions/sess-1/approve" \
+  -H "Authorization: Bearer ${API_TOKEN}" \
   -H "Content-Type: application/json" \
-  -d '{"action_id": "act_01J3XKZP2V8N4DRHMGT5W6QA01", "approve": true}'
+  -d '{"action_id": "restart-1", "approve": true}'
 
 # Deny
-curl -s -X POST http://<unraid-ip>:8043/api/v1/agent/sessions/01J3XKZP2V8N4DRHMGT5W6QA00/approve \
+curl -s -X POST "http://<unraid-ip>:8043/api/v1/agent/sessions/sess-1/approve" \
+  -H "Authorization: Bearer ${API_TOKEN}" \
   -H "Content-Type: application/json" \
-  -d '{"action_id": "act_01J3XKZP2V8N4DRHMGT5W6QA01", "approve": false}'
+  -d '{"action_id": "restart-1", "approve": false}'
 ```
 
-On approval the session resumes and the tool executes. On denial the agent receives a
-"denied" error for that tool call and continues its reasoning loop (it may propose
-an alternative approach or surface a final answer without executing the action).
+Approval runs the tool if the current policy permits it. If the current policy
+forbids the tool or the operator denies the request, the agent records the reason
+and continues the session.
+
+If the model requested several tools in the same turn, the agent processes the
+remaining calls in order. It pauses again if a later call requires approval.
 
 ### Approving or denying via MCP
 
@@ -420,8 +428,8 @@ External MCP clients can use the `agent_approve_action` tool:
 {
   "name": "agent_approve_action",
   "arguments": {
-    "session_id": "01J3XKZP2V8N4DRHMGT5W6QA00",
-    "action_id": "act_01J3XKZP2V8N4DRHMGT5W6QA01",
+    "session_id": "sess-1",
+    "action_id": "restart-1",
     "approve": true
   }
 }
@@ -447,8 +455,8 @@ The session transitions to status `cancelled` and any pending approvals are clea
 
 ## Forbid-list
 
-Some operations are irreversible at the hardware or filesystem level. The agent will
-**never** execute them, even if the operator explicitly approves:
+The forbid-list blocks tool names in every autonomy mode. The default list reserves
+these names for destructive operations:
 
 | Forbidden tool      | Why                                             |
 | ------------------- | ----------------------------------------------- |
@@ -458,12 +466,8 @@ Some operations are irreversible at the hardware or filesystem level. The agent 
 | `partition_disk`    | Rewrites the partition table — cannot be undone |
 | `delete_array_disk` | Removes a disk from the array configuration     |
 
-These are enforced in the gate layer, not the autonomy config, so they cannot be
-overridden by setting `autonomy.high = "auto"`. The agent will describe what it
-would have done and explain why it cannot proceed.
-
-You can extend the forbid-list with additional tool names in the `forbid_list` field
-in `agent_config.json` (merged with the built-in defaults at startup).
+Use `forbid_list` in `agent_config.json` to specify a custom list. To add a
+name and keep the defaults, include all the default names in your list.
 
 ---
 
@@ -610,7 +614,7 @@ curl -s http://<unraid-ip>:8043/api/v1/agent/sessions/01J3XKZP2V8N4DRHMGT5W6QA00
 
 ### POST /api/v1/agent/sessions/{id}/approve
 
-Approve or deny a pending high-risk tool call. The session must be in status
+Approve or deny a pending tool call. The session must be in status
 `awaiting_approval`. Returns the updated session on success, **400** on invalid
 request or wrong state, **503** when the agent is disabled.
 
@@ -620,13 +624,7 @@ request or wrong state, **503** when the agent is disabled.
 { "action_id": "<pending action ID>", "approve": true }
 ```
 
-**Example (approve):**
-
-```bash
-curl -s -X POST http://<unraid-ip>:8043/api/v1/agent/sessions/01J3XKZP2V8N4DRHMGT5W6QA00/approve \
-  -H "Content-Type: application/json" \
-  -d '{"action_id": "act_01J3XKZP2V8N4DRHMGT5W6QA01", "approve": true}'
-```
+See [Approving or denying via REST](#approving-or-denying-via-rest) for a request example.
 
 ---
 
@@ -653,28 +651,27 @@ or wrong session state, **503** when the agent is disabled.
 **Request body:**
 
 ```json
-{ "message": "Also check disk temperatures." }
+{ "message": "How much free space is in the array?" }
 ```
 
 **Example:**
 
 ```bash
-curl -s -X POST http://<unraid-ip>:8043/api/v1/agent/sessions/01J3XKZP2V8N4DRHMGT5W6QA00/messages \
+curl -s -X POST "http://<unraid-ip>:8043/api/v1/agent/sessions/sess-1/messages" \
+  -H "Authorization: Bearer ${API_TOKEN}" \
   -H "Content-Type: application/json" \
-  -d '{"message": "Also check disk temperatures."}'
+  -d '{"message": "How much free space is in the array?"}'
 ```
 
-**Example response (200 OK):**
+**Response excerpt (200 OK):**
 
 ```json
 {
-  "id": "01J3XKZP2V8N4DRHMGT5W6QA00",
+  "id": "sess-1",
   "goal": "Check whether any containers have exited and restart them.",
   "status": "completed",
-  "iterations": 7,
-  "total_tokens": 5840,
-  "final_answer": "All containers are running. Disk temperatures are within normal range.",
-  "steps": ["..."]
+  "tokens_used": 5840,
+  "answer": "The array has 4 TB of free space."
 }
 ```
 
@@ -751,15 +748,15 @@ curl -s -X POST http://<unraid-ip>:8043/api/v1/agent/preferences/01J3XN.../confi
 The following MCP tools are exposed under the `agent_*` namespace for external AI
 agents and MCP clients:
 
-| Tool                       | Description                                                       |
-| -------------------------- | ----------------------------------------------------------------- |
-| `agent_start_session`      | Start a new agent session with a natural-language goal            |
-| `agent_get_session`        | Retrieve a session by ID (includes full step transcript)          |
-| `agent_list_sessions`      | List all persisted sessions, newest first                         |
-| `agent_approve_action`     | Approve or deny a pending high-risk action in an awaiting session |
-| `agent_send_message`       | Continue a finished session with a follow-up operator message     |
-| `agent_get_memory`         | Retrieve the agent's episodic incidents and learned preferences   |
-| `agent_confirm_preference` | Activate a pending learned preference by ID                       |
+| Tool                       | Description                                                     |
+| -------------------------- | --------------------------------------------------------------- |
+| `agent_start_session`      | Start a new agent session with a natural-language goal          |
+| `agent_get_session`        | Retrieve a session by ID (includes full step transcript)        |
+| `agent_list_sessions`      | List all persisted sessions, newest first                       |
+| `agent_approve_action`     | Approve or deny a pending tool call and resume its session.     |
+| `agent_send_message`       | Continue a finished session with a follow-up operator message   |
+| `agent_get_memory`         | Retrieve the agent's episodic incidents and learned preferences |
+| `agent_confirm_preference` | Activate a pending learned preference by ID                     |
 
 ---
 
@@ -798,10 +795,9 @@ websocat ws://<unraid-ip>:8043/ws | grep '"agent_'
 
 ## Sessions persistence
 
-Completed sessions are persisted to
-`/boot/config/plugins/unraid-management-agent/agent_sessions.json`. The file is
-read on daemon startup so sessions survive restarts. There is currently no automatic
-pruning — remove or truncate the file manually if it grows too large.
+Agent Core keeps the most recent 200 sessions in
+`/boot/config/plugins/unraid-management-agent/agent_sessions.json`.
+It loads this file when the daemon starts.
 
 ---
 

@@ -100,7 +100,7 @@ type AgentMessage struct {
 	ToolCalls  []AgentMsgToolCall `json:"tool_calls,omitempty"`
 }
 
-// ApprovalRequest describes a high-risk tool call paused awaiting a human decision.
+// ApprovalRequest describes a tool call paused awaiting a human decision.
 type ApprovalRequest struct {
 	ActionID    string    `json:"action_id"`
 	ToolName    string    `json:"tool_name"`
