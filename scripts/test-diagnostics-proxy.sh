@@ -26,15 +26,16 @@ trap 'rm -rf "$WORK"' EXIT
 
 CONFIG="$WORK/config.cfg"
 POLICY="$WORK/tool_policy.json"
-# Redirect the config and both policy path assignments. A source change that
-# breaks the substitutions must fail before any test invokes the proxy.
+# Isolate the config and policy paths and feed request bodies through CLI stdin.
+# Fail before invoking the proxy if any expected substitution changes.
 php -- "$PROXY" "$WORK/proxy.php" "$CONFIG" "$POLICY" <<'PHP'
 <?php
 [$script, $source, $target, $config, $policy] = $argv;
 $contents = file_get_contents($source);
 $contents = str_replace('"/boot/config/plugins/$plugin/config.cfg"', var_export($config, true), $contents, $configCount);
 $contents = str_replace('"/boot/config/plugins/$plugin/tool_policy.json"', var_export($policy, true), $contents, $policyCount);
-if ($configCount !== 1 || $policyCount !== 2 || file_put_contents($target, $contents) === false) {
+$contents = str_replace("'php://input'", "'php://stdin'", $contents, $inputCount);
+if ($configCount !== 1 || $policyCount !== 2 || $inputCount !== 1 || file_put_contents($target, $contents) === false) {
     exit(1);
 }
 PHP
@@ -57,9 +58,10 @@ chmod +x "$WORK/bin/curl"
 # "<http status>|<body>".
 # shellcheck disable=SC2016 # PHP code, not shell expansions
 run_proxy() {
-    PATH="$WORK/bin:$PATH" FAKE_CURL_ARGS="$WORK/args" php -r '
+    printf '%s' "${PROXY_RAW_BODY:-}" | PATH="$WORK/bin:$PATH" FAKE_CURL_ARGS="$WORK/args" php -r '
         $_SERVER["REQUEST_METHOD"] = $argv[2];
-        foreach (array_slice($argv, 3) as $kv) {
+        parse_str($argv[3], $_POST);
+        foreach (array_slice($argv, 4) as $kv) {
             [$k, $v] = explode("=", $kv, 2);
             if ($k === "policies") {
                 $_POST[$k] = $v;
@@ -73,7 +75,7 @@ run_proxy() {
         });
         ob_start();
         include $argv[1];
-    ' -- "$PROXY" "${PROXY_METHOD:-GET}" "$@"
+    ' -- "$PROXY" "${PROXY_METHOD:-GET}" "${PROXY_FORM:-}" "$@"
 }
 
 BODY='{"unraid_version":"7.3.3","items":[{"name":"hardware.nic_optics","state":"absent"}]}'
@@ -121,16 +123,35 @@ assert_response() {
     ' -- "${response#*|}" "$expected_field" "$expected_value" || fail "unexpected $expected_field in '$response'"
 }
 
-out=$(save_policy 'policies={"get_system_info":"hidden","remove_me":"default"}')
+assert_saved_policy() {
+    local policy=$1
+    grep -qxF "{\"policies\":{\"get_system_info\":\"$policy\"}}" "$WORK/args" || fail "wrong PUT payload"
+    grep -qxF "TOOL_POLICY=\"get_system_info=$policy\"" "$CONFIG" || fail "config was not synchronized"
+    grep -qF "\"get_system_info\": \"$policy\"" "$POLICY" || fail "policy file was not updated"
+}
+
+form='policies=%7B%22get_system_info%22%3A%22hidden%22%2C%22remove_me%22%3A%22default%22%7D'
+out=$(PROXY_RAW_BODY="$form" PROXY_FORM="$form" save_policy)
 assert_response "$out" 200 live_update true
 grep -qxF 'PUT' "$WORK/args" || fail "instant save did not send PUT"
 grep -qxF 'Authorization: Bearer fixture-token' "$WORK/args" || fail "instant save lost authentication"
-grep -qxF '{"policies":{"get_system_info":"hidden"}}' "$WORK/args" || fail "wrong PUT payload"
 grep -qxF 'http://127.0.0.1:8043/api/v1/mcp/tool-policy' "$WORK/args" || fail "wrong policy endpoint"
-grep -qxF 'TOOL_POLICY="get_system_info=hidden"' "$CONFIG" || fail "config was not synchronized"
-grep -qF '"get_system_info": "hidden"' "$POLICY" || fail "policy file was not updated"
+assert_saved_policy hidden
 ! grep -qE 'remove_me|"old"' "$POLICY" || fail "policy file did not replace the old map"
 echo "✓ Instant save sends an authenticated live replacement and synchronizes both files"
+
+out=$(PROXY_RAW_BODY='{"get_system_info":"ask"}' save_policy)
+assert_response "$out" 200 live_update true
+assert_saved_policy ask
+out=$(PROXY_RAW_BODY='{"policies":{"get_system_info":"read_only"}}' save_policy)
+assert_response "$out" 200 live_update true
+assert_saved_policy read_only
+echo "✓ Legacy bare and wrapped JSON bodies both reach the live endpoint and disk"
+
+out=$(PROXY_FORM='policies%5Bget_system_info%5D=hidden' save_policy)
+assert_response "$out" 200 live_update true
+assert_saved_policy hidden
+echo "✓ Bracket-encoded form policies reach the live endpoint and disk"
 
 cp "$POLICY" "$WORK/policy-before"
 cp "$CONFIG" "$WORK/config-before"
