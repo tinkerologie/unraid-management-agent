@@ -730,11 +730,8 @@ func (c *SystemCollector) getFans(chipDeviceIDs map[string]string) ([]dto.FanInf
 
 	// Convert map to slice
 	fans := make([]dto.FanInfo, 0, len(fanMap))
-	for name, rpm := range fanMap {
-		fans = append(fans, dto.FanInfo{
-			Name: name,
-			RPM:  rpm,
-		})
+	for _, fan := range fanMap {
+		fans = append(fans, fan)
 	}
 
 	return fans, nil
@@ -798,6 +795,7 @@ func (c *SystemCollector) parseFanSpeeds(output string, chipDeviceIDs map[string
 	fans := make([]dto.FanInfo, 0, len(readings))
 	index := make(map[string]int, len(readings))
 	identities := hwmonFanIdentities(c.sysfsRoot)
+	gpuChips := hwmonChipGPUs(c.sysfsRoot)
 	for _, r := range readings {
 		name := prefixes[r.chip] + "_" + r.label
 		// Filter after naming, so a dropped reading does not change the
@@ -826,6 +824,10 @@ func (c *SystemCollector) parseFanSpeeds(output string, chipDeviceIDs map[string
 			Source:   r.chip,
 			DeviceID: chipDeviceIDs[r.chip],
 			Label:    r.feature,
+		}
+		if pciID := gpuChips[r.chip]; pciID != "" {
+			info.Role = dto.FanRoleGPU
+			info.PCIID = pciID
 		}
 		if i, ok := index[info.Name]; ok {
 			// Same chip and channel listed twice: keep the latest value.
@@ -906,15 +908,22 @@ func chipModel(chip string) string {
 	return model
 }
 
-func (c *SystemCollector) readHwmonFanSpeeds() (map[string]int, error) {
+// readHwmonFanSpeeds reads fan inputs from sysfs, keyed by fan name. A fan on
+// a display-class PCI device gets a GPU-derived name and GPU metadata.
+func (c *SystemCollector) readHwmonFanSpeeds() (map[string]dto.FanInfo, error) {
 	c.releaseExpiredFans()
-	fanSpeeds := make(map[string]int)
+	fanSpeeds := make(map[string]dto.FanInfo)
 	hwmonDir := filepath.Join(c.sysfsRoot, "class", "hwmon")
 
 	// Read from <sysfs>/class/hwmon/hwmon*/fan*_input
 	for i := range 10 {
+		chipDir := filepath.Join(hwmonDir, fmt.Sprintf("hwmon%d", i))
+		gpuPCIID := ""
+		if kind, pciID := lib.ResolveHwmonDisplayDevice(chipDir); kind == lib.HwmonDeviceDisplay {
+			gpuPCIID = pciID
+		}
 		for j := 1; j < 20; j++ {
-			path := filepath.Join(hwmonDir, fmt.Sprintf("hwmon%d", i), fmt.Sprintf("fan%d_input", j))
+			path := filepath.Join(chipDir, fmt.Sprintf("fan%d_input", j))
 			// #nosec G304 -- path is constructed from the hwmon class directory using bounded numeric indices.
 			data, err := os.ReadFile(path)
 			if err != nil {
@@ -932,21 +941,28 @@ func (c *SystemCollector) readHwmonFanSpeeds() (map[string]int, error) {
 			}
 
 			// Try to get label
-			labelPath := filepath.Join(hwmonDir, fmt.Sprintf("hwmon%d", i), fmt.Sprintf("fan%d_label", j))
+			labelPath := filepath.Join(chipDir, fmt.Sprintf("fan%d_label", j))
 			// #nosec G304 -- labelPath is constructed from the hwmon class directory using bounded numeric indices.
 			labelData, err := os.ReadFile(labelPath)
 			label := fmt.Sprintf("Fan %d", j)
 			if err == nil {
 				label = strings.TrimSpace(string(labelData))
 			}
+			fan := dto.FanInfo{Name: label, RPM: value}
+			if gpuPCIID != "" {
+				// labelData is empty when the channel has no label.
+				gpuLabel := strings.TrimSpace(string(labelData))
+				fan.Name = lib.GPUFanName(lib.GPUName(gpuPCIID), gpuLabel, j, len(lib.HwmonFanChannels(chipDir)))
+				fan.Role = dto.FanRoleGPU
+				fan.PCIID = gpuPCIID
+			}
 
-			chipDir := filepath.Dir(path)
 			_, identity := hwmonFanIdentity(chipDir, c.sysfsRoot)
 			key := fmt.Sprintf("%s/fan%d", identity, j)
 			if !c.acceptFan(key, float64(value)) {
 				continue
 			}
-			fanSpeeds[label] = value
+			fanSpeeds[fan.Name] = fan
 		}
 	}
 

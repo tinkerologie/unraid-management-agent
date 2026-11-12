@@ -102,40 +102,10 @@ func assignGlobalGPUIndices(gpus []*dto.GPUMetrics) {
 }
 
 var (
-	// lspciQuotedFieldRe extracts the quoted fields of an `lspci -Dmm` record.
-	lspciQuotedFieldRe = regexp.MustCompile(`"([^"]*)"`)
 	// lspciDisplayClassRe matches the numeric class that lspci prints for a
 	// PCI base class 0x03 device when pci.ids has no name for it.
 	lspciDisplayClassRe = regexp.MustCompile(`^Class 03[0-9a-fA-F]{2}$`)
 )
-
-// lspciRecord holds the fields of one `lspci -Dmm` line that GPU discovery uses.
-type lspciRecord struct {
-	PCIID  string
-	Class  string
-	Vendor string
-	Device string
-}
-
-// parseLspciRecord splits an `lspci -Dmm` line into its unquoted PCI address
-// and its first three quoted fields (class, vendor, device). Unquoted tokens
-// such as -rXX and -pXX are ignored. It rejects records with an invalid
-// address or fewer than three quoted fields.
-func parseLspciRecord(line string) (lspciRecord, bool) {
-	firstQuote := strings.Index(line, "\"")
-	if firstQuote <= 0 {
-		return lspciRecord{}, false
-	}
-	pciID := strings.TrimSpace(line[:firstQuote])
-	if !pciAddressRe.MatchString(pciID) {
-		return lspciRecord{}, false
-	}
-	matches := lspciQuotedFieldRe.FindAllStringSubmatch(line[firstQuote:], -1)
-	if len(matches) < 3 {
-		return lspciRecord{}, false
-	}
-	return lspciRecord{PCIID: pciID, Class: matches[0][1], Vendor: matches[1][1], Device: matches[2][1]}, true
-}
 
 // isDisplayClass reports whether an lspci class field names a PCI base class
 // 0x03 (display controller) device. It matches whole field values only.
@@ -145,20 +115,6 @@ func isDisplayClass(class string) bool {
 		return true
 	}
 	return lspciDisplayClassRe.MatchString(class)
-}
-
-// lspciModelName returns the bracketed marketing name of an lspci device field,
-// or the whole field when it has no brackets. A malformed bracket gives "".
-func lspciModelName(device string) string {
-	if !strings.Contains(device, "[") {
-		return device
-	}
-	start := strings.Index(device, "[")
-	end := strings.Index(device, "]")
-	if start != -1 && end != -1 && end > start {
-		return strings.TrimSpace(device[start+1 : end])
-	}
-	return ""
 }
 
 // Intel GPU collection using intel_gpu_top
@@ -183,13 +139,13 @@ func (c *GPUCollector) collectIntelGPU() ([]*dto.GPUMetrics, error) {
 
 	for line := range strings.SplitSeq(output, "\n") {
 		// Format: 0000:00:02.0 "VGA compatible controller" "Intel Corporation" "CoffeeLake-S GT2 [UHD Graphics 630]" -p00 "ASRock Incorporation" "Device 3e92"
-		record, ok := parseLspciRecord(line)
+		record, ok := lib.ParseLspciRecord(line)
 		if !ok || !isDisplayClass(record.Class) || record.Vendor != "Intel Corporation" {
 			continue
 		}
 		logger.Debug("Intel GPU: Found Intel GPU line: %s", line)
 		logger.Debug("Intel GPU: Full model string: %s", record.Device)
-		model := lspciModelName(record.Device)
+		model := lib.LspciModelName(record.Device)
 		logger.Debug("Intel GPU: Parsed - ID: %s, Model: %s", record.PCIID, model)
 
 		if model != "" {
@@ -657,7 +613,7 @@ func (c *GPUCollector) collectAMDGPUWithRadeontop() ([]*dto.GPUMetrics, error) {
 	var amdGPUs []amdGPUInfo
 
 	for line := range strings.SplitSeq(output, "\n") {
-		record, ok := parseLspciRecord(line)
+		record, ok := lib.ParseLspciRecord(line)
 		if !ok || !isDisplayClass(record.Class) {
 			continue
 		}
@@ -666,7 +622,7 @@ func (c *GPUCollector) collectAMDGPUWithRadeontop() ([]*dto.GPUMetrics, error) {
 			continue
 		}
 
-		if model := lspciModelName(record.Device); model != "" {
+		if model := lib.LspciModelName(record.Device); model != "" {
 			amdGPUs = append(amdGPUs, amdGPUInfo{PCIID: record.PCIID, Model: model})
 		}
 	}

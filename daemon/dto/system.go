@@ -88,6 +88,10 @@ type FanInfo struct {
 	// or a sensors.conf `label` override), e.g. "Coolant Flow (rpm)". Empty
 	// when the channel has no label beyond its name (e.g. "fan1").
 	Label string `json:"label,omitempty" example:"Coolant Flow (rpm)"`
+	// Role is "gpu" for a fan on a display-class PCI device (a discrete GPU).
+	Role string `json:"role,omitempty" example:"gpu"`
+	// PCIID is the full PCI ID of the GPU when Role is "gpu".
+	PCIID string `json:"pci_id,omitempty" example:"0000:04:00.0"`
 }
 
 // TemperatureReading represents a single temperature sensor reading

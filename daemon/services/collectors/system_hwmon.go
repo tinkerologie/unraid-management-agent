@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/tinkerologie/unraid-management-agent/daemon/lib"
 )
 
 // defaultSysfsRoot is the sysfs mount point used when a collector does not override it.
@@ -76,6 +78,33 @@ func hwmonFanIdentities(sysfsRoot string) map[string]string {
 		}
 	}
 	return identities
+}
+
+// hwmonChipGPUs maps lm-sensors chip names to the PCI ID of a display-class
+// PCI device. A chip name that matches more than one hwmon entry is left out.
+func hwmonChipGPUs(sysfsRoot string) map[string]string {
+	if sysfsRoot == "" {
+		sysfsRoot = defaultSysfsRoot
+	}
+	gpus := make(map[string]string)
+	entries := make(map[string]int)
+	dirs, _ := filepath.Glob(filepath.Join(sysfsRoot, "class", "hwmon", "hwmon*"))
+	for _, dir := range dirs {
+		chip, _ := hwmonFanIdentity(dir, sysfsRoot)
+		if chip == "" {
+			continue
+		}
+		entries[chip]++
+		if kind, pciID := lib.ResolveHwmonDisplayDevice(dir); kind == lib.HwmonDeviceDisplay {
+			gpus[chip] = pciID
+		}
+	}
+	for chip, n := range entries {
+		if n > 1 {
+			delete(gpus, chip)
+		}
+	}
+	return gpus
 }
 
 // hwmonFanIdentity uses a physical device path, or a USB serial/port identity

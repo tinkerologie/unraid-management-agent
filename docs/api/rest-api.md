@@ -881,6 +881,12 @@ Get system information including CPU, memory, temperatures, and uptime.
   `<chip model>_<fanN>` (e.g. `nct6798_fan2`); when two or more chips of the same model
   report fans, all their fans are named `<chip model>-<device_id>_<fanN>`, or
   `<full chip name>_<fanN>` for chips without a `device_id`, so none overwrites another
+- `role` and `pci_id` (fans): set only for a fan on the hwmon device of a display-class PCI
+  function (a discrete GPU). `role` is `gpu` and `pci_id` is the full PCI ID, e.g. `0000:04:00.0`.
+  The `sensors -u` path keeps the fan name and adds these fields only when the chip name
+  identifies one hwmon device. The sysfs fallback names a GPU fan `<GPU name> <label>`,
+  `<GPU name> Fan` (one fan channel) or `<GPU name> Fan N`. The GPU name is the same as the
+  GPU `name`, e.g. `Intel Arc Pro B70`. When `lspci` gives no name, it is `GPU <pci_id>`
 - `device_id` (temperatures and fans): stable identity of the physical device of a USB
   HID chip, whose lm-sensors name (`<driver>-hid-<bus>-<hid id>`) changes whenever the
   device re-enumerates: the USB serial number, or `usb-<busnum>-<devpath>` (USB port

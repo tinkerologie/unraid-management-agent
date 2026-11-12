@@ -93,7 +93,8 @@ and change events. See [Collection Mode](../guides/configuration.md#collection-m
 - `cpu_temp_celsius` - CPU temperature
 - `ram_usage_percent` - RAM usage (0-100)
 - `motherboard_temp_celsius` - Motherboard temperature (`null` when unmeasured)
-- `fans[]` - Array of fan sensors with RPM
+- `fans[]` - Array of fan sensors with RPM. A fan on a discrete GPU also has `role` (`gpu`) and
+  `pci_id` (full PCI ID). See the [REST API reference](rest-api.md) for the fan names
 
 ---
 

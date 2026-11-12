@@ -101,6 +101,8 @@ func (p *HwmonProvider) ReadAll() []dto.FanDevice {
 			RPM:        hf.RPM,
 			HwmonPath:  hf.HwmonDir,
 			HwmonIndex: hf.FanIndex,
+			Role:       hf.Role,
+			PCIID:      hf.PCIID,
 		}
 
 		if hf.HasPWM {

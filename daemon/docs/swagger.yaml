@@ -1685,12 +1685,20 @@ definitions:
       name:
         example: CPU Fan
         type: string
+      pci_id:
+        description: full PCI ID of the GPU when role is "gpu"
+        example: "0000:04:00.0"
+        type: string
       pwm_percent:
         example: 71
         type: integer
       pwm_value:
         example: 180
         type: integer
+      role:
+        description: '"gpu" for a fan on a display-class PCI device (a discrete GPU)'
+        example: gpu
+        type: string
       rpm:
         example: 1200
         type: integer
@@ -1718,6 +1726,15 @@ definitions:
         type: string
       name:
         example: CPU Fan
+        type: string
+      pci_id:
+        description: PCIID is the full PCI ID of the GPU when Role is "gpu".
+        example: "0000:04:00.0"
+        type: string
+      role:
+        description: Role is "gpu" for a fan on a display-class PCI device (a discrete
+          GPU).
+        example: gpu
         type: string
       rpm:
         example: 1200

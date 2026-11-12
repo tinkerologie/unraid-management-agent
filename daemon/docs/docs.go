@@ -8193,6 +8193,11 @@ const docTemplate = `{
                     "type": "string",
                     "example": "CPU Fan"
                 },
+                "pci_id": {
+                    "description": "full PCI ID of the GPU when role is \"gpu\"",
+                    "type": "string",
+                    "example": "0000:04:00.0"
+                },
                 "pwm_percent": {
                     "type": "integer",
                     "example": 71
@@ -8200,6 +8205,11 @@ const docTemplate = `{
                 "pwm_value": {
                     "type": "integer",
                     "example": 180
+                },
+                "role": {
+                    "description": "\"gpu\" for a fan on a display-class PCI device (a discrete GPU)",
+                    "type": "string",
+                    "example": "gpu"
                 },
                 "rpm": {
                     "type": "integer",
@@ -8230,6 +8240,16 @@ const docTemplate = `{
                 "name": {
                     "type": "string",
                     "example": "CPU Fan"
+                },
+                "pci_id": {
+                    "description": "PCIID is the full PCI ID of the GPU when Role is \"gpu\".",
+                    "type": "string",
+                    "example": "0000:04:00.0"
+                },
+                "role": {
+                    "description": "Role is \"gpu\" for a fan on a display-class PCI device (a discrete GPU).",
+                    "type": "string",
+                    "example": "gpu"
                 },
                 "rpm": {
                     "type": "integer",

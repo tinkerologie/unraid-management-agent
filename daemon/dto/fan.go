@@ -24,6 +24,10 @@ const (
 	FanMethodIPMI FanControlMethod = "ipmi"
 )
 
+// FanRoleGPU is the role of a fan on the hwmon device of a display-class PCI
+// function (a discrete GPU).
+const FanRoleGPU = "gpu"
+
 // FanTempSourceType identifies where a fan curve reads its temperature.
 type FanTempSourceType string
 
@@ -78,6 +82,8 @@ type FanDevice struct {
 	Controllable   bool           `json:"controllable" example:"true"`
 	HwmonPath      string         `json:"hwmon_path,omitempty" example:"/sys/class/hwmon/hwmon0"`
 	HwmonIndex     int            `json:"hwmon_index,omitempty" example:"1"`
+	Role           string         `json:"role,omitempty" example:"gpu"`            // "gpu" for a fan on a display-class PCI device (a discrete GPU)
+	PCIID          string         `json:"pci_id,omitempty" example:"0000:04:00.0"` // full PCI ID of the GPU when role is "gpu"
 	ActiveProfile  string         `json:"active_profile,omitempty" example:"balanced"`
 	TempSensorPath string         `json:"temp_sensor_path,omitempty" example:"/sys/class/hwmon/hwmon0/temp1_input"`
 	TempSource     *FanTempSource `json:"temp_source,omitempty"`
