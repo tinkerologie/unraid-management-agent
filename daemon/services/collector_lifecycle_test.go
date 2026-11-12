@@ -406,3 +406,27 @@ func TestStorageTopologyRetainsStalledCommandAcrossRestart(t *testing.T) {
 	release()
 	waitChan(t, replacement, "replacement after command exit")
 }
+
+func TestManualArrayReportsActualCollectionTime(t *testing.T) {
+	var wg sync.WaitGroup
+	cm := NewCollectorManager(createTestContext(), &wg)
+	clock := scheduler.NewFakeClock(runnerEpoch)
+	cm.clock = clock
+	runs := make(chan struct{}, 2)
+	cm.Register("array", func(*domain.Context) Collector {
+		return collectOnce(func() { runs <- struct{}{} })
+	}, 86400, false)
+	t.Cleanup(func() { cm.StopAll(); wg.Wait() })
+	cm.StartAll()
+	waitChan(t, runs, "initial array collection")
+	eventually(t, "Manual array poll timer", func() bool {
+		pending := clock.Pending()
+		return len(pending) == 1 && pending[0] == 24*time.Hour
+	})
+	clock.Advance(24 * time.Hour)
+	waitChan(t, runs, "next array collection")
+	got := mustStatus(t, cm, "array")
+	if got.LastRun == nil || !got.LastRun.Equal(runnerEpoch.Add(24*time.Hour)) || got.EffectiveInterval != 86400 {
+		t.Fatalf("Manual array status shows the wrong collection time or interval: %+v", got)
+	}
+}

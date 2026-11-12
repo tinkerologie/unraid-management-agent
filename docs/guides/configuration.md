@@ -81,8 +81,15 @@ migration: if every `INTERVAL_*` value is still a shipped default (or `auto`), t
 moves to `dynamic`; if any value was changed, it stays on `manual` so the tuning is kept. The
 "Dynamic collection" toggle at the top of the Collection Intervals section switches modes. In
 Dynamic mode the interval settings under it are hidden; saved intervals survive the switch and
-apply again in Manual mode. `GET /api/v1/collectors/status` shows what each collector does right
-now.
+apply again in Manual mode. Array Status and Disk Health run at their configured intervals in
+Manual mode. `GET /api/v1/collectors/status` reports the effective interval and when each collector
+last started a collection.
+
+During an active or paused parity operation, Array Status reuses its last capacity measurement
+and Disk Health uses native disk telemetry. Disk Health skips direct SMART and fallback disk
+capacity queries during this time. It retains the last measured SMART result for disks it can
+identify and reuses the most recent Docker vDisk sample. Both collectors resume their normal
+probes once Unraid reports that the operation has finished.
 
 **What Dynamic mode does.** Each collector has a built-in _active_ and _idle_ interval:
 
@@ -95,9 +102,9 @@ now.
 - **Change events** run a collector right away: Docker container events (`docker`), libvirt
   domain lifecycle events (`vm`), file changes under `/var/local/emhttp` and `/boot/config`
   (`array`, `disk`, `shares`, `notification`, `mover`, `unassigned`, `plugin_update`) and kernel
-  hotplug uevents (`unassigned`, `hardware`). Rewrites of `disks.ini` and `shares.ini` that only
-  update I/O counters, temperatures or space usage, which emhttp writes every few seconds, do
-  not count as changes; the polls pick those values up.
+  hotplug uevents (`unassigned`, `hardware`). Array state transitions such as pause, resume, and
+  completion can trigger collection. Periodic collection samples parity progress, disk I/O counters,
+  temperatures, and space usage.
 - **Refresh on read.** For collectors that follow demand (not the fixed-schedule ones listed
   below), a REST, MCP or `/metrics` read whose data is older than the collector's
   staleness limit (its active interval) triggers one collection, shared by concurrent reads, and
@@ -116,7 +123,7 @@ now.
 | ------------------- | ------ | ----------------- | ----------------------------------------------------- |
 | `system`            | 15s    | 60s               |                                                       |
 | `array`             | 60s    | 600s              | `var.ini`, `disks.ini`                                |
-| `disk`              | 300s   | 1800s             | `var.ini`, `disks.ini`                                |
+| `disk`              | 300s   | 1800s             | `disks.ini`                                           |
 | `docker`            | 30s    | 300s              | Docker events                                         |
 | `vm`                | 60s    | 600s              | libvirt lifecycle                                     |
 | `ups`, `nut`, `gpu` | 60s    | 300s              |                                                       |

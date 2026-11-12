@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Honor the Manual intervals for Array Status and Disk Health and report the actual last collection
+  time. Ignore progress-only array events in Dynamic mode and defer storage probes during parity
+  operations (#341).
 - Fix **Apply Policies Instantly** and saving **Reset All** in the Unraid WebGUI by using its
   CSRF-compatible form submission (#333).
 - Preserve Docker network and memory configuration when replacing a container, including fixed MAC

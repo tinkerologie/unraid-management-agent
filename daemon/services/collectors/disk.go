@@ -12,6 +12,8 @@ import (
 	"syscall"
 	"time"
 
+	"gopkg.in/ini.v1"
+
 	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
 	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
 	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
@@ -31,6 +33,12 @@ type DiskCollector struct {
 	mu              sync.Mutex
 	prevIOTicks     map[string]uint64
 	prevCollectTime time.Time
+	varIni          string
+	disksIni        string
+	probeSMART      func(*dto.DiskInfo)
+	probeDockerDisk func() *dto.DiskInfo
+	dockerDisk      *dto.DiskInfo
+	smart           map[diskIdentity]diskSMARTSample
 }
 
 type zfsPoolUsage struct {
@@ -42,10 +50,15 @@ type zfsPoolUsage struct {
 
 // NewDiskCollector creates a new disk information collector with the given context.
 func NewDiskCollector(ctx *domain.Context) *DiskCollector {
-	return &DiskCollector{
+	c := &DiskCollector{
 		ctx:         ctx,
 		prevIOTicks: make(map[string]uint64),
+		varIni:      constants.VarIni,
+		disksIni:    constants.DisksIni,
 	}
+	c.probeSMART = c.enrichWithSMARTData
+	c.probeDockerDisk = c.collectDockerVDisk
+	return c
 }
 
 // Collect gathers detailed disk information and publishes it to the event bus.
@@ -63,7 +76,7 @@ func (c *DiskCollector) Collect() {
 	// A read error → unavailable (return without publishing); zero parsed disks → degraded
 	// but still publish best-effort; otherwise report healthy.
 	if c.ctx.Platform != nil {
-		f, openErr := os.Open(constants.DisksIni)
+		f, openErr := os.Open(c.disksIni)
 		if openErr != nil {
 			c.ctx.Platform.Report("disk", dto.SourceUnavailable, "cannot read disks.ini", openErr)
 			logger.Error("Disk: Failed to open %s: %v", constants.DisksIni, openErr)
@@ -108,17 +121,25 @@ func (c *DiskCollector) collectDisks() ([]dto.DiskInfo, error) {
 		return nil, err
 	}
 
-	// Enhance each disk with additional stats
-	c.enrichDisks(disks)
+	// The native array state is shared by all storage probes in this run.
+	cfg, err := ini.Load(c.varIni)
+	if err != nil {
+		logger.Debug("Disk: Skipping storage probes: cannot read %s: %v", c.varIni, err)
+	}
+	idle := err == nil && ArrayOperationStatus(cfg.Section("")) == ""
+	c.enrichDisks(disks, idle)
 
 	// Record the collection timestamp for delta-based IO utilization
 	c.prevCollectTime = time.Now()
 
 	logger.Debug("Disk: Parsed %d disks successfully", len(disks))
 
-	// Collect Docker vDisk information
-	if dockerVDisk := c.collectDockerVDisk(); dockerVDisk != nil {
-		disks = append(disks, *dockerVDisk)
+	// The backing image can be on the array or under /mnt/user.
+	if idle {
+		c.dockerDisk = c.probeDockerDisk()
+	}
+	if c.dockerDisk != nil {
+		disks = append(disks, *c.dockerDisk)
 		logger.Debug("Disk: Added Docker vDisk to collection")
 	}
 
@@ -133,7 +154,7 @@ func (c *DiskCollector) collectDisks() ([]dto.DiskInfo, error) {
 
 // parseDisksINI parses the disks.ini file and returns a slice of DiskInfo
 func (c *DiskCollector) parseDisksINI() ([]dto.DiskInfo, error) {
-	file, err := os.Open(constants.DisksIni)
+	file, err := os.Open(c.disksIni)
 	if err != nil {
 		logger.Error("Disk: Failed to open file: %v", err)
 		return nil, err
@@ -295,8 +316,12 @@ func finalizeDiskSource(disk *dto.DiskInfo) {
 }
 
 // enrichDisks enhances each disk with additional statistics
-func (c *DiskCollector) enrichDisks(disks []dto.DiskInfo) {
-	zfsPoolUsages := c.getZFSPoolUsages()
+func (c *DiskCollector) enrichDisks(disks []dto.DiskInfo, idle bool) {
+	var zfsPoolUsages map[string]zfsPoolUsage
+	if idle {
+		zfsPoolUsages = c.getZFSPoolUsages()
+	}
+	samples := make(map[diskIdentity]diskSMARTSample, len(disks))
 
 	for i := range disks {
 		// Get model and serial number
@@ -305,13 +330,10 @@ func (c *DiskCollector) enrichDisks(disks []dto.DiskInfo) {
 		// Get I/O statistics
 		c.enrichWithIOStats(&disks[i])
 
-		// Get SMART attributes (if device is available)
-		if disks[i].Device != "" {
-			c.enrichWithSMARTData(&disks[i])
-		}
+		c.enrichDiskSMART(&disks[i], idle, samples)
 
-		// Get mount information
-		c.enrichWithMountInfo(&disks[i])
+		// Keep mount metadata when a capacity fallback would touch a disk.
+		c.enrichWithMountInfo(&disks[i], idle)
 
 		// Get disk role
 		c.enrichWithRole(&disks[i])
@@ -325,6 +347,7 @@ func (c *DiskCollector) enrichDisks(disks []dto.DiskInfo) {
 			c.enrichWithSpinState(&disks[i])
 		}
 	}
+	c.smart = samples
 }
 
 // enrichWithModelAndSerial extracts model and serial number from sysfs and disk ID.
@@ -752,7 +775,7 @@ func parseSMARTAttributes(lines []string) map[string]dto.SMARTAttribute {
 }
 
 // enrichWithMountInfo adds mount point and usage information
-func (c *DiskCollector) enrichWithMountInfo(disk *dto.DiskInfo) {
+func (c *DiskCollector) enrichWithMountInfo(disk *dto.DiskInfo, probeCapacity bool) {
 	if disk.Name == "" {
 		return
 	}
@@ -798,7 +821,7 @@ func (c *DiskCollector) enrichWithMountInfo(disk *dto.DiskInfo) {
 	}
 
 	disk.MountPoint = mountPoint
-	if disk.FreeFromSource {
+	if disk.FreeFromSource || !probeCapacity {
 		return
 	}
 

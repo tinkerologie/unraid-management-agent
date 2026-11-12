@@ -134,3 +134,50 @@ func TestSharesIniChangesIgnoreSpaceUsage(t *testing.T) {
 	cancel()
 	<-done
 }
+
+func TestDynamicArrayEventsIgnoreProgressAndKeepStateTransitions(t *testing.T) {
+	source, ok := defaultEventSources("array")[0].(*contentChanges)
+	if !ok {
+		t.Fatal("Dynamic array still refreshes on every native state file rewrite")
+	}
+	file := filepath.Join(t.TempDir(), "var.ini")
+	write := func(contents string) {
+		t.Helper()
+		if err := os.WriteFile(file, []byte(contents), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("mdState=STARTED\nmdNumDisks=15\nmdResync=1\nmdResyncPos=1\nmdResyncDt=1\nmdResyncAction=check P\n")
+	src := fakeFileSource{fire: make(chan chan struct{})}
+	source.file, source.src = file, src
+	triggered := make(chan struct{}, 8)
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		source.Run(ctx, func() { triggered <- struct{}{} })
+	}()
+	t.Cleanup(func() { cancel(); <-done })
+	src.fireAndWait()
+
+	for _, step := range []struct {
+		state string
+		want  bool
+	}{
+		{"mdResync=1\nmdResyncPos=400\nmdResyncDt=0\nmdResyncDb=12\nmdResyncAction=check P\n", false},
+		{"mdResync=0\nmdResyncPos=400\nmdResyncDt=0\nmdResyncAction=check P\n", true},
+		{"mdResync=1\nmdResyncPos=400\nmdResyncDt=0\nmdResyncAction=check P\n", true},
+		{"mdResync=1\nmdResyncPos=500\nsbSyncErrs=1\n", true},
+		{"mdResync=1\nmdResyncPos=600\nsbSyncErrs=2\n", false},
+		{"mdResync=0\nmdResyncPos=0\nmdResyncDt=0\nmdResyncAction=check P\n", true},
+	} {
+		write("mdState=STARTED\nmdNumDisks=15\n" + step.state)
+		src.fireAndWait()
+		if got := len(triggered) > 0; got != step.want {
+			t.Errorf("trigger=%t want %t for %q", got, step.want, step.state)
+		}
+		for len(triggered) > 0 {
+			<-triggered
+		}
+	}
+}
