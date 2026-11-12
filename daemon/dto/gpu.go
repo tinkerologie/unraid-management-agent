@@ -10,9 +10,10 @@ type GPUMetrics struct {
 	Vendor            string    `json:"vendor" example:"nvidia"`                                           // "nvidia", "intel", "amd"
 	UUID              string    `json:"uuid,omitempty" example:"GPU-12345678-1234-1234-1234-123456789012"` // Device UUID (NVIDIA only)
 	Name              string    `json:"name" example:"NVIDIA GeForce RTX 3080"`
-	DriverVersion     string    `json:"driver_version" example:"535.183.01"`                      // Intel: bound driver name plus module version when available.
-	Temperature       *float64  `json:"temperature_celsius" example:"55" extensions:"x-nullable"` // Null when not measured.
-	CPUTemperature    float64   `json:"cpu_temperature_celsius,omitempty" example:"45"`           // CPU temp for Intel iGPUs (shares die with CPU)
+	DriverVersion     string    `json:"driver_version" example:"535.183.01"`                             // Intel: bound driver name plus module version when available.
+	Temperature       *float64  `json:"temperature_celsius" example:"55" extensions:"x-nullable"`        // Null when not measured.
+	MemoryTemperature *float64  `json:"memory_temperature_celsius" example:"50" extensions:"x-nullable"` // VRAM temperature from the hwmon of the GPU's PCI device. Null when not measured.
+	CPUTemperature    float64   `json:"cpu_temperature_celsius,omitempty" example:"45"`                  // CPU temp for Intel iGPUs (shares die with CPU)
 	UtilizationGPU    float64   `json:"utilization_gpu_percent" example:"75.5"`
 	UtilizationMemory *float64  `json:"utilization_memory_percent" example:"60.2" extensions:"x-nullable"` // Null when not measured.
 	MemoryTotal       *uint64   `json:"memory_total_bytes" example:"10737418240" extensions:"x-nullable"`  // Null when not measured.

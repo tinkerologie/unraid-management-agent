@@ -325,11 +325,11 @@ func TestShareMetricsOptionalUsage(t *testing.T) {
 
 func TestMetricsNullableMeasurements(t *testing.T) {
 	server := newMetricsTestServer()
-	gpu := []*dto.GPUMetrics{{Name: "nullable", Temperature: new(0.0), MemoryUsed: new(uint64(0)), MemoryTotal: new(uint64(0)), PowerDraw: new(0.0)}}
+	gpu := []*dto.GPUMetrics{{Name: "nullable", Temperature: new(0.0), MemoryTemperature: new(0.0), MemoryUsed: new(uint64(0)), MemoryTotal: new(uint64(0)), PowerDraw: new(0.0)}}
 	disks := []dto.DiskInfo{{Name: "nullable", Device: "sda", Temperature: new(0.0)}}
 	server.gpuCache.Store(&gpu)
 	server.disksCache.Store(&disks)
-	names := []string{"unraid_gpu_temperature_celsius", "unraid_gpu_memory_used_bytes", "unraid_gpu_memory_total_bytes", "unraid_gpu_power_watts", "unraid_disk_temperature_celsius"}
+	names := []string{"unraid_gpu_temperature_celsius", "unraid_gpu_memory_temperature_celsius", "unraid_gpu_memory_used_bytes", "unraid_gpu_memory_total_bytes", "unraid_gpu_power_watts", "unraid_disk_temperature_celsius"}
 	body := getMetricsBody(t, server)
 	for _, name := range names {
 		if !strings.Contains(body, name+"{") {
@@ -346,6 +346,7 @@ func TestMetricsNullableMeasurements(t *testing.T) {
 	}
 	// An inventory disappearing must clear the formerly available series too.
 	gpu[0].Temperature = new(40.0)
+	gpu[0].MemoryTemperature = new(42.0)
 	disks[0].Temperature = new(40.0)
 	getMetricsBody(t, server)
 	server.gpuCache.Store(nil)

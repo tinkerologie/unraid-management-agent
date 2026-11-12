@@ -114,6 +114,53 @@ printf '%s\n' '[{"engines":{"Render/3D/0":{"busy":30}},"power":{"GPU":0}}]'
 	}
 }
 
+func TestCollectSingleIntelGPUMemoryTemperature(t *testing.T) {
+	const pci = "0000:04:00.0"
+	for _, tt := range []struct {
+		name                string
+		files               map[string]string
+		temperature, memory *float64
+	}{
+		{"xe package and vram", map[string]string{
+			"temp2_input": "46000", "temp2_label": "pkg\n",
+			"temp3_input": "48000", "temp3_label": "vram\n",
+		}, new(46.0), new(48.0)},
+		{"measured zero vram", map[string]string{
+			"temp2_input": "46000", "temp2_label": "pkg\n",
+			"temp3_input": "0", "temp3_label": "vram\n",
+		}, new(46.0), new(0.0)},
+		{"vram only", map[string]string{
+			"temp3_input": "48000", "temp3_label": "vram\n",
+		}, nil, new(48.0)},
+		{"package without vram", map[string]string{
+			"temp2_input": "46000", "temp2_label": "pkg\n",
+		}, new(46.0), nil},
+		{"no hwmon, as on i915", nil, nil, nil},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			bin, root := t.TempDir(), t.TempDir()
+			t.Setenv("PATH", bin)
+			writeCollectorCommand(t, bin, "timeout", `
+[ "$*" = "2 intel_gpu_top -J -s 500 -n 1" ] || exit 1
+printf '%s\n' '[{"engines":{"Render/3D/0":{"busy":30}},"power":{"GPU":0}}]'
+`)
+			hwmon := filepath.Join(root, "bus/pci/devices", pci, "hwmon/hwmon6")
+			for name, value := range tt.files {
+				writeSensorFixture(t, filepath.Join(hwmon, name), value)
+			}
+			// Another GPU's VRAM reading is never borrowed.
+			writeSensorFixture(t, filepath.Join(root, "bus/pci/devices/0000:03:00.0/hwmon/hwmon2/temp3_input"), "99000")
+			writeSensorFixture(t, filepath.Join(root, "bus/pci/devices/0000:03:00.0/hwmon/hwmon2/temp3_label"), "vram")
+			gpu := (&GPUCollector{sysfsRoot: root}).collectSingleIntelGPU(pci, "Arc Pro B70", 0)
+			if gpu == nil {
+				t.Fatal("valid Intel sample was discarded")
+			}
+			assertOptionalMeasurement(t, "temperature", gpu.Temperature, tt.temperature)
+			assertOptionalMeasurement(t, "memory temperature", gpu.MemoryTemperature, tt.memory)
+		})
+	}
+}
+
 func TestIntelTemperatureReadFailures(t *testing.T) {
 	t.Run("default sysfs mount", func(t *testing.T) {
 		if got := (&GPUCollector{}).sysfs(); got != "/sys" {
@@ -212,6 +259,56 @@ esac
 	}
 }
 
+func TestCollectSingleAMDGPUMemoryTemperature(t *testing.T) {
+	bin := t.TempDir()
+	t.Setenv("PATH", bin)
+	writeCollectorCommand(t, bin, "timeout", `
+[ "$*" = "3 radeontop -d - -l 1" ] || exit 1
+printf '%s\n' 'gpu 12.50%'
+`)
+	// The edge temperature still comes from the cardN hwmon.
+	writeCollectorCommand(t, bin, "bash", `
+case "$2" in
+  *card1/device/hwmon/hwmon\*/temp1_input*) printf '45000\n' ;;
+  *) exit 1 ;;
+esac
+`)
+	const pci = "0000:03:00.0"
+	for _, tt := range []struct {
+		name   string
+		files  map[string]string
+		memory *float64
+	}{
+		{"mem over junction", map[string]string{
+			"temp1_input": "45000", "temp1_label": "edge\n",
+			"temp2_input": "60000", "temp2_label": "junction\n",
+			"temp3_input": "52000", "temp3_label": "mem\n",
+		}, new(52.0)},
+		{"measured zero", map[string]string{"temp3_input": "0", "temp3_label": "mem"}, new(0.0)},
+		{"no mem channel", map[string]string{
+			"temp1_input": "45000", "temp1_label": "edge\n",
+			"temp2_input": "60000", "temp2_label": "junction\n",
+		}, nil},
+		{"no hwmon", nil, nil},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			root := t.TempDir()
+			for name, value := range tt.files {
+				writeSensorFixture(t, filepath.Join(root, "bus/pci/devices", pci, "hwmon/hwmon2", name), value)
+			}
+			// Another GPU's memory reading is never borrowed.
+			writeSensorFixture(t, filepath.Join(root, "bus/pci/devices/0000:04:00.0/hwmon/hwmon3/temp3_input"), "99000")
+			writeSensorFixture(t, filepath.Join(root, "bus/pci/devices/0000:04:00.0/hwmon/hwmon3/temp3_label"), "mem")
+			gpu := (&GPUCollector{sysfsRoot: root}).collectSingleAMDGPU(pci, "Radeon", 1)
+			if gpu == nil {
+				t.Fatal("valid radeontop sample discarded")
+			}
+			assertOptionalMeasurement(t, "temperature", gpu.Temperature, new(45.0))
+			assertOptionalMeasurement(t, "memory temperature", gpu.MemoryTemperature, tt.memory)
+		})
+	}
+}
+
 func TestAMDTemperatureRejectsInvalidMeasurements(t *testing.T) {
 	bin := t.TempDir()
 	t.Setenv("PATH", bin)
@@ -261,6 +358,8 @@ printf '%s\n' "$ROCM_SAMPLE"
 			assertOptionalMeasurement(t, "used bytes", gpu.MemoryUsed, tt.used)
 			assertOptionalMeasurement(t, "total bytes", gpu.MemoryTotal, tt.total)
 			assertOptionalMeasurement(t, "memory utilisation", gpu.UtilizationMemory, tt.util)
+			// ROCm output has no PCI ID, so memory temperature cannot be attributed.
+			assertOptionalMeasurement(t, "memory temperature", gpu.MemoryTemperature, nil)
 		})
 	}
 }

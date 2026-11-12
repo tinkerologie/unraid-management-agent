@@ -114,17 +114,19 @@ The agent removes an existing series if its reading becomes unavailable. A measu
 
 ### GPU Metrics
 
-| Metric                           | Type  | Description                |
-| -------------------------------- | ----- | -------------------------- |
-| `unraid_gpu_utilization_percent` | Gauge | GPU utilization (0-100)    |
-| `unraid_gpu_temperature_celsius` | Gauge | GPU temperature in Celsius |
-| `unraid_gpu_memory_used_bytes`   | Gauge | GPU memory used in bytes   |
-| `unraid_gpu_memory_total_bytes`  | Gauge | Total GPU memory in bytes  |
-| `unraid_gpu_power_watts`         | Gauge | GPU power draw in watts    |
+| Metric                                  | Type  | Description                              |
+| --------------------------------------- | ----- | ---------------------------------------- |
+| `unraid_gpu_utilization_percent`        | Gauge | GPU utilization (0-100)                  |
+| `unraid_gpu_temperature_celsius`        | Gauge | GPU temperature in Celsius               |
+| `unraid_gpu_memory_temperature_celsius` | Gauge | GPU memory (VRAM) temperature in Celsius |
+| `unraid_gpu_memory_used_bytes`          | Gauge | GPU memory used in bytes                 |
+| `unraid_gpu_memory_total_bytes`         | Gauge | Total GPU memory in bytes                |
+| `unraid_gpu_power_watts`                | Gauge | GPU power draw in watts                  |
 
 **Labels**: `hostname`, `gpu_index`, `gpu_name`
 
-The agent omits GPU temperature, used memory, total memory, and power series if the readings are unavailable.
+The agent omits GPU temperature, memory temperature, used memory, total memory, and power series if the readings
+are unavailable.
 It removes existing series if their readings become unavailable. Measured zero values remain samples.
 
 ### UPS Metrics

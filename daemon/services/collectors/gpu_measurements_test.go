@@ -160,6 +160,72 @@ func TestIntelTemperatureChannelSelection(t *testing.T) {
 	}
 }
 
+func TestGPUMemoryTemperatureChannel(t *testing.T) {
+	const pci = "0000:04:00.0"
+	dev := "bus/pci/devices/" + pci + "/hwmon/"
+	for _, tt := range []struct {
+		name  string
+		label string
+		files map[string]string
+		want  *float64
+	}{
+		{"xe package and vram", "vram", map[string]string{
+			dev + "hwmon6/temp2_input": "46000", dev + "hwmon6/temp2_label": "pkg\n",
+			dev + "hwmon6/temp3_input": "48000", dev + "hwmon6/temp3_label": "vram\n",
+		}, new(48.0)},
+		{"padded mixed-case label", "vram", map[string]string{
+			dev + "hwmon0/temp3_input": "48500", dev + "hwmon0/temp3_label": "  VRAM \n",
+		}, new(48.5)},
+		{"missing label", "vram", map[string]string{
+			dev + "hwmon0/temp1_input": "42000",
+			dev + "hwmon0/temp2_input": "46000", dev + "hwmon0/temp2_label": "pkg",
+		}, nil},
+		{"measured zero", "vram", map[string]string{
+			dev + "hwmon0/temp3_input": "0", dev + "hwmon0/temp3_label": "vram",
+		}, new(0.0)},
+		{"malformed", "vram", map[string]string{
+			dev + "hwmon0/temp2_input": "46000", dev + "hwmon0/temp2_label": "pkg",
+			dev + "hwmon0/temp3_input": "garbled", dev + "hwmon0/temp3_label": "vram",
+		}, nil},
+		{"NaN", "vram", map[string]string{
+			dev + "hwmon0/temp3_input": "NaN", dev + "hwmon0/temp3_label": "vram",
+		}, nil},
+		{"Inf", "vram", map[string]string{
+			dev + "hwmon0/temp3_input": "Inf", dev + "hwmon0/temp3_label": "vram",
+		}, nil},
+		{"vram on another PCI device", "vram", map[string]string{
+			"bus/pci/devices/0000:03:00.0/hwmon/hwmon0/temp3_input": "99000",
+			"bus/pci/devices/0000:03:00.0/hwmon/hwmon0/temp3_label": "vram",
+			dev + "hwmon1/temp2_input":                              "46000", dev + "hwmon1/temp2_label": "pkg",
+		}, nil},
+		{"own vram beside another PCI device", "vram", map[string]string{
+			"bus/pci/devices/0000:03:00.0/hwmon/hwmon0/temp3_input": "99000",
+			"bus/pci/devices/0000:03:00.0/hwmon/hwmon0/temp3_label": "vram",
+			dev + "hwmon1/temp3_input":                              "51000", dev + "hwmon1/temp3_label": "vram",
+		}, new(51.0)},
+		{"amdgpu mem over junction", "mem", map[string]string{
+			dev + "hwmon2/temp1_input": "45000", dev + "hwmon2/temp1_label": "edge\n",
+			dev + "hwmon2/temp2_input": "60000", dev + "hwmon2/temp2_label": "junction\n",
+			dev + "hwmon2/temp3_input": "52000", dev + "hwmon2/temp3_label": "mem\n",
+		}, new(52.0)},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			root := t.TempDir()
+			for path, value := range tt.files {
+				writeSensorFixture(t, filepath.Join(root, path), value)
+			}
+			got := (&GPUCollector{sysfsRoot: root}).getGPUMemoryTemp(pci, tt.label)
+			assertOptionalMeasurement(t, "memory temperature", got, tt.want)
+		})
+	}
+	t.Run("malformed glob", func(t *testing.T) {
+		c := &GPUCollector{sysfsRoot: filepath.Join(t.TempDir(), "[")}
+		if got := c.getGPUMemoryTemp(pci, "vram"); got != nil {
+			t.Errorf("memory temperature = %v, want unknown", *got)
+		}
+	})
+}
+
 func TestNvidiaNullableMeasurements(t *testing.T) {
 	for _, marker := range []string{"[N/A]", "[Not Supported]", "", "garbled", "NaN", "Inf", "0"} {
 		t.Run(marker, func(t *testing.T) {
@@ -178,6 +244,9 @@ func TestNvidiaNullableMeasurements(t *testing.T) {
 			}
 			if gpu.UtilizationMemory != nil {
 				t.Error("memory utilisation must be unknown without a positive total")
+			}
+			if gpu.MemoryTemperature != nil {
+				t.Error("nvidia-smi output has no memory temperature")
 			}
 		})
 	}

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -301,6 +302,8 @@ func (c *GPUCollector) collectSingleIntelGPU(pciID, model string, index int) *dt
 	if temp, err := c.getIntelGPUTemp(pciID); err == nil {
 		gpu.Temperature = new(temp)
 	}
+	// The xe driver labels the VRAM channel vram. i915 has no such channel.
+	gpu.MemoryTemperature = c.getGPUMemoryTemp(pciID, "vram")
 
 	// For Intel iGPUs, add CPU temperature as they share the die with the CPU
 	// This provides useful thermal information since iGPUs don't have dedicated temp sensors
@@ -380,12 +383,57 @@ func (c *GPUCollector) sysfs() string {
 // first usable channel without a vram label. The xe driver has no temp1_input and
 // exposes the package temperature on temp2.
 func (c *GPUCollector) getIntelGPUTemp(pciID string) (float64, error) {
-	paths, err := filepath.Glob(filepath.Join(c.sysfs(), "bus/pci/devices", pciID, "hwmon/hwmon*/temp*_input"))
+	channels, err := c.readPCIHwmonTemps(pciID)
 	if err != nil {
 		return 0, fmt.Errorf("finding Intel GPU temperature: %w", err)
 	}
-	sortHwmonTempInputs(paths)
 	fallback, haveFallback := 0.0, false
+	for _, channel := range channels {
+		if channel.label == "pkg" || channel.label == "package" {
+			return channel.celsius, nil
+		}
+		if !haveFallback && !strings.HasPrefix(channel.label, "vram") {
+			fallback, haveFallback = channel.celsius, true
+		}
+	}
+	if haveFallback {
+		return fallback, nil
+	}
+	return 0, fmt.Errorf("no Intel GPU temperature for PCI device %s", pciID)
+}
+
+// getGPUMemoryTemp returns the first usable channel with one of the labels in
+// the PCI device's own hwmon. It is nil when no channel matches: another channel
+// or device never supplies the memory temperature.
+func (c *GPUCollector) getGPUMemoryTemp(pciID string, labels ...string) *float64 {
+	channels, err := c.readPCIHwmonTemps(pciID)
+	if err != nil {
+		return nil
+	}
+	for _, channel := range channels {
+		if slices.Contains(labels, channel.label) {
+			return new(channel.celsius)
+		}
+	}
+	return nil
+}
+
+// hwmonTempChannel is one usable tempN channel. The label is trimmed and lower case.
+type hwmonTempChannel struct {
+	label   string
+	celsius float64
+}
+
+// readPCIHwmonTemps returns the usable hwmon temp*_input channels of one PCI
+// device in numeric hwmon and channel order. It skips unreadable, malformed
+// and non-finite inputs.
+func (c *GPUCollector) readPCIHwmonTemps(pciID string) ([]hwmonTempChannel, error) {
+	paths, err := filepath.Glob(filepath.Join(c.sysfs(), "bus/pci/devices", pciID, "hwmon/hwmon*/temp*_input"))
+	if err != nil {
+		return nil, err
+	}
+	sortHwmonTempInputs(paths)
+	var channels []hwmonTempChannel
 	for _, path := range paths {
 		// #nosec G304 -- path is a hwmon temperature file under the internally detected PCI device.
 		data, err := os.ReadFile(path)
@@ -397,17 +445,9 @@ func (c *GPUCollector) getIntelGPUTemp(pciID string) (float64, error) {
 			continue
 		}
 		label := strings.ToLower(readTrimmed(strings.TrimSuffix(path, "_input") + "_label"))
-		if label == "pkg" || label == "package" {
-			return temp / 1000, nil
-		}
-		if !haveFallback && !strings.HasPrefix(label, "vram") {
-			fallback, haveFallback = temp/1000, true
-		}
+		channels = append(channels, hwmonTempChannel{label: label, celsius: temp / 1000})
 	}
-	if haveFallback {
-		return fallback, nil
-	}
-	return 0, fmt.Errorf("no Intel GPU temperature for PCI device %s", pciID)
+	return channels, nil
 }
 
 // sortHwmonTempInputs orders hwmonN/tempM_input paths by N, then M, as numbers.
@@ -700,6 +740,8 @@ func (c *GPUCollector) collectSingleAMDGPU(pciID, model string, index int) *dto.
 	if temp, err := c.getAMDGPUTemp(index); err == nil {
 		gpu.Temperature = new(temp)
 	}
+	// amdgpu labels the VRAM channel mem. Read it by PCI ID, not by card index.
+	gpu.MemoryTemperature = c.getGPUMemoryTemp(pciID, "mem")
 
 	// Get fan speed from sysfs (discrete GPUs only)
 	if fanRPM, fanMaxRPM, err := c.getAMDGPUFanSpeed(index); err == nil {

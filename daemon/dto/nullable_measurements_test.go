@@ -13,7 +13,7 @@ func TestNullableMeasurementJSON(t *testing.T) {
 	}{
 		{"system", SystemInfo{}, SystemInfo{MotherboardTemp: new(0.0)}, []string{"motherboard_temp_celsius"}},
 		{"disk", DiskInfo{}, DiskInfo{Temperature: new(0.0)}, []string{"temperature_celsius"}},
-		{"gpu", GPUMetrics{}, GPUMetrics{Temperature: new(0.0), PowerDraw: new(0.0), MemoryUsed: new(uint64(0)), MemoryTotal: new(uint64(0)), UtilizationMemory: new(0.0)}, []string{"temperature_celsius", "power_draw_watts", "memory_used_bytes", "memory_total_bytes", "utilization_memory_percent"}},
+		{"gpu", GPUMetrics{}, GPUMetrics{Temperature: new(0.0), MemoryTemperature: new(0.0), PowerDraw: new(0.0), MemoryUsed: new(uint64(0)), MemoryTotal: new(uint64(0)), UtilizationMemory: new(0.0)}, []string{"temperature_celsius", "memory_temperature_celsius", "power_draw_watts", "memory_used_bytes", "memory_total_bytes", "utilization_memory_percent"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

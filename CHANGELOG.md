@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Report the GPU memory (VRAM) temperature in the new nullable `memory_temperature_celsius` field. The agent reads
+  the hwmon channel of the GPU's own PCI device with the label `vram` (Intel `xe`) or `mem` (AMD with `radeontop`).
+  The value is `null` if no such channel exists. The agent also exports the `unraid_gpu_memory_temperature_celsius`
+  Prometheus gauge and the `gpu_<index>_memory_temp` Home Assistant sensor (#347).
+
 ### Fixed
 
 - Intel and AMD GPU discovery now match the PCI display class (`0x03xx`) and the vendor field of

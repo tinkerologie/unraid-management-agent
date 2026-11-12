@@ -1918,6 +1918,12 @@ definitions:
           → AMD order)
         example: 0
         type: integer
+      memory_temperature_celsius:
+        description: VRAM temperature from the hwmon of the GPU's PCI device. Null
+          when not measured.
+        example: 50
+        type: number
+        x-nullable: true
       memory_total_bytes:
         description: Null when not measured.
         example: 10737418240

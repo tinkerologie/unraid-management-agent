@@ -8505,6 +8505,12 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 0
                 },
+                "memory_temperature_celsius": {
+                    "description": "VRAM temperature from the hwmon of the GPU's PCI device. Null when not measured.",
+                    "type": "number",
+                    "x-nullable": true,
+                    "example": 50
+                },
                 "memory_total_bytes": {
                     "description": "Null when not measured.",
                     "type": "integer",

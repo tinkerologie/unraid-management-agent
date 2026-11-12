@@ -14,10 +14,12 @@ The agent can publish system events to an MQTT broker. The broker distributes th
 ## Unavailable measurements
 
 Unmeasured motherboard temperature, disk temperature (including standby disks), and GPU temperature,
-power, memory used, memory total and memory utilisation retain their JSON keys with `null` values.
+memory temperature, power, memory used, memory total and memory utilisation retain their JSON keys with `null` values.
 Measured zeros remain numbers. Home Assistant discovery templates for these numeric sensors render `None`
 for null or missing fields, so Home Assistant displays unknown rather than a fabricated 0.
 GPU power and memory utilisation keep one decimal place when measured.
+Each GPU has a `GPU: <name> Memory Temperature` sensor (`gpu_<index>_memory_temp`) for `memory_temperature_celsius`.
+The agent removes this sensor when it no longer reports the GPU.
 
 ## Configuration
 

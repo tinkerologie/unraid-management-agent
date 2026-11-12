@@ -1198,6 +1198,7 @@ func (c *Client) publishGPUDiscovery(gpus []*dto.GPUMetrics) {
 func (c *Client) publishGPUEntities(topic, prefix, displayName string) []string {
 	ids := []string{
 		prefix + "_temp",
+		prefix + "_memory_temp",
 		prefix + "_util",
 		prefix + "_mem_util",
 		prefix + "_mem_used",
@@ -1209,6 +1210,12 @@ func (c *Client) publishGPUEntities(topic, prefix, displayName string) []string 
 		entityType: "sensor", stateTopic: topic,
 		id: prefix + "_temp", name: fmt.Sprintf("GPU: %s Temperature", displayName), unit: "°C",
 		icon: "mdi:thermometer", template: optionalNumberTemplate("value_json", "temperature_celsius", -1),
+		deviceClass: "temperature", stateClass: "measurement",
+	})
+	c.publishHAEntity(haEntityOpts{
+		entityType: "sensor", stateTopic: topic,
+		id: prefix + "_memory_temp", name: fmt.Sprintf("GPU: %s Memory Temperature", displayName), unit: "°C",
+		icon: "mdi:thermometer", template: optionalNumberTemplate("value_json", "memory_temperature_celsius", -1),
 		deviceClass: "temperature", stateClass: "measurement",
 	})
 	c.publishHAEntity(haEntityOpts{

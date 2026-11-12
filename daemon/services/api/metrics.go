@@ -251,6 +251,13 @@ var (
 		},
 		[]string{"gpu", "name"},
 	)
+	gpuMemoryTemperature = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "unraid_gpu_memory_temperature_celsius",
+			Help: "GPU memory (VRAM) temperature in Celsius",
+		},
+		[]string{"gpu", "name"},
+	)
 	gpuUtilization = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "unraid_gpu_utilization_percent",
@@ -391,6 +398,7 @@ func init() {
 		serviceRunning,
 		// GPU
 		gpuTemperature,
+		gpuMemoryTemperature,
 		gpuUtilization,
 		gpuMemoryUsed,
 		gpuMemoryTotal,
@@ -627,6 +635,7 @@ func (s *Server) updateMetrics() {
 
 	// Update GPU metrics
 	gpuTemperature.Reset()
+	gpuMemoryTemperature.Reset()
 	gpuMemoryUsed.Reset()
 	gpuMemoryTotal.Reset()
 	gpuPowerWatts.Reset()
@@ -640,6 +649,9 @@ func (s *Server) updateMetrics() {
 			idx := fmt.Sprintf("%d", i)
 			if gpu.Temperature != nil {
 				gpuTemperature.WithLabelValues(idx, gpu.Name).Set(*gpu.Temperature)
+			}
+			if gpu.MemoryTemperature != nil {
+				gpuMemoryTemperature.WithLabelValues(idx, gpu.Name).Set(*gpu.MemoryTemperature)
 			}
 			gpuUtilization.WithLabelValues(idx, gpu.Name).Set(gpu.UtilizationGPU)
 			if gpu.MemoryUsed != nil {
