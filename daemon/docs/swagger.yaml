@@ -265,6 +265,12 @@ definitions:
     type: object
   dto.ArrayStatus:
     properties:
+      capacity_sampled_at:
+        description: |-
+          CapacitySampledAt is the timestamp of the last successful capacity probe.
+          It is absent before the first probe and after the array stops.
+        example: "2025-11-17T04:39:17Z"
+        type: string
       free_bytes:
         example: 54975581388800
         type: integer

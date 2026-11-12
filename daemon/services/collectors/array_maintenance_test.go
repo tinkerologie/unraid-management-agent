@@ -1,6 +1,7 @@
 package collectors
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -42,17 +43,20 @@ func TestArrayCollectionAvoidsCapacityProbesDuringMaintenance(t *testing.T) {
 		stat.Bfree = 25
 		return nil
 	}
+	var sampledAt time.Time
 	for _, step := range []struct {
 		name, native, status string
 		probes               int
 		capacity             uint64
 	}{
+		{"started mid-check", "mdResync=1\nmdResyncPos=12\n", "running", 0, 0},
 		{"idle", "mdResync=0\nmdResyncPos=0\n", "", 1, 409600},
 		{"check at start", "mdResync=1\nmdResyncPos=0\nmdResyncDt=0\nmdResyncAction=check P\n", "running", 1, 409600},
 		{"paused", "mdResync=0\nmdResyncPos=8\nmdResyncDt=10\n", "paused", 1, 409600},
 		{"rebuild", "mdResync=1\nmdResyncPos=10\nmdResyncAction=recon D1\n", "reconstructing", 1, 409600},
 		{"complete", "mdResync=0\nmdResyncPos=0\n", "", 2, 819200},
 		{"capacity read failed", "mdResync=0\nmdResyncPos=0\n", "", 3, 819200},
+		{"array stopped", "mdState=STOPPED\nmdResync=0\nmdResyncPos=0\n", "", 3, 0},
 	} {
 		if err := os.WriteFile(c.varIni, []byte("mdState=STARTED\nmdNumDisks=15\nsbSynced=1\nmdResyncSize=100\n"+step.native), 0o600); err != nil {
 			t.Fatal(err)
@@ -61,6 +65,29 @@ func TestArrayCollectionAvoidsCapacityProbesDuringMaintenance(t *testing.T) {
 		select {
 		case event := <-sub:
 			status := event.(*dto.ArrayStatus)
+			data, err := json.Marshal(status)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var wire struct {
+				CapacitySampledAt *time.Time `json:"capacity_sampled_at"`
+			}
+			if err := json.Unmarshal(data, &wire); err != nil {
+				t.Fatal(err)
+			}
+			switch step.name {
+			case "started mid-check", "array stopped":
+				if wire.CapacitySampledAt != nil {
+					t.Fatalf("%s: unexpected capacity timestamp %v", step.name, wire.CapacitySampledAt)
+				}
+			case "idle", "complete":
+				sampledAt = status.Timestamp
+				fallthrough
+			default:
+				if wire.CapacitySampledAt == nil || !wire.CapacitySampledAt.Equal(sampledAt) {
+					t.Fatalf("%s: capacity timestamp %v, want %v", step.name, wire.CapacitySampledAt, sampledAt)
+				}
+			}
 			if status.ParityCheckStatus != step.status || status.TotalBytes != step.capacity || calls != step.probes {
 				t.Fatalf("%s: status=%q capacity=%d probes=%d", step.name, status.ParityCheckStatus, status.TotalBytes, calls)
 			}

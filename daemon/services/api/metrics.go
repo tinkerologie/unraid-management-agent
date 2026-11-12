@@ -73,6 +73,10 @@ var (
 		Name: "unraid_array_usage_percent",
 		Help: "Array usage percentage",
 	})
+	arrayCapacitySampledAt = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "unraid_array_capacity_sample_timestamp_seconds",
+		Help: "Unix timestamp of the last array capacity measurement (0 when unavailable)",
+	})
 	parityValid = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "unraid_parity_valid",
 		Help: "Parity validity (1=valid, 0=invalid)",
@@ -351,6 +355,7 @@ func init() {
 		arrayUsedBytes,
 		arrayFreeBytes,
 		arrayUsagePercent,
+		arrayCapacitySampledAt,
 		parityValid,
 		parityCheckRunning,
 		parityCheckProgress,
@@ -474,6 +479,11 @@ func (s *Server) updateMetrics() {
 		arrayUsedBytes.Set(float64(usedBytes))
 		arrayFreeBytes.Set(float64(arrCache.FreeBytes))
 		arrayUsagePercent.Set(arrCache.UsedPercent)
+		sampledAt := 0.0
+		if arrCache.CapacitySampledAt != nil {
+			sampledAt = float64(arrCache.CapacitySampledAt.Unix())
+		}
+		arrayCapacitySampledAt.Set(sampledAt)
 
 		if arrCache.ParityValid {
 			parityValid.Set(1)

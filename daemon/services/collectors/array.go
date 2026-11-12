@@ -201,7 +201,10 @@ func (c *ArrayCollector) collectArrayStatus(section *ini.Section, operation stri
 	return status, nil
 }
 
-type arrayCapacity struct{ total, free uint64 }
+type arrayCapacity struct {
+	total, free uint64
+	sampledAt   time.Time
+}
 
 // Reuse the last idle sample during an array operation. The shfs statfs
 // request can fan out to the participating disks.
@@ -216,9 +219,13 @@ func (c *ArrayCollector) enrichWithArraySize(status *dto.ArrayStatus, operation 
 			logger.Debug("Array: Failed to get /mnt/user stats: %v", err)
 		} else if stat.Bsize > 0 && stat.Blocks <= math.MaxUint64/uint64(stat.Bsize) && stat.Bfree <= stat.Blocks {
 			size := uint64(stat.Bsize) // #nosec G115 -- Bsize is checked above.
-			c.capacity = arrayCapacity{total: stat.Blocks * size, free: stat.Bfree * size}
+			c.capacity = arrayCapacity{total: stat.Blocks * size, free: stat.Bfree * size, sampledAt: status.Timestamp}
 		}
 	}
+	if c.capacity.sampledAt.IsZero() {
+		return
+	}
+	status.CapacitySampledAt = new(c.capacity.sampledAt)
 	status.TotalBytes, status.FreeBytes = c.capacity.total, c.capacity.free
 	if status.TotalBytes > 0 {
 		status.UsedPercent = float64(status.TotalBytes-status.FreeBytes) / float64(status.TotalBytes) * 100

@@ -6281,6 +6281,11 @@ const docTemplate = `{
         "dto.ArrayStatus": {
             "type": "object",
             "properties": {
+                "capacity_sampled_at": {
+                    "description": "CapacitySampledAt is the timestamp of the last successful capacity probe.\nIt is absent before the first probe and after the array stops.",
+                    "type": "string",
+                    "example": "2025-11-17T04:39:17Z"
+                },
                 "free_bytes": {
                     "type": "integer",
                     "example": 54975581388800

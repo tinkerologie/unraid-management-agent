@@ -1032,6 +1032,7 @@ Get array status and information.
   "used_percent": 31.27,
   "free_bytes": 28864055205888,
   "total_bytes": 41996310249472,
+  "capacity_sampled_at": "2025-11-17T14:38:57+10:00",
   "parity_valid": true,
   "parity_check_status": "idle",
   "parity_check_progress": 0,
@@ -1048,12 +1049,17 @@ Get array status and information.
 - `used_percent`: Percentage of array capacity used
 - `free_bytes`: Free space in bytes
 - `total_bytes`: Total array capacity in bytes
+- `capacity_sampled_at`: Time of the last successful capacity measurement. A value older than
+  `timestamp` indicates reused capacity. If the field is absent, capacity is unavailable.
 - `parity_valid`: Whether parity is valid
 - `parity_check_status`: Parity check status (`idle`, `running`, `paused`)
 - `parity_check_progress`: Parity check progress percentage (0-100)
 - `num_disks`: Total number of disks in array
 - `num_data_disks`: Number of data disks
 - `num_parity_disks`: Number of parity disks (0, 1, or 2)
+
+Prometheus exposes the same measurement time in `unraid_array_capacity_sample_timestamp_seconds`
+as Unix seconds. A value of 0 indicates that capacity is unavailable.
 
 **Note**: Cache disks are shown in the `/api/v1/disks` endpoint with `role: "cache"` or `role: "pool"`.
 
