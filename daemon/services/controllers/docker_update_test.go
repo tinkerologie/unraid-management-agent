@@ -77,6 +77,7 @@ type updateTestEngine struct {
 	mu                 sync.Mutex
 	originalName       string
 	originalRunning    bool
+	restartPolicy      string
 	originalRemoved    bool
 	replacement        bool
 	replacementRunning bool
@@ -109,6 +110,18 @@ func (e *updateTestEngine) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		e.create(w, r)
 	case strings.HasSuffix(path, "/json"):
 		e.inspect(w, strings.TrimSuffix(strings.TrimPrefix(path, "/containers/"), "/json"))
+	case path == "/containers/"+updateOriginalID+"/update":
+		var payload struct{ RestartPolicy container.RestartPolicy }
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			writeUpdateTestError(w, 400)
+			return
+		}
+		if e.failure == "policy-disable" || (e.failure == "policy-restore" && payload.RestartPolicy.Name == container.RestartPolicyAlways) {
+			writeUpdateTestError(w, 500)
+			return
+		}
+		e.restartPolicy = string(payload.RestartPolicy.Name)
+		_, _ = fmt.Fprint(w, `{"Warnings":[]}`)
 	case path == "/containers/"+updateOriginalID+"/stop":
 		e.originalRunning = false
 		if e.failure == "stop" {
@@ -155,7 +168,7 @@ func (e *updateTestEngine) create(w http.ResponseWriter, r *http.Request) {
 	case "invalid-id":
 		w.WriteHeader(http.StatusCreated)
 		_, _ = fmt.Fprint(w, `{"Id":""}`)
-	case "create", "restore-name", "restart", "missing-original", "inspect-partial":
+	case "create", "restore-name", "restart", "missing-original", "inspect-partial", "policy-restore":
 		writeUpdateTestError(w, 500)
 	case "ambiguous", "conflict":
 		e.replacement = true
@@ -183,12 +196,12 @@ func (e *updateTestEngine) inspect(w http.ResponseWriter, ref string) {
 	if !e.originalRemoved && (ref == updateOriginalID || ref == e.originalName) {
 		_, _ = fmt.Fprintf(w, `{
 			"Id":%q,"Name":%q,"Image":"sha256:old","Config":{"Image":"fixture:latest"},
-			"State":{"Running":%t},"HostConfig":{"Memory":268435456,"MemorySwap":536870912,"NetworkMode":"static"},
+			"State":{"Running":%t},"HostConfig":{"Memory":268435456,"MemorySwap":536870912,"NetworkMode":"static","RestartPolicy":{"Name":%q}},
 			"Mounts":[{"Type":"volume","Name":"existing-data","Destination":"/data","RW":true}],
 			"NetworkSettings":{"Networks":{
 				"static":{"IPAMConfig":{"IPv4Address":"192.0.2.5","IPv6Address":"2001:db8::5"},"Aliases":["static-alias","aaaaaaaaaaaa"],"EndpointID":"old-static"},
-				"dynamic":{"IPAddress":"198.51.100.2","Aliases":["dynamic-alias"],"EndpointID":"old-dynamic"}
-			}}}`, updateOriginalID, "/"+e.originalName, e.originalRunning)
+				"dynamic":{"IPAddress":"198.51.100.2","Aliases":["dynamic-alias"],"MacAddress":"02:42:ac:11:00:09","EndpointID":"old-dynamic"}
+			}}}`, updateOriginalID, "/"+e.originalName, e.originalRunning, e.restartPolicy)
 		return
 	}
 	if e.originalName != "fixture" && e.failure == "inspect-partial" && ref == "fixture" {
@@ -235,7 +248,7 @@ func (e *updateTestEngine) assertCreateConfig(t *testing.T) {
 	aliases, _ := static["Aliases"].([]any)
 	if len(endpoints) != 2 || ipam["IPv4Address"] != "192.0.2.5" || ipam["IPv6Address"] != "2001:db8::5" ||
 		len(aliases) != 1 || aliases[0] != "static-alias" || static["EndpointID"] != "" ||
-		dynamic["IPAMConfig"] != nil || dynamic["IPAddress"] != "" || dynamic["EndpointID"] != "" {
+		dynamic["IPAMConfig"] != nil || dynamic["IPAddress"] != "" || dynamic["EndpointID"] != "" || dynamic["MacAddress"] != "" {
 		t.Fatalf("unexpected endpoint config: %v", endpoints)
 	}
 }
@@ -408,9 +421,48 @@ func TestDockerNetworkListingMembershipAndInspectFailures(t *testing.T) {
 					t.Fatalf("expected canceled inspect: %v", err)
 				}
 			default:
-				if err == nil || !strings.Contains(err.Error(), "inspect Docker network") {
-					t.Fatalf("unexpected inspect result %+v: %v", got, err)
+				if err != nil || len(got) != 2 || got[0].MembershipUnavailable ||
+					!slices.Equal(got[0].ContainerNames, []string{"alpha", "beta"}) ||
+					!got[1].MembershipUnavailable || got[1].ContainerNames == nil || len(got[1].ContainerNames) != 0 {
+					t.Fatalf("unexpected partial inventory %+v: %v", got, err)
 				}
+			}
+		})
+	}
+}
+
+func TestDockerRetainedOriginalCannotAutomaticallyRestart(t *testing.T) {
+	for _, tc := range []struct{ fault, wantPolicy, wantError string }{
+		{"cleanup", "no", ""},
+		{"start", "always", "original restored"},
+		{"policy-disable", "always", "disable original restart policy"},
+		{"policy-restore", "no", "restore original restart policy"},
+	} {
+		t.Run(tc.fault, func(t *testing.T) {
+			engine := &updateTestEngine{originalName: "fixture", originalRunning: true, failure: tc.fault, restartPolicy: "always"}
+			server := httptest.NewServer(engine)
+			t.Cleanup(server.Close)
+			t.Setenv("DOCKER_HOST", server.URL)
+			result, err := NewDockerController().UpdateContainer("fixture", true)
+			engine.mu.Lock()
+			defer engine.mu.Unlock()
+			if engine.restartPolicy != tc.wantPolicy || engine.originalRemoved {
+				t.Fatalf("unexpected retained container: policy=%q removed=%t", engine.restartPolicy, engine.originalRemoved)
+			}
+			if tc.wantError == "" {
+				if err != nil || result == nil || !result.Updated || engine.originalRunning {
+					t.Fatalf("original was not safely retained: %+v, %v", result, err)
+				}
+				host, _ := engine.created["HostConfig"].(map[string]any)
+				restart, _ := host["RestartPolicy"].(map[string]any)
+				if restart["Name"] != "always" {
+					t.Fatalf("replacement lost configured policy: %+v", restart)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), tc.wantError) {
+				t.Fatalf("expected %q, got %v", tc.wantError, err)
+			}
+			if tc.fault == "policy-disable" && (!engine.originalRunning || engine.created != nil) {
+				t.Fatal("failed policy change allowed the update to interrupt the original")
 			}
 		})
 	}

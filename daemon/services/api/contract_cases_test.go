@@ -65,7 +65,8 @@ func unraidCompatibilityContracts() []contractCapture {
 	networks := &dto.DockerNetworkList{Networks: []dto.DockerNetworkInfo{
 		{ID: "net-a", Name: "alpha", Driver: "bridge", ContainerNames: []string{"unlimited"}, Timestamp: contractTime},
 		{ID: "net-z", Name: "zulu", Driver: "bridge", ContainerNames: []string{"unlimited"}, Timestamp: contractTime},
-	}, Count: 2, Timestamp: contractTime}
+		{ID: "net-u", Name: "unavailable", Driver: "bridge", MembershipUnavailable: true, ContainerNames: []string{}, Timestamp: contractTime},
+	}, Count: 3, Timestamp: contractTime}
 	plugins := &dto.PluginList{Plugins: []dto.PluginInfo{{
 		Name: "sample.plugin", Version: "2026.11.01", LatestVersion: "2026.11.02",
 		Enabled: true, UpdateAvailable: true, UpdateStatus: "update_available",
@@ -79,7 +80,7 @@ func unraidCompatibilityContracts() []contractCapture {
 			func(s *Server) { s.dockerCache.Store(&containers) }, "list", "zero", "omitted")),
 		syntheticContract(eventContract("docker-configuration-event", "container_list_update", "[]*dto.ContainerInfo", "Container configuration update",
 			constants.TopicContainerListUpdate, containerEvent, "list", "zero", "omitted")),
-		syntheticContract(restContract("docker-networks", "/docker/networks", "dto.DockerNetworkList", "Membership across two networks", 200,
+		syntheticContract(restContract("docker-networks", "/docker/networks", "dto.DockerNetworkList", "Known and unavailable network membership", 200,
 			func(s *Server) { s.dockerNetworksCache.Store(networks) }, "list")),
 		syntheticContract(eventContract("docker-networks-event", "docker_networks_update", "*dto.DockerNetworkList", "Network membership update",
 			constants.TopicDockerNetworksUpdate, networks, "list")),

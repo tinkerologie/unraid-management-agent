@@ -2,8 +2,8 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"regexp"
-	"sync"
 	"time"
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
@@ -13,10 +13,7 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/plugininventory"
 )
 
-const (
-	pluginCheckTimeout     = 30 * time.Second
-	pluginCheckConcurrency = 4
-)
+const pluginCheckTimeout = 30 * time.Second
 
 var (
 	pluginCheckExec     = lib.ExecCommandOutputWithContext
@@ -55,8 +52,7 @@ func (pc *PluginController) CheckPluginUpdates(parentCtx context.Context) ([]dto
 	if err != nil {
 		return nil, err
 	}
-	refreshPluginTargets(ctx, targets)
-	if err := ctx.Err(); err != nil {
+	if err := refreshPluginTargets(ctx, targets); err != nil {
 		return nil, err
 	}
 	list, err := pc.resolve(ctx)
@@ -77,27 +73,33 @@ func (pc *PluginController) CheckPluginUpdates(parentCtx context.Context) ([]dto
 
 // Check only valid registered plugins. The native checkall command also prunes
 // dangling runtime registrations, which is outside an agent refresh.
-func refreshPluginTargets(ctx context.Context, targets []string) {
-	jobs := make(chan string, len(targets))
+func refreshPluginTargets(ctx context.Context, targets []string) error {
+	var firstFailure error
+	checked := false
 	for _, target := range targets {
-		if pluginCheckFilename.MatchString(target) {
-			jobs <- target
+		if err := ctx.Err(); err != nil {
+			return err
 		}
-	}
-	close(jobs)
-
-	var checks sync.WaitGroup
-	for range min(pluginCheckConcurrency, len(jobs)) {
-		checks.Go(func() {
-			for target := range jobs {
-				if ctx.Err() != nil {
-					return
-				}
-				if _, err := pluginCheckExec(ctx, constants.PluginBin, "check", target); err != nil && ctx.Err() == nil {
-					logger.Debug("Plugin: refresh failed for %q; using cached metadata: %v", target, err)
-				}
+		if !pluginCheckFilename.MatchString(target) {
+			continue
+		}
+		// Match the native checkall command's serial execution of plugin hooks.
+		// A rejected candidate still counts as a successful native check when
+		// the manager publishes a validation marker and exits successfully.
+		if _, err := pluginCheckExec(ctx, constants.PluginBin, "check", target); err != nil {
+			logger.Debug("Plugin: refresh failed for %q: %v", target, err)
+			if firstFailure == nil {
+				firstFailure = fmt.Errorf("check %q: %w", target, err)
 			}
-		})
+			continue
+		}
+		checked = true
 	}
-	checks.Wait()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if !checked && firstFailure != nil {
+		return fmt.Errorf("plugin refresh failed: %w", firstFailure)
+	}
+	return nil
 }

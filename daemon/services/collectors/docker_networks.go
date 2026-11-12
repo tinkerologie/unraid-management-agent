@@ -78,6 +78,7 @@ func networksSignature(networks []dto.DockerNetworkInfo) string {
 		var key strings.Builder
 		key.WriteString(strconv.Quote(n.ID))
 		key.WriteString(strconv.Quote(n.Driver))
+		key.WriteString(strconv.FormatBool(n.MembershipUnavailable))
 		for _, name := range slices.Compact(members) {
 			key.WriteString(strconv.Quote(name))
 		}

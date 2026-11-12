@@ -112,13 +112,13 @@
       "path": "/api/v1/docker/networks",
       "status": 200,
       "model": "dto.DockerNetworkList",
-      "case": "Membership across two networks",
+      "case": "Known and unavailable network membership",
       "semantics": [
         "list"
       ],
       "origin": "dto-constructed",
       "fixture": "docker-networks.json",
-      "sha256": "475a68aba5d66ac97b0b4477c9acb0a87eeb3c261417cec1cccf8d781173d788"
+      "sha256": "50d736f2ee45970e36688200c6ae85ced341e046551e21ff29e927f86c5d1401"
     },
     {
       "id": "docker-networks-event",
@@ -132,7 +132,7 @@
       ],
       "origin": "dto-constructed",
       "fixture": "docker-networks-event.json",
-      "sha256": "7f217ce6c3a2623aef34f3220181c62298d2d98e967d32d81e78647e67cd2a94"
+      "sha256": "2b834dd1c046bdbfc1b3cc348e479d2dfa8ca2a41b239e855a653760fb2b43fb"
     },
     {
       "id": "mover-active-no-progress",

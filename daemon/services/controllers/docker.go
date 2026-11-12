@@ -689,6 +689,7 @@ func (dc *DockerController) UpdateContainer(containerRef string, force bool) (*d
 	if err != nil {
 		return nil, fmt.Errorf("failed to pull image: %w", err)
 	}
+	// Moby Wait consumes and closes the pull stream and reports embedded errors.
 	if err := pullResp.Wait(ctx); err != nil {
 		return nil, fmt.Errorf("failed to pull image: %w", err)
 	}
@@ -845,15 +846,20 @@ func (dc *DockerController) ListNetworks(parentCtx context.Context) ([]dto.Docke
 			continue // The network disappeared after NetworkList.
 		}
 		if inspectErr != nil {
-			return nil, fmt.Errorf("inspect Docker network %q (%s): %w", s.Name, shortID(s.ID), inspectErr)
-		}
-		for _, ep := range inspectResult.Network.Containers {
-			if ep.Name != "" {
-				info.ContainerNames = append(info.ContainerNames, ep.Name)
+			if err := ctx.Err(); err != nil {
+				return nil, err
 			}
+			logger.Debug("Docker: cannot inspect membership for network %q (%s): %v", s.Name, shortID(s.ID), inspectErr)
+			info.MembershipUnavailable = true
+		} else {
+			for _, ep := range inspectResult.Network.Containers {
+				if ep.Name != "" {
+					info.ContainerNames = append(info.ContainerNames, ep.Name)
+				}
+			}
+			slices.Sort(info.ContainerNames)
+			info.ContainerNames = slices.Compact(info.ContainerNames)
 		}
-		slices.Sort(info.ContainerNames)
-		info.ContainerNames = slices.Compact(info.ContainerNames)
 
 		result = append(result, info)
 	}

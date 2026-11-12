@@ -1230,6 +1230,9 @@ definitions:
         additionalProperties:
           type: string
         type: object
+      membership_unavailable:
+        description: Docker could not inspect the network membership.
+        type: boolean
       name:
         example: bridge
         type: string

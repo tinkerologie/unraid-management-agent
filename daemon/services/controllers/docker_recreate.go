@@ -47,16 +47,26 @@ type dockerReplacement struct {
 	wasRunning    bool
 	attempt       string
 	replacementID string
+	restartPolicy container.RestartPolicy
 }
 
 func (dc *DockerController) recreateDockerContainer(ctx context.Context, original container.InspectResponse) (id, message string, err error) {
 	change := dockerReplacement{
-		originalID: original.ID,
-		name:       strings.TrimPrefix(original.Name, "/"),
-		wasRunning: original.State != nil && original.State.Running,
-		attempt:    rand.Text(),
+		originalID:    original.ID,
+		name:          strings.TrimPrefix(original.Name, "/"),
+		wasRunning:    original.State != nil && original.State.Running,
+		attempt:       rand.Text(),
+		restartPolicy: original.HostConfig.RestartPolicy,
 	}
 	change.retainedName = "uma-prev-" + shortID(original.ID) + "-" + strings.ToLower(change.attempt[:8])
+
+	// A retained container must not restart after a Docker daemon restart.
+	if !change.restartPolicy.IsNone() {
+		disabled := container.RestartPolicy{Name: container.RestartPolicyDisabled}
+		if _, err := dc.client.ContainerUpdate(ctx, change.originalID, client.ContainerUpdateOptions{RestartPolicy: &disabled}); err != nil {
+			return "", "", dc.recoverDockerUpdate(change, "disable original restart policy", err)
+		}
+	}
 
 	if change.wasRunning {
 		if _, err := dc.client.ContainerStop(ctx, original.ID, client.ContainerStopOptions{}); err != nil {
@@ -168,7 +178,7 @@ func dockerReplacementNetworks(settings *container.NetworkSettings, oldShortID s
 		endpoints[name] = &network.EndpointSettings{
 			IPAMConfig: previous.IPAMConfig.Copy(),
 			Links:      slices.Clone(previous.Links), Aliases: aliases, DriverOpts: maps.Clone(previous.DriverOpts),
-			MacAddress: previous.MacAddress, GwPriority: previous.GwPriority,
+			GwPriority: previous.GwPriority,
 		}
 	}
 	if len(endpoints) == 0 {
@@ -201,6 +211,12 @@ func (dc *DockerController) restoreDockerOriginal(ctx context.Context, change do
 	if nameChanged {
 		if _, err := dc.client.ContainerRename(ctx, change.originalID, client.ContainerRenameOptions{NewName: change.name}); err != nil {
 			return fmt.Errorf("restore original name: %w", err)
+		}
+	}
+	if !change.restartPolicy.IsNone() &&
+		(original.Container.HostConfig == nil || !change.restartPolicy.IsSame(&original.Container.HostConfig.RestartPolicy)) {
+		if _, err := dc.client.ContainerUpdate(ctx, change.originalID, client.ContainerUpdateOptions{RestartPolicy: &change.restartPolicy}); err != nil {
+			return fmt.Errorf("restore original restart policy: %w", err)
 		}
 	}
 	if change.wasRunning && (original.Container.State == nil || !original.Container.State.Running) {

@@ -147,3 +147,16 @@ func TestDockerNetworksCollector_ListErrorNoPublish(t *testing.T) {
 	case <-time.After(150 * time.Millisecond):
 	}
 }
+
+func TestDockerNetworkMembershipAvailabilityChangesFingerprint(t *testing.T) {
+	networks := fakeNetworks()
+	available := networksSignature(networks)
+	networks[0].MembershipUnavailable = true
+	if got := networksSignature(networks); got == available {
+		t.Fatal("loss of membership visibility did not change the fingerprint")
+	}
+	networks[0].MembershipUnavailable = false
+	if got := networksSignature(networks); got != available {
+		t.Fatal("recovered membership did not restore the fingerprint")
+	}
+}

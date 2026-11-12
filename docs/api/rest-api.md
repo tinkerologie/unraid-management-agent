@@ -1942,8 +1942,10 @@ curl -X POST http://192.168.20.21:8043/api/v1/docker/fedcb3e1ba1f/unpause
 ### GET /docker/networks
 
 List all Docker networks with driver, scope, IPAM settings, and connected containers.
-Returns the cached result from the `docker_networks` collector (refreshed on its interval;
-default 15 min). Returns an empty list if no cache is available yet.
+The endpoint serves the `docker_networks` collector cache and returns an empty list before the
+first collection. When Docker cannot inspect a network, that entry has an empty
+`container_names` array and `membership_unavailable: true`. Other networks still report their
+membership.
 
 **Response**:
 

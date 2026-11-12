@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -27,7 +28,7 @@ func TestPluginControllerChecksOnlyRegisteredTargets(t *testing.T) {
 		gotCmd = cmd
 		gotArgs = args
 		_, gotDeadline = ctx.Deadline()
-		return "", errors.New("exit status 1")
+		return "", nil
 	}
 
 	pc := NewPluginController()
@@ -119,5 +120,53 @@ func TestPluginControllerReportsInventoryErrorsAndOnlyInstallableUpdates(t *test
 	got, err := pc.CheckPluginUpdates(t.Context())
 	if err != nil || len(got) != 1 || got[0].Name != "installable" {
 		t.Fatalf("unexpected installable updates: %+v, %v", got, err)
+	}
+}
+
+func TestPluginControllerDoesNotPublishCachedUpdatesAfterTotalRefreshFailure(t *testing.T) {
+	original := pluginCheckExec
+	t.Cleanup(func() { pluginCheckExec = original })
+	offline := errors.New("fixture mirror unavailable")
+	var targets []string
+	pluginCheckExec = func(_ context.Context, _ string, args ...string) (string, error) {
+		targets = append(targets, args[1])
+		return "", offline
+	}
+	pc := NewPluginController()
+	pc.targets = func(context.Context) ([]string, error) {
+		return []string{"first.plg", "second.plg"}, nil
+	}
+	pc.resolve = func(context.Context) (*dto.PluginList, error) {
+		t.Fatal("a total refresh failure must not publish cached results")
+		return nil, nil
+	}
+	if _, err := pc.CheckPluginUpdates(t.Context()); !errors.Is(err, offline) {
+		t.Fatalf("refresh did not report failure: %v", err)
+	}
+	if !slices.Equal(targets, []string{"first.plg", "second.plg"}) {
+		t.Fatalf("unexpected native check order: %v", targets)
+	}
+}
+
+func TestPluginControllerAllowsResultsAfterPartialRefreshFailure(t *testing.T) {
+	original := pluginCheckExec
+	t.Cleanup(func() { pluginCheckExec = original })
+	pluginCheckExec = func(_ context.Context, _ string, args ...string) (string, error) {
+		if args[1] == "offline.plg" {
+			return "", errors.New("fixture mirror unavailable")
+		}
+		return "", nil
+	}
+	pc := NewPluginController()
+	pc.targets = func(context.Context) ([]string, error) {
+		return []string{"offline.plg", "validated.plg"}, nil
+	}
+	pc.resolve = func(context.Context) (*dto.PluginList, error) {
+		return &dto.PluginList{Plugins: []dto.PluginInfo{
+			{Name: "validated", UpdateStatus: "validation_failed"},
+		}}, nil
+	}
+	if updates, err := pc.CheckPluginUpdates(t.Context()); err != nil || len(updates) != 0 {
+		t.Fatalf("unexpected partial refresh result: %v, %v", updates, err)
 	}
 }

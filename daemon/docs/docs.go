@@ -7589,6 +7589,10 @@ const docTemplate = `{
                         "type": "string"
                     }
                 },
+                "membership_unavailable": {
+                    "description": "Docker could not inspect the network membership.",
+                    "type": "boolean"
+                },
                 "name": {
                     "type": "string",
                     "example": "bridge"
