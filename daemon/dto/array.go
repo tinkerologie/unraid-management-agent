@@ -20,6 +20,10 @@ type ArrayStatus struct {
 	NumParityDisks      int       `json:"num_parity_disks" example:"2"`
 	Timestamp           time.Time `json:"timestamp"`
 
+	// CapacitySampledAt is the timestamp of the last successful capacity probe.
+	// It is absent before the first probe and after the array stops.
+	CapacitySampledAt *time.Time `json:"capacity_sampled_at,omitempty" example:"2025-11-17T04:39:17Z"`
+
 	// SourceStatus is non-nil when the data source is degraded or unavailable.
 	SourceStatus *SourceStatus `json:"source_status,omitempty"`
 }

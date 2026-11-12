@@ -33,6 +33,7 @@ func TestHandleMetrics(t *testing.T) {
 	})
 	server.arrayCache.Store(&dto.ArrayStatus{
 		State:               "Started",
+		CapacitySampledAt:   new(time.Unix(3600, 0)),
 		TotalBytes:          8000000000000,
 		FreeBytes:           3000000000000,
 		UsedPercent:         62.5,
@@ -129,6 +130,9 @@ func TestHandleMetrics(t *testing.T) {
 	}
 	if !strings.Contains(body, "unraid_array_total_bytes") {
 		t.Error("Expected unraid_array_total_bytes metric")
+	}
+	if !strings.Contains(body, "unraid_array_capacity_sample_timestamp_seconds 3600\n") {
+		t.Error("Expected the array capacity sample timestamp")
 	}
 	if !strings.Contains(body, "unraid_parity_valid 1") {
 		t.Error("Expected unraid_parity_valid = 1")

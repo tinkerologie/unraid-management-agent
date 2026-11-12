@@ -3,11 +3,17 @@ package services
 import (
 	"context"
 	"time"
+
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/scheduler"
 )
 
 // runManual polls at the configured interval. A change trigger gets a
 // collection without shifting the fixed polling cadence.
 func (r *collectorRunner) runManual(ctx context.Context, interval time.Duration) {
+	r.mu.Lock()
+	r.decision = scheduler.Decision{Interval: interval, Reason: scheduler.ReasonManual}
+	r.mu.Unlock()
+
 	r.runLifetime(ctx, func(ctx context.Context, startSources func()) {
 		if delay := r.policy.InitialDelay; delay > 0 {
 			timer := r.clock.NewTimer(delay)
@@ -28,7 +34,7 @@ func (r *collectorRunner) runManual(ctx context.Context, interval time.Duration)
 		}
 		// Notifications historically start the ticker before the first refresh.
 		next := r.clock.Now().Add(interval)
-		_ = r.safeRefresh(ctx, interval)
+		r.collect(ctx)
 		if ctx.Err() != nil {
 			return
 		}
@@ -55,7 +61,7 @@ func (r *collectorRunner) runManual(ctx context.Context, interval time.Duration)
 			if ctx.Err() != nil {
 				return
 			}
-			_ = r.safeRefresh(ctx, interval)
+			r.collect(ctx)
 		}
 	})
 }

@@ -47,7 +47,7 @@ type ManagedCollector struct {
 	// Runtime management
 	factory    CollectorFactory
 	generation *collectorGeneration
-	// runner is available for refresh requests only in active Dynamic mode.
+	// runner tracks active collection in either mode. Only Dynamic mode serves refresh requests.
 	runner *collectorRunner
 }
 
@@ -96,7 +96,9 @@ func (cm *CollectorManager) cancelCollectorLocked(mc *ManagedCollector) {
 		g.stopping = true
 		g.cancel()
 	}
-	mc.runner = nil
+	if cm.dynamic {
+		mc.runner = nil
+	}
 }
 
 // NewCollectorManager creates a new collector manager
@@ -164,6 +166,9 @@ func (cm *CollectorManager) floorRequired(name string) bool {
 // a channel that receives its outcome. It returns false in Manual mode and
 // for collectors that are not running.
 func (cm *CollectorManager) RequestRefresh(name string) (<-chan error, bool) {
+	if !cm.dynamic {
+		return nil, false
+	}
 	cm.mu.RLock()
 	mc, ok := cm.collectors[name]
 	var r *collectorRunner
@@ -264,14 +269,11 @@ func (cm *CollectorManager) startCollectorLocked(name string) {
 	mc.generation = g
 	interval := time.Duration(mc.Interval) * time.Second
 	r := newCollectorRunner(name, policy, nil, cm.clock)
+	mc.runner = r
 	if cm.dynamic {
 		r.lowPower = cm.domainCtx.LowPowerMode
 		r.active = func() bool { return cm.demand.Active(name) }
 		r.floor = func() bool { return cm.floorRequired(name) }
-		mc.runner = r
-	} else {
-		now := cm.clock.Now()
-		mc.LastRun = &now
 	}
 
 	cm.wg.Go(func() {
@@ -302,6 +304,11 @@ func (cm *CollectorManager) finishGeneration(mc *ManagedCollector, g *collectorG
 	defer cm.mu.Unlock()
 	defer close(g.done)
 	mc.generation = nil
+	if !cm.dynamic {
+		if run := mc.runner.snapshot(); !run.lastAttempt.IsZero() {
+			mc.LastRun = &run.lastAttempt
+		}
+	}
 	mc.runner = nil
 	if mc.Status == "running" {
 		mc.Status = "stopped"
@@ -573,21 +580,24 @@ func (cm *CollectorManager) statusLocked(mc *ManagedCollector) dto.CollectorStat
 	if len(policy.Topics) > 0 && cm.domainCtx != nil && cm.domainCtx.Hub != nil {
 		status.PublishCount = cm.domainCtx.Hub.PublishCount(policy.Topics[0])
 	}
-	if mc.Status != "running" {
-		return status
-	}
 	if !cm.dynamic {
-		status.EffectiveInterval = mc.Interval
+		if mc.Status == "running" {
+			status.EffectiveInterval = mc.Interval
+		}
+		if mc.runner != nil {
+			if run := mc.runner.snapshot(); !run.lastAttempt.IsZero() {
+				status.LastRun = &run.lastAttempt
+			}
+		}
 		return status
 	}
-	if mc.runner != nil {
+	if mc.Status == "running" && mc.runner != nil {
 		st := mc.runner.snapshot()
 		status.EffectiveInterval = int(st.decision.Interval / time.Second)
 		status.Reason = string(st.decision.Reason)
 		status.ErrorCount = st.errorCount
 		if !st.lastAttempt.IsZero() {
-			at := st.lastAttempt
-			status.LastRun = &at
+			status.LastRun = &st.lastAttempt
 		}
 	}
 	return status

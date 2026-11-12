@@ -44,12 +44,20 @@ func TestManualFileEvents(t *testing.T) {
 
 func TestManualEventSourceSelection(t *testing.T) {
 	coll := collectors.NewNotificationCollector(createTestContext())
-	for _, name := range []string{"array", "disk", "shares", "notification", "psu"} {
+	for _, name := range []string{"shares", "notification", "psu"} {
 		if len(manualEventSources(name, coll)) != 1 {
 			t.Errorf("expected one Manual event source for %s", name)
 		}
 	}
 	if len(manualEventSources("mover", coll)) != 0 {
 		t.Fatal("mover events belong to Dynamic mode")
+	}
+}
+
+func TestManualStorageCollectorsOnlyUseConfiguredInterval(t *testing.T) {
+	for _, name := range []string{"array", "disk"} {
+		if len(manualEventSources(name, nil)) != 0 {
+			t.Errorf("%s can run on native file rewrites before its configured Manual interval", name)
+		}
 	}
 }

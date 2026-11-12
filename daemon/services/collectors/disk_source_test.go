@@ -110,7 +110,7 @@ pool1 /mnt/pool1 zfs rw 0 0
 			disk := &disks[i]
 			collector.enrichWithRole(disk)
 			collector.enrichWithSpinState(disk)
-			collector.enrichWithMountInfo(disk)
+			collector.enrichWithMountInfo(disk, true)
 			if collector.enrichWithZFSPoolUsage(disk, poolUsages) {
 				t.Error("ZFS must not override source capacity")
 			}
@@ -159,7 +159,7 @@ func TestDiskSourceCapacityFallback(t *testing.T) {
 				t.Fatalf("parse: %v, %v", disks, err)
 			}
 			disk := &disks[0]
-			collector.enrichWithMountInfo(disk)
+			collector.enrichWithMountInfo(disk, true)
 			if disk.Free != 40*4096 || disk.Used != 60*4096 || disk.UsagePercent != 60 {
 				t.Errorf("fallback changed: %+v", disk)
 			}
@@ -208,7 +208,7 @@ func TestDiskSourcePoolCapacityTotals(t *testing.T) {
 			}
 			disk := &disks[0]
 			collector.enrichWithRole(disk)
-			collector.enrichWithMountInfo(disk)
+			collector.enrichWithMountInfo(disk, true)
 			if collector.enrichWithZFSPoolUsage(disk, map[string]zfsPoolUsage{
 				"cache": {Size: 9999, Used: 1111, Free: 8888, UsagePercent: 11},
 			}) {

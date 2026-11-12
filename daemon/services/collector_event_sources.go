@@ -8,9 +8,12 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"gopkg.in/ini.v1"
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
 	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
@@ -29,11 +32,10 @@ const (
 // safety-net poll, because events can be missed.
 func defaultEventSources(name string) []eventSource {
 	switch name {
-	case "array", "disk":
-		return []eventSource{
-			collectors.NewFileEventSource(fileEventDebounce, constants.VarIni),
-			disksIniChanges(),
-		}
+	case "array":
+		return []eventSource{arrayStateChanges(), disksIniChanges()}
+	case "disk":
+		return []eventSource{disksIniChanges()}
 	case "shares":
 		return []eventSource{iniChanges(constants.SharesIni, sharesIniVolatileKeys...)}
 	case "mover":
@@ -95,11 +97,13 @@ func iniChanges(file string, ignore ...string) eventSource {
 }
 
 // contentChanges passes on its source's triggers only when the file's
-// content, without the ignored INI keys, changed since the last trigger.
+// content changed since the last trigger, after projecting it or filtering
+// the ignored INI keys.
 type contentChanges struct {
-	src    eventSource
-	file   string
-	ignore []string
+	src     eventSource
+	file    string
+	ignore  []string
+	project func([]byte) []byte
 
 	mu   sync.Mutex
 	last [sha256.Size]byte
@@ -129,6 +133,9 @@ func (c *contentChanges) digest() [sha256.Size]byte {
 	if err != nil {
 		return sha256.Sum256(nil)
 	}
+	if c.project != nil {
+		return sha256.Sum256(c.project(data))
+	}
 	var kept bytes.Buffer
 	sc := bufio.NewScanner(bytes.NewReader(data))
 	for sc.Scan() {
@@ -142,17 +149,42 @@ func (c *contentChanges) digest() [sha256.Size]byte {
 	return sha256.Sum256(kept.Bytes())
 }
 
+func arrayStateChanges() eventSource {
+	return &contentChanges{
+		src:     collectors.NewFileEventSource(fileEventDebounce, constants.VarIni),
+		file:    constants.VarIni,
+		project: arrayStateProjection,
+	}
+}
+
+// Progress counters are sampled by periodic collection. File events carry
+// changes to state and parity validity, including pause, resume and finish.
+func arrayStateProjection(data []byte) []byte {
+	cfg, err := ini.Load(data)
+	if err != nil {
+		return nil
+	}
+	section := cfg.Section("")
+	var state strings.Builder
+	for _, key := range []string{"mdState", "mdNumDisks", "mdNumInvalid", "sbSynced"} {
+		state.WriteString(section.Key(key).String())
+		state.WriteByte(0)
+	}
+	if count, _ := strconv.Atoi(section.Key("sbSyncErrs").String()); count > 0 {
+		state.WriteByte(1)
+	}
+	state.WriteString(collectors.ArrayOperationStatus(section))
+	return []byte(state.String())
+}
+
 type eventSourceFunc func(context.Context, func())
 
 func (f eventSourceFunc) Run(ctx context.Context, trigger func()) { f(ctx, trigger) }
 
-// manualEventSources keeps the legacy trigger set and debounce behavior.
+// manualEventSources keeps the remaining legacy triggers. Array and disk
+// collection honor their configured interval, including during native progress rewrites.
 func manualEventSources(name string, coll Collector) []eventSource {
 	switch name {
-	case "array":
-		return []eventSource{manualFileEvents(constants.VarIni, constants.DisksIni)}
-	case "disk":
-		return []eventSource{manualFileEvents(constants.DisksIni)}
 	case "shares":
 		return []eventSource{manualFileEvents(constants.SharesIni)}
 	case "notification":

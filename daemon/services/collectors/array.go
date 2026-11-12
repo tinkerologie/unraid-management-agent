@@ -3,6 +3,7 @@ package collectors
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"syscall"
@@ -22,46 +23,48 @@ var arrayRequiredKeys = []string{"mdState", "mdNumDisks"}
 // ArrayCollector collects Unraid array status information including state, parity status, and disk assignments.
 // It publishes array status updates to the event bus at regular intervals.
 type ArrayCollector struct {
-	ctx *domain.Context
+	ctx      *domain.Context
+	varIni   string
+	disksIni string
+	statfs   func(string, *syscall.Statfs_t) error
+	capacity arrayCapacity
 }
 
 // NewArrayCollector creates a new array status collector with the given context.
 func NewArrayCollector(ctx *domain.Context) *ArrayCollector {
-	return &ArrayCollector{ctx: ctx}
+	return &ArrayCollector{ctx: ctx, varIni: constants.VarIni, disksIni: constants.DisksIni, statfs: syscall.Statfs}
 }
 
 // Collect gathers current array status information and publishes it to the event bus.
-// It reads array state from Unraid's mdcmd command and var.ini configuration file.
+// It reads native status files and samples user-share capacity while the array is idle.
 func (c *ArrayCollector) Collect() {
-	logger.Debug("Collecting array data...")
-	logger.Debug("TRACE: About to call collectArrayStatus()")
-
-	// OS-resilience: validate var.ini is readable and contains expected keys before
-	// attempting the full parse. Report status to the platform registry so callers
-	// can detect data-source breakage without relying on error logs.
+	cfg, err := ini.Load(c.varIni)
+	if err != nil {
+		if c.ctx.Platform != nil {
+			c.ctx.Platform.Report("array", dto.SourceUnavailable, "cannot read var.ini", err)
+		}
+		logger.Error("Array: Failed to load %s: %v", c.varIni, err)
+		return
+	}
+	section := cfg.Section("")
+	operation, position := arrayOperation(section)
 	if c.ctx.Platform != nil {
-		cfg, loadErr := ini.Load(constants.VarIni)
-		if loadErr != nil {
-			c.ctx.Platform.Report("array", dto.SourceUnavailable, "cannot read var.ini", loadErr)
-			logger.Error("Array: Failed to load %s: %v", constants.VarIni, loadErr)
-			return // nothing valid to publish
+		keys := make(map[string]string, len(arrayRequiredKeys))
+		for _, key := range arrayRequiredKeys {
+			if value, err := section.GetKey(key); err == nil {
+				keys[key] = value.String()
+			}
 		}
-		// Extract the default section into a flat map for key validation.
-		section := cfg.Section("")
-		sectionMap := make(map[string]string, len(section.Keys()))
-		for _, k := range section.Keys() {
-			sectionMap[k.Name()] = strings.Trim(k.String(), `"`)
-		}
-		if ok, reason := validateRequiredKeys(sectionMap, arrayRequiredKeys...); !ok {
+		if ok, reason := validateRequiredKeys(keys, arrayRequiredKeys...); !ok {
 			c.ctx.Platform.Report("array", dto.SourceDegraded, reason, nil)
+		} else if operation == arrayOperationUnknown && strings.EqualFold(keys["mdState"], "STARTED") {
+			c.ctx.Platform.Report("array", dto.SourceDegraded, "cannot determine native maintenance state", nil)
 		} else {
 			c.ctx.Platform.Healthy("array")
 		}
 	}
 
-	// Collect array status
-	arrayStatus, err := c.collectArrayStatus()
-	logger.Debug("TRACE: Returned from collectArrayStatus, err=%v", err)
+	arrayStatus, err := c.collectArrayStatus(section, operation, position)
 	if err != nil {
 		logger.Error("Array: Failed to collect array status: %v", err)
 		return
@@ -78,7 +81,7 @@ func (c *ArrayCollector) Collect() {
 	logger.Debug("Array: Published %s event - state=%s, disks=%d", constants.TopicArrayStatusUpdate.Name, arrayStatus.State, arrayStatus.NumDisks)
 }
 
-func (c *ArrayCollector) collectArrayStatus() (status *dto.ArrayStatus, err error) {
+func (c *ArrayCollector) collectArrayStatus(section *ini.Section, operation string, position uint64) (status *dto.ArrayStatus, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			logger.LogPanicWithStack("Array collector (collect)", r)
@@ -87,21 +90,7 @@ func (c *ArrayCollector) collectArrayStatus() (status *dto.ArrayStatus, err erro
 		}
 	}()
 
-	logger.Debug("Array: Starting collection from %s", constants.VarIni)
-	status = &dto.ArrayStatus{
-		Timestamp: time.Now(),
-	}
-
-	// Parse var.ini for array information
-	cfg, err := ini.Load(constants.VarIni)
-	if err != nil {
-		logger.Error("Array: Failed to load file: %v", err)
-		return nil, err
-	}
-	logger.Debug("Array: File loaded successfully")
-
-	// Get the default section (unnamed section)
-	section := cfg.Section("")
+	status = &dto.ArrayStatus{Timestamp: time.Now()}
 
 	// Array state
 	if section.HasKey("mdState") {
@@ -198,123 +187,55 @@ func (c *ArrayCollector) collectArrayStatus() (status *dto.ArrayStatus, err erro
 		section.Key("sbSyncErrs").String(), section.Key("sbSyncExit").String(),
 		section.Key("mdNumInvalid").String(), section.Key("mdResync").String())
 
-	// Parity check status - need to check multiple fields to detect state properly
-	// Key fields:
-	// - mdResyncPos: Current position in parity operation (>0 means operation in progress)
-	// - mdResyncDt: Delta time (0 = paused, >0 = running)
-	// - mdResyncSize: Total size for calculating progress
-	// - sbSyncAction: Type of parity operation (e.g., "check P", "check NOCORRECT")
-	var mdResyncPos, mdResyncSize uint64
-	var mdResyncDt int64
-
-	if section.HasKey("mdResyncPos") {
-		posStr := strings.Trim(section.Key("mdResyncPos").String(), `"`)
-		if pos, err := strconv.ParseUint(posStr, 10, 64); err == nil {
-			mdResyncPos = pos
-		}
+	if operation != arrayOperationUnknown {
+		status.ParityCheckStatus = operation
+	}
+	if size, err := strconv.ParseUint(section.Key("mdResyncSize").String(), 10, 64); operation != "" && size > 0 && err == nil {
+		status.ParityCheckProgress = min(100, float64(position)/float64(size)*100)
 	}
 
-	if section.HasKey("mdResyncSize") {
-		sizeStr := strings.Trim(section.Key("mdResyncSize").String(), `"`)
-		if size, err := strconv.ParseUint(sizeStr, 10, 64); err == nil {
-			mdResyncSize = size
-		}
-	}
-
-	if section.HasKey("mdResyncDt") {
-		dtStr := strings.Trim(section.Key("mdResyncDt").String(), `"`)
-		if dt, err := strconv.ParseInt(dtStr, 10, 64); err == nil {
-			mdResyncDt = dt
-		}
-	}
-
-	// Determine parity check status based on mdResyncPos and mdResyncDt
-	// - mdResyncPos > 0 AND mdResyncDt = 0 → PAUSED
-	// - mdResyncPos > 0 AND mdResyncDt > 0 → RUNNING (check, correct, etc.)
-	// - mdResyncPos = 0 → IDLE (no active operation)
-	if mdResyncPos > 0 {
-		// There is an active parity operation
-		if mdResyncDt == 0 {
-			// Operation is paused
-			status.ParityCheckStatus = "paused"
-		} else {
-			// Operation is running - get the action type
-			if section.HasKey("sbSyncAction") {
-				action := strings.Trim(section.Key("sbSyncAction").String(), `"`)
-				// Map common action values to user-friendly status
-				switch {
-				case strings.Contains(strings.ToLower(action), "check"):
-					status.ParityCheckStatus = "running"
-				case strings.Contains(strings.ToLower(action), "clear"):
-					status.ParityCheckStatus = "clearing"
-				case strings.Contains(strings.ToLower(action), "recon"):
-					status.ParityCheckStatus = "reconstructing"
-				default:
-					status.ParityCheckStatus = "running"
-				}
-			} else {
-				status.ParityCheckStatus = "running"
-			}
-		}
-
-		// Calculate progress percentage
-		if mdResyncSize > 0 {
-			status.ParityCheckProgress = float64(mdResyncPos) / float64(mdResyncSize) * 100.0
-			// Clamp to 0-100 range
-			if status.ParityCheckProgress > 100 {
-				status.ParityCheckProgress = 100
-			}
-		}
-
-		logger.Debug("Array: Parity operation detected - pos=%d, size=%d, dt=%d, status=%s, progress=%.2f%%",
-			mdResyncPos, mdResyncSize, mdResyncDt, status.ParityCheckStatus, status.ParityCheckProgress)
-	} else {
-		// No active parity operation
-		status.ParityCheckStatus = ""
-		status.ParityCheckProgress = 0
-	}
-
-	// Get array size information from /mnt/user filesystem
-	// /mnt/user is the shfs (Unraid user share filesystem) that represents the entire array
-	c.enrichWithArraySize(status)
+	c.enrichWithArraySize(status, operation)
 
 	logger.Debug("Array: Parsed status - state=%s, disks=%d, parity=%v, used=%.1f%%",
 		status.State, status.NumDisks, status.ParityValid, status.UsedPercent)
 	return status, nil
 }
 
-// enrichWithArraySize gets total array size and usage from /mnt/user
-func (c *ArrayCollector) enrichWithArraySize(status *dto.ArrayStatus) {
-	// Use syscall.Statfs to get filesystem statistics for /mnt/user
-	var stat syscall.Statfs_t
-	if err := syscall.Statfs("/mnt/user", &stat); err != nil {
-		logger.Debug("Array: Failed to get /mnt/user stats: %v", err)
+type arrayCapacity struct {
+	total, free uint64
+	sampledAt   time.Time
+}
+
+// Reuse the last idle sample during an array operation. The shfs statfs
+// request can fan out to the participating disks.
+func (c *ArrayCollector) enrichWithArraySize(status *dto.ArrayStatus, operation string) {
+	if !status.IsStarted() {
+		c.capacity = arrayCapacity{}
 		return
 	}
-
-	// Calculate sizes in bytes (safe conversion - Bsize is always positive)
-	//nolint:gosec // G115: Bsize is always positive on Linux systems
-	bsize := uint64(stat.Bsize)
-	totalBytes := stat.Blocks * bsize
-	freeBytes := stat.Bfree * bsize
-	usedBytes := totalBytes - freeBytes
-
-	status.TotalBytes = totalBytes
-	status.FreeBytes = freeBytes
-
-	// Calculate usage percentage
-	if totalBytes > 0 {
-		status.UsedPercent = float64(usedBytes) / float64(totalBytes) * 100
+	if operation == "" {
+		var stat syscall.Statfs_t
+		if err := c.statfs("/mnt/user", &stat); err != nil {
+			logger.Debug("Array: Failed to get /mnt/user stats: %v", err)
+		} else if stat.Bsize > 0 && stat.Blocks <= math.MaxUint64/uint64(stat.Bsize) && stat.Bfree <= stat.Blocks {
+			size := uint64(stat.Bsize) // #nosec G115 -- Bsize is checked above.
+			c.capacity = arrayCapacity{total: stat.Blocks * size, free: stat.Bfree * size, sampledAt: status.Timestamp}
+		}
 	}
-
-	logger.Debug("Array: Size - total=%d bytes (%.2f TB), used=%.1f%%",
-		totalBytes, float64(totalBytes)/(1024*1024*1024*1024), status.UsedPercent)
+	if c.capacity.sampledAt.IsZero() {
+		return
+	}
+	status.CapacitySampledAt = new(c.capacity.sampledAt)
+	status.TotalBytes, status.FreeBytes = c.capacity.total, c.capacity.free
+	if status.TotalBytes > 0 {
+		status.UsedPercent = float64(status.TotalBytes-status.FreeBytes) / float64(status.TotalBytes) * 100
+	}
 }
 
 // countParityDisks counts the number of parity disks from disks.ini
 func (c *ArrayCollector) countParityDisks() int {
 	// Parse disks.ini to count active parity disks
-	cfg, err := ini.Load(constants.DisksIni)
+	cfg, err := ini.Load(c.disksIni)
 	if err != nil {
 		logger.Debug("Array: Failed to load disks.ini: %v", err)
 		return 0
