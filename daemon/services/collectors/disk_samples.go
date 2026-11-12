@@ -39,3 +39,33 @@ func (c *DiskCollector) enrichDiskSMART(disk *dto.DiskInfo, idle bool, samples m
 		disk.PowerOnHours, disk.PowerCycleCount = sample.powerOnHours, sample.powerCycles
 	}
 }
+
+// A disk can be reassigned or remounted while the agent is running. Only reuse
+// capacity for the same disk, slot and filesystem mount.
+type diskCapacityIdentity struct {
+	diskIdentity
+	name, mountPoint, filesystem string
+}
+
+type diskCapacitySample struct {
+	size, used, free uint64
+	usagePercent     float64
+}
+
+func (c *DiskCollector) retainDiskCapacity(disk *dto.DiskInfo, idle, measured bool, samples map[diskCapacityIdentity]diskCapacitySample) {
+	if disk.ID == "" || disk.Device == "" {
+		return
+	}
+	key := diskCapacityIdentity{diskIdentity{disk.ID, disk.Device}, disk.Name, disk.MountPoint, disk.FileSystem}
+	if measured || disk.FreeFromSource {
+		samples[key] = diskCapacitySample{disk.Size, disk.Used, disk.Free, disk.UsagePercent}
+		return
+	}
+	if sample, ok := c.capacity[key]; ok {
+		samples[key] = sample
+		if !idle {
+			disk.Size, disk.Used, disk.Free = sample.size, sample.used, sample.free
+			disk.UsagePercent = sample.usagePercent
+		}
+	}
+}

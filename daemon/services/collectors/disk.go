@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"strconv"
@@ -39,6 +40,7 @@ type DiskCollector struct {
 	probeDockerDisk func() *dto.DiskInfo
 	dockerDisk      *dto.DiskInfo
 	smart           map[diskIdentity]diskSMARTSample
+	capacity        map[diskCapacityIdentity]diskCapacitySample
 }
 
 type zfsPoolUsage struct {
@@ -79,7 +81,7 @@ func (c *DiskCollector) Collect() {
 		f, openErr := os.Open(c.disksIni)
 		if openErr != nil {
 			c.ctx.Platform.Report("disk", dto.SourceUnavailable, "cannot read disks.ini", openErr)
-			logger.Error("Disk: Failed to open %s: %v", constants.DisksIni, openErr)
+			logger.Error("Disk: Failed to open %s: %v", c.disksIni, openErr)
 			return // nothing valid to publish
 		}
 		_ = f.Close()
@@ -321,7 +323,8 @@ func (c *DiskCollector) enrichDisks(disks []dto.DiskInfo, idle bool) {
 	if idle {
 		zfsPoolUsages = c.getZFSPoolUsages()
 	}
-	samples := make(map[diskIdentity]diskSMARTSample, len(disks))
+	smartSamples := make(map[diskIdentity]diskSMARTSample, len(disks))
+	capacitySamples := make(map[diskCapacityIdentity]diskCapacitySample, len(disks))
 
 	for i := range disks {
 		// Get model and serial number
@@ -330,24 +333,26 @@ func (c *DiskCollector) enrichDisks(disks []dto.DiskInfo, idle bool) {
 		// Get I/O statistics
 		c.enrichWithIOStats(&disks[i])
 
-		c.enrichDiskSMART(&disks[i], idle, samples)
+		c.enrichDiskSMART(&disks[i], idle, smartSamples)
 
 		// Keep mount metadata when a capacity fallback would touch a disk.
-		c.enrichWithMountInfo(&disks[i], idle)
+		mountMeasured := c.enrichWithMountInfo(&disks[i], idle)
 
 		// Get disk role
 		c.enrichWithRole(&disks[i])
 
 		// Without INI capacity, use pool-level usage for ZFS cache/pool disks
 		// so mirrored pools and child datasets report the same numbers as Unraid.
-		c.enrichWithZFSPoolUsage(&disks[i], zfsPoolUsages)
+		poolMeasured := c.enrichWithZFSPoolUsage(&disks[i], zfsPoolUsages)
+		c.retainDiskCapacity(&disks[i], idle, mountMeasured || poolMeasured, capacitySamples)
 
 		// Get spin state
 		if disks[i].Device != "" {
 			c.enrichWithSpinState(&disks[i])
 		}
 	}
-	c.smart = samples
+	c.smart = smartSamples
+	c.capacity = capacitySamples
 }
 
 // enrichWithModelAndSerial extracts model and serial number from sysfs and disk ID.
@@ -774,16 +779,16 @@ func parseSMARTAttributes(lines []string) map[string]dto.SMARTAttribute {
 	return attrs
 }
 
-// enrichWithMountInfo adds mount point and usage information
-func (c *DiskCollector) enrichWithMountInfo(disk *dto.DiskInfo, probeCapacity bool) {
+// enrichWithMountInfo adds mount metadata and reports whether it measured capacity.
+func (c *DiskCollector) enrichWithMountInfo(disk *dto.DiskInfo, probeCapacity bool) bool {
 	if disk.Name == "" {
-		return
+		return false
 	}
 
 	// Read /proc/mounts to find mount point
 	data, err := os.ReadFile(diskMountsPath)
 	if err != nil {
-		return
+		return false
 	}
 
 	// For Unraid array disks, the mount point is /mnt/diskN where N is the disk number
@@ -817,32 +822,27 @@ func (c *DiskCollector) enrichWithMountInfo(disk *dto.DiskInfo, probeCapacity bo
 	}
 
 	if mountPoint == "" {
-		return
+		return false
 	}
 
 	disk.MountPoint = mountPoint
 	if disk.FreeFromSource || !probeCapacity {
-		return
+		return false
 	}
 
-	// Get filesystem statistics using statfs
 	var stat syscall.Statfs_t
-	if err := diskStatfs(disk.MountPoint, &stat); err == nil {
-		// Calculate sizes in bytes (safe conversion - Bsize is always positive)
-		//nolint:gosec // G115: Bsize is always positive on Linux systems
-		bsize := uint64(stat.Bsize)
-		totalBytes := stat.Blocks * bsize
-		freeBytes := stat.Bfree * bsize
-		usedBytes := totalBytes - freeBytes
-
-		disk.Used = usedBytes
-		disk.Free = freeBytes
-
-		// Calculate usage percentage
-		if totalBytes > 0 {
-			disk.UsagePercent = float64(usedBytes) / float64(totalBytes) * 100
-		}
+	if err := diskStatfs(disk.MountPoint, &stat); err != nil || stat.Bsize <= 0 || stat.Blocks == 0 || stat.Bfree > stat.Blocks {
+		return false
 	}
+	bsize := uint64(stat.Bsize) // #nosec G115 -- Bsize is checked above.
+	if stat.Blocks > math.MaxUint64/bsize {
+		return false
+	}
+	totalBytes := stat.Blocks * bsize
+	disk.Free = stat.Bfree * bsize
+	disk.Used = totalBytes - disk.Free
+	disk.UsagePercent = float64(disk.Used) / float64(totalBytes) * 100
+	return true
 }
 
 // enrichWithRole preserves source roles and determines missing roles from disk name/ID.

@@ -71,6 +71,9 @@ func TestDiskCollectionUsesNativeTelemetryWithoutProbingDuringMaintenance(t *tes
 				disk.SMARTExitStatus != step.exit || smartCalls != step.probes || statCalls != step.probes {
 				t.Fatalf("state=%q: disk=%+v SMART probes=%d capacity probes=%d", step.native, disk, smartCalls, statCalls)
 			}
+			if step.probes > 0 && (disk.Free != 3*4096 || disk.Used != 7*4096 || disk.UsagePercent != 70) {
+				t.Fatalf("state=%q: capacity=(free=%d used=%d percent=%g)", step.native, disk.Free, disk.Used, disk.UsagePercent)
+			}
 			if dockerCalls != step.probes {
 				t.Fatalf("state=%q: Docker vDisk probes=%d, want %d", step.native, dockerCalls, step.probes)
 			}
@@ -80,5 +83,45 @@ func TestDiskCollectionUsesNativeTelemetryWithoutProbingDuringMaintenance(t *tes
 		case <-time.After(time.Second):
 			t.Fatal("Disk Health did not publish")
 		}
+	}
+}
+
+func TestDiskCapacityCacheUsesNativeValuesAndEvictsOldDisks(t *testing.T) {
+	c := NewDiskCollector(&domain.Context{})
+	statCalls := 0
+	mockDiskMounts(t, "/dev/md1p1 /mnt/disk1 xfs rw 0 0\n", func(_ string, stat *syscall.Statfs_t) error {
+		statCalls++
+		stat.Blocks = 10
+		stat.Bfree = 3
+		stat.Bsize = 4096
+		return nil
+	})
+	fresh := dto.DiskInfo{ID: "original", Device: "fixture", Name: "disk1", FileSystem: "xfs", Size: 40960}
+	native := fresh
+	native.FreeFromSource, native.Used, native.UsagePercent = true, fresh.Size, 100
+	replacement := fresh
+	replacement.ID = "replacement"
+	c.probeSMART = func(*dto.DiskInfo) {}
+
+	for _, step := range []struct {
+		name       string
+		disk       dto.DiskInfo
+		idle       bool
+		free, used uint64
+	}{
+		{"idle probe", fresh, true, 12288, 28672},
+		{"native full disk", native, false, 0, 40960},
+		{"reuse native reading", fresh, false, 0, 40960},
+		{"disk replaced in same slot", replacement, false, 0, 0},
+		{"previous identity returns after eviction", fresh, false, 0, 0},
+	} {
+		disks := []dto.DiskInfo{step.disk}
+		c.enrichDisks(disks, step.idle)
+		if got := disks[0]; got.Free != step.free || got.Used != step.used {
+			t.Errorf("%s: free=%d used=%d, want free=%d used=%d", step.name, got.Free, got.Used, step.free, step.used)
+		}
+	}
+	if statCalls != 1 {
+		t.Errorf("statfs calls = %d, want 1", statCalls)
 	}
 }

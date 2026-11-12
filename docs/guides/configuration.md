@@ -87,9 +87,9 @@ last started a collection.
 
 During an active or paused parity operation, Array Status reuses its last capacity measurement
 and Disk Health uses native disk telemetry. Disk Health skips direct SMART and fallback disk
-capacity queries during this time. It retains the last measured SMART result for disks it can
-identify and reuses the most recent Docker vDisk sample. Both collectors resume their normal
-probes once Unraid reports that the operation has finished.
+capacity queries during this time. It reuses the last SMART and capacity samples for the same
+disk when current readings are unavailable, and reuses the most recent Docker vDisk sample. Both
+collectors resume their normal probes once Unraid reports that the operation has finished.
 
 **What Dynamic mode does.** Each collector has a built-in _active_ and _idle_ interval:
 
