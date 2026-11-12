@@ -97,3 +97,27 @@ func TestPluginControllerCancellationReleasesSlotWithoutResolvingStaleData(t *te
 		t.Fatal("canceled refresh retained the check slot")
 	}
 }
+
+func TestPluginControllerReportsInventoryErrorsAndOnlyInstallableUpdates(t *testing.T) {
+	pc := NewPluginController()
+	offline := errors.New("fixture inventory unavailable")
+	pc.targets = func(context.Context) ([]string, error) { return nil, offline }
+	if _, err := pc.CheckPluginUpdates(t.Context()); !errors.Is(err, offline) {
+		t.Fatal("expected registration error:", err)
+	}
+	pc.targets = func(context.Context) ([]string, error) { return nil, nil }
+	pc.resolve = func(context.Context) (*dto.PluginList, error) { return nil, offline }
+	if _, err := pc.CheckPluginUpdates(t.Context()); !errors.Is(err, offline) {
+		t.Fatal("expected resolution error:", err)
+	}
+	pc.resolve = func(context.Context) (*dto.PluginList, error) {
+		return &dto.PluginList{UpdatesAvailable: 1, Plugins: []dto.PluginInfo{
+			{Name: "installable", UpdateAvailable: true, UpdateStatus: "update_available"},
+			{Name: "incompatible", UpdateStatus: "update_incompatible"},
+		}}, nil
+	}
+	got, err := pc.CheckPluginUpdates(t.Context())
+	if err != nil || len(got) != 1 || got[0].Name != "installable" {
+		t.Fatalf("unexpected installable updates: %+v, %v", got, err)
+	}
+}

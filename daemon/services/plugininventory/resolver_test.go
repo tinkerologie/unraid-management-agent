@@ -1,6 +1,8 @@
 package plugininventory
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -131,5 +133,112 @@ func TestResolverUsesNativePluginInventoryAndUpdateRules(t *testing.T) {
 	}
 	if len(want) != 0 {
 		t.Fatalf("missing plugins: %v", want)
+	}
+}
+
+func TestManifestDecodesNestedXMLReferences(t *testing.T) {
+	path := writePluginFixture(t, `<!DOCTYPE PLUGIN [
+		<!ENTITY prefix "Name &amp; &lt;sample&gt;">
+		<!ENTITY author "&prefix; &apos;quoted&apos; &quot;value&quot; &#65;&#x42;">
+		<!ENTITY label "&prefix; test">
+	]><PLUGIN name="&label;" author="&author;"/>`)
+	got, _, err := parseManifest(path)
+	if err != nil || got.Name != "Name & <sample> test" || got.Author != "Name & <sample> 'quoted' \"value\" AB" {
+		t.Fatalf("manifest text did not decode: %+v, %v", got, err)
+	}
+	if _, ok := xmlEntityLiteral("#0"); ok {
+		t.Fatal("accepted an XML control character")
+	}
+}
+
+func TestManifestRejectsInvalidRootAndOversizedFiles(t *testing.T) {
+	for _, tc := range []struct{ name, input, want string }{
+		{"wrong-root", "<OTHER/>", "one PLUGIN root"},
+		{"trailing-text", "<PLUGIN/>text", "unexpected text"},
+		{"empty", "<!-- fixture -->", "missing PLUGIN root"},
+		{"oversized", strings.Repeat("x", manifestLimit+1), "exceeds size limit"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, _, err := parseManifest(writePluginFixture(t, tc.input)); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("expected %q, got %v", tc.want, err)
+			}
+		})
+	}
+	if _, _, err := parseManifest(t.TempDir()); err == nil || !strings.Contains(err.Error(), "regular file") {
+		t.Fatalf("manifest must be a file: %v", err)
+	}
+}
+
+func writePluginFixture(t *testing.T, contents string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "sample.plg")
+	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func TestResolverHandlesMissingUnreadableAndCanceledInventory(t *testing.T) {
+	resolver := NewResolver()
+	resolver.RuntimeDir = filepath.Join(t.TempDir(), "missing")
+	resolver.OSVersionPath = filepath.Join(t.TempDir(), "missing")
+	list, err := resolver.Resolve(t.Context())
+	if err != nil || list.TotalCount != 0 {
+		t.Fatalf("unregistered system inventory: %+v, %v", list, err)
+	}
+
+	resolver.RuntimeDir = writePluginFixture(t, "<PLUGIN/>")
+	if _, err := resolver.Resolve(t.Context()); err == nil || !strings.Contains(err.Error(), "read runtime plugin inventory") {
+		t.Fatal("expected inventory directory error:", err)
+	}
+	if _, err := resolver.CheckTargets(t.Context()); err == nil {
+		t.Fatal("refresh targets hid an inventory directory error")
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if _, err := resolver.Resolve(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatal("canceled resolver did not return context cancellation:", err)
+	}
+}
+
+func TestResolverUsesDeclaredNamesAndRejectsInvalidVersionSources(t *testing.T) {
+	resolver := NewResolver()
+	resolver.RuntimeDir = t.TempDir()
+	resolver.CandidateDir = t.TempDir()
+	for name, contents := range map[string]string{
+		"fallback.plg": `<PLUGIN version="1"/>`,
+		"alpha.plg":    `<PLUGIN name="duplicate" version="1"/>`,
+		"beta.plg":     `<PLUGIN name="duplicate" version="2"/>`,
+		"builtin.plg":  `<PLUGIN name="unRAIDServer"/>`,
+	} {
+		target := filepath.Join(t.TempDir(), name)
+		if err := os.WriteFile(target, []byte(contents), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(target, filepath.Join(resolver.RuntimeDir, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	builtIn := filepath.Join(t.TempDir(), "unRAIDServer.plg")
+	if err := os.Symlink(builtIn, filepath.Join(resolver.RuntimeDir, "alias.plg")); err != nil {
+		t.Fatal(err)
+	}
+	for _, contents := range []string{"other=7.4.0\n", strings.Repeat("x", 1025)} {
+		resolver.OSVersionPath = writePluginFixture(t, contents)
+		if got := resolver.osVersion(); got != "" {
+			t.Fatalf("invalid OS version source returned %q", got)
+		}
+	}
+	if !compatible(manifest{}, "7.4.0") {
+		t.Fatal("unbounded manifest should support current Unraid")
+	}
+	if marker := readInvalidMarker(writePluginFixture(t, "{")); marker != (invalidMarker{}) {
+		t.Fatalf("malformed marker classified as a failed update: %+v", marker)
+	}
+	got, err := resolver.Resolve(t.Context())
+	if err != nil || len(got.Plugins) != 2 || got.Plugins[0].Name != "duplicate" ||
+		got.Plugins[0].Version != "1" || got.Plugins[1].Name != "fallback" {
+		t.Fatalf("unexpected registered inventory %+v: %v", got, err)
 	}
 }

@@ -88,3 +88,38 @@ func TestMoverNativeStatusAndProgress(t *testing.T) {
 		})
 	}
 }
+
+func TestMoverDetectionRetriesAfterSourcesBecomeAvailable(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "mover")
+	version := "unknown"
+	path := bin
+	checker := &moverChecker{
+		version: func() string { return version },
+		stat:    func(string) (os.FileInfo, error) { return os.Stat(path) },
+	}
+	if checker.supportsNative() {
+		t.Fatal("invalid version enabled native Mover")
+	}
+	version = "7.4.0"
+	if checker.supportsNative() {
+		t.Fatal("missing executable enabled native Mover")
+	}
+	path = dir
+	if checker.supportsNative() {
+		t.Fatal("directory enabled native Mover")
+	}
+	path = bin
+	if err := os.WriteFile(bin, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if checker.supportsNative() {
+		t.Fatal("non-executable file enabled native Mover")
+	}
+	if err := os.Chmod(bin, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if !checker.supportsNative() {
+		t.Fatal("native Mover did not recover when executable became available")
+	}
+}
