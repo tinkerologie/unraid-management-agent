@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `lspci`. Non-display functions, such as a `Non-VGA unclassified device`, an HDMI audio function, or
   a device with the vendor name only in its subsystem fields, are no longer reported as GPUs.
   Intel `3D controller` devices are now detected (#346).
+- Report `temperature_celsius` for Intel Arc GPUs on the `xe` driver instead of `null`. The agent reads
+  the hwmon channel with the label `pkg` or `package`, or else the first channel without a `vram` label (#345).
 
 ## [2026.11.05] - 2026-11-12
 

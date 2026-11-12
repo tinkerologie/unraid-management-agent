@@ -90,6 +90,76 @@ func TestIntelPCIBoundMetadata(t *testing.T) {
 	}
 }
 
+func TestIntelTemperatureChannelSelection(t *testing.T) {
+	const pci = "0000:04:00.0"
+	dev := "bus/pci/devices/" + pci + "/hwmon/"
+	for _, tt := range []struct {
+		name  string
+		files map[string]string
+		want  *float64
+	}{
+		{"xe package and vram without temp1", map[string]string{
+			dev + "hwmon3/temp2_input": "46000", dev + "hwmon3/temp2_label": "pkg\n",
+			dev + "hwmon3/temp3_input": "48000", dev + "hwmon3/temp3_label": "vram\n",
+		}, new(46.0)},
+		{"unlabelled temp1", map[string]string{dev + "hwmon0/temp1_input": "42500"}, new(42.5)},
+		{"padded mixed-case package label", map[string]string{
+			dev + "hwmon0/temp1_input": "30000",
+			dev + "hwmon0/temp2_input": "45000", dev + "hwmon0/temp2_label": "  Package \n",
+		}, new(45.0)},
+		{"NaN package falls back to non-vram channel", map[string]string{
+			dev + "hwmon0/temp2_input": "NaN", dev + "hwmon0/temp2_label": "pkg",
+			dev + "hwmon0/temp3_input": "48000", dev + "hwmon0/temp3_label": "vram",
+			dev + "hwmon0/temp4_input": "44000",
+		}, new(44.0)},
+		{"garbled package falls back to non-vram channel", map[string]string{
+			dev + "hwmon0/temp2_input": "garbled", dev + "hwmon0/temp2_label": "pkg",
+			dev + "hwmon0/temp3_input": "48000", dev + "hwmon0/temp3_label": "vram",
+			dev + "hwmon0/temp4_input": "44000", dev + "hwmon0/temp4_label": "gt",
+		}, new(44.0)},
+		{"vram only", map[string]string{
+			dev + "hwmon0/temp3_input": "48000", dev + "hwmon0/temp3_label": "vram",
+		}, nil},
+		{"vram channel only", map[string]string{
+			dev + "hwmon0/temp3_input": "48000", dev + "hwmon0/temp3_label": "vram_ch_0",
+		}, nil},
+		{"temp2 before temp10", map[string]string{
+			dev + "hwmon0/temp10_input": "50000",
+			dev + "hwmon0/temp2_input":  "41000",
+		}, new(41.0)},
+		{"hwmon2 before hwmon10", map[string]string{
+			dev + "hwmon10/temp1_input": "50000",
+			dev + "hwmon2/temp1_input":  "41000",
+		}, new(41.0)},
+		{"measured zero package", map[string]string{
+			dev + "hwmon0/temp1_input": "30000",
+			dev + "hwmon0/temp2_input": "0", dev + "hwmon0/temp2_label": "pkg",
+		}, new(0.0)},
+		{"package on another PCI device", map[string]string{
+			"bus/pci/devices/0000:03:00.0/hwmon/hwmon0/temp2_input": "99000",
+			"bus/pci/devices/0000:03:00.0/hwmon/hwmon0/temp2_label": "pkg",
+			dev + "hwmon1/temp1_input":                              "41000",
+		}, new(41.0)},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			root := t.TempDir()
+			for path, value := range tt.files {
+				writeSensorFixture(t, filepath.Join(root, path), value)
+			}
+			temp, err := (&GPUCollector{sysfsRoot: root}).getIntelGPUTemp(pci)
+			if tt.want == nil {
+				if err == nil {
+					t.Errorf("temperature = %v, want unknown", temp)
+				}
+				return
+			}
+			if err != nil || temp != *tt.want {
+				t.Errorf("temperature = %v, error = %v; want %v", temp, err, *tt.want)
+			}
+		})
+	}
+}
+
 func TestNvidiaNullableMeasurements(t *testing.T) {
 	for _, marker := range []string{"[N/A]", "[Not Supported]", "", "garbled", "NaN", "Inf", "0"} {
 		t.Run(marker, func(t *testing.T) {

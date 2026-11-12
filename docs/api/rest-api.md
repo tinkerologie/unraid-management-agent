@@ -2432,6 +2432,10 @@ Get GPU information and metrics.
 Memory utilisation requires both total and used memory readings and a positive total.
 This contract applies to all GPU vendors, including unsupported NVIDIA and unreadable AMD measurements.
 
+For Intel GPUs, the agent reads `temperature_celsius` from the PCI device's hwmon channel with the label `pkg` or
+`package`. If there is no usable package channel, the agent uses the first usable channel without a `vram` label.
+The agent does not report VRAM temperature in `temperature_celsius`.
+
 Intel temperature is read only from the detected PCI device's hwmon; CPU temperature remains separate.
 Intel `driver_version` is the bound driver name (`i915` or `xe`), followed by a space and the contents of
 `/sys/module/<driver>/version` when available (for example `xe 1.2.3`). It is empty if no supported bound driver
