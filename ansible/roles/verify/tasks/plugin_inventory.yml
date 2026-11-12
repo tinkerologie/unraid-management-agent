@@ -1,0 +1,42 @@
+---
+- name: Read the native registered user-plugin inventory
+  ansible.builtin.raw: |
+    for link in /var/log/plugins/*.plg; do
+      [ -L "$link" ] && [ -f "$link" ] || continue
+      manifest=$(readlink -f "$link") || continue
+      name=$(/usr/local/sbin/plugin name "$manifest") || continue
+      case "${link##*/}:${manifest##*/}:${name:-}" in
+        unRAIDServer.plg:*|unRAIDServer-.plg:*|*:unRAIDServer.plg:*|*:unRAIDServer-.plg:*|*:unRAIDServer|*:unRAIDServer-) continue ;;
+      esac
+      if [ -z "$name" ]; then
+        name=${manifest##*/}
+        name=${name%.plg}
+      fi
+      printf '%s\n' "$name"
+    done | LC_ALL=C sort -u
+  changed_when: false
+  no_log: true
+  register: native_plugin_inventory
+
+- name: Read the agent plugin inventory and update summary
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ api_port }}/api/v1/{{ item }}"
+    method: GET
+    status_code: 200
+  loop: [plugins, updates]
+  no_log: true
+  register: plugin_inventory_views
+
+- name: Verify plugin registration and update counts
+  vars:
+    inventory: "{{ plugin_inventory_views.results[0].json }}"
+    summary: "{{ plugin_inventory_views.results[1].json }}"
+  ansible.builtin.assert:
+    that:
+      - inventory.plugins | map(attribute='name') | list | sort == native_plugin_inventory.stdout_lines | sort
+      - inventory.total_count == summary.total_plugins
+      - inventory.updates_available == summary.plugin_updates_count
+    success_msg: The agent plugin inventory matches native registration and its update summary.
+    fail_msg: Plugin registration or update counts differ between native Unraid and the agent.
+    quiet: true

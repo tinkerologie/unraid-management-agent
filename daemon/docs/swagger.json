@@ -6891,6 +6891,11 @@
         "dto.ContainerInfo": {
             "type": "object",
             "properties": {
+                "configured_memory_limit_bytes": {
+                    "description": "ConfiguredMemoryLimit is the Docker hard cap in bytes. Zero means unlimited.\nOmitted means unavailable. MemoryLimit remains the live statistics denominator.",
+                    "type": "integer",
+                    "example": 536870912
+                },
                 "cpu_percent": {
                     "type": "number",
                     "example": 5.2
@@ -6955,6 +6960,13 @@
                 "network_tx_bytes_per_sec": {
                     "type": "number",
                     "example": 512
+                },
+                "networks": {
+                    "description": "Networks lists running-container attachments in network-name order.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.ContainerNetworkAttachment"
+                    }
                 },
                 "port_mappings": {
                     "type": "array",
@@ -7042,6 +7054,31 @@
                 },
                 "timestamp": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.ContainerNetworkAttachment": {
+            "type": "object",
+            "properties": {
+                "ip_address": {
+                    "type": "string",
+                    "example": "172.17.0.2"
+                },
+                "ipv6_address": {
+                    "type": "string",
+                    "example": "2001:db8::2"
+                },
+                "mac_address": {
+                    "type": "string",
+                    "example": "02:42:ac:11:00:02"
+                },
+                "network": {
+                    "type": "string",
+                    "example": "bridge"
+                },
+                "network_id": {
+                    "type": "string",
+                    "example": "abc123"
                 }
             }
         },
@@ -7549,6 +7586,10 @@
                     "additionalProperties": {
                         "type": "string"
                     }
+                },
+                "membership_unavailable": {
+                    "description": "Docker could not inspect the network membership.",
+                    "type": "boolean"
                 },
                 "name": {
                     "type": "string",
@@ -9155,14 +9196,18 @@
             "type": "object",
             "properties": {
                 "active": {
-                    "description": "Active indicates whether the mover is currently running (from var.ini shareMoverActive).",
+                    "description": "Active indicates whether Mover is running.",
                     "type": "boolean",
                     "example": false
                 },
                 "current_throughput_mbs": {
-                    "description": "CurrentThroughputMBs is the live throughput in MB/s. Always 0 in the conservative\nimplementation (live throughput tracking is out of scope).",
+                    "description": "CurrentThroughputMBs is the live decimal MB/s, or zero when unavailable.",
                     "type": "number",
                     "example": 0
+                },
+                "eta_seconds": {
+                    "type": "integer",
+                    "x-nullable": true
                 },
                 "last_run_bytes_moved": {
                     "description": "LastRunBytesMoved is the total bytes moved during the last run.",
@@ -9189,10 +9234,36 @@
                     "type": "string",
                     "example": "2026-05-30T03:40:00Z"
                 },
+                "progress_moved_bytes": {
+                    "type": "integer",
+                    "x-nullable": true
+                },
+                "progress_percent": {
+                    "type": "number",
+                    "x-nullable": true
+                },
+                "progress_remaining_bytes": {
+                    "type": "integer",
+                    "x-nullable": true
+                },
+                "progress_total_bytes": {
+                    "description": "Live progress fields are null when native progress is unavailable.",
+                    "type": "integer",
+                    "x-nullable": true
+                },
                 "schedule": {
                     "description": "Schedule is the cron schedule expression for the mover (from var.ini shareMoverSchedule).",
                     "type": "string",
                     "example": "40 3 * * *"
+                },
+                "status_source": {
+                    "description": "StatusSource identifies the activity source, native or legacy.",
+                    "type": "string",
+                    "example": "native"
+                },
+                "throughput_bytes_per_second": {
+                    "type": "integer",
+                    "x-nullable": true
                 },
                 "timestamp": {
                     "description": "Timestamp is when this status was collected.",
@@ -10733,10 +10804,19 @@
                     "type": "boolean",
                     "example": false
                 },
+                "update_status": {
+                    "description": "Native Plugin Manager update state",
+                    "type": "string",
+                    "example": "up_to_date"
+                },
                 "url": {
                     "description": "Plugin URL",
                     "type": "string",
                     "example": "https://..."
+                },
+                "validation_message": {
+                    "description": "Reason the candidate failed validation",
+                    "type": "string"
                 },
                 "version": {
                     "description": "Current installed version",

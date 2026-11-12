@@ -2792,11 +2792,11 @@ func (s *Server) handleDiskSettingsExtended(w http.ResponseWriter, _ *http.Reque
 //	@Success		200	{object}	dto.MoverSettings	"Mover settings and status"
 //	@Failure		500	{object}	dto.Response		"Failed to get settings"
 //	@Router			/settings/mover [get]
-func (s *Server) handleMoverSettings(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleMoverSettings(w http.ResponseWriter, r *http.Request) {
 	logger.Debug("API: Getting mover settings")
 
 	settingsCollector := collectors.NewSettingsCollector()
-	settings, err := settingsCollector.GetMoverSettings()
+	settings, err := settingsCollector.GetMoverSettingsContext(r.Context())
 
 	if err != nil {
 		logger.Error("API: Failed to get mover settings: %v", err)
@@ -2876,11 +2876,11 @@ func (s *Server) handleServiceStatus(w http.ResponseWriter, _ *http.Request) {
 //	@Success		200	{object}	dto.PluginList	"List of installed plugins"
 //	@Failure		500	{object}	dto.Response	"Failed to get plugins"
 //	@Router			/plugins [get]
-func (s *Server) handlePluginList(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handlePluginList(w http.ResponseWriter, r *http.Request) {
 	logger.Debug("API: Getting plugin list")
 
 	settingsCollector := collectors.NewSettingsCollector()
-	plugins, err := settingsCollector.GetPluginList()
+	plugins, err := settingsCollector.GetPluginList(r.Context())
 
 	if err != nil {
 		logger.Error("API: Failed to get plugin list: %v", err)
@@ -2904,11 +2904,11 @@ func (s *Server) handlePluginList(w http.ResponseWriter, _ *http.Request) {
 //	@Success		200	{object}	dto.UpdateStatus	"Update availability status"
 //	@Failure		500	{object}	dto.Response		"Failed to get update status"
 //	@Router			/updates [get]
-func (s *Server) handleUpdateStatus(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleUpdateStatus(w http.ResponseWriter, r *http.Request) {
 	logger.Debug("API: Getting update status")
 
 	settingsCollector := collectors.NewSettingsCollector()
-	status, err := settingsCollector.GetUpdateStatus()
+	status, err := settingsCollector.GetUpdateStatus(r.Context())
 
 	if err != nil {
 		logger.Error("API: Failed to get update status: %v", err)

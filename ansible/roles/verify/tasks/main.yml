@@ -8,6 +8,9 @@
 - name: Response schema validation
   ansible.builtin.include_tasks: schemas.yml
 
+- name: Native plugin inventory parity
+  ansible.builtin.include_tasks: plugin_inventory.yml
+
 - name: Parameterized endpoint tests
   ansible.builtin.include_tasks: parameterized.yml
 

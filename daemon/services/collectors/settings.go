@@ -2,7 +2,7 @@ package collectors
 
 import (
 	"bufio"
-	"fmt"
+	"context"
 	"io"
 	"maps"
 	"os"
@@ -17,10 +17,12 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 	"github.com/tinkerologie/unraid-management-agent/daemon/lib"
 	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/plugininventory"
 )
 
 // SettingsCollector collects extended settings information from Unraid configuration files
 type SettingsCollector struct {
+	mover *moverChecker
 	// readFile reads /etc/inetd.conf and the /proc/net/tcp tables for the FTP
 	// status. Nil means os.ReadFile; tests inject a fake.
 	readFile func(name string) ([]byte, error)
@@ -182,6 +184,23 @@ func (c *SettingsCollector) parseDynamixCfg(settings *dto.DiskSettingsExtended) 
 // GetMoverSettings reads mover configuration and status
 // This addresses Issue #48: Expose mover schedule and status via API
 func (c *SettingsCollector) GetMoverSettings() (*dto.MoverSettings, error) {
+	return c.GetMoverSettingsContext(context.Background())
+}
+
+// GetMoverSettingsContext reads Mover settings and checks native activity with the request context.
+func (c *SettingsCollector) GetMoverSettingsContext(ctx context.Context) (*dto.MoverSettings, error) {
+	settings, _ := c.moverSettings(ctx)
+	return settings, nil
+}
+
+func (c *SettingsCollector) moverSource() *moverChecker {
+	if c.mover != nil {
+		return c.mover
+	}
+	return hostMover
+}
+
+func (c *SettingsCollector) moverSettings(ctx context.Context) (*dto.MoverSettings, string) {
 	settings := &dto.MoverSettings{
 		Timestamp: time.Now(),
 	}
@@ -191,12 +210,14 @@ func (c *SettingsCollector) GetMoverSettings() (*dto.MoverSettings, error) {
 		logger.Debug("Settings: Could not read mover status from var.ini: %v", err)
 	}
 
-	return settings, nil
+	active, source := c.moverSource().activity(ctx, settings.Active)
+	settings.Active = active
+	return settings, source
 }
 
 // parseMoverFromVarIni reads mover settings from /var/local/emhttp/var.ini
 func (c *SettingsCollector) parseMoverFromVarIni(settings *dto.MoverSettings) error {
-	file, err := os.Open(constants.VarIni)
+	file, err := c.moverSource().open(constants.VarIni)
 	if err != nil {
 		return err
 	}
@@ -548,116 +569,14 @@ func parseParityCheckCronLines(r io.Reader, schedule *dto.ParitySchedule) error 
 	return scanner.Err()
 }
 
-// GetPluginList reads the list of installed plugins
-// This addresses Issue #52: Expose installed plugins list via API
-func (c *SettingsCollector) GetPluginList() (*dto.PluginList, error) {
-	pluginList := &dto.PluginList{
-		Plugins:   []dto.PluginInfo{},
-		Timestamp: time.Now(),
-	}
-
-	// Get list of installed plugins from /boot/config/plugins/*.plg
-	installedPlugins := make(map[string]dto.PluginInfo)
-
-	files, err := filepath.Glob(filepath.Join(constants.PluginsConfigDir, "*.plg"))
-	if err != nil {
-		return pluginList, fmt.Errorf("failed to list plugins: %w", err)
-	}
-
-	for _, file := range files {
-		plugin, err := c.parsePluginFile(file)
-		if err != nil {
-			logger.Debug("Settings: Could not parse plugin file %s: %v", file, err)
-			continue
-		}
-		plugin.Enabled = true
-		installedPlugins[plugin.Name] = plugin
-	}
-
-	// Check for updates in /tmp/plugins/*.plg
-	updateFiles, err := filepath.Glob(filepath.Join(constants.PluginsTempDir, "*.plg"))
-	if err == nil {
-		for _, file := range updateFiles {
-			updatePlugin, err := c.parsePluginFile(file)
-			if err != nil {
-				continue
-			}
-
-			// Check if we have this plugin installed
-			if installed, ok := installedPlugins[updatePlugin.Name]; ok {
-				if updatePlugin.Version != installed.Version {
-					installed.UpdateAvailable = true
-					installed.LatestVersion = updatePlugin.Version
-					installedPlugins[updatePlugin.Name] = installed
-					pluginList.UpdatesAvailable++
-				}
-			}
-		}
-	}
-
-	// Convert map to slice
-	for _, plugin := range installedPlugins {
-		pluginList.Plugins = append(pluginList.Plugins, plugin)
-	}
-
-	pluginList.TotalCount = len(pluginList.Plugins)
-	return pluginList, nil
-}
-
-// parsePluginFile parses a .plg XML file to extract plugin info
-func (c *SettingsCollector) parsePluginFile(path string) (dto.PluginInfo, error) {
-	plugin := dto.PluginInfo{}
-
-	// #nosec G304 -- path points to a discovered plugin file under the trusted plugin directory.
-	file, err := os.Open(path)
-	if err != nil {
-		return plugin, err
-	}
-	defer file.Close() //nolint:errcheck // Error checking not needed for defer Close
-
-	// Extract plugin name from filename
-	basename := filepath.Base(path)
-	plugin.Name = strings.TrimSuffix(basename, ".plg")
-
-	scanner := bufio.NewScanner(file)
-	entityRe := regexp.MustCompile(`<!ENTITY\s+(\w+)\s+"([^"]*)"`)
-
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		// Parse XML entities
-		if matches := entityRe.FindStringSubmatch(line); len(matches) == 3 {
-			key := matches[1]
-			value := matches[2]
-
-			switch key {
-			case "name":
-				plugin.Name = value
-			case "version":
-				plugin.Version = value
-			case "author":
-				plugin.Author = value
-			case "pluginURL":
-				plugin.URL = value
-			case "support":
-				plugin.SupportURL = value
-			case "icon":
-				plugin.Icon = value
-			}
-		}
-
-		// Stop after DOCTYPE section (entities are defined there)
-		if strings.Contains(line, "]>") {
-			break
-		}
-	}
-
-	return plugin, scanner.Err()
+// GetPluginList reads the runtime plugin inventory and cached update states.
+func (c *SettingsCollector) GetPluginList(ctx context.Context) (*dto.PluginList, error) {
+	return plugininventory.NewResolver().Resolve(ctx)
 }
 
 // GetUpdateStatus checks for Unraid OS and plugin updates
 // This addresses Issue #50: Expose plugin and Unraid update availability via API
-func (c *SettingsCollector) GetUpdateStatus() (*dto.UpdateStatus, error) {
+func (c *SettingsCollector) GetUpdateStatus(ctx context.Context) (*dto.UpdateStatus, error) {
 	status := &dto.UpdateStatus{
 		Timestamp: time.Now(),
 	}
@@ -677,16 +596,15 @@ func (c *SettingsCollector) GetUpdateStatus() (*dto.UpdateStatus, error) {
 	}
 
 	// Get plugin list with update info
-	pluginList, err := c.GetPluginList()
-	if err == nil {
-		status.TotalPlugins = pluginList.TotalCount
-		status.PluginUpdatesCount = pluginList.UpdatesAvailable
-
-		// Collect plugins with updates
-		for _, plugin := range pluginList.Plugins {
-			if plugin.UpdateAvailable {
-				status.PluginsWithUpdates = append(status.PluginsWithUpdates, plugin)
-			}
+	pluginList, err := c.GetPluginList(ctx)
+	if err != nil {
+		return nil, err
+	}
+	status.TotalPlugins = pluginList.TotalCount
+	status.PluginUpdatesCount = pluginList.UpdatesAvailable
+	for _, plugin := range pluginList.Plugins {
+		if plugin.UpdateAvailable {
+			status.PluginsWithUpdates = append(status.PluginsWithUpdates, plugin)
 		}
 	}
 

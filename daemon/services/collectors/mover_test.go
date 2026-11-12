@@ -1,6 +1,7 @@
 package collectors
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -25,7 +26,7 @@ Mover: 1024 files (5368709120 bytes) moved
 Finished (Mon May 30 03:52:00 UTC 2026)
 `
 	r := strings.NewReader(fixture)
-	start, finish, files, bytes := parseMoverLog(r)
+	start, finish, files, bytes := parseMoverLog(t.Context(), r)
 
 	if start.IsZero() {
 		t.Error("expected non-zero start time")
@@ -53,7 +54,7 @@ Finished (Mon May 30 03:52:00 UTC 2026)
 // TestParseMoverLog_Idle asserts that an empty/no-run log returns all zero values.
 func TestParseMoverLog_Idle(t *testing.T) {
 	r := strings.NewReader("")
-	start, finish, files, bytes := parseMoverLog(r)
+	start, finish, files, bytes := parseMoverLog(t.Context(), r)
 
 	if !start.IsZero() {
 		t.Errorf("expected zero start time, got %v", start)
@@ -73,7 +74,7 @@ func TestParseMoverLog_Idle(t *testing.T) {
 func TestParseMoverLog_NoFinish(t *testing.T) {
 	fixture := "Started (Mon May 30 03:40:00 UTC 2026)\n"
 	r := strings.NewReader(fixture)
-	start, finish, _, _ := parseMoverLog(r)
+	start, finish, _, _ := parseMoverLog(t.Context(), r)
 
 	if start.IsZero() {
 		t.Error("expected non-zero start time")
@@ -95,7 +96,7 @@ Mover: 1024 files (5368709120 bytes) moved
 Finished (Mon May 30 03:52:00 UTC 2026)
 `
 	r := strings.NewReader(fixture)
-	start, finish, files, bytes := parseMoverLog(r)
+	start, finish, files, bytes := parseMoverLog(t.Context(), r)
 
 	// Expect the second (most-recent) run.
 	if start.Day() != 30 {
@@ -130,10 +131,10 @@ func TestMoverCollector_PublishesAndDedupes(t *testing.T) {
 	}
 
 	c := NewMoverCollector(&domain.Context{Hub: hub})
-	c.CheckFn = func() (*dto.MoverStatus, error) { return result, nil }
+	c.CheckFn = func(context.Context) (*dto.MoverStatus, error) { return result, nil }
 
 	// First collect → must publish.
-	c.Collect()
+	c.Collect(t.Context())
 	select {
 	case msg := <-sub:
 		got, ok := msg.(*dto.MoverStatus)
@@ -145,7 +146,7 @@ func TestMoverCollector_PublishesAndDedupes(t *testing.T) {
 	}
 
 	// Second collect with identical result → must NOT publish (dedupe).
-	c.Collect()
+	c.Collect(t.Context())
 	select {
 	case msg := <-sub:
 		t.Fatalf("expected no re-publish on unchanged result, got %#v", msg)
@@ -160,7 +161,7 @@ func TestMoverCollector_NilCheckFnIsSafe(t *testing.T) {
 
 	c := NewMoverCollector(&domain.Context{Hub: hub})
 	c.CheckFn = nil
-	c.Collect() // must not panic and must not publish
+	c.Collect(t.Context()) // must not panic and must not publish
 
 	select {
 	case msg := <-sub:
@@ -176,10 +177,10 @@ func TestMoverCollector_RepublishesOnChange(t *testing.T) {
 
 	c := NewMoverCollector(&domain.Context{Hub: hub})
 
-	c.CheckFn = func() (*dto.MoverStatus, error) {
+	c.CheckFn = func(context.Context) (*dto.MoverStatus, error) {
 		return &dto.MoverStatus{LastRunFinish: "2026-05-30T03:52:00Z", LastRunFilesMoved: 100, Timestamp: time.Now()}, nil
 	}
-	c.Collect()
+	c.Collect(t.Context())
 	select {
 	case <-sub: // drain first publish
 	case <-time.After(time.Second):
@@ -187,14 +188,44 @@ func TestMoverCollector_RepublishesOnChange(t *testing.T) {
 	}
 
 	// Change file count → signature changes → must republish.
-	c.CheckFn = func() (*dto.MoverStatus, error) {
+	c.CheckFn = func(context.Context) (*dto.MoverStatus, error) {
 		return &dto.MoverStatus{LastRunFinish: "2026-05-30T03:52:00Z", LastRunFilesMoved: 200, Timestamp: time.Now()}, nil
 	}
-	c.Collect()
+	c.Collect(t.Context())
 	select {
 	case <-sub: // success
 	case <-time.After(time.Second):
 		t.Fatal("expected republish after signature change, got none")
+	}
+}
+
+func TestMoverCollectorPublishesProgressOnlyChanges(t *testing.T) {
+	hub := domain.NewEventBus(16)
+	sub := hub.Sub(constants.TopicMoverUpdate.Name)
+	t.Cleanup(func() { hub.Unsub(sub) })
+	collector := NewMoverCollector(&domain.Context{Hub: hub})
+	for _, state := range []struct {
+		active     bool
+		throughput float64
+	}{{true, 0}, {true, 12.5}, {true, 24}, {false, 0}} {
+		collector.CheckFn = func(context.Context) (*dto.MoverStatus, error) {
+			result := &dto.MoverStatus{Active: state.active, CurrentThroughputMBs: state.throughput, Timestamp: time.Now()}
+			if state.active {
+				moved := uint64(100)
+				result.ProgressMovedBytes = &moved
+			}
+			return result, nil
+		}
+		collector.Collect(t.Context())
+		select {
+		case event := <-sub:
+			got := event.(*dto.MoverStatus)
+			if got.Active != state.active || got.CurrentThroughputMBs != state.throughput || (got.ProgressMovedBytes != nil) != state.active {
+				t.Fatalf("published %+v, want active=%v throughput=%g", got, state.active, state.throughput)
+			}
+		case <-time.After(time.Second):
+			t.Fatalf("Mover status change %+v was not published", state)
+		}
 	}
 }
 
@@ -204,12 +235,39 @@ func TestMoverCollector_CheckErrorNoPublish(t *testing.T) {
 	defer hub.Unsub(sub)
 
 	c := NewMoverCollector(&domain.Context{Hub: hub})
-	c.CheckFn = func() (*dto.MoverStatus, error) { return nil, fmt.Errorf("boom") }
-	c.Collect()
+	c.CheckFn = func(context.Context) (*dto.MoverStatus, error) { return nil, fmt.Errorf("boom") }
+	c.Collect(t.Context())
 
 	select {
 	case <-sub:
 		t.Fatal("expected no publish on check error")
 	case <-time.After(150 * time.Millisecond):
+	}
+}
+
+func TestMoverCollectorCancellationSuppressesPublish(t *testing.T) {
+	hub := domain.NewEventBus(16)
+	sub := hub.Sub(constants.TopicMoverUpdate.Name)
+	defer hub.Unsub(sub)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	collector := NewMoverCollector(&domain.Context{Hub: hub})
+	collector.CheckFn = func(checkCtx context.Context) (*dto.MoverStatus, error) {
+		cancel()
+		if checkCtx.Err() != context.Canceled {
+			t.Fatal("status check did not receive the collection context")
+		}
+		return &dto.MoverStatus{Active: true}, nil
+	}
+
+	collector.Collect(ctx)
+	if collector.lastSig != "" {
+		t.Fatal("canceled collection changed the deduplication state")
+	}
+	select {
+	case event := <-sub:
+		t.Fatalf("canceled collection published %v", event)
+	case <-time.After(20 * time.Millisecond):
 	}
 }

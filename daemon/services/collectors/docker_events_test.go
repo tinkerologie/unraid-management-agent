@@ -99,7 +99,7 @@ func TestDockerEventSource(t *testing.T) {
 	unreachable := newFakeDockerClient(errors.New("connection refused"))
 	first := newFakeDockerClient(nil)
 	second := newFakeDockerClient(nil)
-	src := fastSource(newDockerEventSource(fakeFactory[dockerEventsClient](unreachable, first, second)), 20*time.Millisecond)
+	src := fastSource(newDockerEventSource(dockerContainerEvents, fakeFactory[dockerEventsClient](unreachable, first, second)), 20*time.Millisecond)
 
 	rec := newTriggerRecorder()
 	stop := runSource(t, src, rec.trigger)
@@ -108,6 +108,7 @@ func TestDockerEventSource(t *testing.T) {
 	for _, a := range []events.Action{"health_status: healthy", events.ActionStop, events.ActionDie} {
 		first.msgs <- events.Message{Type: events.ContainerEventType, Action: a}
 	}
+	first.msgs <- events.Message{Type: events.NetworkEventType, Action: events.ActionConnect}
 	rec.wait(t) // one debounced trigger for the burst
 
 	first.errs <- io.EOF
@@ -126,7 +127,7 @@ func TestDockerEventSource(t *testing.T) {
 		}
 	}
 	f := first.opts.Filters
-	if !f["type"]["container"] || !f["event"]["health_status"] || !f["event"]["destroy"] {
+	if !f["type"]["container"] || !f["type"]["network"] || !f["event"]["health_status"] || !f["event"]["connect"] {
 		t.Errorf("filters = %v, want type=container and the lifecycle actions", f)
 	}
 }
@@ -153,7 +154,7 @@ func TestDockerEventSource_SessionErrors(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			src := newDockerEventSource(fakeFactory(tt.clients...))
+			src := newDockerEventSource(dockerContainerEvents, fakeFactory(tt.clients...))
 			connected := false
 			err := src.session(t.Context(), func() { connected = true }, func() {})
 			if connected != tt.wantConnected {
@@ -183,10 +184,12 @@ func TestIsDockerContainerChange(t *testing.T) {
 		{"attach", events.Message{Type: events.ContainerEventType, Action: events.ActionAttach}, false},
 		{"image pull", events.Message{Type: events.ImageEventType, Action: events.ActionPull}, false},
 		{"network start", events.Message{Type: events.NetworkEventType, Action: events.ActionStart}, false},
+		{"network connect", events.Message{Type: events.NetworkEventType, Action: events.ActionConnect}, true},
+		{"network create", events.Message{Type: events.NetworkEventType, Action: events.ActionCreate}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isDockerContainerChange(tt.msg); got != tt.want {
+			if got := dockerContainerEvents.matches(tt.msg); got != tt.want {
 				t.Errorf("isDockerContainerChange(%v) = %v, want %v", tt.msg, got, tt.want)
 			}
 		})

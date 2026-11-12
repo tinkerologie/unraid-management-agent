@@ -39,12 +39,12 @@ package: release
 	@echo "Creating plugin package..."
 	mkdir -p $(BUILD_DIR)/usr/local/emhttp/plugins/$(BINARY)
 	cp $(BUILD_DIR)/$(BINARY) $(BUILD_DIR)/usr/local/emhttp/plugins/$(BINARY)/
-	cp VERSION $(BUILD_DIR)/usr/local/emhttp/plugins/$(BINARY)/
+	printf '%s\n' "$(VERSION)" > $(BUILD_DIR)/usr/local/emhttp/plugins/$(BINARY)/VERSION
 	COPYFILE_DISABLE=1 cp -r $(PLUGIN_DIR)/. $(BUILD_DIR)/usr/local/emhttp/plugins/$(BINARY)/
 	find $(BUILD_DIR)/usr/local/emhttp/plugins/$(BINARY) -name '._*' -delete 2>/dev/null || true
 	@# Archive entries must be owned by root so extraction never chowns system dirs (#242)
 	OWNER_FLAGS=$$(sh scripts/tar-owner-flags.sh) && \
-		cd $(BUILD_DIR) && COPYFILE_DISABLE=1 tar $$OWNER_FLAGS -czf $(BINARY)-$(VERSION).tgz usr/
+		cd $(BUILD_DIR) && COPYFILE_DISABLE=1 tar $$OWNER_FLAGS --no-xattrs -czf $(BINARY)-$(VERSION).tgz usr/
 	bash scripts/check-package-artifact.sh check $(BUILD_DIR)/$(BINARY)-$(VERSION).tgz
 	@echo "Package created: $(BUILD_DIR)/$(BINARY)-$(VERSION).tgz"
 
@@ -70,6 +70,7 @@ test-packaging: package
 	bash scripts/test-auto-intervals-migration.sh
 	bash scripts/test-collection-mode-migration.sh
 	bash scripts/test-plg-checksums.sh
+	bash scripts/test-plg-version-preflight.sh
 	bash scripts/test-release-notes.sh
 	bash scripts/test-plg-changes.sh
 	bash scripts/test-plugin-settings.sh

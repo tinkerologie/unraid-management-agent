@@ -1186,10 +1186,10 @@ func (s *Server) registerNewMonitoringTools() {
 		})
 	})
 
-	// Get mover status (local files only: var.ini + mover.log)
+	// Get Mover status from the local collector cache.
 	addToolDirect(s, &mcp.Tool{
 		Name:        "get_mover_status",
-		Description: "Return the cached mover status (active state, schedule, and last-run duration/files/bytes parsed from /var/log/mover.log). Local files only — no outbound network calls.",
+		Description: "Return cached Mover activity, schedule, native live progress when available, and last-run statistics when recorded.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, _ dto.MCPEmptyArgs) (*mcp.CallToolResult, any, error) {
 		logger.Info("MCP: Getting cached mover status")
@@ -1920,14 +1920,14 @@ func (s *Server) registerNewControlTools() {
 	// Update single container
 	addWriteTool(s, &mcp.Tool{
 		Name:        "update_container",
-		Description: "Update a Docker container to the latest image. Stops the container, pulls the latest image, recreates with the same config, and starts it.",
+		Description: "Pull the latest Docker image and replace the container with the same configuration. Preserve whether it was running. Retain the original until the replacement succeeds.",
 		Annotations: &mcp.ToolAnnotations{
 			DestructiveHint: new(true),
 			IdempotentHint:  true,
 		},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPContainerUpdateArgs) (*mcp.CallToolResult, any, error) {
 		if !args.Confirm {
-			return textResult("Container update requires confirm=true. This will stop, remove, and recreate the container with the latest image."), nil, nil
+			return textResult("Container update requires confirm=true. Updating replaces the container with one using the latest image and can interrupt a running workload."), nil, nil
 		}
 		logger.Info("MCP: Updating container '%s'", args.ContainerID)
 		dockerCtrl := controllers.NewDockerController()

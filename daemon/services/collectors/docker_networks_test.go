@@ -1,7 +1,9 @@
 package collectors
 
 import (
+	"context"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -9,6 +11,28 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
 	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 )
+
+func TestDockerNetworkMembershipChangesPublish(t *testing.T) {
+	hub := domain.NewEventBus(16)
+	sub := hub.Sub(constants.TopicDockerNetworksUpdate.Name)
+	t.Cleanup(func() { hub.Unsub(sub) })
+	networks := fakeNetworks()
+	collector := NewDockerNetworksCollector(&domain.Context{Hub: hub})
+	collector.ListFn = func(context.Context) ([]dto.DockerNetworkInfo, error) { return networks, nil }
+	for _, members := range [][]string{nil, {"one", "two"}, {"two"}} {
+		networks[0].ContainerNames = members
+		collector.Collect(t.Context())
+		select {
+		case event := <-sub:
+			got := event.(*dto.DockerNetworkList).Networks[0].ContainerNames
+			if !slices.Equal(got, members) {
+				t.Fatalf("published members %v, want %v", got, members)
+			}
+		case <-time.After(time.Second):
+			t.Fatalf("membership %v did not publish", members)
+		}
+	}
+}
 
 func fakeNetworks() []dto.DockerNetworkInfo {
 	return []dto.DockerNetworkInfo{
@@ -25,10 +49,10 @@ func TestDockerNetworksCollector_PublishesAndDedupes(t *testing.T) {
 	networks := fakeNetworks()
 
 	c := NewDockerNetworksCollector(&domain.Context{Hub: hub})
-	c.ListFn = func() ([]dto.DockerNetworkInfo, error) { return networks, nil }
+	c.ListFn = func(context.Context) ([]dto.DockerNetworkInfo, error) { return networks, nil }
 
 	// First Collect → must publish with Count 2.
-	c.Collect()
+	c.Collect(t.Context())
 	select {
 	case msg := <-sub:
 		got, ok := msg.(*dto.DockerNetworkList)
@@ -46,7 +70,7 @@ func TestDockerNetworksCollector_PublishesAndDedupes(t *testing.T) {
 	}
 
 	// Identical second Collect → must NOT publish (dedupe).
-	c.Collect()
+	c.Collect(t.Context())
 	select {
 	case msg := <-sub:
 		t.Fatalf("expected no re-publish on unchanged result, got %#v", msg)
@@ -60,7 +84,7 @@ func TestDockerNetworksCollector_NilListFnIsSafe(t *testing.T) {
 	defer hub.Unsub(sub)
 
 	c := NewDockerNetworksCollector(&domain.Context{Hub: hub})
-	c.Collect() // ListFn nil → must not panic, must not publish
+	c.Collect(t.Context()) // ListFn nil → must not panic, must not publish
 
 	select {
 	case msg := <-sub:
@@ -75,9 +99,9 @@ func TestDockerNetworksCollector_RepublishesOnChange(t *testing.T) {
 	defer hub.Unsub(sub)
 
 	c := NewDockerNetworksCollector(&domain.Context{Hub: hub})
-	c.ListFn = func() ([]dto.DockerNetworkInfo, error) { return fakeNetworks(), nil }
+	c.ListFn = func(context.Context) ([]dto.DockerNetworkInfo, error) { return fakeNetworks(), nil }
 
-	c.Collect()
+	c.Collect(t.Context())
 	select {
 	case <-sub: // drain first publish
 	case <-time.After(time.Second):
@@ -85,14 +109,14 @@ func TestDockerNetworksCollector_RepublishesOnChange(t *testing.T) {
 	}
 
 	// Change the network list — a third network is added.
-	c.ListFn = func() ([]dto.DockerNetworkInfo, error) {
+	c.ListFn = func(context.Context) ([]dto.DockerNetworkInfo, error) {
 		nets := fakeNetworks()
 		nets = append(nets, dto.DockerNetworkInfo{
 			ID: "net-ccc", Name: "custom", Driver: "bridge", Scope: "local", ContainerNames: []string{},
 		})
 		return nets, nil
 	}
-	c.Collect()
+	c.Collect(t.Context())
 
 	select {
 	case msg := <-sub:
@@ -114,12 +138,25 @@ func TestDockerNetworksCollector_ListErrorNoPublish(t *testing.T) {
 	defer hub.Unsub(sub)
 
 	c := NewDockerNetworksCollector(&domain.Context{Hub: hub})
-	c.ListFn = func() ([]dto.DockerNetworkInfo, error) { return nil, fmt.Errorf("docker error") }
-	c.Collect()
+	c.ListFn = func(context.Context) ([]dto.DockerNetworkInfo, error) { return nil, fmt.Errorf("docker error") }
+	c.Collect(t.Context())
 
 	select {
 	case <-sub:
 		t.Fatal("expected no publish on list error")
 	case <-time.After(150 * time.Millisecond):
+	}
+}
+
+func TestDockerNetworkMembershipAvailabilityChangesFingerprint(t *testing.T) {
+	networks := fakeNetworks()
+	available := networksSignature(networks)
+	networks[0].MembershipUnavailable = true
+	if got := networksSignature(networks); got == available {
+		t.Fatal("loss of membership visibility did not change the fingerprint")
+	}
+	networks[0].MembershipUnavailable = false
+	if got := networksSignature(networks); got != available {
+		t.Fatal("recovered membership did not restore the fingerprint")
 	}
 }

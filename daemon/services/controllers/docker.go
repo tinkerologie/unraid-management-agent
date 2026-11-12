@@ -5,16 +5,18 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/moby/moby/api/types/network"
+	"github.com/containerd/errdefs"
 	"github.com/moby/moby/client"
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/lib"
 	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
 )
 
@@ -648,6 +650,9 @@ func (dc *DockerController) GetContainerSize(containerRef string) (*dto.Containe
 
 // UpdateContainer updates a specific container by pulling the latest image and recreating it.
 func (dc *DockerController) UpdateContainer(containerRef string, force bool) (*dto.ContainerUpdateResult, error) {
+	if err := lib.ValidateContainerRef(containerRef); err != nil {
+		return nil, err
+	}
 	logger.Info("Updating container: %s (force=%v)", containerRef, force)
 
 	if err := dc.initClient(); err != nil {
@@ -664,19 +669,29 @@ func (dc *DockerController) UpdateContainer(containerRef string, force bool) (*d
 	}
 
 	containerInfo := inspectResult.Container
+	if containerInfo.Config == nil || containerInfo.HostConfig == nil || containerInfo.ID == "" || strings.TrimPrefix(containerInfo.Name, "/") == "" {
+		return nil, fmt.Errorf("incomplete container configuration in Docker inspect")
+	}
+	if containerInfo.HostConfig.AutoRemove {
+		return nil, fmt.Errorf("cannot safely update an auto-remove container")
+	}
 	imageName := containerInfo.Config.Image
 	previousImageID := containerInfo.Image
 	containerName := strings.TrimPrefix(containerInfo.Name, "/")
-	wasRunning := containerInfo.State != nil && containerInfo.State.Running
+	release, err := reserveDockerUpdate(containerInfo.ID, containerName)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 
 	// Pull latest image
 	pullResp, err := dc.client.ImagePull(ctx, imageName, client.ImagePullOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to pull image: %w", err)
 	}
-	defer func() { _ = pullResp.Close() }()
-	if _, err := io.Copy(io.Discard, pullResp); err != nil {
-		logger.Warning("Docker: Error draining pull response: %v", err)
+	// Moby Wait consumes and closes the pull stream and reports embedded errors.
+	if err := pullResp.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("failed to pull image: %w", err)
 	}
 
 	// Check if update is available
@@ -697,58 +712,21 @@ func (dc *DockerController) UpdateContainer(containerRef string, force bool) (*d
 		}, nil
 	}
 
-	// Stop container if running
-	if wasRunning {
-		logger.Info("Stopping container %s for update", containerName)
-		if _, err := dc.client.ContainerStop(ctx, containerInfo.ID, client.ContainerStopOptions{}); err != nil {
-			return nil, fmt.Errorf("failed to stop container: %w", err)
-		}
-	}
-
-	// Remove old container
-	logger.Info("Removing container %s for update", containerName)
-	if _, err := dc.client.ContainerRemove(ctx, containerInfo.ID, client.ContainerRemoveOptions{}); err != nil {
-		return nil, fmt.Errorf("failed to remove container: %w", err)
-	}
-
-	// Reconstruct networking config from the old container
-	var networkConfig *network.NetworkingConfig
-	if containerInfo.NetworkSettings != nil && containerInfo.NetworkSettings.Networks != nil {
-		networkConfig = &network.NetworkingConfig{
-			EndpointsConfig: containerInfo.NetworkSettings.Networks,
-		}
-	}
-
-	// Create new container with same config but new image
-	logger.Info("Creating updated container %s", containerName)
-	createResult, err := dc.client.ContainerCreate(ctx, client.ContainerCreateOptions{
-		Config:           containerInfo.Config,
-		HostConfig:       containerInfo.HostConfig,
-		NetworkingConfig: networkConfig,
-		Name:             containerName,
-	})
+	replacementID, message, err := dc.recreateDockerContainer(ctx, containerInfo)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create container: %w", err)
-	}
-
-	// Start new container if the old one was running
-	if wasRunning {
-		logger.Info("Starting updated container %s", containerName)
-		if _, err := dc.client.ContainerStart(ctx, createResult.ID, client.ContainerStartOptions{}); err != nil {
-			return nil, fmt.Errorf("failed to start container: %w", err)
-		}
+		return nil, err
 	}
 
 	logger.Info("Successfully updated container %s", containerName)
 	return &dto.ContainerUpdateResult{
-		ContainerID:    shortID(createResult.ID),
+		ContainerID:    shortID(replacementID),
 		ContainerName:  containerName,
 		Image:          imageName,
 		PreviousDigest: previousImageID,
 		NewDigest:      imageResult.ID,
 		Updated:        true,
 		Recreated:      true,
-		Message:        "Container updated successfully",
+		Message:        message,
 		Timestamp:      time.Now(),
 	}, nil
 }
@@ -815,14 +793,14 @@ func shortID(id string) string {
 // ListNetworks returns all Docker networks with their IPAM and connected-container metadata.
 // NetworkList is called first for the full list; NetworkInspect is called per network to
 // retrieve the connected-container map, which is not included in the list response.
-func (dc *DockerController) ListNetworks() ([]dto.DockerNetworkInfo, error) {
+func (dc *DockerController) ListNetworks(parentCtx context.Context) ([]dto.DockerNetworkInfo, error) {
 	logger.Debug("Listing Docker networks")
 
 	if err := dc.initClient(); err != nil {
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 30*time.Second)
 	defer cancel()
 
 	listResult, err := dc.client.NetworkList(ctx, client.NetworkListOptions{})
@@ -864,14 +842,23 @@ func (dc *DockerController) ListNetworks() ([]dto.DockerNetworkInfo, error) {
 
 		// Retrieve connected-container names via NetworkInspect (not included in list response).
 		inspectResult, inspectErr := dc.client.NetworkInspect(ctx, s.ID, client.NetworkInspectOptions{})
+		if errdefs.IsNotFound(inspectErr) {
+			continue // The network disappeared after NetworkList.
+		}
 		if inspectErr != nil {
-			logger.Warning("DockerNetworks: inspect failed for %s (%s): %v", s.Name, s.ID[:12], inspectErr)
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
+			logger.Debug("Docker: cannot inspect membership for network %q (%s): %v", s.Name, shortID(s.ID), inspectErr)
+			info.MembershipUnavailable = true
 		} else {
 			for _, ep := range inspectResult.Network.Containers {
 				if ep.Name != "" {
 					info.ContainerNames = append(info.ContainerNames, ep.Name)
 				}
 			}
+			slices.Sort(info.ContainerNames)
+			info.ContainerNames = slices.Compact(info.ContainerNames)
 		}
 
 		result = append(result, info)

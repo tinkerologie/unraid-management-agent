@@ -22,6 +22,16 @@ Use this reference to read the WebSocket envelope and payload fields.
 
 ---
 
+## Collector payloads
+
+- `container_list_update` includes optional configured Docker memory caps and sorted network attachments.
+- `docker_networks_update` publishes when containers join or leave, or when membership becomes
+  unavailable or recovers. An affected network reports `membership_unavailable: true`.
+- `mover_update` publishes progress changes and clears live fields when the run ends.
+- `plugin_updates_update` publishes after each successful scheduled check and includes only installable updates.
+
+See the [REST API reference](rest-api.md) for field definitions.
+
 ## Event Envelope Structure
 
 ### Base Event Format

@@ -44,7 +44,68 @@ func syntheticContract(c contractCapture) contractCapture {
 }
 
 func producerContractCases() []contractCapture {
-	return slices.Concat(networkAndPoolContracts(), powerContracts(), notificationContracts(), shareAndHealthContracts())
+	return slices.Concat(networkAndPoolContracts(), powerContracts(), notificationContracts(), shareAndHealthContracts(), unraidCompatibilityContracts())
+}
+
+func unraidCompatibilityContracts() []contractCapture {
+	containers := []dto.ContainerInfo{
+		{ID: "samplecapped", Name: "capped", State: "exited", ConfiguredMemoryLimit: new(uint64(268435456)), Timestamp: contractTime},
+		{ID: "samplenocap", Name: "unlimited", State: "running", ConfiguredMemoryLimit: new(uint64(0)), Timestamp: contractTime,
+			NetworkMode: "zulu", IPAddress: "198.51.100.2",
+			Networks: []dto.ContainerNetworkAttachment{
+				{Network: "alpha", NetworkID: "net-a", IPAddress: "192.0.2.2"},
+				{Network: "zulu", NetworkID: "net-z", IPAddress: "198.51.100.2", IPv6Address: "2001:db8::2"},
+			}},
+		{ID: "sampleunknown", Name: "unavailable", State: "exited", Timestamp: contractTime},
+	}
+	containerEvent := make([]*dto.ContainerInfo, 0, len(containers))
+	for i := range containers {
+		containerEvent = append(containerEvent, &containers[i])
+	}
+	networks := &dto.DockerNetworkList{Networks: []dto.DockerNetworkInfo{
+		{ID: "net-a", Name: "alpha", Driver: "bridge", ContainerNames: []string{"unlimited"}, Timestamp: contractTime},
+		{ID: "net-z", Name: "zulu", Driver: "bridge", ContainerNames: []string{"unlimited"}, Timestamp: contractTime},
+		{ID: "net-u", Name: "unavailable", Driver: "bridge", MembershipUnavailable: true, ContainerNames: []string{}, Timestamp: contractTime},
+	}, Count: 3, Timestamp: contractTime}
+	plugins := &dto.PluginList{Plugins: []dto.PluginInfo{{
+		Name: "sample.plugin", Version: "2026.11.01", LatestVersion: "2026.11.02",
+		Enabled: true, UpdateAvailable: true, UpdateStatus: "update_available",
+	}}, TotalCount: 1, UpdatesAvailable: 1, Timestamp: contractTime}
+	progress := &dto.MoverStatus{Active: true, StatusSource: "native", Timestamp: contractTime,
+		ProgressTotalBytes: new(uint64(20000000)), ProgressRemainingBytes: new(uint64(5000000)),
+		ProgressMovedBytes: new(uint64(15000000)), ProgressPercent: new(float64(75)),
+		ThroughputBytesPerSecond: new(uint64(2500000)), ETASeconds: new(uint64(2)), CurrentThroughputMBs: 2.5}
+	cases := []contractCapture{
+		syntheticContract(restContract("docker-configuration", "/docker", "[]dto.ContainerInfo", "Configured limits and sorted attachments", 200,
+			func(s *Server) { s.dockerCache.Store(&containers) }, "list", "zero", "omitted")),
+		syntheticContract(eventContract("docker-configuration-event", "container_list_update", "[]*dto.ContainerInfo", "Container configuration update",
+			constants.TopicContainerListUpdate, containerEvent, "list", "zero", "omitted")),
+		syntheticContract(restContract("docker-networks", "/docker/networks", "dto.DockerNetworkList", "Known and unavailable network membership", 200,
+			func(s *Server) { s.dockerNetworksCache.Store(networks) }, "list")),
+		syntheticContract(eventContract("docker-networks-event", "docker_networks_update", "*dto.DockerNetworkList", "Network membership update",
+			constants.TopicDockerNetworksUpdate, networks, "list")),
+		restContract("plugin-updates-pending", "/plugins/check-updates", "dto.PluginList", "No check completed", 200, nil, "null", "zero"),
+		syntheticContract(restContract("plugin-updates", "/plugins/check-updates", "dto.PluginList", "Installable cached update", 200,
+			func(s *Server) { s.pluginUpdatesCache.Store(plugins) }, "list")),
+		syntheticContract(eventContract("plugin-updates-event", "plugin_updates_update", "*dto.PluginList", "Installable update event",
+			constants.TopicPluginUpdatesUpdate, plugins, "list")),
+		normalizeTimestamp(restContract("mover-empty", "/mover", "dto.MoverStatus", "No cached Mover observation", 200, nil, "null")),
+		syntheticContract(eventContract("mover-event", "mover_update", "*dto.MoverStatus", "Native progress event", constants.TopicMoverUpdate, progress, "object")),
+	}
+	for _, item := range []struct {
+		id, description string
+		data            *dto.MoverStatus
+	}{
+		{"mover-idle", "Idle with no live progress", &dto.MoverStatus{StatusSource: "native", Timestamp: contractTime}},
+		{"mover-active-progress", "Active with progress", progress},
+		{"mover-active-no-progress", "Active with progress unavailable", &dto.MoverStatus{Active: true, StatusSource: "native", Timestamp: contractTime}},
+		{"mover-completed", "Completed with legacy history", &dto.MoverStatus{StatusSource: "native", LastRunFilesMoved: 12,
+			LastRunBytesMoved: 20000000, LastRunFinish: "2026-01-02T03:04:05Z", Timestamp: contractTime}},
+	} {
+		cases = append(cases, syntheticContract(restContract(item.id, "/mover", "dto.MoverStatus", item.description, 200,
+			func(s *Server) { s.moverCache.Store(item.data) }, "object")))
+	}
+	return cases
 }
 
 func networkAndPoolContracts() []contractCapture {

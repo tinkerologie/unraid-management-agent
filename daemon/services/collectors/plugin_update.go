@@ -2,9 +2,6 @@ package collectors
 
 import (
 	"context"
-	"fmt"
-	"sort"
-	"strings"
 	"time"
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
@@ -33,8 +30,6 @@ type PluginUpdateCollector struct {
 	// update-available since the previous run. Injected by the factory in
 	// package services to avoid a collectors→controllers import cycle.
 	NotifyFn      func(names []string)
-	lastSig       string
-	published     bool
 	prevAvailable map[string]bool
 	baselineSet   bool
 }
@@ -50,8 +45,7 @@ func NewPluginUpdateCollector(ctx *domain.Context) *PluginUpdateCollector {
 	}
 }
 
-// Collect runs a plugin update check and publishes the result only if it
-// changed since the last publish (dedupe to avoid no-op WebSocket broadcasts).
+// Collect publishes each successful plugin update check to advance the cached timestamp.
 // The passed lifecycle context bounds the check so it is cancelled on shutdown.
 func (c *PluginUpdateCollector) Collect(parentCtx context.Context) {
 	if c.CheckFn == nil {
@@ -65,7 +59,7 @@ func (c *PluginUpdateCollector) Collect(parentCtx context.Context) {
 		logger.Warning("PluginUpdate: check failed: %v", err)
 		return
 	}
-	if result == nil {
+	if result == nil || ctx.Err() != nil {
 		return
 	}
 
@@ -99,32 +93,11 @@ func (c *PluginUpdateCollector) Collect(parentCtx context.Context) {
 		}
 	}
 
-	// The first result is always published, even when it is empty: an empty
-	// signature equals the initial lastSig, so "no updates" would otherwise
-	// never reach the cache and /plugins/check-updates would keep returning
-	// an empty result with a zero timestamp.
-	sig := pluginUpdateSignature(result)
-	if c.published && sig == c.lastSig {
-		logger.Debug("PluginUpdate: no change (%d updates available), skipping publish", result.UpdatesAvailable)
-		return
-	}
-	c.lastSig = sig
-	c.published = true
-	if result.Timestamp.IsZero() {
-		result.Timestamp = time.Now()
+	snapshot := *result
+	if snapshot.Timestamp.IsZero() {
+		snapshot.Timestamp = time.Now()
 	}
 
-	domain.Publish(c.appCtx.Hub, constants.TopicPluginUpdatesUpdate, result)
+	domain.Publish(c.appCtx.Hub, constants.TopicPluginUpdatesUpdate, &snapshot)
 	logger.Info("PluginUpdate: published (%d/%d plugins have updates)", result.UpdatesAvailable, result.TotalCount)
-}
-
-// pluginUpdateSignature builds an order-independent fingerprint of update
-// status (plugin name + available flag + latest version), ignoring timestamp.
-func pluginUpdateSignature(r *dto.PluginList) string {
-	parts := make([]string, 0, len(r.Plugins))
-	for _, p := range r.Plugins {
-		parts = append(parts, fmt.Sprintf("%s=%t:%s", p.Name, p.UpdateAvailable, p.LatestVersion))
-	}
-	sort.Strings(parts)
-	return strings.Join(parts, ",")
 }

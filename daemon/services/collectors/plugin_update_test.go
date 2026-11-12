@@ -11,7 +11,7 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 )
 
-func TestPluginUpdateCollector_PublishesAndDedupes(t *testing.T) {
+func TestPluginUpdateCollector_PublishesEverySuccess(t *testing.T) {
 	hub := domain.NewEventBus(16)
 	sub := hub.Sub(constants.TopicPluginUpdatesUpdate.Name)
 	defer hub.Unsub(sub)
@@ -37,11 +37,11 @@ func TestPluginUpdateCollector_PublishesAndDedupes(t *testing.T) {
 		t.Fatal("expected first publish, got none")
 	}
 
-	c.Collect(context.Background()) // identical → must NOT publish
+	c.Collect(context.Background())
 	select {
-	case msg := <-sub:
-		t.Fatalf("expected no re-publish on unchanged result, got %#v", msg)
-	case <-time.After(200 * time.Millisecond):
+	case <-sub:
+	case <-time.After(time.Second):
+		t.Fatal("expected a new snapshot from the second successful check")
 	}
 }
 
@@ -182,8 +182,7 @@ func TestPluginUpdateCollector_PublishesFirstEmptyResult(t *testing.T) {
 		return &dto.PluginList{}, nil // no plugin has an update
 	}
 
-	// An empty result has the same signature as the initial state; it must
-	// still be published so the cache records that the check ran.
+	// Empty results still record that the check ran.
 	c.Collect(context.Background())
 	select {
 	case msg := <-sub:
@@ -198,11 +197,11 @@ func TestPluginUpdateCollector_PublishesFirstEmptyResult(t *testing.T) {
 		t.Fatal("expected the first (empty) result to be published")
 	}
 
-	c.Collect(context.Background()) // unchanged → no re-publish
+	c.Collect(context.Background())
 	select {
-	case msg := <-sub:
-		t.Fatalf("expected no re-publish on unchanged empty result, got %#v", msg)
-	case <-time.After(200 * time.Millisecond):
+	case <-sub:
+	case <-time.After(time.Second):
+		t.Fatal("expected the second empty result to be published")
 	}
 }
 

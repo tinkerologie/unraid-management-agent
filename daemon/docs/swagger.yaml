@@ -710,6 +710,12 @@ definitions:
     type: object
   dto.ContainerInfo:
     properties:
+      configured_memory_limit_bytes:
+        description: |-
+          ConfiguredMemoryLimit is the Docker hard cap in bytes. Zero means unlimited.
+          Omitted means unavailable. MemoryLimit remains the live statistics denominator.
+        example: 536870912
+        type: integer
       cpu_percent:
         example: 5.2
         type: number
@@ -759,6 +765,12 @@ definitions:
       network_tx_bytes_per_sec:
         example: 512
         type: number
+      networks:
+        description: Networks lists running-container attachments in network-name
+          order.
+        items:
+          $ref: '#/definitions/dto.ContainerNetworkAttachment'
+        type: array
       port_mappings:
         items:
           type: string
@@ -822,6 +834,24 @@ definitions:
         example: "2026-02-17T00:00:00Z"
         type: string
       timestamp:
+        type: string
+    type: object
+  dto.ContainerNetworkAttachment:
+    properties:
+      ip_address:
+        example: 172.17.0.2
+        type: string
+      ipv6_address:
+        example: 2001:db8::2
+        type: string
+      mac_address:
+        example: 02:42:ac:11:00:02
+        type: string
+      network:
+        example: bridge
+        type: string
+      network_id:
+        example: abc123
         type: string
     type: object
   dto.ContainerRemoveRequest:
@@ -1200,6 +1230,9 @@ definitions:
         additionalProperties:
           type: string
         type: object
+      membership_unavailable:
+        description: Docker could not inspect the network membership.
+        type: boolean
       name:
         example: bridge
         type: string
@@ -2371,16 +2404,16 @@ definitions:
     description: Mover state, schedule, last-run timing, and file/byte transfer statistics.
     properties:
       active:
-        description: Active indicates whether the mover is currently running (from
-          var.ini shareMoverActive).
+        description: Active indicates whether Mover is running.
         example: false
         type: boolean
       current_throughput_mbs:
-        description: |-
-          CurrentThroughputMBs is the live throughput in MB/s. Always 0 in the conservative
-          implementation (live throughput tracking is out of scope).
+        description: CurrentThroughputMBs is the live decimal MB/s, or zero when unavailable.
         example: 0
         type: number
+      eta_seconds:
+        type: integer
+        x-nullable: true
       last_run_bytes_moved:
         description: LastRunBytesMoved is the total bytes moved during the last run.
         example: 5368709120
@@ -2405,11 +2438,31 @@ definitions:
           began.
         example: "2026-05-30T03:40:00Z"
         type: string
+      progress_moved_bytes:
+        type: integer
+        x-nullable: true
+      progress_percent:
+        type: number
+        x-nullable: true
+      progress_remaining_bytes:
+        type: integer
+        x-nullable: true
+      progress_total_bytes:
+        description: Live progress fields are null when native progress is unavailable.
+        type: integer
+        x-nullable: true
       schedule:
         description: Schedule is the cron schedule expression for the mover (from
           var.ini shareMoverSchedule).
         example: 40 3 * * *
         type: string
+      status_source:
+        description: StatusSource identifies the activity source, native or legacy.
+        example: native
+        type: string
+      throughput_bytes_per_second:
+        type: integer
+        x-nullable: true
       timestamp:
         description: Timestamp is when this status was collected.
         type: string
@@ -3568,9 +3621,16 @@ definitions:
         description: Is update available
         example: false
         type: boolean
+      update_status:
+        description: Native Plugin Manager update state
+        example: up_to_date
+        type: string
       url:
         description: Plugin URL
         example: https://...
+        type: string
+      validation_message:
+        description: Reason the candidate failed validation
         type: string
       version:
         description: Current installed version

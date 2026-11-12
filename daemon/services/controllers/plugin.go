@@ -3,86 +3,117 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"path/filepath"
-	"strings"
+	"regexp"
 	"time"
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
 	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 	"github.com/tinkerologie/unraid-management-agent/daemon/lib"
 	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/plugininventory"
 )
 
-// pluginCheckTimeout bounds the `plugin check` command, which downloads update
-// metadata for every installed plugin. On networks without outbound internet
-// access (issue #123) the command hangs, so it must fail fast; locally cached
-// update files are still read afterwards.
-const pluginCheckTimeout = 30 * time.Second
+const (
+	pluginCheckTimeout   = 30 * time.Second
+	pluginDownloadBudget = 25 * time.Second
+	pluginTargetTimeout  = 10 * time.Second
+)
 
-// pluginCheckExec runs the bounded update-metadata download; a variable so
-// tests can stub it.
-var pluginCheckExec = lib.ExecCommandOutputWithContext
+var (
+	pluginCheckExec     = lib.ExecCommandOutputWithContext
+	pluginCheckSlot     = make(chan struct{}, 1)
+	pluginCheckFilename = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]*\.plg$`)
+)
 
-// PluginController provides read-only plugin update checks. It never installs
-// or updates plugins; users apply updates from Unraid's Plugins page (#244).
-type PluginController struct{}
-
-// NewPluginController creates a new plugin controller.
-func NewPluginController() *PluginController {
-	return &PluginController{}
+// PluginController refreshes and reads update metadata for installed plugins.
+type PluginController struct {
+	resolve func(context.Context) (*dto.PluginList, error)
+	targets func(context.Context) ([]string, error)
 }
 
-// CheckPluginUpdates checks all plugins for available updates. The check is
-// bounded by both the caller's context (cancellable on shutdown) and
-// pluginCheckTimeout.
-func (pc *PluginController) CheckPluginUpdates(parentCtx context.Context) ([]dto.PluginInfo, error) {
-	logger.Info("Plugin: Checking for plugin updates")
+// NewPluginController creates a controller for the native Plugin Manager cache.
+func NewPluginController() *PluginController {
+	resolver := plugininventory.NewResolver()
+	return &PluginController{resolve: resolver.Resolve, targets: resolver.CheckTargets}
+}
 
+// CheckPluginUpdates refreshes cached metadata and returns installable updates.
+// Checks share one slot because the native command writes to a shared cache.
+func (pc *PluginController) CheckPluginUpdates(parentCtx context.Context) ([]dto.PluginInfo, error) {
 	ctx, cancel := context.WithTimeout(parentCtx, pluginCheckTimeout)
 	defer cancel()
 
-	// Download update info for every installed plugin into /tmp/plugins.
-	// "check" needs a plugin file argument (without one it only prints usage
-	// and exits 1); "checkall" checks all installed plugins.
-	_, err := pluginCheckExec(ctx, constants.PluginBin, "checkall")
-	if err != nil {
-		logger.Warning("Plugin: Check command returned error (may be normal): %v", err)
+	select {
+	case pluginCheckSlot <- struct{}{}:
+		defer func() { <-pluginCheckSlot }()
+	case <-ctx.Done():
+		return nil, ctx.Err()
 	}
-
-	// Now read the plugin list to find which have updates
-	pluginFiles, err := filepath.Glob(filepath.Join(constants.PluginsConfigDir, "*.plg"))
-	if err != nil {
-		return nil, fmt.Errorf("failed to list plugin files: %w", err)
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
-
-	var updatesAvailable []dto.PluginInfo
-	for _, pluginFile := range pluginFiles {
-		pluginName := strings.TrimSuffix(filepath.Base(pluginFile), ".plg")
-
-		// Check if an update file exists in /tmp/plugins/
-		updateFile := filepath.Join(constants.PluginsTempDir, filepath.Base(pluginFile))
-		installedVersion := getPluginVersion(pluginFile)
-		updateVersion := getPluginVersion(updateFile)
-
-		if updateVersion != "" && updateVersion != installedVersion {
-			updatesAvailable = append(updatesAvailable, dto.PluginInfo{
-				Name:            pluginName,
-				Version:         installedVersion,
-				UpdateAvailable: true,
-				LatestVersion:   updateVersion,
-			})
+	targets, err := pc.targets(ctx)
+	if err != nil {
+		return nil, err
+	}
+	// Reserve time for reading native metadata after network checks finish.
+	downloadCtx, cancelDownloads := context.WithTimeout(ctx, pluginDownloadBudget)
+	refreshErr := refreshPluginTargets(downloadCtx, targets, pluginTargetTimeout)
+	cancelDownloads()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if refreshErr != nil {
+		return nil, refreshErr
+	}
+	list, err := pc.resolve(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	available := make([]dto.PluginInfo, 0, list.UpdatesAvailable)
+	for _, plugin := range list.Plugins {
+		if plugin.UpdateAvailable {
+			available = append(available, plugin)
 		}
 	}
-
-	logger.Info("Plugin: Found %d plugins with updates available", len(updatesAvailable))
-	return updatesAvailable, nil
+	return available, nil
 }
 
-// getPluginVersion extracts the version from a .plg file by parsing XML entities.
-func getPluginVersion(path string) string {
-	lines, err := lib.ExecCommand("/bin/grep", "-oP", `<!ENTITY\s+version\s+"\K[^"]+`, path)
-	if err != nil || len(lines) == 0 {
-		return ""
+// Check only valid registered plugins. The native checkall command also prunes
+// dangling runtime registrations, which is outside an agent refresh.
+func refreshPluginTargets(ctx context.Context, targets []string, targetTimeout time.Duration) error {
+	var firstFailure error
+	checked := false
+	for _, target := range targets {
+		if ctx.Err() != nil {
+			break
+		}
+		if !pluginCheckFilename.MatchString(target) {
+			continue
+		}
+		// Match the native checkall command's serial execution of plugin hooks.
+		// A rejected candidate still counts as a successful native check when
+		// the manager publishes a validation marker and exits successfully.
+		checkCtx, cancel := context.WithTimeout(ctx, targetTimeout)
+		_, err := pluginCheckExec(checkCtx, constants.PluginBin, "check", target)
+		cancel()
+		if err != nil {
+			logger.Debug("Plugin: refresh failed for %q: %v", target, err)
+			if firstFailure == nil {
+				firstFailure = fmt.Errorf("check %q: %w", target, err)
+			}
+			continue
+		}
+		checked = true
 	}
-	return strings.TrimSpace(lines[0])
+	if checked {
+		return nil
+	}
+	if firstFailure != nil {
+		return fmt.Errorf("plugin refresh failed: %w", firstFailure)
+	}
+	return ctx.Err()
 }

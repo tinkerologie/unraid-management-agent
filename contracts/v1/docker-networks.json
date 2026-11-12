@@ -1,0 +1,41 @@
+{
+  "networks": [
+    {
+      "id": "net-a",
+      "name": "alpha",
+      "driver": "bridge",
+      "scope": "",
+      "internal": false,
+      "attachable": false,
+      "container_names": [
+        "unlimited"
+      ],
+      "timestamp": "2026-01-01T00:00:00Z"
+    },
+    {
+      "id": "net-z",
+      "name": "zulu",
+      "driver": "bridge",
+      "scope": "",
+      "internal": false,
+      "attachable": false,
+      "container_names": [
+        "unlimited"
+      ],
+      "timestamp": "2026-01-01T00:00:00Z"
+    },
+    {
+      "id": "net-u",
+      "name": "unavailable",
+      "driver": "bridge",
+      "scope": "",
+      "internal": false,
+      "attachable": false,
+      "membership_unavailable": true,
+      "container_names": [],
+      "timestamp": "2026-01-01T00:00:00Z"
+    }
+  ],
+  "count": 3,
+  "timestamp": "2026-01-01T00:00:00Z"
+}

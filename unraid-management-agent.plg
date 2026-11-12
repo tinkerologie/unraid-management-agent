@@ -53,7 +53,7 @@ Features:
 - Automatic log rotation
 
 Requirements:
-- Unraid 6.9+ (tested on Unraid 7.x)
+- Unraid 7.2+ (tested on Unraid 7.x)
 - Port 8043 available (configurable)
 
 Support:
@@ -69,20 +69,26 @@ Support:
 
 # Check Unraid version compatibility
 if [ -f /etc/unraid-version ]; then
-    source /etc/unraid-version
-
-    # Extract major and minor version numbers
-    major_version=$(echo "$version" | cut -d'.' -f1)
-    minor_version=$(echo "$version" | cut -d'.' -f2)
-
-    # Check if version is at least 6.9.0
-    if [ "$major_version" -lt 6 ] || ([ "$major_version" -eq 6 ] && [ "$minor_version" -lt 9 ]); then
+    version=$(sed -nE 's/^[[:space:]]*version[[:space:]]*=[[:space:]]*(.*)$/\1/p' /etc/unraid-version)
+    case "$version" in
+        \"*\") version=${version#\"}; version=${version%\"} ;;
+        \'*\') version=${version#\'}; version=${version%\'} ;;
+    esac
+    compatible=false
+    if [[ $version =~ ^([0-9]{1,3})\.([0-9]{1,3})(\.[0-9]+)?([-+][[:alnum:].+-]+)?$ ]]; then
+        major=$((10#${BASH_REMATCH[1]}))
+        minor=$((10#${BASH_REMATCH[2]}))
+        if (( major > 7 || (major == 7 && minor >= 2) )); then
+            compatible=true
+        fi
+    fi
+    if [ "$compatible" = false ]; then
         echo ""
         echo "========================================="
         echo " ERROR: Incompatible Unraid Version"
         echo "========================================="
         echo ""
-        echo "This plugin requires Unraid 6.9.0 or higher."
+        echo "This plugin requires Unraid 7.2.0 or higher."
         echo "Your current version: $version"
         echo ""
         echo "Please upgrade your Unraid system before installing this plugin."

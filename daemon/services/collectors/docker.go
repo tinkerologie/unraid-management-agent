@@ -40,9 +40,10 @@ type DockerCollector struct {
 	appCtx       *domain.Context
 	dockerClient *client.Client
 	initialized  bool
-	mu           sync.Mutex             // protects prevCPU and prevNet
+	mu           sync.Mutex             // protects prevCPU, prevNet and memoryCaps
 	prevCPU      map[string]cpuSnapshot // keyed by full container ID
 	prevNet      map[string]netSnapshot // keyed by full container ID
+	memoryCaps   map[string]dockerMemoryCap
 }
 
 // NewDockerCollector creates a new Docker SDK-based collector
@@ -52,6 +53,7 @@ func NewDockerCollector(ctx *domain.Context) *DockerCollector {
 		initialized: false,
 		prevCPU:     make(map[string]cpuSnapshot),
 		prevNet:     make(map[string]netSnapshot),
+		memoryCaps:  make(map[string]dockerMemoryCap),
 	}
 }
 
@@ -123,16 +125,21 @@ func (c *DockerCollector) collect(ctx context.Context) error {
 	logger.Debug("Docker SDK: ContainerList took %v for %d containers", time.Since(startList), len(apiContainers))
 
 	containers := make([]*dto.ContainerInfo, 0, len(apiContainers))
+	containerMap := make(map[string]*dto.ContainerInfo, len(apiContainers))
 	var runningContainers []container.Summary
 
 	// First pass: create basic container info
 	for _, apiContainer := range apiContainers {
-		shortID := apiContainer.ID[:12]
+		shortID := apiContainer.ID[:min(12, len(apiContainer.ID))]
 		state := strings.ToLower(string(apiContainer.State))
+		name := shortID
+		if len(apiContainer.Names) > 0 {
+			name = strings.TrimPrefix(apiContainer.Names[0], "/")
+		}
 
 		cont := &dto.ContainerInfo{
 			ID:        shortID,
-			Name:      strings.TrimPrefix(apiContainer.Names[0], "/"),
+			Name:      name,
 			Image:     apiContainer.Image,
 			State:     state,
 			Status:    apiContainer.Status,
@@ -149,6 +156,7 @@ func (c *DockerCollector) collect(ctx context.Context) error {
 		}
 
 		containers = append(containers, cont)
+		containerMap[apiContainer.ID] = cont
 
 		if state == "running" {
 			runningContainers = append(runningContainers, apiContainer)
@@ -158,114 +166,94 @@ func (c *DockerCollector) collect(ctx context.Context) error {
 	// Batch inspect running containers for detailed info
 	if len(runningContainers) > 0 {
 		startInspect := time.Now()
-		containerMap := make(map[string]*dto.ContainerInfo)
-		for _, cont := range containers {
-			containerMap[cont.ID] = cont
-		}
-
 		for _, apiContainer := range runningContainers {
-			shortID := apiContainer.ID[:12]
+			cont := containerMap[apiContainer.ID]
 			inspectResult, err := c.dockerClient.ContainerInspect(ctx, apiContainer.ID, client.ContainerInspectOptions{})
 			if err != nil {
 				if cancelled := ctx.Err(); cancelled != nil {
 					return cancelled
 				}
-				logger.Debug("Docker SDK: Failed to inspect container %s: %v", shortID, err)
+				logger.Debug("Docker SDK: Failed to inspect container %s: %v", cont.ID, err)
 				continue
 			}
 
 			inspectData := inspectResult.Container
 
-			if cont, ok := containerMap[shortID]; ok {
-				// Network mode
-				if inspectData.HostConfig != nil {
-					cont.NetworkMode = string(inspectData.HostConfig.NetworkMode)
-				}
+			c.recordDockerMemoryCap(apiContainer.ID, inspectData.HostConfig)
 
-				// IP Address and MAC (get first available)
-				if inspectData.NetworkSettings != nil {
-					for _, network := range inspectData.NetworkSettings.Networks {
-						if network.IPAddress.IsValid() {
-							cont.IPAddress = network.IPAddress.String()
-							if mac := network.MacAddress.String(); mac != "" {
-								cont.MACAddress = mac
-							}
-							break
-						}
-					}
-					// Fall back to any network that exposes a MAC even without a valid IP.
-					if cont.MACAddress == "" {
-						for _, network := range inspectData.NetworkSettings.Networks {
-							if mac := network.MacAddress.String(); mac != "" {
-								cont.MACAddress = mac
-								break
-							}
+			// Network mode
+			if inspectData.HostConfig != nil {
+				cont.NetworkMode = string(inspectData.HostConfig.NetworkMode)
+			}
+
+			if inspectData.NetworkSettings != nil {
+				cont.Networks = buildNetworkAttachments(inspectData.NetworkSettings.Networks)
+				cont.IPAddress, cont.MACAddress = selectLegacyEndpoint(cont.NetworkMode, cont.Networks)
+			}
+
+			// Port mappings
+			if inspectData.HostConfig != nil {
+				portMappings := []string{}
+				for containerPort, bindings := range inspectData.HostConfig.PortBindings {
+					for _, binding := range bindings {
+						if binding.HostPort != "" {
+							portMappings = append(portMappings, fmt.Sprintf("%s:%s", binding.HostPort, containerPort))
 						}
 					}
 				}
+				cont.PortMappings = portMappings
 
-				// Port mappings
-				if inspectData.HostConfig != nil {
-					portMappings := []string{}
-					for containerPort, bindings := range inspectData.HostConfig.PortBindings {
-						for _, binding := range bindings {
-							if binding.HostPort != "" {
-								portMappings = append(portMappings, fmt.Sprintf("%s:%s", binding.HostPort, containerPort))
-							}
-						}
-					}
-					cont.PortMappings = portMappings
-
-					// Restart policy
-					cont.RestartPolicy = string(inspectData.HostConfig.RestartPolicy.Name)
-					if cont.RestartPolicy == "" {
-						cont.RestartPolicy = "no"
-					}
+				// Restart policy
+				cont.RestartPolicy = string(inspectData.HostConfig.RestartPolicy.Name)
+				if cont.RestartPolicy == "" {
+					cont.RestartPolicy = "no"
 				}
+			}
 
-				// Volume mappings
-				volumeMappings := []dto.VolumeMapping{}
-				for _, mount := range inspectData.Mounts {
-					volumeMappings = append(volumeMappings, dto.VolumeMapping{
-						HostPath:      mount.Source,
-						ContainerPath: mount.Destination,
-						Mode:          mount.Mode,
-					})
+			// Volume mappings
+			volumeMappings := []dto.VolumeMapping{}
+			for _, mount := range inspectData.Mounts {
+				volumeMappings = append(volumeMappings, dto.VolumeMapping{
+					HostPath:      mount.Source,
+					ContainerPath: mount.Destination,
+					Mode:          mount.Mode,
+				})
+			}
+			cont.VolumeMappings = volumeMappings
+
+			// Uptime
+			if inspectData.State != nil && inspectData.State.StartedAt != "" {
+				startTime, err := time.Parse(time.RFC3339Nano, inspectData.State.StartedAt)
+				if err == nil {
+					cont.Uptime = dockerFormatUptime(time.Since(startTime))
 				}
-				cont.VolumeMappings = volumeMappings
+			}
 
-				// Uptime
-				if inspectData.State != nil && inspectData.State.StartedAt != "" {
-					startTime, err := time.Parse(time.RFC3339Nano, inspectData.State.StartedAt)
-					if err == nil {
-						cont.Uptime = dockerFormatUptime(time.Since(startTime))
-					}
-				}
+			// RestartCount
+			cont.RestartCount = inspectData.RestartCount
 
-				// RestartCount
-				cont.RestartCount = inspectData.RestartCount
+			// Memory stats from cgroups (much faster than ContainerStats API)
+			c.getMemoryFromCgroups(apiContainer.ID, cont)
 
-				// Memory stats from cgroups (much faster than ContainerStats API)
-				c.getMemoryFromCgroups(apiContainer.ID, cont)
+			// CPU stats from cgroups (delta between collections)
+			c.getCPUFromCgroups(apiContainer.ID, cont)
 
-				// CPU stats from cgroups (delta between collections)
-				c.getCPUFromCgroups(apiContainer.ID, cont)
-
-				// Network I/O from /proc/<pid>/net/dev
-				if inspectData.State != nil {
-					c.getNetworkFromProc(inspectData.State.Pid, apiContainer.ID, cont)
-				}
+			// Network I/O from /proc/<pid>/net/dev
+			if inspectData.State != nil {
+				c.getNetworkFromProc(inspectData.State.Pid, apiContainer.ID, cont)
 			}
 		}
 		logger.Debug("Docker SDK: Inspect + cgroup stats took %v for %d containers", time.Since(startInspect), len(runningContainers))
 	}
 
+	c.inspectStoppedMemoryCaps(ctx, apiContainers)
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
 	// Prune stale CPU snapshots for containers that no longer exist
 	c.pruneStaleSnapshots(runningContainers)
+	c.publishConfiguredMemoryCaps(containerMap)
 
 	// Source healthy (zero containers is normal, not degraded). Attach the
 	// inline status flag only when not healthy.
