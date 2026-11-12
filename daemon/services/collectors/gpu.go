@@ -100,6 +100,66 @@ func assignGlobalGPUIndices(gpus []*dto.GPUMetrics) {
 	}
 }
 
+var (
+	// lspciQuotedFieldRe extracts the quoted fields of an `lspci -Dmm` record.
+	lspciQuotedFieldRe = regexp.MustCompile(`"([^"]*)"`)
+	// lspciDisplayClassRe matches the numeric class that lspci prints for a
+	// PCI base class 0x03 device when pci.ids has no name for it.
+	lspciDisplayClassRe = regexp.MustCompile(`^Class 03[0-9a-fA-F]{2}$`)
+)
+
+// lspciRecord holds the fields of one `lspci -Dmm` line that GPU discovery uses.
+type lspciRecord struct {
+	PCIID  string
+	Class  string
+	Vendor string
+	Device string
+}
+
+// parseLspciRecord splits an `lspci -Dmm` line into its unquoted PCI address
+// and its first three quoted fields (class, vendor, device). Unquoted tokens
+// such as -rXX and -pXX are ignored. It rejects records with an invalid
+// address or fewer than three quoted fields.
+func parseLspciRecord(line string) (lspciRecord, bool) {
+	firstQuote := strings.Index(line, "\"")
+	if firstQuote <= 0 {
+		return lspciRecord{}, false
+	}
+	pciID := strings.TrimSpace(line[:firstQuote])
+	if !pciAddressRe.MatchString(pciID) {
+		return lspciRecord{}, false
+	}
+	matches := lspciQuotedFieldRe.FindAllStringSubmatch(line[firstQuote:], -1)
+	if len(matches) < 3 {
+		return lspciRecord{}, false
+	}
+	return lspciRecord{PCIID: pciID, Class: matches[0][1], Vendor: matches[1][1], Device: matches[2][1]}, true
+}
+
+// isDisplayClass reports whether an lspci class field names a PCI base class
+// 0x03 (display controller) device. It matches whole field values only.
+func isDisplayClass(class string) bool {
+	switch class {
+	case "VGA compatible controller", "XGA compatible controller", "3D controller", "Display controller":
+		return true
+	}
+	return lspciDisplayClassRe.MatchString(class)
+}
+
+// lspciModelName returns the bracketed marketing name of an lspci device field,
+// or the whole field when it has no brackets. A malformed bracket gives "".
+func lspciModelName(device string) string {
+	if !strings.Contains(device, "[") {
+		return device
+	}
+	start := strings.Index(device, "[")
+	end := strings.Index(device, "]")
+	if start != -1 && end != -1 && end > start {
+		return strings.TrimSpace(device[start+1 : end])
+	}
+	return ""
+}
+
 // Intel GPU collection using intel_gpu_top
 func (c *GPUCollector) collectIntelGPU() ([]*dto.GPUMetrics, error) {
 	logger.Debug("Intel GPU: Starting Intel GPU detection")
@@ -121,51 +181,20 @@ func (c *GPUCollector) collectIntelGPU() ([]*dto.GPUMetrics, error) {
 	var intelGPUs []intelGPUInfo
 
 	for line := range strings.SplitSeq(output, "\n") {
-		if (strings.Contains(line, "VGA") || strings.Contains(line, "Display")) && strings.Contains(line, "Intel Corporation") {
-			logger.Debug("Intel GPU: Found Intel GPU line: %s", line)
-			// Parse PCI ID and model name using a more robust approach
-			// Format: "0000:00:02.0" "VGA compatible controller" "Intel Corporation" "CoffeeLake-S GT2 [UHD Graphics 630]" -p00 "ASRock Incorporation" "Device 3e92"
-
-			var pciID, model string
-
-			// Extract PCI ID (everything before first quote)
-			firstQuote := strings.Index(line, "\"")
-			if firstQuote > 0 {
-				pciID = strings.TrimSpace(line[:firstQuote])
-			}
-
-			// Extract all quoted strings using regex
-			// Format: "VGA compatible controller" "Intel Corporation" "CoffeeLake-S GT2 [UHD Graphics 630]" -p00 "ASRock Incorporation" "Device 3e92"
-			// Indices: [0]=class, [1]=vendor, [2]=device_name, [3]=subsys_vendor, [4]=subsys_device
-			re := regexp.MustCompile(`"([^"]*)"`)
-			matches := re.FindAllStringSubmatch(line, -1)
-
-			// The 3rd quoted string (index 2) is the device name
-			if len(matches) >= 3 {
-				fullModel := matches[2][1] // matches[2][0] is the full match with quotes, [1] is the captured group
-				logger.Debug("Intel GPU: Full model string: %s", fullModel)
-
-				// Extract just the marketing name from brackets if present
-				if strings.Contains(fullModel, "[") {
-					start := strings.Index(fullModel, "[")
-					end := strings.Index(fullModel, "]")
-					if start != -1 && end != -1 && end > start {
-						model = strings.TrimSpace(fullModel[start+1 : end])
-					}
-				} else {
-					// No brackets, use the full model name
-					model = fullModel
-				}
-				logger.Debug("Intel GPU: Parsed - ID: %s, Model: %s", pciID, model)
-			} else {
-				logger.Debug("Intel GPU: Failed to parse model name from line (found %d quoted strings, need at least 3)", len(matches))
-			}
-
-			if pciID != "" && model != "" {
-				intelGPUs = append(intelGPUs, intelGPUInfo{PCIID: pciID, Model: model})
-			}
-			// REMOVED: break statement - continue searching for more Intel GPUs
+		// Format: 0000:00:02.0 "VGA compatible controller" "Intel Corporation" "CoffeeLake-S GT2 [UHD Graphics 630]" -p00 "ASRock Incorporation" "Device 3e92"
+		record, ok := parseLspciRecord(line)
+		if !ok || !isDisplayClass(record.Class) || record.Vendor != "Intel Corporation" {
+			continue
 		}
+		logger.Debug("Intel GPU: Found Intel GPU line: %s", line)
+		logger.Debug("Intel GPU: Full model string: %s", record.Device)
+		model := lspciModelName(record.Device)
+		logger.Debug("Intel GPU: Parsed - ID: %s, Model: %s", record.PCIID, model)
+
+		if model != "" {
+			intelGPUs = append(intelGPUs, intelGPUInfo{PCIID: record.PCIID, Model: model})
+		}
+		// REMOVED: break statement - continue searching for more Intel GPUs
 	}
 
 	if len(intelGPUs) == 0 {
@@ -554,37 +583,17 @@ func (c *GPUCollector) collectAMDGPUWithRadeontop() ([]*dto.GPUMetrics, error) {
 	var amdGPUs []amdGPUInfo
 
 	for line := range strings.SplitSeq(output, "\n") {
-		if (strings.Contains(line, "VGA") || strings.Contains(line, "Display")) &&
-			(strings.Contains(line, "AMD") || strings.Contains(line, "Advanced Micro Devices") || strings.Contains(line, "ATI")) {
+		record, ok := parseLspciRecord(line)
+		if !ok || !isDisplayClass(record.Class) {
+			continue
+		}
+		if !strings.Contains(record.Vendor, "AMD") && !strings.Contains(record.Vendor, "Advanced Micro Devices") &&
+			!strings.Contains(record.Vendor, "ATI") {
+			continue
+		}
 
-			var pciID, model string
-
-			// Extract PCI ID
-			firstQuote := strings.Index(line, "\"")
-			if firstQuote > 0 {
-				pciID = strings.TrimSpace(line[:firstQuote])
-			}
-
-			// Extract model name
-			re := regexp.MustCompile(`"([^"]*)"`)
-			matches := re.FindAllStringSubmatch(line, -1)
-			if len(matches) >= 3 {
-				fullModel := matches[2][1]
-				// Extract marketing name from brackets if present
-				if strings.Contains(fullModel, "[") {
-					start := strings.Index(fullModel, "[")
-					end := strings.Index(fullModel, "]")
-					if start != -1 && end != -1 && end > start {
-						model = strings.TrimSpace(fullModel[start+1 : end])
-					}
-				} else {
-					model = fullModel
-				}
-			}
-
-			if pciID != "" && model != "" {
-				amdGPUs = append(amdGPUs, amdGPUInfo{PCIID: pciID, Model: model})
-			}
+		if model := lspciModelName(record.Device); model != "" {
+			amdGPUs = append(amdGPUs, amdGPUInfo{PCIID: record.PCIID, Model: model})
 		}
 	}
 

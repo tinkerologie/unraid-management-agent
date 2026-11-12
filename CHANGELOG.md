@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Intel and AMD GPU discovery now match the PCI display class (`0x03xx`) and the vendor field of
+  `lspci`. Non-display functions, such as a `Non-VGA unclassified device`, an HDMI audio function, or
+  a device with the vendor name only in its subsystem fields, are no longer reported as GPUs.
+  Intel `3D controller` devices are now detected (#346).
+
 ## [2026.11.05] - 2026-11-12
 
 ### Added
