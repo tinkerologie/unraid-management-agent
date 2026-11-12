@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -51,6 +52,10 @@ type dockerReplacement struct {
 }
 
 func (dc *DockerController) recreateDockerContainer(ctx context.Context, original container.InspectResponse) (id, message string, err error) {
+	macs, err := dc.configuredDockerMACs(ctx, original)
+	if err != nil {
+		return "", "", fmt.Errorf("read configured Docker MAC addresses: %w", err)
+	}
 	change := dockerReplacement{
 		originalID:    original.ID,
 		name:          strings.TrimPrefix(original.Name, "/"),
@@ -86,7 +91,7 @@ func (dc *DockerController) recreateDockerContainer(ctx context.Context, origina
 	cfg.Labels[dockerUpdateAttemptLabel] = change.attempt
 	result, err := dc.client.ContainerCreate(ctx, client.ContainerCreateOptions{
 		Config: &cfg, HostConfig: dockerReplacementHostConfig(original), Name: change.name,
-		NetworkingConfig: dockerReplacementNetworks(original.NetworkSettings, shortID(original.ID)),
+		NetworkingConfig: dockerReplacementNetworks(original.NetworkSettings, shortID(original.ID), macs),
 	})
 	if err != nil {
 		return "", "", dc.recoverDockerUpdate(change, "create replacement", err)
@@ -114,17 +119,19 @@ func (dc *DockerController) recreateDockerContainer(ctx context.Context, origina
 func dockerReplacementHostConfig(original container.InspectResponse) *container.HostConfig {
 	config := *original.HostConfig
 	config.Mounts = slices.Clone(config.Mounts)
+	config.Binds = slices.Clone(config.Binds)
 	bound := make(map[string]struct{}, len(config.Binds)+len(config.Mounts))
-	for _, bind := range config.Binds {
-		source, rest, hasSource := strings.Cut(bind, ":")
-		if hasSource && strings.HasPrefix(source, "/") && (rest == "ro" || rest == "rw") {
-			// A destination with only a mode has an anonymous source.
+	anonymousBinds := make(map[string]int)
+	for index, bind := range config.Binds {
+		sourceOrTarget, rest, _ := strings.Cut(bind, ":")
+		if !strings.HasPrefix(rest, "/") {
+			// Linux bind targets are absolute paths. A suffix with no
+			// leading slash is the mode list of an anonymous volume.
+			anonymousBinds[sourceOrTarget] = index
 			continue
 		}
-		if hasSource {
-			target, _, _ := strings.Cut(rest, ":")
-			bound[target] = struct{}{}
-		}
+		target, _, _ := strings.Cut(rest, ":")
+		bound[target] = struct{}{}
 	}
 	for _, existing := range config.Mounts {
 		if existing.Type == mount.TypeVolume && existing.Source == "" {
@@ -151,10 +158,18 @@ func dockerReplacementHostConfig(original container.InspectResponse) *container.
 			entry.VolumeOptions = &options
 			continue
 		}
-		config.Binds = slices.DeleteFunc(slices.Clone(config.Binds), func(bind string) bool {
-			target, mode, _ := strings.Cut(bind, ":")
-			return target == existing.Destination && (mode == "" || mode == "ro" || mode == "rw")
-		})
+		if index, found := anonymousBinds[existing.Destination]; found {
+			bind := config.Binds[index]
+			_, modes, hasModes := strings.Cut(bind, ":")
+			switch {
+			case !hasModes:
+				bind += ":nocopy"
+			case !slices.Contains(strings.Split(modes, ","), "nocopy"):
+				bind += ",nocopy"
+			}
+			config.Binds[index] = existing.Name + ":" + bind
+			continue
+		}
 		config.Mounts = append(config.Mounts, mount.Mount{
 			Type: mount.TypeVolume, Source: existing.Name, Target: existing.Destination, ReadOnly: !existing.RW,
 			VolumeOptions: &mount.VolumeOptions{NoCopy: true},
@@ -163,7 +178,7 @@ func dockerReplacementHostConfig(original container.InspectResponse) *container.
 	return &config
 }
 
-func dockerReplacementNetworks(settings *container.NetworkSettings, oldShortID string) *network.NetworkingConfig {
+func dockerReplacementNetworks(settings *container.NetworkSettings, oldShortID string, macs map[string]network.HardwareAddr) *network.NetworkingConfig {
 	if settings == nil || len(settings.Networks) == 0 {
 		return nil
 	}
@@ -178,7 +193,7 @@ func dockerReplacementNetworks(settings *container.NetworkSettings, oldShortID s
 		endpoints[name] = &network.EndpointSettings{
 			IPAMConfig: previous.IPAMConfig.Copy(),
 			Links:      slices.Clone(previous.Links), Aliases: aliases, DriverOpts: maps.Clone(previous.DriverOpts),
-			GwPriority: previous.GwPriority,
+			MacAddress: macs[name], GwPriority: previous.GwPriority,
 		}
 	}
 	if len(endpoints) == 0 {
@@ -213,18 +228,19 @@ func (dc *DockerController) restoreDockerOriginal(ctx context.Context, change do
 			return fmt.Errorf("restore original name: %w", err)
 		}
 	}
+	var policyErr, startErr error
 	if !change.restartPolicy.IsNone() &&
 		(original.Container.HostConfig == nil || !change.restartPolicy.IsSame(&original.Container.HostConfig.RestartPolicy)) {
 		if _, err := dc.client.ContainerUpdate(ctx, change.originalID, client.ContainerUpdateOptions{RestartPolicy: &change.restartPolicy}); err != nil {
-			return fmt.Errorf("restore original restart policy: %w", err)
+			policyErr = fmt.Errorf("restore original restart policy: %w", err)
 		}
 	}
 	if change.wasRunning && (original.Container.State == nil || !original.Container.State.Running) {
 		if _, err := dc.client.ContainerStart(ctx, change.originalID, client.ContainerStartOptions{}); err != nil {
-			return fmt.Errorf("restart original: %w", err)
+			startErr = fmt.Errorf("restart original: %w", err)
 		}
 	}
-	return nil
+	return errors.Join(policyErr, startErr)
 }
 
 func (dc *DockerController) removeFailedDockerReplacement(ctx context.Context, change dockerReplacement) error {

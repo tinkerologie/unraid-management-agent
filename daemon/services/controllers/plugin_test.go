@@ -170,3 +170,43 @@ func TestPluginControllerAllowsResultsAfterPartialRefreshFailure(t *testing.T) {
 		t.Fatalf("unexpected partial refresh result: %v, %v", updates, err)
 	}
 }
+
+func TestPluginRefreshContinuesAfterTargetDeadline(t *testing.T) {
+	original := pluginCheckExec
+	t.Cleanup(func() { pluginCheckExec = original })
+	var targets []string
+	pluginCheckExec = func(ctx context.Context, _ string, args ...string) (string, error) {
+		targets = append(targets, args[1])
+		if args[1] == "slow.plg" {
+			<-ctx.Done()
+			return "", ctx.Err()
+		}
+		return "", nil
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	if err := refreshPluginTargets(ctx, []string{"slow.plg", "healthy.plg"}, 20*time.Millisecond); err != nil ||
+		!slices.Equal(targets, []string{"slow.plg", "healthy.plg"}) || ctx.Err() != nil {
+		t.Fatalf("slow target interrupted refresh: targets=%v, err=%v", targets, err)
+	}
+}
+
+func TestPluginRefreshRetainsSuccessfulChecksWhenDownloadBudgetExpires(t *testing.T) {
+	original := pluginCheckExec
+	t.Cleanup(func() { pluginCheckExec = original })
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	pluginCheckExec = func(_ context.Context, _ string, args ...string) (string, error) {
+		if args[1] == "successful.plg" {
+			return "", nil
+		}
+		if args[1] != "pending.plg" {
+			t.Fatalf("unexpected check after deadline: %s", args[1])
+		}
+		cancel()
+		return "", ctx.Err()
+	}
+	if err := refreshPluginTargets(ctx, []string{"successful.plg", "pending.plg", "skipped.plg"}, time.Second); err != nil {
+		t.Fatal("successful checks were discarded:", err)
+	}
+}

@@ -337,7 +337,7 @@ func TestDockerUpdateReportsRecoveryFailures(t *testing.T) {
 
 func TestDockerReplacementResolvesImplicitMountsWithoutMutatingInspect(t *testing.T) {
 	host := &container.HostConfig{
-		Binds: []string{"shared:/shared:ro", "/anonymous:ro"},
+		Binds: []string{"shared:/shared:ro", "/anonymous:rw,nocopy", "/read-only:ro", "/default"},
 		Mounts: []mount.Mount{
 			{Type: mount.TypeVolume, Target: "/options", VolumeOptions: &mount.VolumeOptions{Subpath: "fixture"}},
 			{Type: mount.TypeVolume, Source: "named", Target: "/named"},
@@ -351,21 +351,24 @@ func TestDockerReplacementResolvesImplicitMountsWithoutMutatingInspect(t *testin
 			{Type: mount.TypeVolume, Name: "named", Destination: "/named"},
 			{Type: mount.TypeVolume, Name: "assigned", Destination: "/options"},
 			{Type: mount.TypeVolume, Name: "old-data", Destination: "/anonymous"},
+			{Type: mount.TypeVolume, Name: "old-read", Destination: "/read-only"},
+			{Type: mount.TypeVolume, Name: "old-default", Destination: "/default"},
 		},
 	})
-	if !slices.Equal(got.Binds, []string{"shared:/shared:ro"}) || len(got.Mounts) != 3 ||
+	if !slices.Equal(got.Binds, []string{"shared:/shared:ro", "old-data:/anonymous:rw,nocopy", "old-read:/read-only:ro,nocopy", "old-default:/default:nocopy"}) ||
+		len(got.Mounts) != 2 ||
 		got.Mounts[0].Source != "assigned" || got.Mounts[0].VolumeOptions.Subpath != "fixture" || !got.Mounts[0].VolumeOptions.NoCopy ||
-		got.Mounts[1].Source != "named" || got.Mounts[2].Source != "old-data" || !got.Mounts[2].ReadOnly {
+		got.Mounts[1].Source != "named" {
 		t.Fatalf("unexpected replacement configuration: %+v, %+v", got.Binds, got.Mounts)
 	}
-	if len(host.Binds) != 2 || host.Mounts[0].Source != "" || host.Mounts[0].VolumeOptions.NoCopy {
+	if host.Binds[1] != "/anonymous:rw,nocopy" || host.Mounts[0].Source != "" || host.Mounts[0].VolumeOptions.NoCopy {
 		t.Fatal("replacement config changed the original inspect response")
 	}
 }
 
 func TestDockerReplacementSkipsEmptyNetworkEndpoints(t *testing.T) {
 	for _, settings := range []*container.NetworkSettings{nil, {Networks: map[string]*network.EndpointSettings{"removed": nil}}} {
-		if got := dockerReplacementNetworks(settings, "fixture"); got != nil {
+		if got := dockerReplacementNetworks(settings, "fixture", nil); got != nil {
 			t.Fatalf("unexpected network config %+v", got)
 		}
 	}
@@ -460,6 +463,9 @@ func TestDockerRetainedOriginalCannotAutomaticallyRestart(t *testing.T) {
 				}
 			} else if err == nil || !strings.Contains(err.Error(), tc.wantError) {
 				t.Fatalf("expected %q, got %v", tc.wantError, err)
+			}
+			if tc.fault == "policy-restore" && !engine.originalRunning {
+				t.Fatal("restart-policy error prevented restarting the original")
 			}
 			if tc.fault == "policy-disable" && (!engine.originalRunning || engine.created != nil) {
 				t.Fatal("failed policy change allowed the update to interrupt the original")

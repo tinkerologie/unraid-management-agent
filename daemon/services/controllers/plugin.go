@@ -13,7 +13,11 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/plugininventory"
 )
 
-const pluginCheckTimeout = 30 * time.Second
+const (
+	pluginCheckTimeout   = 30 * time.Second
+	pluginDownloadBudget = 25 * time.Second
+	pluginTargetTimeout  = 10 * time.Second
+)
 
 var (
 	pluginCheckExec     = lib.ExecCommandOutputWithContext
@@ -52,8 +56,15 @@ func (pc *PluginController) CheckPluginUpdates(parentCtx context.Context) ([]dto
 	if err != nil {
 		return nil, err
 	}
-	if err := refreshPluginTargets(ctx, targets); err != nil {
+	// Reserve time for reading native metadata after network checks finish.
+	downloadCtx, cancelDownloads := context.WithTimeout(ctx, pluginDownloadBudget)
+	refreshErr := refreshPluginTargets(downloadCtx, targets, pluginTargetTimeout)
+	cancelDownloads()
+	if err := ctx.Err(); err != nil {
 		return nil, err
+	}
+	if refreshErr != nil {
+		return nil, refreshErr
 	}
 	list, err := pc.resolve(ctx)
 	if err != nil {
@@ -73,12 +84,12 @@ func (pc *PluginController) CheckPluginUpdates(parentCtx context.Context) ([]dto
 
 // Check only valid registered plugins. The native checkall command also prunes
 // dangling runtime registrations, which is outside an agent refresh.
-func refreshPluginTargets(ctx context.Context, targets []string) error {
+func refreshPluginTargets(ctx context.Context, targets []string, targetTimeout time.Duration) error {
 	var firstFailure error
 	checked := false
 	for _, target := range targets {
-		if err := ctx.Err(); err != nil {
-			return err
+		if ctx.Err() != nil {
+			break
 		}
 		if !pluginCheckFilename.MatchString(target) {
 			continue
@@ -86,7 +97,10 @@ func refreshPluginTargets(ctx context.Context, targets []string) error {
 		// Match the native checkall command's serial execution of plugin hooks.
 		// A rejected candidate still counts as a successful native check when
 		// the manager publishes a validation marker and exits successfully.
-		if _, err := pluginCheckExec(ctx, constants.PluginBin, "check", target); err != nil {
+		checkCtx, cancel := context.WithTimeout(ctx, targetTimeout)
+		_, err := pluginCheckExec(checkCtx, constants.PluginBin, "check", target)
+		cancel()
+		if err != nil {
 			logger.Debug("Plugin: refresh failed for %q: %v", target, err)
 			if firstFailure == nil {
 				firstFailure = fmt.Errorf("check %q: %w", target, err)
@@ -95,11 +109,11 @@ func refreshPluginTargets(ctx context.Context, targets []string) error {
 		}
 		checked = true
 	}
-	if err := ctx.Err(); err != nil {
-		return err
+	if checked {
+		return nil
 	}
-	if !checked && firstFailure != nil {
+	if firstFailure != nil {
 		return fmt.Errorf("plugin refresh failed: %w", firstFailure)
 	}
-	return nil
+	return ctx.Err()
 }

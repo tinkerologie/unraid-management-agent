@@ -25,9 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fix **Apply Policies Instantly** and saving **Reset All** in the Unraid WebGUI by using its
   CSRF-compatible form submission (#333).
-- Preserve Docker network and memory configuration when replacing a container. Retain the original
-  until the replacement succeeds and restore it after a failed create or start. Prevent automatic
-  restarts of an original retained after cleanup fails (#336).
+- Preserve Docker network and memory configuration when replacing a container, including fixed MAC
+  addresses on the local Engine. Retain the original until the replacement succeeds and restore it
+  after a failed create or start. Prevent automatic restarts of an original retained after cleanup
+  fails (#336).
 - Keep the Docker network inventory available when individual membership queries fail (#335).
 - Keep the last successful plugin update result when all native refresh checks fail (#338).
 - Enforce the advertised Unraid 7.2.0 minimum in the installer and reject malformed versions (#339).
