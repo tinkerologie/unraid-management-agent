@@ -11,9 +11,9 @@ import (
 func TestMCPNullableDiskMeasurements(t *testing.T) {
 	server, mock := setupInitializedServer(t)
 	mock.disks = []dto.DiskInfo{
-		{ID: "standby", Name: "standby", Status: "PASSED", SpinState: "standby"},
-		{ID: "hot", Name: "hot", Status: "PASSED", Temperature: new(60.0)},
-		{ID: "failed", Name: "failed", Status: "FAILED"},
+		{ID: "standby", Name: "standby", Status: "DISK_OK", SMARTStatus: "UNKNOWN", SpinState: "standby"},
+		{ID: "hot", Name: "hot", Status: "DISK_OK", SMARTStatus: "PASSED", Temperature: new(60.0)},
+		{ID: "failed", Name: "failed", Status: "DISK_OK", SMARTStatus: "FAILED"},
 	}
 	cs, cleanup := connectClientToServer(t, server)
 	defer cleanup()

@@ -582,6 +582,54 @@ func TestGetHealthStatus_Populated(t *testing.T) {
 	}
 }
 
+// TestGetHealthStatus_DiskCounts uses the disk inventory from issue #344.
+func TestGetHealthStatus_DiskCounts(t *testing.T) {
+	issueInventory := []dto.DiskInfo{
+		{ID: "WDC_WD140EDGZ_7LGGXR5K", Device: "sdb", Name: "parity", Role: "parity", Status: "DISK_OK", SMARTStatus: "PASSED", Temperature: new(32.0)},
+		{ID: "WDC_WD140EDGZ_7LGH9KAK", Device: "sda", Name: "disk1", Role: "data", Status: "DISK_OK", SMARTStatus: "PASSED", Temperature: new(33.0)},
+		{ID: "WDC_WD140EDGZ_9MJDHH8T", Device: "sde", Name: "disk2", Role: "data", Status: "DISK_OK", SMARTStatus: "PASSED", Temperature: new(33.0)},
+		{ID: "WDC_WD140EDGZ_7LGHGJXK", Device: "sdd", Name: "disk3", Role: "data", Status: "DISK_OK", SMARTStatus: "UNKNOWN", SpinState: "standby"},
+		{Name: "parity2", Role: "parity2", Status: "DISK_NP_DSBL"},
+		{ID: "CT2000T500SSD8_25285175763C", Device: "nvme0n1", Name: "cache", Role: "cache", Status: "DISK_OK", SMARTStatus: "PASSED", Temperature: new(38.0)},
+		{ID: "Samsung_Flash_Drive_FIT", Device: "sdc", Name: "flash", Role: "flash", Status: "DISK_OK", SMARTStatus: "UNKNOWN"},
+		{ID: "docker_vdisk", Name: "Docker vDisk", Role: "docker_vdisk", Status: "DISK_OK"},
+		{ID: "log_filesystem", Device: "tmpfs", Name: "Log", Role: "log", Status: "DISK_OK"},
+	}
+	tests := []struct {
+		name                            string
+		disks                           *[]dto.DiskInfo
+		wantHealthy, wantWarn, wantUnkn int
+	}{
+		{"nil cache", nil, 0, 0, 0},
+		{"empty cache", &[]dto.DiskInfo{}, 0, 0, 0},
+		{"issue inventory", &issueInventory, 4, 0, 1},
+		{"failed and missing assigned disks", &[]dto.DiskInfo{
+			{ID: "disk1", Device: "sda", Role: "data", Status: "DISK_OK", SMARTStatus: "FAILED"},
+			{ID: "disk2", Role: "data", Status: "DISK_NP_DSBL"},
+			{ID: "disk3", Device: "sdc", Role: "data", Status: "DISK_OK", SMARTStatus: "PASSED", Temperature: new(51.0)},
+		}, 0, 3, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server, _ := setupTestServer()
+			if tt.disks != nil {
+				server.disksCache.Store(tt.disks)
+			}
+			health := server.GetHealthStatus()
+			for key, want := range map[string]int{
+				"healthy_disks": tt.wantHealthy,
+				"warning_disks": tt.wantWarn,
+				"unknown_disks": tt.wantUnkn,
+			} {
+				got, ok := health[key].(int)
+				if !ok || got != want {
+					t.Errorf("%s = %v, want %d", key, health[key], want)
+				}
+			}
+		})
+	}
+}
+
 // ===== Settings Methods (error path on non-Unraid) =====
 
 func TestGetSystemSettings_ErrorPath(t *testing.T) {

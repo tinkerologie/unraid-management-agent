@@ -743,19 +743,24 @@ func (s *Server) GetHealthStatus() map[string]any {
 		health["array_used_percent"] = arrayStatus.UsedPercent
 	}
 
-	// Disk health summary
+	// Disk health summary; excluded entries are not counted.
 	disks := s.GetDisksCache()
 	healthyDisks := 0
 	warningDisks := 0
+	unknownDisks := 0
 	for _, disk := range disks {
-		if disk.Status == "PASSED" && (disk.Temperature == nil || *disk.Temperature <= 50) {
+		switch disk.HealthClass() {
+		case dto.DiskHealthHealthy:
 			healthyDisks++
-		} else {
+		case dto.DiskHealthWarning:
 			warningDisks++
+		case dto.DiskHealthUnknown:
+			unknownDisks++
 		}
 	}
 	health["healthy_disks"] = healthyDisks
 	health["warning_disks"] = warningDisks
+	health["unknown_disks"] = unknownDisks
 
 	// Container health
 	containers := s.GetDockerCache()

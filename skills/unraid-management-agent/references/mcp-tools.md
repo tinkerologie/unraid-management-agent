@@ -29,6 +29,16 @@ Tool names are exact. Do not invent or alias them.
 | R | `get_network_info` | Interfaces, IPs, speeds, traffic stats |
 | R | `get_network_access_urls` | LAN/WAN/WireGuard/mDNS/IPv6 access URLs |
 
+`get_health_status` disk counts:
+
+- `healthy_disks`: native status `DISK_OK`, SMART `PASSED`, and not above 50 °C.
+- `warning_disks`: native status not `DISK_OK`, SMART not `PASSED` or `UNKNOWN`, or above 50 °C.
+- `unknown_disks`: SMART `UNKNOWN` or empty (for example, a disk in standby), or native status empty.
+
+The counts do not include the flash device, the Docker vDisk, the log filesystem and vacant
+`DISK_NP*` slots without a device and ID. The sum of the counts can be less than the number of
+disks from `list_disks`. `get_diagnostic_summary` lists only `warning_disks` disks in `disk_issues`.
+
 ## Storage — Array, Disks, Shares (read)
 
 | R/W | Tool | Purpose |

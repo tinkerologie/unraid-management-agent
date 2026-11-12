@@ -361,17 +361,18 @@ func TestMetricsNullableMeasurements(t *testing.T) {
 func TestHealthNullableDiskTemperature(t *testing.T) {
 	server := newMetricsTestServer()
 	disks := []dto.DiskInfo{
-		{Name: "standby", Status: "PASSED", SMARTStatus: "PASSED", SpinState: "standby"},
-		{Name: "hot", Status: "PASSED", SMARTStatus: "PASSED", Temperature: new(60.0)},
+		{Name: "standby", Device: "sdd", Role: "data", Status: "DISK_OK", SMARTStatus: "UNKNOWN", SpinState: "standby"},
+		{Name: "hot", Device: "sdb", Role: "data", Status: "DISK_OK", SMARTStatus: "PASSED", Temperature: new(60.0)},
+		{Name: "cool", Device: "sda", Role: "parity", Status: "DISK_OK", SMARTStatus: "PASSED", Temperature: new(32.0)},
 	}
 	server.disksCache.Store(&disks)
 	health := server.GetHealthStatus()
-	if health["healthy_disks"] != 1 || health["warning_disks"] != 1 {
+	if health["healthy_disks"] != 1 || health["warning_disks"] != 1 || health["unknown_disks"] != 1 {
 		t.Fatalf("health=%v", health)
 	}
 	report := BuildHealthReport(nil, &dto.ArrayStatus{State: "Started"}, disks, nil)
 	for _, finding := range report.Findings {
-		if strings.Contains(finding.Title, "standby") {
+		if strings.Contains(finding.Title, "standby") && strings.Contains(finding.Title, "temperature") {
 			t.Errorf("unknown temperature caused finding: %+v", finding)
 		}
 	}
