@@ -14,7 +14,7 @@ const TOOLS = [
 ];
 
 // Opens the panel and returns the requests that would save policies.
-async function openPanel(page) {
+async function openPanel(page, savePolicy) {
   const saves = [];
   await page.setViewportSize({ width: 900, height: 800 });
   await page.route('**/*', async (route) => {
@@ -30,6 +30,9 @@ async function openPanel(page) {
       return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ tools: TOOLS, policies: {} }) });
     }
     if (request.method() !== 'GET' && (request.postData() || '').includes('polic')) saves.push(request.url());
+    if (url.searchParams.get('action') === 'save_tool_policy' && savePolicy) {
+      return savePolicy(route);
+    }
     return route.fulfill({ contentType: 'application/json', body: '{}' });
   });
   await page.goto(`${BASE}/`);
@@ -63,6 +66,59 @@ test('Reset All stays the last bulk action and undoes All → Hidden', async ({ 
   await buttons.last().click();
   expect(JSON.parse(await page.locator('#tool_policy_json').inputValue())).toEqual({});
 });
+
+test('instant save posts form-encoded policy edits and an explicit empty reset', async ({ page }) => {
+  const response = { message: 'Policies applied instantly.' };
+  await openPanel(page, (route) => route.fulfill({ json: response }));
+  const button = page.locator('#uma-btn-save-policies');
+  const status = page.locator('#uma-policy-save-status');
+
+  async function applyPolicies(expected) {
+    const posted = page.waitForRequest((request) =>
+      new URL(request.url()).searchParams.get('action') === 'save_tool_policy');
+    await button.click();
+    const request = await posted;
+    expect(request.method()).toBe('POST');
+    expect(request.headers()['content-type']).toMatch(/^application\/x-www-form-urlencoded\b/);
+    expect(new URLSearchParams(request.postData()).get('policies')).toBe(JSON.stringify(expected));
+    await expect(status).toHaveText(response.message);
+    await expect(button).toBeEnabled();
+  }
+
+  await page.locator('.uma-policy-select').first().selectOption('hidden');
+  await applyPolicies({ get_system_info: 'hidden' });
+  await page.getByRole('button', { name: 'Reset All', exact: true }).click();
+  await applyPolicies({});
+});
+
+for (const scenario of [
+  { status: 200, body: { message: 'Policies applied instantly.' }, color: 'rgb(0, 128, 0)' },
+  { status: 400, body: { error: 'Policy rejected.' }, color: 'rgb(255, 0, 0)' },
+]) {
+  test(`instant save restores the button and reports HTTP ${scenario.status}`, async ({ page }) => {
+    let releaseResponse;
+    const responseReady = new Promise((resolve) => { releaseResponse = resolve; });
+    await openPanel(page, async (route) => {
+      await responseReady;
+      await route.fulfill({ status: scenario.status, json: scenario.body });
+    });
+    const button = page.locator('#uma-btn-save-policies');
+    const status = page.locator('#uma-policy-save-status');
+    await page.locator('.uma-policy-select').first().selectOption('hidden');
+    try {
+      await button.click();
+      await expect(button).toBeDisabled();
+      await expect(button).toHaveValue('Applying…');
+      await expect(status).toHaveText('Saving policies…');
+    } finally {
+      releaseResponse();
+    }
+    await expect(status).toHaveText(scenario.body.message || scenario.body.error);
+    await expect(status).toHaveCSS('color', scenario.color);
+    await expect(button).toBeEnabled();
+    await expect(button).toHaveValue('Apply Policies Instantly');
+  });
+}
 
 test('a long description wraps in full without widening the table', async ({ page }) => {
   await openPanel(page);

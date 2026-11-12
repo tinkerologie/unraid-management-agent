@@ -1688,8 +1688,8 @@ function saveToolPoliciesViaAJAX() {
     $.ajax({
         url: '/plugins/<?=$plugin?>/include/diagnostics.php?action=save_tool_policy',
         type: 'POST',
-        data: JSON.stringify({policies: umaActivePolicies}),
-        contentType: 'application/json',
+        // The Unraid WebGUI appends its CSRF token to form-encoded POST data.
+        data: {policies: JSON.stringify(umaActivePolicies)},
         dataType: 'json'
     }).done(function(resp) {
         status.style.color = 'var(--green-500, green)';

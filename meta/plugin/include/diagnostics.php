@@ -126,24 +126,32 @@ switch ($action) {
 
     case 'save_tool_policy':
         header('Content-Type: application/json');
-        $raw = file_get_contents('php://input');
-        if (empty($raw) && isset($_POST['policies'])) {
-            $raw = json_encode(['policies' => $_POST['policies']]);
-        }
-        if (empty($raw)) {
-            http_response_code(400);
-            echo json_encode(['error' => 'No policy payload received']);
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            header('Allow: POST');
+            http_response_code(405);
+            echo json_encode(['error' => 'Method not allowed']);
             exit;
         }
 
-        $decoded = json_decode($raw, true);
-        if (!is_array($decoded)) {
+        if (isset($_POST['policies'])) {
+            $field = $_POST['policies'];
+            $input_map = is_string($field) ? json_decode($field, true) : $field;
+        } else {
+            $raw = file_get_contents('php://input');
+            if (empty($raw)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'No policy payload received']);
+                exit;
+            }
+            $decoded = json_decode($raw, true);
+            $input_map = isset($decoded['policies']) && is_array($decoded['policies']) ? $decoded['policies'] : $decoded;
+        }
+        if (!is_array($input_map)) {
             http_response_code(400);
             echo json_encode(['error' => 'Invalid JSON payload']);
             exit;
         }
 
-        $input_map = isset($decoded['policies']) && is_array($decoded['policies']) ? $decoded['policies'] : $decoded;
         $allowed_policies = ['default', 'hidden', 'read_only', 'allow', 'ask'];
         $clean_policies = [];
 
