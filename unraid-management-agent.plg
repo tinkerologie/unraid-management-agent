@@ -10,8 +10,8 @@
     <!ENTITY launch      "Settings/unraid-management-agent">
     <!ENTITY bundle      "&name;-&version;.tgz">
     <!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
-    <!ENTITY md5         "fd2d8420a0dae99981791754d8acdaf4"> <!-- pragma: allowlist secret -->
-    <!ENTITY sha256      "508982a82bf14df6d5482cef896c5515ad44bdaf39cdc27a60be53d31d09bcf7"> <!-- pragma: allowlist secret -->
+    <!ENTITY md5         "db83bf4ecf46a26c51fb9863e06aadb3"> <!-- pragma: allowlist secret -->
+    <!ENTITY sha256      "427dfc41144c2b570b54c5d81db4c80fff3f587ebc46d48b1a216fde36eeac46"> <!-- pragma: allowlist secret -->
 ]>
 
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" icon="server" min="7.2.0" pluginURL="&pluginURL;" support="&supportURL;" project="&gitURL;" readme="&gitURL;#readme">
@@ -21,18 +21,26 @@ Monitor and control your Unraid system via REST API, WebSocket, MCP, Prometheus,
 </DESCRIPTION>
 
 <CHANGES>
-### 2026.11.04
+### 2026.11.05
 
-### Fixed
+### Added
 
-- Serve MCP `2026-07-28` discovery at `/mcp-stateless` for ChatGPT Secure MCP Tunnel clients. The endpoint uses the existing API authentication and MCP tool access policies (#331).
-- Enforce Agent Core's `forbid` mode for tool calls and saved approvals, including calls with confirmed auto-approve preferences.
-- Resume the remaining Agent Core tool calls after an approval decision. Send Claude one message with all results from the turn.
+- Report Docker hard memory caps for running and stopped containers without changing live memory statistics (#334).
+- List Docker network attachments in a stable order and publish network membership changes (#335).
+- Report native Unraid 7.4 Mover activity, transfer progress, throughput and ETA when available (#337).
 
 ### Changed
 
-- Apply ASD-STE100 Issue 9 guidance to the README and related setup, security, API, and integration guides (#331).
-- List the built-in Agent Core tools and show how to approve a Docker container restart with REST API authentication.
+- Match the native Plugin Manager's installed inventory and distinguish installable, incompatible, stale and invalid updates (#338).
+
+### Fixed
+
+- Honor the Manual intervals for Array Status and Disk Health and report the actual last collection time. Ignore progress-only array events in Dynamic mode. During parity operations, defer storage probes and retain the last available capacity samples. Array Status reports when capacity was last measured (#341).
+- Fix **Apply Policies Instantly** and saving **Reset All** in the Unraid WebGUI by using its CSRF-compatible form submission (#333).
+- Preserve Docker network and memory configuration when replacing a container, including fixed MAC addresses on the local Engine. Retain the original until the replacement succeeds and restore it after a failed create or start. Prevent automatic restarts of an original retained after cleanup fails (#336).
+- Keep the Docker network inventory available when individual membership queries fail (#335).
+- Keep the last successful plugin update result when all native refresh checks fail (#338).
+- Enforce the advertised Unraid 7.2.0 minimum in the installer and reject malformed versions (#339).
 </CHANGES>
 
 <!--
