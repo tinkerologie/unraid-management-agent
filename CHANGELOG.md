@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fix **Apply Policies Instantly** and saving **Reset All** in the Unraid WebGUI by using its
+  CSRF-compatible form submission (#333).
+
 ## [2026.11.04] - 2026-11-11
 
 ### Fixed
