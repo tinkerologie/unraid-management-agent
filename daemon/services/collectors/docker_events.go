@@ -15,10 +15,18 @@ import (
 // dockerEventsDebounce coalesces bursts such as stop+die+destroy.
 const dockerEventsDebounce = 250 * time.Millisecond
 
-// dockerEventActions are the container actions that change collected data.
-var dockerEventActions = []events.Action{
-	events.ActionStart, events.ActionStop, events.ActionDie,
-	events.ActionHealthStatus, events.ActionCreate, events.ActionDestroy,
+type dockerEventSpec map[events.Type][]events.Action
+
+var dockerContainerEvents = dockerEventSpec{
+	events.ContainerEventType: {
+		events.ActionStart, events.ActionStop, events.ActionDie,
+		events.ActionHealthStatus, events.ActionCreate, events.ActionDestroy,
+	},
+	events.NetworkEventType: {events.ActionConnect, events.ActionDisconnect},
+}
+
+var dockerInventoryEvents = dockerEventSpec{
+	events.NetworkEventType: {events.ActionCreate, events.ActionDestroy, events.ActionConnect, events.ActionDisconnect},
 }
 
 // dockerEventsClient is the part of the Docker client the event source uses.
@@ -28,17 +36,22 @@ type dockerEventsClient interface {
 	Close() error
 }
 
-// NewDockerEventSource returns an EventSource that reports container
-// lifecycle events from the Docker daemon. It opens its own Docker client.
+// NewDockerEventSource reports container lifecycle and attachment changes.
 func NewDockerEventSource() EventSource {
-	return newDockerEventSource(func() (dockerEventsClient, error) {
-		// API-version negotiation is the default in this client version.
-		return client.New(client.FromEnv)
-	})
+	return newDockerEventSource(dockerContainerEvents, openDockerEventsClient)
+}
+
+// NewDockerNetworkEventSource reports Docker network lifecycle and membership changes.
+func NewDockerNetworkEventSource() EventSource {
+	return newDockerEventSource(dockerInventoryEvents, openDockerEventsClient)
+}
+
+func openDockerEventsClient() (dockerEventsClient, error) {
+	return client.New(client.FromEnv)
 }
 
 // newDockerEventSource builds the Docker source on an injectable client factory.
-func newDockerEventSource(newClient func() (dockerEventsClient, error)) *sessionSource {
+func newDockerEventSource(spec dockerEventSpec, newClient func() (dockerEventsClient, error)) *sessionSource {
 	return newSessionSource("Docker event source", dockerEventsDebounce, func(ctx context.Context, connected, changed func()) error {
 		cli, err := newClient()
 		if err != nil {
@@ -52,9 +65,12 @@ func newDockerEventSource(newClient func() (dockerEventsClient, error)) *session
 		// Cancelling the stream context ends the client's stream goroutine.
 		streamCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
-		filters := make(client.Filters).Add("type", string(events.ContainerEventType))
-		for _, a := range dockerEventActions {
-			filters.Add("event", string(a))
+		filters := make(client.Filters)
+		for eventType, actions := range spec {
+			filters.Add("type", string(eventType))
+			for _, action := range actions {
+				filters.Add("event", string(action))
+			}
 		}
 		stream := cli.Events(streamCtx, client.EventsListOptions{Filters: filters})
 		connected()
@@ -63,8 +79,11 @@ func newDockerEventSource(newClient func() (dockerEventsClient, error)) *session
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
-			case msg := <-stream.Messages:
-				if isDockerContainerChange(msg) {
+			case msg, ok := <-stream.Messages:
+				if !ok {
+					return errors.New("event stream closed")
+				}
+				if spec.matches(msg) {
 					changed()
 				}
 			case err, ok := <-stream.Err:
@@ -77,13 +96,9 @@ func newDockerEventSource(newClient func() (dockerEventsClient, error)) *session
 	})
 }
 
-// isDockerContainerChange reports whether msg is a container event with one of
-// dockerEventActions. Health events carry the status after a colon, e.g.
-// "health_status: healthy".
-func isDockerContainerChange(msg events.Message) bool {
-	if msg.Type != events.ContainerEventType {
-		return false
-	}
+// matches rejects cross-type combinations that Docker's filter permits.
+// Health events carry the status after a colon.
+func (spec dockerEventSpec) matches(msg events.Message) bool {
 	action, _, _ := strings.Cut(string(msg.Action), ":")
-	return slices.Contains(dockerEventActions, events.Action(action))
+	return slices.Contains(spec[msg.Type], events.Action(action))
 }

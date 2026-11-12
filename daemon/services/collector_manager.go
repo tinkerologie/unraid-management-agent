@@ -824,12 +824,12 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 	// collectors→controllers import cycle.
 	cm.Register("docker_networks", func(ctx *domain.Context) Collector {
 		c := collectors.NewDockerNetworksCollector(ctx)
-		c.ListFn = func() ([]dto.DockerNetworkInfo, error) {
+		c.ListFn = func(ctx context.Context) ([]dto.DockerNetworkInfo, error) {
 			dc := controllers.NewDockerController()
 			defer func() { _ = dc.Close() }()
-			return dc.ListNetworks()
+			return dc.ListNetworks(ctx)
 		}
-		return collectOnce(c.Collect)
+		return collectFunc(c.Collect)
 	}, intervals.DockerNetworks, false)
 
 	// PluginUpdate collector — checks installed plugins for available updates.
@@ -882,9 +882,9 @@ func (cm *CollectorManager) RegisterAllCollectors() {
 		return collectOnce(c.Collect)
 	}, intervals.OSUpdate, false)
 
-	// Mover collector — reads var.ini state + /var/log/mover.log (local files only).
+	// Mover collector — reads native status and progress plus legacy settings and history.
 	cm.Register("mover", func(ctx *domain.Context) Collector {
-		return collectOnce(collectors.NewMoverCollector(ctx).Collect)
+		return collectFunc(collectors.NewMoverCollector(ctx).Collect)
 	}, intervals.Mover, false)
 
 	// Storage topology collector — storcli (Broadcom/LSI) and sg_ses (SES enclosures).

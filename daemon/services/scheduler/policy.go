@@ -99,7 +99,7 @@ var policies = map[string]Policy{
 	"fancontrol":       demand(60*sec, 5*minute, 60*sec, constants.TopicFanControlUpdate.Name),
 	"tuning":           fixed(2*minute, 0, constants.TopicTuningUpdate.Name),
 	"docker_update":    fixed(6*time.Hour, 45*sec, constants.TopicDockerUpdatesUpdate.Name),
-	"docker_networks":  delayed(5*sec, demand(60*sec, 10*minute, 60*sec, constants.TopicDockerNetworksUpdate.Name)),
+	"docker_networks":  delayed(5*sec, evented(60*sec, 10*minute, 60*sec, constants.TopicDockerNetworksUpdate.Name)),
 	"plugin_update":    pluginUpdatePolicy(),
 	"os_update":        fixed(24*time.Hour, 60*sec, constants.TopicOSUpdateUpdate.Name),
 	"mover":            delayed(10*sec, evented(30*sec, 5*minute, 30*sec, constants.TopicMoverUpdate.Name)),

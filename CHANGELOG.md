@@ -9,10 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Report Docker hard memory caps for running and stopped containers without changing live memory
+  statistics (#334).
+- List Docker network attachments in a stable order and publish network membership changes (#335).
+- Report native Unraid 7.4 Mover activity, transfer progress, throughput and ETA when available (#337).
+
+### Changed
+
+- Match the native Plugin Manager's installed inventory and distinguish installable, incompatible,
+  stale and invalid updates (#338).
+
 ### Fixed
 
 - Fix **Apply Policies Instantly** and saving **Reset All** in the Unraid WebGUI by using its
   CSRF-compatible form submission (#333).
+- Preserve Docker network and memory configuration when replacing a container. Retain the original
+  until the replacement succeeds and restore it after a failed create or start (#336).
+- Enforce the advertised Unraid 7.2.0 minimum in the installer and reject malformed versions (#339).
 
 ## [2026.11.04] - 2026-11-11
 

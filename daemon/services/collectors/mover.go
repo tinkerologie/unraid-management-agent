@@ -2,6 +2,8 @@ package collectors
 
 import (
 	"bufio"
+	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -20,33 +22,38 @@ import (
 // (not a constant) so that tests can override it with a fixture file path.
 var moverLogPath = "/var/log/mover.log"
 
-// MoverCollector periodically reads mover state from var.ini and last-run
-// statistics from /var/log/mover.log. It publishes on TopicMoverUpdate whenever
-// the active flag, finish time, or file count changes (dedupe).
+// MoverCollector publishes activity, native progress and legacy run history.
 type MoverCollector struct {
 	appCtx *domain.Context
 	// CheckFn performs the actual data collection. The constructor installs a
 	// default implementation; callers may replace it for testing.
-	CheckFn func() (*dto.MoverStatus, error)
-	lastSig string
+	CheckFn  func(context.Context) (*dto.MoverStatus, error)
+	lastSig  string
+	settings *SettingsCollector
 }
 
 // NewMoverCollector creates a new MoverCollector with the default CheckFn installed.
 func NewMoverCollector(ctx *domain.Context) *MoverCollector {
-	c := &MoverCollector{appCtx: ctx}
+	c := &MoverCollector{appCtx: ctx, settings: NewSettingsCollector()}
 	c.CheckFn = c.defaultCheck
 	return c
 }
 
 // Collect runs a mover status check and publishes the result only when the
-// dedupe signature changes (active + last-run-finish + files-moved).
-func (c *MoverCollector) Collect() {
+// status or progress changes.
+func (c *MoverCollector) Collect(ctx context.Context) {
+	if ctx.Err() != nil {
+		return
+	}
 	if c.CheckFn == nil {
 		logger.Warning("Mover: CheckFn not set, skipping collect")
 		return
 	}
 
-	result, err := c.CheckFn()
+	result, err := c.CheckFn(ctx)
+	if ctx.Err() != nil {
+		return
+	}
 	if err != nil {
 		logger.Warning("Mover: check failed: %v", err)
 		return
@@ -55,8 +62,14 @@ func (c *MoverCollector) Collect() {
 		return
 	}
 
-	// Dedupe: only publish when active flag, last finish time, or file count changes.
-	sig := fmt.Sprintf("%v|%s|%d", result.Active, result.LastRunFinish, result.LastRunFilesMoved)
+	comparable := *result
+	comparable.Timestamp = time.Time{}
+	snapshot, err := json.Marshal(comparable)
+	if err != nil {
+		logger.Warning("Mover: cannot encode status: %v", err)
+		return
+	}
+	sig := string(snapshot)
 	if sig == c.lastSig {
 		logger.Debug("Mover: no change (active=%v finish=%s files=%d), skipping publish",
 			result.Active, result.LastRunFinish, result.LastRunFilesMoved)
@@ -65,23 +78,23 @@ func (c *MoverCollector) Collect() {
 	c.lastSig = sig
 
 	domain.Publish(c.appCtx.Hub, constants.TopicMoverUpdate, result)
-	logger.Info("Mover: published (active=%v, files=%d, bytes=%d)",
+	logger.Debug("Mover: published (active=%v, files=%d, bytes=%d)",
 		result.Active, result.LastRunFilesMoved, result.LastRunBytesMoved)
 }
 
 // defaultCheck reads mover state from var.ini and last-run stats from moverLogPath.
-func (c *MoverCollector) defaultCheck() (*dto.MoverStatus, error) {
+func (c *MoverCollector) defaultCheck(ctx context.Context) (*dto.MoverStatus, error) {
 	result := &dto.MoverStatus{
 		Timestamp: time.Now(),
 	}
 
-	// Read Active + Schedule from var.ini
-	sc := NewSettingsCollector()
-	if ms, err := sc.GetMoverSettings(); err == nil {
-		result.Active = ms.Active
-		result.Schedule = ms.Schedule
-	} else {
-		logger.Debug("Mover: could not read var.ini mover settings: %v", err)
+	ms, source := c.settings.moverSettings(ctx)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	result.Active, result.Schedule, result.StatusSource = ms.Active, ms.Schedule, source
+	if result.Active && source == moverNativeSource {
+		c.settings.moverSource().progress(result)
 	}
 
 	// Parse last-run stats from mover.log
@@ -94,7 +107,7 @@ func (c *MoverCollector) defaultCheck() (*dto.MoverStatus, error) {
 	}
 	defer f.Close() //nolint:errcheck
 
-	start, finish, files, bytes := parseMoverLog(f)
+	start, finish, files, bytes := parseMoverLog(ctx, f)
 	if !start.IsZero() {
 		result.LastRunStart = start.UTC().Format(time.RFC3339)
 	}
@@ -106,8 +119,6 @@ func (c *MoverCollector) defaultCheck() (*dto.MoverStatus, error) {
 	}
 	result.LastRunFilesMoved = files
 	result.LastRunBytesMoved = bytes
-	// CurrentThroughputMBs: always 0 (live throughput is out of scope for conservative version)
-
 	return result, nil
 }
 
@@ -123,7 +134,7 @@ func (c *MoverCollector) defaultCheck() (*dto.MoverStatus, error) {
 // The parser is defensive: it recognises only lines that match the patterns below
 // and returns zero-values for any fields absent from the log. Unrecognised lines
 // are silently skipped so that format variations do not cause hard failures.
-func parseMoverLog(r io.Reader) (start, finish time.Time, files, bytes uint64) {
+func parseMoverLog(ctx context.Context, r io.Reader) (start, finish time.Time, files, bytes uint64) {
 	// Regex patterns for the three line types we recognise.
 	// Using UNIX date format: "Day Mon DD HH:MM:SS TZ YYYY"
 	startRe := regexp.MustCompile(`[Ss]tarted\s+\((.+?)\)`)
@@ -141,7 +152,7 @@ func parseMoverLog(r io.Reader) (start, finish time.Time, files, bytes uint64) {
 	)
 
 	scanner := bufio.NewScanner(r)
-	for scanner.Scan() {
+	for ctx.Err() == nil && scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
 			continue

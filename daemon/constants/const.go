@@ -5,7 +5,10 @@ import "time"
 
 const (
 	// VarIni is the path to the Unraid var.ini configuration file.
-	VarIni = "/var/local/emhttp/var.ini"
+	VarIni        = "/var/local/emhttp/var.ini"
+	MoverBin      = "/usr/local/sbin/mover"
+	MoverPID      = "/var/run/mover.pid"
+	MoverProgress = "/usr/local/emhttp/state/mover.ini"
 	// DisksIni is the path to the Unraid disks.ini configuration file.
 	DisksIni = "/var/local/emhttp/disks.ini"
 	// SharesIni is the path to the Unraid shares.ini configuration file.
@@ -29,6 +32,10 @@ const (
 	SharesConfigDir = "/boot/config/shares"
 	// PluginsConfigDir is the directory containing plugin files.
 	PluginsConfigDir = "/boot/config/plugins"
+	// PluginsRuntimeDir contains links to plugin manifests registered at runtime.
+	PluginsRuntimeDir = "/var/log/plugins"
+	// UnraidVersionFile records the installed release.
+	UnraidVersionFile = "/etc/unraid-version"
 	// PluginsTempDir is the directory containing downloaded plugin updates.
 	PluginsTempDir = "/tmp/plugins"
 

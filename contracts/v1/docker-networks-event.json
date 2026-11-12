@@ -1,0 +1,34 @@
+{
+  "event": "docker_networks_update",
+  "timestamp": "2026-01-01T00:00:00Z",
+  "data": {
+    "networks": [
+      {
+        "id": "net-a",
+        "name": "alpha",
+        "driver": "bridge",
+        "scope": "",
+        "internal": false,
+        "attachable": false,
+        "container_names": [
+          "unlimited"
+        ],
+        "timestamp": "2026-01-01T00:00:00Z"
+      },
+      {
+        "id": "net-z",
+        "name": "zulu",
+        "driver": "bridge",
+        "scope": "",
+        "internal": false,
+        "attachable": false,
+        "container_names": [
+          "unlimited"
+        ],
+        "timestamp": "2026-01-01T00:00:00Z"
+      }
+    ],
+    "count": 2,
+    "timestamp": "2026-01-01T00:00:00Z"
+  }
+}

@@ -37,7 +37,11 @@ func defaultEventSources(name string) []eventSource {
 	case "shares":
 		return []eventSource{iniChanges(constants.SharesIni, sharesIniVolatileKeys...)}
 	case "mover":
-		return []eventSource{collectors.NewFileEventSource(fileEventDebounce, constants.VarIni)}
+		return []eventSource{
+			collectors.NewFileEventSource(fileEventDebounce, constants.VarIni),
+			collectors.NewFileEventSource(fileEventDebounce, constants.MoverPID),
+			collectors.NewFileEventSource(fileEventDebounce, constants.MoverProgress),
+		}
 	case "notification":
 		unread, archive := collectors.ResolveNotificationDirs(constants.DynamixCfg)
 		return []eventSource{
@@ -51,9 +55,11 @@ func defaultEventSources(name string) []eventSource {
 			collectors.NewUeventSource(collectors.BlockDeviceUevent),
 		}
 	case "plugin_update":
-		return []eventSource{collectors.NewDirEventSource(pluginEventDebounce, constants.PluginsConfigDir, "*.plg")}
+		return []eventSource{collectors.NewDirEventSource(pluginEventDebounce, constants.PluginsRuntimeDir, "*.plg")}
 	case "docker":
 		return []eventSource{collectors.NewDockerEventSource()}
+	case "docker_networks":
+		return []eventSource{collectors.NewDockerNetworkEventSource()}
 	case "vm":
 		return []eventSource{collectors.NewLibvirtEventSource()}
 	case "psu":

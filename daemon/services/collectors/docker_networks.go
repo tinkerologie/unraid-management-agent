@@ -1,8 +1,9 @@
 package collectors
 
 import (
-	"fmt"
-	"sort"
+	"context"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,8 +20,9 @@ type DockerNetworksCollector struct {
 	// ListFn fetches the network list; the collector factory in package services
 	// injects the controller-backed implementation to avoid a
 	// collectors→controllers import cycle.
-	ListFn  func() ([]dto.DockerNetworkInfo, error)
-	lastSig string
+	ListFn    func(context.Context) ([]dto.DockerNetworkInfo, error)
+	lastSig   string
+	published bool
 }
 
 // NewDockerNetworksCollector creates a new DockerNetworks collector. ListFn must
@@ -34,12 +36,15 @@ func NewDockerNetworksCollector(ctx *domain.Context) *DockerNetworksCollector {
 
 // Collect fetches the current network list and publishes only when it changed
 // since the last publish (dedupe to avoid no-op WebSocket broadcasts).
-func (c *DockerNetworksCollector) Collect() {
+func (c *DockerNetworksCollector) Collect(ctx context.Context) {
 	if c.ListFn == nil {
 		logger.Warning("DockerNetworks: ListFn not set, skipping collect")
 		return
 	}
-	networks, err := c.ListFn()
+	networks, err := c.ListFn(ctx)
+	if ctx.Err() != nil {
+		return
+	}
 	if err != nil {
 		logger.Warning("DockerNetworks: list failed: %v", err)
 		return
@@ -52,23 +57,32 @@ func (c *DockerNetworksCollector) Collect() {
 	}
 
 	sig := networksSignature(networks)
-	if sig == c.lastSig {
+	if c.published && sig == c.lastSig {
 		logger.Debug("DockerNetworks: no change (%d networks), skipping publish", len(networks))
 		return
 	}
 	c.lastSig = sig
+	c.published = true
 
 	domain.Publish(c.appCtx.Hub, constants.TopicDockerNetworksUpdate, result)
 	logger.Info("DockerNetworks: published (%d networks)", len(networks))
 }
 
 // networksSignature builds an order-independent fingerprint of the network list
-// (ID + driver), ignoring timestamps.
+// (ID, driver and membership), ignoring timestamps and member order.
 func networksSignature(networks []dto.DockerNetworkInfo) string {
 	parts := make([]string, 0, len(networks))
 	for _, n := range networks {
-		parts = append(parts, fmt.Sprintf("%s:%s", n.ID, n.Driver))
+		members := slices.Clone(n.ContainerNames)
+		slices.Sort(members)
+		var key strings.Builder
+		key.WriteString(strconv.Quote(n.ID))
+		key.WriteString(strconv.Quote(n.Driver))
+		for _, name := range slices.Compact(members) {
+			key.WriteString(strconv.Quote(name))
+		}
+		parts = append(parts, strconv.Quote(key.String()))
 	}
-	sort.Strings(parts)
-	return strings.Join(parts, ",")
+	slices.Sort(parts)
+	return strings.Join(parts, "")
 }

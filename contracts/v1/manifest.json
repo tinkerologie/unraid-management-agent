@@ -73,6 +73,160 @@
       "sha256": "53c2af02a63134ed1adf084a42847a311a781bbecef36f73255fe3c2a95ec184"
     },
     {
+      "id": "docker-configuration",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/docker",
+      "status": 200,
+      "model": "[]dto.ContainerInfo",
+      "case": "Configured limits and sorted attachments",
+      "semantics": [
+        "list",
+        "zero",
+        "omitted"
+      ],
+      "origin": "dto-constructed",
+      "fixture": "docker-configuration.json",
+      "sha256": "7f332bc687f02fa6360fff400cbb896f2abf3f938018a9f5e8713b918b9e9667"
+    },
+    {
+      "id": "docker-configuration-event",
+      "transport": "websocket",
+      "event": "container_list_update",
+      "envelope": "dto.WSEvent",
+      "model": "[]*dto.ContainerInfo",
+      "case": "Container configuration update",
+      "semantics": [
+        "list",
+        "zero",
+        "omitted"
+      ],
+      "origin": "dto-constructed",
+      "fixture": "docker-configuration-event.json",
+      "sha256": "d04ba3de33b3120c5c962b9134a152def7b19ae2498a990c46eea3e5c3bb3387"
+    },
+    {
+      "id": "docker-networks",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/docker/networks",
+      "status": 200,
+      "model": "dto.DockerNetworkList",
+      "case": "Membership across two networks",
+      "semantics": [
+        "list"
+      ],
+      "origin": "dto-constructed",
+      "fixture": "docker-networks.json",
+      "sha256": "475a68aba5d66ac97b0b4477c9acb0a87eeb3c261417cec1cccf8d781173d788"
+    },
+    {
+      "id": "docker-networks-event",
+      "transport": "websocket",
+      "event": "docker_networks_update",
+      "envelope": "dto.WSEvent",
+      "model": "*dto.DockerNetworkList",
+      "case": "Network membership update",
+      "semantics": [
+        "list"
+      ],
+      "origin": "dto-constructed",
+      "fixture": "docker-networks-event.json",
+      "sha256": "7f217ce6c3a2623aef34f3220181c62298d2d98e967d32d81e78647e67cd2a94"
+    },
+    {
+      "id": "mover-active-no-progress",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/mover",
+      "status": 200,
+      "model": "dto.MoverStatus",
+      "case": "Active with progress unavailable",
+      "semantics": [
+        "object"
+      ],
+      "origin": "dto-constructed",
+      "fixture": "mover-active-no-progress.json",
+      "sha256": "cdd3ac7c5d71db5fdd186e86ca39b3ac6fc15bf6d9bb7b4b154bbde05f889501"
+    },
+    {
+      "id": "mover-active-progress",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/mover",
+      "status": 200,
+      "model": "dto.MoverStatus",
+      "case": "Active with progress",
+      "semantics": [
+        "object"
+      ],
+      "origin": "dto-constructed",
+      "fixture": "mover-active-progress.json",
+      "sha256": "ce64d757e1fce03558e802243999b7ebbb507f74ba616b0c7d0b82c448d0aa97"
+    },
+    {
+      "id": "mover-completed",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/mover",
+      "status": 200,
+      "model": "dto.MoverStatus",
+      "case": "Completed with legacy history",
+      "semantics": [
+        "object"
+      ],
+      "origin": "dto-constructed",
+      "fixture": "mover-completed.json",
+      "sha256": "328ee3ccd670f8d9130f7d55cceaca457b54c51598a9635ef881c7cb1ea10629"
+    },
+    {
+      "id": "mover-empty",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/mover",
+      "status": 200,
+      "model": "dto.MoverStatus",
+      "case": "No cached Mover observation",
+      "semantics": [
+        "null"
+      ],
+      "origin": "producer-reachable",
+      "fixture": "mover-empty.json",
+      "sha256": "2b77522d2caad38abd5102a4a995c227d2f775fb56246b69afe409ef5568a909",
+      "normalized_fields": [
+        "/timestamp"
+      ]
+    },
+    {
+      "id": "mover-event",
+      "transport": "websocket",
+      "event": "mover_update",
+      "envelope": "dto.WSEvent",
+      "model": "*dto.MoverStatus",
+      "case": "Native progress event",
+      "semantics": [
+        "object"
+      ],
+      "origin": "dto-constructed",
+      "fixture": "mover-event.json",
+      "sha256": "a8846d5662cbef13986f9df2174d238356223b541d79b5f5415ba2691341146d"
+    },
+    {
+      "id": "mover-idle",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/mover",
+      "status": 200,
+      "model": "dto.MoverStatus",
+      "case": "Idle with no live progress",
+      "semantics": [
+        "object"
+      ],
+      "origin": "dto-constructed",
+      "fixture": "mover-idle.json",
+      "sha256": "260d4ea4fdc44d76344e5b5bc5f3ecd01d392e1a0f342fe5561e69a3bd7fe54a"
+    },
+    {
       "id": "network-services",
       "transport": "rest",
       "method": "GET",
@@ -283,6 +437,51 @@
       "origin": "producer-reachable",
       "fixture": "nut-stopped.json",
       "sha256": "2668b4a861eefdaf5ac8c727b8123c8fe5946bc3e1b9924ec450e42a7f6b499a"
+    },
+    {
+      "id": "plugin-updates",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/plugins/check-updates",
+      "status": 200,
+      "model": "dto.PluginList",
+      "case": "Installable cached update",
+      "semantics": [
+        "list"
+      ],
+      "origin": "dto-constructed",
+      "fixture": "plugin-updates.json",
+      "sha256": "e9d3c19934575c3596a347ce4df1cb80bd910ce6b0881ee0c802f07de8ff97fa"
+    },
+    {
+      "id": "plugin-updates-event",
+      "transport": "websocket",
+      "event": "plugin_updates_update",
+      "envelope": "dto.WSEvent",
+      "model": "*dto.PluginList",
+      "case": "Installable update event",
+      "semantics": [
+        "list"
+      ],
+      "origin": "dto-constructed",
+      "fixture": "plugin-updates-event.json",
+      "sha256": "7348030e133a1478001112af663350eb755cff328d34903c60e686eef6155a7a"
+    },
+    {
+      "id": "plugin-updates-pending",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/plugins/check-updates",
+      "status": 200,
+      "model": "dto.PluginList",
+      "case": "No check completed",
+      "semantics": [
+        "null",
+        "zero"
+      ],
+      "origin": "producer-reachable",
+      "fixture": "plugin-updates-pending.json",
+      "sha256": "8b27d9a121ad397f35d621d3ae0d0dcb4f0689b88768c3baef804b9e693f2d48"
     },
     {
       "id": "shares-empty",

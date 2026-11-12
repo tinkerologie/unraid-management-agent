@@ -671,7 +671,7 @@ dotm="W2"
 
 func TestSettingsCollector_GetPluginList(t *testing.T) {
 	collector := NewSettingsCollector()
-	plugins, err := collector.GetPluginList()
+	plugins, err := collector.GetPluginList(t.Context())
 
 	if err != nil {
 		t.Logf("Expected errors in test environment: %v", err)
@@ -689,7 +689,7 @@ func TestSettingsCollector_GetPluginList(t *testing.T) {
 
 func TestSettingsCollector_GetUpdateStatus(t *testing.T) {
 	collector := NewSettingsCollector()
-	status, err := collector.GetUpdateStatus()
+	status, err := collector.GetUpdateStatus(t.Context())
 
 	if err != nil {
 		t.Logf("Expected errors in test environment: %v", err)
@@ -725,53 +725,6 @@ func TestSettingsCollector_GetFlashDriveHealth(t *testing.T) {
 	// Verify timestamp is set
 	if health.Timestamp.IsZero() {
 		t.Error("Timestamp should not be zero")
-	}
-}
-
-func TestSettingsCollector_parsePluginFile(t *testing.T) {
-	// Create a temporary plugin file
-	tempDir := t.TempDir()
-	pluginContent := `<?xml version='1.0' standalone='yes'?>
-<!DOCTYPE PLUGIN [
-<!ENTITY name      "test.plugin">
-<!ENTITY author    "Test Author">
-<!ENTITY version   "2025.01.22">
-<!ENTITY pluginURL "https://example.com/test.plg">
-<!ENTITY support   "https://forums.example.com/test">
-<!ENTITY icon      "test-icon">
-]>
-<PLUGIN name="&name;" author="&author;" version="&version;">
-</PLUGIN>
-`
-	pluginPath := filepath.Join(tempDir, "test.plugin.plg")
-	if err := os.WriteFile(pluginPath, []byte(pluginContent), 0644); err != nil {
-		t.Fatalf("Failed to create test plugin: %v", err)
-	}
-
-	collector := NewSettingsCollector()
-	plugin, err := collector.parsePluginFile(pluginPath)
-
-	if err != nil {
-		t.Fatalf("Failed to parse plugin file: %v", err)
-	}
-
-	if plugin.Name != "test.plugin" {
-		t.Errorf("Expected Name='test.plugin', got '%s'", plugin.Name)
-	}
-	if plugin.Version != "2025.01.22" {
-		t.Errorf("Expected Version='2025.01.22', got '%s'", plugin.Version)
-	}
-	if plugin.Author != "Test Author" {
-		t.Errorf("Expected Author='Test Author', got '%s'", plugin.Author)
-	}
-	if plugin.URL != "https://example.com/test.plg" {
-		t.Errorf("Expected URL='https://example.com/test.plg', got '%s'", plugin.URL)
-	}
-	if plugin.SupportURL != "https://forums.example.com/test" {
-		t.Errorf("Expected SupportURL='https://forums.example.com/test', got '%s'", plugin.SupportURL)
-	}
-	if plugin.Icon != "test-icon" {
-		t.Errorf("Expected Icon='test-icon', got '%s'", plugin.Icon)
 	}
 }
 

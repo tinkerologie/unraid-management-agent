@@ -108,15 +108,17 @@ type ServiceStatus struct {
 // PluginInfo represents an installed plugin (Issue #52)
 // @Description Information about an installed Unraid plugin
 type PluginInfo struct {
-	Name            string `json:"name" example:"community.applications"`         // Plugin name
-	Version         string `json:"version" example:"2025.10.27"`                  // Current installed version
-	Author          string `json:"author" example:"Lime Technology"`              // Plugin author
-	Enabled         bool   `json:"enabled" example:"true"`                        // Is plugin enabled
-	URL             string `json:"url,omitempty" example:"https://..."`           // Plugin URL
-	SupportURL      string `json:"support_url,omitempty"`                         // Support forum URL
-	Icon            string `json:"icon,omitempty" example:"users"`                // Plugin icon
-	UpdateAvailable bool   `json:"update_available" example:"false"`              // Is update available
-	LatestVersion   string `json:"latest_version,omitempty" example:"2025.10.28"` // Latest available version
+	Name              string `json:"name" example:"community.applications"`         // Plugin name
+	Version           string `json:"version" example:"2025.10.27"`                  // Current installed version
+	Author            string `json:"author" example:"Lime Technology"`              // Plugin author
+	Enabled           bool   `json:"enabled" example:"true"`                        // Is plugin enabled
+	URL               string `json:"url,omitempty" example:"https://..."`           // Plugin URL
+	SupportURL        string `json:"support_url,omitempty"`                         // Support forum URL
+	Icon              string `json:"icon,omitempty" example:"users"`                // Plugin icon
+	UpdateAvailable   bool   `json:"update_available" example:"false"`              // Is update available
+	LatestVersion     string `json:"latest_version,omitempty" example:"2025.10.28"` // Latest available version
+	UpdateStatus      string `json:"update_status,omitempty" example:"up_to_date"`  // Native Plugin Manager update state
+	ValidationMessage string `json:"validation_message,omitempty"`                  // Reason the candidate failed validation
 }
 
 // PluginList represents the list of installed plugins

@@ -1,0 +1,14 @@
+{
+  "active": false,
+  "last_run_duration_seconds": 0,
+  "last_run_files_moved": 0,
+  "last_run_bytes_moved": 0,
+  "current_throughput_mbs": 0,
+  "progress_total_bytes": null,
+  "progress_remaining_bytes": null,
+  "progress_moved_bytes": null,
+  "progress_percent": null,
+  "throughput_bytes_per_second": null,
+  "eta_seconds": null,
+  "timestamp": "2000-01-01T00:00:00Z"
+}

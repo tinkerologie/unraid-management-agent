@@ -295,7 +295,7 @@ func TestDockerFormatMemoryDisplay(t *testing.T) {
 }
 
 func TestDockerRefreshCancelsWithoutPublishing(t *testing.T) {
-	for _, target := range []string{"list", "inspect"} {
+	for _, target := range []string{"list", "inspect", "stopped inspect"} {
 		t.Run(target, func(t *testing.T) {
 			entered := make(chan struct{})
 			release := make(chan struct{})
@@ -304,9 +304,13 @@ func TestDockerRefreshCancelsWithoutPublishing(t *testing.T) {
 				case strings.HasSuffix(r.URL.Path, "/_ping"):
 					w.Header().Set("API-Version", "1.51")
 					w.WriteHeader(http.StatusOK)
-				case target == "inspect" && strings.HasSuffix(r.URL.Path, "/containers/json"):
+				case target != "list" && strings.HasSuffix(r.URL.Path, "/containers/json"):
 					w.Header().Set("Content-Type", "application/json")
-					_, _ = io.WriteString(w, `[{"Id":"abcdef1234567890","Names":["/synthetic"],"Image":"image","State":"running"}]`)
+					state := "running"
+					if target == "stopped inspect" {
+						state = "exited"
+					}
+					_, _ = fmt.Fprintf(w, `[{"Id":"abcdef1234567890","Names":["/synthetic"],"Image":"image","State":%q}]`, state)
 				default:
 					close(entered)
 					select {

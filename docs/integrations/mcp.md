@@ -264,10 +264,10 @@ listed and report that no data is available.
 
 ### Plugin Tools
 
-| Tool                     | Description                                                                                               |
-| ------------------------ | --------------------------------------------------------------------------------------------------------- |
-| `check_plugin_updates`   | Return the cached plugin update status (read-only)                                                        |
-| `refresh_plugin_updates` | Force an immediate plugin update check for all installed plugins and publish the result (non-destructive) |
+| Tool                     | Description                                                           |
+| ------------------------ | --------------------------------------------------------------------- |
+| `check_plugin_updates`   | Return cached installable plugin updates (read-only)                  |
+| `refresh_plugin_updates` | Refresh native update metadata and publish installable plugin updates |
 
 ### Service & Process Tools
 
@@ -289,7 +289,7 @@ listed and report that no data is available.
 | Tool               | Description                                                                                                                                                               |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `get_os_update`    | Return the cached Unraid OS update availability. Sources local files only — no outbound network calls. Status: `up_to_date`, `update_available`, or `unknown` (read-only) |
-| `get_mover_status` | Return the cached mover state (active flag, cron schedule, last-run start/finish timestamps, duration, files moved, bytes moved) (read-only)                              |
+| `get_mover_status` | Return cached Mover activity, schedule, live progress and recorded last-run statistics                                                                                    |
 
 ### Storage Topology Tools
 

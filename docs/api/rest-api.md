@@ -1668,8 +1668,17 @@ List all Docker containers.
     "status": "Up 9 hours",
     "ip_address": "172.17.0.2",
     "mac_address": "02:42:ac:11:00:02",
-    "cpu_usage_percent": 0.5,
+    "networks": [
+      {
+        "network": "bridge",
+        "network_id": "sample-network-id",
+        "ip_address": "172.17.0.2",
+        "mac_address": "02:42:ac:11:00:02"
+      }
+    ],
+    "cpu_percent": 0.5,
     "memory_usage_bytes": 104857600,
+    "configured_memory_limit_bytes": 536870912,
     "network_rx_bytes": 1000000,
     "network_tx_bytes": 500000,
     "network_rx_bytes_per_sec": 1024,
@@ -1683,13 +1692,21 @@ List all Docker containers.
 ]
 ```
 
-> `mac_address` is populated from `docker inspect` (Docker 29 / Unraid 7.3 fixed-MAC support).
+`networks` lists inspected running-container attachments in network-name order. Each entry gives
+the network name, network ID, IPv4 address, and any IPv6 or MAC address. The existing
+`ip_address` and `mac_address` fields prefer the configured primary network, then use the
+available addresses in network-name order. The attachment list is omitted when unavailable.
+
+`configured_memory_limit_bytes` is Docker's configured hard cap. Zero means unlimited.
+An omitted field means the cap is unavailable. The collector reuses running-container inspections
+and refreshes a bounded number of stopped containers per cycle. `memory_limit_bytes` remains
+the live statistics denominator and can contain host RAM for an unlimited running container.
 
 `memory_usage_bytes` is cgroup v2 `memory.current` minus `inactive_file` from `memory.stat`,
 clamped at zero; if `memory.stat` is missing, unreadable or lacks a valid `inactive_file`, raw
 `memory.current` is used. Memory usage in MB, percentage, display and aggregates use this same value.
 
-**New container fields (this branch):**
+**Container statistics fields**
 
 | Field                      | Type      | Description                                                         |
 | -------------------------- | --------- | ------------------------------------------------------------------- |
@@ -3438,30 +3455,29 @@ _Monthly - Last Day of Month (`dotm="28-31"`)_:
 
 ### GET /plugins
 
-Get list of installed plugins with version and update information.
+List installed user plugins and their cached update states. A plugin is installed when it has a valid
+runtime manifest link. Built-in OS entries and boot-only declarations are excluded. The native
+manager caches update manifests under the filename from each plugin's update URL.
 
-**Response**:
+`update_status` is one of the following.
 
-```json
-{
-  "plugins": [
-    {
-      "name": "unassigned.devices",
-      "version": "2024.08.09",
-      "author": "dlandon",
-      "icon": "/plugins/unassigned.devices/images/unassigned.devices.png",
-      "support_url": "https://forums.unraid.net/topic/...",
-      "update_available": true,
-      "update_version": "2024.10.15"
-    }
-  ],
-  "total_plugins": 12,
-  "plugin_updates_count": 3,
-  "timestamp": "2025-10-03T13:41:13+10:00"
-}
-```
+| State                 | Meaning                                                                                               |
+| --------------------- | ----------------------------------------------------------------------------------------------------- |
+| `update_available`    | A newer, compatible candidate is available.                                                           |
+| `update_incompatible` | A newer candidate cannot run on the current Unraid release.                                           |
+| `validation_failed`   | The native manager rejected a newer candidate. `validation_message` carries the reason when recorded. |
+| `up_to_date`          | A fresh cached check found no newer version.                                                          |
+| `need_check`          | The cached check is stale.                                                                            |
+| `not_available`       | No candidate is cached.                                                                               |
 
----
+Only `update_available` sets the existing boolean of the same name. The inventory uses
+`total_count` for installed plugins and `updates_available` for installable updates.
+`latest_version` records the candidate version when available.
+
+### GET /plugins/check-updates
+
+Return the cached list of installable updates. Both counts describe the number of entries in the
+updates-only list. Before the first check, `plugins` is null and the counts are zero.
 
 ### POST /plugins/updates/refresh
 
@@ -3479,11 +3495,12 @@ for the next scheduled `plugin_update` collector run.
       "name": "unassigned.devices",
       "version": "2024.08.09",
       "update_available": true,
-      "update_version": "2024.10.15"
+      "update_status": "update_available",
+      "latest_version": "2024.10.15"
     }
   ],
-  "total_count": 12,
-  "updates_available": 3,
+  "total_count": 1,
+  "updates_available": 1,
   "timestamp": "2026-05-30T12:00:00Z"
 }
 ```
@@ -3620,9 +3637,10 @@ curl http://192.168.20.21:8043/api/v1/os/update
 
 ### GET /mover
 
-Return the cached mover status, including whether it is currently active, its configured
-cron schedule, and last-run statistics parsed from `/var/log/mover.log`.
-Refreshed by the `mover` background collector (`INTERVAL_MOVER`, default 5 min).
+Return cached Mover activity, cron schedule, available live progress, and last-run statistics
+when recorded in `/var/log/mover.log`. Unraid 7.4 and later use the native status command when
+available. Live fields require an active run and **Mover Progress** enabled in Unraid.
+The Manual collector interval defaults to 30 seconds. Dynamic mode also watches for changes.
 
 **Response**:
 
@@ -3636,22 +3654,36 @@ Refreshed by the `mover` background collector (`INTERVAL_MOVER`, default 5 min).
   "last_run_files_moved": 1024,
   "last_run_bytes_moved": 5368709120,
   "current_throughput_mbs": 0,
+  "progress_total_bytes": null,
+  "progress_remaining_bytes": null,
+  "progress_moved_bytes": null,
+  "progress_percent": null,
+  "throughput_bytes_per_second": null,
+  "eta_seconds": null,
+  "status_source": "native",
   "timestamp": "2026-05-30T12:00:00Z"
 }
 ```
 
 **Fields**:
 
-| Field                       | Type   | Description                                           |
-| --------------------------- | ------ | ----------------------------------------------------- |
-| `active`                    | bool   | Whether the mover is running                          |
-| `schedule`                  | string | Cron expression from `var.ini` (`shareMoverSchedule`) |
-| `last_run_start`            | string | ISO-8601 timestamp when the last run began            |
-| `last_run_finish`           | string | ISO-8601 timestamp when the last run ended            |
-| `last_run_duration_seconds` | int    | Duration of the last run in seconds                   |
-| `last_run_files_moved`      | int    | Files moved during the last run                       |
-| `last_run_bytes_moved`      | int    | Bytes moved during the last run                       |
-| `current_throughput_mbs`    | float  | Live throughput MB/s (always 0 in this release)       |
+| Field                         | Type         | Description                                                 |
+| ----------------------------- | ------------ | ----------------------------------------------------------- |
+| `active`                      | bool         | Whether the mover is running                                |
+| `schedule`                    | string       | Cron expression from `var.ini` (`shareMoverSchedule`)       |
+| `last_run_start`              | string       | ISO-8601 timestamp when the last run began                  |
+| `last_run_finish`             | string       | ISO-8601 timestamp when the last run ended                  |
+| `last_run_duration_seconds`   | int          | Duration of the last run in seconds                         |
+| `last_run_files_moved`        | int          | Files moved during the last run                             |
+| `last_run_bytes_moved`        | int          | Bytes moved during the last run                             |
+| `current_throughput_mbs`      | float        | Live decimal MB/s, or zero when unavailable                 |
+| `progress_total_bytes`        | integer/null | Bytes planned for this run                                  |
+| `progress_remaining_bytes`    | integer/null | Bytes remaining                                             |
+| `progress_moved_bytes`        | integer/null | Planned bytes minus remaining bytes                         |
+| `progress_percent`            | number/null  | Completion percentage when the total is positive            |
+| `throughput_bytes_per_second` | integer/null | Live bytes per second when known                            |
+| `eta_seconds`                 | integer/null | Estimated seconds remaining when known                      |
+| `status_source`               | string       | `native` or `legacy`. Omitted before the first observation. |
 
 **Example**:
 

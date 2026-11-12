@@ -129,6 +129,8 @@ func ExecCommandOutputWithTimeout(timeout time.Duration, command string, args ..
 // honouring the caller's context for cancellation.
 func ExecCommandOutputWithContext(ctx context.Context, command string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, command, args...) // #nosec G204 -- callers pass validated commands and arguments without shell interpolation
+	cancelProcessGroup(cmd)
+	cmd.WaitDelay = time.Second
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return string(output), fmt.Errorf("command failed: %w", err)
