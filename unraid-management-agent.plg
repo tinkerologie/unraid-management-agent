@@ -10,8 +10,8 @@
     <!ENTITY launch      "Settings/unraid-management-agent">
     <!ENTITY bundle      "&name;-&version;.tgz">
     <!ENTITY bundleURL   "&gitURL;/releases/download/v&version;/&bundle;">
-    <!ENTITY md5         "db83bf4ecf46a26c51fb9863e06aadb3"> <!-- pragma: allowlist secret -->
-    <!ENTITY sha256      "427dfc41144c2b570b54c5d81db4c80fff3f587ebc46d48b1a216fde36eeac46"> <!-- pragma: allowlist secret -->
+    <!ENTITY md5         "86e54c185fed6b44198f3f8bb74e1a6f"> <!-- pragma: allowlist secret -->
+    <!ENTITY sha256      "fc2192dfe8743dba155878d3e4c271a91149ad9e16da74b9ed49b751ce720287"> <!-- pragma: allowlist secret -->
 ]>
 
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" icon="server" min="7.2.0" pluginURL="&pluginURL;" support="&supportURL;" project="&gitURL;" readme="&gitURL;#readme">
@@ -21,26 +21,18 @@ Monitor and control your Unraid system via REST API, WebSocket, MCP, Prometheus,
 </DESCRIPTION>
 
 <CHANGES>
-### 2026.11.05
+### 2026.11.06
 
 ### Added
 
-- Report Docker hard memory caps for running and stopped containers without changing live memory statistics (#334).
-- List Docker network attachments in a stable order and publish network membership changes (#335).
-- Report native Unraid 7.4 Mover activity, transfer progress, throughput and ETA when available (#337).
-
-### Changed
-
-- Match the native Plugin Manager's installed inventory and distinguish installable, incompatible, stale and invalid updates (#338).
+- Report the GPU memory (VRAM) temperature in the new nullable `memory_temperature_celsius` field. The agent reads the hwmon channel of the GPU's own PCI device with the label `vram` (Intel `xe`) or `mem` (AMD with `radeontop`). The value is `null` if no such channel exists. The agent also exports the `unraid_gpu_memory_temperature_celsius` Prometheus gauge and the `gpu_&lt;index&gt;_memory_temp` Home Assistant sensor (#347).
+- Attribute a fan on the hwmon device of a discrete GPU (PCI display class `0x03xx`) to that GPU. Fan control status and system fans report `role: "gpu"` and the full `pci_id`. Fan control status names the fan after the GPU, for example `Intel Arc Pro B70 Fan` instead of `Fan 1`, so the Prometheus `name` label and the Home Assistant display name of these fans change. Fan IDs, fan control and Home Assistant fan control entity IDs do not change. System fans from `sensors -u` keep their names. The sysfs fallback uses the GPU name, so a GPU fan no longer overwrites a motherboard fan with the same `Fan N` label (#347).
 
 ### Fixed
 
-- Honor the Manual intervals for Array Status and Disk Health and report the actual last collection time. Ignore progress-only array events in Dynamic mode. During parity operations, defer storage probes and retain the last available capacity samples. Array Status reports when capacity was last measured (#341).
-- Fix **Apply Policies Instantly** and saving **Reset All** in the Unraid WebGUI by using its CSRF-compatible form submission (#333).
-- Preserve Docker network and memory configuration when replacing a container, including fixed MAC addresses on the local Engine. Retain the original until the replacement succeeds and restore it after a failed create or start. Prevent automatic restarts of an original retained after cleanup fails (#336).
-- Keep the Docker network inventory available when individual membership queries fail (#335).
-- Keep the last successful plugin update result when all native refresh checks fail (#338).
-- Enforce the advertised Unraid 7.2.0 minimum in the installer and reject malformed versions (#339).
+- Intel and AMD GPU discovery now match the PCI display class (`0x03xx`) and the vendor field of `lspci`. Non-display functions, such as a `Non-VGA unclassified device`, an HDMI audio function, or a device with the vendor name only in its subsystem fields, are no longer reported as GPUs. Intel `3D controller` devices are now detected (#346).
+- Report `temperature_celsius` for Intel Arc GPUs on the `xe` driver instead of `null`. The agent reads the hwmon channel with the label `pkg` or `package`, or else the first channel without a `vram` label (#345).
+- MCP `get_health_status` classifies disks from the native status, the SMART status and the temperature, and a current pre-fail SMART attribute counts as a warning. It no longer reports `healthy_disks: 0` for healthy disks. The counts do not include the flash device, the Docker vDisk, the log filesystem or vacant slots. The new `unknown_disks` count shows disks in standby or without a SMART status. `get_diagnostic_summary` uses the same rules for `disk_issues` (#344).
 </CHANGES>
 
 <!--
