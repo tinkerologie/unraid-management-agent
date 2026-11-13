@@ -32,8 +32,10 @@ Tool names are exact. Do not invent or alias them.
 `get_health_status` disk counts:
 
 - `healthy_disks`: native status `DISK_OK`, SMART `PASSED`, and not above 50 °C.
-- `warning_disks`: native status not `DISK_OK`, SMART not `PASSED` or `UNKNOWN`, or above 50 °C.
-- `unknown_disks`: SMART `UNKNOWN` or empty (for example, a disk in standby), or native status empty.
+- `warning_disks`: native status set and not `DISK_OK`, SMART set and not `PASSED` or `UNKNOWN`,
+  a current pre-fail SMART attribute (`smart_exit_status` bit 4), or above 50 °C. A warning takes precedence.
+- `unknown_disks`: SMART `UNKNOWN` or empty (for example, a disk in standby), or native status empty,
+  and no warning condition applies.
 
 The counts do not include the flash device, the Docker vDisk, the log filesystem and vacant
 `DISK_NP*` slots without a device and ID. The sum of the counts can be less than the number of

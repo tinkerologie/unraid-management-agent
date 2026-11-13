@@ -17,6 +17,8 @@ func TestDiskInfoHealthClass(t *testing.T) {
 		{"native status empty", DiskInfo{SMARTStatus: "PASSED", Role: "data"}, DiskHealthUnknown},
 		{"hot standby smart unknown", DiskInfo{Status: "DISK_OK", SMARTStatus: "UNKNOWN", Temperature: new(55.0), Role: "data"}, DiskHealthWarning},
 		{"ok smart failed", DiskInfo{Status: "DISK_OK", SMARTStatus: "FAILED", Role: "data"}, DiskHealthWarning},
+		{"ok passed with current pre-fail attribute", DiskInfo{Status: "DISK_OK", SMARTStatus: "PASSED", SMARTExitStatus: SMARTExitPrefailNow, Temperature: new(33.0), Role: "data"}, DiskHealthWarning},
+		{"ok passed with historic smart bits only", DiskInfo{Status: "DISK_OK", SMARTStatus: "PASSED", SMARTExitStatus: SMARTExitPastThreshold | SMARTExitErrorLog | SMARTExitSelfTestLog, Temperature: new(33.0), Role: "data"}, DiskHealthHealthy},
 		{"disabled smart passed", DiskInfo{Status: "DISK_DSBL", SMARTStatus: "PASSED", Role: "data"}, DiskHealthWarning},
 		{"vacant parity2 slot", DiskInfo{Name: "parity2", Status: "DISK_NP_DSBL", Role: "parity2"}, DiskHealthExcluded},
 		{"missing assigned disk keeps id", DiskInfo{ID: "WDC_WD140EDGZ_7LGH9KAK", Status: "DISK_NP_DSBL", Role: "data"}, DiskHealthWarning},
