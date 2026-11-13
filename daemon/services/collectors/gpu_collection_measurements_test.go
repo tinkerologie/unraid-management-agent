@@ -75,6 +75,45 @@ printf '%s\n' '[{"engines":{"Render/3D/0":{"busy":30}},"power":{"GPU":0}}]'
 	}
 }
 
+func TestCollectSingleIntelGPUTemperatureChannels(t *testing.T) {
+	const pci = "0000:04:00.0"
+	for _, tt := range []struct {
+		name  string
+		files map[string]string
+		want  *float64
+	}{
+		{"xe battlemage package channel", map[string]string{
+			"temp2_input": "46000", "temp2_label": "pkg\n",
+			"temp3_input": "48000", "temp3_label": "vram\n",
+		}, new(46.0)},
+		{"no usable GPU channel", map[string]string{
+			"temp3_input": "48000", "temp3_label": "vram\n",
+		}, nil},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			bin, root := t.TempDir(), t.TempDir()
+			t.Setenv("PATH", bin)
+			writeCollectorCommand(t, bin, "timeout", `
+[ "$*" = "2 intel_gpu_top -J -s 500 -n 1" ] || exit 1
+printf '%s\n' '[{"engines":{"Render/3D/0":{"busy":30}},"power":{"GPU":0}}]'
+`)
+			writeCollectorCommand(t, bin, "bash", "printf '51000\\n'")
+			hwmon := filepath.Join(root, "bus/pci/devices", pci, "hwmon/hwmon3")
+			for name, value := range tt.files {
+				writeSensorFixture(t, filepath.Join(hwmon, name), value)
+			}
+			gpu := (&GPUCollector{sysfsRoot: root}).collectSingleIntelGPU(pci, "Arc Pro B70", 0)
+			if gpu == nil {
+				t.Fatal("valid Intel sample was discarded")
+			}
+			assertOptionalMeasurement(t, "temperature", gpu.Temperature, tt.want)
+			if gpu.CPUTemperature != 51 {
+				t.Errorf("CPU temperature = %v, want 51 from coretemp", gpu.CPUTemperature)
+			}
+		})
+	}
+}
+
 func TestIntelTemperatureReadFailures(t *testing.T) {
 	t.Run("default sysfs mount", func(t *testing.T) {
 		if got := (&GPUCollector{}).sysfs(); got != "/sys" {

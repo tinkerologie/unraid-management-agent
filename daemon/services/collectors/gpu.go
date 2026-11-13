@@ -376,22 +376,56 @@ func (c *GPUCollector) sysfs() string {
 }
 
 // getIntelGPUTemp reads only hwmon channels belonging to the detected PCI device.
+// It uses the first usable channel labelled pkg or package. Otherwise it uses the
+// first usable channel without a vram label. The xe driver has no temp1_input and
+// exposes the package temperature on temp2.
 func (c *GPUCollector) getIntelGPUTemp(pciID string) (float64, error) {
-	paths, err := filepath.Glob(filepath.Join(c.sysfs(), "bus/pci/devices", pciID, "hwmon/hwmon*/temp1_input"))
+	paths, err := filepath.Glob(filepath.Join(c.sysfs(), "bus/pci/devices", pciID, "hwmon/hwmon*/temp*_input"))
 	if err != nil {
 		return 0, fmt.Errorf("finding Intel GPU temperature: %w", err)
 	}
+	sortHwmonTempInputs(paths)
+	fallback, haveFallback := 0.0, false
 	for _, path := range paths {
 		// #nosec G304 -- path is a hwmon temperature file under the internally detected PCI device.
 		data, err := os.ReadFile(path)
 		if err != nil {
 			continue
 		}
-		if temp, err := strconv.ParseFloat(strings.TrimSpace(string(data)), 64); err == nil && !math.IsNaN(temp) && !math.IsInf(temp, 0) {
+		temp, err := strconv.ParseFloat(strings.TrimSpace(string(data)), 64)
+		if err != nil || math.IsNaN(temp) || math.IsInf(temp, 0) {
+			continue
+		}
+		label := strings.ToLower(readTrimmed(strings.TrimSuffix(path, "_input") + "_label"))
+		if label == "pkg" || label == "package" {
 			return temp / 1000, nil
 		}
+		if !haveFallback && !strings.HasPrefix(label, "vram") {
+			fallback, haveFallback = temp/1000, true
+		}
+	}
+	if haveFallback {
+		return fallback, nil
 	}
 	return 0, fmt.Errorf("no Intel GPU temperature for PCI device %s", pciID)
+}
+
+// sortHwmonTempInputs orders hwmonN/tempM_input paths by N, then M, as numbers.
+// filepath.Glob sorts lexically and puts temp10 before temp2.
+func sortHwmonTempInputs(paths []string) {
+	index := func(path string) (int, int) {
+		hwmon, _ := strconv.Atoi(strings.TrimPrefix(filepath.Base(filepath.Dir(path)), "hwmon"))
+		channel, _ := strconv.Atoi(strings.TrimSuffix(strings.TrimPrefix(filepath.Base(path), "temp"), "_input"))
+		return hwmon, channel
+	}
+	sort.SliceStable(paths, func(i, j int) bool {
+		hwmonI, channelI := index(paths[i])
+		hwmonJ, channelJ := index(paths[j])
+		if hwmonI != hwmonJ {
+			return hwmonI < hwmonJ
+		}
+		return channelI < channelJ
+	})
 }
 
 // Get CPU temperature from coretemp hwmon
