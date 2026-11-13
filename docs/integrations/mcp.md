@@ -169,6 +169,26 @@ The STDIO transport (`mcp-stdio`) does not go through the HTTP server, so no tok
 | `get_diagnostic_summary`  | Comprehensive diagnostic summary including all subsystems                                               |
 | `get_network_access_urls` | All available access URLs (LAN, WAN, mDNS, IPv6)                                                        |
 
+#### Disk counts in health summaries
+
+`get_health_status` puts each disk in one of these counts:
+
+- `healthy_disks`: The native status is `DISK_OK` and the SMART status is `PASSED`.
+  The temperature is not above 50 °C.
+- `warning_disks`: The native status is set and is not `DISK_OK`, or the SMART status is set and is not
+  `PASSED` or `UNKNOWN`. A current pre-fail SMART attribute (`smart_exit_status` bit 4) or a temperature
+  above 50 °C also puts the disk in this count. Historic SMART exit bits do not.
+- `unknown_disks`: The SMART status is `UNKNOWN` or empty, or the native status is empty, and no warning
+  condition applies. A disk in standby is usually in this count.
+
+A warning condition takes precedence over an unknown reading.
+
+The counts do not include the flash device, the Docker vDisk, the log filesystem and vacant slots.
+A vacant slot has a native status that starts with `DISK_NP`, and it has no device and no ID.
+Thus, the sum of the counts can be less than the number of disk entries.
+
+`get_diagnostic_summary` uses the same rules. Its `disk_issues` list contains only the disks in `warning_disks`.
+
 ### Disk & Storage Tools
 
 | Tool                     | Description                                                |

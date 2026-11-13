@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Intel `3D controller` devices are now detected (#346).
 - Report `temperature_celsius` for Intel Arc GPUs on the `xe` driver instead of `null`. The agent reads
   the hwmon channel with the label `pkg` or `package`, or else the first channel without a `vram` label (#345).
+- MCP `get_health_status` classifies disks from the native status, the SMART status and
+  the temperature, and a current pre-fail SMART attribute counts as a warning. It no longer reports
+  `healthy_disks: 0` for healthy disks. The counts do not
+  include the flash device, the Docker vDisk, the log filesystem or vacant slots. The new
+  `unknown_disks` count shows disks in standby or without a SMART status. `get_diagnostic_summary`
+  uses the same rules for `disk_issues` (#344).
 
 ## [2026.11.05] - 2026-11-12
 

@@ -1066,7 +1066,7 @@ func (s *Server) registerMonitoringTools() {
 		disks := s.cacheProvider.GetDisksCache()
 		var diskIssues []map[string]any
 		for _, disk := range disks {
-			if (disk.Temperature != nil && *disk.Temperature > 50) || disk.Status != "PASSED" {
+			if disk.HealthClass() == dto.DiskHealthWarning {
 				diskIssues = append(diskIssues, map[string]any{
 					"id":          disk.ID,
 					"name":        disk.Name,
