@@ -4224,7 +4224,7 @@ Prometheus exposition format endpoint for native Grafana integration.
 | **Services** | `unraid_service_enabled`                | Gauge | service                    | Service enabled state                        |
 |              | `unraid_service_running`                | Gauge | service                    | Service running state                        |
 | **GPU**      | `unraid_gpu_temperature_celsius`        | Gauge | name, index                | GPU temperature                              |
-|              | `unraid_gpu_memory_temperature_celsius` | Gauge | name, index                | GPU memory (VRAM) temperature                |
+|              | `unraid_gpu_memory_temperature_celsius` | Gauge | gpu, name                  | GPU memory (VRAM) temperature                |
 |              | `unraid_gpu_utilization_percent`        | Gauge | name, index                | GPU utilization                              |
 |              | `unraid_gpu_memory_used_bytes`          | Gauge | name, index                | GPU memory used                              |
 |              | `unraid_gpu_memory_total_bytes`         | Gauge | name, index                | GPU memory total                             |

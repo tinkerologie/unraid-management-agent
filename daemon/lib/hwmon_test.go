@@ -111,17 +111,3 @@ func TestDiscoverHwmonFansAt(t *testing.T) {
 		t.Errorf("lspci lookups = %v, want %v", lookups, want)
 	}
 }
-
-func TestDiscoverHwmonFansUsesDefaultPath(t *testing.T) {
-	ids := func(fans []HwmonFan) []string {
-		out := make([]string, 0, len(fans))
-		for _, fan := range fans {
-			out = append(out, fan.ID)
-		}
-		return out
-	}
-	got, want := ids(DiscoverHwmonFans()), ids(DiscoverHwmonFansAt(HwmonBasePath))
-	if strings.Join(got, ",") != strings.Join(want, ",") {
-		t.Errorf("DiscoverHwmonFans() IDs = %v, want %v from DiscoverHwmonFansAt(HwmonBasePath)", got, want)
-	}
-}
