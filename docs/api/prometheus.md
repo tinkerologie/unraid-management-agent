@@ -8,7 +8,7 @@ The agent serves Prometheus metrics at `/metrics`. The available series depend o
 
 **Endpoint**: `http://<unraid-ip>:8043/metrics`  
 **Format**: Prometheus text format  
-**Update Frequency**: Real-time (current cached values)
+**Update Frequency**: Each scrape returns the current cached collector values
 
 Set `metrics_enabled: false` to disable this endpoint. The agent then returns `404 Not Found`. See
 [Endpoint toggles](../guides/configuration.md#endpoint-toggles-rest-only-mode).
@@ -26,6 +26,8 @@ scrape_configs:
     scrape_timeout: 10s
     metrics_path: "/metrics"
 ```
+
+If `API_TOKEN` is set, the scrape must send `Authorization: Bearer <token>`.
 
 ### Docker Compose (Prometheus)
 
@@ -49,81 +51,84 @@ volumes:
 
 ### System Metrics
 
-| Metric                           | Type  | Description                                                             |
-| -------------------------------- | ----- | ----------------------------------------------------------------------- |
-| `unraid_cpu_usage_percent`       | Gauge | CPU usage percentage (0-100)                                            |
-| `unraid_cpu_temperature_celsius` | Gauge | CPU temperature in Celsius                                              |
-| `unraid_memory_used_bytes`       | Gauge | Memory used in bytes                                                    |
-| `unraid_memory_total_bytes`      | Gauge | Total memory in bytes                                                   |
-| `unraid_memory_usage_percent`    | Gauge | Memory usage percentage (0-100)                                         |
-| `unraid_uptime_seconds`          | Gauge | System uptime in seconds                                                |
-| `unraid_cpu_power_watts`         | Gauge | CPU package power consumption in watts (Intel RAPL, 0 when unavailable) |
-| `unraid_dram_power_watts`        | Gauge | DRAM power consumption in watts (Intel RAPL, 0 when unavailable)        |
+| Metric                           | Type  | Labels                           | Description                                                             |
+| -------------------------------- | ----- | -------------------------------- | ----------------------------------------------------------------------- |
+| `unraid_system_info`             | Gauge | hostname, version, agent_version | Unraid system information (always 1)                                    |
+| `unraid_cpu_usage_percent`       | Gauge | -                                | CPU usage percentage (0-100)                                            |
+| `unraid_cpu_temperature_celsius` | Gauge | -                                | CPU temperature in Celsius                                              |
+| `unraid_memory_used_bytes`       | Gauge | -                                | Memory used in bytes                                                    |
+| `unraid_memory_total_bytes`      | Gauge | -                                | Total memory in bytes                                                   |
+| `unraid_memory_usage_percent`    | Gauge | -                                | Memory usage percentage (0-100)                                         |
+| `unraid_system_uptime_seconds`   | Gauge | -                                | System uptime in seconds                                                |
+| `unraid_cpu_power_watts`         | Gauge | -                                | CPU package power consumption in watts (Intel RAPL, 0 when unavailable) |
+| `unraid_dram_power_watts`        | Gauge | -                                | DRAM power consumption in watts (Intel RAPL, 0 when unavailable)        |
 
-**Labels**: `hostname`, `version`
+Only `unraid_system_info` has the `hostname` label. The other families in this document do not have it.
 
 ### Array Metrics
 
-| Metric                              | Type  | Description                                    |
-| ----------------------------------- | ----- | ---------------------------------------------- |
-| `unraid_array_state`                | Gauge | Array state (0=stopped, 1=started, 2=stopping) |
-| `unraid_array_size_bytes`           | Gauge | Total array size in bytes                      |
-| `unraid_array_free_bytes`           | Gauge | Free space in bytes                            |
-| `unraid_array_used_percent`         | Gauge | Array usage percentage (0-100)                 |
-| `unraid_array_parity_valid`         | Gauge | Parity valid (0=invalid, 1=valid)              |
-| `unraid_array_parity_check_running` | Gauge | Parity check running (0=no, 1=yes)             |
-| `unraid_array_parity_check_percent` | Gauge | Parity check progress (0-100)                  |
-
-**Labels**: `hostname`
+| Metric                                           | Type  | Labels | Description                                                                     |
+| ------------------------------------------------ | ----- | ------ | ------------------------------------------------------------------------------- |
+| `unraid_array_state`                             | Gauge | -      | Array state (1=started, 0 for all other states)                                 |
+| `unraid_array_total_bytes`                       | Gauge | -      | Total array capacity in bytes                                                   |
+| `unraid_array_used_bytes`                        | Gauge | -      | Used array space in bytes                                                       |
+| `unraid_array_free_bytes`                        | Gauge | -      | Free space in bytes                                                             |
+| `unraid_array_usage_percent`                     | Gauge | -      | Array usage percentage (0-100)                                                  |
+| `unraid_array_capacity_sample_timestamp_seconds` | Gauge | -      | Unix time of the last array capacity measurement; 0 when no sample is available |
+| `unraid_parity_valid`                            | Gauge | -      | Parity valid (0=invalid, 1=valid)                                               |
+| `unraid_parity_check_running`                    | Gauge | -      | 1 for any non-empty parity check status except `IDLE` or `idle`, else 0         |
+| `unraid_parity_check_progress`                   | Gauge | -      | Parity check progress (0-100)                                                   |
 
 ### Disk Metrics
 
-| Metric                            | Type  | Description                              |
-| --------------------------------- | ----- | ---------------------------------------- |
-| `unraid_disk_size_bytes`          | Gauge | Disk size in bytes                       |
-| `unraid_disk_free_bytes`          | Gauge | Free space in bytes                      |
-| `unraid_disk_temperature_celsius` | Gauge | Disk temperature in Celsius              |
-| `unraid_disk_standby`             | Gauge | Disk standby state (0=active, 1=standby) |
-| `unraid_disk_smart_status`        | Gauge | SMART status (0=fail, 1=pass)            |
+| Metric                            | Type  | Labels               | Description                                                   |
+| --------------------------------- | ----- | -------------------- | ------------------------------------------------------------- |
+| `unraid_disk_size_bytes`          | Gauge | disk, device         | Disk size in bytes                                            |
+| `unraid_disk_used_bytes`          | Gauge | disk, device         | Used space in bytes                                           |
+| `unraid_disk_free_bytes`          | Gauge | disk, device         | Free space in bytes                                           |
+| `unraid_disk_temperature_celsius` | Gauge | disk, device, type   | Disk temperature in Celsius                                   |
+| `unraid_disk_status`              | Gauge | disk, device, status | Disk status: 1 for `DISK_OK`, `OK` or an empty status, else 0 |
+| `unraid_disk_standby`             | Gauge | disk, device         | Disk standby state (0=active, 1=standby)                      |
+| `unraid_disk_smart_status`        | Gauge | disk, device         | SMART status: 0 only for `FAILED`, else 1                     |
 
-**Labels**: `hostname`, `disk_id`, `disk_name`, `device`
+The `disk` label is the disk name, for example `disk1` or `parity`. The `type` label is `Flash` for boot flash,
+`SSD` for cache and pool disks, and `HDD` for all other disks.
 
 The agent omits a disk temperature series if the reading is unavailable. This can occur when the disk is in standby.
 The agent removes an existing series if its reading becomes unavailable. A measured 0 °C remains a sample.
 
 ### Container Metrics (Docker)
 
-| Metric                      | Type  | Description                  |
-| --------------------------- | ----- | ---------------------------- |
-| `unraid_containers_total`   | Gauge | Total number of containers   |
-| `unraid_containers_running` | Gauge | Number of running containers |
-| `unraid_containers_stopped` | Gauge | Number of stopped containers |
-| `unraid_containers_paused`  | Gauge | Number of paused containers  |
+| Metric                             | Type  | Labels          | Description                                         |
+| ---------------------------------- | ----- | --------------- | --------------------------------------------------- |
+| `unraid_docker_container_state`    | Gauge | name, id, image | Container state (1=running, 0 for all other states) |
+| `unraid_docker_containers_total`   | Gauge | -               | Total number of containers                          |
+| `unraid_docker_containers_running` | Gauge | -               | Number of running containers                        |
 
-**Labels**: `hostname`
+The agent does not export stopped or paused container counts. Use `unraid_docker_container_state` for each container.
 
 ### VM Metrics
 
-| Metric               | Type  | Description           |
-| -------------------- | ----- | --------------------- |
-| `unraid_vms_total`   | Gauge | Total number of VMs   |
-| `unraid_vms_running` | Gauge | Number of running VMs |
-| `unraid_vms_stopped` | Gauge | Number of stopped VMs |
+| Metric               | Type  | Labels     | Description                                  |
+| -------------------- | ----- | ---------- | -------------------------------------------- |
+| `unraid_vm_state`    | Gauge | name, uuid | VM state (1=running, 0 for all other states) |
+| `unraid_vms_total`   | Gauge | -          | Total number of VMs                          |
+| `unraid_vms_running` | Gauge | -          | Number of running VMs                        |
 
-**Labels**: `hostname`
+The agent does not export a stopped VM count. Use `unraid_vm_state` for each VM.
 
 ### GPU Metrics
 
-| Metric                                  | Type  | Description                              |
-| --------------------------------------- | ----- | ---------------------------------------- |
-| `unraid_gpu_utilization_percent`        | Gauge | GPU utilization (0-100)                  |
-| `unraid_gpu_temperature_celsius`        | Gauge | GPU temperature in Celsius               |
-| `unraid_gpu_memory_temperature_celsius` | Gauge | GPU memory (VRAM) temperature in Celsius |
-| `unraid_gpu_memory_used_bytes`          | Gauge | GPU memory used in bytes                 |
-| `unraid_gpu_memory_total_bytes`         | Gauge | Total GPU memory in bytes                |
-| `unraid_gpu_power_watts`                | Gauge | GPU power draw in watts                  |
+| Metric                                  | Type  | Labels    | Description                              |
+| --------------------------------------- | ----- | --------- | ---------------------------------------- |
+| `unraid_gpu_utilization_percent`        | Gauge | gpu, name | GPU utilization (0-100)                  |
+| `unraid_gpu_temperature_celsius`        | Gauge | gpu, name | GPU temperature in Celsius               |
+| `unraid_gpu_memory_temperature_celsius` | Gauge | gpu, name | GPU memory (VRAM) temperature in Celsius |
+| `unraid_gpu_memory_used_bytes`          | Gauge | gpu, name | GPU memory used in bytes                 |
+| `unraid_gpu_memory_total_bytes`         | Gauge | gpu, name | Total GPU memory in bytes                |
+| `unraid_gpu_power_watts`                | Gauge | gpu, name | GPU power draw in watts                  |
 
-**Labels**: `hostname`, `gpu_index`, `gpu_name`
+The `gpu` label is the position of the GPU in the GPU list, starting at `0`. The `name` label is the GPU name.
 
 The agent omits GPU temperature, memory temperature, used memory, total memory, and power series if the readings
 are unavailable.
@@ -131,29 +136,27 @@ It removes existing series if their readings become unavailable. Measured zero v
 
 ### UPS Metrics
 
-| Metric                              | Type  | Description                      |
-| ----------------------------------- | ----- | -------------------------------- |
-| `unraid_ups_battery_charge_percent` | Gauge | Battery charge (0-100)           |
-| `unraid_ups_load_percent`           | Gauge | UPS load (0-100)                 |
-| `unraid_ups_time_left_seconds`      | Gauge | Estimated runtime in seconds     |
-| `unraid_ups_online`                 | Gauge | UPS status (0=offline, 1=online) |
+| Metric                              | Type  | Labels      | Description                                             |
+| ----------------------------------- | ----- | ----------- | ------------------------------------------------------- |
+| `unraid_ups_battery_charge_percent` | Gauge | name        | Battery charge (0-100)                                  |
+| `unraid_ups_load_percent`           | Gauge | name        | UPS load (0-100)                                        |
+| `unraid_ups_runtime_seconds`        | Gauge | name        | Estimated runtime in seconds                            |
+| `unraid_ups_status`                 | Gauge | name, model | UPS status (1=`ONLINE` or `OL`, 0 for all other states) |
 
-**Labels**: `hostname`, `ups_name`
+The `name` label is always `ups`.
 
 The battery, load and runtime gauges are not exported when the UPS does not
 report that value, rather than being exported as 0.
 
 ### Share Metrics
 
-| Metric                             | Type  | Description                                           |
-| ---------------------------------- | ----- | ----------------------------------------------------- |
-| `unraid_shares_total`              | Gauge | Total number of shares                                |
-| `unraid_share_used_bytes`          | Gauge | Measured share content in bytes; omitted when unknown |
-| `unraid_share_storage_used_bytes`  | Gauge | Backing-storage used space in bytes                   |
-| `unraid_share_storage_free_bytes`  | Gauge | Backing-storage free space in bytes                   |
-| `unraid_share_storage_total_bytes` | Gauge | Backing-storage capacity in bytes                     |
-
-**Labels**: `name` on per-share gauges; no labels on `unraid_shares_total`.
+| Metric                             | Type  | Labels | Description                                           |
+| ---------------------------------- | ----- | ------ | ----------------------------------------------------- |
+| `unraid_shares_total`              | Gauge | -      | Total number of shares                                |
+| `unraid_share_used_bytes`          | Gauge | name   | Measured share content in bytes; omitted when unknown |
+| `unraid_share_storage_used_bytes`  | Gauge | name   | Backing-storage used space in bytes                   |
+| `unraid_share_storage_free_bytes`  | Gauge | name   | Backing-storage free space in bytes                   |
+| `unraid_share_storage_total_bytes` | Gauge | name   | Backing-storage capacity in bytes                     |
 
 Measured usage is available only for cache-only shares on an assigned mounted ZFS pool whose members
 are all known spinning. A measured empty share emits zero. Storage figures are shared by all shares
@@ -161,11 +164,52 @@ on the same backing storage, so summing these per-share gauges can double-count 
 
 ### Service Metrics
 
-| Metric                   | Type  | Description                             |
-| ------------------------ | ----- | --------------------------------------- |
-| `unraid_service_enabled` | Gauge | Service enabled (0=disabled, 1=enabled) |
+| Metric                   | Type  | Labels  | Description                             |
+| ------------------------ | ----- | ------- | --------------------------------------- |
+| `unraid_service_enabled` | Gauge | service | Service enabled (0=disabled, 1=enabled) |
+| `unraid_service_running` | Gauge | service | Service running (0=stopped, 1=running)  |
 
-**Labels**: `hostname`, `service` (docker, vm_manager)
+The `service` label is `smb`, `nfs`, `afp`, `ftp`, `ssh`, `telnet`, `avahi`, `netbios`, `wsd`, `wireguard`,
+`upnp`, `ntp` or `syslog`.
+
+### Fan Metrics
+
+| Metric                   | Type  | Labels       | Description                           |
+| ------------------------ | ----- | ------------ | ------------------------------------- |
+| `unraid_fan_rpm`         | Gauge | fan_id, name | Fan speed in revolutions per minute   |
+| `unraid_fan_pwm_percent` | Gauge | fan_id, name | Fan PWM duty cycle percentage (0-100) |
+
+The `fan_id` label is the fan ID from the fan control status, for example `hwmon0_fan1`.
+The `name` label is the fan name.
+
+### Subsystem Health Metrics
+
+| Metric                            | Type  | Labels    | Description                                                                         |
+| --------------------------------- | ----- | --------- | ----------------------------------------------------------------------------------- |
+| `unraid_subsystem_status`         | Gauge | subsystem | Data-source health per subsystem (0=healthy or disabled, 1=degraded, 2=unavailable) |
+| `unraid_degraded_subsystem_count` | Gauge | -         | Number of subsystems whose data source is degraded or unavailable                   |
+
+A subsystem that is disabled on purpose, for example Docker or the VM manager, has the value 0.
+It does not increase `unraid_degraded_subsystem_count`.
+
+### MCP Metrics
+
+| Metric                        | Type    | Labels | Description                                                   |
+| ----------------------------- | ------- | ------ | ------------------------------------------------------------- |
+| `mcp_connection_events_total` | Counter | event  | Total MCP connection and handshake events by bounded category |
+
+The `event` label is `initialize_ok`, `initialize_error`, `auth_rejected`, `origin_rejected`, `not_found` or
+`tools_list_ok`. The agent ignores all other event names. Each of the six series starts at 0.
+
+This counter counts events. It does not show the number of current MCP connections. Use `rate()` for queries:
+
+```promql
+# MCP initialize requests per second, by result
+sum by (event) (rate(mcp_connection_events_total{event=~"initialize_ok|initialize_error"}[5m]))
+
+# Rejected MCP requests per second
+sum(rate(mcp_connection_events_total{event=~"auth_rejected|origin_rejected"}[5m]))
+```
 
 ## Example Queries
 
@@ -173,7 +217,7 @@ on the same backing storage, so summing these per-share gauges can double-count 
 
 ```promql
 # CPU usage over time
-unraid_cpu_usage_percent{hostname="Tower"}
+unraid_cpu_usage_percent
 
 # Memory usage percentage
 (unraid_memory_used_bytes / unraid_memory_total_bytes) * 100
@@ -185,10 +229,10 @@ unraid_disk_temperature_celsius > 45
 sum(unraid_disk_size_bytes - unraid_disk_free_bytes)
 
 # Running containers count
-unraid_containers_running
+unraid_docker_containers_running
 
 # Array usage percentage
-unraid_array_used_percent
+unraid_array_usage_percent
 
 # GPU temperature alert
 unraid_gpu_temperature_celsius > 80
@@ -196,30 +240,32 @@ unraid_gpu_temperature_celsius > 80
 
 ### Grafana Dashboard Panels
 
+The series have no `hostname` label. To select one server, use a target label such as `instance`.
+
 #### System Overview Panel
 
 ```promql
 # CPU Usage
-unraid_cpu_usage_percent{hostname="$hostname"}
+unraid_cpu_usage_percent
 
 # Memory Usage
-(unraid_memory_used_bytes{hostname="$hostname"} / unraid_memory_total_bytes{hostname="$hostname"}) * 100
+(unraid_memory_used_bytes / unraid_memory_total_bytes) * 100
 
 # Uptime (days)
-unraid_uptime_seconds{hostname="$hostname"} / 86400
+unraid_system_uptime_seconds / 86400
 ```
 
 #### Disk Health Panel
 
 ```promql
 # Hottest disk
-max(unraid_disk_temperature_celsius{hostname="$hostname"})
+max(unraid_disk_temperature_celsius)
 
 # Disks in standby
-sum(unraid_disk_standby{hostname="$hostname"})
+sum(unraid_disk_standby)
 
 # Failed SMART checks
-count(unraid_disk_smart_status{hostname="$hostname"} == 0)
+count(unraid_disk_smart_status == 0)
 ```
 
 ## Grafana Integration
@@ -252,13 +298,13 @@ curl http://localhost:8043/metrics | promtool check metrics
 # Check for errors
 curl -s http://localhost:8043/metrics | grep "# HELP\|# TYPE"
 
-# Count metrics
+# Count sample lines
 curl -s http://localhost:8043/metrics | grep -c "^unraid_"
 ```
 
 ## Metric Updates
 
-Metrics reflect current cached values from collectors:
+Each scrape returns the current cached values from the collectors. The default collector intervals are:
 
 - **Fast metrics** (15s): CPU, memory, temperatures
 - **Standard metrics** (30s): Array, disks, containers
@@ -302,10 +348,25 @@ Check collector intervals in plugin settings. Increase scrape frequency or decre
 ---
 
 **Last Updated**: January 2026  
-**Metrics Count**: 41
+**Metrics Count**: 62 application families (61 `unraid_` families and one `mcp_` family)
+
+The endpoint also exposes the Go runtime (`go_*`) and process (`process_*`) families. The count does not include them.
 
 ## PSU metrics
 
-`unraid_psu_state` and `unraid_psu_device_state` expose availability. Per-device sensor metrics
-cover voltage, current, DC output watts, temperature, fan RPM and derived load. Missing readings
-produce no samples. See [PSU telemetry](../guides/psu-telemetry.md) for exact series names.
+| Metric                           | Type  | Labels         | Description                                                        |
+| -------------------------------- | ----- | -------------- | ------------------------------------------------------------------ |
+| `unraid_psu_state`               | Gauge | state          | PSU snapshot state (always 1); the `state` label carries the state |
+| `unraid_psu_device_state`        | Gauge | device, state  | PSU device state (always 1); the `state` label carries the state   |
+| `unraid_psu_voltage_volts`       | Gauge | device, sensor | PSU measured voltage in volts                                      |
+| `unraid_psu_current_amperes`     | Gauge | device, sensor | PSU measured current in amperes                                    |
+| `unraid_psu_power_watts`         | Gauge | device, sensor | PSU power in watts; output channels are DC, not wall power         |
+| `unraid_psu_temperature_celsius` | Gauge | device, sensor | PSU temperature in Celsius                                         |
+| `unraid_psu_fan_rpm`             | Gauge | device, sensor | PSU fan revolutions per minute                                     |
+| `unraid_psu_load_percent`        | Gauge | device, sensor | PSU DC output load derived from rated capacity                     |
+| `unraid_psu_efficiency_percent`  | Gauge | device, sensor | PSU efficiency when a backend supplies it                          |
+
+`unraid_psu_state` and `unraid_psu_device_state` expose availability. The `device` label is the PSU device ID.
+The `sensor` label is the sensor name, for example `output_power` or `12v_voltage`.
+Missing readings produce no samples. The current Corsair backend does not supply an efficiency sample.
+See [PSU telemetry](../guides/psu-telemetry.md) for the state values and the measurement meaning.
