@@ -26,6 +26,7 @@ func TestNullableMeasurementDiscovery(t *testing.T) {
 		{"motherboard_temp", "motherboard_temp_celsius", -1},
 		{"disk_disk1_temp", "temperature_celsius", -1},
 		{"gpu_0_temp", "temperature_celsius", -1},
+		{"gpu_0_memory_temp", "memory_temperature_celsius", -1},
 		{"gpu_0_mem_util", "utilization_memory_percent", 1},
 		{"gpu_0_mem_used", "memory_used_bytes", -1},
 		{"gpu_0_power", "power_draw_watts", 1},
@@ -48,6 +49,16 @@ func TestNullableMeasurementDiscovery(t *testing.T) {
 			}
 		})
 	}
+	// The GPU inventory tracker removes the memory temperature sensor with its GPU.
+	memoryTempTopic := "homeassistant/sensor/test-server/gpu_0_memory_temp/config"
+	client.publishGPUDiscovery([]*dto.GPUMetrics{{Available: true, Index: 0}})
+	if !strings.Contains(capture.published[memoryTempTopic], `"device_class":"temperature"`) {
+		t.Fatalf("memory temperature sensor not discovered: %q", capture.published[memoryTempTopic])
+	}
+	client.publishGPUDiscovery(nil)
+	if payload, ok := capture.published[memoryTempTopic]; !ok || payload != "" {
+		t.Errorf("memory temperature sensor not removed with its GPU: %q", payload)
+	}
 	// Direct payload marshalling preserves null and measured zero for every
 	// changed field; no broker is used by this capture client.
 	for _, zero := range []bool{false, true} {
@@ -60,6 +71,7 @@ func TestNullableMeasurementDiscovery(t *testing.T) {
 			system.MotherboardTemp = new(0.0)
 			disk.Temperature = new(0.0)
 			gpu.Temperature = new(0.0)
+			gpu.MemoryTemperature = new(0.0)
 			gpu.PowerDraw = new(0.0)
 			gpu.MemoryUsed = new(uint64(0))
 			gpu.MemoryTotal = new(uint64(0))
@@ -72,7 +84,7 @@ func TestNullableMeasurementDiscovery(t *testing.T) {
 		}{
 			{"system", system, []string{"motherboard_temp_celsius"}},
 			{"disk", disk, []string{"temperature_celsius"}},
-			{"gpu", gpu, []string{"temperature_celsius", "power_draw_watts", "memory_used_bytes", "memory_total_bytes", "utilization_memory_percent"}},
+			{"gpu", gpu, []string{"temperature_celsius", "memory_temperature_celsius", "power_draw_watts", "memory_used_bytes", "memory_total_bytes", "utilization_memory_percent"}},
 		} {
 			if err := client.publishJSON(sample.topic, sample.value); err != nil {
 				t.Fatal(err)

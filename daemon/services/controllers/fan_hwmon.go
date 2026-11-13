@@ -91,7 +91,11 @@ func (p *HwmonProvider) Discover() {
 
 // ReadAll reads fan status using the shared lib discovery function.
 func (p *HwmonProvider) ReadAll() []dto.FanDevice {
-	hwmonFans := lib.DiscoverHwmonFans()
+	return fanDevicesFromHwmon(lib.DiscoverHwmonFans())
+}
+
+// fanDevicesFromHwmon converts discovered hwmon fans to their fan control status.
+func fanDevicesFromHwmon(hwmonFans []lib.HwmonFan) []dto.FanDevice {
 	fans := make([]dto.FanDevice, 0, len(hwmonFans))
 
 	for _, hf := range hwmonFans {
@@ -101,6 +105,8 @@ func (p *HwmonProvider) ReadAll() []dto.FanDevice {
 			RPM:        hf.RPM,
 			HwmonPath:  hf.HwmonDir,
 			HwmonIndex: hf.FanIndex,
+			Role:       hf.Role,
+			PCIID:      hf.PCIID,
 		}
 
 		if hf.HasPWM {

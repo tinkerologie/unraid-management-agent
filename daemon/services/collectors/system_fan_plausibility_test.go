@@ -113,7 +113,7 @@ func TestFanQuarantineSharesDeviceAndChannelAcrossSources(t *testing.T) {
 			c := &SystemCollector{sysfsRoot: root}
 			c.parseFanSpeeds(tt.chip+"\nfan5:\n  fan5_input: 56784\n", hwmonChipDeviceIDs(root))
 			fans, err := c.readHwmonFanSpeeds()
-			if err != nil || len(fans) != 2 || fans["Healthy channel"] != 1200 || fans["Other device"] != 1500 {
+			if err != nil || len(fans) != 2 || fans["Healthy channel"].RPM != 1200 || fans["Other device"].RPM != 1500 {
 				t.Fatalf("sysfs after bad sensors channel = %v, %v; want healthy channel and other device", fans, err)
 			}
 			// The reverse transition must use the same identity too.
@@ -206,7 +206,7 @@ func TestReadHwmonFanSpeedsDropsImplausibleReadings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("readHwmonFanSpeeds() error = %v", err)
 	}
-	if len(got) != 1 || got["CPU Fan"] != 1500 {
+	if len(got) != 1 || got["CPU Fan"].RPM != 1500 {
 		t.Errorf("readHwmonFanSpeeds() = %v, want only CPU Fan at 1500", got)
 	}
 	if len(c.fanQuarantine) != 1 {

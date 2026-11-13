@@ -197,7 +197,7 @@ func TestHwmonFanIdentityWithoutUSBIdentity(t *testing.T) {
 	c := &SystemCollector{sysfsRoot: root}
 	c.parseFanSpeeds("octo-hid-3-13\nfan1:\n  fan1_input: 56784\n", nil)
 	fans, err := c.readHwmonFanSpeeds()
-	if err != nil || len(fans) != 1 || fans["Second"] != 1500 {
+	if err != nil || len(fans) != 1 || fans["Second"].RPM != 1500 {
 		t.Errorf("fans after HID quarantine = %v, %v; want only second device", fans, err)
 	}
 }
@@ -339,5 +339,138 @@ in0:
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("parseFanSpeeds() =\n  %+v\nwant\n  %+v", got, want)
+	}
+}
+
+// arcB70PCIPath is the sysfs path of the Intel Arc Pro B70 from issue #347.
+const arcB70PCIPath = "pci0000:00/0000:00:06.0/0000:02:00.0/0000:03:01.0/0000:04:00.0"
+
+// installGPUFanLspci puts a fake lspci on PATH that names the GPUs of the fan
+// fixtures. lib caches GPU names per PCI ID, so every test uses the same names.
+func installGPUFanLspci(t *testing.T) {
+	t.Helper()
+	bin := t.TempDir()
+	t.Setenv("PATH", bin)
+	writeCollectorCommand(t, bin, "lspci", `case "$*" in
+"-Dmm -s 0000:04:00.0") echo '0000:04:00.0 "VGA compatible controller" "Intel Corporation" "Battlemage G31 [Arc Pro B70]" -p00 "Intel Corporation" "Device 1701"' ;;
+"-Dmm -s 0000:03:00.0") echo '0000:03:00.0 "VGA compatible controller" "Advanced Micro Devices, Inc. [AMD/ATI]" "Navi 31 [Radeon RX 7900 XTX]"' ;;
+*) exit 1 ;;
+esac`)
+}
+
+// writeHwmonFiles writes attributes of <root>/class/hwmon/<hwmon> and, when
+// class is not empty, the class attribute of its parent device.
+func writeHwmonFiles(t *testing.T, root, hwmon, class string, files map[string]string) {
+	t.Helper()
+	dir := filepath.Join(root, "class", "hwmon", hwmon)
+	for name, value := range files {
+		writeSensorFixture(t, filepath.Join(dir, name), value+"\n")
+	}
+	if class != "" {
+		writeSensorFixture(t, filepath.Join(dir, "device", "class"), class+"\n")
+	}
+}
+
+func TestParseFanSpeedsGPUMetadata(t *testing.T) {
+	installGPUFanLspci(t)
+	const xe = "xe-pci-0400\nAdapter: PCI adapter\nfan1:\n  fan1_input: 811.000\n"
+	const nct = "nct6687-isa-0a20\nAdapter: ISA adapter\nCPU Fan:\n  fan1_input: 1005.000\nfan2:\n  fan2_input: 818.000\n"
+	const amdgpuPair = "amdgpu-pci-0300\nAdapter: PCI adapter\nfan1:\n  fan1_input: 1500.000\n\n" +
+		"amdgpu-pci-0400\nAdapter: PCI adapter\nfan1:\n  fan1_input: 1400.000\n"
+
+	tests := []struct {
+		name    string
+		entries []fakeHwmon
+		classes map[string]string // hwmon -> PCI class
+		output  string
+		want    []dto.FanInfo
+	}{
+		{
+			name: "GPU chip with one hwmon entry gets metadata and keeps its name",
+			entries: []fakeHwmon{
+				{hwmon: "hwmon6", name: "xe", devRel: arcB70PCIPath},
+				{hwmon: "hwmon7", name: "nct6687", devRel: "platform/nct6687.2592"},
+			},
+			classes: map[string]string{"hwmon6": "0x030000"},
+			output:  xe + "\n" + nct,
+			want: []dto.FanInfo{
+				{Name: "xe_fan1", RPM: 811, Source: "xe-pci-0400", Role: dto.FanRoleGPU, PCIID: "0000:04:00.0"},
+				{Name: "nct6687_fan1", RPM: 1005, Source: "nct6687-isa-0a20", Label: "CPU Fan"},
+				{Name: "nct6687_fan2", RPM: 818, Source: "nct6687-isa-0a20"},
+			},
+		},
+		{
+			name: "chip name of two hwmon entries gets no metadata",
+			entries: []fakeHwmon{
+				{hwmon: "hwmon5", name: "xe", devRel: "pci0001:00/0001:04:00.0"},
+				{hwmon: "hwmon6", name: "xe", devRel: arcB70PCIPath},
+			},
+			classes: map[string]string{"hwmon5": "0x030000", "hwmon6": "0x030000"},
+			output:  xe,
+			want:    []dto.FanInfo{{Name: "xe_fan1", RPM: 811, Source: "xe-pci-0400"}},
+		},
+		{
+			name: "non-display PCI chip gets no metadata",
+			entries: []fakeHwmon{
+				{hwmon: "hwmon6", name: "xe", devRel: arcB70PCIPath},
+			},
+			classes: map[string]string{"hwmon6": "0x040300"},
+			output:  xe,
+			want:    []dto.FanInfo{{Name: "xe_fan1", RPM: 811, Source: "xe-pci-0400"}},
+		},
+		{
+			name: "two GPUs of the same model keep their full chip names",
+			entries: []fakeHwmon{
+				{hwmon: "hwmon2", name: "amdgpu", devRel: "pci0000:00/0000:00:01.1/0000:03:00.0"},
+				{hwmon: "hwmon3", name: "amdgpu", devRel: "pci0000:00/0000:00:01.2/0000:04:00.0"},
+			},
+			classes: map[string]string{"hwmon2": "0x030000", "hwmon3": "0x030000"},
+			output:  amdgpuPair,
+			want: []dto.FanInfo{
+				{Name: "amdgpu-pci-0300_fan1", RPM: 1500, Source: "amdgpu-pci-0300", Role: dto.FanRoleGPU, PCIID: "0000:03:00.0"},
+				{Name: "amdgpu-pci-0400_fan1", RPM: 1400, Source: "amdgpu-pci-0400", Role: dto.FanRoleGPU, PCIID: "0000:04:00.0"},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := buildFakeSysfs(t, tt.entries)
+			for hwmon, class := range tt.classes {
+				writeHwmonFiles(t, root, hwmon, class, nil)
+			}
+			c := &SystemCollector{sysfsRoot: root}
+			if got := c.parseFanSpeeds(tt.output, nil); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("parseFanSpeeds() =\n  %+v\nwant\n  %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestReadHwmonFanSpeedsGPUFans(t *testing.T) {
+	installGPUFanLspci(t)
+	root := buildFakeSysfs(t, []fakeHwmon{
+		{hwmon: "hwmon2", name: "amdgpu", devRel: "pci0000:00/0000:00:01.1/0000:03:00.0"},
+		{hwmon: "hwmon6", name: "xe", devRel: arcB70PCIPath},
+		{hwmon: "hwmon7", name: "nct6687", devRel: "platform/nct6687.2592"},
+	})
+	writeHwmonFiles(t, root, "hwmon2", "0x030000", map[string]string{"fan1_input": "1500", "fan2_input": "1400", "fan2_label": "Pump"})
+	writeHwmonFiles(t, root, "hwmon6", "0x030000", map[string]string{"fan1_input": "811"})
+	writeHwmonFiles(t, root, "hwmon7", "", map[string]string{"fan1_input": "1005", "fan3_input": "818", "fan3_label": "System Fan #1"})
+
+	c := &SystemCollector{sysfsRoot: root}
+	got, err := c.readHwmonFanSpeeds()
+	if err != nil {
+		t.Fatalf("readHwmonFanSpeeds() error = %v", err)
+	}
+	// The GPU fan1 and the motherboard fan1 no longer share the name "Fan 1".
+	want := map[string]dto.FanInfo{
+		"AMD Radeon RX 7900 XTX Fan 1": {Name: "AMD Radeon RX 7900 XTX Fan 1", RPM: 1500, Role: dto.FanRoleGPU, PCIID: "0000:03:00.0"},
+		"AMD Radeon RX 7900 XTX Pump":  {Name: "AMD Radeon RX 7900 XTX Pump", RPM: 1400, Role: dto.FanRoleGPU, PCIID: "0000:03:00.0"},
+		"Intel Arc Pro B70 Fan":        {Name: "Intel Arc Pro B70 Fan", RPM: 811, Role: dto.FanRoleGPU, PCIID: "0000:04:00.0"},
+		"Fan 1":                        {Name: "Fan 1", RPM: 1005},
+		"System Fan #1":                {Name: "System Fan #1", RPM: 818},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("readHwmonFanSpeeds() =\n  %+v\nwant\n  %+v", got, want)
 	}
 }

@@ -300,6 +300,7 @@ Nullable fields are `null` when the UPS does not report the value.
 | `name`                       | string  | -       | -     | No       | GPU name        |
 | `driver_version`             | string  | -       | -     | No       | Driver version  |
 | `temperature_celsius`        | float64 | °C      | 0-∞   | Yes      | GPU temp        |
+| `memory_temperature_celsius` | float64 | °C      | 0-∞   | Yes      | VRAM temp       |
 | `cpu_temperature_celsius`    | float64 | °C      | 0-∞   | Yes      | CPU temp (iGPU) |
 | `utilization_gpu_percent`    | float64 | percent | 0-100 | No       | GPU usage       |
 | `utilization_memory_percent` | float64 | percent | 0-100 | No       | VRAM usage      |

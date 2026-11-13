@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -101,40 +102,10 @@ func assignGlobalGPUIndices(gpus []*dto.GPUMetrics) {
 }
 
 var (
-	// lspciQuotedFieldRe extracts the quoted fields of an `lspci -Dmm` record.
-	lspciQuotedFieldRe = regexp.MustCompile(`"([^"]*)"`)
 	// lspciDisplayClassRe matches the numeric class that lspci prints for a
 	// PCI base class 0x03 device when pci.ids has no name for it.
 	lspciDisplayClassRe = regexp.MustCompile(`^Class 03[0-9a-fA-F]{2}$`)
 )
-
-// lspciRecord holds the fields of one `lspci -Dmm` line that GPU discovery uses.
-type lspciRecord struct {
-	PCIID  string
-	Class  string
-	Vendor string
-	Device string
-}
-
-// parseLspciRecord splits an `lspci -Dmm` line into its unquoted PCI address
-// and its first three quoted fields (class, vendor, device). Unquoted tokens
-// such as -rXX and -pXX are ignored. It rejects records with an invalid
-// address or fewer than three quoted fields.
-func parseLspciRecord(line string) (lspciRecord, bool) {
-	firstQuote := strings.Index(line, "\"")
-	if firstQuote <= 0 {
-		return lspciRecord{}, false
-	}
-	pciID := strings.TrimSpace(line[:firstQuote])
-	if !pciAddressRe.MatchString(pciID) {
-		return lspciRecord{}, false
-	}
-	matches := lspciQuotedFieldRe.FindAllStringSubmatch(line[firstQuote:], -1)
-	if len(matches) < 3 {
-		return lspciRecord{}, false
-	}
-	return lspciRecord{PCIID: pciID, Class: matches[0][1], Vendor: matches[1][1], Device: matches[2][1]}, true
-}
 
 // isDisplayClass reports whether an lspci class field names a PCI base class
 // 0x03 (display controller) device. It matches whole field values only.
@@ -144,20 +115,6 @@ func isDisplayClass(class string) bool {
 		return true
 	}
 	return lspciDisplayClassRe.MatchString(class)
-}
-
-// lspciModelName returns the bracketed marketing name of an lspci device field,
-// or the whole field when it has no brackets. A malformed bracket gives "".
-func lspciModelName(device string) string {
-	if !strings.Contains(device, "[") {
-		return device
-	}
-	start := strings.Index(device, "[")
-	end := strings.Index(device, "]")
-	if start != -1 && end != -1 && end > start {
-		return strings.TrimSpace(device[start+1 : end])
-	}
-	return ""
 }
 
 // Intel GPU collection using intel_gpu_top
@@ -182,13 +139,13 @@ func (c *GPUCollector) collectIntelGPU() ([]*dto.GPUMetrics, error) {
 
 	for line := range strings.SplitSeq(output, "\n") {
 		// Format: 0000:00:02.0 "VGA compatible controller" "Intel Corporation" "CoffeeLake-S GT2 [UHD Graphics 630]" -p00 "ASRock Incorporation" "Device 3e92"
-		record, ok := parseLspciRecord(line)
+		record, ok := lib.ParseLspciRecord(line)
 		if !ok || !isDisplayClass(record.Class) || record.Vendor != "Intel Corporation" {
 			continue
 		}
 		logger.Debug("Intel GPU: Found Intel GPU line: %s", line)
 		logger.Debug("Intel GPU: Full model string: %s", record.Device)
-		model := lspciModelName(record.Device)
+		model := lib.LspciModelName(record.Device)
 		logger.Debug("Intel GPU: Parsed - ID: %s, Model: %s", record.PCIID, model)
 
 		if model != "" {
@@ -301,6 +258,8 @@ func (c *GPUCollector) collectSingleIntelGPU(pciID, model string, index int) *dt
 	if temp, err := c.getIntelGPUTemp(pciID); err == nil {
 		gpu.Temperature = new(temp)
 	}
+	// The xe driver labels the VRAM channel vram. i915 has no such channel.
+	gpu.MemoryTemperature = c.getGPUMemoryTemp(pciID, "vram")
 
 	// For Intel iGPUs, add CPU temperature as they share the die with the CPU
 	// This provides useful thermal information since iGPUs don't have dedicated temp sensors
@@ -380,12 +339,57 @@ func (c *GPUCollector) sysfs() string {
 // first usable channel without a vram label. The xe driver has no temp1_input and
 // exposes the package temperature on temp2.
 func (c *GPUCollector) getIntelGPUTemp(pciID string) (float64, error) {
-	paths, err := filepath.Glob(filepath.Join(c.sysfs(), "bus/pci/devices", pciID, "hwmon/hwmon*/temp*_input"))
+	channels, err := c.readPCIHwmonTemps(pciID)
 	if err != nil {
 		return 0, fmt.Errorf("finding Intel GPU temperature: %w", err)
 	}
-	sortHwmonTempInputs(paths)
 	fallback, haveFallback := 0.0, false
+	for _, channel := range channels {
+		if channel.label == "pkg" || channel.label == "package" {
+			return channel.celsius, nil
+		}
+		if !haveFallback && !strings.HasPrefix(channel.label, "vram") {
+			fallback, haveFallback = channel.celsius, true
+		}
+	}
+	if haveFallback {
+		return fallback, nil
+	}
+	return 0, fmt.Errorf("no Intel GPU temperature for PCI device %s", pciID)
+}
+
+// getGPUMemoryTemp returns the first usable channel with one of the labels in
+// the PCI device's own hwmon. It is nil when no channel matches: another channel
+// or device never supplies the memory temperature.
+func (c *GPUCollector) getGPUMemoryTemp(pciID string, labels ...string) *float64 {
+	channels, err := c.readPCIHwmonTemps(pciID)
+	if err != nil {
+		return nil
+	}
+	for _, channel := range channels {
+		if slices.Contains(labels, channel.label) {
+			return new(channel.celsius)
+		}
+	}
+	return nil
+}
+
+// hwmonTempChannel is one usable tempN channel. The label is trimmed and lower case.
+type hwmonTempChannel struct {
+	label   string
+	celsius float64
+}
+
+// readPCIHwmonTemps returns the usable hwmon temp*_input channels of one PCI
+// device in numeric hwmon and channel order. It skips unreadable, malformed
+// and non-finite inputs.
+func (c *GPUCollector) readPCIHwmonTemps(pciID string) ([]hwmonTempChannel, error) {
+	paths, err := filepath.Glob(filepath.Join(c.sysfs(), "bus/pci/devices", pciID, "hwmon/hwmon*/temp*_input"))
+	if err != nil {
+		return nil, err
+	}
+	sortHwmonTempInputs(paths)
+	var channels []hwmonTempChannel
 	for _, path := range paths {
 		// #nosec G304 -- path is a hwmon temperature file under the internally detected PCI device.
 		data, err := os.ReadFile(path)
@@ -397,17 +401,9 @@ func (c *GPUCollector) getIntelGPUTemp(pciID string) (float64, error) {
 			continue
 		}
 		label := strings.ToLower(readTrimmed(strings.TrimSuffix(path, "_input") + "_label"))
-		if label == "pkg" || label == "package" {
-			return temp / 1000, nil
-		}
-		if !haveFallback && !strings.HasPrefix(label, "vram") {
-			fallback, haveFallback = temp/1000, true
-		}
+		channels = append(channels, hwmonTempChannel{label: label, celsius: temp / 1000})
 	}
-	if haveFallback {
-		return fallback, nil
-	}
-	return 0, fmt.Errorf("no Intel GPU temperature for PCI device %s", pciID)
+	return channels, nil
 }
 
 // sortHwmonTempInputs orders hwmonN/tempM_input paths by N, then M, as numbers.
@@ -617,7 +613,7 @@ func (c *GPUCollector) collectAMDGPUWithRadeontop() ([]*dto.GPUMetrics, error) {
 	var amdGPUs []amdGPUInfo
 
 	for line := range strings.SplitSeq(output, "\n") {
-		record, ok := parseLspciRecord(line)
+		record, ok := lib.ParseLspciRecord(line)
 		if !ok || !isDisplayClass(record.Class) {
 			continue
 		}
@@ -626,7 +622,7 @@ func (c *GPUCollector) collectAMDGPUWithRadeontop() ([]*dto.GPUMetrics, error) {
 			continue
 		}
 
-		if model := lspciModelName(record.Device); model != "" {
+		if model := lib.LspciModelName(record.Device); model != "" {
 			amdGPUs = append(amdGPUs, amdGPUInfo{PCIID: record.PCIID, Model: model})
 		}
 	}
@@ -700,6 +696,8 @@ func (c *GPUCollector) collectSingleAMDGPU(pciID, model string, index int) *dto.
 	if temp, err := c.getAMDGPUTemp(index); err == nil {
 		gpu.Temperature = new(temp)
 	}
+	// amdgpu labels the VRAM channel mem. Read it by PCI ID, not by card index.
+	gpu.MemoryTemperature = c.getGPUMemoryTemp(pciID, "mem")
 
 	// Get fan speed from sysfs (discrete GPUs only)
 	if fanRPM, fanMaxRPM, err := c.getAMDGPUFanSpeed(index); err == nil {

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 )
 
 // HwmonBasePath is the sysfs base path for hwmon devices.
@@ -36,24 +38,39 @@ type HwmonFan struct {
 	HasPWM     bool
 	HwmonDir   string
 	FanIndex   int
+	Role       string // dto.FanRoleGPU for a fan on a display-class PCI device, otherwise ""
+	PCIID      string // full PCI ID of the GPU when Role is dto.FanRoleGPU
 }
 
 // DiscoverHwmonFans scans /sys/class/hwmon for fan devices with their readings.
 func DiscoverHwmonFans() []HwmonFan {
+	return DiscoverHwmonFansAt(HwmonBasePath)
+}
+
+// DiscoverHwmonFansAt scans hwmonBasePath (normally /sys/class/hwmon) for fan
+// devices with their readings. A fan on a display-class PCI device gets
+// Role dto.FanRoleGPU, the PCI ID and a name derived from the GPU name.
+func DiscoverHwmonFansAt(hwmonBasePath string) []HwmonFan {
 	var fans []HwmonFan
 
 	for i := range MaxHwmonDevices {
-		hwmonDir := filepath.Join(HwmonBasePath, fmt.Sprintf("hwmon%d", i))
+		hwmonDir := filepath.Join(hwmonBasePath, fmt.Sprintf("hwmon%d", i))
 		if _, err := os.Stat(hwmonDir); err != nil {
 			continue
 		}
 
-		for j := 1; j < MaxFanChannels; j++ {
-			inputPath := filepath.Join(hwmonDir, fmt.Sprintf("fan%d_input", j))
-			if _, err := os.Stat(inputPath); err != nil {
-				continue
-			}
+		channels := HwmonFanChannels(hwmonDir)
+		if len(channels) == 0 {
+			continue
+		}
 
+		var gpuName, pciID string
+		if kind, id := ResolveHwmonDisplayDevice(hwmonDir); kind == HwmonDeviceDisplay {
+			gpuName, pciID = GPUName(id), id
+		}
+
+		for _, j := range channels {
+			inputPath := filepath.Join(hwmonDir, fmt.Sprintf("fan%d_input", j))
 			fanID := fmt.Sprintf("hwmon%d_fan%d", i, j)
 			fan := HwmonFan{
 				ID:       fanID,
@@ -70,9 +87,15 @@ func DiscoverHwmonFans() []HwmonFan {
 
 			// Read label
 			labelPath := filepath.Join(hwmonDir, fmt.Sprintf("fan%d_label", j))
-			fan.Name = ReadSysfsString(labelPath)
+			label := ReadSysfsString(labelPath)
+			fan.Name = label
 			if fan.Name == "" {
 				fan.Name = fmt.Sprintf("Fan %d", j)
+			}
+			if pciID != "" {
+				fan.Role = dto.FanRoleGPU
+				fan.PCIID = pciID
+				fan.Name = GPUFanName(gpuName, label, j, len(channels))
 			}
 
 			// Read PWM
@@ -91,6 +114,31 @@ func DiscoverHwmonFans() []HwmonFan {
 	}
 
 	return fans
+}
+
+// HwmonFanChannels returns the channel numbers N, in order, for which a hwmon
+// directory has a fanN_input file.
+func HwmonFanChannels(hwmonDir string) []int {
+	var channels []int
+	for j := 1; j < MaxFanChannels; j++ {
+		if _, err := os.Stat(filepath.Join(hwmonDir, fmt.Sprintf("fan%d_input", j))); err == nil {
+			channels = append(channels, j)
+		}
+	}
+	return channels
+}
+
+// GPUFanName names fan channel j of a GPU hwmon device that has channelCount
+// fan channels: "<gpu> <label>" with a fanN_label, "<gpu> Fan" for the only
+// channel, otherwise "<gpu> Fan N".
+func GPUFanName(gpuName, label string, j, channelCount int) string {
+	switch {
+	case label != "":
+		return gpuName + " " + label
+	case channelCount == 1:
+		return gpuName + " Fan"
+	}
+	return fmt.Sprintf("%s Fan %d", gpuName, j)
 }
 
 // ReadSysfsInt reads an integer from a sysfs file. Returns 0 on any error.

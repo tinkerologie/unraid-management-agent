@@ -10,70 +10,26 @@ import (
 // nonVGARecord is the chipset function from issue #346 that was reported as a GPU.
 const nonVGARecord = `0000:80:14.5 "Non-VGA unclassified device" "Intel Corporation" "Device 7f2f" -r10 "Micro-Star International Co., Ltd. [MSI]" "Device 7e42"`
 
-func TestParseLspciRecordAndDisplayClass(t *testing.T) {
+func TestIsDisplayClass(t *testing.T) {
 	tests := []struct {
-		name      string
-		line      string
-		wantOK    bool
-		wantGPU   bool
-		wantClass string
+		class string
+		want  bool
 	}{
-		{"VGA compatible controller", `0000:00:02.0 "VGA compatible controller" "Intel Corporation" "Arrow Lake-S [Intel Graphics]" -r06 "Micro-Star International Co., Ltd. [MSI]" "Device 7e42"`, true, true, "VGA compatible controller"},
-		{"3D controller", `0000:05:00.0 "3D controller" "Intel Corporation" "Device e20b"`, true, true, "3D controller"},
-		{"Display controller", `0000:04:00.0 "Display controller" "Intel Corporation" "Battlemage G31 [Arc Pro B70]" -p00 "Intel Corporation" "Device 1234"`, true, true, "Display controller"},
-		{"XGA compatible controller", `0000:00:03.0 "XGA compatible controller" "Intel Corporation" "Device 0001"`, true, true, "XGA compatible controller"},
-		{"numeric display class fallback", `0000:00:04.0 "Class 0380" "Intel Corporation" "Device 0002"`, true, true, "Class 0380"},
-		{"non-VGA unclassified device from issue 346", nonVGARecord, true, false, "Non-VGA unclassified device"},
-		{"audio device with Display in device name", `0000:03:00.1 "Audio device" "Advanced Micro Devices, Inc. [AMD/ATI]" "Navi 31 HDMI/DP Audio [Display Audio]"`, true, false, "Audio device"},
-		{"numeric non-display class", `0000:00:1f.3 "Class 0480" "Intel Corporation" "Device 7f50"`, true, false, "Class 0480"},
-		{"VGA only in subsystem fields", `0000:00:1f.4 "SMBus" "Intel Corporation" "Device 7f23" -r10 "VGA Corp" "VGA compatible controller"`, true, false, "SMBus"},
-		{"empty line", "", false, false, ""},
-		{"fewer than three quoted fields", `0000:00:02.0 "VGA compatible controller" "Intel Corporation"`, false, false, ""},
-		{"unterminated quote", `0000:00:02.0 "VGA compatible controller" "Intel Corporation" "Arc`, false, false, ""},
-		{"quoted address", `"0000:00:02.0" "VGA compatible controller" "Intel Corporation" "Arc"`, false, false, ""},
-		{"address without domain", `00:02.0 "VGA compatible controller" "Intel Corporation" "Arc"`, false, false, ""},
-		{"path traversal address", `../../etc/passwd "VGA compatible controller" "Intel Corporation" "Arc"`, false, false, ""},
-		{"command injection address", `0000:00:02.0;rm -rf / "VGA compatible controller" "Intel Corporation" "Arc"`, false, false, ""},
-		{"oversized class field", `0000:00:02.0 "` + strings.Repeat("VGA ", 1<<18) + `" "Intel Corporation" "Arc"`, true, false, ""},
+		{"VGA compatible controller", true},
+		{"3D controller", true},
+		{"Display controller", true},
+		{"XGA compatible controller", true},
+		{"Class 0380", true},
+		{"Non-VGA unclassified device", false},
+		{"Audio device", false},
+		{"Class 0480", false},
+		{"SMBus", false},
+		{"", false},
+		{strings.Repeat("VGA ", 1<<18), false},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			record, ok := parseLspciRecord(tt.line)
-			if ok != tt.wantOK {
-				t.Fatalf("parseLspciRecord ok = %v, want %v (record %+v)", ok, tt.wantOK, record)
-			}
-			if !ok {
-				if record != (lspciRecord{}) {
-					t.Errorf("rejected record returned fields: %+v", record)
-				}
-				return
-			}
-			if tt.wantClass != "" && record.Class != tt.wantClass {
-				t.Errorf("class = %q, want %q", record.Class, tt.wantClass)
-			}
-			if got := isDisplayClass(record.Class); got != tt.wantGPU {
-				t.Errorf("isDisplayClass(%.40q) = %v, want %v", record.Class, got, tt.wantGPU)
-			}
-		})
-	}
-
-	record, ok := parseLspciRecord(nonVGARecord)
-	want := lspciRecord{PCIID: "0000:80:14.5", Class: "Non-VGA unclassified device", Vendor: "Intel Corporation", Device: "Device 7f2f"}
-	if !ok || record != want {
-		t.Errorf("parseLspciRecord(issue 346 record) = %+v, %v; want %+v", record, ok, want)
-	}
-}
-
-func TestLspciModelName(t *testing.T) {
-	for _, tt := range []struct{ device, want string }{
-		{"Battlemage G31 [Arc Pro B70]", "Arc Pro B70"},
-		{"Navi 31 [ Radeon RX 7900 XTX ]", "Radeon RX 7900 XTX"},
-		{"Device 7f2f", "Device 7f2f"},
-		{"Broken [bracket", ""},
-		{"Reversed ]bracket[", ""},
-	} {
-		if got := lspciModelName(tt.device); got != tt.want {
-			t.Errorf("lspciModelName(%q) = %q, want %q", tt.device, got, tt.want)
+		if got := isDisplayClass(tt.class); got != tt.want {
+			t.Errorf("isDisplayClass(%.40q) = %v, want %v", tt.class, got, tt.want)
 		}
 	}
 }

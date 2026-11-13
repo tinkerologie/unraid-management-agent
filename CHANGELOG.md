@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Report the GPU memory (VRAM) temperature in the new nullable `memory_temperature_celsius` field. The agent reads
+  the hwmon channel of the GPU's own PCI device with the label `vram` (Intel `xe`) or `mem` (AMD with `radeontop`).
+  The value is `null` if no such channel exists. The agent also exports the `unraid_gpu_memory_temperature_celsius`
+  Prometheus gauge and the `gpu_<index>_memory_temp` Home Assistant sensor (#347).
+- Attribute a fan on the hwmon device of a discrete GPU (PCI display class `0x03xx`) to that GPU.
+  Fan control status and system fans report `role: "gpu"` and the full `pci_id`. Fan control
+  status names the fan after the GPU, for example `Intel Arc Pro B70 Fan` instead of `Fan 1`, so
+  the Prometheus `name` label and the Home Assistant display name of these fans change. Fan IDs,
+  fan control and Home Assistant fan control entity IDs do not change. System fans from
+  `sensors -u` keep their names. The sysfs fallback uses the GPU name, so a GPU fan no longer
+  overwrites a motherboard fan with the same `Fan N` label (#347).
+
 ### Fixed
 
 - Intel and AMD GPU discovery now match the PCI display class (`0x03xx`) and the vendor field of

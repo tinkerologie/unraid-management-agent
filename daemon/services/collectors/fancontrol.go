@@ -14,6 +14,8 @@ import (
 // FanControlCollector periodically reads fan status and publishes it to the event bus.
 type FanControlCollector struct {
 	ctx *domain.Context
+	// hwmonBasePath allows fan discovery against a fixture ("" = lib.HwmonBasePath).
+	hwmonBasePath string
 }
 
 // NewFanControlCollector creates a new fan control collector.
@@ -30,7 +32,11 @@ func (c *FanControlCollector) Collect() {
 // buildStatus reads the current fan status, including whether a third-party fan
 // controller is active so consumers can see when the agent is deferring.
 func (c *FanControlCollector) buildStatus() *dto.FanControlStatus {
-	hwmonFans := lib.DiscoverHwmonFans()
+	basePath := c.hwmonBasePath
+	if basePath == "" {
+		basePath = lib.HwmonBasePath
+	}
+	hwmonFans := lib.DiscoverHwmonFansAt(basePath)
 
 	fans := make([]dto.FanDevice, 0, len(hwmonFans))
 	controllable := 0
@@ -41,6 +47,8 @@ func (c *FanControlCollector) buildStatus() *dto.FanControlStatus {
 			RPM:        hf.RPM,
 			HwmonPath:  hf.HwmonDir,
 			HwmonIndex: hf.FanIndex,
+			Role:       hf.Role,
+			PCIID:      hf.PCIID,
 		}
 
 		if hf.HasPWM {

@@ -94,7 +94,11 @@ func TestFanChannelQuarantine(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					return fans
+					result := map[string]int{}
+					for name, fan := range fans {
+						result[name] = fan.RPM
+					}
+					return result
 				}
 				fans := c.parseFanSpeeds(fmt.Sprintf("nct6793-isa-0290\nfan1:\n  fan1_input: 25000\nfan5:\n  fan5_input: %d\n", rpm), nil)
 				result := map[string]int{}

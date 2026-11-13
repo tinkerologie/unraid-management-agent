@@ -93,7 +93,8 @@ and change events. See [Collection Mode](../guides/configuration.md#collection-m
 - `cpu_temp_celsius` - CPU temperature
 - `ram_usage_percent` - RAM usage (0-100)
 - `motherboard_temp_celsius` - Motherboard temperature (`null` when unmeasured)
-- `fans[]` - Array of fan sensors with RPM
+- `fans[]` - Array of fan sensors with RPM. A fan on a discrete GPU also has `role` (`gpu`) and
+  `pci_id` (full PCI ID). See the [REST API reference](rest-api.md) for the fan names
 
 ---
 
@@ -400,6 +401,7 @@ UPSes have no load or power reading). They are never sent as a made-up `0`.
     "name": "Intel UHD Graphics 630",
     "driver_version": "i915",
     "temperature_celsius": null,
+    "memory_temperature_celsius": null,
     "cpu_temperature_celsius": 34,
     "utilization_gpu_percent": 0,
     "utilization_memory_percent": null,
@@ -416,12 +418,13 @@ UPSes have no load or power reading). They are never sent as a made-up `0`.
 - `available` - Whether GPU is available
 - `name` - GPU model name
 - `driver_version` - GPU driver version; for Intel, the bound driver name plus module version when available
+- `memory_temperature_celsius` - GPU memory (VRAM) temperature from the GPU's own hwmon
 - `cpu_temperature_celsius` - CPU temp (for iGPUs)
 - `utilization_gpu_percent` - GPU utilization
 - `power_draw_watts` - Power consumption
 
-GPU temperature, power, memory total, memory used and memory utilisation are `null` when unmeasured,
-with keys retained. Measured zero values remain numbers. CPU temperature is separate from GPU temperature.
+GPU temperature, memory temperature, power, memory total, memory used and memory utilisation are `null` when
+unmeasured, with keys retained. Measured zero values remain numbers. CPU temperature is separate from GPU temperature.
 
 ---
 
