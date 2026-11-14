@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The Prometheus references `docs/api/rest-api.md` and `docs/api/prometheus.md` now list the 62 metric families
+  that `/metrics` exports, with the correct names, types and labels. They no longer list names that the agent does
+  not export, for example `unraid_memory_free_bytes` and `unraid_parity_check_errors`. The value descriptions,
+  the example response and the PromQL examples now agree with the exporter (#352).
+
 ## [2026.11.06] - 2026-11-13
 
 ### Added
