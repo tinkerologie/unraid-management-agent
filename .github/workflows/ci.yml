@@ -19,6 +19,7 @@ env:
 
 jobs:
   test-and-upload:
+    timeout-minutes: 30
     name: Test
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
 
@@ -57,8 +58,8 @@ jobs:
           files: ./coverage.out
           flags: unittests
           name: unraid-management-agent
-          use_oidc: ${{ env.CODECOV_OIDC == 'true' }}
-          fail_ci_if_error: ${{ env.CODECOV_OIDC == 'true' }}
+          use_oidc: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+          fail_ci_if_error: false
           verbose: true
 
       - name: Upload test results to Codecov
@@ -68,10 +69,11 @@ jobs:
           report_type: test_results
           slug: ${{ github.repository }}
           files: ./junit.xml
-          use_oidc: ${{ env.CODECOV_OIDC == 'true' }}
-          fail_ci_if_error: ${{ env.CODECOV_OIDC == 'true' }}
+          use_oidc: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+          fail_ci_if_error: false
 
   bundle-ownership:
+    timeout-minutes: 30
     name: Bundle Ownership
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
 

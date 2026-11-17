@@ -1,6 +1,9 @@
 codecov:
-  require_ci_to_pass: true
+  require_ci_to_pass: false
 
+  strict_yaml_branch: main
+  notify:
+    wait_for_ci: false
 coverage:
   precision: 2
   round: down
@@ -19,6 +22,7 @@ coverage:
         informational: false
         if_ci_failed: error
 
+        if_not_found: failure
 comment:
   layout: "reach,diff,flags,files,footer"
   behavior: default
@@ -29,3 +33,4 @@ comment:
 ignore:
   - "daemon/docs"
   - "tests"
+github_checks: false

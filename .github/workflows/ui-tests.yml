@@ -28,6 +28,7 @@ concurrency:
 
 jobs:
   playwright:
+    timeout-minutes: 30
     name: Settings page (Playwright)
     # Skip draft PRs to conserve runner capacity, like the other CI jobs.
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false

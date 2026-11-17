@@ -35,6 +35,7 @@ concurrency:
 
 jobs:
   detect:
+    timeout-minutes: 60
     name: Detect Release
     # Track the newest supported Ubuntu GitHub-hosted runner image.
     runs-on: ubuntu-latest
@@ -120,6 +121,7 @@ jobs:
           echo "should_release=$SHOULD_RELEASE tag=$TAG version=$VERSION prerelease=$PRERELEASE"
 
   release:
+    timeout-minutes: 60
     name: Release
     # Track the newest supported Ubuntu GitHub-hosted runner image.
     needs: detect
