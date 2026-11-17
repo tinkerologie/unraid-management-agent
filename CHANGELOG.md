@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Require aggregate CI validation and align automation with free-tier governance.
+
 ### Fixed
 
 - The Prometheus references `docs/api/rest-api.md` and `docs/api/prometheus.md` now list the 62 metric families
