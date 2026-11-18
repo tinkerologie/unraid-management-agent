@@ -234,6 +234,24 @@ Thus, the sum of the counts can be less than the number of disk entries.
 >
 > Use `refresh_container_updates` to force a fresh registry check and push results to the cache, WebSocket hub, and alerting engine. Use `check_container_updates` / `check_container_update` for synchronous on-demand checks that return results directly without publishing.
 
+### Community Applications Tools
+
+| Tool                            | Arguments                      | Description                                                  |
+| ------------------------------- | ------------------------------ | ------------------------------------------------------------ |
+| `search_community_applications` | Optional `query` string        | Find Docker listings in the host’s filtered CA catalog.      |
+| `inspect_community_application` | `reference` string from search | Read the exact variant’s editable fields and known blockers. |
+
+Both are read-only tools. Search returns up to 100 listings and a total match count. A successful
+search with no matches returns an empty `listings` array. An unavailable catalog returns a tool
+error with code `catalog_unavailable`. Open the Unraid Apps tab to load the cache, then retry.
+`catalog_unsupported` identifies an unsupported build or layout. When a template is withdrawn or
+hidden, inspection returns `listing_unavailable`. Search again to select a visible listing.
+
+Inspection shows environment variable names with flags for the presence of values or defaults.
+The values and defaults are redacted. If `onboarding_accepted` is false, accept the CA warning in
+the Unraid Apps tab before planning an installation.
+[Supported CA builds and response fields](../api/rest-api.md#community-applications)
+
 ### VM Tools
 
 | Tool                | Description                              |

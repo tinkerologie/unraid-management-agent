@@ -1662,6 +1662,50 @@ curl -X POST http://192.168.20.21:8043/api/v1/shares/appdata/config \
 
 ---
 
+## Community Applications
+
+The read endpoints use the host’s Community Applications (CA) catalog. The supported CA build is
+**2026.07.21**, verified on **Unraid 7.4.0**. The Management Agent’s minimum Unraid version is 7.2.
+The adapter reads the cache written by the verified CA release. Open the Unraid Apps tab to load
+the cache after a reboot and to accept CA’s first-run warning before planning an installation.
+[Verified CA release artifact](https://github.com/unraid/community.applications/blob/ec8657092da8c444e6ca7b9f68cdd960cbef8d70/archive/community.applications-2026.07.21-x86_64-1.txz)
+
+### GET /community-applications
+
+Search Docker listings using the optional `q` query parameter (up to 256 bytes). Matching is case
+insensitive and covers app names, images, publishers, repository names, and variant names. Results
+follow CA’s visibility settings for deprecated and incompatible apps and exclude blacklisted
+listings. Variants available from a visible app are separate results. An app can appear in search
+while its settings prevent installation.
+
+The response contains `ca_version`, `listings`, and `total`. It returns up to 100 listings and
+`total` counts all matches. Refine the query if there are more matches. Use each listing’s opaque
+`reference` to select the published template and variant, including when several use the same
+Docker image. A successful query with zero matches returns HTTP 200 with `listings: []`.
+
+### GET /community-applications/{reference}
+
+Inspect the exact listing selected by search. The response includes the listing, configured
+`network`, editable `fields`, `onboarding_accepted`, and `eligibility_issues`. Fields describe declared
+ports, paths, and environment variables. Environment fields give the variable name and the
+`has_value` and `has_default` flags. The values and defaults are redacted. Inspection reports blockers
+it can determine from the catalog, including unresolved publisher requirements and unsupported
+runtime settings. Installation planning additionally verifies the host’s network, storage, and
+port state.
+
+Both endpoints follow the regular API read authentication settings. Errors include a stable
+`code` and an actionable `message`.
+
+| HTTP status | Code                  | Action                                                        |
+| ----------- | --------------------- | ------------------------------------------------------------- |
+| 400         | `invalid_search`      | Use a query of at most 256 bytes without null bytes.          |
+| 400         | `invalid_reference`   | Copy a listing reference from a search result.                |
+| 404         | `listing_unavailable` | Search again to find listings allowed by current host policy. |
+| 501         | `catalog_unsupported` | Check the installed CA build and supported catalog layout.    |
+| 503         | `catalog_unavailable` | Open the Unraid Apps tab to load the catalog, then retry.     |
+
+---
+
 ## Docker Containers
 
 ### GET /docker

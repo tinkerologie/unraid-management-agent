@@ -15,6 +15,89 @@ definitions:
       unraid_version:
         type: string
     type: object
+  communityapps.ConfigKind:
+    enum:
+    - port
+    - path
+    - environment
+    type: string
+    x-enum-varnames:
+    - ConfigPort
+    - ConfigPath
+    - ConfigEnvironment
+  communityapps.Inspection:
+    properties:
+      ca_version:
+        type: string
+      eligibility_issues:
+        items:
+          type: string
+        type: array
+      fields:
+        items:
+          $ref: '#/definitions/communityapps.TemplateField'
+        type: array
+      listing:
+        $ref: '#/definitions/communityapps.Listing'
+      network:
+        type: string
+      onboarding_accepted:
+        type: boolean
+    type: object
+  communityapps.Listing:
+    properties:
+      image:
+        type: string
+      name:
+        type: string
+      publisher:
+        type: string
+      reference:
+        type: string
+      variant:
+        type: string
+    type: object
+  communityapps.Problem:
+    properties:
+      code:
+        type: string
+      message:
+        type: string
+    type: object
+  communityapps.SearchResult:
+    properties:
+      ca_version:
+        type: string
+      listings:
+        items:
+          $ref: '#/definitions/communityapps.Listing'
+        type: array
+      total:
+        type: integer
+    type: object
+  communityapps.TemplateField:
+    properties:
+      default:
+        type: string
+      has_default:
+        type: boolean
+      has_value:
+        type: boolean
+      kind:
+        $ref: '#/definitions/communityapps.ConfigKind'
+      masked:
+        type: boolean
+      mode:
+        type: string
+      name:
+        type: string
+      required:
+        type: boolean
+      target:
+        type: string
+      value:
+        type: string
+    type: object
   dto.AccessURL:
     properties:
       ipv4:
@@ -6761,6 +6844,72 @@ paths:
       summary: Get all collectors status
       tags:
       - Collectors
+  /community-applications:
+    get:
+      description: Search the host's filtered Community Applications Docker catalog
+      parameters:
+      - description: Search term (maximum 256 bytes)
+        in: query
+        name: q
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/communityapps.SearchResult'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "501":
+          description: Not Implemented
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+      summary: Search Community Applications
+      tags:
+      - Community Applications
+  /community-applications/{reference}:
+    get:
+      description: Show the exact listing's editable fields and known install eligibility
+        issues
+      parameters:
+      - description: Listing reference from search
+        in: path
+        name: reference
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/communityapps.Inspection'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "501":
+          description: Not Implemented
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+      summary: Inspect a Community Applications listing
+      tags:
+      - Community Applications
   /cpu/governor:
     post:
       consumes:

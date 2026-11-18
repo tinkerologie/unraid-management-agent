@@ -1258,6 +1258,105 @@ const docTemplate = `{
                 }
             }
         },
+        "/community-applications": {
+            "get": {
+                "description": "Search the host's filtered Community Applications Docker catalog",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Community Applications"
+                ],
+                "summary": "Search Community Applications",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search term (maximum 256 bytes)",
+                        "name": "q",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.SearchResult"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/community-applications/{reference}": {
+            "get": {
+                "description": "Show the exact listing's editable fields and known install eligibility issues",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Community Applications"
+                ],
+                "summary": "Inspect a Community Applications listing",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Listing reference from search",
+                        "name": "reference",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Inspection"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    }
+                }
+            }
+        },
         "/cpu/governor": {
             "post": {
                 "description": "Set the CPU scaling governor for all cores (e.g. performance, powersave)",
@@ -5904,6 +6003,131 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "unraid_version": {
+                    "type": "string"
+                }
+            }
+        },
+        "communityapps.ConfigKind": {
+            "type": "string",
+            "enum": [
+                "port",
+                "path",
+                "environment"
+            ],
+            "x-enum-varnames": [
+                "ConfigPort",
+                "ConfigPath",
+                "ConfigEnvironment"
+            ]
+        },
+        "communityapps.Inspection": {
+            "type": "object",
+            "properties": {
+                "ca_version": {
+                    "type": "string"
+                },
+                "eligibility_issues": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "fields": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/communityapps.TemplateField"
+                    }
+                },
+                "listing": {
+                    "$ref": "#/definitions/communityapps.Listing"
+                },
+                "network": {
+                    "type": "string"
+                },
+                "onboarding_accepted": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "communityapps.Listing": {
+            "type": "object",
+            "properties": {
+                "image": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "publisher": {
+                    "type": "string"
+                },
+                "reference": {
+                    "type": "string"
+                },
+                "variant": {
+                    "type": "string"
+                }
+            }
+        },
+        "communityapps.Problem": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "communityapps.SearchResult": {
+            "type": "object",
+            "properties": {
+                "ca_version": {
+                    "type": "string"
+                },
+                "listings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/communityapps.Listing"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "communityapps.TemplateField": {
+            "type": "object",
+            "properties": {
+                "default": {
+                    "type": "string"
+                },
+                "has_default": {
+                    "type": "boolean"
+                },
+                "has_value": {
+                    "type": "boolean"
+                },
+                "kind": {
+                    "$ref": "#/definitions/communityapps.ConfigKind"
+                },
+                "masked": {
+                    "type": "boolean"
+                },
+                "mode": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "required": {
+                    "type": "boolean"
+                },
+                "target": {
+                    "type": "string"
+                },
+                "value": {
                     "type": "string"
                 }
             }

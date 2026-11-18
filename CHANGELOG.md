@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Search the host Community Applications Docker catalog and inspect a listing’s redacted template through REST and MCP (#362).
+
 - Select MQTT telemetry topics independently and disable MQTT commands while keeping Home Assistant monitoring.
   Applying the new settings clears retained records for disabled topics and command controls (#356).
   Home Assistant receives read-only service status once a minute while MQTT is connected and commands are disabled.

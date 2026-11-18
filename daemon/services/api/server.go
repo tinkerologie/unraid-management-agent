@@ -23,6 +23,7 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/agent"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/alerting"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/collectors"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/communityapps"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/controllers"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/watchdog"
 )
@@ -80,6 +81,8 @@ type Server struct {
 	agentSvc            *agent.Service
 	toolPolicyStore     *domain.ToolPolicyStore
 
+	communityAppsCatalog *communityapps.Catalog
+
 	// diskSpinFn replaces the array controller's spin calls in tests.
 	diskSpinFn func(diskID string, up bool) error
 
@@ -109,6 +112,8 @@ func NewServerWithCollectorManager(ctx *domain.Context, cm CollectorManagerInter
 		collectorManager: cm,
 		CacheStore:       &CacheStore{registry: ctx.Platform},
 		networkAccess:    collectors.NewNetworkAccessDiscovery(ctx.WANIPLookup),
+
+		communityAppsCatalog: communityapps.NewHostCatalog(),
 	}
 
 	if !ctx.WebSocketDisabled {
@@ -178,6 +183,8 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/disks/{id}", s.handleDisk).Methods("GET")
 	api.HandleFunc("/shares", s.handleShares).Methods("GET")
 	api.HandleFunc("/docker", s.handleDockerList).Methods("GET")
+	api.HandleFunc("/community-applications", s.handleCommunityAppsSearch).Methods(http.MethodGet)
+	api.HandleFunc("/community-applications/{reference}", s.handleCommunityAppInspection).Methods(http.MethodGet)
 	api.HandleFunc("/docker/networks", s.handleDockerNetworks).Methods("GET")
 	api.HandleFunc("/docker/port-conflicts", s.handleDockerPortConflicts).Methods("GET")
 	api.HandleFunc("/docker/updates", s.handleDockerCheckUpdates).Methods("GET")

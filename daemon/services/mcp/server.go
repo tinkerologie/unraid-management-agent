@@ -38,6 +38,7 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/agent"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/alerting"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/api"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/communityapps"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/controllers"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/remediation"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/watchdog"
@@ -116,6 +117,7 @@ type Server struct {
 	tuningController        *controllers.TuningController
 	agentSvc                *agent.Service
 	toolPolicyStore         *ToolPolicyStore
+	communityAppsCatalog    *communityapps.Catalog
 	toolsListLoggedSessions sync.Map
 	// networkWriteLock makes every write tool read-only for network (HTTP)
 	// clients while no API token is configured (#245). STDIO never sets it.
@@ -129,9 +131,10 @@ func NewServer(ctx *domain.Context, cacheProvider CacheProvider) *Server {
 		initialPolicies = ctx.ToolPolicy
 	}
 	return &Server{
-		ctx:             ctx,
-		cacheProvider:   cacheProvider,
-		toolPolicyStore: NewToolPolicyStore("", initialPolicies),
+		ctx:                  ctx,
+		cacheProvider:        cacheProvider,
+		toolPolicyStore:      NewToolPolicyStore("", initialPolicies),
+		communityAppsCatalog: communityapps.NewHostCatalog(),
 	}
 }
 
@@ -319,6 +322,7 @@ func (s *Server) Initialize() error {
 
 	// Register all tools, resources, and prompts
 	s.registerMonitoringTools()
+	s.registerCommunityAppsTools()
 	s.registerNewMonitoringTools()
 	s.registerControlTools()
 	s.registerNewControlTools()

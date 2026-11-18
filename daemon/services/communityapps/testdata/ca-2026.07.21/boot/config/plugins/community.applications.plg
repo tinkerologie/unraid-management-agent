@@ -1,0 +1,6 @@
+<?xml version="1.0" standalone="yes"?>
+<!DOCTYPE PLUGIN [
+<!ENTITY name "community.applications">
+<!ENTITY version "2026.07.21">
+]>
+<PLUGIN name="&name;" version="&version;" />

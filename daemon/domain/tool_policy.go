@@ -248,7 +248,7 @@ func (s *ToolPolicyStore) GetCatalog(globalReadOnly bool) []dto.MCPToolCatalogIt
 // CategorizeMCPTool assigns a logical category string to an MCP tool.
 func CategorizeMCPTool(name string) string {
 	switch {
-	case strings.HasPrefix(name, "container_") || strings.Contains(name, "container") || strings.Contains(name, "docker"):
+	case strings.HasPrefix(name, "container_") || strings.Contains(name, "container") || strings.Contains(name, "docker") || strings.Contains(name, "community_application"):
 		return "docker"
 	case strings.HasPrefix(name, "vm_") || strings.Contains(name, "vm"):
 		return "vm"
