@@ -81,7 +81,9 @@ func (o *Orchestrator) Run() error {
 	// Pass the collector manager for runtime control
 	apiServer := api.NewServerWithCollectorManager(o.ctx, o.collectorManager)
 	communityCatalog := communityapps.NewHostCatalog()
+	communityInstall := communityapps.NewHostService(communityCatalog)
 	apiServer.SetCommunityAppsCatalog(communityCatalog)
+	apiServer.SetCommunityAppsService(communityInstall)
 
 	// Start API server subscriptions and WebSocket hub
 	apiServer.StartSubscriptions()
@@ -112,6 +114,7 @@ func (o *Orchestrator) Run() error {
 
 	mcpServer := mcp.NewServer(o.ctx, apiServer)
 	mcpServer.SetCommunityAppsCatalog(communityCatalog)
+	mcpServer.SetCommunityAppsService(communityInstall)
 	mcpServer.SetToolPolicyStore(toolPolicyStore)
 	mcpServer.SetNetworkWriteLock(o.ctx.WritesLocked())
 	if err := mcpServer.Initialize(); err != nil {

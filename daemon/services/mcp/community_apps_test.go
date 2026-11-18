@@ -1,7 +1,12 @@
 package mcp
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
+	"io"
+	"maps"
+	"net/http"
 	"os"
 	"slices"
 	"strings"
@@ -53,4 +58,104 @@ func TestCommunityAppsMCPRemainsReadableWithWritesLocked(t *testing.T) {
 	if err := json.Unmarshal([]byte(content), &problem); err != nil || !result.IsError || problem.Code != "listing_unavailable" {
 		t.Fatalf("missing listing did not produce an actionable tool error: %s", content)
 	}
+}
+
+func TestPrepareCommunityAppMCPRequiresPerRequestCredentialAndPolicy(t *testing.T) {
+	root := communityappstest.CopyHeimdallHost(t)
+	service := communityapps.NewService(communityapps.NewCatalog(os.DirFS(root)), communityapps.ServiceOptions{
+		HostRoot:      root,
+		OpenDocker:    func() (communityapps.PlanningDocker, error) { return &communityappstest.Docker{}, nil },
+		PortAvailable: func(context.Context, communityapps.PortBinding) error { return nil },
+	})
+	const tool = "prepare_community_app_install"
+	const (
+		token    = "test-real-api-token"
+		secret   = "mcp_fixture-mcp_fixture-mcp_fixture-mcp" // pragma: allowlist secret (synthetic test credential)
+		sentinel = "private-preview-sentinel"
+	)
+	for _, tc := range []struct {
+		name, endpoint, bearer string
+		config                 domain.Config
+		policy                 domain.ToolPolicyValue
+		arguments              map[string]any
+		want                   string
+	}{
+		{name: "stateless bearer receives eligible preview", endpoint: "/mcp-stateless", bearer: token, config: domain.Config{APIToken: token}},
+		{name: "stateful connect secret receives eligible preview", endpoint: "/mcp/" + secret, config: domain.Config{MCPConnectSecret: secret, AllowUnauthenticatedWrites: true}},
+		{name: "tokenless opt-in cannot authorize preparation", endpoint: "/mcp-stateless", config: domain.Config{AllowUnauthenticatedWrites: true}, want: "credential_required"},
+		{name: "network write lock applies to accepted connect secret", endpoint: "/mcp/" + secret, config: domain.Config{MCPConnectSecret: secret}, want: writesLockedBlockedMessage},
+		{name: "MCP read-only applies to accepted bearer", endpoint: "/mcp-stateless", bearer: token, config: domain.Config{APIToken: token, ReadOnly: true}, want: readOnlyBlockedMessage},
+		{name: "read-only tool policy applies", endpoint: "/mcp-stateless", bearer: token, config: domain.Config{APIToken: token}, policy: domain.PolicyReadOnly, want: "set to read-only"},
+		{name: "ask tool policy requires confirmation", endpoint: "/mcp-stateless", bearer: token, config: domain.Config{APIToken: token}, policy: domain.PolicyAsk, want: "Set confirm=true"},
+		{name: "explicit confirmation satisfies ask to prepare", endpoint: "/mcp-stateless", bearer: token, config: domain.Config{APIToken: token}, policy: domain.PolicyAsk, arguments: map[string]any{"confirm": true}},
+		{name: "withdrawn listing returns a stable problem", endpoint: "/mcp-stateless", bearer: token, config: domain.Config{APIToken: token}, arguments: map[string]any{"reference": strings.Repeat("a", 64)}, want: "listing_unavailable"},
+		{name: "schema errors never echo secrets", endpoint: "/mcp-stateless", bearer: token, config: domain.Config{APIToken: token}, arguments: map[string]any{"environment": map[string]any{sentinel: map[string]any{}}}, want: "invalid_plan_request"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			policies := domain.NewToolPolicyStore(t.TempDir(), map[string]domain.ToolPolicyValue{tool: tc.policy})
+			server, _ := mountMCPTestServerWithCommunityApps(t, tc.config, policies, service)
+			version := "2026-07-28"
+			if tc.endpoint != "/mcp-stateless" {
+				version = "2025-11-25"
+			}
+			session := connectMCPHTTP(t, server, tc.endpoint, tc.bearer, version)
+			args := map[string]any{"reference": communityappstest.HeimdallReference, "environment": map[string]string{"PUID": sentinel}}
+			maps.Copy(args, tc.arguments)
+			result, content := callToolJSON(t, session, tool, args)
+			if strings.Contains(content, sentinel) {
+				t.Fatalf("MCP returned sensitive input: %s", content)
+			}
+			if tc.want != "" {
+				if !strings.Contains(content, tc.want) {
+					t.Fatalf("reply = %s, want %q", content, tc.want)
+				}
+				return
+			}
+			var preview communityapps.Preview
+			if err := json.Unmarshal([]byte(content), &preview); err != nil || result.IsError || !preview.Eligible || preview.ApprovalToken == "" {
+				t.Fatalf("invalid MCP preview: %+v, %v, %s", preview, err, content)
+			}
+		})
+	}
+
+	t.Run("initializing through the secret does not authorize later tokenless calls", func(t *testing.T) {
+		server, _ := mountMCPTestServerWithCommunityApps(t, domain.Config{
+			MCPConnectSecret: secret, AllowUnauthenticatedWrites: true,
+		}, nil, service)
+		client := server.Client()
+		session := doInitializeAndGetSession(t, client, server.URL+"/mcp/"+secret, "")
+		body := `{"jsonrpc":"2.0","method":"tools/call","id":2,"params":{"name":"` + tool + `","arguments":{"reference":"` + communityappstest.HeimdallReference + `"},"_meta":{"verified":true}}}`
+		request, err := http.NewRequestWithContext(t.Context(), http.MethodPost, server.URL+"/mcp", strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("Accept", "application/json, text/event-stream")
+		request.Header.Set("Mcp-Session-Id", session)
+		request.Header.Set("Mcp-Protocol-Version", "2025-06-18")
+		request.Header.Set("Authorization", "Bearer verified")
+		request.Header.Set("X-Verified-Credential", "true")
+		response, err := client.Do(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = response.Body.Close() }()
+		reply, err := io.ReadAll(response.Body)
+		if err != nil || response.StatusCode != http.StatusOK || !bytes.Contains(reply, []byte("credential_required")) {
+			t.Fatalf("uncredentialed session call returned %d and %q, %v", response.StatusCode, reply, err)
+		}
+	})
+
+	t.Run("local in-process MCP gives an actionable HTTP route", func(t *testing.T) {
+		server := NewServer(&domain.Context{}, newMockCacheProvider())
+		if err := server.Initialize(); err != nil {
+			t.Fatal(err)
+		}
+		session, cleanup := connectClientToServer(t, server)
+		defer cleanup()
+		_, content := callToolJSON(t, session, tool, map[string]any{"reference": communityappstest.HeimdallReference})
+		if !strings.Contains(content, "Streamable HTTP MCP") {
+			t.Fatalf("received non-actionable error %q", content)
+		}
+	})
 }

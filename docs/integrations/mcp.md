@@ -236,12 +236,13 @@ Thus, the sum of the counts can be less than the number of disk entries.
 
 ### Community Applications Tools
 
-| Tool                            | Arguments                      | Description                                                  |
-| ------------------------------- | ------------------------------ | ------------------------------------------------------------ |
-| `search_community_applications` | Optional `query` string        | Find Docker listings in the host’s filtered CA catalog.      |
-| `inspect_community_application` | `reference` string from search | Read the exact variant’s editable fields and known blockers. |
+| Tool                            | Arguments                                                                   | Description                                                             |
+| ------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `search_community_applications` | Optional `query` string                                                     | Find Docker listings in the host’s filtered CA catalog.                 |
+| `inspect_community_application` | `reference` string from search                                              | Read the exact variant’s editable fields and known blockers.            |
+| `prepare_community_app_install` | `reference` and optional `name`, `network`, `ports`, `paths`, `environment` | Preview an exact Docker install and receive a 15-minute approval token. |
 
-Both are read-only tools. Search returns up to 100 listings and a total match count. A successful
+Search and inspection are read-only. Search returns up to 100 listings and a total match count. A successful
 search with no matches returns an empty `listings` array. An unavailable catalog returns a tool
 error with code `catalog_unavailable`. Open the Unraid Apps tab to load the cache, then retry.
 `catalog_unsupported` identifies an unsupported build or layout. When a template is withdrawn or
@@ -250,6 +251,13 @@ hidden, inspection returns `listing_unavailable`. Search again to select a visib
 Inspection shows environment variable names with flags for the presence of values or defaults.
 The values and defaults are redacted. If `onboarding_accepted` is false, accept the CA warning in
 the Unraid Apps tab before planning an installation.
+Preparation uses Streamable HTTP MCP with a valid API bearer token or the configured MCP
+connect-secret URL. Supply credentials on every request, including within an established session.
+Ordinary network write access and MCP tool policy also apply. When the prepare tool policy is
+`ask`, obtain operator consent and set `confirm: true` to prepare the preview. Present the exact
+result for separate install approval. The preparation arguments and response match the REST
+contract. To prepare from an MCP client using STDIO, connect that client over Streamable HTTP.
+
 [Supported CA builds and response fields](../api/rest-api.md#community-applications)
 
 ### VM Tools

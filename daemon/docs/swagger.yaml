@@ -15,6 +15,21 @@ definitions:
       unraid_version:
         type: string
     type: object
+  communityapps.Bridge:
+    properties:
+      driver:
+        type: string
+      id:
+        type: string
+      internal:
+        type: boolean
+      ipv4:
+        type: boolean
+      ipv6:
+        type: boolean
+      name:
+        type: string
+    type: object
   communityapps.ConfigKind:
     enum:
     - port
@@ -25,6 +40,13 @@ definitions:
     - ConfigPort
     - ConfigPath
     - ConfigEnvironment
+  communityapps.EnvironmentField:
+    properties:
+      name:
+        type: string
+      set:
+        type: boolean
+    type: object
   communityapps.Inspection:
     properties:
       ca_version:
@@ -56,6 +78,106 @@ definitions:
         type: string
       variant:
         type: string
+    type: object
+  communityapps.Mount:
+    properties:
+      create_directory:
+        type: boolean
+      mode:
+        type: string
+      shared:
+        type: boolean
+      source:
+        type: string
+      target:
+        type: string
+    type: object
+  communityapps.PathOverride:
+    properties:
+      allow_shared:
+        type: boolean
+      source:
+        type: string
+    type: object
+  communityapps.PortBinding:
+    properties:
+      bind_address:
+        type: string
+      container_port:
+        type: integer
+      host_port:
+        type: integer
+      protocol:
+        type: string
+    type: object
+  communityapps.PortOverride:
+    properties:
+      bind_address:
+        type: string
+      host_port:
+        type: integer
+    type: object
+  communityapps.PrepareRequest:
+    properties:
+      environment:
+        additionalProperties:
+          type: string
+        type: object
+      name:
+        type: string
+      network:
+        type: string
+      paths:
+        additionalProperties:
+          $ref: '#/definitions/communityapps.PathOverride'
+        type: object
+      ports:
+        additionalProperties:
+          $ref: '#/definitions/communityapps.PortOverride'
+        type: object
+      reference:
+        type: string
+    type: object
+  communityapps.Preview:
+    properties:
+      approval_token:
+        type: string
+      digest:
+        type: string
+      eligible:
+        type: boolean
+      environment:
+        items:
+          $ref: '#/definitions/communityapps.EnvironmentField'
+        type: array
+      expires_at:
+        type: string
+      image:
+        type: string
+      issues:
+        items:
+          type: string
+        type: array
+      listing:
+        $ref: '#/definitions/communityapps.Listing'
+      mounts:
+        items:
+          $ref: '#/definitions/communityapps.Mount'
+        type: array
+      name:
+        type: string
+      network:
+        $ref: '#/definitions/communityapps.Bridge'
+      pids_limit:
+        type: integer
+      plan_id:
+        type: string
+      ports:
+        items:
+          $ref: '#/definitions/communityapps.PortBinding'
+        type: array
+      privileged:
+        type: boolean
     type: object
   communityapps.Problem:
     properties:
@@ -6908,6 +7030,62 @@ paths:
           schema:
             $ref: '#/definitions/communityapps.Problem'
       summary: Inspect a Community Applications listing
+      tags:
+      - Community Applications
+  /community-applications/install-plans:
+    post:
+      consumes:
+      - application/json
+      description: Resolve exact effective settings and an image digest without installing
+      parameters:
+      - description: Listing and declared overrides
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/communityapps.PrepareRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/communityapps.Preview'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "501":
+          description: Not Implemented
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+      security:
+      - BearerAuth: []
+      summary: Prepare a Community Applications install
       tags:
       - Community Applications
   /cpu/governor:

@@ -1704,6 +1704,61 @@ Both endpoints follow the regular API read authentication settings. Errors inclu
 | 501         | `catalog_unsupported` | Check the installed CA build and supported catalog layout.    |
 | 503         | `catalog_unavailable` | Open the Unraid Apps tab to load the catalog, then retry.     |
 
+### POST /community-applications/install-plans
+
+Prepare an exact install preview from a listing reference. Send the configured API bearer token.
+The agent requires authenticated write access and refuses preparation in read-only mode. Enabling
+tokenless writes for other operations does not authorize this endpoint.
+
+```json
+{
+  "reference": "<listing reference>",
+  "name": "heimdall-secondary",
+  "network": "bridge",
+  "ports": {
+    "80/tcp": { "host_port": 18080, "bind_address": "127.0.0.1" },
+    "443/tcp": { "host_port": 18443, "bind_address": "127.0.0.1" }
+  },
+  "paths": {
+    "/config": { "source": "/mnt/user/appdata/heimdall-secondary", "allow_shared": false }
+  },
+  "environment": { "PUID": "99", "PGID": "100" }
+}
+```
+
+Only `reference` is required. Override keys must match declared container ports and protocols, path
+targets, or environment variable names. Choose Docker’s default bridge or an existing local bridge.
+Published ports must be fixed TCP or UDP bindings. With no declared or requested IP address the
+preview uses the bridge’s configured binding address, or explicit all-IPv4 binding `0.0.0.0`.
+
+The response includes the configured image, registry digest, container name, Docker network
+identity, exact port bindings, canonical host mount sources and targets, planned directory creation,
+PID limit, and environment variable names with `set` flags. Environment values are redacted. Host mount
+sources must resolve to mounted Unraid storage. Supported bind modes are `ro` and `rw`. Privileged
+mode, Docker socket and device mounts, raw Docker arguments, and other effective unsupported
+settings make the preview ineligible. An ineligible HTTP 200 preview returns `eligible: false` and
+specific codes in `issues`.
+
+An eligible preview has an opaque `plan_id`, `approval_token`, and `expires_at` 15 minutes after
+preparation. Present the effective configuration to the operator for approval. Preparing a plan
+leaves Docker containers, native templates, and appdata unchanged.
+
+| HTTP status | Code                                        | Action                                                                          |
+| ----------- | ------------------------------------------- | ------------------------------------------------------------------------------- |
+| 400         | `invalid_plan_request`                      | Send typed overrides for declared settings.                                     |
+| 401         | `credential_required`                       | Supply the configured API bearer token.                                         |
+| 403         | `read_only`                                 | Request preparation from a write-enabled installation.                          |
+| 409         | `onboarding_required`                       | Accept the first-run warning in the Unraid Apps tab.                            |
+| 409         | `name_conflict`                             | Choose a name unused by containers or saved Unraid user templates.              |
+| 409         | `port_conflict`                             | Choose distinct available port bindings.                                        |
+| 409         | `shared_appdata`                            | Select a distinct path or supply the intended source with `allow_shared: true`. |
+| 429         | `plan_capacity`                             | Retry after an outstanding preview expires.                                     |
+| 503         | `image_digest_unavailable`                  | Verify that Docker can resolve the configured image in its registry.            |
+| 503         | `docker_unavailable`, `storage_unavailable` | Verify Docker and Unraid storage are available.                                 |
+
+The appdata conflict check includes writable overlaps with a parent path in an existing
+container or retained template. It also checks user-share aliases for array and pool paths.
+
 ---
 
 ## Docker Containers

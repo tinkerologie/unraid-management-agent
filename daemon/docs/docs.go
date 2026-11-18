@@ -1304,6 +1304,93 @@ const docTemplate = `{
                 }
             }
         },
+        "/community-applications/install-plans": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Resolve exact effective settings and an image digest without installing",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Community Applications"
+                ],
+                "summary": "Prepare a Community Applications install",
+                "parameters": [
+                    {
+                        "description": "Listing and declared overrides",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.PrepareRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Preview"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    }
+                }
+            }
+        },
         "/community-applications/{reference}": {
             "get": {
                 "description": "Show the exact listing's editable fields and known install eligibility issues",
@@ -6007,6 +6094,29 @@ const docTemplate = `{
                 }
             }
         },
+        "communityapps.Bridge": {
+            "type": "object",
+            "properties": {
+                "driver": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "internal": {
+                    "type": "boolean"
+                },
+                "ipv4": {
+                    "type": "boolean"
+                },
+                "ipv6": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "communityapps.ConfigKind": {
             "type": "string",
             "enum": [
@@ -6019,6 +6129,17 @@ const docTemplate = `{
                 "ConfigPath",
                 "ConfigEnvironment"
             ]
+        },
+        "communityapps.EnvironmentField": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "set": {
+                    "type": "boolean"
+                }
+            }
         },
         "communityapps.Inspection": {
             "type": "object",
@@ -6066,6 +6187,159 @@ const docTemplate = `{
                 },
                 "variant": {
                     "type": "string"
+                }
+            }
+        },
+        "communityapps.Mount": {
+            "type": "object",
+            "properties": {
+                "create_directory": {
+                    "type": "boolean"
+                },
+                "mode": {
+                    "type": "string"
+                },
+                "shared": {
+                    "type": "boolean"
+                },
+                "source": {
+                    "type": "string"
+                },
+                "target": {
+                    "type": "string"
+                }
+            }
+        },
+        "communityapps.PathOverride": {
+            "type": "object",
+            "properties": {
+                "allow_shared": {
+                    "type": "boolean"
+                },
+                "source": {
+                    "type": "string"
+                }
+            }
+        },
+        "communityapps.PortBinding": {
+            "type": "object",
+            "properties": {
+                "bind_address": {
+                    "type": "string"
+                },
+                "container_port": {
+                    "type": "integer"
+                },
+                "host_port": {
+                    "type": "integer"
+                },
+                "protocol": {
+                    "type": "string"
+                }
+            }
+        },
+        "communityapps.PortOverride": {
+            "type": "object",
+            "properties": {
+                "bind_address": {
+                    "type": "string"
+                },
+                "host_port": {
+                    "type": "integer"
+                }
+            }
+        },
+        "communityapps.PrepareRequest": {
+            "type": "object",
+            "properties": {
+                "environment": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "network": {
+                    "type": "string"
+                },
+                "paths": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/communityapps.PathOverride"
+                    }
+                },
+                "ports": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/communityapps.PortOverride"
+                    }
+                },
+                "reference": {
+                    "type": "string"
+                }
+            }
+        },
+        "communityapps.Preview": {
+            "type": "object",
+            "properties": {
+                "approval_token": {
+                    "type": "string"
+                },
+                "digest": {
+                    "type": "string"
+                },
+                "eligible": {
+                    "type": "boolean"
+                },
+                "environment": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/communityapps.EnvironmentField"
+                    }
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "image": {
+                    "type": "string"
+                },
+                "issues": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "listing": {
+                    "$ref": "#/definitions/communityapps.Listing"
+                },
+                "mounts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/communityapps.Mount"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "network": {
+                    "$ref": "#/definitions/communityapps.Bridge"
+                },
+                "pids_limit": {
+                    "type": "integer"
+                },
+                "plan_id": {
+                    "type": "string"
+                },
+                "ports": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/communityapps.PortBinding"
+                    }
+                },
+                "privileged": {
+                    "type": "boolean"
                 }
             }
         },

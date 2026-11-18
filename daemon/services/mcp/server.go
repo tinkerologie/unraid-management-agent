@@ -118,6 +118,7 @@ type Server struct {
 	agentSvc                *agent.Service
 	toolPolicyStore         *ToolPolicyStore
 	communityAppsCatalog    *communityapps.Catalog
+	communityAppsService    *communityapps.Service
 	toolsListLoggedSessions sync.Map
 	// networkWriteLock makes every write tool read-only for network (HTTP)
 	// clients while no API token is configured (#245). STDIO never sets it.
@@ -130,11 +131,13 @@ func NewServer(ctx *domain.Context, cacheProvider CacheProvider) *Server {
 	if ctx != nil {
 		initialPolicies = ctx.ToolPolicy
 	}
+	communityCatalog := communityapps.NewHostCatalog()
 	return &Server{
 		ctx:                  ctx,
 		cacheProvider:        cacheProvider,
 		toolPolicyStore:      NewToolPolicyStore("", initialPolicies),
-		communityAppsCatalog: communityapps.NewHostCatalog(),
+		communityAppsCatalog: communityCatalog,
+		communityAppsService: communityapps.NewHostService(communityCatalog),
 	}
 }
 

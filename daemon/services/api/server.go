@@ -82,6 +82,7 @@ type Server struct {
 	toolPolicyStore     *domain.ToolPolicyStore
 
 	communityAppsCatalog *communityapps.Catalog
+	communityAppsService *communityapps.Service
 
 	// diskSpinFn replaces the array controller's spin calls in tests.
 	diskSpinFn func(diskID string, up bool) error
@@ -103,6 +104,7 @@ func NewServer(ctx *domain.Context) *Server {
 // NewServerWithCollectorManager creates a new API server with a collector manager for runtime control.
 func NewServerWithCollectorManager(ctx *domain.Context, cm CollectorManagerInterface) *Server {
 	cancelCtx, cancelFunc := context.WithCancel(context.Background())
+	communityCatalog := communityapps.NewHostCatalog()
 	s := &Server{
 		ctx:              ctx,
 		router:           mux.NewRouter(),
@@ -113,7 +115,8 @@ func NewServerWithCollectorManager(ctx *domain.Context, cm CollectorManagerInter
 		CacheStore:       &CacheStore{registry: ctx.Platform},
 		networkAccess:    collectors.NewNetworkAccessDiscovery(ctx.WANIPLookup),
 
-		communityAppsCatalog: communityapps.NewHostCatalog(),
+		communityAppsCatalog: communityCatalog,
+		communityAppsService: communityapps.NewHostService(communityCatalog),
 	}
 
 	if !ctx.WebSocketDisabled {
@@ -184,6 +187,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/shares", s.handleShares).Methods("GET")
 	api.HandleFunc("/docker", s.handleDockerList).Methods("GET")
 	api.HandleFunc("/community-applications", s.handleCommunityAppsSearch).Methods(http.MethodGet)
+	api.HandleFunc("/community-applications/install-plans", s.handleCommunityAppsPrepare).Methods(http.MethodPost)
 	api.HandleFunc("/community-applications/{reference}", s.handleCommunityAppInspection).Methods(http.MethodGet)
 	api.HandleFunc("/docker/networks", s.handleDockerNetworks).Methods("GET")
 	api.HandleFunc("/docker/port-conflicts", s.handleDockerPortConflicts).Methods("GET")
@@ -427,6 +431,7 @@ func (s *Server) RegisterMCPRoutes(handler http.Handler) {
 	if handler == nil {
 		return
 	}
+	handler = withMCPRequestCredential(handler)
 	s.router.Handle("/mcp", handler)
 	s.router.Handle("/mcp/", handler)
 	if secret := strings.TrimSpace(s.ctx.MCPConnectSecret); secret != "" {
@@ -440,7 +445,7 @@ const mcpStatelessPath = "/mcp-stateless"
 // connect-secret path. The router applies its normal bearer authentication.
 func (s *Server) RegisterMCPStatelessRoute(handler http.Handler) {
 	if handler != nil {
-		s.router.Handle(mcpStatelessPath, handler)
+		s.router.Handle(mcpStatelessPath, withMCPRequestCredential(handler))
 	}
 }
 
