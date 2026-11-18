@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Select MQTT telemetry topics independently and disable MQTT commands while keeping Home Assistant monitoring.
   Applying the new settings clears retained records for disabled topics and command controls (#356).
-  Home Assistant refreshes read-only service status every minute while MQTT commands are disabled.
+  Home Assistant receives read-only service status once a minute while MQTT is connected and commands are disabled.
   Cleanup preserves enabled data and recognizes neighboring agents' payloads when topic prefixes overlap.
   ZFS pools whose names overlap aggregate topics use a separate state path and retain their discovery IDs.
 

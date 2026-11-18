@@ -302,7 +302,10 @@ func (c *Client) execServiceSwitch(nameID, payload string) error {
 
 	// Publish updated service states so HA switches reflect the change
 	if err == nil {
-		go c.publishServiceStates()
+		c.mu.RLock()
+		ctx := c.connectContext
+		c.mu.RUnlock()
+		go c.publishServiceStates(ctx)
 	}
 
 	return err

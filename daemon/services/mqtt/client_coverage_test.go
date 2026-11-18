@@ -472,7 +472,7 @@ func TestPublishServiceStates_NotConnected(t *testing.T) {
 	// Without a broker connection the states are collected and the publish
 	// fails cleanly (logged), without panicking.
 	client := NewClient(DefaultConfig(), "test-server", "1.0.0", nil)
-	client.publishServiceStates()
+	client.publishServiceStates(t.Context())
 }
 
 func TestOptionalNumberTemplate(t *testing.T) {

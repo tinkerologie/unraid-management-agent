@@ -14,6 +14,7 @@ import (
 	pahomqtt "github.com/eclipse/paho.mqtt.golang"
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/controllers"
 )
 
 func TestParseDisabledTopics(t *testing.T) {
@@ -669,7 +670,7 @@ func TestMQTTTelemetryAndCommandDiscoveryPolicy(t *testing.T) {
 	if err := client.PublishFanControlStatus(&dto.FanControlStatus{}); err != nil {
 		t.Fatal(err)
 	}
-	client.publishServiceStates()
+	client.publishServiceStates(t.Context())
 	client.publishServiceDiscovery()
 	if err := client.PublishNotifications(&dto.NotificationList{}); err != nil {
 		t.Fatal(err)
@@ -712,6 +713,21 @@ func TestRemoteShareRoutingRejectsAmbiguousIDs(t *testing.T) {
 		if !maps.Equal(got, want) {
 			t.Fatalf("remote share sources = %v, want %v", got, want)
 		}
+	}
+}
+
+func TestServiceSnapshotFromCancelledSessionIsDiscarded(t *testing.T) {
+	client := NewClient(DefaultConfig(), "tower", "test", nil)
+	capture := &capturingClient{published: make(map[string]string)}
+	client.client = capture
+	prior, cancel := context.WithCancel(t.Context())
+	cancel()
+	current := []controllers.ServiceStatus{{Name: "smb", Running: true}}
+	late := []controllers.ServiceStatus{{Name: "smb", Running: false}}
+	client.publishServiceSnapshot(t.Context(), current)
+	client.publishServiceSnapshot(prior, late)
+	if got := capture.published["unraid/services"]; got != `{"smb":true}` {
+		t.Fatalf("previous session replaced the current service status: %s", got)
 	}
 }
 

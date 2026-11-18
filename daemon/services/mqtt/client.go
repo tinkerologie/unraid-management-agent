@@ -54,7 +54,7 @@ type Client struct {
 	// connectCancel cancels the context for goroutines spawned by handleConnect.
 	// Protected by mu.
 	connectCancel  context.CancelFunc
-	connectContext context.Context // protected by mu; cancels queued PSU discovery
+	connectContext context.Context // protected by mu; cancels work from the prior connection
 	// zfsPublishMu orders legacy retained deletions against writes to the
 	// aggregate topic that used to share the same per-pool address.
 	zfsPublishMu sync.Mutex
@@ -257,7 +257,7 @@ func (c *Client) handleConnect() {
 			if ctx.Err() != nil {
 				return
 			}
-			c.publishServiceStates()
+			c.publishServiceStates(ctx)
 			if ctx.Err() != nil {
 				return
 			}

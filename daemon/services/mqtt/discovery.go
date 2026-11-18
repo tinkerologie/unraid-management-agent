@@ -699,26 +699,34 @@ func (c *Client) refreshReadOnlyServiceStates(ctx context.Context, interval time
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if ctx.Err() != nil {
-				return
-			}
-			c.publishServiceStates()
+			c.publishServiceStates(ctx)
 		}
 	}
 }
 
 // publishServiceStates publishes running states for HA sensors and switches.
-func (c *Client) publishServiceStates() {
-	if !c.TelemetryEnabled(TopicServices) {
+func (c *Client) publishServiceStates(ctx context.Context) {
+	if ctx.Err() != nil || !c.TelemetryEnabled(TopicServices) {
 		return
 	}
-	statuses := controllers.NewServiceController().ListServiceStatuses()
+	c.publishServiceSnapshot(ctx, controllers.NewServiceController().ListServiceStatuses())
+}
+
+func (c *Client) publishServiceSnapshot(ctx context.Context, statuses []controllers.ServiceStatus) {
 	states := make(map[string]bool, len(statuses))
 	for _, svc := range statuses {
 		states[svc.Name] = svc.Running
 	}
 
-	topic := c.buildTopic("services")
+	// Keep the final cancellation check and publish ordered against the
+	// reconnect handler. A previous session's sample must not overwrite a
+	// freshly published snapshot after its service checks finish late.
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if ctx.Err() != nil {
+		return
+	}
+	topic := c.buildTopic(TopicServices)
 	if err := c.publishJSON(topic, states); err != nil {
 		logger.Warning("MQTT: Failed to publish service states: %v", err)
 	}
