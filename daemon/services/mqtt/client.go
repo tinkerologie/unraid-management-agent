@@ -635,7 +635,7 @@ func (c *Client) PublishZFSPools(pools []dto.ZFSPool) error {
 	if !c.shouldPublishTopic(TopicZFSPools) {
 		return nil
 	}
-	err := c.publishZFSAggregate(TopicZFSPools, pools)
+	err := c.publishJSON(c.buildTopic(TopicZFSPools), pools)
 	// Publish per-pool topics and HA discovery
 	go c.publishZFSDiscovery(pools)
 	return err
@@ -680,7 +680,7 @@ func (c *Client) PublishZFSDatasets(datasets []dto.ZFSDataset) error {
 	if !c.shouldPublishTopic(TopicZFSDatasets) {
 		return nil
 	}
-	err := c.publishZFSAggregate(TopicZFSDatasets, datasets)
+	err := c.publishJSON(c.buildTopic(TopicZFSDatasets), datasets)
 	go c.publishZFSDatasetDiscovery(datasets)
 	return err
 }
@@ -690,7 +690,7 @@ func (c *Client) PublishZFSSnapshots(snapshots []dto.ZFSSnapshot) error {
 	if !c.shouldPublishTopic(TopicZFSSnapshots) {
 		return nil
 	}
-	return c.publishZFSAggregate(TopicZFSSnapshots, snapshots)
+	return c.publishJSON(c.buildTopic(TopicZFSSnapshots), snapshots)
 }
 
 // PublishZFSARCStats publishes ZFS ARC statistics to MQTT.
@@ -698,23 +698,7 @@ func (c *Client) PublishZFSARCStats(stats dto.ZFSARCStats) error {
 	if !c.shouldPublishTopic(TopicZFSARC) {
 		return nil
 	}
-	return c.publishZFSAggregate(TopicZFSARC, stats)
-}
-
-func (c *Client) publishZFSAggregate(suffix string, payload any) error {
-	topic := c.buildTopic(suffix)
-	if c.TelemetryEnabled(TopicZFSPools) || !c.config.RetainMessages {
-		return c.publishJSON(topic, payload)
-	}
-	c.zfsPublishMu.Lock()
-	defer c.zfsPublishMu.Unlock()
-	if c.zfsPublished == nil {
-		c.zfsPublished = make(map[string]bool)
-	}
-	// A timed-out write may still reach the broker. Avoid deleting that
-	// enabled aggregate even when the acknowledgement is lost.
-	c.zfsPublished[topic] = true
-	return c.publishJSON(topic, payload)
+	return c.publishJSON(c.buildTopic(TopicZFSARC), stats)
 }
 
 // PublishFanControlStatus publishes fan control status to MQTT.
@@ -749,8 +733,24 @@ func (c *Client) publish(topic, payload string, retained bool) error {
 		return fmt.Errorf("MQTT client not initialized")
 	}
 
+	_, shared := sharedZFSPoolID(strings.TrimPrefix(topic, c.buildTopic("")))
+	trackAggregate := retained && shared && !c.TelemetryEnabled(TopicZFSPools)
+	if trackAggregate {
+		c.zfsPublishMu.Lock()
+		defer c.zfsPublishMu.Unlock()
+	}
+
 	token := c.client.Publish(topic, normalizeQoS(c.config.QoS), retained, payload)
-	if !token.WaitTimeout(5 * time.Second) {
+	completed := token.WaitTimeout(5 * time.Second)
+	if trackAggregate && (!completed || token.Error() == nil) {
+		// A timed-out write may still reach the broker. Protect the aggregate
+		// from an older retained deletion unless the write definitely failed.
+		if c.zfsPublished == nil {
+			c.zfsPublished = make(map[string]bool)
+		}
+		c.zfsPublished[topic] = true
+	}
+	if !completed {
 		c.msgErrors.Add(1)
 		logger.Debug("MQTT: Publish to %s timed out after 5s", topic)
 		return fmt.Errorf("MQTT publish to %s timed out after 5s", topic)

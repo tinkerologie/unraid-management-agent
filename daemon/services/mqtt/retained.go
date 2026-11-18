@@ -103,14 +103,18 @@ func (c *Client) reconcileRetained(ctx context.Context) {
 
 func (c *Client) clearRetained(ctx context.Context, topic string) bool {
 	suffix := strings.TrimPrefix(topic, c.buildTopic(""))
+	qos := byte(1)
 	if _, shared := sharedZFSPoolID(suffix); shared && c.TelemetryEnabled(suffix) {
 		c.zfsPublishMu.Lock()
 		defer c.zfsPublishMu.Unlock()
 		if c.zfsPublished[topic] {
 			return true // The enabled aggregate already replaced the legacy state.
 		}
+		// Do not replay a shared-path deletion after reconnect, where it
+		// could erase a fresh aggregate. The new session checks it again.
+		qos = 0
 	}
-	return ctx.Err() == nil && waitForCleanupToken(ctx, c.client.Publish(topic, 1, true, ""))
+	return ctx.Err() == nil && waitForCleanupToken(ctx, c.client.Publish(topic, qos, true, ""))
 }
 
 func waitForCleanupToken(ctx context.Context, token pahomqtt.Token) bool {
@@ -150,7 +154,7 @@ func (c *Client) shouldClearRetained(msg pahomqtt.Message) bool {
 		return !c.TelemetryEnabled(TopicZFSPools) || !c.TelemetryEnabled(suffix)
 	}
 	if _, exact := telemetryTopics[suffix]; exact {
-		return !c.TelemetryEnabled(suffix)
+		return !c.TelemetryEnabled(suffix) && !c.isParentResource(msg.Topic(), msg.Payload())
 	}
 	last := strings.LastIndexByte(suffix, '/')
 	if last < 0 {
@@ -159,6 +163,25 @@ func (c *Client) shouldClearRetained(msg pahomqtt.Message) bool {
 	resource, id := suffix[:last], suffix[last+1:]
 	group := resourceTopicGroups[resource]
 	return group != "" && !c.TelemetryEnabled(group) && matchesRetainedResource(resource, id, msg.Payload())
+}
+
+// An exact aggregate can also overlap a parent agent's resource topic. At
+// nested prefixes, check the parent resource shape before deleting it.
+func (c *Client) isParentResource(topic string, payload []byte) bool {
+	last := strings.LastIndexByte(topic, '/')
+	if last < 0 {
+		return false
+	}
+	base, id := "/"+topic[:last], topic[last+1:]
+	ownPrefix := "/" + c.config.TopicPrefix
+	for resource := range retainedResourceFields {
+		parent, found := strings.CutSuffix(base, "/"+resource)
+		if found && strings.HasPrefix(ownPrefix, parent+"/") &&
+			matchesRetainedResource(resource, id, payload) {
+			return true
+		}
+	}
+	return false
 }
 
 // A wildcard can overlap another agent's nested prefix or a custom topic.

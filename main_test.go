@@ -27,6 +27,27 @@ func TestApplyFileConfigStorageTopologyInterval(t *testing.T) {
 	}
 }
 
+func TestBuildMQTTConfig(t *testing.T) {
+	orig := cli
+	t.Cleanup(func() { cli = orig })
+	cli.MQTTEnabled = true
+	cli.MQTTDisableCommands = true
+	cli.MQTTDisabledTopics = "psu,zfs/arc,psu"
+	cli.MQTTHomeAssistant = true
+	cfg, err := buildMQTTConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Enabled || !cfg.DisableCommands || !cfg.HomeAssistantMode || !cfg.DiscoveryEnabled ||
+		!slices.Equal(cfg.DisabledTopics, []string{"psu", "zfs/arc"}) {
+		t.Fatal("daemon config did not preserve independent command, topic, and discovery settings")
+	}
+	cli.MQTTDisabledTopics = "zfs/#"
+	if _, err := buildMQTTConfig(); err == nil {
+		t.Fatal("daemon config accepted a wildcard in the topic selection")
+	}
+}
+
 func TestApplyFileConfigNICInterval(t *testing.T) {
 	orig := cli.IntervalNIC
 	t.Cleanup(func() { cli.IntervalNIC = orig })

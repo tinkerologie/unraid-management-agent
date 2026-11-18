@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Select MQTT telemetry topics independently and disable MQTT commands while keeping Home Assistant monitoring.
   Applying the new settings clears retained records for disabled topics and command controls (#356).
+  Cleanup preserves enabled data and recognizes neighboring agents' payloads when topic prefixes overlap.
   ZFS pools whose names overlap aggregate topics use a separate state path and retain their discovery IDs.
 
 ### Changed

@@ -416,7 +416,7 @@ export MQTT_USE_TLS=true
 
 ### QoS and Retained Messages
 
-The daemon defaults to QoS 0 and retains telemetry and discovery payloads. Use `MQTT_QOS` and `MQTT_RETAIN` to change those defaults. Availability is always retained, notification events are never retained, and retained deletions use QoS 1.
+The daemon defaults to QoS 0 and retains telemetry and discovery payloads. Use `MQTT_QOS` and `MQTT_RETAIN` to change those defaults. Availability is always retained, notification events are never retained, and retained deletions use QoS 1. Cleanup of a legacy ZFS pool payload on an enabled aggregate path uses QoS 0 so a reconnect cannot replay a stale deletion over the aggregate's new state.
 
 ### Custom Topic Prefix
 

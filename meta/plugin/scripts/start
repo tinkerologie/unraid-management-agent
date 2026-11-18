@@ -139,9 +139,12 @@ for var in INTERVAL_SYSTEM INTERVAL_ARRAY INTERVAL_DISK INTERVAL_DOCKER \
     eval "$var=\$(sanitize_int \"\$$var\")"
 done
 
-for var in MQTT_ENABLED MQTT_HOME_ASSISTANT MQTT_DISABLE_COMMANDS; do
+for var in MQTT_ENABLED MQTT_HOME_ASSISTANT; do
     eval "$var=\$(sanitize_bool \"\$$var\")"
 done
+if [ -n "$MQTT_DISABLE_COMMANDS" ]; then
+    MQTT_DISABLE_COMMANDS=$(sanitize_bool "$MQTT_DISABLE_COMMANDS")
+fi
 for var in MQTT_BROKER MQTT_USERNAME MQTT_PASSWORD MQTT_CLIENT_ID MQTT_TOPIC_PREFIX; do
     eval "$var=\$(sanitize_str \"\$$var\")"
 done

@@ -315,7 +315,7 @@ func main() {
 		logger.Info("Read-only mode enabled: all state-changing MCP tools are blocked")
 	}
 
-	mqttDisabledTopics, err := mqtt.ParseDisabledTopics(cli.MQTTDisabledTopics)
+	mqttConfig, err := buildMQTTConfig()
 	if err != nil {
 		logger.Error("Invalid MQTT configuration: %v", err)
 		os.Exit(1)
@@ -414,24 +414,7 @@ func main() {
 		VMGuest:          buildVMGuestConfig(cli.VMGuestAgent, vmGuestFileConfig(fileCfg)),
 		Hub:              domain.NewEventBus(1024), // Buffer size for event bus
 		Platform:         platform.NewRegistry(),
-		MQTTConfig: domain.MQTTConfig{
-			Enabled:             cli.MQTTEnabled,
-			Broker:              cli.MQTTBroker,
-			Port:                cli.MQTTPort,
-			Username:            cli.MQTTUsername,
-			Password:            cli.MQTTPassword,
-			ClientID:            cli.MQTTClientID,
-			UseTLS:              cli.MQTTUseTLS,
-			InsecureSkipVerify:  cli.MQTTInsecureSkipVerify,
-			TopicPrefix:         cli.MQTTTopicPrefix,
-			QoS:                 cli.MQTTQoS,
-			RetainMessages:      cli.MQTTRetain,
-			DisableCommands:     cli.MQTTDisableCommands,
-			DisabledTopics:      mqttDisabledTopics,
-			HomeAssistantMode:   cli.MQTTHomeAssistant,
-			HomeAssistantPrefix: cli.MQTTHAPrefix,
-			DiscoveryEnabled:    cli.MQTTHomeAssistant, // Enable discovery when HA mode is enabled
-		},
+		MQTTConfig:       mqttConfig,
 		DiscoveryConfig: domain.DiscoveryConfig{
 			Enabled:     cli.DiscoveryEnabled,
 			ServiceName: cli.DiscoveryServiceName,
@@ -664,6 +647,31 @@ func vmGuestFileConfig(cfg *domain.FileConfig) *domain.FileConfigVMGuest {
 		return nil
 	}
 	return cfg.VMGuestAgent
+}
+
+func buildMQTTConfig() (domain.MQTTConfig, error) {
+	disabledTopics, err := mqtt.ParseDisabledTopics(cli.MQTTDisabledTopics)
+	if err != nil {
+		return domain.MQTTConfig{}, err
+	}
+	return domain.MQTTConfig{
+		Enabled:             cli.MQTTEnabled,
+		Broker:              cli.MQTTBroker,
+		Port:                cli.MQTTPort,
+		Username:            cli.MQTTUsername,
+		Password:            cli.MQTTPassword,
+		ClientID:            cli.MQTTClientID,
+		UseTLS:              cli.MQTTUseTLS,
+		InsecureSkipVerify:  cli.MQTTInsecureSkipVerify,
+		TopicPrefix:         cli.MQTTTopicPrefix,
+		QoS:                 cli.MQTTQoS,
+		RetainMessages:      cli.MQTTRetain,
+		DisableCommands:     cli.MQTTDisableCommands,
+		DisabledTopics:      disabledTopics,
+		HomeAssistantMode:   cli.MQTTHomeAssistant,
+		HomeAssistantPrefix: cli.MQTTHAPrefix,
+		DiscoveryEnabled:    cli.MQTTHomeAssistant, // Enable discovery when HA mode is enabled
+	}, nil
 }
 
 // buildVMGuestConfig merges the --vm-guest-agent flag with the vm_guest_agent

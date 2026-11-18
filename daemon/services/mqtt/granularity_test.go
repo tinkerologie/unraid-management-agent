@@ -208,6 +208,34 @@ func TestMQTTGranularityWithBroker(t *testing.T) {
 		return allRetained(records, containerState, containerSensor, containerButton, legacy.buildTopic("docker/containers"))
 	})
 	assertBrokerCommand(t, peer, legacy.buildCommandTopic("system", "fixture-only"), true)
+	enabled.Disconnect()
+
+	// A parent agent's container can also occupy a nested agent's exact
+	// system suffix. Verify cleanup removes the nested agent's own PSU data
+	// while preserving the retained container at the overlapping address.
+	legacy.publishContainerDiscovery([]dto.ContainerInfo{{Name: "system", Image: "fixture"}})
+	nestedCfg := *cfg
+	nestedCfg.ClientID += "-nested"
+	nestedCfg.TopicPrefix += "/docker"
+	nestedCfg.DisabledTopics = []string{TopicSystem, TopicPSU}
+	nestedCfg.HomeAssistantMode = false
+	nestedClient := NewClient(&nestedCfg, "neighbor", "new", nil)
+	nestedPSU := nestedClient.buildTopic(TopicPSU)
+	waitForBrokerToken(t, peer.Publish(nestedPSU, 1, true, `{"fixture":true}`))
+	observedNested := []string{nestedSystem, nestedPSU}
+	containerRetained := func(records map[string]string) bool {
+		return strings.Contains(records[nestedSystem], `"image":"fixture"`)
+	}
+	waitForRetained(t, peer, prefix, observedNested, func(records map[string]string) bool {
+		return containerRetained(records) && records[nestedPSU] != ""
+	})
+	if err := nestedClient.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer nestedClient.Disconnect()
+	waitForRetained(t, peer, prefix, observedNested, func(records map[string]string) bool {
+		return containerRetained(records) && records[nestedPSU] == ""
+	})
 }
 
 func connectBrokerFixture(t *testing.T, brokerURL, id string) pahomqtt.Client {
@@ -471,6 +499,84 @@ func TestZFSPoolWithAggregateNameKeepsItsDiscovery(t *testing.T) {
 	}
 	if _, found := capture.published["homeassistant/sensor/tower/arc_size/config"]; found {
 		t.Fatal("disabled ARC topic published discovery")
+	}
+}
+
+func TestExactCleanupPreservesParentResource(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.TopicPrefix = "unraid/docker"
+	cfg.DisabledTopics = []string{TopicSystem}
+	client := NewClient(cfg, "neighbor", "test", nil)
+	msg := retainedFixtureMessage{topic: "unraid/docker/system", retained: true}
+	msg.payload = `{"name":"system","image":"fixture"}`
+	if client.shouldClearRetained(msg) {
+		t.Fatal("cleanup selected the parent agent's container payload")
+	}
+	msg.payload = `{"hostname":"neighbor"}`
+	if !client.shouldClearRetained(msg) {
+		t.Fatal("cleanup did not select the local agent's system payload")
+	}
+}
+
+func TestRetainedCleanupMatchesLegacyGPUIdentity(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.DisabledTopics = []string{TopicGPU}
+	client := NewClient(cfg, "tower", "test", nil)
+	msg := retainedFixtureMessage{topic: "unraid/gpu/0", retained: true}
+	for payload, want := range map[string]bool{
+		`{"index":0,"driver_version":"fixture"}`:    true,
+		`{"index":1,"driver_version":"fixture"}`:    false,
+		`{"index":null,"driver_version":"fixture"}`: false,
+		`{"driver_version":"fixture"}`:              false,
+	} {
+		msg.payload = payload
+		if client.shouldClearRetained(msg) != want {
+			t.Errorf("GPU retained identity match for %s, want %v", payload, want)
+		}
+	}
+}
+
+func TestCancelledRetainedCleanupStopsWaitingForAck(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if waitForCleanupToken(ctx, pendingCleanupToken{done: make(chan struct{})}) {
+		t.Fatal("cancelled cleanup reported a completed acknowledgement")
+	}
+}
+
+type pendingCleanupToken struct {
+	pahomqtt.Token
+	done chan struct{}
+}
+
+func (t pendingCleanupToken) Done() <-chan struct{} { return t.done }
+
+func TestZFSSelectionsKeepEnabledCollectionsPublishing(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Enabled = true
+	cfg.HomeAssistantMode = false
+	cfg.DisabledTopics = []string{TopicZFSARC}
+	client := NewClient(cfg, "tower", "test", nil)
+	capture := &capturingClient{published: make(map[string]string)}
+	client.client = capture
+	client.connected.Store(true)
+	for _, err := range []error{
+		client.PublishZFSPools([]dto.ZFSPool{{Name: "tank"}}),
+		client.PublishZFSDatasets([]dto.ZFSDataset{{Name: "tank/media"}}),
+		client.PublishZFSSnapshots([]dto.ZFSSnapshot{{Name: "tank/media@fixture"}}),
+		client.PublishZFSARCStats(dto.ZFSARCStats{}),
+	} {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, topic := range []string{"unraid/zfs/pools", "unraid/zfs/datasets", "unraid/zfs/snapshots"} {
+		if capture.published[topic] == "" {
+			t.Errorf("enabled ZFS collection did not publish on %s", topic)
+		}
+	}
+	if capture.published["unraid/zfs/arc"] != "" {
+		t.Fatal("disabled ZFS ARC collection published state")
 	}
 }
 
