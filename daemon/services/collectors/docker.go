@@ -139,6 +139,7 @@ func (c *DockerCollector) collect(ctx context.Context) error {
 
 		cont := &dto.ContainerInfo{
 			ID:        shortID,
+			FullID:    apiContainer.ID,
 			Name:      name,
 			Image:     apiContainer.Image,
 			State:     state,
@@ -148,12 +149,7 @@ func (c *DockerCollector) collect(ctx context.Context) error {
 		}
 
 		// Extract version from image tag
-		imageParts := strings.Split(apiContainer.Image, ":")
-		if len(imageParts) > 1 {
-			cont.Version = imageParts[1]
-		} else {
-			cont.Version = "latest"
-		}
+		cont.Version = dockerImageVersion(apiContainer.Image)
 
 		containers = append(containers, cont)
 		containerMap[apiContainer.ID] = cont
@@ -181,56 +177,7 @@ func (c *DockerCollector) collect(ctx context.Context) error {
 
 			c.recordDockerMemoryCap(apiContainer.ID, inspectData.HostConfig)
 
-			// Network mode
-			if inspectData.HostConfig != nil {
-				cont.NetworkMode = string(inspectData.HostConfig.NetworkMode)
-			}
-
-			if inspectData.NetworkSettings != nil {
-				cont.Networks = buildNetworkAttachments(inspectData.NetworkSettings.Networks)
-				cont.IPAddress, cont.MACAddress = selectLegacyEndpoint(cont.NetworkMode, cont.Networks)
-			}
-
-			// Port mappings
-			if inspectData.HostConfig != nil {
-				portMappings := []string{}
-				for containerPort, bindings := range inspectData.HostConfig.PortBindings {
-					for _, binding := range bindings {
-						if binding.HostPort != "" {
-							portMappings = append(portMappings, fmt.Sprintf("%s:%s", binding.HostPort, containerPort))
-						}
-					}
-				}
-				cont.PortMappings = portMappings
-
-				// Restart policy
-				cont.RestartPolicy = string(inspectData.HostConfig.RestartPolicy.Name)
-				if cont.RestartPolicy == "" {
-					cont.RestartPolicy = "no"
-				}
-			}
-
-			// Volume mappings
-			volumeMappings := []dto.VolumeMapping{}
-			for _, mount := range inspectData.Mounts {
-				volumeMappings = append(volumeMappings, dto.VolumeMapping{
-					HostPath:      mount.Source,
-					ContainerPath: mount.Destination,
-					Mode:          mount.Mode,
-				})
-			}
-			cont.VolumeMappings = volumeMappings
-
-			// Uptime
-			if inspectData.State != nil && inspectData.State.StartedAt != "" {
-				startTime, err := time.Parse(time.RFC3339Nano, inspectData.State.StartedAt)
-				if err == nil {
-					cont.Uptime = dockerFormatUptime(time.Since(startTime))
-				}
-			}
-
-			// RestartCount
-			cont.RestartCount = inspectData.RestartCount
+			populateDockerConfiguration(cont, inspectData)
 
 			// Memory stats from cgroups (much faster than ContainerStats API)
 			c.getMemoryFromCgroups(apiContainer.ID, cont)

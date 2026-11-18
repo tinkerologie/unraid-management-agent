@@ -233,7 +233,7 @@ func validImageID(id string) bool {
 
 func containerOptions(settings installSettings, owner string) client.ContainerCreateOptions {
 	c := settings.configuration
-	labels := map[string]string{"net.unraid.docker.managed": "dockerman", installOwnerLabel: owner}
+	labels := map[string]string{dockerManagedLabel: dockerManagedValue, installOwnerLabel: owner}
 	if settings.template.WebUI != "" {
 		labels["net.unraid.docker.webui"] = settings.template.WebUI
 	}

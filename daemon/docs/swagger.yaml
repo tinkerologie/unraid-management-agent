@@ -984,6 +984,120 @@ definitions:
       timestamp:
         type: string
     type: object
+  dto.ContainerDetail:
+    properties:
+      catalog_link:
+        description: CatalogLink comes from the native Unraid user template. Omitted
+          means unknown.
+        example: https://example.com/templates/plex.xml
+        type: string
+      configured_memory_limit_bytes:
+        description: |-
+          ConfiguredMemoryLimit is the Docker hard cap in bytes. Zero means unlimited.
+          Omitted means unavailable. MemoryLimit remains the live statistics denominator.
+        example: 536870912
+        type: integer
+      cpu_percent:
+        example: 5.2
+        type: number
+      id:
+        example: abc123def456
+        type: string
+      image:
+        example: plexinc/pms-docker:latest
+        type: string
+      ip_address:
+        example: 172.17.0.2
+        type: string
+      mac_address:
+        description: Container MAC (Docker 29 / Unraid 7.3 fixed-MAC support)
+        example: 02:42:ac:11:00:02
+        type: string
+      memory_display:
+        example: 1 GiB / 8 GiB
+        type: string
+      memory_limit_bytes:
+        example: 8589934592
+        type: integer
+      memory_percent:
+        example: 12.5
+        type: number
+      memory_usage_bytes:
+        example: 1073741824
+        type: integer
+      memory_usage_mb:
+        example: 1024
+        type: number
+      name:
+        example: plex
+        type: string
+      network_mode:
+        example: bridge
+        type: string
+      network_rx_bytes:
+        example: 104857600
+        type: integer
+      network_rx_bytes_per_sec:
+        example: 1024
+        type: number
+      network_tx_bytes:
+        example: 52428800
+        type: integer
+      network_tx_bytes_per_sec:
+        example: 512
+        type: number
+      networks:
+        description: Networks lists running-container attachments in network-name
+          order.
+        items:
+          $ref: '#/definitions/dto.ContainerNetworkAttachment'
+        type: array
+      port_mappings:
+        items:
+          type: string
+        type: array
+      ports:
+        items:
+          $ref: '#/definitions/dto.PortMapping'
+        type: array
+      restart_count:
+        example: 0
+        type: integer
+      restart_policy:
+        example: unless-stopped
+        type: string
+      source_status:
+        $ref: '#/definitions/dto.SourceStatus'
+      state:
+        example: running
+        type: string
+      status:
+        example: Up 2 days
+        type: string
+      timestamp:
+        type: string
+      update_available:
+        description: null when not yet checked / registry unreachable (field omitted
+          in JSON)
+        type: boolean
+      update_checked:
+        type: string
+      update_status:
+        description: Update status — populated by merging the DockerUpdate collector's
+          cache at read time.
+        example: up_to_date
+        type: string
+      uptime:
+        example: 2 days
+        type: string
+      version:
+        example: 1.40.1
+        type: string
+      volume_mappings:
+        items:
+          $ref: '#/definitions/dto.VolumeMapping'
+        type: array
+    type: object
   dto.ContainerInfo:
     properties:
       configured_memory_limit_bytes:
@@ -7419,7 +7533,8 @@ paths:
       - Docker
   /docker/{id}:
     get:
-      description: Read information about a specific Docker container by ID or name
+      description: Resolve the live Docker container by ID or name and show its native
+        catalog link when available
       parameters:
       - description: Container ID or name
         in: path
@@ -7432,9 +7547,13 @@ paths:
         "200":
           description: Container information
           schema:
-            $ref: '#/definitions/dto.ContainerInfo'
+            $ref: '#/definitions/dto.ContainerDetail'
         "404":
           description: Container not found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Docker container information unavailable
           schema:
             $ref: '#/definitions/dto.Response'
       summary: Get specific Docker container

@@ -10,6 +10,7 @@ import (
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
 	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/internal/communityappstest"
 )
 
 func setupTestServer() (*Server, *domain.Context) {
@@ -1368,13 +1369,16 @@ func TestZFSPoolEndpointNotFound(t *testing.T) {
 }
 
 func TestDockerInfoEndpointWithCacheData(t *testing.T) {
+	communityappstest.UseDockerInspectEngine(t, map[string]string{
+		"aaaaaaaaaaaa": `{"Id":"aaaaaaaaaaaaaaaaaaaaa","Name":"/test-container","Config":{},"State":{"Status":"running"}}`,
+	})
 	server, _ := setupTestServer()
 
 	// Set up Docker cache with test data
-	dockerVal := []dto.ContainerInfo{{ID: "abc123", Name: "test-container", State: "running"}}
+	dockerVal := []dto.ContainerInfo{{ID: "aaaaaaaaaaaa", FullID: "aaaaaaaaaaaaaaaaaaaaa", Name: "test-container", State: "running", CPUPercent: 42}}
 	server.dockerCache.Store(&dockerVal)
 
-	req, err := http.NewRequest("GET", "/api/v1/docker/abc123", nil)
+	req, err := http.NewRequest("GET", "/api/v1/docker/aaaaaaaaaaaa", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1391,12 +1395,13 @@ func TestDockerInfoEndpointWithCacheData(t *testing.T) {
 		t.Errorf("failed to parse response: %v", err)
 	}
 
-	if container.Name != "test-container" {
-		t.Errorf("expected name 'test-container', got %q", container.Name)
+	if container.Name != "test-container" || container.CPUPercent != 42 {
+		t.Errorf("expected cached statistics for the inspected identity, got %+v", container)
 	}
 }
 
 func TestDockerInfoEndpointContainerNotFound(t *testing.T) {
+	communityappstest.UseDockerInspectEngine(t, nil)
 	server, _ := setupTestServer()
 
 	// Empty cache

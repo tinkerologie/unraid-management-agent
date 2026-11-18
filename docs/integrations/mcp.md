@@ -234,6 +234,11 @@ Thus, the sum of the counts can be less than the number of disk entries.
 >
 > Use `refresh_container_updates` to force a fresh registry check and push results to the cache, WebSocket hub, and alerting engine. Use `check_container_updates` / `check_container_update` for synchronous on-demand checks that return results directly without publishing.
 
+After a container is recreated, use its name as `container_id` in `get_container_info`
+to get the current Docker ID. A Docker Manager container can include `catalog_link`, the public
+link saved in its native Unraid user template. When the field is absent, the origin is unknown.
+Ordinary removal keeps the template and appdata for **Apps → Previous Apps**.
+
 ### Community Applications Tools
 
 | Tool                                | Arguments                                                                   | Description                                                             |

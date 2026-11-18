@@ -1981,7 +1981,7 @@
         },
         "/docker/{id}": {
             "get": {
-                "description": "Read information about a specific Docker container by ID or name",
+                "description": "Resolve the live Docker container by ID or name and show its native catalog link when available",
                 "produces": [
                     "application/json"
                 ],
@@ -2002,11 +2002,17 @@
                     "200": {
                         "description": "Container information",
                         "schema": {
-                            "$ref": "#/definitions/dto.ContainerInfo"
+                            "$ref": "#/definitions/dto.ContainerDetail"
                         }
                     },
                     "404": {
                         "description": "Container not found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "503": {
+                        "description": "Docker container information unavailable",
                         "schema": {
                             "$ref": "#/definitions/dto.Response"
                         }
@@ -7619,6 +7625,153 @@
                 },
                 "timestamp": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.ContainerDetail": {
+            "type": "object",
+            "properties": {
+                "catalog_link": {
+                    "description": "CatalogLink comes from the native Unraid user template. Omitted means unknown.",
+                    "type": "string",
+                    "example": "https://example.com/templates/plex.xml"
+                },
+                "configured_memory_limit_bytes": {
+                    "description": "ConfiguredMemoryLimit is the Docker hard cap in bytes. Zero means unlimited.\nOmitted means unavailable. MemoryLimit remains the live statistics denominator.",
+                    "type": "integer",
+                    "example": 536870912
+                },
+                "cpu_percent": {
+                    "type": "number",
+                    "example": 5.2
+                },
+                "id": {
+                    "type": "string",
+                    "example": "abc123def456"
+                },
+                "image": {
+                    "type": "string",
+                    "example": "plexinc/pms-docker:latest"
+                },
+                "ip_address": {
+                    "type": "string",
+                    "example": "172.17.0.2"
+                },
+                "mac_address": {
+                    "description": "Container MAC (Docker 29 / Unraid 7.3 fixed-MAC support)",
+                    "type": "string",
+                    "example": "02:42:ac:11:00:02"
+                },
+                "memory_display": {
+                    "type": "string",
+                    "example": "1 GiB / 8 GiB"
+                },
+                "memory_limit_bytes": {
+                    "type": "integer",
+                    "example": 8589934592
+                },
+                "memory_percent": {
+                    "type": "number",
+                    "example": 12.5
+                },
+                "memory_usage_bytes": {
+                    "type": "integer",
+                    "example": 1073741824
+                },
+                "memory_usage_mb": {
+                    "type": "number",
+                    "example": 1024
+                },
+                "name": {
+                    "type": "string",
+                    "example": "plex"
+                },
+                "network_mode": {
+                    "type": "string",
+                    "example": "bridge"
+                },
+                "network_rx_bytes": {
+                    "type": "integer",
+                    "example": 104857600
+                },
+                "network_rx_bytes_per_sec": {
+                    "type": "number",
+                    "example": 1024
+                },
+                "network_tx_bytes": {
+                    "type": "integer",
+                    "example": 52428800
+                },
+                "network_tx_bytes_per_sec": {
+                    "type": "number",
+                    "example": 512
+                },
+                "networks": {
+                    "description": "Networks lists running-container attachments in network-name order.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.ContainerNetworkAttachment"
+                    }
+                },
+                "port_mappings": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "ports": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.PortMapping"
+                    }
+                },
+                "restart_count": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "restart_policy": {
+                    "type": "string",
+                    "example": "unless-stopped"
+                },
+                "source_status": {
+                    "$ref": "#/definitions/dto.SourceStatus"
+                },
+                "state": {
+                    "type": "string",
+                    "example": "running"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "Up 2 days"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "update_available": {
+                    "description": "null when not yet checked / registry unreachable (field omitted in JSON)",
+                    "type": "boolean"
+                },
+                "update_checked": {
+                    "type": "string"
+                },
+                "update_status": {
+                    "description": "Update status — populated by merging the DockerUpdate collector's cache at read time.",
+                    "type": "string",
+                    "example": "up_to_date"
+                },
+                "uptime": {
+                    "type": "string",
+                    "example": "2 days"
+                },
+                "version": {
+                    "type": "string",
+                    "example": "1.40.1"
+                },
+                "volume_mappings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.VolumeMapping"
+                    }
                 }
             }
         },

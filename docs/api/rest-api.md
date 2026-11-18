@@ -1798,6 +1798,21 @@ requires resolving the conflict before retrying. Cleanup preserves appdata and u
 containers and templates. The native user template stores effective environment values for
 Unraid’s editing and update workflow.
 
+### Manage an installed application
+
+Use **Edit** and **Update** in Unraid’s Docker tab to apply changes from the saved user template.
+The Management Agent’s existing Docker operations start, stop, restart, update, and remove these
+containers. A running agent update uses the configured image reference and the current Docker
+settings. The replacement uses the same mounted data, and the agent restores the original
+container if replacement fails and recovery succeeds.
+
+After a replacement, look up the container by name to get its current Docker ID. The install
+attempt retains the ID reported at completion. To install the same listing twice, choose
+different names and free host ports. Use separate appdata paths for independent instances.
+
+Ordinary agent removal keeps the native user template and appdata. Open **Apps → Previous Apps**
+to reinstall with the saved settings.
+
 ---
 
 ## Docker Containers
@@ -1873,7 +1888,14 @@ clamped at zero; if `memory.stat` is missing, unreadable or lacks a valid `inact
 
 ### GET /docker/{id}
 
-Get a single container by ID or name.
+Get a single container by ID or name. The agent resolves the current identity against Docker.
+During recreation, look up the container by name for the replacement’s 12-character ID.
+The old ID returns 404 once Docker removes that container. Live statistics appear after the
+collector samples the replacement. An unavailable Docker engine returns HTTP 503.
+
+For a container managed by Docker Manager on this Unraid host, `catalog_link` shows the public
+`TemplateURL` from its saved native user template. A missing, ambiguous, or invalid link leaves
+the origin unknown and the field is omitted.
 
 **Path Parameters**:
 

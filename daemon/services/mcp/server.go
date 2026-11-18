@@ -44,13 +44,14 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/watchdog"
 )
 
-// CacheProvider defines the interface for accessing cached data from the API server.
+// CacheProvider provides monitoring data from the API server.
 type CacheProvider interface {
 	GetSystemCache() *dto.SystemInfo
 	GetArrayCache() *dto.ArrayStatus
 	GetDisksCache() []dto.DiskInfo
 	GetSharesCache() []dto.ShareInfo
 	GetDockerCache() []dto.ContainerInfo
+	GetDockerContainer(context.Context, string) (*dto.ContainerDetail, error)
 	GetVMsCache() []dto.VMInfo
 	GetUPSCache() *dto.UPSStatus
 	GetGPUCache() []*dto.GPUMetrics
@@ -560,19 +561,17 @@ func (s *Server) registerMonitoringTools() {
 	// Get specific container info tool
 	addToolDirect(s, &mcp.Tool{
 		Name:        "get_container_info",
-		Description: "Get detailed information about a specific Docker container",
+		Description: "Get a Docker container by its current ID or name, including its native catalog link when available",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPContainerArgs) (*mcp.CallToolResult, any, error) {
-		containers := s.cacheProvider.GetDockerCache()
-		if containers == nil {
-			return textResult("Container information not available yet"), nil, nil
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, args dto.MCPContainerArgs) (*mcp.CallToolResult, any, error) {
+		detail, err := s.cacheProvider.GetDockerContainer(ctx, args.ContainerID)
+		if err != nil {
+			return textResult("Docker container information unavailable"), nil, nil
 		}
-		for _, c := range containers {
-			if c.ID == args.ContainerID || c.Name == args.ContainerID {
-				return jsonResult(c)
-			}
+		if detail == nil {
+			return textResult(fmt.Sprintf("Container '%s' not found", args.ContainerID)), nil, nil
 		}
-		return textResult(fmt.Sprintf("Container '%s' not found", args.ContainerID)), nil, nil
+		return jsonResult(detail)
 	})
 
 	// List Docker networks tool

@@ -9,6 +9,7 @@ import (
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/controllers"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/internal/communityappstest"
 )
 
 // ===== Helper to populate all caches for testing =====
@@ -334,6 +335,7 @@ func TestHandleDockerList_WithCache(t *testing.T) {
 }
 
 func TestHandleDockerInfo_ByID(t *testing.T) {
+	communityappstest.UseDockerInspectEngine(t, map[string]string{"abc123def456": `{"Id":"abc123def456","Name":"/plex","Config":{},"State":{"Status":"running"}}`})
 	server, _ := setupTestServer()
 	populateTestCaches(server)
 
@@ -355,6 +357,7 @@ func TestHandleDockerInfo_ByID(t *testing.T) {
 }
 
 func TestHandleDockerInfo_ByName(t *testing.T) {
+	communityappstest.UseDockerInspectEngine(t, map[string]string{"nginx": `{"Id":"bbbbbbbbbbbb","Name":"/nginx","Config":{},"State":{"Status":"running"}}`})
 	server, _ := setupTestServer()
 	populateTestCaches(server)
 
@@ -376,6 +379,7 @@ func TestHandleDockerInfo_ByName(t *testing.T) {
 }
 
 func TestHandleDockerInfo_NotFound(t *testing.T) {
+	communityappstest.UseDockerInspectEngine(t, nil)
 	server, _ := setupTestServer()
 	populateTestCaches(server)
 
