@@ -18,14 +18,16 @@ const (
 // TemplateConfig is a setting declared by the publisher. It can contain
 // sensitive defaults and values and belongs to the install service.
 type TemplateConfig struct {
-	Kind     ConfigKind
-	Name     string
-	Target   string
-	Mode     string
-	Default  string `json:"-"`
-	Value    string `json:"-"`
-	Required bool
-	Masked   bool
+	Kind        ConfigKind
+	Name        string
+	Target      string
+	Mode        string
+	Default     string `json:"-"`
+	Value       string `json:"-"`
+	Required    bool
+	Masked      bool
+	Description string
+	Display     string
 }
 
 // Template contains the installation settings parsed from the publisher's
@@ -34,6 +36,13 @@ type Template struct {
 	Name          string
 	Image         string
 	CatalogLink   string `json:"-"`
+	Registry      string
+	WebUI         string
+	Icon          string
+	Support       string
+	Project       string
+	Overview      string
+	Category      string
 	Network       string
 	Config        []TemplateConfig
 	RuntimeIssues []string
@@ -71,7 +80,13 @@ func (c TemplateConfig) publicField() TemplateField {
 }
 
 func readTemplate(row phpArray, listing Listing) Template {
-	t := Template{Name: listing.Name, Image: listing.Image, CatalogLink: row.text("TemplateURL")}
+	t := Template{
+		Name: listing.Name, Image: listing.Image, CatalogLink: row.text("TemplateURL"),
+		Registry: safeNativeURL(row.text("Registry")), WebUI: safeNativeURL(row.text("WebUI")),
+		Icon: safeNativeURL(row.text("Icon")), Support: safeNativeURL(row.text("Support")),
+		Project: safeNativeURL(row.text("Project")), Overview: safeNativeAttribute(row.text("Overview")),
+		Category: safeNativeAttribute(row.text("Category")),
+	}
 	t.Network = row.text("Network")
 	if t.Network == "" {
 		t.Network = row.array("Networking").text("Mode")
@@ -137,6 +152,7 @@ func (t *Template) addConfig(row phpArray) {
 	kind := strings.ToLower(attrs.text("Type"))
 	config := TemplateConfig{
 		Name: attrs.text("Name"), Target: attrs.text("Target"), Mode: attrs.text("Mode"),
+		Description: safeNativeAttribute(attrs.text("Description")), Display: nativeDisplay(attrs.text("Display")),
 		Default: attrs.text("Default"), Value: row.text("value"),
 		Required: attrs.flag("Required"), Masked: attrs.flag("Mask"),
 	}
@@ -185,4 +201,13 @@ func (c TemplateConfig) mountsDockerSocket() bool {
 
 func isDockerSocket(value string) bool {
 	return path.Base(strings.TrimSpace(value)) == "docker.sock"
+}
+
+func nativeDisplay(display string) string {
+	switch display {
+	case "always", "advanced", "hidden":
+		return display
+	default:
+		return "always"
+	}
 }

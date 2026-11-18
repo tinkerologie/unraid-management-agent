@@ -1759,6 +1759,45 @@ leaves Docker containers, native templates, and appdata unchanged.
 The appdata conflict check includes writable overlaps with a parent path in an existing
 container or retained template. It also checks user-share aliases for array and pool paths.
 
+### POST /community-applications/install-plans/{id}/confirm
+
+After the operator has approved the exact preview, send its `plan_id` in the path and its
+`approval_token` in the JSON body. This endpoint has the same authenticated write requirements
+as preparation. The service rechecks current CA eligibility, native settings and Docker conflicts
+before accepting the plan.
+
+```json
+{ "approval_token": "<exact approval token from the reviewed preview>" }
+```
+
+HTTP 202 returns the accepted attempt, including its `attempt_id`. The `Location` header points to
+the status resource. Installation continues after the client disconnects. If the confirmation
+response is lost, resend the same plan ID and token to retrieve the original attempt. An expired
+or changed pending plan requires a new preview and approval. After an attempt fails, prepare and
+approve a fresh plan to try another installation.
+
+| HTTP status | Code                          | Action                                                           |
+| ----------- | ----------------------------- | ---------------------------------------------------------------- |
+| 400         | `invalid_plan_approval`       | Supply the exact token from the reviewed preview.                |
+| 409         | `plan_changed`                | Prepare and review a new preview.                                |
+| 410         | `plan_expired`                | Prepare and review a new preview.                                |
+| 429         | `install_capacity`            | Retry when an active attempt settles.                            |
+| 503         | `attempt_storage_unavailable` | Verify that the agent can write to its persistent configuration. |
+
+### GET /community-applications/install-attempts/{id}
+
+Use the returned `attempt_id` to poll under the regular API read policy. The response includes
+`state` (`pending`, `running`, `succeeded`, or `failed`), `phase`, and redacted `configuration`.
+A successful attempt returns `container_id`, with the installed name and CA listing reference in
+`configuration`. Success means that Docker started the approved image and the native user template
+was saved. Check readiness in the application separately.
+
+A failed attempt returns a `problem` with a stable code and any `cleanup_failures`. For example,
+`image_digest_changed` requires a new preview and approval, and `name_conflict` or `port_conflict`
+requires resolving the conflict before retrying. Cleanup preserves appdata and unrelated
+containers and templates. The native user template stores effective environment values for
+Unraid’s editing and update workflow.
+
 ---
 
 ## Docker Containers

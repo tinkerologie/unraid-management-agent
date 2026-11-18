@@ -156,21 +156,32 @@ type PlanningDocker interface {
 
 // ServiceOptions supplies the host filesystem and system boundaries for planning.
 type ServiceOptions struct {
-	HostRoot      string
-	OpenDocker    func() (PlanningDocker, error)
-	PortAvailable func(context.Context, PortBinding) error
-	Now           func() time.Time
+	HostRoot          string
+	Lifecycle         context.Context
+	OpenInstallDocker func() (InstallDocker, error)
+	OpenDocker        func() (PlanningDocker, error)
+	PortAvailable     func(context.Context, PortBinding) error
+	Now               func() time.Time
 }
 
 // Service owns pending plans shared by REST and MCP.
 type Service struct {
-	catalog       *Catalog
-	hostRoot      string
-	openDocker    func() (PlanningDocker, error)
-	portAvailable func(context.Context, PortBinding) error
-	now           func() time.Time
-	mu            sync.Mutex
-	plans         map[string]*pendingPlan
+	catalog        *Catalog
+	hostRoot       string
+	openDocker     func() (PlanningDocker, error)
+	portAvailable  func(context.Context, PortBinding) error
+	now            func() time.Time
+	mu             sync.Mutex
+	plans          map[string]*pendingPlan
+	openInstaller  func() (InstallDocker, error)
+	lifecycle      context.Context
+	stop           context.CancelFunc
+	workers        sync.WaitGroup
+	applyMu        sync.Mutex
+	active         int
+	receiptsLoaded bool
+	receipts       map[string]installReceipt
+	attemptIDs     map[string]string
 }
 
 // NewService creates an install service using the supplied host dependencies.
@@ -184,6 +195,13 @@ func NewService(catalog *Catalog, options ServiceOptions) *Service {
 	if options.OpenDocker == nil {
 		options.OpenDocker = func() (PlanningDocker, error) { return client.New(client.FromEnv) }
 	}
+	if options.OpenInstallDocker == nil {
+		options.OpenInstallDocker = func() (InstallDocker, error) { return client.New(client.FromEnv) }
+	}
+	if options.Lifecycle == nil {
+		options.Lifecycle = context.Background()
+	}
+	lifecycle, stop := context.WithCancel(options.Lifecycle)
 	if options.PortAvailable == nil {
 		options.PortAvailable = probePort
 	}
@@ -192,6 +210,7 @@ func NewService(catalog *Catalog, options ServiceOptions) *Service {
 	}
 	return &Service{
 		catalog: catalog, hostRoot: options.HostRoot, openDocker: options.OpenDocker,
+		openInstaller: options.OpenInstallDocker, lifecycle: lifecycle, stop: stop,
 		portAvailable: options.PortAvailable, now: options.Now, plans: make(map[string]*pendingPlan),
 	}
 }
@@ -205,7 +224,7 @@ func NewHostService(catalog *Catalog) *Service {
 func (s *Service) Prepare(ctx context.Context, request PrepareRequest) (Preview, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	effective, issues, err := s.resolve(ctx, request)
+	effective, issues, err := s.resolve(ctx, request, "")
 	if err != nil {
 		return Preview{}, err
 	}
@@ -290,17 +309,39 @@ func (s *Service) lookupPending(planID, approvalToken string) (*pendingPlan, err
 // revalidate recomputes the selected material template and live effective
 // settings. Unrelated catalog rows and presentation fields are immaterial.
 func (s *Service) revalidate(ctx context.Context, plan *pendingPlan) error {
-	current, issues, err := s.resolve(ctx, plan.request)
+	return s.revalidateSettings(ctx, plan, "")
+}
+
+func (s *Service) revalidateForInstall(ctx context.Context, plan *pendingPlan) error {
+	return s.revalidateSettings(ctx, plan, plan.effective.configuration.Digest)
+}
+
+func (s *Service) revalidateSettings(ctx context.Context, plan *pendingPlan, approvedDigest digest.Digest) error {
+	current, issues, err := s.resolve(ctx, plan.request, approvedDigest)
 	if err != nil {
 		return err
 	}
-	if len(issues) != 0 || !reflect.DeepEqual(current, plan.effective) {
+	if len(issues) != 0 || !sameInstallSettings(current, plan.effective) {
 		return ErrPlanChanged
 	}
 	return nil
 }
 
-func (s *Service) resolve(ctx context.Context, request PrepareRequest) (installSettings, []string, error) {
+func sameInstallSettings(current, approved installSettings) bool {
+	// Presentation metadata is carried into the saved template without
+	// changing the runtime approval. Icon and WebUI also set Docker labels.
+	for _, settings := range []*installSettings{&current, &approved} {
+		t := &settings.template
+		t.Registry, t.Support, t.Project, t.Overview, t.Category = "", "", "", "", ""
+		t.Config = slices.Clone(t.Config)
+		for i := range t.Config {
+			t.Config[i].Name, t.Config[i].Description, t.Config[i].Display = "", "", ""
+		}
+	}
+	return reflect.DeepEqual(current, approved)
+}
+
+func (s *Service) resolve(ctx context.Context, request PrepareRequest, approvedDigest digest.Digest) (installSettings, []string, error) {
 	result, err := s.catalog.Resolve(ctx, request.Reference)
 	if err != nil {
 		return installSettings{}, nil, err
@@ -314,6 +355,9 @@ func (s *Service) resolve(ctx context.Context, request PrepareRequest) (installS
 	}
 	issues := append(append([]string{}, result.PolicyIssues...), result.Template.RuntimeIssues...)
 	settings.configuration.Privileged = slices.Contains(issues, "privileged")
+	if safeNativeURL(result.Template.CatalogLink) == "" {
+		issues = append(issues, "missing_native_catalog_link")
+	}
 	if len(issues) != 0 {
 		for _, field := range result.Template.Config {
 			if field.Kind != ConfigPath {
@@ -339,7 +383,7 @@ func (s *Service) resolve(ctx context.Context, request PrepareRequest) (installS
 	if issues = settings.resolveFields(host, request); len(issues) != 0 {
 		return settings, issues, nil
 	}
-	return s.resolveDocker(ctx, settings, host, request)
+	return s.resolveDocker(ctx, settings, host, request, approvedDigest)
 }
 
 func newInstallSettings(result ResolvedTemplate, request PrepareRequest) installSettings {
@@ -360,7 +404,7 @@ func newInstallSettings(result ResolvedTemplate, request PrepareRequest) install
 	}
 }
 
-func (s *Service) resolveDocker(ctx context.Context, settings installSettings, host installHost, request PrepareRequest) (installSettings, []string, error) {
+func (s *Service) resolveDocker(ctx context.Context, settings installSettings, host installHost, request PrepareRequest, approvedDigest digest.Digest) (installSettings, []string, error) {
 	config := &settings.configuration
 	if !bridgeName.MatchString(config.Network.Name) {
 		return settings, []string{"unsupported_network"}, nil
@@ -370,20 +414,14 @@ func (s *Service) resolveDocker(ctx context.Context, settings installSettings, h
 		return installSettings{}, nil, ErrDockerState
 	}
 	defer func() { _ = docker.Close() }()
-	bridge, err := docker.NetworkInspect(ctx, config.Network.Name, client.NetworkInspectOptions{})
-	if err != nil && !errdefs.IsNotFound(err) {
-		return installSettings{}, nil, ErrDockerState
+	bridge, err := inspectBridge(ctx, docker, config.Network.Name, config.Ports)
+	if err != nil {
+		return settings, nil, err
 	}
-	network := bridge.Network
-	if network.Name != config.Network.Name || network.Driver != "bridge" || network.Scope != "local" ||
-		network.Internal && len(config.Ports) != 0 || network.ConfigOnly || !fullID.MatchString(network.ID) ||
-		!assignBindAddresses(config.Ports, network.Network) || !supportsFixedBindings(config.Ports, network.Network) {
+	if bridge.ID == "" {
 		return settings, []string{"unsupported_network"}, nil
 	}
-	config.Network = Bridge{
-		Name: network.Name, ID: network.ID, Driver: network.Driver, Internal: network.Internal,
-		IPv4: hasNetworkFamily(network.Network, false), IPv6: hasNetworkFamily(network.Network, true),
-	}
+	config.Network = bridge
 	if err := checkDuplicateBindings(config.Ports); err != nil {
 		return installSettings{}, nil, err
 	}
@@ -397,11 +435,31 @@ func (s *Service) resolveDocker(ctx context.Context, settings installSettings, h
 	if err := s.checkApprovedPorts(ctx, *config); err != nil {
 		return installSettings{}, nil, err
 	}
-	config.Digest, err = resolveImageDigest(ctx, docker, config.Image)
+	config.Digest = approvedDigest
+	if approvedDigest == "" {
+		config.Digest, err = resolveImageDigest(ctx, docker, config.Image)
+	}
 	if err != nil {
 		return installSettings{}, nil, err
 	}
 	return settings, []string{}, nil
+}
+
+func inspectBridge(ctx context.Context, docker PlanningDocker, name string, ports []PortBinding) (Bridge, error) {
+	bridge, err := docker.NetworkInspect(ctx, name, client.NetworkInspectOptions{})
+	if err != nil && !errdefs.IsNotFound(err) {
+		return Bridge{}, ErrDockerState
+	}
+	network := bridge.Network
+	if network.Name != name || network.Driver != "bridge" || network.Scope != "local" ||
+		network.Internal && len(ports) != 0 || network.ConfigOnly || !fullID.MatchString(network.ID) ||
+		!assignBindAddresses(ports, network.Network) || !supportsFixedBindings(ports, network.Network) {
+		return Bridge{}, nil
+	}
+	return Bridge{
+		Name: network.Name, ID: network.ID, Driver: network.Driver, Internal: network.Internal,
+		IPv4: hasNetworkFamily(network.Network, false), IPv6: hasNetworkFamily(network.Network, true),
+	}, nil
 }
 
 func resolveImageDigest(ctx context.Context, docker PlanningDocker, image string) (digest.Digest, error) {

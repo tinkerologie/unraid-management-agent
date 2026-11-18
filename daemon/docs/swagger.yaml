@@ -15,6 +15,37 @@ definitions:
       unraid_version:
         type: string
     type: object
+  communityapps.Attempt:
+    properties:
+      attempt_id:
+        type: string
+      cleanup_failures:
+        items:
+          type: string
+        type: array
+      configuration:
+        $ref: '#/definitions/communityapps.Configuration'
+      container_id:
+        type: string
+      phase:
+        type: string
+      problem:
+        $ref: '#/definitions/communityapps.Problem'
+      state:
+        $ref: '#/definitions/communityapps.AttemptState'
+    type: object
+  communityapps.AttemptState:
+    enum:
+    - pending
+    - running
+    - succeeded
+    - failed
+    type: string
+    x-enum-varnames:
+    - AttemptPending
+    - AttemptRunning
+    - AttemptSucceeded
+    - AttemptFailed
   communityapps.Bridge:
     properties:
       driver:
@@ -40,6 +71,40 @@ definitions:
     - ConfigPort
     - ConfigPath
     - ConfigEnvironment
+  communityapps.Configuration:
+    properties:
+      digest:
+        type: string
+      environment:
+        items:
+          $ref: '#/definitions/communityapps.EnvironmentField'
+        type: array
+      image:
+        type: string
+      listing:
+        $ref: '#/definitions/communityapps.Listing'
+      mounts:
+        items:
+          $ref: '#/definitions/communityapps.Mount'
+        type: array
+      name:
+        type: string
+      network:
+        $ref: '#/definitions/communityapps.Bridge'
+      pids_limit:
+        type: integer
+      ports:
+        items:
+          $ref: '#/definitions/communityapps.PortBinding'
+        type: array
+      privileged:
+        type: boolean
+    type: object
+  communityapps.ConfirmRequest:
+    properties:
+      approval_token:
+        type: string
+    type: object
   communityapps.EnvironmentField:
     properties:
       name:
@@ -7032,6 +7097,33 @@ paths:
       summary: Inspect a Community Applications listing
       tags:
       - Community Applications
+  /community-applications/install-attempts/{id}:
+    get:
+      description: Return durable progress or the final install result
+      parameters:
+      - description: Install attempt ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/communityapps.Attempt'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+      summary: Get a Community Applications install attempt
+      tags:
+      - Community Applications
   /community-applications/install-plans:
     post:
       consumes:
@@ -7086,6 +7178,68 @@ paths:
       security:
       - BearerAuth: []
       summary: Prepare a Community Applications install
+      tags:
+      - Community Applications
+  /community-applications/install-plans/{id}/confirm:
+    post:
+      consumes:
+      - application/json
+      description: Claim one approved plan and return its durable attempt. Repeat
+        the same approval to retrieve the original attempt.
+      parameters:
+      - description: Pending install plan ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Exact approval token from the reviewed preview
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/communityapps.ConfirmRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/communityapps.Attempt'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "410":
+          description: Gone
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+      security:
+      - BearerAuth: []
+      summary: Confirm a Community Applications install
       tags:
       - Community Applications
   /cpu/governor:

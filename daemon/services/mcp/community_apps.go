@@ -59,6 +59,27 @@ func (s *Server) registerCommunityAppsTools() {
 		}
 		return jsonResult(result)
 	})
+	addCommunityAppsWriteTool(s, &mcp.Tool{
+		Name:        "confirm_community_app_install",
+		Description: "Install the exact reviewed Community Applications plan. Obtain operator approval for the preview and send its approval token. Repeating the same approval returns the original attempt.",
+	}, func(ctx context.Context, args communityAppsConfirmArgs) (*mcp.CallToolResult, any, error) {
+		attempt, err := s.communityAppsService.Confirm(ctx, args.PlanID, args.ApprovalToken)
+		if err != nil {
+			return catalogToolError(err)
+		}
+		return jsonResult(attempt)
+	})
+	addToolDirect(s, &mcp.Tool{
+		Name:        "get_community_app_install_attempt",
+		Description: "Read redacted progress or the final result of a confirmed Community Applications install.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args communityAppsAttemptArgs) (*mcp.CallToolResult, any, error) {
+		attempt, err := s.communityAppsService.GetAttempt(args.AttemptID)
+		if err != nil {
+			return catalogToolError(err)
+		}
+		return jsonResult(attempt)
+	})
 }
 
 func catalogToolError(err error) (*mcp.CallToolResult, any, error) {
@@ -75,6 +96,16 @@ func (s *Server) SetCommunityAppsService(service *communityapps.Service) {
 type communityAppsPrepareArgs struct {
 	communityapps.PrepareRequest
 	Confirm bool `json:"confirm,omitempty" jsonschema:"Required when the MCP tool access policy is ask"`
+}
+
+type communityAppsConfirmArgs struct {
+	communityapps.ConfirmRequest
+	PlanID  string `json:"plan_id" jsonschema:"ID of the exact plan from prepare_community_app_install"`
+	Confirm bool   `json:"confirm,omitempty" jsonschema:"Required when the MCP tool access policy is ask"`
+}
+
+type communityAppsAttemptArgs struct {
+	AttemptID string `json:"attempt_id" jsonschema:"Attempt ID from confirm_community_app_install"`
 }
 
 func requireCommunityAppsCredential(req *mcp.CallToolRequest) error {

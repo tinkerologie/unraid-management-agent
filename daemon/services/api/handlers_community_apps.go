@@ -62,11 +62,11 @@ func respondCatalogError(w http.ResponseWriter, err error) {
 	switch problem.Code {
 	case "catalog_request_failed":
 		status = http.StatusInternalServerError
-	case "catalog_unavailable", "docker_unavailable", "storage_unavailable", "image_digest_unavailable":
+	case "catalog_unavailable", "docker_unavailable", "storage_unavailable", "image_digest_unavailable", "attempt_storage_unavailable", "install_worker_unavailable":
 		status = http.StatusServiceUnavailable
 	case "catalog_unsupported":
 		status = http.StatusNotImplemented
-	case "listing_unavailable":
+	case "listing_unavailable", "attempt_not_found":
 		status = http.StatusNotFound
 	case "credential_required":
 		status = http.StatusUnauthorized
@@ -74,7 +74,9 @@ func respondCatalogError(w http.ResponseWriter, err error) {
 		status = http.StatusForbidden
 	case "name_conflict", "port_conflict", "shared_appdata", "onboarding_required", "plan_changed":
 		status = http.StatusConflict
-	case "plan_capacity":
+	case "plan_expired":
+		status = http.StatusGone
+	case "plan_capacity", "install_capacity":
 		status = http.StatusTooManyRequests
 	}
 	respondJSON(w, status, problem)
@@ -133,4 +135,63 @@ func (s *Server) handleCommunityAppsPrepare(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	respondJSON(w, http.StatusOK, result)
+}
+
+// handleCommunityAppsConfirm accepts an exact approved install plan.
+//
+// @Summary Confirm a Community Applications install
+// @Description Claim one approved plan and return its durable attempt. Repeat the same approval to retrieve the original attempt.
+// @Tags Community Applications
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Pending install plan ID"
+// @Param request body communityapps.ConfirmRequest true "Exact approval token from the reviewed preview"
+// @Success 202 {object} communityapps.Attempt
+// @Failure 400 {object} communityapps.Problem
+// @Failure 401 {object} communityapps.Problem
+// @Failure 403 {object} communityapps.Problem
+// @Failure 404 {object} communityapps.Problem
+// @Failure 409 {object} communityapps.Problem
+// @Failure 410 {object} communityapps.Problem
+// @Failure 429 {object} communityapps.Problem
+// @Failure 503 {object} communityapps.Problem
+// @Router /community-applications/install-plans/{id}/confirm [post]
+func (s *Server) handleCommunityAppsConfirm(w http.ResponseWriter, r *http.Request) {
+	if !s.requireCommunityAppsCredential(w, r) {
+		return
+	}
+	args, err := communityapps.DecodePlanArguments[communityapps.ConfirmRequest](r.Body)
+	if err != nil {
+		respondCatalogError(w, err)
+		return
+	}
+	attempt, err := s.communityAppsService.Confirm(r.Context(), mux.Vars(r)["id"], args.ApprovalToken)
+	if err != nil {
+		respondCatalogError(w, err)
+		return
+	}
+	w.Header().Set("Location", "/api/v1/community-applications/install-attempts/"+attempt.ID)
+	respondJSON(w, http.StatusAccepted, attempt)
+}
+
+// handleCommunityAppsAttempt returns one confirmed install's redacted status.
+//
+// @Summary Get a Community Applications install attempt
+// @Description Return durable progress or the final install result
+// @Tags Community Applications
+// @Produce json
+// @Param id path string true "Install attempt ID"
+// @Success 200 {object} communityapps.Attempt
+// @Failure 404 {object} communityapps.Problem
+// @Failure 503 {object} communityapps.Problem
+// @Router /community-applications/install-attempts/{id} [get]
+func (s *Server) handleCommunityAppsAttempt(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	attempt, err := s.communityAppsService.GetAttempt(mux.Vars(r)["id"])
+	if err != nil {
+		respondCatalogError(w, err)
+		return
+	}
+	respondJSON(w, http.StatusOK, attempt)
 }

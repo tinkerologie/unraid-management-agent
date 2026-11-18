@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Confirm an approved Community Applications install through REST or Streamable HTTP MCP and follow its durable attempt (#364).
+  A successful attempt starts the verified image and saves an Unraid user template for native editing and updates.
+
 - Preview an exact Community Applications Docker install through REST or Streamable HTTP MCP (#363).
   The preview pins the registry digest, network, fixed port bindings and resolved appdata paths for 15 minutes,
   and shows which environment variables are set with values redacted.

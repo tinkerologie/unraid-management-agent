@@ -65,7 +65,7 @@ func (settings *installSettings) resolveField(host installHost, field TemplateCo
 		if isDockerSocket(field.Target) {
 			return "docker_socket_mount"
 		}
-		if !validBindPath(field.Target) || path.Clean(field.Target) != field.Target {
+		if !validBindPath(field.Target) || path.Clean(field.Target) != field.Target || strings.ContainsAny(field.Target, "\"'&") {
 			return "unsafe_mount_target"
 		}
 		if override, ok := request.Paths[field.Target]; ok {

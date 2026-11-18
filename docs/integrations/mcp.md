@@ -236,11 +236,13 @@ Thus, the sum of the counts can be less than the number of disk entries.
 
 ### Community Applications Tools
 
-| Tool                            | Arguments                                                                   | Description                                                             |
-| ------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `search_community_applications` | Optional `query` string                                                     | Find Docker listings in the host’s filtered CA catalog.                 |
-| `inspect_community_application` | `reference` string from search                                              | Read the exact variant’s editable fields and known blockers.            |
-| `prepare_community_app_install` | `reference` and optional `name`, `network`, `ports`, `paths`, `environment` | Preview an exact Docker install and receive a 15-minute approval token. |
+| Tool                                | Arguments                                                                   | Description                                                             |
+| ----------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `search_community_applications`     | Optional `query` string                                                     | Find Docker listings in the host’s filtered CA catalog.                 |
+| `inspect_community_application`     | `reference` string from search                                              | Read the exact variant’s editable fields and known blockers.            |
+| `prepare_community_app_install`     | `reference` and optional `name`, `network`, `ports`, `paths`, `environment` | Preview an exact Docker install and receive a 15-minute approval token. |
+| `confirm_community_app_install`     | `plan_id`, `approval_token`, and `confirm` when policy requires             | Confirm the operator-approved preview and return the durable attempt.   |
+| `get_community_app_install_attempt` | `attempt_id` from confirmation                                              | Read progress or the redacted terminal result.                          |
 
 Search and inspection are read-only. Search returns up to 100 listings and a total match count. A successful
 search with no matches returns an empty `listings` array. An unavailable catalog returns a tool
@@ -257,6 +259,17 @@ Ordinary network write access and MCP tool policy also apply. When the prepare t
 `ask`, obtain operator consent and set `confirm: true` to prepare the preview. Present the exact
 result for separate install approval. The preparation arguments and response match the REST
 contract. To prepare from an MCP client using STDIO, connect that client over Streamable HTTP.
+
+After the operator approves the preview, confirm using the exact `plan_id` and `approval_token`.
+Confirmation requires the same authenticated write access as preparation. The confirmation tool
+also requires `confirm: true` when its policy is `ask`. Every policy that allows confirmation still
+requires the exact approval token.
+
+Use the returned `attempt_id` to check status. The installation continues across request disconnects,
+and any MCP session can call the read-only status tool under the normal read policy. If a response is
+lost, resend the exact confirmation to recover the original attempt ID. Prepare and approve a
+fresh plan after a failed installation. Success means Docker started the container and the agent
+saved its native Unraid user template. Verify application readiness separately.
 
 [Supported CA builds and response fields](../api/rest-api.md#community-applications)
 

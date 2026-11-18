@@ -331,7 +331,7 @@ type savedTemplate struct {
 	} `xml:"Data>Volume"`
 }
 
-func (host installHost) savedBindings(name string) ([]string, error) {
+func (host installHost) savedBindings(name, ignoredTemplate string) ([]string, error) {
 	dir := filepath.Join(host.root, userTemplatesDir)
 	bindings := []string{}
 	count := 0
@@ -342,7 +342,7 @@ func (host installHost) savedBindings(name string) ([]string, error) {
 			}
 			return ErrStorageState
 		}
-		if entry.IsDir() {
+		if filename == ignoredTemplate || entry.IsDir() {
 			return nil
 		}
 		if filename == dir {
@@ -392,10 +392,14 @@ func readOnlyMode(mode string) bool {
 }
 
 func (host installHost) checkConflicts(config *Configuration, request PrepareRequest, containers []container.Summary) error {
+	return host.checkConflictsExcept(config, request, containers, "")
+}
+
+func (host installHost) checkConflictsExcept(config *Configuration, request PrepareRequest, containers []container.Summary, ignoredTemplate string) error {
 	if err := checkDockerName(containers, config.Name); err != nil {
 		return err
 	}
-	existing, err := host.savedBindings(config.Name)
+	existing, err := host.savedBindings(config.Name, ignoredTemplate)
 	if err != nil {
 		return err
 	}
@@ -469,4 +473,9 @@ func (s *Service) checkApprovedPorts(ctx context.Context, config Configuration) 
 		}
 	}
 	return nil
+}
+
+func hasMountIdentity(info fs.FileInfo, identity mountIdentity) bool {
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	return ok && fmt.Sprint(stat.Dev) == identity.device && stat.Ino == identity.inode
 }

@@ -1302,6 +1302,47 @@
                 }
             }
         },
+        "/community-applications/install-attempts/{id}": {
+            "get": {
+                "description": "Return durable progress or the final install result",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Community Applications"
+                ],
+                "summary": "Get a Community Applications install attempt",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Install attempt ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Attempt"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    }
+                }
+            }
+        },
         "/community-applications/install-plans": {
             "post": {
                 "security": [
@@ -1376,6 +1417,100 @@
                     },
                     "501": {
                         "description": "Not Implemented",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/community-applications/install-plans/{id}/confirm": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Claim one approved plan and return its durable attempt. Repeat the same approval to retrieve the original attempt.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Community Applications"
+                ],
+                "summary": "Confirm a Community Applications install",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pending install plan ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Exact approval token from the reviewed preview",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.ConfirmRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Attempt"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "410": {
+                        "description": "Gone",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
                         "schema": {
                             "$ref": "#/definitions/communityapps.Problem"
                         }
@@ -6092,6 +6227,50 @@
                 }
             }
         },
+        "communityapps.Attempt": {
+            "type": "object",
+            "properties": {
+                "attempt_id": {
+                    "type": "string"
+                },
+                "cleanup_failures": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "configuration": {
+                    "$ref": "#/definitions/communityapps.Configuration"
+                },
+                "container_id": {
+                    "type": "string"
+                },
+                "phase": {
+                    "type": "string"
+                },
+                "problem": {
+                    "$ref": "#/definitions/communityapps.Problem"
+                },
+                "state": {
+                    "$ref": "#/definitions/communityapps.AttemptState"
+                }
+            }
+        },
+        "communityapps.AttemptState": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "running",
+                "succeeded",
+                "failed"
+            ],
+            "x-enum-varnames": [
+                "AttemptPending",
+                "AttemptRunning",
+                "AttemptSucceeded",
+                "AttemptFailed"
+            ]
+        },
         "communityapps.Bridge": {
             "type": "object",
             "properties": {
@@ -6127,6 +6306,58 @@
                 "ConfigPath",
                 "ConfigEnvironment"
             ]
+        },
+        "communityapps.Configuration": {
+            "type": "object",
+            "properties": {
+                "digest": {
+                    "type": "string"
+                },
+                "environment": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/communityapps.EnvironmentField"
+                    }
+                },
+                "image": {
+                    "type": "string"
+                },
+                "listing": {
+                    "$ref": "#/definitions/communityapps.Listing"
+                },
+                "mounts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/communityapps.Mount"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "network": {
+                    "$ref": "#/definitions/communityapps.Bridge"
+                },
+                "pids_limit": {
+                    "type": "integer"
+                },
+                "ports": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/communityapps.PortBinding"
+                    }
+                },
+                "privileged": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "communityapps.ConfirmRequest": {
+            "type": "object",
+            "properties": {
+                "approval_token": {
+                    "type": "string"
+                }
+            }
         },
         "communityapps.EnvironmentField": {
             "type": "object",

@@ -81,7 +81,8 @@ func (o *Orchestrator) Run() error {
 	// Pass the collector manager for runtime control
 	apiServer := api.NewServerWithCollectorManager(o.ctx, o.collectorManager)
 	communityCatalog := communityapps.NewHostCatalog()
-	communityInstall := communityapps.NewHostService(communityCatalog)
+	communityInstall := communityapps.NewService(communityCatalog, communityapps.ServiceOptions{Lifecycle: ctx})
+	defer communityInstall.Close()
 	apiServer.SetCommunityAppsCatalog(communityCatalog)
 	apiServer.SetCommunityAppsService(communityInstall)
 

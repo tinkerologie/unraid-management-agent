@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -158,4 +159,100 @@ func TestPrepareCommunityAppMCPRequiresPerRequestCredentialAndPolicy(t *testing.
 			t.Fatalf("received non-actionable error %q", content)
 		}
 	})
+}
+
+func TestCommunityAppMCPConfirmAndPollFromAnotherSession(t *testing.T) {
+	root := communityappstest.CopyHeimdallHost(t)
+	unblock := make(chan struct{})
+	docker := &communityappstest.InstallEngine{BeforePull: func(ctx context.Context) error {
+		select {
+		case <-unblock:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}}
+	service := communityapps.NewService(communityapps.NewCatalog(os.DirFS(root)), communityapps.ServiceOptions{
+		HostRoot:          root,
+		OpenDocker:        func() (communityapps.PlanningDocker, error) { return docker, nil },
+		OpenInstallDocker: func() (communityapps.InstallDocker, error) { return docker, nil },
+		PortAvailable:     func(context.Context, communityapps.PortBinding) error { return nil },
+	})
+	t.Cleanup(service.Close)
+	const tool = "confirm_community_app_install"
+	const statusTool = "get_community_app_install_attempt"
+	const bearer = "install-auth"
+	const protocol = "2026-07-28"
+	const sentinel = "private-mcp-install"
+	preview, err := service.Prepare(t.Context(), communityapps.PrepareRequest{
+		Reference: communityappstest.HeimdallReference, Environment: map[string]string{"PUID": sentinel},
+	})
+	if err != nil || !preview.Eligible {
+		t.Fatalf("prepare returned %+v, %v", preview, err)
+	}
+
+	policies := domain.NewToolPolicyStore(t.TempDir(), map[string]domain.ToolPolicyValue{tool: domain.PolicyAsk})
+	server, _ := mountMCPTestServerWithCommunityApps(t, domain.Config{APIToken: bearer}, policies, service)
+	const path = "/mcp-stateless"
+	session := connectMCPHTTP(t, server, path, bearer, protocol)
+	_, missingPolicyConsent := callToolJSON(t, session, tool, map[string]any{"plan_id": preview.PlanID, "approval_token": preview.ApprovalToken})
+	if !strings.Contains(missingPolicyConsent, "Set confirm=true") {
+		t.Fatalf("ordinary tool policy was bypassed: %s", missingPolicyConsent)
+	}
+	errorResult, missingExactApproval := callToolJSON(t, session, tool, map[string]any{"plan_id": preview.PlanID, "confirm": true})
+	if !errorResult.IsError || !strings.Contains(missingExactApproval, "invalid_plan_approval") {
+		t.Fatalf("exact approval was bypassed by generic confirmation: %s", missingExactApproval)
+	}
+	allowed := domain.NewToolPolicyStore(t.TempDir(), map[string]domain.ToolPolicyValue{tool: domain.PolicyAllow})
+	allowServer, _ := mountMCPTestServerWithCommunityApps(t, domain.Config{APIToken: bearer}, allowed, service)
+	allowSession := connectMCPHTTP(t, allowServer, path, bearer, protocol)
+	errorResult, missingExactApproval = callToolJSON(t, allowSession, tool, map[string]any{"plan_id": preview.PlanID})
+	if !errorResult.IsError || !strings.Contains(missingExactApproval, "invalid_plan_approval") {
+		t.Fatalf("exact approval was bypassed by the allow policy: %s", missingExactApproval)
+	}
+
+	args := map[string]any{"plan_id": preview.PlanID, "approval_token": preview.ApprovalToken, "confirm": true}
+	noToken, _ := mountMCPTestServerWithCommunityApps(t, domain.Config{AllowUnauthenticatedWrites: true}, nil, service)
+	noTokenSession := connectMCPHTTP(t, noToken, path, "", protocol)
+	errorResult, tokenless := callToolJSON(t, noTokenSession, tool, args)
+	if !errorResult.IsError || !strings.Contains(tokenless, "credential_required") {
+		t.Fatalf("tokenless confirmation was accepted: %s", tokenless)
+	}
+	result, reply := callToolJSON(t, session, tool, args)
+	var claim communityapps.Attempt
+	if err := json.Unmarshal([]byte(reply), &claim); err != nil || result.IsError || claim.ID == "" ||
+		strings.Contains(reply, sentinel) || strings.Contains(reply, preview.ApprovalToken) {
+		t.Fatalf("confirm did not return a redacted claim: %+v, %v", claim, err)
+	}
+	other := connectMCPHTTP(t, server, path, bearer, protocol)
+	_, missing := callToolJSON(t, other, statusTool, map[string]any{"attempt_id": strings.Repeat("A", 26)})
+	if !strings.Contains(missing, "attempt_not_found") {
+		t.Fatalf("invalid status response: %s", missing)
+	}
+	poll := func() communityapps.Attempt {
+		t.Helper()
+		result, reply := callToolJSON(t, other, statusTool, map[string]any{"attempt_id": claim.ID})
+		var state communityapps.Attempt
+		if err := json.Unmarshal([]byte(reply), &state); err != nil || result.IsError || state.ID != claim.ID || strings.Contains(reply, sentinel) {
+			t.Fatalf("could not poll from another session: %+v, %v", state, err)
+		}
+		return state
+	}
+	if state := poll(); state.State != communityapps.AttemptPending && state.State != communityapps.AttemptRunning {
+		t.Fatalf("slow pull did not remain active: %+v", state)
+	}
+	close(unblock)
+	deadline := time.Now().Add(5 * time.Second)
+	for state := poll(); state.State != communityapps.AttemptSucceeded; state = poll() {
+		if time.Now().After(deadline) || state.State == communityapps.AttemptFailed {
+			t.Fatalf("install did not succeed: %+v", state)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	result, reply = callToolJSON(t, other, tool, args)
+	var replay communityapps.Attempt
+	if err := json.Unmarshal([]byte(reply), &replay); err != nil || result.IsError || replay.ID != claim.ID ||
+		replay.State != communityapps.AttemptSucceeded || replay.ContainerID != communityappstest.ContainerID {
+		t.Fatalf("confirmation replay returned %+v, %v", replay, err)
+	}
 }

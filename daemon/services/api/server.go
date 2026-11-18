@@ -188,6 +188,8 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/docker", s.handleDockerList).Methods("GET")
 	api.HandleFunc("/community-applications", s.handleCommunityAppsSearch).Methods(http.MethodGet)
 	api.HandleFunc("/community-applications/install-plans", s.handleCommunityAppsPrepare).Methods(http.MethodPost)
+	api.HandleFunc("/community-applications/install-plans/{id}/confirm", s.handleCommunityAppsConfirm).Methods(http.MethodPost)
+	api.HandleFunc("/community-applications/install-attempts/{id}", s.handleCommunityAppsAttempt).Methods(http.MethodGet)
 	api.HandleFunc("/community-applications/{reference}", s.handleCommunityAppInspection).Methods(http.MethodGet)
 	api.HandleFunc("/docker/networks", s.handleDockerNetworks).Methods("GET")
 	api.HandleFunc("/docker/port-conflicts", s.handleDockerPortConflicts).Methods("GET")
