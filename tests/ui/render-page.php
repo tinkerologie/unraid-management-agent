@@ -34,6 +34,9 @@ if ($count !== 1) {
     exit(1);
 }
 
+// Match the English locale's _(...)_ substitutions in Dynamix's parse_text.
+$body = preg_replace('/_\((.+?)\)_/m', '$1', $body);
+
 $tmp = tempnam(sys_get_temp_dir(), 'uma-page-');
 file_put_contents($tmp, $body);
 ob_start();
