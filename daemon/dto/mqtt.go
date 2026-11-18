@@ -5,20 +5,22 @@ import "time"
 
 // MQTTConfig represents the MQTT client configuration.
 type MQTTConfig struct {
-	Enabled           bool   `json:"enabled" example:"true"`
-	Broker            string `json:"broker" example:"tcp://localhost:1883"`
-	ClientID          string `json:"client_id" example:"unraid-agent"`
-	Username          string `json:"username,omitempty" example:""`
-	Password          string `json:"-"` // Never expose password in JSON
-	TopicPrefix       string `json:"topic_prefix" example:"unraid"`
-	QoS               int    `json:"qos" example:"1"`
-	RetainMessages    bool   `json:"retain_messages" example:"true"`
-	ConnectTimeout    int    `json:"connect_timeout" example:"30"`
-	KeepAlive         int    `json:"keepalive" example:"60"`
-	CleanSession      bool   `json:"clean_session" example:"true"`
-	AutoReconnect     bool   `json:"auto_reconnect" example:"true"`
-	HomeAssistantMode bool   `json:"homeassistant_mode" example:"true"`
-	HADiscoveryPrefix string `json:"ha_discovery_prefix" example:"homeassistant"`
+	Enabled           bool     `json:"enabled" example:"true"`
+	Broker            string   `json:"broker" example:"tcp://localhost:1883"`
+	ClientID          string   `json:"client_id" example:"unraid-agent"`
+	Username          string   `json:"username,omitempty" example:""`
+	Password          string   `json:"-"` // Never expose password in JSON
+	TopicPrefix       string   `json:"topic_prefix" example:"unraid"`
+	QoS               int      `json:"qos" example:"1"`
+	RetainMessages    bool     `json:"retain_messages" example:"true"`
+	DisableCommands   bool     `json:"disable_commands,omitempty"`
+	DisabledTopics    []string `json:"disabled_topics,omitempty"`
+	ConnectTimeout    int      `json:"connect_timeout" example:"30"`
+	KeepAlive         int      `json:"keepalive" example:"60"`
+	CleanSession      bool     `json:"clean_session" example:"true"`
+	AutoReconnect     bool     `json:"auto_reconnect" example:"true"`
+	HomeAssistantMode bool     `json:"homeassistant_mode" example:"true"`
+	HADiscoveryPrefix string   `json:"ha_discovery_prefix" example:"homeassistant"`
 }
 
 // MQTTStatus represents the current status of the MQTT client.

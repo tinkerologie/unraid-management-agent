@@ -75,7 +75,10 @@ func (t *discoveryTracker) update(category string, currentIDs []string) []string
 
 // publishHAEntity publishes a single Home Assistant discovery config.
 func (c *Client) publishHAEntity(opts haEntityOpts) {
-	hostID := strings.ReplaceAll(c.hostname, " ", "_")
+	if !c.allowDiscovery(opts.stateTopic, opts.commandTopic) {
+		return
+	}
+	hostID := c.discoveryHost()
 
 	discoveryTopic := fmt.Sprintf("%s/%s/%s/%s/config",
 		c.config.HADiscoveryPrefix,
@@ -189,9 +192,13 @@ func (c *Client) publishHAEntity(opts haEntityOpts) {
 	}
 }
 
+func (c *Client) discoveryHost() string {
+	return strings.ReplaceAll(c.hostname, " ", "_")
+}
+
 // removeHAEntity removes a Home Assistant discovery entity by publishing empty payload.
 func (c *Client) removeHAEntity(entityType, id string) {
-	hostID := strings.ReplaceAll(c.hostname, " ", "_")
+	hostID := c.discoveryHost()
 	discoveryTopic := fmt.Sprintf("%s/%s/%s/%s/config",
 		c.config.HADiscoveryPrefix,
 		entityType,
@@ -671,6 +678,9 @@ func (c *Client) publishServiceDiscovery() {
 // publishServiceStates queries all service running states and publishes
 // them to the services topic so HA switches reflect the actual state.
 func (c *Client) publishServiceStates() {
+	if !c.TelemetryEnabled(TopicServices) {
+		return
+	}
 	statuses := controllers.NewServiceController().ListServiceStatuses()
 	states := make(map[string]bool, len(statuses))
 	for _, svc := range statuses {
@@ -1792,6 +1802,9 @@ func (c *Client) publishRemoteShareStates() {
 		domain.Publish(c.domainCtx.Hub, constants.TopicUnassignedDevicesUpdate, deviceList)
 	}
 
+	if !c.TelemetryEnabled(TopicUnassigned) {
+		return
+	}
 	for _, share := range shares {
 		if share.MountPoint == "" {
 			continue

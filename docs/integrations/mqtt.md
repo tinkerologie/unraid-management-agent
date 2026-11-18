@@ -52,6 +52,22 @@ The agent sends any other value as you set it. It records the client ID in the l
 If an MQTT 3.1 broker returns "identifier rejected", set `MQTT_CLIENT_ID` to at most 23 characters.
 Use `mqtt.client_id` in `config.yml` or `client_id` at the MQTT configuration REST endpoint.
 
+### Choose telemetry and disable commands
+
+In the Unraid plugin's **MQTT Integration** settings, use **Disable MQTT Commands** for monitoring-only access and **MQTT Telemetry** to choose which topics to publish. Click **Apply** to restart the agent with the new settings.
+
+For a standalone daemon, use the environment variables `MQTT_DISABLE_COMMANDS=true` and `MQTT_DISABLED_TOPICS=docker/containers,zfs/datasets`, or the flags `--mqtt-disable-commands` and `--mqtt-disabled-topics=docker/containers,zfs/datasets`. The YAML equivalents are:
+
+```yaml
+mqtt:
+  disable_commands: true
+  disabled_topics: [docker/containers, zfs/datasets]
+```
+
+Use topic suffixes without the broker prefix. The options are `system`, `array`, `disks`, `docker/containers`, `vm/list`, `services`, `ups`, `gpu`, `network`, `shares`, `notifications`, `notifications/event`, `nut/status`, `hardware`, `registration`, `unassigned/devices`, `zfs/pools`, `zfs/datasets`, `zfs/snapshots`, `zfs/arc`, `fancontrol`, and `psu`. A selection includes that topic's per-resource updates and discovery entities. Availability stays active while MQTT is enabled. Existing installations keep their current behavior until an operator applies these settings.
+
+On connect, the agent clears matching retained state and discovery payloads, including controls from previous versions. Broker ACLs must let the agent subscribe to the affected telemetry topics and its Home Assistant discovery namespace and publish retained deletions there. Give each agent on a shared broker its own telemetry prefix and keep the prefix and hostname stable while applying the settings so cleanup can identify its records. Use separate topic paths for custom messages and integrations.
+
 ### Restart Service
 
 ```bash
@@ -398,10 +414,7 @@ export MQTT_USE_TLS=true
 
 ### QoS and Retained Messages
 
-- **QoS**: Messages are published with QoS 1 (at least once delivery)
-- **Retained**: Messages are NOT retained by default (latest state only)
-
-To enable retained messages for persistent state, this would require a code modification.
+The daemon defaults to QoS 0 and retains telemetry and discovery payloads. Use `MQTT_QOS` and `MQTT_RETAIN` to change those defaults. Availability is always retained, notification events are never retained, and retained deletions use QoS 1.
 
 ### Custom Topic Prefix
 

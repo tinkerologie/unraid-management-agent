@@ -284,7 +284,7 @@ func TestConfigFilePrecedence(t *testing.T) {
 	yes, no := true, false
 	yamlToken := "yaml-token-1234567890"
 	fileInterval := 300
-	envs := []string{"READ_ONLY", "API_TOKEN", "ALLOW_UNAUTHENTICATED_WRITES", "WAN_IP_LOOKUP", "INTERVAL_NIC"}
+	envs := []string{"READ_ONLY", "API_TOKEN", "ALLOW_UNAUTHENTICATED_WRITES", "WAN_IP_LOOKUP", "INTERVAL_NIC", "MQTT_DISABLE_COMMANDS", "MQTT_DISABLED_TOPICS"}
 
 	tests := []struct {
 		name  string
@@ -324,6 +324,30 @@ func TestConfigFilePrecedence(t *testing.T) {
 			check: func(t *testing.T) {
 				if cli.APIToken != "env-token-1234567890" {
 					t.Errorf("APIToken=%q, want the env token", cli.APIToken)
+				}
+			},
+		},
+		{
+			name: "MQTT filters from YAML",
+			file: domain.FileConfig{MQTT: &domain.FileConfigMQTT{
+				DisableCommands: &yes, DisabledTopics: []string{"psu", "zfs/datasets"},
+			}},
+			check: func(t *testing.T) {
+				if !cli.MQTTDisableCommands || cli.MQTTDisabledTopics != "psu,zfs/datasets" {
+					t.Errorf("MQTT filters from YAML = %v, %q", cli.MQTTDisableCommands, cli.MQTTDisabledTopics)
+				}
+			},
+		},
+		{
+			name: "MQTT flags and env beat YAML",
+			args: []string{"--mqtt-disable-commands=false"},
+			env:  map[string]string{"MQTT_DISABLED_TOPICS": "gpu"},
+			file: domain.FileConfig{MQTT: &domain.FileConfigMQTT{
+				DisableCommands: &yes, DisabledTopics: []string{"psu", "zfs/datasets"},
+			}},
+			check: func(t *testing.T) {
+				if cli.MQTTDisableCommands || cli.MQTTDisabledTopics != "gpu" {
+					t.Errorf("MQTT filters after override = %v, %q", cli.MQTTDisableCommands, cli.MQTTDisabledTopics)
 				}
 			},
 		},

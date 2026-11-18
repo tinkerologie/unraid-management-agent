@@ -104,19 +104,21 @@ type FileConfigVMGuestSensor struct {
 
 // FileConfigMQTT holds MQTT-specific settings from the config file.
 type FileConfigMQTT struct {
-	Enabled            *bool   `yaml:"enabled,omitempty"`
-	Broker             *string `yaml:"broker,omitempty"`
-	Port               *int    `yaml:"port,omitempty"`
-	Username           *string `yaml:"username,omitempty"`
-	Password           *string `yaml:"password,omitempty"`
-	ClientID           *string `yaml:"client_id,omitempty"`
-	TopicPrefix        *string `yaml:"topic_prefix,omitempty"`
-	UseTLS             *bool   `yaml:"use_tls,omitempty"`
-	InsecureSkipVerify *bool   `yaml:"insecure_skip_verify,omitempty"`
-	QoS                *int    `yaml:"qos,omitempty"`
-	Retain             *bool   `yaml:"retain,omitempty"`
-	HomeAssistant      *bool   `yaml:"home_assistant,omitempty"`
-	HAPrefix           *string `yaml:"ha_prefix,omitempty"`
+	Enabled            *bool    `yaml:"enabled,omitempty"`
+	Broker             *string  `yaml:"broker,omitempty"`
+	Port               *int     `yaml:"port,omitempty"`
+	Username           *string  `yaml:"username,omitempty"`
+	Password           *string  `yaml:"password,omitempty"`
+	ClientID           *string  `yaml:"client_id,omitempty"`
+	TopicPrefix        *string  `yaml:"topic_prefix,omitempty"`
+	UseTLS             *bool    `yaml:"use_tls,omitempty"`
+	InsecureSkipVerify *bool    `yaml:"insecure_skip_verify,omitempty"`
+	QoS                *int     `yaml:"qos,omitempty"`
+	Retain             *bool    `yaml:"retain,omitempty"`
+	DisableCommands    *bool    `yaml:"disable_commands,omitempty"`
+	DisabledTopics     []string `yaml:"disabled_topics,omitempty"`
+	HomeAssistant      *bool    `yaml:"home_assistant,omitempty"`
+	HAPrefix           *string  `yaml:"ha_prefix,omitempty"`
 }
 
 // FileConfigIntervals holds collection interval overrides from the config file.

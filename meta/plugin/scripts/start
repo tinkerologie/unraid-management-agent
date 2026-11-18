@@ -85,6 +85,8 @@ MQTT_PASSWORD="${MQTT_PASSWORD:-}"
 MQTT_CLIENT_ID="${MQTT_CLIENT_ID:-unraid-management-agent}"
 MQTT_TOPIC_PREFIX="${MQTT_TOPIC_PREFIX:-unraid}"
 MQTT_HOME_ASSISTANT="${MQTT_HOME_ASSISTANT:-false}"
+MQTT_DISABLE_COMMANDS="${MQTT_DISABLE_COMMANDS:-false}"
+MQTT_DISABLED_TOPICS="${MQTT_DISABLED_TOPICS:-}"
 
 # ── Sanitize all config values ────────────────────────────────
 PORT=$(sanitize_int "$PORT");                       PORT="${PORT:-8043}"
@@ -132,7 +134,7 @@ for var in INTERVAL_SYSTEM INTERVAL_ARRAY INTERVAL_DISK INTERVAL_DOCKER \
     eval "$var=\$(sanitize_int \"\$$var\")"
 done
 
-for var in MQTT_ENABLED MQTT_HOME_ASSISTANT; do
+for var in MQTT_ENABLED MQTT_HOME_ASSISTANT MQTT_DISABLE_COMMANDS; do
     eval "$var=\$(sanitize_bool \"\$$var\")"
 done
 for var in MQTT_BROKER MQTT_USERNAME MQTT_PASSWORD MQTT_CLIENT_ID MQTT_TOPIC_PREFIX; do
@@ -229,6 +231,8 @@ nohup env \
   MQTT_CLIENT_ID="$MQTT_CLIENT_ID" \
   MQTT_TOPIC_PREFIX="$MQTT_TOPIC_PREFIX" \
   MQTT_HOME_ASSISTANT="$MQTT_HOME_ASSISTANT" \
+  MQTT_DISABLE_COMMANDS="$MQTT_DISABLE_COMMANDS" \
+  MQTT_DISABLED_TOPICS="$MQTT_DISABLED_TOPICS" \
   "$PROG" --logs-dir "$LOGS_DIR" --port "$PORT" --log-level "$LOG_LEVEL" boot \
   >/dev/null 2>&1 &
 

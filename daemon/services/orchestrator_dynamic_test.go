@@ -2,10 +2,13 @@ package services
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
 	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
 	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/alerting"
@@ -52,7 +55,7 @@ func TestSubscribeMQTTEvents_ManualSkipsDemand(t *testing.T) {
 func runMQTTSubscription(t *testing.T, mode string) {
 	t.Helper()
 	o := newModeOrchestrator(mode)
-	o.mqttClient = mqtt.NewClient(&dto.MQTTConfig{Broker: "tcp://localhost:1883"}, "test-host", "1.0.0", o.ctx)
+	o.mqttClient = mqtt.NewClient(&dto.MQTTConfig{Broker: "tcp://localhost:1883", DisabledTopics: []string{mqtt.TopicContainers}}, "test-host", "1.0.0", o.ctx)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
@@ -82,5 +85,62 @@ func TestMQTTDemandFollowsConnection(t *testing.T) {
 	handler(false)
 	if demand.Active("system") {
 		t.Error("disconnected MQTT kept system active")
+	}
+}
+
+func TestMQTTSelectedTopicsDemandWithBroker(t *testing.T) {
+	brokerURL := os.Getenv("UMA_TEST_MQTT_BROKER")
+	if brokerURL == "" {
+		t.Skip("set UMA_TEST_MQTT_BROKER to a disposable broker")
+	}
+	o := newModeOrchestrator(domain.CollectionModeDynamic)
+	cfg := mqtt.DefaultConfig()
+	cfg.Broker = brokerURL
+	cfg.ClientID = fmt.Sprintf("uma356-demand-%d", time.Now().UnixNano())
+	cfg.TopicPrefix = cfg.ClientID
+	cfg.HADiscoveryPrefix = cfg.ClientID + "-discovery"
+	cfg.Enabled = true
+	cfg.HomeAssistantMode = false
+	cfg.DisabledTopics = []string{mqtt.TopicContainers, mqtt.TopicNotifications}
+	o.mqttClient = mqtt.NewClient(cfg, "tower", "test", o.ctx)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := o.mqttClient.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer o.mqttClient.Disconnect()
+	ready := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Go(func() { o.subscribeMQTTEvents(ctx, nil, func() { close(ready) }) })
+	defer wg.Wait()
+	defer cancel()
+	select {
+	case <-ready:
+	case <-ctx.Done():
+		t.Fatal("MQTT subscriber did not start")
+	}
+
+	demand := o.collectorManager.Demand()
+	for !demand.Active("system") {
+		select {
+		case <-ctx.Done():
+			t.Fatal("enabled system telemetry did not activate MQTT collector demand")
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	if demand.Active("docker") {
+		t.Error("disabled Docker telemetry activated collector demand")
+	}
+	if !demand.Active("notification") {
+		t.Error("enabled notification events should still activate collector demand")
+	}
+	websocket := map[string]bool{constants.TopicContainerListUpdate.Name: true}
+	demand.WSAdd(websocket)
+	if !demand.Active("docker") {
+		t.Error("MQTT topic filtering interfered with WebSocket demand for containers")
+	}
+	demand.WSRemove(websocket)
+	if demand.Active("docker") {
+		t.Error("Docker demand did not drop after the WebSocket subscriber left")
 	}
 }

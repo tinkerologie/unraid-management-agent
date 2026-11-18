@@ -43,8 +43,26 @@ jobs:
       - name: Install test reporting tooling
         run: go install gotest.tools/gotestsum@v1.13.0
 
+      - name: Install MQTT broker fixture
+        run: sudo apt-get update && sudo apt-get install -y mosquitto
+
       - name: Run tests with coverage and JUnit output
+        env:
+          UMA_TEST_MQTT_BROKER: tcp://127.0.0.1:28883
         run: |
+          cat > "$RUNNER_TEMP/mosquitto-uma.conf" <<'EOF'
+          listener 28883 127.0.0.1
+          allow_anonymous true
+          persistence false
+          EOF
+          mosquitto -c "$RUNNER_TEMP/mosquitto-uma.conf" > "$RUNNER_TEMP/mosquitto-uma.log" 2>&1 &
+          broker_pid=$!
+          trap 'kill "$broker_pid" 2>/dev/null || true' EXIT
+          if ! timeout 5 bash -c 'until (: </dev/tcp/127.0.0.1/28883) 2>/dev/null; do sleep 0.1; done'; then
+            cat "$RUNNER_TEMP/mosquitto-uma.log"
+            exit 1
+          fi
+
           "$(go env GOPATH)/bin/gotestsum" \
             --junitfile junit.xml \
             --format standard-quiet \

@@ -20,6 +20,16 @@ if (isset($_POST['MQTT_PASSWORD']) && $_POST['MQTT_PASSWORD'] === '') {
     }
 }
 
+// These settings are stored in the shell-readable plugin configuration.
+if (isset($_POST['MQTT_DISABLE_COMMANDS'])) {
+    $_POST['MQTT_DISABLE_COMMANDS'] = $_POST['MQTT_DISABLE_COMMANDS'] === 'true' ? 'true' : 'false';
+}
+if (isset($_POST['MQTT_DISABLED_TOPICS']) &&
+    (!is_string($_POST['MQTT_DISABLED_TOPICS']) || !preg_match('~\A[a-z0-9/,]*\z~', $_POST['MQTT_DISABLED_TOPICS']))) {
+    $saved = is_file($cfg_path) ? (parse_ini_file($cfg_path, false, INI_SCANNER_RAW)['MQTT_DISABLED_TOPICS'] ?? '') : '';
+    $_POST['MQTT_DISABLED_TOPICS'] = preg_match('~\A[a-z0-9/,]*\z~', $saved) ? $saved : '';
+}
+
 // Preserve API token: the form leaves the input empty when unchanged.
 // If the user explicitly cleared the token (API_TOKEN_CLEAR == "1"), set it to empty.
 // Otherwise, when empty, restore the existing token from config.cfg.

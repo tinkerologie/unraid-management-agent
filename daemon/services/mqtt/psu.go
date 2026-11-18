@@ -18,7 +18,7 @@ type psuDiscoveryUpdate struct {
 func (c *Client) PublishPSUStatus(status *dto.PSUStatus) error {
 	c.psuMu.Lock()
 	defer c.psuMu.Unlock()
-	if !c.shouldPublish() {
+	if !c.shouldPublishTopic(TopicPSU) {
 		return nil
 	}
 	if err := c.publishJSON(c.buildTopic("psu"), status); err != nil {

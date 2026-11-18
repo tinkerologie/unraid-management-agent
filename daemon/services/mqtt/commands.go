@@ -9,6 +9,7 @@ import (
 	pahomqtt "github.com/eclipse/paho.mqtt.golang"
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/collectors"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/controllers"
 )
 
@@ -16,7 +17,7 @@ import (
 // Uses a combination of wildcard subscriptions for per-entity commands and
 // direct subscriptions for fixed-path commands.
 func (c *Client) subscribeCommandTopics() {
-	if c.client == nil || !c.client.IsConnected() {
+	if c.config.DisableCommands || c.client == nil || !c.client.IsConnected() {
 		return
 	}
 
@@ -42,6 +43,9 @@ func (c *Client) buildCommandTopic(parts ...string) string {
 
 // handleCommand routes incoming MQTT command messages to the appropriate handler.
 func (c *Client) handleCommand(msg pahomqtt.Message) {
+	if c.config.DisableCommands {
+		return
+	}
 	defer func() {
 		if r := recover(); r != nil {
 			logger.LogPanicWithStack("MQTT command handler", r)
@@ -307,6 +311,16 @@ func (c *Client) execServiceSwitch(nameID, payload string) error {
 
 func (c *Client) execRemoteShareSwitch(shareID, payload string) error {
 	source := c.lookupRemoteShareSource(shareID)
+	if source == "" && c.domainCtx != nil && !c.TelemetryEnabled(TopicUnassigned) {
+		// The MQTT collector binding is off, so resolve a direct command
+		// against the current mounts instead of relying on discovery's cache.
+		for _, share := range collectors.NewUnassignedCollector(c.domainCtx).CollectRemoteShares() {
+			if share.MountPoint != "" && share.Type != "iso" && sanitizeID(share.MountPoint) == shareID {
+				source = share.Source
+				break
+			}
+		}
+	}
 	if source == "" {
 		return fmt.Errorf("unknown remote share id: %s", shareID)
 	}

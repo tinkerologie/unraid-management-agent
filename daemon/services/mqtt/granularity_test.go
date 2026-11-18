@@ -1,0 +1,488 @@
+package mqtt
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"slices"
+	"strings"
+	"testing"
+	"time"
+
+	pahomqtt "github.com/eclipse/paho.mqtt.golang"
+
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
+)
+
+func TestParseDisabledTopics(t *testing.T) {
+	got, err := ParseDisabledTopics(" zfs/datasets,psu,zfs/datasets, ")
+	if err != nil || !slices.Equal(got, []string{TopicZFSDatasets, TopicPSU}) {
+		t.Fatalf("ParseDisabledTopics() = %v, %v", got, err)
+	}
+	for _, input := range []string{"availability", "docker/+", "zfs/#", "unknown"} {
+		if _, err := ParseDisabledTopics(input); err == nil {
+			t.Errorf("accepted invalid topic %q", input)
+		}
+	}
+}
+
+func TestTelemetryGroup(t *testing.T) {
+	for suffix, want := range map[string]string{
+		"docker/containers":       TopicContainers,
+		"docker/media":            TopicContainers,
+		"vm/list":                 TopicVMs,
+		"disk/disk1":              TopicDisks,
+		"unassigned/remote/share": TopicUnassigned,
+		"zfs/datasets":            TopicZFSDatasets,
+		"zfs/datasets/tank_media": TopicZFSDatasets,
+		"zfs/snapshots":           TopicZFSSnapshots,
+		"zfs/tank":                TopicZFSPools,
+		"zfs/":                    "",
+		"zfs/other/leaf":          "",
+		"availability":            "",
+	} {
+		if got := telemetryGroup(suffix); got != want {
+			t.Errorf("telemetryGroup(%q) = %q, want %q", suffix, got, want)
+		}
+	}
+}
+
+func TestDisableCommandsGuardsDispatch(t *testing.T) {
+	c := NewClient(&dto.MQTTConfig{DisableCommands: true}, "tower", "test", nil)
+	// No message is inspected and no controller is reached when dispatch is off.
+	c.handleCommand(nil)
+}
+
+func TestMQTTGranularityWithBroker(t *testing.T) {
+	brokerURL := os.Getenv("UMA_TEST_MQTT_BROKER")
+	if brokerURL == "" {
+		t.Skip("set UMA_TEST_MQTT_BROKER to a disposable broker to exercise retained cleanup")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+	defer cancel()
+
+	prefix := fmt.Sprintf("uma356-%d", time.Now().UnixNano())
+	cfg := DefaultConfig()
+	cfg.Enabled = true
+	cfg.Broker = brokerURL
+	cfg.ClientID = prefix
+	cfg.TopicPrefix = prefix
+	cfg.HADiscoveryPrefix = prefix + "-discovery"
+	cfg.QoS = 0
+	host := "tower"
+	peer := connectBrokerFixture(t, brokerURL, prefix+"-observer")
+	legacy := NewClient(cfg, host, "old", nil)
+	legacy.client = peer // Publish the same discovery shape as a prior release.
+
+	containerState := legacy.buildTopic("docker/media")
+	containerSensor := cfg.HADiscoveryPrefix + "/binary_sensor/tower/container_media_state/config"
+	containerButton := cfg.HADiscoveryPrefix + "/button/tower/container_media_restart/config"
+	arrayControl := cfg.HADiscoveryPrefix + "/switch/tower/array_switch/config"
+	systemSensor := cfg.HADiscoveryPrefix + "/sensor/tower/fixture_system/config"
+	foreign := cfg.HADiscoveryPrefix + "/sensor/other/fixture_system/config"
+	foreignPrefix := cfg.HADiscoveryPrefix + "/sensor/tower/other_prefix/config"
+	zfsPool := legacy.buildTopic("zfs/tank")
+	zfsDataset := legacy.buildTopic("zfs/datasets/tank_media")
+	unrelated := legacy.buildTopic("custom/fixture")
+
+	// Seed retained records, including per-resource records from a stopped agent.
+	legacy.publishContainerDiscovery([]dto.ContainerInfo{{Name: "media"}})
+	legacy.publishHAEntity(haEntityOpts{
+		entityType: "switch", id: "array_switch", stateTopic: legacy.buildTopic("array"),
+		commandTopic: legacy.buildCommandTopic("array", "set"),
+	})
+	legacy.publishHAEntity(haEntityOpts{
+		entityType: "sensor", id: "fixture_system", stateTopic: legacy.buildTopic("system"),
+	})
+	otherCfg := *cfg
+	otherCfg.TopicPrefix += "-other"
+	foreignAgent := NewClient(&otherCfg, "other", "old", nil)
+	foreignAgent.client = peer
+	foreignAgent.publishHAEntity(haEntityOpts{
+		entityType: "sensor", id: "fixture_system", stateTopic: foreignAgent.buildTopic("system"),
+	})
+	foreignPrefixAgent := NewClient(&otherCfg, host, "old", nil)
+	foreignPrefixAgent.client = peer
+	foreignPrefixAgent.publishHAEntity(haEntityOpts{
+		entityType: "sensor", id: "other_prefix", stateTopic: legacy.buildTopic("docker/media"),
+	})
+	for _, topic := range []string{zfsPool, zfsDataset, unrelated} {
+		waitForBrokerToken(t, peer.Publish(topic, 1, true, `{"name":"fixture"}`))
+	}
+
+	removed := []string{containerState, containerSensor, containerButton, arrayControl, zfsPool}
+	kept := []string{systemSensor, foreign, foreignPrefix, zfsDataset, unrelated}
+	observed := append(slices.Clone(removed), kept...)
+	observed = append(observed, legacy.buildTopic("availability"), legacy.buildTopic("system"))
+	observed = append(observed, legacy.buildTopic("docker/containers"))
+	waitForRetained(t, peer, prefix, observed, func(records map[string]string) bool {
+		return allRetained(records, append(slices.Clone(removed), kept...)...)
+	})
+
+	disabledCfg := *cfg
+	disabledCfg.ClientID += "-disabled"
+	disabledCfg.DisableCommands = true
+	disabledCfg.DisabledTopics = []string{TopicContainers, TopicZFSPools}
+	client := NewClient(&disabledCfg, host, "new", nil)
+	if err := client.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer client.Disconnect()
+
+	recordFilter := func(records map[string]string) bool {
+		return records[legacy.buildTopic("availability")] == "online" &&
+			allRetained(records, kept...) && !anyRetained(records, removed...)
+	}
+	waitForRetained(t, peer, prefix, observed, recordFilter)
+	if err := client.PublishContainers([]dto.ContainerInfo{{Name: "media"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.PublishSystemInfo(&dto.SystemInfo{}); err != nil {
+		t.Fatal(err)
+	}
+	waitForRetained(t, peer, prefix, observed, func(records map[string]string) bool {
+		return records[legacy.buildTopic("system")] != "" &&
+			!anyRetained(records, append(removed, legacy.buildTopic("docker/containers"))...)
+	})
+	assertBrokerCommand(t, peer, legacy.buildCommandTopic("system", "fixture-only"), false)
+
+	// A fresh retained record must also be removed when this same client reconnects.
+	waitForBrokerToken(t, peer.Publish(zfsPool, 1, true, `{"name":"fixture"}`))
+	waitForRetained(t, peer, prefix, observed, func(records map[string]string) bool {
+		return records[zfsPool] != ""
+	})
+	takeover := connectBrokerFixture(t, brokerURL, disabledCfg.ClientID)
+	takeover.Disconnect(250)
+	waitForRetained(t, peer, prefix, observed, recordFilter)
+	assertBrokerCommand(t, peer, legacy.buildCommandTopic("system", "fixture-only"), false)
+	client.Disconnect()
+
+	enabled := NewClient(cfg, host, "new", nil)
+	if err := enabled.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer enabled.Disconnect()
+	deadline := time.Now().Add(5 * time.Second)
+	for !enabled.IsConnected() && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if err := enabled.PublishContainers([]dto.ContainerInfo{{Name: "media"}}); err != nil {
+		t.Fatal(err)
+	}
+	waitForRetained(t, peer, prefix, observed, func(records map[string]string) bool {
+		return allRetained(records, containerState, containerSensor, containerButton, legacy.buildTopic("docker/containers"))
+	})
+	assertBrokerCommand(t, peer, legacy.buildCommandTopic("system", "fixture-only"), true)
+}
+
+func connectBrokerFixture(t *testing.T, brokerURL, id string) pahomqtt.Client {
+	t.Helper()
+	opts := pahomqtt.NewClientOptions().AddBroker(brokerURL).SetClientID(id).
+		SetCleanSession(true).SetAutoReconnect(false).SetConnectTimeout(5 * time.Second)
+	client := pahomqtt.NewClient(opts)
+	waitForBrokerToken(t, client.Connect())
+	t.Cleanup(func() { client.Disconnect(250) })
+	return client
+}
+
+func waitForBrokerToken(t *testing.T, token pahomqtt.Token) {
+	t.Helper()
+	if !token.WaitTimeout(5*time.Second) || token.Error() != nil {
+		t.Fatalf("fixture MQTT operation failed: %v", token.Error())
+	}
+}
+
+func waitForRetained(t *testing.T, peer pahomqtt.Client, prefix string, topics []string, check func(map[string]string) bool) {
+	t.Helper()
+	deadline := time.Now().Add(6 * time.Second)
+	for {
+		records := brokerRetained(t, peer, prefix, topics)
+		if check(records) {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("retained topics did not reach expected state: %v", retainedNames(records))
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+// Observe a subscription's initial retained replay, followed by a marker
+// published on the same connection after SUBACK.
+func brokerRetained(t *testing.T, peer pahomqtt.Client, prefix string, topics []string) map[string]string {
+	t.Helper()
+	marker := prefix + "/fixture-marker"
+	filters := map[string]byte{marker: 1}
+	for _, topic := range topics {
+		filters[topic] = 1
+	}
+	seen := make(chan pahomqtt.Message, len(topics)*2+1)
+	waitForBrokerToken(t, peer.SubscribeMultiple(filters, func(_ pahomqtt.Client, msg pahomqtt.Message) {
+		seen <- msg
+	}))
+	waitForBrokerToken(t, peer.Publish(marker, 1, false, "end"))
+	records := make(map[string]string)
+	timeout := time.NewTimer(5 * time.Second)
+	defer timeout.Stop()
+	for {
+		select {
+		case msg := <-seen:
+			if msg.Topic() == marker {
+				waitForBrokerToken(t, peer.Unsubscribe(append(slices.Clone(topics), marker)...))
+				return records
+			}
+			if msg.Retained() && len(msg.Payload()) > 0 {
+				records[msg.Topic()] = string(msg.Payload())
+			}
+		case <-timeout.C:
+			t.Fatal("MQTT snapshot marker not received")
+		}
+	}
+}
+
+func retainedNames(records map[string]string) string {
+	names := make([]string, 0, len(records))
+	for topic := range records {
+		names = append(names, topic)
+	}
+	slices.Sort(names)
+	return strings.Join(names, ", ")
+}
+
+func allRetained(records map[string]string, topics ...string) bool {
+	for _, topic := range topics {
+		if records[topic] == "" {
+			return false
+		}
+	}
+	return true
+}
+
+func anyRetained(records map[string]string, topics ...string) bool {
+	for _, topic := range topics {
+		if records[topic] != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func assertBrokerCommand(t *testing.T, peer pahomqtt.Client, command string, enabled bool) {
+	t.Helper()
+	reply := make(chan []byte, 1)
+	waitForBrokerToken(t, peer.Subscribe(command+"/result", 1, func(_ pahomqtt.Client, msg pahomqtt.Message) {
+		select {
+		case reply <- msg.Payload():
+		default:
+		}
+	}))
+	defer func() { waitForBrokerToken(t, peer.Unsubscribe(command+"/result")) }()
+	// This action is intentionally invalid. It exercises routing without
+	// invoking a state-changing controller even in the enabled control case.
+	window := 500 * time.Millisecond
+	if enabled {
+		window = 3 * time.Second
+	}
+	deadline := time.After(window)
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		waitForBrokerToken(t, peer.Publish(command, 1, false, "fixture"))
+		select {
+		case payload := <-reply:
+			var result struct {
+				Success bool   `json:"success"`
+				Error   string `json:"error"`
+			}
+			if !enabled || json.Unmarshal(payload, &result) != nil || result.Success || result.Error == "" {
+				t.Fatalf("unexpected MQTT command result: %s", payload)
+			}
+			return
+		case <-deadline:
+			if enabled {
+				t.Fatal("enabled MQTT command probe did not reach dispatch")
+			}
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+type retainedFixtureMessage struct {
+	pahomqtt.Message
+	topic    string
+	payload  string
+	retained bool
+}
+
+func (m retainedFixtureMessage) Topic() string   { return m.topic }
+func (m retainedFixtureMessage) Payload() []byte { return []byte(m.payload) }
+func (m retainedFixtureMessage) Retained() bool  { return m.retained }
+
+type retainedFixtureClient struct {
+	pahomqtt.Client
+	filters map[string]byte
+	message retainedFixtureMessage
+	deleted chan string
+}
+
+func (b *retainedFixtureClient) SubscribeMultiple(filters map[string]byte, handle pahomqtt.MessageHandler) pahomqtt.Token {
+	b.filters = filters
+	handle(b, b.message)
+	return doneToken{}
+}
+
+func (b *retainedFixtureClient) Publish(topic string, qos byte, retained bool, payload any) pahomqtt.Token {
+	if qos == 1 && retained && payload == "" {
+		b.deleted <- topic
+	}
+	return doneToken{}
+}
+
+func TestReconcileRetainedWithScopedFilters(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.DisableCommands = true
+	cfg.DisabledTopics = []string{TopicContainers, TopicZFSDatasets}
+	client := NewClient(cfg, "test tower", "test", nil)
+	topic := client.buildTopic("docker/media")
+	broker := &retainedFixtureClient{
+		message: retainedFixtureMessage{topic: topic, payload: "fixture", retained: true},
+		deleted: make(chan string, 1),
+	}
+	client.client = broker
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	client.reconcileRetained(ctx)
+	filters := []string{"unraid/docker/containers", "unraid/docker/+", "unraid/zfs/datasets",
+		"unraid/zfs/datasets/+", "homeassistant/+/test_tower/+/config"}
+	if len(broker.filters) != len(filters) {
+		t.Fatalf("cleanup subscriptions = %v", broker.filters)
+	}
+	for _, filter := range filters {
+		if broker.filters[filter] != 1 {
+			t.Errorf("expected QoS 1 subscription to %q, got %v", filter, broker.filters)
+		}
+	}
+	select {
+	case got := <-broker.deleted:
+		if got != topic {
+			t.Errorf("retained deletion topic = %q, want %q", got, topic)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("cleanup did not publish a retained deletion")
+	}
+}
+
+func TestRetainedCleanupOwnership(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.DisabledTopics = []string{TopicPSU, TopicZFSPools}
+	client := NewClient(cfg, "tower", "test", nil)
+
+	record := func(state, availability string) string {
+		return `{"state_topic":"` + state + `","unique_id":"unraid_tower_fixture","device":{"identifiers":["unraid_tower"]},"availability":` +
+			`[{"topic":"` + availability + `"}]}`
+	}
+	discovery := "homeassistant/sensor/tower/fixture/config"
+	for _, tc := range []struct {
+		name     string
+		message  retainedFixtureMessage
+		deletion bool
+	}{
+		{"live", retainedFixtureMessage{topic: "unraid/psu", payload: "fixture"}, false},
+		{"tombstone", retainedFixtureMessage{topic: "unraid/psu", retained: true}, false},
+		{"pool", retainedFixtureMessage{topic: "unraid/zfs/tank", payload: "fixture", retained: true}, true},
+		{"dataset", retainedFixtureMessage{topic: "unraid/zfs/datasets", payload: "fixture", retained: true}, false},
+		{"foreign telemetry", retainedFixtureMessage{topic: "other/psu", payload: "fixture", retained: true}, false},
+		{"availability", retainedFixtureMessage{topic: "unraid/availability", payload: "online", retained: true}, false},
+		{"owned discovery", retainedFixtureMessage{topic: discovery, payload: record("unraid/psu", "unraid/availability"), retained: true}, true},
+		{"enabled discovery", retainedFixtureMessage{topic: discovery, payload: record("unraid/system", "unraid/availability"), retained: true}, false},
+		{"foreign discovery", retainedFixtureMessage{topic: discovery, payload: record("unraid/psu", "other/availability"), retained: true}, false},
+		{"foreign host", retainedFixtureMessage{topic: "homeassistant/sensor/other/fixture/config", payload: record("unraid/psu", "unraid/availability"), retained: true}, false},
+		{"unknown discovery", retainedFixtureMessage{topic: discovery, payload: `{"state_topic":"unraid/psu"}`, retained: true}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := client.shouldClearRetained(tc.message); got != tc.deletion {
+				t.Errorf("retained deletion = %v, want %v", got, tc.deletion)
+			}
+		})
+	}
+}
+
+func TestMQTTTelemetryAndCommandDiscoveryPolicy(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Enabled = true
+	cfg.DisableCommands = true
+	cfg.DisabledTopics = []string{TopicContainers, TopicNotificationEvent, TopicFanControl, TopicServices}
+	client := NewClient(cfg, "tower", "test", nil)
+	capture := &psuCaptureClient{published: make(map[string]string)}
+	client.client = capture
+	client.connected.Store(true)
+
+	if err := client.PublishContainers([]dto.ContainerInfo{{Name: "media"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.PublishFanControlStatus(&dto.FanControlStatus{}); err != nil {
+		t.Fatal(err)
+	}
+	client.publishServiceStates()
+	if err := client.PublishNotifications(&dto.NotificationList{}); err != nil {
+		t.Fatal(err)
+	}
+	client.publishHAEntity(haEntityOpts{entityType: "button", id: "reboot", commandTopic: "unraid/cmd/system/reboot"})
+	client.publishHAEntity(haEntityOpts{entityType: "event", id: "event", stateTopic: "unraid/notifications/event"})
+	client.publishHAEntity(haEntityOpts{entityType: "sensor", id: "system", stateTopic: "unraid/system"})
+	got := capture.snapshot()
+	if len(got) != 2 || got["unraid/notifications"] == "" || got["homeassistant/sensor/tower/system/config"] == "" {
+		t.Fatalf("unexpected publications: %v", got)
+	}
+
+	cfg.DisableCommands = false
+	controlsEnabled := NewClient(cfg, "tower", "test", nil)
+	if controlsEnabled.allowDiscovery("", "unraid/cmd/docker/media/restart") {
+		t.Error("disabled Docker telemetry exposed a Docker button")
+	}
+	if !controlsEnabled.allowDiscovery("", "unraid/cmd/system/reboot") {
+		t.Error("disabled Docker telemetry hid a system button")
+	}
+}
+
+func TestRetainedCleanupDoesNotSubscribeWithUnsafeFilters(t *testing.T) {
+	for _, tc := range []struct {
+		name, host string
+		config     dto.MQTTConfig
+	}{
+		{"pre-upgrade defaults", "tower", dto.MQTTConfig{}},
+		{"wildcard in telemetry prefix", "tower", dto.MQTTConfig{TopicPrefix: "bad/+", DisabledTopics: []string{TopicPSU}}},
+		{"invalid host", "bad/host", dto.MQTTConfig{DisableCommands: true}},
+		{"invalid discovery prefix", "tower", dto.MQTTConfig{HADiscoveryPrefix: "bad/#", DisableCommands: true}},
+		{"unknown topic cannot create a filter", "", dto.MQTTConfig{DisabledTopics: []string{"foo/#"}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client := NewClient(&tc.config, tc.host, "test", nil)
+			// No MQTT client is necessary if no safe cleanup filters exist.
+			client.reconcileRetained(t.Context())
+		})
+	}
+}
+
+func TestNotificationEventsCanPublishWithoutStatus(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Enabled = true
+	cfg.DisabledTopics = []string{TopicNotifications}
+	client := NewClient(cfg, "tower", "test", nil)
+	capture := &psuCaptureClient{published: make(map[string]string)}
+	client.client = capture
+	client.connected.Store(true)
+	for _, snapshot := range []*dto.NotificationList{
+		{},
+		{Notifications: []dto.Notification{{ID: "fixture", Importance: "warning"}}},
+	} {
+		if err := client.PublishNotifications(snapshot); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := capture.snapshot(); len(got) != 1 || got["unraid/notifications/event"] == "" {
+		t.Fatalf("unexpected notification publications: %v", got)
+	}
+}

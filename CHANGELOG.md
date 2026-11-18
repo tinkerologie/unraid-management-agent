@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Select MQTT telemetry topics independently and disable MQTT commands while keeping Home Assistant monitoring.
+  Applying the new settings clears retained records for disabled topics and command controls (#356).
+
 ### Changed
 
 - Use Dynamix settings rows and theme colors with the plugin’s compact left-aligned layout and switches.
