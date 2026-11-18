@@ -106,7 +106,14 @@ func (*Service) finalTemplateName(receipt installReceipt) string {
 }
 
 func (*Service) stagedTemplateName(receipt installReceipt) string {
-	return ".uma-ca-" + receipt.Owner + ".tmp"
+	return nativePrivatePrefix(receipt) + ".tmp"
+}
+
+func nativePrivatePrefix(receipt installReceipt) string {
+	if receipt.Version == 1 {
+		return ".uma-ca-" + receipt.Owner
+	}
+	return ".uma-ca-" + receipt.Attempt.ID
 }
 
 const maxNativeTemplate = 512 << 10
@@ -154,14 +161,10 @@ func (s *Service) publishNativeTemplate(template []byte, receipt installReceipt)
 	if err == nil {
 		err = file.Sync()
 	}
-	info, _ := file.Stat()
 	if closeErr := file.Close(); err == nil {
 		err = closeErr
 	}
 	if err != nil {
-		if current, statErr := os.Lstat(stage); statErr == nil && info != nil && os.SameFile(info, current) {
-			_ = os.Remove(stage)
-		}
 		return ErrNativeTemplate
 	}
 	// Durably name the staging file before attempting exclusive publication.
@@ -181,24 +184,66 @@ func (s *Service) publishNativeTemplate(template []byte, receipt installReceipt)
 	return nil
 }
 
-func (s *Service) ownsNativeFile(receipt installReceipt, staged bool) (bool, error) {
-	name := s.finalTemplateName(receipt)
-	if staged {
-		name = s.stagedTemplateName(receipt)
+// openNativeTemplates anchors recovery at the existing templates directory.
+// Every path component must be a directory rather than a symlink.
+func (s *Service) openNativeTemplates() (*os.Root, error) {
+	root, err := os.OpenRoot(s.hostRoot)
+	if err != nil {
+		return nil, err
 	}
-	return s.nativeFileOwnership(filepath.Join(s.hostRoot, userTemplatesDir, name), receipt, staged)
+	for component := range strings.SplitSeq(userTemplatesDir, "/") {
+		info, err := root.Lstat(component)
+		if err != nil || !info.IsDir() {
+			_ = root.Close()
+			if err != nil {
+				return nil, err
+			}
+			return nil, ErrNativeTemplate
+		}
+		child, err := root.OpenRoot(component)
+		_ = root.Close()
+		if err != nil {
+			return nil, ErrNativeTemplate
+		}
+		actual, err := child.Stat(".")
+		if err != nil || !os.SameFile(info, actual) {
+			_ = child.Close()
+			return nil, ErrNativeTemplate
+		}
+		root = child
+	}
+	return root, nil
 }
 
-func (*Service) nativeFileOwnership(filename string, receipt installReceipt, staged bool) (bool, error) {
-	info, err := os.Lstat(filename)
-	if errors.Is(err, fs.ErrNotExist) || err == nil && !info.Mode().IsRegular() {
+func (s *Service) ownsPublishedTemplate(receipt installReceipt) (bool, error) {
+	dir, err := s.openNativeTemplates()
+	if errors.Is(err, fs.ErrNotExist) {
 		return false, nil
 	}
 	if err != nil {
 		return false, ErrNativeTemplate
 	}
-	// #nosec G304 -- Template or random staging basename is derived from a validated receipt.
-	file, err := os.OpenFile(filename, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	defer func() { _ = dir.Close() }()
+	owned, err := nativeFileOwnership(dir, s.finalTemplateName(receipt), receipt, false)
+	if errors.Is(err, errUnverifiedTemplate) {
+		return false, nil
+	}
+	return owned, err
+}
+
+var errUnverifiedTemplate = errors.New("template ownership could not be verified")
+
+func nativeFileOwnership(dir *os.Root, filename string, receipt installReceipt, staged bool) (bool, error) {
+	info, err := dir.Lstat(filename)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return false, nil
+	case err != nil:
+		return false, ErrNativeTemplate
+	case !info.Mode().IsRegular():
+		return unownedNativeFile(staged)
+	}
+	file, err := dir.OpenFile(filename, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		return false, ErrNativeTemplate
 	}
@@ -214,7 +259,7 @@ func (*Service) nativeFileOwnership(filename string, receipt installReceipt, sta
 		return false, ErrNativeTemplate
 	}
 	if !bytes.Equal(header, []byte(xml.Header)) {
-		return false, nil
+		return unownedNativeFile(staged)
 	}
 	marker, markerErr := reader.ReadSlice('\n')
 	if markerErr != nil && !errors.Is(markerErr, io.EOF) && !errors.Is(markerErr, bufio.ErrBufferFull) {
@@ -223,12 +268,15 @@ func (*Service) nativeFileOwnership(filename string, receipt installReceipt, sta
 	prefix := "<!-- Unraid Management Agent CA install " + receipt.Owner + " "
 	key, found := strings.CutPrefix(string(marker), prefix)
 	key, valid := strings.CutSuffix(key, " -->\n")
-	if !found || !valid || !opaqueID.MatchString(key) || sha256.Sum256([]byte(key)) != receipt.TemplateKeyHash {
-		return false, nil
+	if !found {
+		return unownedNativeFile(staged)
+	}
+	if !valid || !opaqueID.MatchString(key) || sha256.Sum256([]byte(key)) != receipt.TemplateKeyHash {
+		return false, errUnverifiedTemplate
 	}
 	if staged {
-		// An owned staging file may be truncated by interrupted writes. The
-		// key fingerprint verifies its identity independently of XML content.
+		// A staging write may be torn. The key fingerprint verifies its
+		// identity independently of XML content.
 		return true, nil
 	}
 	body, err := io.ReadAll(reader)
@@ -236,50 +284,102 @@ func (*Service) nativeFileOwnership(filename string, receipt installReceipt, sta
 		return false, ErrNativeTemplate
 	}
 	mac := nativeTemplateMAC(key, body)
-	return len(body) < maxNativeTemplate && hmac.Equal(mac[:], receipt.TemplateMAC[:]), nil
+	if len(body) >= maxNativeTemplate || !hmac.Equal(mac[:], receipt.TemplateMAC[:]) {
+		return false, errUnverifiedTemplate
+	}
+	return true, nil
 }
 
-func (s *Service) removeOwnedNativeFile(receipt installReceipt, staged bool) bool {
-	dir := filepath.Join(s.hostRoot, userTemplatesDir)
-	name := s.finalTemplateName(receipt)
-	suffix := ".published"
+func unownedNativeFile(staged bool) (bool, error) {
 	if staged {
-		name = s.stagedTemplateName(receipt)
-		suffix = ".staged"
+		return false, errUnverifiedTemplate
 	}
-	target := filepath.Join(dir, name)
-	quarantine := filepath.Join(dir, ".uma-ca-"+receipt.Owner+suffix+"-cleanup")
+	return false, nil
+}
 
-	if _, err := os.Lstat(quarantine); err == nil {
+func (s *Service) removeOwnedNativeFile(receipt installReceipt, staged bool) CleanupIssue {
+	target := s.finalTemplateName(receipt)
+	issue := CleanupIssue{Resource: "template", Code: "remove_template", TemplateFile: target}
+	suffix := ".published-cleanup"
+	if staged {
+		target = s.stagedTemplateName(receipt)
+		issue = CleanupIssue{Resource: "staged_template", Code: "remove_staged_template"}
+		if receipt.Version != 1 {
+			issue.TemplateFile = target
+		}
+		suffix = ".staged-cleanup"
+	}
+
+	dir, err := s.openNativeTemplates()
+	if errors.Is(err, fs.ErrNotExist) {
+		return CleanupIssue{}
+	}
+	if err != nil {
+		return issue
+	}
+	defer func() { _ = dir.Close() }()
+	anchor, err := dir.Open(".")
+	if err != nil {
+		return issue
+	}
+	defer func() { _ = anchor.Close() }()
+	dirFD := int(anchor.Fd())
+
+	quarantine := nativePrivatePrefix(receipt) + suffix
+	quarantineIssue := issue
+	quarantineIssue.TemplateFile = ""
+	if receipt.Version != 1 {
+		quarantineIssue.TemplateFile = quarantine
+	}
+	if _, err := dir.Lstat(quarantine); err == nil {
 		// Cleanup may have been interrupted after the exclusive rename.
-		if !s.finishNativeRemoval(quarantine, target, receipt, staged) {
-			return false
+		if failure := finishNativeRemoval(dir, anchor, quarantine, target, receipt, staged, quarantineIssue); failure.Code != "" {
+			return failure
 		}
 	} else if !errors.Is(err, fs.ErrNotExist) {
-		return false
+		return quarantineIssue
 	}
-	owned, err := s.nativeFileOwnership(target, receipt, staged)
-	if err != nil || !owned {
-		return err == nil
+
+	owned, err := nativeFileOwnership(dir, target, receipt, staged)
+	if err != nil {
+		return issue
 	}
-	if err := renameExclusive(target, quarantine); err != nil {
-		return errors.Is(err, fs.ErrNotExist)
+	if !owned {
+		return CleanupIssue{}
 	}
-	return s.finishNativeRemoval(quarantine, target, receipt, staged)
+	if err := renameExclusiveAt(dirFD, target, quarantine); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return CleanupIssue{}
+		}
+		issue.OwnershipVerified = true
+		return issue
+	}
+	return finishNativeRemoval(dir, anchor, quarantine, target, receipt, staged, quarantineIssue)
 }
 
-func (s *Service) finishNativeRemoval(quarantine, target string, receipt installReceipt, staged bool) bool {
+func finishNativeRemoval(dir *os.Root, anchor *os.File, quarantine, target string, receipt installReceipt, staged bool, issue CleanupIssue) CleanupIssue {
 	// Native edits can preserve the original inode. Verify the contents
 	// again after removing the artifact from the native writer's path.
-	owned, err := s.nativeFileOwnership(quarantine, receipt, staged)
+	owned, err := nativeFileOwnership(dir, quarantine, receipt, staged)
 	if err != nil || !owned {
-		restored := renameExclusive(quarantine, target) == nil && syncDirectory(filepath.Dir(target)) == nil
-		return err == nil && restored
+		restored := renameExclusiveAt(int(anchor.Fd()), quarantine, target) == nil && anchor.Sync() == nil
+		if err == nil && restored {
+			return CleanupIssue{}
+		}
+		if restored && receipt.Version != 1 {
+			issue.TemplateFile = target
+		}
+		return issue
 	}
-	if err := os.Remove(quarantine); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return false
+	issue.OwnershipVerified = true
+	if err := dir.Remove(quarantine); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return issue
 	}
-	return syncDirectory(filepath.Dir(target)) == nil
+	if anchor.Sync() != nil {
+		issue.OwnershipVerified = false
+		return issue
+	}
+	return CleanupIssue{}
 }
 
 func safeNativeAttribute(value string) string {

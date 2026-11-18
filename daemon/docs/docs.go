@@ -1306,7 +1306,7 @@ const docTemplate = `{
         },
         "/community-applications/install-attempts/{id}": {
             "get": {
-                "description": "Return durable progress or the final install result",
+                "description": "Return durable progress or the final install result, including any cleanup details after recovery.",
                 "produces": [
                     "application/json"
                 ],
@@ -6241,6 +6241,12 @@ const docTemplate = `{
                 "attempt_id": {
                     "type": "string"
                 },
+                "cleanup_details": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/communityapps.CleanupIssue"
+                    }
+                },
                 "cleanup_failures": {
                     "type": "array",
                     "items": {
@@ -6298,6 +6304,26 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "communityapps.CleanupIssue": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "container_id": {
+                    "type": "string"
+                },
+                "ownership_verified": {
+                    "type": "boolean"
+                },
+                "resource": {
+                    "type": "string"
+                },
+                "template_file": {
                     "type": "string"
                 }
             }

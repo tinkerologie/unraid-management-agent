@@ -72,7 +72,7 @@ func respondCatalogError(w http.ResponseWriter, err error) {
 		status = http.StatusUnauthorized
 	case "read_only":
 		status = http.StatusForbidden
-	case "name_conflict", "port_conflict", "shared_appdata", "onboarding_required", "plan_changed":
+	case "name_conflict", "port_conflict", "shared_appdata", "onboarding_required", "plan_changed", "install_recovery_pending":
 		status = http.StatusConflict
 	case "plan_expired":
 		status = http.StatusGone
@@ -178,7 +178,7 @@ func (s *Server) handleCommunityAppsConfirm(w http.ResponseWriter, r *http.Reque
 // handleCommunityAppsAttempt returns one confirmed install's redacted status.
 //
 // @Summary Get a Community Applications install attempt
-// @Description Return durable progress or the final install result
+// @Description Return durable progress or the final install result, including any cleanup details after recovery.
 // @Tags Community Applications
 // @Produce json
 // @Param id path string true "Install attempt ID"

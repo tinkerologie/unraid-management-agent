@@ -514,7 +514,15 @@ func TestInstallFailurePreservesAppdataAndOnlyCleansOwnedResources(t *testing.T)
 					return failure
 				}
 			},
-			wantProblem: "container_start_failed", wantCreate: 1, wantStart: 1, wantSentinel: true,
+			wantProblem: "container_start_failed", wantCreate: 1, wantStart: 1, wantSentinel: true, wantCleanup: []string{"remove_template"},
+		},
+		{
+			name: "Docker removal returned an error after removing the container",
+			configure: func(_ *testing.T, _ string, d *communityappstest.InstallEngine) {
+				d.BeforeStart = func() error { return failure }
+				d.AfterRemove = func() error { return failure }
+			},
+			wantProblem: "container_start_failed", wantCreate: 1, wantStart: 1,
 		},
 		{
 			name: "Docker start and cleanup both failed",
@@ -965,11 +973,12 @@ func TestInstallCleanupVerifiesQuarantinedTemplate(t *testing.T) {
 			target := filepath.Join(dir, "my-heimdall.xml")
 			var quarantine string
 			docker := &communityappstest.InstallEngine{
-				BeforeCreate: func(opts client.ContainerCreateOptions) error {
-					quarantine = filepath.Join(dir, ".uma-ca-"+opts.Config.Labels["net.unraid.management-agent.ca-install"]+".published-cleanup")
-					return nil
-				},
 				BeforeStart: func() error {
+					var r receiptCheckpoint
+					if err := captureReceipt(root, &r); err != nil {
+						return err
+					}
+					quarantine = filepath.Join(dir, ".uma-ca-"+r.Attempt.ID+".published-cleanup")
 					if !edited {
 						if err := os.Rename(target, quarantine); err != nil {
 							return err

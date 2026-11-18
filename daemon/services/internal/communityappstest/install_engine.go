@@ -6,6 +6,7 @@ import (
 	"iter"
 	"strings"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/containerd/errdefs"
@@ -19,30 +20,38 @@ import (
 const ContainerID = "2a0686c9ded09699be089748236184e2b5563269a1759710edf66f8b302d2982" // pragma: allowlist secret (synthetic Docker identifier)
 const ImageID = "sha256:1c5d673b707b4d180ac2d4c5c81ca0480424ed82f1b67855acb6720a193ef341"
 
+type RemoveRequest struct {
+	ID      string
+	Options client.ContainerRemoveOptions
+}
+
 type InstallEngine struct {
 	Docker
-	BeforePull            func(context.Context) error
-	BeforeDistribution    func()
-	BeforeList            func() error
-	BeforeNetwork         func() error
-	BeforeCreate          func(client.ContainerCreateOptions) error
-	AfterCreate           func() error
-	BeforeStart           func() error
-	AfterStart            func() error
-	BeforeRemove          func() error
-	PullMessages          []jsonstream.Message
-	PullStreamErr         error
-	InspectError          error
-	NoDigestProof         bool
-	HasDescriptor         bool
-	PostStartInspectError error
-	CreateImageID         string
-	NoStartEffect         bool
-	DropCreateID          bool
+	BeforePull             func(context.Context) error
+	BeforeDistribution     func()
+	BeforeList             func() error
+	BeforeNetwork          func() error
+	BeforeCreate           func(client.ContainerCreateOptions) error
+	BeforeContainerInspect func(string, *container.InspectResponse) error
+	AfterCreate            func() error
+	BeforeStart            func() error
+	AfterStart             func() error
+	BeforeRemove           func() error
+	AfterRemove            func() error
+	PullMessages           []jsonstream.Message
+	PullStreamErr          error
+	InspectError           error
+	NoDigestProof          bool
+	HasDescriptor          bool
+	PostStartInspectError  error
+	CreateImageID          string
+	NoStartEffect          bool
+	DropCreateID           bool
 
 	mu          sync.Mutex
 	created     map[string]container.InspectResponse
 	started     []string
+	removed     []RemoveRequest
 	createCount int
 	lastOptions client.ContainerCreateOptions
 	lastInspect string
@@ -58,7 +67,7 @@ func (d *InstallEngine) ContainerList(ctx context.Context, opts client.Container
 	}
 	result, err := d.Docker.ContainerList(ctx, opts)
 	for _, c := range d.created {
-		summary := container.Summary{ID: c.ID, Names: []string{c.Name}}
+		summary := container.Summary{ID: c.ID, Names: []string{c.Name}, Labels: c.Config.Labels}
 		for _, m := range c.HostConfig.Mounts {
 			summary.Mounts = append(summary.Mounts, container.MountPoint{Type: mount.TypeBind, Source: m.Source, RW: !m.ReadOnly})
 		}
@@ -155,9 +164,21 @@ func (d *InstallEngine) ContainerInspect(_ context.Context, key string, _ client
 	}
 	for id, c := range d.created {
 		if id == key || c.Name == "/"+key {
-			state := *c.State
-			c.State = &state
+			if c.State != nil {
+				state := *c.State
+				c.State = &state
+			}
+			if d.BeforeContainerInspect != nil {
+				if err := d.BeforeContainerInspect(key, &c); err != nil {
+					return client.ContainerInspectResult{}, err
+				}
+			}
 			return client.ContainerInspectResult{Container: c}, nil
+		}
+	}
+	if d.BeforeContainerInspect != nil {
+		if err := d.BeforeContainerInspect(key, nil); err != nil {
+			return client.ContainerInspectResult{}, err
 		}
 	}
 	return client.ContainerInspectResult{}, errdefs.ErrNotFound
@@ -186,15 +207,19 @@ func (d *InstallEngine) ContainerStart(_ context.Context, id string, _ client.Co
 	return client.ContainerStartResult{}, nil
 }
 
-func (d *InstallEngine) ContainerRemove(_ context.Context, id string, _ client.ContainerRemoveOptions) (client.ContainerRemoveResult, error) {
+func (d *InstallEngine) ContainerRemove(_ context.Context, id string, opts client.ContainerRemoveOptions) (client.ContainerRemoveResult, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	d.removed = append(d.removed, RemoveRequest{ID: id, Options: opts})
 	if d.BeforeRemove != nil {
 		if err := d.BeforeRemove(); err != nil {
 			return client.ContainerRemoveResult{}, err
 		}
 	}
 	delete(d.created, id)
+	if d.AfterRemove != nil {
+		return client.ContainerRemoveResult{}, d.AfterRemove()
+	}
 	return client.ContainerRemoveResult{}, nil
 }
 
@@ -202,6 +227,26 @@ func (d *InstallEngine) Observation() (int, int, []string, client.ContainerCreat
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	return d.createCount, len(d.created), append([]string{}, d.started...), d.lastOptions, d.lastInspect
+}
+
+func (d *InstallEngine) RemoveRequests() []RemoveRequest {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return append([]RemoveRequest(nil), d.removed...)
+}
+
+func (d *InstallEngine) ReplaceForUpdate(t testing.TB, replacementID string) {
+	t.Helper()
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	c, ok := d.created[ContainerID]
+	if !ok {
+		t.Fatal("cannot replace missing initial container")
+	}
+	delete(d.created, ContainerID)
+	c.ID = replacementID
+	c.Config.Labels["io.tinkerologie.uma.update-attempt"] = "fixture updater marker"
+	d.created[replacementID] = c
 }
 
 type fakePull struct {

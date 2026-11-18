@@ -243,6 +243,9 @@ func (o *Orchestrator) Run() error {
 		logger.Info("Disabled collectors: %v", disabledNames)
 	}
 
+	// Reconcile prior CA installs in the background before accepting new confirmations.
+	communityInstall.StartRecovery()
+
 	// Start HTTP server
 	wg.Go(func() {
 		defer func() {

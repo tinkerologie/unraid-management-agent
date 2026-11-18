@@ -1,0 +1,231 @@
+package communityapps
+
+import (
+	"context"
+	"strings"
+	"time"
+)
+
+var (
+	ErrInstallInterrupted  = &Problem{Code: "install_interrupted", Message: "The install was interrupted. Prepare and approve a new plan after reviewing any remaining resources."}
+	ErrInstallRecovery     = &Problem{Code: "install_recovery_pending", Message: "An install for this name is still in progress or awaiting verification. Check that Docker and the Unraid flash are available, then poll the original attempt."}
+	ErrInstallReceiptProof = &Problem{Code: "install_receipt_unverified", Message: "The interrupted attempt lacks valid ownership evidence. Check Docker and the Unraid user templates for this install before preparing a new plan."}
+)
+
+// StartRecovery starts the daemon-owned recovery worker. Readers and
+// standalone service instances can access receipts without applying recovery.
+func (s *Service) StartRecovery() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.recoveryWake != nil || s.lifecycle.Err() != nil {
+		return
+	}
+	s.recoveryWake = make(chan struct{}, 1)
+	s.workers.Go(s.recoverInstalls)
+}
+
+func (s *Service) wakeRecoveryLocked() {
+	select {
+	case s.recoveryWake <- struct{}{}:
+	default:
+	}
+}
+
+func (s *Service) recoverInstalls() {
+	delay := time.Second
+	for s.lifecycle.Err() == nil {
+		pending, err := s.interruptedInstalls()
+		retry := err != nil
+		for _, receipt := range pending {
+			if !s.reconcileInstall(receipt) {
+				retry = true
+			}
+		}
+		var next <-chan time.Time
+		var timer *time.Timer
+		if retry {
+			timer = time.NewTimer(delay)
+			next = timer.C
+		}
+		select {
+		case <-s.lifecycle.Done():
+		case <-s.recoveryWake:
+			delay = time.Second
+		case <-next:
+			delay = min(2*delay, 30*time.Second)
+		}
+		if timer != nil {
+			timer.Stop()
+		}
+	}
+}
+
+func (s *Service) interruptedInstalls() ([]installReceipt, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.loadReceipts(); err != nil {
+		return nil, err
+	}
+	var pending []installReceipt
+	for id, receipt := range s.receipts {
+		if isTerminal(receipt.Attempt.State) || s.active[id] {
+			continue
+		}
+		if result, ready := s.pendingCommit[id]; ready {
+			receipt = result
+		}
+		pending = append(pending, receipt)
+	}
+	return pending, nil
+}
+
+func isTerminal(state AttemptState) bool {
+	return state == AttemptSucceeded || state == AttemptFailed
+}
+
+func (s *Service) installNameReserved(name string) bool {
+	for _, receipt := range s.receipts {
+		if !isTerminal(receipt.Attempt.State) && strings.EqualFold(receipt.Attempt.Configuration.Name, name) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Service) attemptStatusLocked(receipt installReceipt) Attempt {
+	result := cloneAttempt(receipt.Attempt)
+	if s.recoveryWake != nil && !s.active[receipt.PlanID] && !isTerminal(result.State) && result.Problem == nil {
+		result.Problem = ProblemForError(ErrInstallRecovery)
+	}
+	return result
+}
+
+// reconcileInstall never replays Create or Start. Its return value indicates
+// whether the attempt is settled and has no work left to retry.
+func (s *Service) reconcileInstall(receipt installReceipt) bool {
+	s.applyMu.Lock()
+	defer s.applyMu.Unlock()
+
+	ctx, cancel := context.WithTimeout(s.lifecycle, 10*time.Second)
+	defer cancel()
+	if ctx.Err() != nil {
+		return false
+	}
+	if isTerminal(receipt.Attempt.State) {
+		return s.persistProgress(receipt) == nil
+	}
+	if !validRecoveryReceipt(receipt) {
+		return s.finishInstall(&receipt, ErrInstallReceiptProof)
+	}
+	if !installMutationMayExist(receipt.Attempt.Phase) {
+		return s.finishInstall(&receipt, ErrInstallInterrupted)
+	}
+	docker, err := s.openInstaller()
+	if err != nil {
+		return false
+	}
+	defer func() { _ = docker.Close() }()
+
+	var cause error = ErrInstallInterrupted
+	if receipt.Attempt.Phase == "cleaning_up" {
+		if receipt.Attempt.Problem != nil {
+			cause = receipt.Attempt.Problem
+		}
+		// Version 1 did not save the phase that triggered cleanup.
+		// Continue to protect a late verified start when it has complete proof.
+		if receipt.CleanupPhase == "" && receipt.OwnedContainerID != "" && hasTemplateProof(receipt) {
+			receipt.CleanupPhase = "starting_container"
+		}
+	}
+	return s.settleInstall(ctx, docker, &receipt, cause)
+}
+
+func (s *Service) settleInstall(ctx context.Context, docker InstallDocker, receipt *installReceipt, cause error) bool {
+	phase := receipt.Attempt.Phase
+	if phase == "starting_container" {
+		complete, err := s.completedInstall(ctx, docker, *receipt)
+		if err != nil {
+			return false
+		}
+		if !complete {
+			// A lost acknowledgement may leave the Engine call in flight.
+			// Give it another observation before making a cleanup decision.
+			if !waitForEngineObservation(ctx) {
+				return false
+			}
+			complete, err = s.completedInstall(ctx, docker, *receipt)
+			if err != nil {
+				return false
+			}
+		}
+		if complete {
+			return s.finishInstall(receipt, nil)
+		}
+		if cause == nil {
+			cause = ErrContainerStart
+		}
+	}
+	if phase == "creating_container" && receipt.OwnedContainerID == "" {
+		_, found, err := ownedContainer(ctx, docker, *receipt)
+		if err == ErrDockerState || (err == nil && !found && !waitForEngineObservation(ctx)) {
+			return false
+		}
+	}
+	if err := s.beginInstallCleanup(receipt, cause); err != nil {
+		return false
+	}
+	ready, completed := s.cleanupInstall(ctx, docker, receipt)
+	if !ready {
+		return false
+	}
+	if completed {
+		cause = nil
+	}
+	return s.finishInstall(receipt, cause)
+}
+
+func waitForEngineObservation(ctx context.Context) bool {
+	timer := time.NewTimer(250 * time.Millisecond)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
+	}
+}
+
+func validRecoveryReceipt(r installReceipt) bool {
+	phase := r.Attempt.Phase
+	if phase == "queued" {
+		return r.Attempt.State == AttemptPending
+	}
+	if r.Attempt.State != AttemptRunning || (r.OwnedContainerID != "" && !fullID.MatchString(r.OwnedContainerID)) {
+		return false
+	}
+	switch phase {
+	case "validating", "pulling_image", "preparing_storage":
+		return true
+	case "creating_container":
+		return validImageID(r.ImageID) && r.Attempt.Configuration.Image != ""
+	case "cleaning_up":
+		switch r.CleanupPhase {
+		case "":
+			return r.Version == 1 && validImageID(r.ImageID) && r.Attempt.Configuration.Image != ""
+		case "creating_container", "publishing_template", "starting_container":
+			r.Attempt.Phase, r.CleanupPhase = r.CleanupPhase, ""
+			return validRecoveryReceipt(r)
+		default:
+			return false
+		}
+	case "publishing_template", "starting_container":
+		return r.OwnedContainerID != "" && validImageID(r.ImageID) && r.Attempt.Configuration.Image != "" &&
+			hasTemplateProof(r)
+	default:
+		return false
+	}
+}
+
+func hasTemplateProof(receipt installReceipt) bool {
+	return receipt.TemplateKeyHash != [32]byte{} && receipt.TemplateMAC != [32]byte{}
+}

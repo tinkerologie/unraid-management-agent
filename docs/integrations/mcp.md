@@ -273,8 +273,11 @@ requires the exact approval token.
 Use the returned `attempt_id` to check status. The installation continues across request disconnects,
 and any MCP session can call the read-only status tool under the normal read policy. If a response is
 lost, resend the exact confirmation to recover the original attempt ID. Prepare and approve a
-fresh plan after a failed installation. Success means Docker started the container and the agent
-saved its native Unraid user template. Verify application readiness separately.
+fresh plan after a failed installation. After a daemon restart, poll the same attempt ID. If the
+attempt is awaiting verification, check that Docker and the Unraid flash are available.
+A failed attempt can include a Docker ID or template basename in `cleanup_details` for
+operator review. Success means Docker started the approved container and the agent saved its
+native Unraid user template. Verify application readiness separately.
 
 [Supported CA builds and response fields](../api/rest-api.md#community-applications)
 

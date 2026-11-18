@@ -39,13 +39,23 @@ var (
 
 // Attempt is the redacted, durable progress or outcome of one approved install.
 type Attempt struct {
-	ID              string        `json:"attempt_id"`
-	State           AttemptState  `json:"state"`
-	Phase           string        `json:"phase"`
-	Configuration   Configuration `json:"configuration"`
-	ContainerID     string        `json:"container_id,omitempty"`
-	Problem         *Problem      `json:"problem,omitempty"`
-	CleanupFailures []string      `json:"cleanup_failures,omitempty"`
+	ID              string         `json:"attempt_id"`
+	State           AttemptState   `json:"state"`
+	Phase           string         `json:"phase"`
+	Configuration   Configuration  `json:"configuration"`
+	ContainerID     string         `json:"container_id,omitempty"`
+	Problem         *Problem       `json:"problem,omitempty"`
+	CleanupFailures []string       `json:"cleanup_failures,omitempty"`
+	CleanupDetails  []CleanupIssue `json:"cleanup_details,omitempty"`
+}
+
+// CleanupIssue identifies a remaining or unverified resource using public, safe identifiers.
+type CleanupIssue struct {
+	Code              string `json:"code"`
+	Resource          string `json:"resource"`
+	ContainerID       string `json:"container_id,omitempty"`
+	TemplateFile      string `json:"template_file,omitempty"`
+	OwnershipVerified bool   `json:"ownership_verified"`
 }
 
 // ConfirmRequest carries the opaque approval token returned with the preview.
@@ -98,15 +108,18 @@ func (s *Service) Confirm(ctx context.Context, planID, approvalToken string) (At
 	if s.lifecycle.Err() != nil {
 		return Attempt{}, ErrInstallStopped
 	}
-	if s.active >= maxActiveAttempts {
+	if len(s.active) >= maxActiveAttempts {
 		return Attempt{}, ErrInstallCapacity
 	}
 	if ctx.Err() != nil {
 		return Attempt{}, ErrInstallStopped
 	}
+	if s.installNameReserved(plan.effective.configuration.Name) {
+		return Attempt{}, ErrInstallRecovery
+	}
 
 	receipt := installReceipt{
-		Version:      1,
+		Version:      installReceiptVersion,
 		PlanID:       planID,
 		ApprovalHash: sha256.Sum256([]byte(approvalToken)),
 		Owner:        rand.Text(),
@@ -115,13 +128,14 @@ func (s *Service) Confirm(ctx context.Context, planID, approvalToken string) (At
 		},
 	}
 	if err := s.saveReceipt(receipt, true); err != nil {
+		s.wakeRecoveryLocked()
 		return Attempt{}, err
 	}
 	s.indexReceipt(receipt)
 	delete(s.plans, planID)
-	s.active++
+	s.active[planID] = true
 	s.workers.Go(func() { s.runInstall(receipt, plan) })
-	return cloneAttempt(receipt.Attempt), nil
+	return s.attemptStatusLocked(receipt), nil
 }
 
 func (s *Service) replayConfirmation(planID, token string) (Attempt, bool, error) {
@@ -142,7 +156,7 @@ func (s *Service) replayConfirmationLocked(planID, token string) (Attempt, bool,
 	if subtle.ConstantTimeCompare(receipt.ApprovalHash[:], hash[:]) != 1 {
 		return Attempt{}, true, ErrPlanApproval
 	}
-	return cloneAttempt(receipt.Attempt), true, nil
+	return s.attemptStatusLocked(receipt), true, nil
 }
 
 // GetAttempt returns the latest redacted status of a confirmed install.
@@ -159,7 +173,7 @@ func (s *Service) GetAttempt(id string) (Attempt, error) {
 	if !found {
 		return Attempt{}, ErrAttemptNotFound
 	}
-	return cloneAttempt(receipt.Attempt), nil
+	return s.attemptStatusLocked(receipt), nil
 }
 
 func cloneAttempt(attempt Attempt) Attempt {
@@ -167,6 +181,7 @@ func cloneAttempt(attempt Attempt) Attempt {
 	attempt.Configuration.Mounts = slices.Clone(attempt.Configuration.Mounts)
 	attempt.Configuration.Environment = slices.Clone(attempt.Configuration.Environment)
 	attempt.CleanupFailures = slices.Clone(attempt.CleanupFailures)
+	attempt.CleanupDetails = slices.Clone(attempt.CleanupDetails)
 	if attempt.Problem != nil {
 		problem := *attempt.Problem
 		attempt.Problem = &problem

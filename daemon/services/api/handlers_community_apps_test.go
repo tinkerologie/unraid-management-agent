@@ -16,6 +16,7 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/communityapps"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/internal/communityappstest"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/internal/communityappstest/recovery"
 )
 
 func TestCommunityAppsRESTUsesReadPolicy(t *testing.T) {
@@ -214,5 +215,48 @@ func TestCommunityAppRESTConfirmAndPoll(t *testing.T) {
 	if err := json.Unmarshal(replay.Body.Bytes(), &done); err != nil || replay.Code != http.StatusAccepted ||
 		done.ID != claim.ID || done.State != communityapps.AttemptSucceeded || done.ContainerID != communityappstest.ContainerID {
 		t.Fatalf("replay was %d: %+v, %v", replay.Code, done, err)
+	}
+}
+
+func TestCommunityAppRESTReportsRecoveredAttempt(t *testing.T) {
+	const environment = "private-recovered-rest-environment"
+	for _, started := range []bool{true, false} {
+		name := "failed cleanup"
+		if started {
+			name = "completed"
+		}
+		t.Run(name, func(t *testing.T) {
+			service, claim := recovery.InterruptedStart(t, environment, started)
+			server := NewServer(&domain.Context{Config: domain.Config{WebSocketDisabled: true}})
+			t.Cleanup(server.Stop)
+			server.SetCommunityAppsService(service)
+			service.StartRecovery()
+
+			for deadline := time.Now().Add(5 * time.Second); ; {
+				req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/community-applications/install-attempts/"+claim.ID, nil)
+				resp := httptest.NewRecorder()
+				server.GetRouter().ServeHTTP(resp, req)
+				var attempt communityapps.Attempt
+				if err := json.Unmarshal(resp.Body.Bytes(), &attempt); err != nil || resp.Code != http.StatusOK ||
+					attempt.ID != claim.ID || resp.Header().Get("Cache-Control") != "no-store" || strings.Contains(resp.Body.String(), environment) {
+					t.Fatalf("invalid recovered status %d: %+v, %v", resp.Code, attempt, err)
+				}
+				if attempt.State == communityapps.AttemptSucceeded || attempt.State == communityapps.AttemptFailed {
+					if started && (attempt.State != communityapps.AttemptSucceeded || attempt.ContainerID != communityappstest.ContainerID) {
+						t.Fatalf("success was not recovered: %+v", attempt)
+					}
+					if !started && (attempt.State != communityapps.AttemptFailed || attempt.Problem == nil ||
+						attempt.Problem.Code != "install_interrupted" || len(attempt.CleanupDetails) != 1 ||
+						attempt.CleanupDetails[0].ContainerID != communityappstest.ContainerID || !attempt.CleanupDetails[0].OwnershipVerified) {
+						t.Fatalf("cleanup details were not recovered: %+v", attempt)
+					}
+					return
+				}
+				if time.Now().After(deadline) {
+					t.Fatalf("recovery did not settle: %+v", attempt)
+				}
+				time.Sleep(5 * time.Millisecond)
+			}
+		})
 	}
 }

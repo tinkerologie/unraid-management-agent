@@ -95,7 +95,7 @@ func (s *Service) createAppdata(root *os.Root, identity mountIdentity, source st
 
 func (s *Service) checkBeforeStart(ctx context.Context, docker InstallDocker, receipt installReceipt, plan *pendingPlan, mounts []mountIdentity) error {
 	config := plan.effective.configuration
-	owned, err := s.ownsNativeFile(receipt, false)
+	owned, err := s.ownsPublishedTemplate(receipt)
 	if err != nil || !owned {
 		return ErrNativeTemplate
 	}

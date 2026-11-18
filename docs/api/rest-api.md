@@ -1780,6 +1780,7 @@ approve a fresh plan to try another installation.
 | ----------- | ----------------------------- | ---------------------------------------------------------------- |
 | 400         | `invalid_plan_approval`       | Supply the exact token from the reviewed preview.                |
 | 409         | `plan_changed`                | Prepare and review a new preview.                                |
+| 409         | `install_recovery_pending`    | Poll the existing attempt for that installation name.            |
 | 410         | `plan_expired`                | Prepare and review a new preview.                                |
 | 429         | `install_capacity`            | Retry when an active attempt settles.                            |
 | 503         | `attempt_storage_unavailable` | Verify that the agent can write to its persistent configuration. |
@@ -1792,11 +1793,26 @@ A successful attempt returns `container_id`, with the installed name and CA list
 `configuration`. Success means that Docker started the approved image and the native user template
 was saved. Check readiness in the application separately.
 
-A failed attempt returns a `problem` with a stable code and any `cleanup_failures`. For example,
-`image_digest_changed` requires a new preview and approval, and `name_conflict` or `port_conflict`
-requires resolving the conflict before retrying. Cleanup preserves appdata and unrelated
-containers and templates. The native user template stores effective environment values for
-Unraid’s editing and update workflow.
+The daemon reconciles interrupted attempts in the background. Poll or resend the original
+confirmation to retrieve the same attempt ID after a restart. While verification is pending, the
+attempt may report `install_recovery_pending`. Check that Docker and the Unraid flash are
+available. A new confirmation for the same installation name waits for the interrupted attempt
+to settle. Status requests only read the receipt.
+
+The daemon can recover success when Docker reports a start for the exact owned container with
+the approved image and the complete saved template still matches. A container that started and
+exited qualifies. If the daemon can establish that the install is partial, it cleans up the
+container and any template files whose ownership it can verify. It preserves appdata, volumes,
+images, unrelated containers, and replaced templates. Completed receipts remain available even if
+the container or template later changes.
+
+A failed attempt returns a `problem` with a stable code. For `install_interrupted`, review any
+remaining resources, then prepare and approve a fresh plan. For `install_receipt_unverified`,
+inspect the installation in Docker Manager and the Unraid user templates before preparing another
+plan. The existing `cleanup_failures` array lists safe failure codes. When available,
+`cleanup_details` identifies the resource, an original full Docker ID or template basename, and
+whether ownership could be verified. Review those resources before retrying. The native user
+template stores effective environment values for Unraid’s editing and update workflow.
 
 ### Manage an installed application
 

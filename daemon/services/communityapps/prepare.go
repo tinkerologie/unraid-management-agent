@@ -166,22 +166,25 @@ type ServiceOptions struct {
 
 // Service owns pending plans shared by REST and MCP.
 type Service struct {
-	catalog        *Catalog
-	hostRoot       string
-	openDocker     func() (PlanningDocker, error)
-	portAvailable  func(context.Context, PortBinding) error
-	now            func() time.Time
-	mu             sync.Mutex
-	plans          map[string]*pendingPlan
-	openInstaller  func() (InstallDocker, error)
-	lifecycle      context.Context
-	stop           context.CancelFunc
-	workers        sync.WaitGroup
-	applyMu        sync.Mutex
-	active         int
-	receiptsLoaded bool
-	receipts       map[string]installReceipt
-	attemptIDs     map[string]string
+	catalog           *Catalog
+	hostRoot          string
+	openDocker        func() (PlanningDocker, error)
+	portAvailable     func(context.Context, PortBinding) error
+	now               func() time.Time
+	mu                sync.Mutex
+	plans             map[string]*pendingPlan
+	openInstaller     func() (InstallDocker, error)
+	lifecycle         context.Context
+	stop              context.CancelFunc
+	workers           sync.WaitGroup
+	applyMu           sync.Mutex
+	active            map[string]bool
+	recoveryWake      chan struct{}
+	receiptsLoaded    bool
+	receiptSyncNeeded bool
+	pendingCommit     map[string]installReceipt
+	receipts          map[string]installReceipt
+	attemptIDs        map[string]string
 }
 
 // NewService creates an install service using the supplied host dependencies.
@@ -212,6 +215,7 @@ func NewService(catalog *Catalog, options ServiceOptions) *Service {
 		catalog: catalog, hostRoot: options.HostRoot, openDocker: options.OpenDocker,
 		openInstaller: options.OpenInstallDocker, lifecycle: lifecycle, stop: stop,
 		portAvailable: options.PortAvailable, now: options.Now, plans: make(map[string]*pendingPlan),
+		active: make(map[string]bool), pendingCommit: make(map[string]installReceipt),
 	}
 }
 

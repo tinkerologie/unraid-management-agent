@@ -11,7 +11,12 @@ import (
 	"strings"
 )
 
-const attemptDirectory = "boot/config/plugins/unraid-management-agent/community-app-attempts"
+const (
+	attemptDirectory      = "boot/config/plugins/unraid-management-agent/community-app-attempts"
+	installReceiptVersion = 2
+)
+
+var errReceiptSync = errors.New("receipt rename was not synced")
 
 type installReceipt struct {
 	Version          int               `json:"version"`
@@ -21,6 +26,7 @@ type installReceipt struct {
 	OwnedContainerID string            `json:"owned_container_id,omitempty"`
 	ImageID          string            `json:"image_id,omitempty"`
 	TemplateKeyHash  [sha256.Size]byte `json:"template_key_hash"`
+	CleanupPhase     string            `json:"cleanup_phase,omitempty"`
 	TemplateMAC      [sha256.Size]byte `json:"template_mac"`
 	Attempt          Attempt           `json:"attempt"`
 }
@@ -36,6 +42,12 @@ func (s *Service) loadReceipts() error {
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return ErrAttemptStorage
 	}
+	if s.receiptSyncNeeded {
+		if syncDirectory(dir) != nil {
+			return ErrAttemptStorage
+		}
+		s.receiptSyncNeeded = false
+	}
 	s.receipts = make(map[string]installReceipt, len(entries))
 	s.attemptIDs = make(map[string]string, len(entries))
 	for _, entry := range entries {
@@ -45,9 +57,16 @@ func (s *Service) loadReceipts() error {
 		}
 		var receipt installReceipt
 		err := readInstallFile(filepath.Join(dir, entry.Name()), 256<<10, func(reader io.Reader) error {
-			return json.NewDecoder(reader).Decode(&receipt)
+			decoder := json.NewDecoder(reader)
+			if err := decoder.Decode(&receipt); err != nil {
+				return err
+			}
+			if err := decoder.Decode(new(json.RawMessage)); !errors.Is(err, io.EOF) {
+				return ErrAttemptStorage
+			}
+			return nil
 		})
-		if err != nil || receipt.Version != 1 || receipt.PlanID != planID ||
+		if err != nil || (receipt.Version != 1 && receipt.Version != installReceiptVersion) || receipt.PlanID != planID ||
 			!opaqueID.MatchString(receipt.Attempt.ID) || !opaqueID.MatchString(receipt.Owner) ||
 			!nativeName.MatchString(receipt.Attempt.Configuration.Name) ||
 			s.attemptIDs[receipt.Attempt.ID] != "" {
@@ -68,7 +87,12 @@ func (s *Service) saveReceipt(receipt installReceipt, exclusive bool) error {
 	dir := filepath.Join(s.hostRoot, attemptDirectory)
 	err := s.writeReceipt(dir, receipt, exclusive)
 	if err != nil {
-		s.receiptsLoaded = false
+		if errors.Is(err, errReceiptSync) {
+			s.receiptSyncNeeded = true
+		}
+		if exclusive {
+			s.receiptsLoaded = false
+		}
 		return ErrAttemptStorage
 	}
 	return nil
@@ -102,7 +126,10 @@ func (s *Service) writeReceipt(dir string, receipt installReceipt, exclusive boo
 	if err != nil {
 		return err
 	}
-	return syncDirectory(dir)
+	if syncDirectory(dir) != nil {
+		return errReceiptSync
+	}
+	return nil
 }
 
 // ensureInstallDirectory syncs newly-created directory entries in their
@@ -143,9 +170,14 @@ func syncDirectory(path string) error {
 func (s *Service) persistProgress(receipt installReceipt) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if current, exists := s.receipts[receipt.PlanID]; exists && isTerminal(current.Attempt.State) {
+		delete(s.pendingCommit, receipt.PlanID)
+		return nil
+	}
 	err := s.saveReceipt(receipt, false)
 	if err == nil {
 		s.indexReceipt(receipt)
+		delete(s.pendingCommit, receipt.PlanID)
 	}
 	return err
 }

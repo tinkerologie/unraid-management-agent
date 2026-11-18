@@ -18,6 +18,7 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/communityapps"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/internal/communityappstest"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/internal/communityappstest/recovery"
 )
 
 func TestCommunityAppsMCPRemainsReadableWithWritesLocked(t *testing.T) {
@@ -254,5 +255,45 @@ func TestCommunityAppMCPConfirmAndPollFromAnotherSession(t *testing.T) {
 	if err := json.Unmarshal([]byte(reply), &replay); err != nil || result.IsError || replay.ID != claim.ID ||
 		replay.State != communityapps.AttemptSucceeded || replay.ContainerID != communityappstest.ContainerID {
 		t.Fatalf("confirmation replay returned %+v, %v", replay, err)
+	}
+}
+
+func TestCommunityAppMCPReportsRecoveredAttempt(t *testing.T) {
+	const environment = "private-recovered-mcp-environment"
+	for _, started := range []bool{true, false} {
+		name := "failed cleanup"
+		if started {
+			name = "completed"
+		}
+		t.Run(name, func(t *testing.T) {
+			service, claim := recovery.InterruptedStart(t, environment, started)
+			server, _ := mountMCPTestServerWithCommunityApps(t, domain.Config{}, nil, service)
+			session := connectMCPHTTP(t, server, "/mcp-stateless", "", "2026-07-28")
+			service.StartRecovery()
+
+			for deadline := time.Now().Add(5 * time.Second); ; {
+				result, reply := callToolJSON(t, session, "get_community_app_install_attempt", map[string]any{"attempt_id": claim.ID})
+				var attempt communityapps.Attempt
+				if err := json.Unmarshal([]byte(reply), &attempt); err != nil || result.IsError ||
+					attempt.ID != claim.ID || strings.Contains(reply, environment) {
+					t.Fatalf("invalid recovered status: %+v, %v", attempt, err)
+				}
+				if attempt.State == communityapps.AttemptSucceeded || attempt.State == communityapps.AttemptFailed {
+					if started && (attempt.State != communityapps.AttemptSucceeded || attempt.ContainerID != communityappstest.ContainerID) {
+						t.Fatalf("success was not recovered: %+v", attempt)
+					}
+					if !started && (attempt.State != communityapps.AttemptFailed || attempt.Problem == nil ||
+						attempt.Problem.Code != "install_interrupted" || len(attempt.CleanupDetails) != 1 ||
+						attempt.CleanupDetails[0].ContainerID != communityappstest.ContainerID || !attempt.CleanupDetails[0].OwnershipVerified) {
+						t.Fatalf("cleanup details were not recovered: %+v", attempt)
+					}
+					return
+				}
+				if time.Now().After(deadline) {
+					t.Fatalf("recovery did not settle: %+v", attempt)
+				}
+				time.Sleep(5 * time.Millisecond)
+			}
+		})
 	}
 }

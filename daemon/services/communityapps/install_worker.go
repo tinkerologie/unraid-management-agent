@@ -19,10 +19,13 @@ import (
 
 const installOwnerLabel = "net.unraid.management-agent.ca-install"
 
+var errContainerIdentity = &Problem{Code: "container_identity_unverified", Message: "Docker reports a container with changed or ambiguous ownership evidence. Inspect the original installation in Docker Manager."}
+
 func (s *Service) runInstall(receipt installReceipt, plan *pendingPlan) {
 	defer func() {
 		s.mu.Lock()
-		s.active--
+		delete(s.active, receipt.PlanID)
+		s.wakeRecoveryLocked()
 		s.mu.Unlock()
 	}()
 	s.applyMu.Lock()
@@ -47,27 +50,12 @@ func (s *Service) runInstall(receipt installReceipt, plan *pendingPlan) {
 	defer func() { _ = docker.Close() }()
 	err = s.executeInstall(ctx, docker, &receipt, plan)
 	if installMutationMayExist(receipt.Attempt.Phase) {
-		// A disconnected Engine call can report failure after create or
-		// start took effect. Check with a bounded context even on shutdown.
+		// A disconnected Engine call can report failure after taking effect.
+		// Observe with a bounded context even during daemon shutdown.
 		checkCtx, checkCancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer checkCancel()
-		if receipt.Attempt.Phase == "starting_container" {
-			complete, proofErr := s.completedInstall(checkCtx, docker, receipt)
-			switch {
-			case proofErr != nil:
-				// Leave the durable start intent for reconciliation. An
-				// unavailable Engine or flash is not proof of non-start.
-				return
-			case complete:
-				err = nil
-			case err == nil:
-				err = ErrContainerStart
-			}
-		}
-		if err != nil {
-			_ = s.advanceInstall(&receipt, "cleaning_up")
-			receipt.Attempt.CleanupFailures = s.cleanupInstall(checkCtx, docker, &receipt)
-		}
+		s.settleInstall(checkCtx, docker, &receipt, err)
+		return
 	}
 	s.finishInstall(&receipt, err)
 }
@@ -91,10 +79,25 @@ func (s *Service) advanceInstall(receipt *installReceipt, phase string) error {
 	return nil
 }
 
-func (s *Service) finishInstall(receipt *installReceipt, err error) {
+func (s *Service) beginInstallCleanup(receipt *installReceipt, cause error) error {
+	if receipt.Attempt.Phase == "cleaning_up" {
+		return nil
+	}
+	next := *receipt
+	next.Attempt.Problem = ProblemForError(cause)
+	next.CleanupPhase = receipt.Attempt.Phase
+	if err := s.advanceInstall(&next, "cleaning_up"); err != nil {
+		return err
+	}
+	*receipt = next
+	return nil
+}
+
+func (s *Service) finishInstall(receipt *installReceipt, err error) bool {
 	receipt.Attempt.Phase = "complete"
 	if err == nil {
 		receipt.Attempt.State = AttemptSucceeded
+		receipt.Attempt.Problem = nil
 		receipt.Attempt.ContainerID = receipt.OwnedContainerID
 	} else {
 		receipt.Attempt.State = AttemptFailed
@@ -103,9 +106,15 @@ func (s *Service) finishInstall(receipt *installReceipt, err error) {
 	// Retry transient writes. If the store remains unavailable, return its
 	// last durable phase for restart reconciliation instead of inventing a
 	// durable outcome.
-	if s.persistProgress(*receipt) != nil {
-		_ = s.persistProgress(*receipt)
+	for range 2 {
+		if s.persistProgress(*receipt) == nil {
+			return true
+		}
 	}
+	s.mu.Lock()
+	s.pendingCommit[receipt.PlanID] = *receipt
+	s.mu.Unlock()
+	return false
 }
 
 func (s *Service) executeInstall(ctx context.Context, docker InstallDocker, receipt *installReceipt, plan *pendingPlan) error {
@@ -284,11 +293,15 @@ func engineInstallError(err error, fallback *Problem) error {
 }
 
 func ownedContainer(ctx context.Context, docker InstallDocker, receipt installReceipt) (container.InspectResponse, bool, error) {
-	key := receipt.OwnedContainerID
-	if key == "" {
-		key = receipt.Attempt.Configuration.Name
+	id := receipt.OwnedContainerID
+	if id == "" {
+		var err error
+		id, err = findCreatedContainer(ctx, docker, receipt)
+		if err != nil || id == "" {
+			return container.InspectResponse{}, false, err
+		}
 	}
-	result, err := docker.ContainerInspect(ctx, key, client.ContainerInspectOptions{})
+	result, err := docker.ContainerInspect(ctx, id, client.ContainerInspectOptions{})
 	if errdefs.IsNotFound(err) {
 		return container.InspectResponse{}, false, nil
 	}
@@ -296,15 +309,40 @@ func ownedContainer(ctx context.Context, docker InstallDocker, receipt installRe
 		return container.InspectResponse{}, false, ErrDockerState
 	}
 	c := result.Container
-	// The regular Docker updater copies labels to its replacement. A
-	// replacement is never evidence of a lost create response.
-	if receipt.OwnedContainerID == "" && c.Config != nil && c.Config.Labels["io.tinkerologie.uma.update-attempt"] != "" {
+	if !fullID.MatchString(c.ID) {
+		return c, false, ErrDockerState
+	}
+	if c.ID != id {
 		return c, false, nil
 	}
-	owned := fullID.MatchString(c.ID) && (receipt.OwnedContainerID == "" || receipt.OwnedContainerID == c.ID) &&
-		c.Name == "/"+receipt.Attempt.Configuration.Name &&
-		c.Config != nil && c.Config.Labels[installOwnerLabel] == receipt.Owner && c.Config.Image == receipt.Attempt.Configuration.Image
-	return c, owned, nil
+	if c.Config == nil || c.Name != "/"+receipt.Attempt.Configuration.Name ||
+		c.Config.Labels[installOwnerLabel] != receipt.Owner || c.Config.Image != receipt.Attempt.Configuration.Image ||
+		(receipt.OwnedContainerID == "" && c.Config.Labels["io.tinkerologie.uma.update-attempt"] != "") {
+		return c, false, errContainerIdentity
+	}
+	return c, true, nil
+}
+
+func findCreatedContainer(ctx context.Context, docker InstallDocker, receipt installReceipt) (string, error) {
+	result, err := docker.ContainerList(ctx, client.ContainerListOptions{
+		All: true, Filters: make(client.Filters).Add("label", installOwnerLabel+"="+receipt.Owner),
+	})
+	if err != nil {
+		return "", ErrDockerState
+	}
+	var id string
+	for _, c := range result.Items {
+		// The updater copies labels to its replacement. An unrelated
+		// container with the expected name is also never ownership proof.
+		if c.Labels[installOwnerLabel] != receipt.Owner || c.Labels["io.tinkerologie.uma.update-attempt"] != "" {
+			continue
+		}
+		if id != "" || !fullID.MatchString(c.ID) {
+			return "", errContainerIdentity
+		}
+		id = c.ID
+	}
+	return id, nil
 }
 
 func hasStarted(container container.InspectResponse) bool {
@@ -322,8 +360,18 @@ func (s *Service) completedInstall(ctx context.Context, docker InstallDocker, re
 		return false, nil
 	}
 	c, owned, err := ownedContainer(ctx, docker, receipt)
-	if err != nil || !owned || c.Image != receipt.ImageID {
+	if err == errContainerIdentity {
+		return false, nil
+	}
+	if err != nil || !owned {
 		return false, err
+	}
+	return s.startedWithTemplate(c, receipt)
+}
+
+func (s *Service) startedWithTemplate(c container.InspectResponse, receipt installReceipt) (bool, error) {
+	if c.Image != receipt.ImageID {
+		return false, nil
 	}
 	if c.State == nil {
 		return false, ErrDockerState
@@ -335,41 +383,107 @@ func (s *Service) completedInstall(ctx context.Context, docker InstallDocker, re
 	if started.IsZero() {
 		return false, nil
 	}
-	return s.ownsNativeFile(receipt, false)
+	return s.ownsPublishedTemplate(receipt)
 }
 
-func (s *Service) cleanupInstall(ctx context.Context, docker InstallDocker, receipt *installReceipt) []string {
-	var failures []string
-	if issue := s.removeOwnedContainer(ctx, docker, receipt); issue != "" {
-		failures = append(failures, issue)
+func (s *Service) cleanupInstall(ctx context.Context, docker InstallDocker, receipt *installReceipt) (bool, bool) {
+	if ctx.Err() != nil {
+		return false, false
 	}
-	if !s.removeOwnedNativeFile(*receipt, false) {
-		failures = append(failures, "remove_template")
+	containerIssue, confirmedStart, retry := s.removeOwnedContainer(ctx, docker, receipt)
+	if retry || ctx.Err() != nil {
+		return false, false
 	}
-	if !s.removeOwnedNativeFile(*receipt, true) {
-		failures = append(failures, "remove_staged_template")
+	if confirmedStart {
+		return true, true
 	}
-	return failures
+	provenTemplate := receipt.CleanupPhase != "creating_container" && hasTemplateProof(*receipt)
+	var preserveFinal bool
+	if provenTemplate {
+		// The native template may now be in use by a replacement. A lookup
+		// by name can only veto template removal; it never authorizes it.
+		replacement, err := replacementAtInstallName(ctx, docker, *receipt)
+		if err != nil {
+			return false, false
+		}
+		preserveFinal = replacement
+	}
+	if containerIssue.Code != "" {
+		receipt.Attempt.CleanupDetails = append(receipt.Attempt.CleanupDetails, containerIssue)
+	}
+	if provenTemplate {
+		if !preserveFinal {
+			if issue := s.removeOwnedNativeFile(*receipt, false); issue.Code != "" {
+				receipt.Attempt.CleanupDetails = append(receipt.Attempt.CleanupDetails, issue)
+			}
+		}
+		if issue := s.removeOwnedNativeFile(*receipt, true); issue.Code != "" {
+			receipt.Attempt.CleanupDetails = append(receipt.Attempt.CleanupDetails, issue)
+		}
+	}
+	for _, issue := range receipt.Attempt.CleanupDetails {
+		receipt.Attempt.CleanupFailures = append(receipt.Attempt.CleanupFailures, issue.Code)
+	}
+	return true, false
 }
 
-func (s *Service) removeOwnedContainer(ctx context.Context, docker InstallDocker, receipt *installReceipt) string {
+func replacementAtInstallName(ctx context.Context, docker InstallDocker, receipt installReceipt) (bool, error) {
+	inspected, err := docker.ContainerInspect(ctx, receipt.Attempt.Configuration.Name, client.ContainerInspectOptions{})
+	if errdefs.IsNotFound(err) {
+		return false, nil
+	}
+	if err != nil || !fullID.MatchString(inspected.Container.ID) {
+		return false, ErrDockerState
+	}
+	return inspected.Container.ID != receipt.OwnedContainerID, nil
+}
+
+// removeOwnedContainer reports any residual resource, a late verified start,
+// or an observation that needs to be retried before further cleanup.
+func (s *Service) removeOwnedContainer(ctx context.Context, docker InstallDocker, receipt *installReceipt) (CleanupIssue, bool, bool) {
+	issue := CleanupIssue{Resource: "container", ContainerID: receipt.OwnedContainerID}
 	c, owned, err := ownedContainer(ctx, docker, *receipt)
-	if err != nil {
-		return "inspect_container"
+	switch err {
+	case errContainerIdentity:
+		issue.Code = errContainerIdentity.Code
+		return issue, false, false
+	case nil:
+		if !owned {
+			return CleanupIssue{}, false, false
+		}
+	default:
+		return CleanupIssue{}, false, true
 	}
-	if !owned {
-		return ""
-	}
+	issue.ContainerID, issue.OwnershipVerified = c.ID, true
 	if receipt.OwnedContainerID == "" {
 		next := *receipt
 		next.OwnedContainerID = c.ID
 		if err := s.persistProgress(next); err != nil {
-			return "record_container_ownership"
+			return CleanupIssue{}, false, true
 		}
 		*receipt = next
 	}
-	if _, err := docker.ContainerRemove(ctx, c.ID, client.ContainerRemoveOptions{Force: true}); err != nil && !errdefs.IsNotFound(err) {
-		return "remove_container"
+	if receipt.CleanupPhase == "starting_container" {
+		if complete, err := s.startedWithTemplate(c, *receipt); complete || err != nil {
+			return CleanupIssue{}, complete, err != nil
+		}
 	}
-	return ""
+	// Refuse a force-removal when Docker has no evidence of a start.
+	// A concurrently running Start can then fail removal safely.
+	_, err = docker.ContainerRemove(ctx, c.ID, client.ContainerRemoveOptions{Force: hasStarted(c)})
+	if err == nil || errdefs.IsNotFound(err) {
+		return CleanupIssue{}, false, false
+	}
+	after, stillOwned, inspectErr := ownedContainer(ctx, docker, *receipt)
+	if inspectErr == nil && !stillOwned {
+		return CleanupIssue{}, false, false
+	}
+	if receipt.CleanupPhase == "starting_container" && stillOwned {
+		if complete, err := s.startedWithTemplate(after, *receipt); complete || err != nil {
+			return CleanupIssue{}, complete, err != nil
+		}
+	}
+	issue.Code = "remove_container"
+	issue.OwnershipVerified = stillOwned
+	return issue, false, false
 }

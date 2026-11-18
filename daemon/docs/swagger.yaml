@@ -19,6 +19,10 @@ definitions:
     properties:
       attempt_id:
         type: string
+      cleanup_details:
+        items:
+          $ref: '#/definitions/communityapps.CleanupIssue'
+        type: array
       cleanup_failures:
         items:
           type: string
@@ -59,6 +63,19 @@ definitions:
       ipv6:
         type: boolean
       name:
+        type: string
+    type: object
+  communityapps.CleanupIssue:
+    properties:
+      code:
+        type: string
+      container_id:
+        type: string
+      ownership_verified:
+        type: boolean
+      resource:
+        type: string
+      template_file:
         type: string
     type: object
   communityapps.ConfigKind:
@@ -7213,7 +7230,8 @@ paths:
       - Community Applications
   /community-applications/install-attempts/{id}:
     get:
-      description: Return durable progress or the final install result
+      description: Return durable progress or the final install result, including
+        any cleanup details after recovery.
       parameters:
       - description: Install attempt ID
         in: path
