@@ -116,6 +116,25 @@ test('settings rows associate labels with their controls', async ({ page }) => {
   await expect(direct).toBeHidden();
 });
 
+test('disabling MQTT hides its settings and preserves the broker fields on Apply', async ({ page }) => {
+  await openSettings(page);
+  const enabled = page.getByRole('switch', { name: 'Enable MQTT', exact: true });
+  const brokerFields = page.locator('#mqtt_fields');
+  await expect(enabled).toBeChecked();
+  await expect(brokerFields).toBeVisible();
+
+  await enabled.press('Space');
+  await expect(brokerFields).toBeHidden();
+  const fields = await page.locator('#agentConfigForm').evaluate((form) => Object.fromEntries(new FormData(form)));
+  expect(fields.MQTT_ENABLED).toBe('false');
+  expect(fields.MQTT_BROKER).toBe('127.0.0.1');
+  expect(fields.MQTT_HOME_ASSISTANT).toBe('true');
+  expect(fields.MQTT_PASSWORD).toBe('');
+
+  await enabled.press('Space');
+  await expect(brokerFields).toBeVisible();
+});
+
 for (const theme of ['white', 'black']) {
   test(`Dynamix ${theme} theme keeps settings usable at desktop and narrow widths`, async ({ page }) => {
     test.skip(!styles, 'requires the stock Dynamix styles');
@@ -133,10 +152,12 @@ for (const theme of ['white', 'black']) {
 
     const firstRow = page.locator('dl.uma-settings').first();
     const port = page.locator('#uma_port_input');
-    const leftInset = async () => (await port.boundingBox()).x - (await firstRow.boundingBox()).x;
-    expect(await leftInset()).toBeLessThan(250);
-    await page.setViewportSize({ width: 2000, height: 940 });
-    expect(await leftInset()).toBeLessThan(250);
+    for (const width of [1440, 2000]) {
+      await page.setViewportSize({ width, height: 940 });
+      const leftInset = (await port.boundingBox()).x - (await firstRow.boundingBox()).x;
+      expect(leftInset).toBeGreaterThan(150);
+      expect(leftInset).toBeLessThan(250);
+    }
     await page.setViewportSize({ width: 1440, height: 940 });
 
     const discovery = page.getByRole('switch', { name: 'Home Assistant Auto-Discovery' });

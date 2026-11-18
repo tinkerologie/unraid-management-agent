@@ -58,6 +58,7 @@ module.exports = async () => {
     mqtt,
     [
       'MQTT_ENABLED="true"',
+      'MQTT_BROKER="127.0.0.1"',
       'MQTT_HOME_ASSISTANT="true"',
       'MQTT_PASSWORD="fixture-mqtt-password"', // pragma: allowlist secret
       '',
