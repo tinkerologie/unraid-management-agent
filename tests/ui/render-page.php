@@ -34,6 +34,9 @@ if ($count !== 1) {
     exit(1);
 }
 
+$mqttTopicsFile = dirname(realpath($page)) . '/include/mqtt-topics.php';
+$body = preg_replace('/^\$mqtt_topics_file = .*;$/m', '$mqtt_topics_file = ' . var_export($mqttTopicsFile, true) . ';', $body);
+
 // Match the English locale's _(...)_ substitutions in Dynamix's parse_text.
 $body = preg_replace('/_\((.+?)\)_/m', '$1', $body);
 

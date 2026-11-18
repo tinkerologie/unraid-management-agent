@@ -27,6 +27,27 @@ func TestApplyFileConfigStorageTopologyInterval(t *testing.T) {
 	}
 }
 
+func TestBuildMQTTConfig(t *testing.T) {
+	orig := cli
+	t.Cleanup(func() { cli = orig })
+	cli.MQTTEnabled = true
+	cli.MQTTDisableCommands = true
+	cli.MQTTDisabledTopics = "psu,zfs/arc,psu"
+	cli.MQTTHomeAssistant = true
+	cfg, err := buildMQTTConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Enabled || !cfg.DisableCommands || !cfg.HomeAssistantMode || !cfg.DiscoveryEnabled ||
+		!slices.Equal(cfg.DisabledTopics, []string{"psu", "zfs/arc"}) {
+		t.Fatal("daemon config did not preserve independent command, topic, and discovery settings")
+	}
+	cli.MQTTDisabledTopics = "zfs/#"
+	if _, err := buildMQTTConfig(); err == nil {
+		t.Fatal("daemon config accepted a wildcard in the topic selection")
+	}
+}
+
 func TestApplyFileConfigNICInterval(t *testing.T) {
 	orig := cli.IntervalNIC
 	t.Cleanup(func() { cli.IntervalNIC = orig })
@@ -284,7 +305,7 @@ func TestConfigFilePrecedence(t *testing.T) {
 	yes, no := true, false
 	yamlToken := "yaml-token-1234567890"
 	fileInterval := 300
-	envs := []string{"READ_ONLY", "API_TOKEN", "ALLOW_UNAUTHENTICATED_WRITES", "WAN_IP_LOOKUP", "INTERVAL_NIC"}
+	envs := []string{"READ_ONLY", "API_TOKEN", "ALLOW_UNAUTHENTICATED_WRITES", "WAN_IP_LOOKUP", "INTERVAL_NIC", "MQTT_DISABLE_COMMANDS", "MQTT_DISABLED_TOPICS"}
 
 	tests := []struct {
 		name  string
@@ -324,6 +345,43 @@ func TestConfigFilePrecedence(t *testing.T) {
 			check: func(t *testing.T) {
 				if cli.APIToken != "env-token-1234567890" {
 					t.Errorf("APIToken=%q, want the env token", cli.APIToken)
+				}
+			},
+		},
+		{
+			name: "MQTT filters from YAML",
+			file: domain.FileConfig{MQTT: &domain.FileConfigMQTT{
+				DisableCommands: &yes, DisabledTopics: []string{"psu", "zfs/datasets"},
+			}},
+			check: func(t *testing.T) {
+				if !cli.MQTTDisableCommands || cli.MQTTDisabledTopics != "psu,zfs/datasets" {
+					t.Errorf("MQTT filters from YAML = %v, %q", cli.MQTTDisableCommands, cli.MQTTDisabledTopics)
+				}
+			},
+		},
+		{
+			name: "MQTT flags and env beat YAML",
+			args: []string{"--mqtt-disable-commands=false"},
+			env:  map[string]string{"MQTT_DISABLED_TOPICS": "gpu"},
+			file: domain.FileConfig{MQTT: &domain.FileConfigMQTT{
+				DisableCommands: &yes, DisabledTopics: []string{"psu", "zfs/datasets"},
+			}},
+			check: func(t *testing.T) {
+				if cli.MQTTDisableCommands || cli.MQTTDisabledTopics != "gpu" {
+					t.Errorf("MQTT filters after override = %v, %q", cli.MQTTDisableCommands, cli.MQTTDisabledTopics)
+				}
+			},
+		},
+		{
+			name: "empty MQTT topic flag clears YAML selections",
+			args: []string{"--mqtt-disabled-topics="},
+			env:  map[string]string{"MQTT_DISABLE_COMMANDS": ""},
+			file: domain.FileConfig{MQTT: &domain.FileConfigMQTT{
+				DisableCommands: &yes, DisabledTopics: []string{"psu"},
+			}},
+			check: func(t *testing.T) {
+				if !cli.MQTTDisableCommands || cli.MQTTDisabledTopics != "" {
+					t.Errorf("MQTT filters after clearing topic selection = %v, %q", cli.MQTTDisableCommands, cli.MQTTDisabledTopics)
 				}
 			},
 		},

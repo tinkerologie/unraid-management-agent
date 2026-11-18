@@ -22,6 +22,7 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
 	"github.com/tinkerologie/unraid-management-agent/daemon/platform"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/collectors"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/mqtt"
 )
 
 // Version is the application version, set at build time via ldflags.
@@ -129,6 +130,8 @@ var cli struct {
 	MQTTUseTLS             bool   `default:"false" env:"MQTT_USE_TLS" help:"use TLS for MQTT connection"`
 	MQTTInsecureSkipVerify bool   `default:"false" env:"MQTT_INSECURE_SKIP_VERIFY" help:"skip TLS certificate verification"`
 	MQTTQoS                int    `default:"0" env:"MQTT_QOS" help:"MQTT QoS level (0, 1, or 2)"`
+	MQTTDisableCommands    bool   `default:"false" env:"MQTT_DISABLE_COMMANDS" help:"disable MQTT command handling and discovery of controls"`
+	MQTTDisabledTopics     string `default:"" env:"MQTT_DISABLED_TOPICS" help:"comma-separated MQTT telemetry topic suffixes to disable"`
 	MQTTRetain             bool   `default:"true" env:"MQTT_RETAIN" help:"retain MQTT messages"`
 	MQTTHomeAssistant      bool   `default:"false" env:"MQTT_HOME_ASSISTANT" help:"enable Home Assistant MQTT discovery"`
 	MQTTHAPrefix           string `default:"homeassistant" env:"MQTT_HA_PREFIX" help:"Home Assistant discovery prefix"`
@@ -312,6 +315,12 @@ func main() {
 		logger.Info("Read-only mode enabled: all state-changing MCP tools are blocked")
 	}
 
+	mqttConfig, err := buildMQTTConfig()
+	if err != nil {
+		logger.Error("Invalid MQTT configuration: %v", err)
+		os.Exit(1)
+	}
+
 	// Parse disabled collectors from CLI/env and create a map
 	disabledCollectors := make(map[string]bool)
 	if cli.DisableCollectors != "" {
@@ -405,22 +414,7 @@ func main() {
 		VMGuest:          buildVMGuestConfig(cli.VMGuestAgent, vmGuestFileConfig(fileCfg)),
 		Hub:              domain.NewEventBus(1024), // Buffer size for event bus
 		Platform:         platform.NewRegistry(),
-		MQTTConfig: domain.MQTTConfig{
-			Enabled:             cli.MQTTEnabled,
-			Broker:              cli.MQTTBroker,
-			Port:                cli.MQTTPort,
-			Username:            cli.MQTTUsername,
-			Password:            cli.MQTTPassword,
-			ClientID:            cli.MQTTClientID,
-			UseTLS:              cli.MQTTUseTLS,
-			InsecureSkipVerify:  cli.MQTTInsecureSkipVerify,
-			TopicPrefix:         cli.MQTTTopicPrefix,
-			QoS:                 cli.MQTTQoS,
-			RetainMessages:      cli.MQTTRetain,
-			HomeAssistantMode:   cli.MQTTHomeAssistant,
-			HomeAssistantPrefix: cli.MQTTHAPrefix,
-			DiscoveryEnabled:    cli.MQTTHomeAssistant, // Enable discovery when HA mode is enabled
-		},
+		MQTTConfig:       mqttConfig,
 		DiscoveryConfig: domain.DiscoveryConfig{
 			Enabled:     cli.DiscoveryEnabled,
 			ServiceName: cli.DiscoveryServiceName,
@@ -655,6 +649,31 @@ func vmGuestFileConfig(cfg *domain.FileConfig) *domain.FileConfigVMGuest {
 	return cfg.VMGuestAgent
 }
 
+func buildMQTTConfig() (domain.MQTTConfig, error) {
+	disabledTopics, err := mqtt.ParseDisabledTopics(cli.MQTTDisabledTopics)
+	if err != nil {
+		return domain.MQTTConfig{}, err
+	}
+	return domain.MQTTConfig{
+		Enabled:             cli.MQTTEnabled,
+		Broker:              cli.MQTTBroker,
+		Port:                cli.MQTTPort,
+		Username:            cli.MQTTUsername,
+		Password:            cli.MQTTPassword,
+		ClientID:            cli.MQTTClientID,
+		UseTLS:              cli.MQTTUseTLS,
+		InsecureSkipVerify:  cli.MQTTInsecureSkipVerify,
+		TopicPrefix:         cli.MQTTTopicPrefix,
+		QoS:                 cli.MQTTQoS,
+		RetainMessages:      cli.MQTTRetain,
+		DisableCommands:     cli.MQTTDisableCommands,
+		DisabledTopics:      disabledTopics,
+		HomeAssistantMode:   cli.MQTTHomeAssistant,
+		HomeAssistantPrefix: cli.MQTTHAPrefix,
+		DiscoveryEnabled:    cli.MQTTHomeAssistant, // Enable discovery when HA mode is enabled
+	}, nil
+}
+
 // buildVMGuestConfig merges the --vm-guest-agent flag with the vm_guest_agent
 // section of config.yml. The flag, when set, replaces the file's VM list.
 // Invalid VM names and sensors are logged and skipped.
@@ -845,6 +864,10 @@ func applyFileConfig(cfg *domain.FileConfig) {
 		setBool(&cli.MQTTInsecureSkipVerify, m.InsecureSkipVerify)
 		setInt(&cli.MQTTQoS, m.QoS)
 		setBool(&cli.MQTTRetain, m.Retain)
+		setBool(&cli.MQTTDisableCommands, m.DisableCommands)
+		if m.DisabledTopics != nil && !isExplicitFlag(&cli.MQTTDisabledTopics) {
+			cli.MQTTDisabledTopics = strings.Join(m.DisabledTopics, ",")
+		}
 		setBool(&cli.MQTTHomeAssistant, m.HomeAssistant)
 		setStr(&cli.MQTTHAPrefix, m.HAPrefix)
 	}

@@ -61,6 +61,8 @@ module.exports = async () => {
       'MQTT_BROKER="127.0.0.1"',
       'MQTT_HOME_ASSISTANT="true"',
       'MQTT_PASSWORD="fixture-mqtt-password"', // pragma: allowlist secret
+      "MQTT_DISABLE_COMMANDS='true'",
+      "MQTT_DISABLED_TOPICS='docker/containers, zfs/datasets'",
       '',
     ].join('\n'),
   );

@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -53,7 +54,11 @@ type Client struct {
 	// connectCancel cancels the context for goroutines spawned by handleConnect.
 	// Protected by mu.
 	connectCancel  context.CancelFunc
-	connectContext context.Context // protected by mu; cancels queued PSU discovery
+	connectContext context.Context // protected by mu; cancels work from the prior connection
+	// zfsPublishMu orders legacy retained deletions against writes to the
+	// aggregate topic that used to share the same per-pool address.
+	zfsPublishMu sync.Mutex
+	zfsPublished map[string]bool
 	// onConnState receives every connection state change. connStateMu
 	// guards it and serialises its calls, so they arrive in order.
 	onConnState func(connected bool)
@@ -97,8 +102,10 @@ func normalizeQoS(qos int) byte {
 
 // NewClient creates a new MQTT client with the given configuration.
 func NewClient(config *dto.MQTTConfig, hostname, agentVersion string, domainCtx *domain.Context) *Client {
+	clientConfig := *config
+	clientConfig.DisabledTopics = slices.Clone(config.DisabledTopics)
 	return &Client{
-		config:         config,
+		config:         &clientConfig,
 		hostname:       hostname,
 		agentVersion:   agentVersion,
 		tracker:        newDiscoveryTracker(),
@@ -152,9 +159,10 @@ func (c *Client) Connect(ctx context.Context) error {
 	opts := pahomqtt.NewClientOptions()
 	opts.AddBroker(c.config.Broker)
 	opts.SetClientID(c.clientID())
-	opts.SetCleanSession(c.config.CleanSession)
+	opts.SetCleanSession(c.config.CleanSession || c.config.DisableCommands || len(c.config.DisabledTopics) != 0)
 	opts.SetAutoReconnect(c.config.AutoReconnect)
 	opts.SetConnectTimeout(time.Duration(c.config.ConnectTimeout) * time.Second)
+	opts.SetWriteTimeout(5 * time.Second)
 	opts.SetKeepAlive(time.Duration(c.config.KeepAlive) * time.Second)
 
 	if c.config.Username != "" {
@@ -188,17 +196,11 @@ func (c *Client) Connect(ctx context.Context) error {
 
 	token := c.client.Connect()
 
-	// Wait with context for connection
-	done := make(chan bool)
-	go func() {
-		token.Wait()
-		done <- true
-	}()
-
+	// Wait for either the broker acknowledgment or caller cancellation.
 	select {
 	case <-ctx.Done():
 		return fmt.Errorf("connection cancelled: %w", ctx.Err())
-	case <-done:
+	case <-token.Done():
 		if token.Error() != nil {
 			c.lastError = token.Error().Error()
 			return fmt.Errorf("failed to connect: %w", token.Error())
@@ -215,15 +217,17 @@ func (c *Client) handleConnect() {
 	if c.connectCancel != nil {
 		c.connectCancel()
 	}
+	c.zfsPublishMu.Lock()
+	clear(c.zfsPublished)
+	c.zfsPublishMu.Unlock()
 	ctx, cancel := context.WithCancel(context.Background())
 	c.connectCancel = cancel
 	c.connectContext = ctx
-	c.mu.Unlock()
-
 	c.connected.Store(true)
 	now := time.Now()
 	c.lastConnect = &now
 	c.lastError = ""
+	c.mu.Unlock()
 	c.notifyConnState()
 
 	logger.Success("MQTT: Connected to broker %s", c.config.Broker)
@@ -233,7 +237,7 @@ func (c *Client) handleConnect() {
 	_ = c.publish(availabilityTopic, "online", true)
 
 	// Publish Home Assistant discovery if enabled
-	if c.config.HomeAssistantMode {
+	if c.config.HomeAssistantMode || c.config.DisableCommands || len(c.config.DisabledTopics) != 0 {
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
@@ -245,36 +249,49 @@ func (c *Client) handleConnect() {
 			if ctx.Err() != nil {
 				return
 			}
+			c.reconcileRetained(ctx)
+			if ctx.Err() != nil || !c.config.HomeAssistantMode {
+				return
+			}
 			c.publishHADiscovery()
 			if ctx.Err() != nil {
 				return
 			}
-			c.publishServiceStates()
+			c.publishServiceStates(ctx)
 			if ctx.Err() != nil {
 				return
 			}
 			c.subscribeCommandTopics()
+			c.refreshReadOnlyServiceStates(ctx, time.Minute)
 		}()
 	}
 }
 
 // handleDisconnect is called when connection is lost.
 func (c *Client) handleDisconnect(err error) {
+	c.mu.Lock()
+	if c.client != nil && c.client.IsConnectionOpen() {
+		// The library dispatches loss and reconnect callbacks independently.
+		// A delayed loss callback must not cancel the open session's work.
+		c.mu.Unlock()
+		return
+	}
 	c.connected.Store(false)
 	now := time.Now()
 	c.lastDisconn = &now
-	c.notifyConnState()
+	if err != nil {
+		c.lastError = err.Error()
+	}
 
 	// Cancel any in-flight connect goroutines.
-	c.mu.Lock()
 	if c.connectCancel != nil {
 		c.connectCancel()
 		c.connectCancel = nil
 	}
 	c.mu.Unlock()
+	c.notifyConnState()
 
 	if err != nil {
-		c.lastError = err.Error()
 		logger.Warning("MQTT: Connection lost: %v", err)
 	} else {
 		logger.Info("MQTT: Disconnected from broker")
@@ -401,6 +418,8 @@ func (c *Client) GetConfig() *dto.MQTTConfig {
 		TopicPrefix:       c.config.TopicPrefix,
 		QoS:               c.config.QoS,
 		RetainMessages:    c.config.RetainMessages,
+		DisableCommands:   c.config.DisableCommands,
+		DisabledTopics:    slices.Clone(c.config.DisabledTopics),
 		ConnectTimeout:    c.config.ConnectTimeout,
 		KeepAlive:         c.config.KeepAlive,
 		CleanSession:      c.config.CleanSession,
@@ -439,7 +458,7 @@ func (c *Client) GetTopics() *dto.MQTTTopics {
 
 // PublishSystemInfo publishes system information to MQTT.
 func (c *Client) PublishSystemInfo(info *dto.SystemInfo) error {
-	if !c.shouldPublish() {
+	if !c.shouldPublishTopic(TopicSystem) {
 		return nil
 	}
 	if err := c.publishJSON(c.buildTopic("system"), info); err != nil {
@@ -454,7 +473,7 @@ func (c *Client) PublishSystemInfo(info *dto.SystemInfo) error {
 
 // PublishArrayStatus publishes array status to MQTT.
 func (c *Client) PublishArrayStatus(status *dto.ArrayStatus) error {
-	if !c.shouldPublish() {
+	if !c.shouldPublishTopic(TopicArray) {
 		return nil
 	}
 	return c.publishJSON(c.buildTopic("array"), status)
@@ -462,7 +481,7 @@ func (c *Client) PublishArrayStatus(status *dto.ArrayStatus) error {
 
 // PublishDisks publishes disk information to MQTT.
 func (c *Client) PublishDisks(disks []dto.DiskInfo) error {
-	if !c.shouldPublish() {
+	if !c.shouldPublishTopic(TopicDisks) {
 		return nil
 	}
 	err := c.publishJSON(c.buildTopic("disks"), disks)
@@ -473,7 +492,7 @@ func (c *Client) PublishDisks(disks []dto.DiskInfo) error {
 
 // PublishContainers publishes Docker container information to MQTT.
 func (c *Client) PublishContainers(containers []dto.ContainerInfo) error {
-	if !c.shouldPublish() {
+	if !c.shouldPublishTopic(TopicContainers) {
 		return nil
 	}
 	err := c.publishJSON(c.buildTopic("docker/containers"), containers)
@@ -484,7 +503,7 @@ func (c *Client) PublishContainers(containers []dto.ContainerInfo) error {
 
 // PublishVMs publishes VM information to MQTT.
 func (c *Client) PublishVMs(vms []dto.VMInfo) error {
-	if !c.shouldPublish() {
+	if !c.shouldPublishTopic(TopicVMs) {
 		return nil
 	}
 	err := c.publishJSON(c.buildTopic("vm/list"), vms)
@@ -495,7 +514,7 @@ func (c *Client) PublishVMs(vms []dto.VMInfo) error {
 
 // PublishUPSStatus publishes UPS status to MQTT.
 func (c *Client) PublishUPSStatus(ups *dto.UPSStatus) error {
-	if !c.shouldPublish() {
+	if !c.shouldPublishTopic(TopicUPS) {
 		return nil
 	}
 	return c.publishJSON(c.buildTopic("ups"), ups)
@@ -503,7 +522,7 @@ func (c *Client) PublishUPSStatus(ups *dto.UPSStatus) error {
 
 // PublishGPUMetrics publishes GPU metrics to MQTT.
 func (c *Client) PublishGPUMetrics(gpus []*dto.GPUMetrics) error {
-	if !c.shouldPublish() {
+	if !c.shouldPublishTopic(TopicGPU) {
 		return nil
 	}
 	err := c.publishJSON(c.buildTopic("gpu"), gpus)
@@ -514,7 +533,7 @@ func (c *Client) PublishGPUMetrics(gpus []*dto.GPUMetrics) error {
 
 // PublishNetworkInfo publishes network information to MQTT.
 func (c *Client) PublishNetworkInfo(network []dto.NetworkInfo) error {
-	if !c.shouldPublish() {
+	if !c.shouldPublishTopic(TopicNetwork) {
 		return nil
 	}
 	err := c.publishJSON(c.buildTopic("network"), network)
@@ -525,7 +544,7 @@ func (c *Client) PublishNetworkInfo(network []dto.NetworkInfo) error {
 
 // PublishShares publishes share information to MQTT.
 func (c *Client) PublishShares(shares []dto.ShareInfo) error {
-	if !c.shouldPublish() {
+	if !c.shouldPublishTopic(TopicShares) {
 		return nil
 	}
 	err := c.publishJSON(c.buildTopic("shares"), shares)
@@ -536,13 +555,15 @@ func (c *Client) PublishShares(shares []dto.ShareInfo) error {
 
 // PublishNotifications publishes notifications to MQTT.
 func (c *Client) PublishNotifications(notifications *dto.NotificationList) error {
-	if !c.shouldPublish() {
+	if !c.shouldPublishTopic(TopicNotifications, TopicNotificationEvent) {
 		return nil
 	}
-	if err := c.publishJSON(c.buildTopic("notifications"), notifications); err != nil {
-		return err
+	if c.TelemetryEnabled(TopicNotifications) {
+		if err := c.publishJSON(c.buildTopic(TopicNotifications), notifications); err != nil {
+			return err
+		}
 	}
-	if notifications != nil {
+	if notifications != nil && c.TelemetryEnabled(TopicNotificationEvent) {
 		c.publishNewNotificationEvents(notifications.Notifications)
 	}
 	return nil
@@ -612,10 +633,10 @@ func (c *Client) publishNewNotificationEvents(notifications []dto.Notification) 
 
 // PublishZFSPools publishes ZFS pool information to MQTT.
 func (c *Client) PublishZFSPools(pools []dto.ZFSPool) error {
-	if !c.shouldPublish() {
+	if !c.shouldPublishTopic(TopicZFSPools) {
 		return nil
 	}
-	err := c.publishJSON(c.buildTopic("zfs/pools"), pools)
+	err := c.publishJSON(c.buildTopic(TopicZFSPools), pools)
 	// Publish per-pool topics and HA discovery
 	go c.publishZFSDiscovery(pools)
 	return err
@@ -623,7 +644,7 @@ func (c *Client) PublishZFSPools(pools []dto.ZFSPool) error {
 
 // PublishNUTStatus publishes NUT UPS status to MQTT.
 func (c *Client) PublishNUTStatus(data *dto.NUTResponse) error {
-	if !c.shouldPublish() {
+	if !c.shouldPublishTopic(TopicNUT) {
 		return nil
 	}
 	return c.publishJSON(c.buildTopic("nut/status"), data)
@@ -631,7 +652,7 @@ func (c *Client) PublishNUTStatus(data *dto.NUTResponse) error {
 
 // PublishHardwareInfo publishes hardware information to MQTT.
 func (c *Client) PublishHardwareInfo(info *dto.HardwareInfo) error {
-	if !c.shouldPublish() {
+	if !c.shouldPublishTopic(TopicHardware) {
 		return nil
 	}
 	return c.publishJSON(c.buildTopic("hardware"), info)
@@ -639,7 +660,7 @@ func (c *Client) PublishHardwareInfo(info *dto.HardwareInfo) error {
 
 // PublishRegistration publishes registration/license information to MQTT.
 func (c *Client) PublishRegistration(reg *dto.Registration) error {
-	if !c.shouldPublish() {
+	if !c.shouldPublishTopic(TopicRegistration) {
 		return nil
 	}
 	return c.publishJSON(c.buildTopic("registration"), reg)
@@ -647,7 +668,7 @@ func (c *Client) PublishRegistration(reg *dto.Registration) error {
 
 // PublishUnassignedDevices publishes unassigned device information to MQTT.
 func (c *Client) PublishUnassignedDevices(list *dto.UnassignedDeviceList) error {
-	if !c.shouldPublish() {
+	if !c.shouldPublishTopic(TopicUnassigned) {
 		return nil
 	}
 	err := c.publishJSON(c.buildTopic("unassigned/devices"), list)
@@ -657,33 +678,33 @@ func (c *Client) PublishUnassignedDevices(list *dto.UnassignedDeviceList) error 
 
 // PublishZFSDatasets publishes ZFS dataset information to MQTT.
 func (c *Client) PublishZFSDatasets(datasets []dto.ZFSDataset) error {
-	if !c.shouldPublish() {
+	if !c.shouldPublishTopic(TopicZFSDatasets) {
 		return nil
 	}
-	err := c.publishJSON(c.buildTopic("zfs/datasets"), datasets)
+	err := c.publishJSON(c.buildTopic(TopicZFSDatasets), datasets)
 	go c.publishZFSDatasetDiscovery(datasets)
 	return err
 }
 
 // PublishZFSSnapshots publishes ZFS snapshot list to MQTT.
 func (c *Client) PublishZFSSnapshots(snapshots []dto.ZFSSnapshot) error {
-	if !c.shouldPublish() {
+	if !c.shouldPublishTopic(TopicZFSSnapshots) {
 		return nil
 	}
-	return c.publishJSON(c.buildTopic("zfs/snapshots"), snapshots)
+	return c.publishJSON(c.buildTopic(TopicZFSSnapshots), snapshots)
 }
 
 // PublishZFSARCStats publishes ZFS ARC statistics to MQTT.
 func (c *Client) PublishZFSARCStats(stats dto.ZFSARCStats) error {
-	if !c.shouldPublish() {
+	if !c.shouldPublishTopic(TopicZFSARC) {
 		return nil
 	}
-	return c.publishJSON(c.buildTopic("zfs/arc"), stats)
+	return c.publishJSON(c.buildTopic(TopicZFSARC), stats)
 }
 
 // PublishFanControlStatus publishes fan control status to MQTT.
 func (c *Client) PublishFanControlStatus(status *dto.FanControlStatus) error {
-	if !c.shouldPublish() {
+	if !c.shouldPublishTopic(TopicFanControl) {
 		return nil
 	}
 	err := c.publishJSON(c.buildTopic("fancontrol"), status)
@@ -713,8 +734,24 @@ func (c *Client) publish(topic, payload string, retained bool) error {
 		return fmt.Errorf("MQTT client not initialized")
 	}
 
+	_, shared := sharedZFSPoolID(strings.TrimPrefix(topic, c.buildTopic("")))
+	trackAggregate := retained && shared && !c.TelemetryEnabled(TopicZFSPools)
+	if trackAggregate {
+		c.zfsPublishMu.Lock()
+		defer c.zfsPublishMu.Unlock()
+	}
+
 	token := c.client.Publish(topic, normalizeQoS(c.config.QoS), retained, payload)
-	if !token.WaitTimeout(5 * time.Second) {
+	completed := token.WaitTimeout(5 * time.Second)
+	if trackAggregate && (!completed || token.Error() == nil) {
+		// A timed-out write may still reach the broker. Protect the aggregate
+		// from an older retained deletion unless the write definitely failed.
+		if c.zfsPublished == nil {
+			c.zfsPublished = make(map[string]bool)
+		}
+		c.zfsPublished[topic] = true
+	}
+	if !completed {
 		c.msgErrors.Add(1)
 		logger.Debug("MQTT: Publish to %s timed out after 5s", topic)
 		return fmt.Errorf("MQTT publish to %s timed out after 5s", topic)

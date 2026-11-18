@@ -23,9 +23,11 @@ type MQTTConfig struct {
 	InsecureSkipVerify bool `json:"insecure_skip_verify"`
 
 	// Publishing settings
-	TopicPrefix    string `json:"topic_prefix"`
-	QoS            int    `json:"qos"`
-	RetainMessages bool   `json:"retain_messages"`
+	TopicPrefix     string   `json:"topic_prefix"`
+	QoS             int      `json:"qos"`
+	RetainMessages  bool     `json:"retain_messages"`
+	DisableCommands bool     `json:"disable_commands"`
+	DisabledTopics  []string `json:"disabled_topics,omitempty"`
 
 	// Home Assistant integration
 	HomeAssistantMode   bool   `json:"home_assistant_mode"`
@@ -201,6 +203,8 @@ func (c *MQTTConfig) ToDTOConfig() *dto.MQTTConfig {
 		TopicPrefix:       c.TopicPrefix,
 		QoS:               c.QoS,
 		RetainMessages:    c.RetainMessages,
+		DisableCommands:   c.DisableCommands,
+		DisabledTopics:    c.DisabledTopics,
 		ConnectTimeout:    30,
 		KeepAlive:         60,
 		CleanSession:      true,

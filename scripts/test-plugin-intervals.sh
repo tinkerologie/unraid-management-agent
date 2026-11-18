@@ -103,7 +103,7 @@ cp "${REPO_ROOT}/meta/plugin/scripts/auto-intervals" "$SANDBOX/scripts/"
 grep -q "^CONFIG_FILE=\"$SANDBOX" "$SANDBOX/scripts/start" || fail "could not redirect CONFIG_FILE in the start script copy"
 grep -q "^PROG=\"$SANDBOX" "$SANDBOX/scripts/start" || fail "could not redirect PROG in the start script copy"
 printf '#!/bin/sh\nexit 0\n' >"$SANDBOX/bin/killall"
-printf '#!/bin/sh\nenv >"%s/env.out"\n' "$SANDBOX" >"$SANDBOX/bin/daemon"
+printf '#!/bin/sh\nprintf "%%s\\n" "$@" >"%s/args.out"\nenv >"%s/env.out"\n' "$SANDBOX" "$SANDBOX" >"$SANDBOX/bin/daemon"
 chmod +x "$SANDBOX/bin/killall" "$SANDBOX/bin/daemon"
 
 # Runs the start script with config.cfg content $1 and prints the daemon's
@@ -160,6 +160,19 @@ for var in MCP_ENABLED METRICS_ENABLED WEBSOCKET_ENABLED; do
     done
 done
 echo "✓ endpoint toggles reach the daemon as true unless explicitly false"
+
+# MQTT YAML values may fill absent plugin settings. A saved empty topic list
+# is an explicit request to publish all telemetry topics.
+got=$(unset MQTT_DISABLE_COMMANDS MQTT_DISABLED_TOPICS; run_start 'PORT="8043"' MQTT_DISABLE_COMMANDS)
+[ -z "$got" ] || fail "absent MQTT_DISABLE_COMMANDS overrides the daemon default"
+if grep -Fxq -- '--mqtt-disabled-topics=' "$SANDBOX/args.out"; then
+    fail "absent MQTT_DISABLED_TOPICS overrides the daemon default"
+fi
+cfg=$'PORT="8043"\nMQTT_DISABLE_COMMANDS="false"\nMQTT_DISABLED_TOPICS=""'
+got=$(run_start "$cfg" MQTT_DISABLE_COMMANDS)
+[ "$got" = "false" ] || fail "explicit MQTT_DISABLE_COMMANDS=false was lost"
+grep -Fxq -- '--mqtt-disabled-topics=' "$SANDBOX/args.out" || fail "explicitly empty MQTT_DISABLED_TOPICS was lost"
+echo "✓ MQTT launcher preserves the difference between absent and explicit settings"
 
 # Invalid: non-digits are stripped before the value reaches the daemon.
 got=$(run_start $'PORT="8043"\nINTERVAL_FAN_CONTROL="15s"\nINTERVAL_MOVER="30;reboot"' INTERVAL_FAN_CONTROL INTERVAL_MOVER | paste -sd, -)

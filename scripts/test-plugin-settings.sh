@@ -59,6 +59,19 @@ for key in MCP_ENABLED METRICS_ENABLED WEBSOCKET_ENABLED; do
 done
 echo "✓ Endpoint toggles save as true unless explicitly false; their checkbox fields are dropped (#273)"
 
+check MQTT_DISABLE_COMMANDS true true
+check MQTT_DISABLE_COMMANDS false false
+check MQTT_DISABLE_COMMANDS yes false
+check MQTT_DISABLE_COMMANDS "<absent>" "<unset>"
+check MQTT_DISABLED_TOPICS "docker/containers,zfs/arc" "docker/containers,zfs/arc"
+check MQTT_DISABLED_TOPICS "" ""
+check MQTT_DISABLED_TOPICS "<absent>" "<unset>"
+if [ ! -f /boot/config/plugins/unraid-management-agent/config.cfg ]; then
+    check MQTT_DISABLED_TOPICS "invalid/topic" ""
+    check MQTT_DISABLED_TOPICS "docker/+,zfs/arc" ""
+fi
+echo "✓ MQTT command and telemetry settings validate independently (#356)"
+
 # Unauthenticated writes: only an explicit "true" turns them on (default off).
 check ALLOW_UNAUTHENTICATED_WRITES true true
 check ALLOW_UNAUTHENTICATED_WRITES false false

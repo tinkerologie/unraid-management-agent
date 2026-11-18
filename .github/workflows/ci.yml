@@ -43,12 +43,39 @@ jobs:
       - name: Install test reporting tooling
         run: go install gotest.tools/gotestsum@v1.13.0
 
+      - name: Install MQTT broker fixture
+        run: sudo apt-get update && sudo apt-get install -y mosquitto
+
       - name: Run tests with coverage and JUnit output
+        env:
+          UMA_TEST_MQTT_BROKER: tcp://127.0.0.1:28883
         run: |
+          # Mosquitto 2's unconfigured listener is loopback-only, with no persistence.
+          # Avoid loading a runner-temp config under the packaged AppArmor profile.
+          broker_log="$RUNNER_TEMP/mosquitto-uma.log"
+          mosquitto -p 28883 -v > "$broker_log" 2>&1 &
+          broker_pid=$!
+          trap 'kill "$broker_pid" 2>/dev/null || true' EXIT
+          if ! timeout 5 bash -c 'until (: </dev/tcp/127.0.0.1/28883) 2>/dev/null; do sleep 0.1; done'; then
+            cat "$broker_log"
+            exit 1
+          fi
+
           "$(go env GOPATH)/bin/gotestsum" \
             --junitfile junit.xml \
             --format standard-quiet \
             -- -covermode=atomic -coverprofile=coverage.out ./...
+          # The takeover fixture has the same ID and a 30s keepalive. Count
+          # only the two real agent sessions, which use a 60s keepalive.
+          awk '
+            /New client connected.* as uma356-[0-9]+-disabled .*k60/ { disabled_connections++ }
+            $2 ~ /^uma356-[0-9]+-disabled$/ && $4 ~ /\/cmd\// { disabled_subscriptions++ }
+            $2 ~ /^uma356-[0-9]+$/ && $4 ~ /\/cmd\/#$/ { enabled_subscriptions++ }
+            END {
+              printf "Disabled agent connections: %d, disabled subscriptions: %d, enabled subscriptions: %d\n", disabled_connections, disabled_subscriptions, enabled_subscriptions
+              exit !(disabled_connections >= 2 && disabled_subscriptions == 0 && enabled_subscriptions > 0)
+            }
+          ' "$broker_log"
           go tool cover -func=coverage.out | tail -n 1
 
       - name: Upload coverage to Codecov

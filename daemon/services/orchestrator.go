@@ -635,14 +635,16 @@ func (o *Orchestrator) initializeMQTT(ctx context.Context, wg *sync.WaitGroup, a
 
 // mqttBinding connects a topic to its MQTT publish function.
 type mqttBinding struct {
+	telemetry []string
 	topicName string
 	msgType   reflect.Type
 	handle    func(any)
 }
 
 // mqttBind creates a type-safe mqttBinding using generics.
-func mqttBind[T any](topic domain.Topic[T], fn func(T) error) mqttBinding {
+func mqttBind[T any](topic domain.Topic[T], fn func(T) error, telemetry ...string) mqttBinding {
 	return mqttBinding{
+		telemetry: telemetry,
 		topicName: topic.Name,
 		msgType:   reflect.TypeFor[T](),
 		handle: func(v any) {
@@ -669,45 +671,48 @@ func (o *Orchestrator) subscribeMQTTEvents(ctx context.Context, _ *api.Server, s
 	logger.Info("MQTT: Starting event subscription...")
 
 	bindings := []mqttBinding{
-		mqttBind(constants.TopicSystemUpdate, o.mqttClient.PublishSystemInfo),
-		mqttBind(constants.TopicArrayStatusUpdate, o.mqttClient.PublishArrayStatus),
-		mqttBind(constants.TopicDiskListUpdate, o.mqttClient.PublishDisks),
-		mqttBind(constants.TopicShareListUpdate, o.mqttClient.PublishShares),
+		mqttBind(constants.TopicSystemUpdate, o.mqttClient.PublishSystemInfo, mqtt.TopicSystem),
+		mqttBind(constants.TopicArrayStatusUpdate, o.mqttClient.PublishArrayStatus, mqtt.TopicArray),
+		mqttBind(constants.TopicDiskListUpdate, o.mqttClient.PublishDisks, mqtt.TopicDisks),
+		mqttBind(constants.TopicShareListUpdate, o.mqttClient.PublishShares, mqtt.TopicShares),
 		mqttBind(constants.TopicContainerListUpdate, func(v []*dto.ContainerInfo) error {
 			containers := make([]dto.ContainerInfo, len(v))
 			for i, c := range v {
 				containers[i] = *c
 			}
 			return o.mqttClient.PublishContainers(containers)
-		}),
+		}, mqtt.TopicContainers),
 		mqttBind(constants.TopicVMListUpdate, func(v []*dto.VMInfo) error {
 			vms := make([]dto.VMInfo, len(v))
 			for i, vm := range v {
 				vms[i] = *vm
 			}
 			return o.mqttClient.PublishVMs(vms)
-		}),
-		mqttBind(constants.TopicPSUStatusUpdate, o.mqttClient.PublishPSUStatus),
-		mqttBind(constants.TopicUPSStatusUpdate, o.mqttClient.PublishUPSStatus),
-		mqttBind(constants.TopicGPUMetricsUpdate, o.mqttClient.PublishGPUMetrics),
-		mqttBind(constants.TopicNetworkListUpdate, o.mqttClient.PublishNetworkInfo),
-		mqttBind(constants.TopicNotificationsUpdate, o.mqttClient.PublishNotifications),
-		mqttBind(constants.TopicZFSPoolsUpdate, o.mqttClient.PublishZFSPools),
-		mqttBind(constants.TopicNUTStatusUpdate, o.mqttClient.PublishNUTStatus),
-		mqttBind(constants.TopicHardwareUpdate, o.mqttClient.PublishHardwareInfo),
-		mqttBind(constants.TopicRegistrationUpdate, o.mqttClient.PublishRegistration),
-		mqttBind(constants.TopicUnassignedDevicesUpdate, o.mqttClient.PublishUnassignedDevices),
-		mqttBind(constants.TopicZFSDatasetsUpdate, o.mqttClient.PublishZFSDatasets),
-		mqttBind(constants.TopicZFSSnapshotsUpdate, o.mqttClient.PublishZFSSnapshots),
-		mqttBind(constants.TopicZFSARCStatsUpdate, o.mqttClient.PublishZFSARCStats),
-		mqttBind(constants.TopicFanControlUpdate, o.mqttClient.PublishFanControlStatus),
+		}, mqtt.TopicVMs),
+		mqttBind(constants.TopicPSUStatusUpdate, o.mqttClient.PublishPSUStatus, mqtt.TopicPSU),
+		mqttBind(constants.TopicUPSStatusUpdate, o.mqttClient.PublishUPSStatus, mqtt.TopicUPS),
+		mqttBind(constants.TopicGPUMetricsUpdate, o.mqttClient.PublishGPUMetrics, mqtt.TopicGPU),
+		mqttBind(constants.TopicNetworkListUpdate, o.mqttClient.PublishNetworkInfo, mqtt.TopicNetwork),
+		mqttBind(constants.TopicNotificationsUpdate, o.mqttClient.PublishNotifications, mqtt.TopicNotifications, mqtt.TopicNotificationEvent),
+		mqttBind(constants.TopicZFSPoolsUpdate, o.mqttClient.PublishZFSPools, mqtt.TopicZFSPools),
+		mqttBind(constants.TopicNUTStatusUpdate, o.mqttClient.PublishNUTStatus, mqtt.TopicNUT),
+		mqttBind(constants.TopicHardwareUpdate, o.mqttClient.PublishHardwareInfo, mqtt.TopicHardware),
+		mqttBind(constants.TopicRegistrationUpdate, o.mqttClient.PublishRegistration, mqtt.TopicRegistration),
+		mqttBind(constants.TopicUnassignedDevicesUpdate, o.mqttClient.PublishUnassignedDevices, mqtt.TopicUnassigned),
+		mqttBind(constants.TopicZFSDatasetsUpdate, o.mqttClient.PublishZFSDatasets, mqtt.TopicZFSDatasets),
+		mqttBind(constants.TopicZFSSnapshotsUpdate, o.mqttClient.PublishZFSSnapshots, mqtt.TopicZFSSnapshots),
+		mqttBind(constants.TopicZFSARCStatsUpdate, o.mqttClient.PublishZFSARCStats, mqtt.TopicZFSARC),
+		mqttBind(constants.TopicFanControlUpdate, o.mqttClient.PublishFanControlStatus, mqtt.TopicFanControl),
 	}
 
-	topics := make([]string, len(bindings))
+	topics := make([]string, 0, len(bindings))
 	dispatch := make(map[reflect.Type]func(any), len(bindings))
 	bound := map[string]bool{}
-	for i, b := range bindings {
-		topics[i] = b.topicName
+	for _, b := range bindings {
+		if !o.mqttClient.TelemetryEnabled(b.telemetry...) {
+			continue
+		}
+		topics = append(topics, b.topicName)
 		dispatch[b.msgType] = b.handle
 		if name, ok := scheduler.CollectorForTopic(b.topicName); ok {
 			bound[name] = true

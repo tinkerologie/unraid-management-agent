@@ -2,6 +2,7 @@
 package mqtt
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -75,7 +76,10 @@ func (t *discoveryTracker) update(category string, currentIDs []string) []string
 
 // publishHAEntity publishes a single Home Assistant discovery config.
 func (c *Client) publishHAEntity(opts haEntityOpts) {
-	hostID := strings.ReplaceAll(c.hostname, " ", "_")
+	if !c.allowDiscovery(opts.id, opts.stateTopic, opts.commandTopic) {
+		return
+	}
+	hostID := c.discoveryHost()
 
 	discoveryTopic := fmt.Sprintf("%s/%s/%s/%s/config",
 		c.config.HADiscoveryPrefix,
@@ -189,9 +193,13 @@ func (c *Client) publishHAEntity(opts haEntityOpts) {
 	}
 }
 
+func (c *Client) discoveryHost() string {
+	return strings.ReplaceAll(c.hostname, " ", "_")
+}
+
 // removeHAEntity removes a Home Assistant discovery entity by publishing empty payload.
 func (c *Client) removeHAEntity(entityType, id string) {
-	hostID := strings.ReplaceAll(c.hostname, " ", "_")
+	hostID := c.discoveryHost()
 	discoveryTopic := fmt.Sprintf("%s/%s/%s/%s/config",
 		c.config.HADiscoveryPrefix,
 		entityType,
@@ -647,37 +655,78 @@ func (c *Client) publishNotificationDiscovery() {
 // Services
 // ──────────────────────────────────────────────────────────────────────────────
 
-// publishServiceDiscovery publishes HA discovery for service switches.
+// publishServiceDiscovery publishes service switches or read-only status sensors.
 func (c *Client) publishServiceDiscovery() {
+	if !c.TelemetryEnabled(TopicServices) {
+		return
+	}
 	services := controllers.ValidServiceNames()
-	servicesTopic := c.buildTopic("services")
+	servicesTopic := c.buildTopic(TopicServices)
 
 	for _, svc := range services {
 		svcID := sanitizeID(svc)
 		displayName := serviceDisplayName(svc)
 
-		c.publishHAEntity(haEntityOpts{
-			entityType:   "switch",
-			stateTopic:   servicesTopic,
-			commandTopic: c.buildCommandTopic("service", svcID, "set"),
-			id:           fmt.Sprintf("service_%s_switch", svcID),
-			name:         fmt.Sprintf("Service: %s", displayName),
-			icon:         serviceIcon(svc),
-			template:     fmt.Sprintf("{{ 'ON' if value_json.%s else 'OFF' }}", svc),
-		})
+		opts := haEntityOpts{
+			stateTopic: servicesTopic,
+			name:       fmt.Sprintf("Service: %s", displayName),
+			icon:       serviceIcon(svc),
+			template:   fmt.Sprintf("{{ 'ON' if value_json.%s else 'OFF' }}", svc),
+		}
+		statusID := fmt.Sprintf("service_%s_running", svcID)
+		if c.config.DisableCommands {
+			opts.entityType = "binary_sensor"
+			opts.id = statusID
+		} else {
+			opts.entityType = "switch"
+			opts.id = fmt.Sprintf("service_%s_switch", svcID)
+			opts.commandTopic = c.buildCommandTopic("service", svcID, "set")
+		}
+		c.publishHAEntity(opts)
 	}
 }
 
-// publishServiceStates queries all service running states and publishes
-// them to the services topic so HA switches reflect the actual state.
-func (c *Client) publishServiceStates() {
-	statuses := controllers.NewServiceController().ListServiceStatuses()
+// refreshReadOnlyServiceStates keeps service sensors current when there is no
+// MQTT command path to refresh them. It runs only while this session is open.
+func (c *Client) refreshReadOnlyServiceStates(ctx context.Context, interval time.Duration) {
+	if !c.config.DisableCommands || !c.TelemetryEnabled(TopicServices) {
+		return
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			c.publishServiceStates(ctx)
+		}
+	}
+}
+
+// publishServiceStates publishes running states for HA sensors and switches.
+func (c *Client) publishServiceStates(ctx context.Context) {
+	if ctx.Err() != nil || !c.TelemetryEnabled(TopicServices) {
+		return
+	}
+	c.publishServiceSnapshot(ctx, controllers.NewServiceController().ListServiceStatuses())
+}
+
+func (c *Client) publishServiceSnapshot(ctx context.Context, statuses []controllers.ServiceStatus) {
 	states := make(map[string]bool, len(statuses))
 	for _, svc := range statuses {
 		states[svc.Name] = svc.Running
 	}
 
-	topic := c.buildTopic("services")
+	// Keep the final cancellation check and publish ordered against the
+	// reconnect handler. A previous session's sample must not overwrite a
+	// freshly published snapshot after its service checks finish late.
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if ctx.Err() != nil {
+		return
+	}
+	topic := c.buildTopic(TopicServices)
 	if err := c.publishJSON(topic, states); err != nil {
 		logger.Warning("MQTT: Failed to publish service states: %v", err)
 	}
@@ -1454,7 +1503,13 @@ func (c *Client) publishZFSDiscovery(pools []dto.ZFSPool) {
 
 	for _, pool := range pools {
 		poolID := sanitizeID(pool.Name)
-		poolTopic := c.buildTopic(fmt.Sprintf("zfs/%s", poolID))
+		suffix := "zfs/" + poolID
+		if _, shared := sharedZFSPoolID(suffix); shared {
+			// Keep the entity IDs and use a distinct state topic for a pool
+			// whose name would otherwise alias an aggregate topic.
+			suffix = TopicZFSPools + "/" + poolID
+		}
+		poolTopic := c.buildTopic(suffix)
 
 		if err := c.publishJSON(poolTopic, pool); err != nil {
 			logger.Debug("MQTT: Failed to publish ZFS pool %s: %v", poolID, err)
@@ -1747,17 +1802,12 @@ func (c *Client) publishUnassignedDiscovery(list *dto.UnassignedDeviceList) {
 		ids := c.publishUnassignedEntities(devTopic, fmt.Sprintf("unassigned_%s", devID), displayName, dev)
 		currentIDs = append(currentIDs, ids...)
 	}
-	shareSources := make(map[string]string)
+	c.setRemoteShareSources(indexRemoteShareSources(list.RemoteShares))
 	for _, share := range list.RemoteShares {
 		if share.MountPoint == "" {
 			continue
 		}
 		shareID := sanitizeID(share.MountPoint)
-		// Record the ID→source mapping so MQTT switch commands can be routed
-		// back to the controller. Skip ISO mounts, which cannot be toggled.
-		if share.Source != "" && share.Type != "iso" {
-			shareSources[shareID] = share.Source
-		}
 		shareTopic := c.buildTopic(fmt.Sprintf("unassigned/remote/%s", shareID))
 		if err := c.publishJSON(shareTopic, share); err != nil {
 			logger.Debug("MQTT: Failed to publish remote share %s: %v", shareID, err)
@@ -1765,7 +1815,6 @@ func (c *Client) publishUnassignedDiscovery(list *dto.UnassignedDeviceList) {
 		ids := c.publishRemoteShareEntities(shareTopic, fmt.Sprintf("remote_share_%s", shareID), remoteShareDisplayName(share), shareID, share.Type)
 		currentIDs = append(currentIDs, ids...)
 	}
-	c.setRemoteShareSources(shareSources)
 	removed := c.tracker.update("unassigned", currentIDs)
 	for _, id := range removed {
 		c.removeHAEntities(id)
@@ -1792,6 +1841,9 @@ func (c *Client) publishRemoteShareStates() {
 		domain.Publish(c.domainCtx.Hub, constants.TopicUnassignedDevicesUpdate, deviceList)
 	}
 
+	if !c.TelemetryEnabled(TopicUnassigned) {
+		return
+	}
 	for _, share := range shares {
 		if share.MountPoint == "" {
 			continue
