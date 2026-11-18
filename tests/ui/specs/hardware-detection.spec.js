@@ -116,7 +116,7 @@ test('Show all collectors reveals rows without changing any setting', async ({ p
     page.evaluate((names) => names.map((n) => document.querySelector(`select[name="${n}"]`).value), HARDWARE_SELECTS);
   const before = await values();
 
-  await page.locator('label:has(#show_all_collectors)').click();
+  await page.locator('label[for="show_all_collectors"]').click();
   await expect(page.locator('#show_all_collectors')).toBeChecked();
   await expect(page.locator('#show_all_collectors_val')).toHaveValue('true');
   for (const capability of Object.keys(REFERENCE).filter((c) => c !== 'hardware.fan_control')) {
@@ -124,7 +124,7 @@ test('Show all collectors reveals rows without changing any setting', async ({ p
   }
   expect(await values()).toEqual(before);
 
-  await page.locator('label:has(#show_all_collectors)').click();
+  await page.locator('label[for="show_all_collectors"]').click();
   await expect(page.locator('#show_all_collectors')).not.toBeChecked();
   await expect(page.locator('#show_all_collectors_val')).toHaveValue('false');
   await expectReferenceVisibility(page);

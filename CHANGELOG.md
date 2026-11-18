@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Use Dynamix settings rows and theme colors with the plugin’s compact left-aligned layout and switches (#358).
 - Require aggregate CI validation and align automation with free-tier governance.
 
 ### Fixed

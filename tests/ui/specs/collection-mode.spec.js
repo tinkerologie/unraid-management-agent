@@ -49,7 +49,7 @@ async function openPage(page, html) {
   return requests;
 }
 
-const toggle = (page) => page.locator('label:has(#collection_mode)');
+const toggle = (page) => page.locator('label[for="collection_mode"]');
 const manual = (page) => page.locator('#uma-manual-intervals');
 const formFields = (page) =>
   page.locator('#collection_mode').evaluate((el) => Object.fromEntries(new FormData(el.closest('form'))));
@@ -57,11 +57,11 @@ const formFields = (page) =>
 // Everything under the toggle that Dynamic mode hides.
 const MANUAL_ONLY = [
   'text=How often data is collected',
-  'label:has(#show_all_collectors)',
+  'label[for="show_all_collectors"]',
   '#uma-hw-recheck-btn',
   '#uma-hw-status',
   'select[name="INTERVAL_SYSTEM"]',
-  '.uma-power-warning:has-text("Power Tip")',
+  '.uma-note:has-text("Power Tip")',
 ];
 
 test('Dynamic collection hides every interval setting under the toggle', async ({ page }) => {

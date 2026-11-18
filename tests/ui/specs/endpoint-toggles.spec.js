@@ -38,11 +38,11 @@ for (const { id, field } of TOGGLES) {
     await expect(page.locator(`#${id}`)).toBeChecked();
     expect((await postedFields(page, id))[field]).toBe('true');
 
-    await page.locator(`label:has(#${id})`).click();
+    await page.locator(`label[for="${id}"]`).click();
     await expect(page.locator(`#${id}`)).not.toBeChecked();
     expect((await postedFields(page, id))[field]).toBe('false');
 
-    await page.locator(`label:has(#${id})`).click();
+    await page.locator(`label[for="${id}"]`).click();
     expect((await postedFields(page, id))[field]).toBe('true');
   });
 

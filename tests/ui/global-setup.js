@@ -43,4 +43,8 @@ module.exports = async () => {
   const endpointsOff = path.join(out, 'config-endpoints-off.cfg');
   fs.writeFileSync(endpointsOff, 'MCP_ENABLED="false"\nMETRICS_ENABLED="false"\nWEBSOCKET_ENABLED="false"\n');
   render('page-endpoints-off.html', endpointsOff);
+
+  const mqtt = path.join(out, 'config-mqtt.cfg');
+  fs.writeFileSync(mqtt, 'MQTT_ENABLED="true"\nMQTT_HOME_ASSISTANT="true"\n');
+  render('page-mqtt.html', mqtt);
 };
