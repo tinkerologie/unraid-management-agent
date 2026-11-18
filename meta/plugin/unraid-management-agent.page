@@ -337,7 +337,8 @@ dl.uma-settings {
     overflow-wrap: anywhere;
 }
 .uma-muted {
-    color: var(--alt-text-color, inherit);
+    color: var(--text-color, inherit);
+    color: color-mix(in srgb, var(--text-color, currentColor) 75%, var(--background-color, transparent));
 }
 .uma-interval-section {
     border-top: 1px solid var(--border-color, currentColor);
@@ -719,7 +720,7 @@ Configure granular access policies for individual MCP tools. Available policies:
         </tr>
       </thead>
       <tbody id="uma-tool-policy-tbody">
-        <tr><td colspan="5" style="padding:20px; text-align:center; color:var(--alt-text-color, inherit);">Click "Configure Tool Policies" to load tools.</td></tr>
+        <tr><td colspan="5" class="uma-muted" style="padding:20px; text-align:center;">Click "Configure Tool Policies" to load tools.</td></tr>
       </tbody>
     </table>
   </div>
@@ -1535,7 +1536,7 @@ function toggleToolPolicyPanel() {
 
 function loadToolCatalog() {
     var tbody = document.getElementById('uma-tool-policy-tbody');
-    tbody.innerHTML = '<tr><td colspan="5" style="padding:20px; text-align:center; color:var(--alt-text-color, inherit);"><i class="fa fa-spinner fa-spin"></i> Loading MCP tool catalog…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="uma-muted" style="padding:20px; text-align:center;"><i class="fa fa-spinner fa-spin"></i> Loading MCP tool catalog…</td></tr>';
 
     $.getJSON('/plugins/<?=$plugin?>/include/diagnostics.php?action=get_tool_policy', function(data) {
         umaToolCatalogLoaded = true;
@@ -1604,7 +1605,7 @@ function renderToolPolicyTable() {
     }
 
     if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="padding:20px; text-align:center; color:var(--alt-text-color, inherit);">No tools match the selected filters.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="uma-muted" style="padding:20px; text-align:center;">No tools match the selected filters.</td></tr>';
         return;
     }
 
@@ -1618,7 +1619,7 @@ function renderToolPolicyTable() {
 
         html += '<tr>';
         html += '<td style="padding:6px 10px; font-family:monospace; font-weight:bold;">' + umaEscapeHtml(t.name) + '</td>';
-        html += '<td style="padding:6px 10px; color:var(--alt-text-color, inherit);">' + umaEscapeHtml(t.category || 'General') + '</td>';
+        html += '<td class="uma-muted" style="padding:6px 10px;">' + umaEscapeHtml(t.category || 'General') + '</td>';
         html += '<td style="padding:6px 10px;">' + typeLabel + '</td>';
         html += '<td title="' + umaEscapeHtml(t.description || '') + '">' + umaEscapeHtml(t.description || '') + '</td>';
         html += '<td style="padding:6px 10px; text-align:right;">';
