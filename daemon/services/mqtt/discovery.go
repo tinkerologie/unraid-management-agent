@@ -2,6 +2,7 @@
 package mqtt
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -677,7 +678,6 @@ func (c *Client) publishServiceDiscovery() {
 			opts.entityType = "binary_sensor"
 			opts.id = statusID
 		} else {
-			c.removeHAEntity("binary_sensor", statusID)
 			opts.entityType = "switch"
 			opts.id = fmt.Sprintf("service_%s_switch", svcID)
 			opts.commandTopic = c.buildCommandTopic("service", svcID, "set")
@@ -686,8 +686,28 @@ func (c *Client) publishServiceDiscovery() {
 	}
 }
 
-// publishServiceStates queries all service running states and publishes
-// them to the services topic so HA switches reflect the actual state.
+// refreshReadOnlyServiceStates keeps service sensors current when there is no
+// MQTT command path to refresh them. It runs only while this session is open.
+func (c *Client) refreshReadOnlyServiceStates(ctx context.Context, interval time.Duration) {
+	if !c.config.DisableCommands || !c.TelemetryEnabled(TopicServices) {
+		return
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if ctx.Err() != nil {
+				return
+			}
+			c.publishServiceStates()
+		}
+	}
+}
+
+// publishServiceStates publishes running states for HA sensors and switches.
 func (c *Client) publishServiceStates() {
 	if !c.TelemetryEnabled(TopicServices) {
 		return

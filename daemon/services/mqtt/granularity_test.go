@@ -172,6 +172,30 @@ func TestMQTTGranularityWithBroker(t *testing.T) {
 			strings.Contains(records[serviceStatus], `"state_topic"`) && !strings.Contains(records[serviceStatus], `"command_topic"`)
 	}
 	waitForRetained(t, peer, prefix, observed, recordFilter)
+	serviceTopic := client.buildTopic(TopicServices)
+	const staleServiceState = `{"smb":"stale"}`
+	waitForBrokerToken(t, peer.Publish(serviceTopic, 1, true, staleServiceState))
+	refreshCtx, stopRefresh := context.WithCancel(ctx)
+	defer stopRefresh()
+	refreshDone := make(chan struct{})
+	go func() {
+		defer close(refreshDone)
+		client.refreshReadOnlyServiceStates(refreshCtx, 10*time.Millisecond)
+	}()
+	waitForRetained(t, peer, prefix, []string{serviceTopic}, func(records map[string]string) bool {
+		var states map[string]bool
+		if json.Unmarshal([]byte(records[serviceTopic]), &states) != nil {
+			return false
+		}
+		_, present := states["smb"]
+		return present
+	})
+	stopRefresh()
+	select {
+	case <-refreshDone:
+	case <-ctx.Done():
+		t.Fatal("service refresh did not stop after cancellation")
+	}
 	if err := client.PublishContainers([]dto.ContainerInfo{{Name: "media"}}); err != nil {
 		t.Fatal(err)
 	}
@@ -215,6 +239,24 @@ func TestMQTTGranularityWithBroker(t *testing.T) {
 	})
 	assertBrokerCommand(t, peer, legacy.buildCommandTopic("system", "fixture-only"), true)
 	enabled.Disconnect()
+
+	// An agent with the same HA hostname but a different telemetry
+	// prefix can have its own read-only service sensor at this address.
+	foreignMonitorCfg := otherCfg
+	foreignMonitorCfg.DisableCommands = true
+	foreignMonitor := NewClient(&foreignMonitorCfg, host, "other", nil)
+	foreignMonitor.client = peer
+	foreignMonitor.publishServiceDiscovery()
+	resumed := NewClient(cfg, host, "new", nil)
+	if err := resumed.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer resumed.Disconnect()
+	assertBrokerCommand(t, peer, legacy.buildCommandTopic("system", "fixture-only"), true)
+	waitForRetained(t, peer, prefix, observed, func(records map[string]string) bool {
+		return strings.Contains(records[serviceStatus], foreignMonitor.buildTopic(TopicServices))
+	})
+	resumed.Disconnect()
 
 	// A parent agent's container can also occupy a nested agent's exact
 	// system suffix. Verify cleanup removes the nested agent's own PSU data

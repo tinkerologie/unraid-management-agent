@@ -13,6 +13,7 @@ import (
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/controllers"
 )
 
 // reconcileRetained subscribes to the affected namespaces so a restart can
@@ -20,7 +21,8 @@ import (
 // MQTT delivers retained records on subscribe and does not signal the end of
 // that replay. Ignore live traffic and let the clean session expire the filters.
 func (c *Client) reconcileRetained(ctx context.Context) {
-	if !c.config.DisableCommands && len(c.config.DisabledTopics) == 0 {
+	filterTelemetryOrCommands := c.config.DisableCommands || len(c.config.DisabledTopics) != 0
+	if !filterTelemetryOrCommands && !c.config.HomeAssistantMode {
 		return
 	}
 	if strings.ContainsAny(c.config.TopicPrefix, "+#\x00") {
@@ -42,7 +44,13 @@ func (c *Client) reconcileRetained(ctx context.Context) {
 	host := c.discoveryHost()
 	if host != "" && !strings.ContainsAny(host, "/+#\x00") &&
 		!strings.ContainsAny(c.config.HADiscoveryPrefix, "+#\x00") {
-		filters[c.config.HADiscoveryPrefix+"/+/"+host+"/+/config"] = 1
+		entityType := "+"
+		if !filterTelemetryOrCommands {
+			// Check read-only service records left by an earlier connection
+			// with commands disabled. Verify ownership before deleting them.
+			entityType = "binary_sensor"
+		}
+		filters[c.config.HADiscoveryPrefix+"/"+entityType+"/"+host+"/+/config"] = 1
 	}
 	if len(filters) == 0 {
 		return
@@ -139,7 +147,7 @@ func (c *Client) shouldClearRetained(msg pahomqtt.Message) bool {
 	if underDiscoveryPrefix {
 		parts := strings.Split(relative, "/")
 		if len(parts) == 4 && parts[1] == c.discoveryHost() && parts[3] == "config" {
-			return c.shouldClearDiscovery(parts[2], msg.Payload())
+			return c.shouldClearDiscovery(parts[0], parts[2], msg.Payload())
 		}
 	}
 
@@ -218,7 +226,7 @@ func matchesRetainedResource(resource, id string, payload []byte) bool {
 	return json.Unmarshal(record[fields.id], &name) == nil && name != "" && sanitizeID(name) == id
 }
 
-func (c *Client) shouldClearDiscovery(id string, payload []byte) bool {
+func (c *Client) shouldClearDiscovery(entityType, id string, payload []byte) bool {
 	var record struct {
 		dto.HADiscoveryConfig
 		Availability []struct {
@@ -242,6 +250,14 @@ func (c *Client) shouldClearDiscovery(id string, payload []byte) bool {
 	})
 	if !ownsRecord {
 		return false
+	}
+	if c.config.HomeAssistantMode && !c.config.DisableCommands && entityType == "binary_sensor" &&
+		record.StateTopic == c.buildTopic(TopicServices) && record.CommandTopic == "" {
+		service, hasPrefix := strings.CutPrefix(id, "service_")
+		service, hasSuffix := strings.CutSuffix(service, "_running")
+		if hasPrefix && hasSuffix && slices.Contains(controllers.ValidServiceNames(), service) {
+			return true
+		}
 	}
 	return !c.allowDiscovery(id, record.StateTopic, record.CommandTopic)
 }

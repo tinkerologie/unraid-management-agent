@@ -262,6 +262,7 @@ func (c *Client) handleConnect() {
 				return
 			}
 			c.subscribeCommandTopics()
+			c.refreshReadOnlyServiceStates(ctx, time.Minute)
 		}()
 	}
 }

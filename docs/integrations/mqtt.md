@@ -56,6 +56,8 @@ Use `mqtt.client_id` in `config.yml` or `client_id` at the MQTT configuration RE
 
 In the Unraid plugin's **MQTT Integration** settings, use **Disable MQTT Commands** for monitoring-only access and **MQTT Telemetry** to choose which topics to publish. Click **Apply** to restart the agent with the new settings.
 
+An unrelated Apply preserves the daemon's YAML settings when a plugin override is absent. Editing the telemetry checklist saves its full topic selection as a plugin override.
+
 For a standalone daemon, use the environment variables `MQTT_DISABLE_COMMANDS=true` and `MQTT_DISABLED_TOPICS=docker/containers,zfs/datasets`, or the flags `--mqtt-disable-commands` and `--mqtt-disabled-topics=docker/containers,zfs/datasets`. The YAML equivalents are:
 
 ```yaml
@@ -68,7 +70,7 @@ Use topic suffixes without the broker prefix. The options are `system`, `array`,
 
 Pools named `arc`, `datasets`, `pools`, or `snapshots` publish per-pool state under `<prefix>/zfs/pools/<name>` to avoid sharing an aggregate topic. Home Assistant keeps the existing entity IDs. Direct MQTT clients that read those individual pool payloads should subscribe to the new path.
 
-On connect, the agent clears matching retained state and discovery payloads, including controls from previous versions. Home Assistant displays read-only service status while commands are disabled. Broker ACLs must let the agent subscribe to the affected telemetry topics and its Home Assistant discovery namespace and publish retained deletions there. Failed cleanup attempts are retried on the next connection. Give each agent on a shared broker its own telemetry prefix and keep the prefix and hostname stable while applying the settings so cleanup can identify its records. Use separate topic paths for custom messages and integrations.
+On connect, the agent clears matching retained state and discovery payloads, including controls from previous versions. Home Assistant displays read-only service status while commands are disabled. The agent refreshes those statuses once per minute while connected and service telemetry is enabled. Broker ACLs must let the agent subscribe to the affected telemetry topics and its Home Assistant discovery namespace and publish retained deletions there. Failed cleanup attempts are retried on the next connection. Give each agent on a shared broker its own telemetry prefix and keep the prefix and hostname stable while applying the settings so cleanup can identify its records. Use separate topic paths for custom messages and integrations.
 
 ### Restart Service
 
