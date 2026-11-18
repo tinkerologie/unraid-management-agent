@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Use Dynamix settings rows and theme colors with the plugin’s compact left-aligned layout and switches.
-  Improve the contrast of helper text and tool policy details in light and dark themes (#358).
+  Improve helper text contrast in light and dark themes, and preserve saved collection intervals that are outside the displayed presets (#358).
 - Require aggregate CI validation and align automation with free-tier governance.
 
 ### Fixed

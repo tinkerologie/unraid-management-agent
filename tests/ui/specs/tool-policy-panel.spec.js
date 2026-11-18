@@ -11,6 +11,7 @@ const LONG = 'Reads a very long description that has to wrap onto more than one 
 const TOOLS = [
   { name: 'get_system_info', category: 'System', read_only: true, description: LONG },
   { name: 'system_reboot', category: 'System', read_only: false, description: 'Reboots the server.' },
+  { name: 'remove_fixture', category: 'Fixture', read_only: false, destructive: true, description: 'Removes fixture data.' },
 ];
 
 // Opens the panel and returns the requests that would save policies.
@@ -52,6 +53,7 @@ test('All → Hidden hides every tool and saves nothing until applied', async ({
   expect(JSON.parse(await page.locator('#tool_policy_json').inputValue())).toEqual({
     get_system_info: 'hidden',
     system_reboot: 'hidden',
+    remove_fixture: 'hidden',
   });
   await expect(page.locator('#uma-btn-save-policies')).toBeVisible();
   expect(saves).toEqual([]);
@@ -136,4 +138,19 @@ test('a long description wraps in full without widening the table', async ({ pag
   const table = await page.locator('#uma-tool-policy-table').boundingBox();
   const panel = await page.locator('#uma-tool-policy-panel').boundingBox();
   expect(table.width).toBeLessThanOrEqual(panel.width);
+});
+
+test('tool rows identify each access type and explain empty results', async ({ page }) => {
+  await openPanel(page);
+  const rows = page.locator('#uma-tool-policy-tbody tr');
+  for (const [tool, access] of [
+    ['get_system_info', 'Read-Only'],
+    ['system_reboot', 'Write'],
+    ['remove_fixture', 'Destructive'],
+  ]) {
+    await expect(rows.filter({ hasText: tool }).getByRole('cell').nth(2)).toHaveText(access);
+  }
+  await page.getByRole('textbox', { name: 'Search tools' }).fill('no matching tools');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toHaveText('No tools match the selected filters.');
 });

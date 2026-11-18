@@ -19,13 +19,13 @@ const tools = [
   },
 ];
 
-function luminance(rgb) {
+function weightedRgbBrightness(rgb) {
   const components = rgb.match(/\d+/g).slice(0, 3).map(Number);
   return 0.2126 * components[0] + 0.7152 * components[1] + 0.0722 * components[2];
 }
 
 async function openSettings(page, theme, catalogReady = Promise.resolve()) {
-  const css = ['default-color-palette.css', 'default-base.css', `themes/${theme}.css`];
+  const css = theme ? ['default-color-palette.css', 'default-base.css', `themes/${theme}.css`] : [];
   const html = fs.readFileSync(render, 'utf8')
     .replace('<html>', `<html class="Theme--${theme}">`)
     .replace('</head>', `${css.map((file) => `<link rel="stylesheet" href="/styles/${file}">`).join('')}</head>`);
@@ -86,6 +86,36 @@ async function mutedTextContrast(page) {
   });
 }
 
+test('settings rows associate labels with their controls', async ({ page }) => {
+  await openSettings(page);
+  const rows = await page.locator('dl.uma-settings > dt').count();
+  expect(rows).toBeGreaterThan(40);
+  await expect(page.locator('dl.uma-settings > dt + dd')).toHaveCount(rows);
+  for (const id of [
+    'uma_port_input', 'mcp_enabled', 'api_token', 'read_only',
+    'mqtt_ha_enabled', 'debug_logging', 'collection_mode', 'uma-interval-system',
+  ]) {
+    const label = page.locator(`dt label[for="${id}"]`);
+    const control = page.locator(`dd #${id}`);
+    await expect(label).toBeVisible();
+    await expect(control).toBeVisible();
+    expect(await label.evaluate((element) => element.control?.id)).toBe(id);
+  }
+  const password = page.locator('#mqtt_password');
+  await expect(password).toHaveValue('');
+  await expect(password).toHaveAttribute('placeholder', '••••••••');
+
+  const direct = page.locator('#uma-mcp-direct-url-item');
+  const standard = page.locator('#uma-mcp-standard-url-link');
+  await expect(direct).toBeHidden();
+  await expect(standard).toContainText('/mcp');
+  await page.locator('#mcp_connect_secret').fill('fixture-secret-only');
+  await expect(direct).toBeVisible();
+  await expect(direct).toContainText('/mcp/fixture-secret-only');
+  await page.locator('#mcp_connect_secret').fill('');
+  await expect(direct).toBeHidden();
+});
+
 for (const theme of ['white', 'black']) {
   test(`Dynamix ${theme} theme keeps settings usable at desktop and narrow widths`, async ({ page }) => {
     test.skip(!styles, 'requires the stock Dynamix styles');
@@ -97,23 +127,9 @@ for (const theme of ['white', 'black']) {
       const css = getComputedStyle(el);
       return { foreground: css.color, background: css.backgroundColor };
     });
-    const bg = luminance(colors.background);
-    const fg = luminance(colors.foreground);
+    const bg = weightedRgbBrightness(colors.background);
+    const fg = weightedRgbBrightness(colors.foreground);
     expect(theme === 'white' ? bg - fg : fg - bg).toBeGreaterThan(160);
-
-    const rows = await page.locator('dl.uma-settings > dt').count();
-    expect(rows).toBeGreaterThan(40);
-    await expect(page.locator('dl.uma-settings > dt + dd')).toHaveCount(rows);
-    for (const id of [
-      'uma_port_input', 'mcp_enabled', 'api_token', 'read_only',
-      'mqtt_ha_enabled', 'debug_logging', 'collection_mode', 'uma-interval-system',
-    ]) {
-      const label = page.locator(`dt label[for="${id}"]`);
-      const control = page.locator(`dd #${id}`);
-      await expect(label).toBeVisible();
-      await expect(control).toBeVisible();
-      expect((await control.boundingBox()).x).toBeGreaterThan((await label.boundingBox()).x);
-    }
 
     const firstRow = page.locator('dl.uma-settings').first();
     const port = page.locator('#uma_port_input');

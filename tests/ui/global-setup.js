@@ -20,6 +20,7 @@ module.exports = async () => {
   fs.writeFileSync(
     config,
     [
+      'INTERVAL_DISK="30"',
       'INTERVAL_FAN_CONTROL="30"',
       'INTERVAL_TUNING="300"',
       'INTERVAL_DOCKER_UPDATE="86400"',
@@ -36,7 +37,15 @@ module.exports = async () => {
   const dynamic = path.join(out, 'config-dynamic.cfg');
   fs.writeFileSync(
     dynamic,
-    ['COLLECTION_MODE="dynamic"', 'INTERVAL_SYSTEM="30"', 'INTERVAL_DOCKER="10"', 'INTERVAL_MOVER="120"', ''].join('\n'),
+    [
+      'COLLECTION_MODE="dynamic"',
+      'INTERVAL_SYSTEM="30"',
+      'INTERVAL_DISK="30"',
+      'INTERVAL_ARRAY="37"',
+      'INTERVAL_DOCKER="10"',
+      'INTERVAL_MOVER="120"',
+      '',
+    ].join('\n'),
   );
   render('page-dynamic.html', dynamic);
 
@@ -45,6 +54,14 @@ module.exports = async () => {
   render('page-endpoints-off.html', endpointsOff);
 
   const mqtt = path.join(out, 'config-mqtt.cfg');
-  fs.writeFileSync(mqtt, 'MQTT_ENABLED="true"\nMQTT_HOME_ASSISTANT="true"\n');
+  fs.writeFileSync(
+    mqtt,
+    [
+      'MQTT_ENABLED="true"',
+      'MQTT_HOME_ASSISTANT="true"',
+      'MQTT_PASSWORD="fixture-mqtt-password"', // pragma: allowlist secret
+      '',
+    ].join('\n'),
+  );
   render('page-mqtt.html', mqtt);
 };

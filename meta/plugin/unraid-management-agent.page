@@ -229,9 +229,14 @@ function intervalOptions($selected, $type = 'standard', $auto = false) {
     if ($auto) {
         $options = ['auto' => 'Auto'] + $options;
     }
+    $selected = (string)$selected;
+    // Keep intervals from existing configs, including hidden Dynamic mode rows.
+    if (preg_match('/\A[0-9]+\z/', $selected) === 1 && !isset($options[$selected])) {
+        $options[$selected] = "$selected seconds (saved)";
+    }
     $html = '';
     foreach ($options as $value => $label) {
-        $isSelected = ((string)$selected === (string)$value) ? 'selected' : '';
+        $isSelected = ($selected === (string)$value) ? 'selected' : '';
         $html .= "<option value=\"$value\" $isSelected>$label</option>";
     }
     return $html;
@@ -333,8 +338,12 @@ dl.uma-settings {
 .uma-panel {
     max-width: 96rem;
 }
-.uma-note code {
+.uma-note code,
+.uma-connect-url {
     overflow-wrap: anywhere;
+}
+.uma-connect-url {
+    user-select: all;
 }
 .uma-muted {
     color: var(--text-color, inherit);
@@ -349,6 +358,10 @@ dl.uma-settings {
 }
 .uma-interval-row.uma-hw-absent dt {
     opacity: .75;
+}
+.uma-interval-select.is-disabled {
+    border-bottom-color: var(--brand-orange, currentColor);
+    font-weight: 600;
 }
 .uma-selftest-result {
     max-width: 46rem;
@@ -410,37 +423,46 @@ dl.uma-settings {
   <dd>
     <div>
       <i id="uma-status-orb" class="fa fa-circle <?= $running ? 'green-orb' : 'grey-orb' ?>"></i>
-      <span id="uma-status-text" class="uma-status-text <?= $running ? 'running' : 'stopped' ?>">
+      <span id="uma-status-text" class="uma-status-text">
         <?= $running ? 'RUNNING' : 'STOPPED' ?>
       </span>
     </div>
+  </dd>
+</dl>
 
-    <?php
-        // Show the configured bind address when one is set; otherwise the
-        // address the WebUI was reached on (agent listens on all interfaces).
-        $raw_addr = $_SERVER['SERVER_ADDR'];
-        if (!empty($bind_address) && $bind_address !== '0.0.0.0' && $bind_address !== '::') {
-            $raw_addr = $bind_address;
-        }
-        // Bracket-wrap IPv6 addresses for valid URLs (e.g. http://[::1]:8043/)
-        $bracketed_addr = (strpos($raw_addr, ':') !== false) ? "[$raw_addr]" : $raw_addr;
-        $addr_esc = htmlspecialchars($bracketed_addr, ENT_QUOTES, 'UTF-8');
-        $port_esc = htmlspecialchars($port, ENT_QUOTES, 'UTF-8');
-        $has_tls = (!empty($tls_cert_file) && !empty($tls_key_file));
-        $http_scheme = $has_tls ? 'https' : 'http';
-        $ws_scheme = $has_tls ? 'wss' : 'ws';
-        $has_mcp_secret = !empty($mcp_connect_secret);
-    ?>
-    <div id="uma-endpoints" style="display: <?= $running ? 'block' : 'none' ?>;">
-        <p><strong>API Endpoint:</strong> <?= $http_scheme ?>://<?= $addr_esc ?>:<?= $port_esc ?>/api/v1</p>
+<?php
+    // Show the configured bind address when one is set; otherwise the
+    // address the WebUI was reached on (agent listens on all interfaces).
+    $raw_addr = $_SERVER['SERVER_ADDR'];
+    if (!empty($bind_address) && $bind_address !== '0.0.0.0' && $bind_address !== '::') {
+        $raw_addr = $bind_address;
+    }
+    // Bracket-wrap IPv6 addresses for valid URLs (e.g. http://[::1]:8043/)
+    $bracketed_addr = (strpos($raw_addr, ':') !== false) ? "[$raw_addr]" : $raw_addr;
+    $addr_esc = htmlspecialchars($bracketed_addr, ENT_QUOTES, 'UTF-8');
+    $port_esc = htmlspecialchars($port, ENT_QUOTES, 'UTF-8');
+    $has_tls = (!empty($tls_cert_file) && !empty($tls_key_file));
+    $http_scheme = $has_tls ? 'https' : 'http';
+    $ws_scheme = $has_tls ? 'wss' : 'ws';
+    $has_mcp_secret = !empty($mcp_connect_secret);
+?>
+
+<dl id="uma-endpoints" class="uma-settings"<?= $running ? '' : ' style="display: none;"' ?>>
+  <dt>API Endpoint</dt>
+  <dd><?= $http_scheme ?>://<?= $addr_esc ?>:<?= $port_esc ?>/api/v1</dd>
 <?php if ($websocket_enabled === 'true'): ?>
-        <p><strong>WebSocket:</strong> <?= $ws_scheme ?>://<?= $addr_esc ?>:<?= $port_esc ?>/api/v1/ws</p>
+  <dt>WebSocket</dt>
+  <dd><?= $ws_scheme ?>://<?= $addr_esc ?>:<?= $port_esc ?>/api/v1/ws</dd>
 <?php endif; ?>
 <?php if ($mcp_enabled === 'true'): ?>
-        <p><strong>MCP Endpoint:</strong> <span id="uma-mcp-endpoint-url"><?= $http_scheme ?>://<?= $addr_esc ?>:<?= $port_esc ?>/mcp</span></p>
+  <dt>MCP Endpoint</dt>
+  <dd><span id="uma-mcp-endpoint-url"><?= $http_scheme ?>://<?= $addr_esc ?>:<?= $port_esc ?>/mcp</span></dd>
 <?php endif; ?>
-    </div>
+</dl>
 
+<dl class="uma-settings">
+  <dt>Service Actions</dt>
+  <dd>
     <div class="uma-actions">
         <?php if ($running): ?>
             <input type="button" id="uma-btn-startstop" value="Stop" onclick="serviceControl('stop')">
@@ -617,21 +639,27 @@ When set (32–256 chars of <code>[A-Za-z0-9_-]</code>), requests to <code>/mcp/
   </dd>
 </dl>
 
-<div class="uma-note uma-panel">
-  <div style="margin-bottom: 6px;"><strong>Connect URL(s):</strong></div>
-  <ul style="margin: 4px 0 10px 20px; padding: 0; line-height: 2.2;">
-    <li id="uma-mcp-direct-url-item" style="display: <?= $has_mcp_secret ? 'list-item' : 'none' ?>;">
-      <code id="uma-mcp-direct-url-link" style="font-family: monospace; word-break: break-all; user-select: all;"><?= $http_scheme ?>://<?= $addr_esc ?>:<?= $port_esc ?>/mcp/<?= htmlspecialchars($mcp_connect_secret, ENT_QUOTES, 'UTF-8') ?></code>
-      <span>(direct access)</span>
-      <input type="button" id="uma-btn-mcp-url-copy" value="Copy" style="margin-left:6px;" onclick="copyMcpConnectUrl(this)">
-    </li>
-    <li>
-      <code id="uma-mcp-standard-url-link" style="font-family: monospace; word-break: break-all; user-select: all;"><?= $http_scheme ?>://<?= $addr_esc ?>:<?= $port_esc ?>/mcp</code>
+<dl id="uma-mcp-direct-url-item" class="uma-settings"<?= $has_mcp_secret ? '' : ' style="display: none;"' ?>>
+  <dt>Direct URL</dt>
+  <dd>
+    <div class="uma-actions">
+      <code id="uma-mcp-direct-url-link" class="uma-connect-url"><?= $http_scheme ?>://<?= $addr_esc ?>:<?= $port_esc ?>/mcp/<?= htmlspecialchars($mcp_connect_secret, ENT_QUOTES, 'UTF-8') ?></code>
+      <input type="button" id="uma-btn-mcp-url-copy" value="Copy" onclick="copyMcpConnectUrl(this)">
+    </div>
+  </dd>
+</dl>
+<dl class="uma-settings">
+  <dt>Standard URL</dt>
+  <dd>
+    <div class="uma-actions">
+      <code id="uma-mcp-standard-url-link" class="uma-connect-url"><?= $http_scheme ?>://<?= $addr_esc ?>:<?= $port_esc ?>/mcp</code>
       <span id="uma-mcp-standard-url-label">(<?= $has_token ? 'Bearer token' : 'standard endpoint' ?>)</span>
-      <input type="button" value="Copy" style="margin-left:6px;" onclick="copyTextValue(getEffectiveMcpBaseUrl(), this)">
-    </li>
-  </ul>
+      <input type="button" value="Copy" onclick="copyTextValue(getEffectiveMcpBaseUrl(), this)">
+    </div>
+  </dd>
+</dl>
 
+<div class="uma-panel">
   <?php if (!$has_tls): ?>
   <div class="uma-note" style="margin-top:6px; margin-bottom:8px;">
     <i class="fa fa-lock"></i> <strong>Plain HTTP Transport Notice:</strong> TLS is not currently configured (<code>TLS_CERT_FILE</code> / <code>TLS_KEY_FILE</code>). Path-based Connect URLs transmit the secret in the URL on your local network. Enable TLS or use a local HTTPS reverse proxy when connecting across untrusted networks.
@@ -821,10 +849,9 @@ recent agent &amp; system logs, and configuration with secrets removed) to attac
 Debug Logging first for richer logs. <strong>Run Self-Test</strong> checks the agent's data sources and shows
 which subsystems are healthy. Both require the service to be running.
 </blockquote>
+    <div id="uma-selftest-result" class="uma-note uma-selftest-result" style="display: none;"></div>
   </dd>
 </dl>
-
-<div id="uma-selftest-result" class="uma-note uma-selftest-result" style="display: none;"></div>
 
 <div class="title"><span class="left"><i class="title fa fa-clock-o"></i>Collection Intervals</span></div>
 
@@ -1159,16 +1186,14 @@ function updateServiceStatus(running) {
     if (running) {
         statusOrb.className = 'fa fa-circle green-orb';
         statusText.textContent = 'RUNNING';
-        statusText.className = 'uma-status-text running';
         btn.value = 'Stop';
         btn.onclick = function() { serviceControl('stop'); };
         btn.disabled = false;
         restartBtn.disabled = false;
-        endpoints.style.display = 'block';
+        endpoints.style.display = '';
     } else {
         statusOrb.className = 'fa fa-circle grey-orb';
         statusText.textContent = 'STOPPED';
-        statusText.className = 'uma-status-text stopped';
         btn.value = 'Start';
         btn.onclick = function() { serviceControl('start'); };
         btn.disabled = false;
@@ -1855,7 +1880,7 @@ function updateMcpOnboardingUI() {
     var directItem = document.getElementById('uma-mcp-direct-url-item');
     var directLink = document.getElementById('uma-mcp-direct-url-link');
     if (directItem) {
-        directItem.style.display = secret ? 'list-item' : 'none';
+        directItem.style.display = secret ? '' : 'none';
     }
     if (directLink && secret) {
         var fullUrl = baseUrl + '/' + secret;
