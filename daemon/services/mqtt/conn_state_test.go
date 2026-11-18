@@ -15,8 +15,22 @@ type connectedClient struct {
 	capturingClient
 }
 
-func (*connectedClient) IsConnected() bool { return true }
-func (*connectedClient) Disconnect(uint)   {}
+func (*connectedClient) IsConnected() bool      { return true }
+func (*connectedClient) IsConnectionOpen() bool { return true }
+func (*connectedClient) Disconnect(uint)        {}
+
+func TestDelayedBrokerLossKeepsOpenConnection(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.HomeAssistantMode = false
+	client := NewClient(cfg, "tower", "test", nil)
+	client.client = &connectedClient{capturingClient{published: map[string]string{}}}
+	client.handleConnect()
+	defer client.Disconnect()
+	client.handleDisconnect(errors.New("prior connection lost"))
+	if !client.IsConnected() || client.connectContext.Err() != nil {
+		t.Fatal("prior loss cancelled the open connection")
+	}
+}
 
 func TestConnectionStateHandler(t *testing.T) {
 	config := DefaultConfig()

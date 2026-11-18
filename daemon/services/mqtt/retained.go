@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -79,15 +80,16 @@ func (c *Client) reconcileRetained(ctx context.Context) {
 				if ctx.Err() != nil {
 					return
 				}
-				token := c.client.Publish(topic, 1, true, "")
-				if !token.WaitTimeout(5*time.Second) || token.Error() != nil {
+				if !c.clearRetained(ctx, topic) && ctx.Err() == nil {
 					logger.Warning("MQTT: Could not clear retained record for %q", topic)
 				}
 			}
 		}
 	}()
-	if !token.WaitTimeout(5*time.Second) || token.Error() != nil {
-		logger.Warning("MQTT: Could not subscribe to reconcile retained records")
+	if !waitForCleanupToken(ctx, token) {
+		if ctx.Err() == nil {
+			logger.Warning("MQTT: Could not subscribe to reconcile retained records")
+		}
 		return
 	}
 	if sub, ok := token.(*pahomqtt.SubscribeToken); ok {
@@ -96,6 +98,31 @@ func (c *Client) reconcileRetained(ctx context.Context) {
 				logger.Warning("MQTT: Broker denied the retained cleanup subscription to %q", filter)
 			}
 		}
+	}
+}
+
+func (c *Client) clearRetained(ctx context.Context, topic string) bool {
+	suffix := strings.TrimPrefix(topic, c.buildTopic(""))
+	if _, shared := sharedZFSPoolID(suffix); shared && c.TelemetryEnabled(suffix) {
+		c.zfsPublishMu.Lock()
+		defer c.zfsPublishMu.Unlock()
+		if c.zfsPublished[topic] {
+			return true // The enabled aggregate already replaced the legacy state.
+		}
+	}
+	return ctx.Err() == nil && waitForCleanupToken(ctx, c.client.Publish(topic, 1, true, ""))
+}
+
+func waitForCleanupToken(ctx context.Context, token pahomqtt.Token) bool {
+	timer := time.NewTimer(5 * time.Second)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return false
+	case <-token.Done():
+		return token.Error() == nil
 	}
 }
 
@@ -113,8 +140,59 @@ func (c *Client) shouldClearRetained(msg pahomqtt.Message) bool {
 	}
 
 	suffix, underTopicPrefix := strings.CutPrefix(msg.Topic(), c.buildTopic(""))
-	group := telemetryGroup(suffix)
-	return underTopicPrefix && group != "" && !c.TelemetryEnabled(group)
+	if !underTopicPrefix {
+		return false
+	}
+	if id, shared := sharedZFSPoolID(suffix); shared &&
+		matchesRetainedResource("zfs", id, msg.Payload()) {
+		// The pool now uses its own path. Remove the old copy if either
+		// owner of the previously shared path is disabled.
+		return !c.TelemetryEnabled(TopicZFSPools) || !c.TelemetryEnabled(suffix)
+	}
+	if _, exact := telemetryTopics[suffix]; exact {
+		return !c.TelemetryEnabled(suffix)
+	}
+	last := strings.LastIndexByte(suffix, '/')
+	if last < 0 {
+		return false
+	}
+	resource, id := suffix[:last], suffix[last+1:]
+	group := resourceTopicGroups[resource]
+	return group != "" && !c.TelemetryEnabled(group) && matchesRetainedResource(resource, id, msg.Payload())
+}
+
+// A wildcard can overlap another agent's nested prefix or a custom topic.
+// Legacy resource JSON has no owner field, so verify both the resource ID and
+// a field specific to the resource kind before deleting a wildcard match.
+var retainedResourceFields = map[string]struct{ id, marker string }{
+	"disk":              {"id", "smart_status"},
+	"docker":            {"name", "image"},
+	"vm":                {"name", "memory_allocated_bytes"},
+	"gpu":               {"index", "driver_version"},
+	"network":           {"name", "packets_received"},
+	"shares":            {"name", "smb_export"},
+	"zfs":               {"name", "capacity_percent"},
+	TopicZFSPools:       {"name", "capacity_percent"},
+	"unassigned":        {"device", "partitions"},
+	"unassigned/remote": {"mount_point", "source"},
+	TopicZFSDatasets:    {"name", "referenced_bytes"},
+}
+
+func matchesRetainedResource(resource, id string, payload []byte) bool {
+	fields, ok := retainedResourceFields[resource]
+	if !ok || id == "" {
+		return false
+	}
+	var record map[string]json.RawMessage
+	if json.Unmarshal(payload, &record) != nil || record[fields.marker] == nil {
+		return false
+	}
+	var name string
+	if resource == TopicGPU {
+		var index *int
+		return json.Unmarshal(record[fields.id], &index) == nil && index != nil && strconv.Itoa(*index) == id
+	}
+	return json.Unmarshal(record[fields.id], &name) == nil && name != "" && sanitizeID(name) == id
 }
 
 func (c *Client) shouldClearDiscovery(id string, payload []byte) bool {
@@ -142,5 +220,5 @@ func (c *Client) shouldClearDiscovery(id string, payload []byte) bool {
 	if !ownsRecord {
 		return false
 	}
-	return !c.allowDiscovery(record.StateTopic, record.CommandTopic)
+	return !c.allowDiscovery(id, record.StateTopic, record.CommandTopic)
 }

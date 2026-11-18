@@ -38,7 +38,7 @@ var telemetryTopics = map[string][]string{
 	TopicContainers: {"docker"}, TopicVMs: {"vm"},
 	TopicUPS: nil, TopicGPU: {"gpu"}, TopicNetwork: {"network"},
 	TopicShares: {"shares"}, TopicNotifications: nil, TopicNotificationEvent: nil,
-	TopicZFSPools: {"zfs"}, TopicNUT: nil, TopicHardware: nil, TopicRegistration: nil,
+	TopicZFSPools: {"zfs", TopicZFSPools}, TopicNUT: nil, TopicHardware: nil, TopicRegistration: nil,
 	TopicUnassigned: {"unassigned", "unassigned/remote"}, TopicZFSDatasets: {"zfs/datasets"},
 	TopicZFSSnapshots: nil, TopicZFSARC: nil, TopicFanControl: nil, TopicPSU: nil, TopicServices: nil,
 }
@@ -104,16 +104,21 @@ var commandTopicGroups = map[string]string{
 	"unassigned": TopicUnassigned, "notifications": TopicNotifications,
 }
 
-func (c *Client) allowDiscovery(stateTopic, commandTopic string) bool {
+func (c *Client) allowDiscovery(id, stateTopic, commandTopic string) bool {
 	if commandTopic != "" && c.config.DisableCommands {
 		return false
 	}
 	if len(c.config.DisabledTopics) == 0 {
 		return true
 	}
-	if suffix, ok := strings.CutPrefix(stateTopic, c.buildTopic("")); ok &&
-		!c.TelemetryEnabled(telemetryGroup(suffix)) {
-		return false
+	if suffix, ok := strings.CutPrefix(stateTopic, c.buildTopic("")); ok {
+		group := telemetryGroup(suffix)
+		if poolID, shared := sharedZFSPoolID(suffix); shared && strings.HasPrefix(id, "zfs_"+poolID+"_") {
+			group = TopicZFSPools // Legacy per-pool discovery on an aggregate path.
+		}
+		if !c.TelemetryEnabled(group) {
+			return false
+		}
 	}
 	// Buttons do not publish state_topic. Their command path identifies
 	// the telemetry group that owns their discovery record.
@@ -122,4 +127,13 @@ func (c *Client) allowDiscovery(stateTopic, commandTopic string) bool {
 		return c.TelemetryEnabled(commandTopicGroups[group])
 	}
 	return true
+}
+
+func sharedZFSPoolID(suffix string) (string, bool) {
+	switch suffix {
+	case TopicZFSPools, TopicZFSDatasets, TopicZFSSnapshots, TopicZFSARC:
+		return strings.TrimPrefix(suffix, "zfs/"), true
+	default:
+		return "", false
+	}
 }

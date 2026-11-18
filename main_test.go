@@ -352,6 +352,19 @@ func TestConfigFilePrecedence(t *testing.T) {
 			},
 		},
 		{
+			name: "empty MQTT topic flag clears YAML selections",
+			args: []string{"--mqtt-disabled-topics="},
+			env:  map[string]string{"MQTT_DISABLE_COMMANDS": ""},
+			file: domain.FileConfig{MQTT: &domain.FileConfigMQTT{
+				DisableCommands: &yes, DisabledTopics: []string{"psu"},
+			}},
+			check: func(t *testing.T) {
+				if !cli.MQTTDisableCommands || cli.MQTTDisabledTopics != "" {
+					t.Errorf("MQTT filters after clearing topic selection = %v, %q", cli.MQTTDisableCommands, cli.MQTTDisabledTopics)
+				}
+			},
+		},
+		{
 			name: "int flag beats file", args: []string{"--interval-nic=120"},
 			file: domain.FileConfig{Intervals: &domain.FileConfigIntervals{NIC: &fileInterval}},
 			check: func(t *testing.T) {

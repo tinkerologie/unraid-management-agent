@@ -64,7 +64,9 @@ mqtt:
   disabled_topics: [docker/containers, zfs/datasets]
 ```
 
-Use topic suffixes without the broker prefix. The options are `system`, `array`, `disks`, `docker/containers`, `vm/list`, `services`, `ups`, `gpu`, `network`, `shares`, `notifications`, `notifications/event`, `nut/status`, `hardware`, `registration`, `unassigned/devices`, `zfs/pools`, `zfs/datasets`, `zfs/snapshots`, `zfs/arc`, `fancontrol`, and `psu`. A selection includes that topic's per-resource updates and discovery entities. Availability stays active while MQTT is enabled. Existing installations keep their current behavior until an operator applies these settings.
+Use topic suffixes without the broker prefix. The options are `system`, `array`, `disks`, `docker/containers`, `vm/list`, `services`, `ups`, `gpu`, `network`, `shares`, `notifications`, `notifications/event`, `nut/status`, `hardware`, `registration`, `unassigned/devices`, `zfs/pools`, `zfs/datasets`, `zfs/snapshots`, `zfs/arc`, `fancontrol`, and `psu`. A selection includes that topic's per-resource updates and discovery entities. Availability stays active while MQTT is enabled. Existing installations publish all telemetry and keep commands enabled by default.
+
+Pools named `arc`, `datasets`, `pools`, or `snapshots` publish per-pool state under `<prefix>/zfs/pools/<name>` to avoid sharing an aggregate topic. Home Assistant keeps the existing entity IDs. Direct MQTT clients that read those individual pool payloads should subscribe to the new path.
 
 On connect, the agent clears matching retained state and discovery payloads, including controls from previous versions. Broker ACLs must let the agent subscribe to the affected telemetry topics and its Home Assistant discovery namespace and publish retained deletions there. Give each agent on a shared broker its own telemetry prefix and keep the prefix and hostname stable while applying the settings so cleanup can identify its records. Use separate topic paths for custom messages and integrations.
 

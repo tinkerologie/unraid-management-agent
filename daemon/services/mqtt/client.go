@@ -55,6 +55,10 @@ type Client struct {
 	// Protected by mu.
 	connectCancel  context.CancelFunc
 	connectContext context.Context // protected by mu; cancels queued PSU discovery
+	// zfsPublishMu orders legacy retained deletions against writes to the
+	// aggregate topic that used to share the same per-pool address.
+	zfsPublishMu sync.Mutex
+	zfsPublished map[string]bool
 	// onConnState receives every connection state change. connStateMu
 	// guards it and serialises its calls, so they arrive in order.
 	onConnState func(connected bool)
@@ -158,6 +162,7 @@ func (c *Client) Connect(ctx context.Context) error {
 	opts.SetCleanSession(c.config.CleanSession || c.config.DisableCommands || len(c.config.DisabledTopics) != 0)
 	opts.SetAutoReconnect(c.config.AutoReconnect)
 	opts.SetConnectTimeout(time.Duration(c.config.ConnectTimeout) * time.Second)
+	opts.SetWriteTimeout(5 * time.Second)
 	opts.SetKeepAlive(time.Duration(c.config.KeepAlive) * time.Second)
 
 	if c.config.Username != "" {
@@ -212,6 +217,9 @@ func (c *Client) handleConnect() {
 	if c.connectCancel != nil {
 		c.connectCancel()
 	}
+	c.zfsPublishMu.Lock()
+	clear(c.zfsPublished)
+	c.zfsPublishMu.Unlock()
 	ctx, cancel := context.WithCancel(context.Background())
 	c.connectCancel = cancel
 	c.connectContext = ctx
@@ -261,6 +269,12 @@ func (c *Client) handleConnect() {
 // handleDisconnect is called when connection is lost.
 func (c *Client) handleDisconnect(err error) {
 	c.mu.Lock()
+	if c.client != nil && c.client.IsConnectionOpen() {
+		// The library dispatches loss and reconnect callbacks independently.
+		// A delayed loss callback must not cancel the open session's work.
+		c.mu.Unlock()
+		return
+	}
 	c.connected.Store(false)
 	now := time.Now()
 	c.lastDisconn = &now
@@ -621,7 +635,7 @@ func (c *Client) PublishZFSPools(pools []dto.ZFSPool) error {
 	if !c.shouldPublishTopic(TopicZFSPools) {
 		return nil
 	}
-	err := c.publishJSON(c.buildTopic("zfs/pools"), pools)
+	err := c.publishZFSAggregate(TopicZFSPools, pools)
 	// Publish per-pool topics and HA discovery
 	go c.publishZFSDiscovery(pools)
 	return err
@@ -666,7 +680,7 @@ func (c *Client) PublishZFSDatasets(datasets []dto.ZFSDataset) error {
 	if !c.shouldPublishTopic(TopicZFSDatasets) {
 		return nil
 	}
-	err := c.publishJSON(c.buildTopic("zfs/datasets"), datasets)
+	err := c.publishZFSAggregate(TopicZFSDatasets, datasets)
 	go c.publishZFSDatasetDiscovery(datasets)
 	return err
 }
@@ -676,7 +690,7 @@ func (c *Client) PublishZFSSnapshots(snapshots []dto.ZFSSnapshot) error {
 	if !c.shouldPublishTopic(TopicZFSSnapshots) {
 		return nil
 	}
-	return c.publishJSON(c.buildTopic("zfs/snapshots"), snapshots)
+	return c.publishZFSAggregate(TopicZFSSnapshots, snapshots)
 }
 
 // PublishZFSARCStats publishes ZFS ARC statistics to MQTT.
@@ -684,7 +698,23 @@ func (c *Client) PublishZFSARCStats(stats dto.ZFSARCStats) error {
 	if !c.shouldPublishTopic(TopicZFSARC) {
 		return nil
 	}
-	return c.publishJSON(c.buildTopic("zfs/arc"), stats)
+	return c.publishZFSAggregate(TopicZFSARC, stats)
+}
+
+func (c *Client) publishZFSAggregate(suffix string, payload any) error {
+	topic := c.buildTopic(suffix)
+	if c.TelemetryEnabled(TopicZFSPools) || !c.config.RetainMessages {
+		return c.publishJSON(topic, payload)
+	}
+	c.zfsPublishMu.Lock()
+	defer c.zfsPublishMu.Unlock()
+	if c.zfsPublished == nil {
+		c.zfsPublished = make(map[string]bool)
+	}
+	// A timed-out write may still reach the broker. Avoid deleting that
+	// enabled aggregate even when the acknowledgement is lost.
+	c.zfsPublished[topic] = true
+	return c.publishJSON(topic, payload)
 }
 
 // PublishFanControlStatus publishes fan control status to MQTT.

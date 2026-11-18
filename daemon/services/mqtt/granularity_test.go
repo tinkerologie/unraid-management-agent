@@ -37,6 +37,7 @@ func TestTelemetryGroup(t *testing.T) {
 		"zfs/datasets":            TopicZFSDatasets,
 		"zfs/datasets/tank_media": TopicZFSDatasets,
 		"zfs/snapshots":           TopicZFSSnapshots,
+		"zfs/pools/snapshots":     TopicZFSPools,
 		"zfs/tank":                TopicZFSPools,
 		"zfs/":                    "",
 		"zfs/other/leaf":          "",
@@ -49,9 +50,26 @@ func TestTelemetryGroup(t *testing.T) {
 }
 
 func TestDisableCommandsGuardsDispatch(t *testing.T) {
+	command := &commandProbe{retainedFixtureMessage: retainedFixtureMessage{topic: "unraid/cmd/system/fixture-only"}}
 	c := NewClient(&dto.MQTTConfig{DisableCommands: true}, "tower", "test", nil)
-	// No message is inspected and no controller is reached when dispatch is off.
-	c.handleCommand(nil)
+	c.handleCommand(command)
+	if command.inspected {
+		t.Fatal("disabled command reached dispatch")
+	}
+	NewClient(DefaultConfig(), "tower", "test", nil).handleCommand(command)
+	if !command.inspected {
+		t.Fatal("enabled command did not reach dispatch")
+	}
+}
+
+type commandProbe struct {
+	retainedFixtureMessage
+	inspected bool
+}
+
+func (p *commandProbe) Topic() string {
+	p.inspected = true
+	return p.retainedFixtureMessage.Topic()
 }
 
 func TestMQTTGranularityWithBroker(t *testing.T) {
@@ -85,6 +103,11 @@ func TestMQTTGranularityWithBroker(t *testing.T) {
 	zfsPool := legacy.buildTopic("zfs/tank")
 	zfsDataset := legacy.buildTopic("zfs/datasets/tank_media")
 	unrelated := legacy.buildTopic("custom/fixture")
+	nestedAvailability := legacy.buildTopic("docker/availability")
+	nestedSystem := legacy.buildTopic("docker/system")
+	legacyARC := legacy.buildTopic("zfs/arc")
+	legacyARCControl := cfg.HADiscoveryPrefix + "/sensor/tower/zfs_arc_health/config"
+	arcStats := cfg.HADiscoveryPrefix + "/sensor/tower/arc_size/config"
 
 	// Seed retained records, including per-resource records from a stopped agent.
 	legacy.publishContainerDiscovery([]dto.ContainerInfo{{Name: "media"}})
@@ -107,12 +130,21 @@ func TestMQTTGranularityWithBroker(t *testing.T) {
 	foreignPrefixAgent.publishHAEntity(haEntityOpts{
 		entityType: "sensor", id: "other_prefix", stateTopic: legacy.buildTopic("docker/media"),
 	})
-	for _, topic := range []string{zfsPool, zfsDataset, unrelated} {
-		waitForBrokerToken(t, peer.Publish(topic, 1, true, `{"name":"fixture"}`))
+	legacy.publishZFSEntities(legacyARC, "zfs_arc", "arc")
+	legacy.publishZFSARCDiscovery()
+	for topic, payload := range map[string]any{
+		zfsPool: dto.ZFSPool{Name: "tank"}, zfsDataset: dto.ZFSDataset{Name: "tank/media"},
+		legacyARC: dto.ZFSPool{Name: "arc"}, unrelated: map[string]string{"name": "fixture"},
+		nestedSystem: dto.SystemInfo{Hostname: "neighbor"},
+	} {
+		if err := legacy.publishJSON(topic, payload); err != nil {
+			t.Fatal(err)
+		}
 	}
+	waitForBrokerToken(t, peer.Publish(nestedAvailability, 1, true, "online"))
 
-	removed := []string{containerState, containerSensor, containerButton, arrayControl, zfsPool}
-	kept := []string{systemSensor, foreign, foreignPrefix, zfsDataset, unrelated}
+	removed := []string{containerState, containerSensor, containerButton, arrayControl, zfsPool, legacyARC, legacyARCControl}
+	kept := []string{systemSensor, foreign, foreignPrefix, zfsDataset, unrelated, nestedSystem, nestedAvailability, arcStats}
 	observed := append(slices.Clone(removed), kept...)
 	observed = append(observed, legacy.buildTopic("availability"), legacy.buildTopic("system"))
 	observed = append(observed, legacy.buildTopic("docker/containers"))
@@ -148,7 +180,9 @@ func TestMQTTGranularityWithBroker(t *testing.T) {
 	assertBrokerCommand(t, peer, legacy.buildCommandTopic("system", "fixture-only"), false)
 
 	// A fresh retained record must also be removed when this same client reconnects.
-	waitForBrokerToken(t, peer.Publish(zfsPool, 1, true, `{"name":"fixture"}`))
+	if err := legacy.publishJSON(zfsPool, dto.ZFSPool{Name: "tank"}); err != nil {
+		t.Fatal(err)
+	}
 	waitForRetained(t, peer, prefix, observed, func(records map[string]string) bool {
 		return records[zfsPool] != ""
 	})
@@ -347,7 +381,7 @@ func TestReconcileRetainedWithScopedFilters(t *testing.T) {
 	client := NewClient(cfg, "test tower", "test", nil)
 	topic := client.buildTopic("docker/media")
 	broker := &retainedFixtureClient{
-		message: retainedFixtureMessage{topic: topic, payload: "fixture", retained: true},
+		message: retainedFixtureMessage{topic: topic, payload: `{"name":"media","image":""}`, retained: true},
 		deleted: make(chan string, 1),
 	}
 	client.client = broker
@@ -391,7 +425,10 @@ func TestRetainedCleanupOwnership(t *testing.T) {
 	}{
 		{"live", retainedFixtureMessage{topic: "unraid/psu", payload: "fixture"}, false},
 		{"tombstone", retainedFixtureMessage{topic: "unraid/psu", retained: true}, false},
-		{"pool", retainedFixtureMessage{topic: "unraid/zfs/tank", payload: "fixture", retained: true}, true},
+		{"pool", retainedFixtureMessage{topic: "unraid/zfs/tank", payload: `{"name":"tank","capacity_percent":0}`, retained: true}, true},
+		{"legacy named pool", retainedFixtureMessage{topic: "unraid/zfs/arc", payload: `{"name":"arc","capacity_percent":0}`, retained: true}, true},
+		{"enabled ARC", retainedFixtureMessage{topic: "unraid/zfs/arc", payload: `{"target_size_bytes":0}`, retained: true}, false},
+		{"custom payload", retainedFixtureMessage{topic: "unraid/zfs/tank", payload: `{"name":"tank"}`, retained: true}, false},
 		{"dataset", retainedFixtureMessage{topic: "unraid/zfs/datasets", payload: "fixture", retained: true}, false},
 		{"foreign telemetry", retainedFixtureMessage{topic: "other/psu", payload: "fixture", retained: true}, false},
 		{"availability", retainedFixtureMessage{topic: "unraid/availability", payload: "online", retained: true}, false},
@@ -406,6 +443,59 @@ func TestRetainedCleanupOwnership(t *testing.T) {
 				t.Errorf("retained deletion = %v, want %v", got, tc.deletion)
 			}
 		})
+	}
+}
+
+func TestZFSPoolWithAggregateNameKeepsItsDiscovery(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Enabled = true
+	cfg.DisabledTopics = []string{TopicZFSARC}
+	client := NewClient(cfg, "tower", "test", nil)
+	capture := &capturingClient{published: make(map[string]string)}
+	client.client = capture
+	client.connected.Store(true)
+	client.publishZFSDiscovery([]dto.ZFSPool{{Name: "arc", Health: "ONLINE"}})
+	client.publishZFSARCDiscovery()
+	if err := client.PublishZFSARCStats(dto.ZFSARCStats{}); err != nil {
+		t.Fatal(err)
+	}
+	poolTopic := "unraid/zfs/pools/arc"
+	if !strings.Contains(capture.published[poolTopic], `"name":"arc"`) {
+		t.Fatal("enabled pool did not publish state on its distinct topic")
+	}
+	if !strings.Contains(capture.published["homeassistant/sensor/tower/zfs_arc_health/config"], poolTopic) {
+		t.Fatal("pool discovery did not retain its identity and reference the distinct topic")
+	}
+	if _, found := capture.published["unraid/zfs/arc"]; found {
+		t.Fatal("disabled ARC topic received state")
+	}
+	if _, found := capture.published["homeassistant/sensor/tower/arc_size/config"]; found {
+		t.Fatal("disabled ARC topic published discovery")
+	}
+}
+
+func TestLegacyZFSCleanupKeepsNewlyPublishedAggregate(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Enabled = true
+	cfg.DisabledTopics = []string{TopicZFSPools}
+	client := NewClient(cfg, "tower", "test", nil)
+	capture := &capturingClient{published: make(map[string]string)}
+	client.client = capture
+	client.connected.Store(true)
+
+	topic := "unraid/zfs/arc"
+	legacy := retainedFixtureMessage{topic: topic, payload: `{"name":"arc","capacity_percent":0}`, retained: true}
+	if !client.shouldClearRetained(legacy) {
+		t.Fatal("disabled legacy pool incorrectly classified as enabled ARC")
+	}
+	if err := client.PublishZFSARCStats(dto.ZFSARCStats{TargetSizeBytes: 42}); err != nil {
+		t.Fatal(err)
+	}
+	if !client.clearRetained(t.Context(), topic) {
+		t.Fatal("cleanup should be satisfied by the replacement publication")
+	}
+	if !strings.Contains(capture.published[topic], `"target_size_bytes":42`) {
+		t.Fatal("cleanup deleted the enabled ARC sample")
 	}
 }
 
@@ -439,10 +529,10 @@ func TestMQTTTelemetryAndCommandDiscoveryPolicy(t *testing.T) {
 
 	cfg.DisableCommands = false
 	controlsEnabled := NewClient(cfg, "tower", "test", nil)
-	if controlsEnabled.allowDiscovery("", "unraid/cmd/docker/media/restart") {
+	if controlsEnabled.allowDiscovery("", "", "unraid/cmd/docker/media/restart") {
 		t.Error("disabled Docker telemetry exposed a Docker button")
 	}
-	if !controlsEnabled.allowDiscovery("", "unraid/cmd/system/reboot") {
+	if !controlsEnabled.allowDiscovery("", "", "unraid/cmd/system/reboot") {
 		t.Error("disabled Docker telemetry hid a system button")
 	}
 }

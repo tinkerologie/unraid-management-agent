@@ -16,6 +16,11 @@ type doneToken struct{ pahomqtt.Token }
 
 func (doneToken) WaitTimeout(time.Duration) bool { return true }
 func (doneToken) Error() error                   { return nil }
+func (doneToken) Done() <-chan struct{} {
+	done := make(chan struct{})
+	close(done)
+	return done
+}
 
 // capturingClient records every publish by topic.
 type capturingClient struct {

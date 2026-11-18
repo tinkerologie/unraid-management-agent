@@ -75,7 +75,7 @@ func (t *discoveryTracker) update(category string, currentIDs []string) []string
 
 // publishHAEntity publishes a single Home Assistant discovery config.
 func (c *Client) publishHAEntity(opts haEntityOpts) {
-	if !c.allowDiscovery(opts.stateTopic, opts.commandTopic) {
+	if !c.allowDiscovery(opts.id, opts.stateTopic, opts.commandTopic) {
 		return
 	}
 	hostID := c.discoveryHost()
@@ -1464,7 +1464,13 @@ func (c *Client) publishZFSDiscovery(pools []dto.ZFSPool) {
 
 	for _, pool := range pools {
 		poolID := sanitizeID(pool.Name)
-		poolTopic := c.buildTopic(fmt.Sprintf("zfs/%s", poolID))
+		suffix := "zfs/" + poolID
+		if _, shared := sharedZFSPoolID(suffix); shared {
+			// Keep the entity IDs and use a distinct state topic for a pool
+			// whose name would otherwise alias an aggregate topic.
+			suffix = TopicZFSPools + "/" + poolID
+		}
+		poolTopic := c.buildTopic(suffix)
 
 		if err := c.publishJSON(poolTopic, pool); err != nil {
 			logger.Debug("MQTT: Failed to publish ZFS pool %s: %v", poolID, err)
