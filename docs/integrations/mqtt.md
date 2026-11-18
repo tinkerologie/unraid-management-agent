@@ -68,7 +68,7 @@ Use topic suffixes without the broker prefix. The options are `system`, `array`,
 
 Pools named `arc`, `datasets`, `pools`, or `snapshots` publish per-pool state under `<prefix>/zfs/pools/<name>` to avoid sharing an aggregate topic. Home Assistant keeps the existing entity IDs. Direct MQTT clients that read those individual pool payloads should subscribe to the new path.
 
-On connect, the agent clears matching retained state and discovery payloads, including controls from previous versions. Broker ACLs must let the agent subscribe to the affected telemetry topics and its Home Assistant discovery namespace and publish retained deletions there. Give each agent on a shared broker its own telemetry prefix and keep the prefix and hostname stable while applying the settings so cleanup can identify its records. Use separate topic paths for custom messages and integrations.
+On connect, the agent clears matching retained state and discovery payloads, including controls from previous versions. Home Assistant displays read-only service status while commands are disabled. Broker ACLs must let the agent subscribe to the affected telemetry topics and its Home Assistant discovery namespace and publish retained deletions there. Failed cleanup attempts are retried on the next connection. Give each agent on a shared broker its own telemetry prefix and keep the prefix and hostname stable while applying the settings so cleanup can identify its records. Use separate topic paths for custom messages and integrations.
 
 ### Restart Service
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"slices"
 	"strings"
@@ -97,6 +98,8 @@ func TestMQTTGranularityWithBroker(t *testing.T) {
 	containerSensor := cfg.HADiscoveryPrefix + "/binary_sensor/tower/container_media_state/config"
 	containerButton := cfg.HADiscoveryPrefix + "/button/tower/container_media_restart/config"
 	arrayControl := cfg.HADiscoveryPrefix + "/switch/tower/array_switch/config"
+	serviceControl := cfg.HADiscoveryPrefix + "/switch/tower/service_smb_switch/config"
+	serviceStatus := cfg.HADiscoveryPrefix + "/binary_sensor/tower/service_smb_running/config"
 	systemSensor := cfg.HADiscoveryPrefix + "/sensor/tower/fixture_system/config"
 	foreign := cfg.HADiscoveryPrefix + "/sensor/other/fixture_system/config"
 	foreignPrefix := cfg.HADiscoveryPrefix + "/sensor/tower/other_prefix/config"
@@ -111,6 +114,7 @@ func TestMQTTGranularityWithBroker(t *testing.T) {
 
 	// Seed retained records, including per-resource records from a stopped agent.
 	legacy.publishContainerDiscovery([]dto.ContainerInfo{{Name: "media"}})
+	legacy.publishServiceDiscovery()
 	legacy.publishHAEntity(haEntityOpts{
 		entityType: "switch", id: "array_switch", stateTopic: legacy.buildTopic("array"),
 		commandTopic: legacy.buildCommandTopic("array", "set"),
@@ -143,10 +147,10 @@ func TestMQTTGranularityWithBroker(t *testing.T) {
 	}
 	waitForBrokerToken(t, peer.Publish(nestedAvailability, 1, true, "online"))
 
-	removed := []string{containerState, containerSensor, containerButton, arrayControl, zfsPool, legacyARC, legacyARCControl}
+	removed := []string{containerState, containerSensor, containerButton, arrayControl, serviceControl, zfsPool, legacyARC, legacyARCControl}
 	kept := []string{systemSensor, foreign, foreignPrefix, zfsDataset, unrelated, nestedSystem, nestedAvailability, arcStats}
 	observed := append(slices.Clone(removed), kept...)
-	observed = append(observed, legacy.buildTopic("availability"), legacy.buildTopic("system"))
+	observed = append(observed, legacy.buildTopic("availability"), legacy.buildTopic("system"), serviceStatus)
 	observed = append(observed, legacy.buildTopic("docker/containers"))
 	waitForRetained(t, peer, prefix, observed, func(records map[string]string) bool {
 		return allRetained(records, append(slices.Clone(removed), kept...)...)
@@ -164,7 +168,8 @@ func TestMQTTGranularityWithBroker(t *testing.T) {
 
 	recordFilter := func(records map[string]string) bool {
 		return records[legacy.buildTopic("availability")] == "online" &&
-			allRetained(records, kept...) && !anyRetained(records, removed...)
+			allRetained(records, kept...) && !anyRetained(records, removed...) &&
+			strings.Contains(records[serviceStatus], `"state_topic"`) && !strings.Contains(records[serviceStatus], `"command_topic"`)
 	}
 	waitForRetained(t, peer, prefix, observed, recordFilter)
 	if err := client.PublishContainers([]dto.ContainerInfo{{Name: "media"}}); err != nil {
@@ -205,7 +210,8 @@ func TestMQTTGranularityWithBroker(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitForRetained(t, peer, prefix, observed, func(records map[string]string) bool {
-		return allRetained(records, containerState, containerSensor, containerButton, legacy.buildTopic("docker/containers"))
+		return allRetained(records, containerState, containerSensor, containerButton, serviceControl, legacy.buildTopic("docker/containers")) &&
+			records[serviceStatus] == ""
 	})
 	assertBrokerCommand(t, peer, legacy.buildCommandTopic("system", "fixture-only"), true)
 	enabled.Disconnect()
@@ -622,6 +628,7 @@ func TestMQTTTelemetryAndCommandDiscoveryPolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.publishServiceStates()
+	client.publishServiceDiscovery()
 	if err := client.PublishNotifications(&dto.NotificationList{}); err != nil {
 		t.Fatal(err)
 	}
@@ -640,6 +647,29 @@ func TestMQTTTelemetryAndCommandDiscoveryPolicy(t *testing.T) {
 	}
 	if !controlsEnabled.allowDiscovery("", "", "unraid/cmd/system/reboot") {
 		t.Error("disabled Docker telemetry hid a system button")
+	}
+}
+
+func TestRemoteShareRoutingRejectsAmbiguousIDs(t *testing.T) {
+	shares := []dto.UnassignedRemoteShare{
+		{MountPoint: "/mnt/remotes/media-data", Type: "smb", Source: "//fixture/first"},
+		{MountPoint: "/mnt/remotes/media_data", Type: "smb", Source: "//fixture/second"},
+		{MountPoint: "/mnt/remotes/media-data", Type: "smb", Source: "//fixture/first"},
+		{MountPoint: "/mnt/remotes/backup", Type: "nfs", Source: "fixture:/backup"},
+		{MountPoint: "/mnt/remotes/disk", Type: "iso", Source: "/fixture.iso"},
+	}
+	want := map[string]string{
+		sanitizeID(shares[0].MountPoint): "",
+		sanitizeID(shares[3].MountPoint): shares[3].Source,
+	}
+	for _, reverse := range []bool{false, true} {
+		if reverse {
+			slices.Reverse(shares)
+		}
+		got := indexRemoteShareSources(shares)
+		if !maps.Equal(got, want) {
+			t.Fatalf("remote share sources = %v, want %v", got, want)
+		}
 	}
 }
 

@@ -654,24 +654,35 @@ func (c *Client) publishNotificationDiscovery() {
 // Services
 // ──────────────────────────────────────────────────────────────────────────────
 
-// publishServiceDiscovery publishes HA discovery for service switches.
+// publishServiceDiscovery publishes service switches or read-only status sensors.
 func (c *Client) publishServiceDiscovery() {
+	if !c.TelemetryEnabled(TopicServices) {
+		return
+	}
 	services := controllers.ValidServiceNames()
-	servicesTopic := c.buildTopic("services")
+	servicesTopic := c.buildTopic(TopicServices)
 
 	for _, svc := range services {
 		svcID := sanitizeID(svc)
 		displayName := serviceDisplayName(svc)
 
-		c.publishHAEntity(haEntityOpts{
-			entityType:   "switch",
-			stateTopic:   servicesTopic,
-			commandTopic: c.buildCommandTopic("service", svcID, "set"),
-			id:           fmt.Sprintf("service_%s_switch", svcID),
-			name:         fmt.Sprintf("Service: %s", displayName),
-			icon:         serviceIcon(svc),
-			template:     fmt.Sprintf("{{ 'ON' if value_json.%s else 'OFF' }}", svc),
-		})
+		opts := haEntityOpts{
+			stateTopic: servicesTopic,
+			name:       fmt.Sprintf("Service: %s", displayName),
+			icon:       serviceIcon(svc),
+			template:   fmt.Sprintf("{{ 'ON' if value_json.%s else 'OFF' }}", svc),
+		}
+		statusID := fmt.Sprintf("service_%s_running", svcID)
+		if c.config.DisableCommands {
+			opts.entityType = "binary_sensor"
+			opts.id = statusID
+		} else {
+			c.removeHAEntity("binary_sensor", statusID)
+			opts.entityType = "switch"
+			opts.id = fmt.Sprintf("service_%s_switch", svcID)
+			opts.commandTopic = c.buildCommandTopic("service", svcID, "set")
+		}
+		c.publishHAEntity(opts)
 	}
 }
 
@@ -1763,17 +1774,12 @@ func (c *Client) publishUnassignedDiscovery(list *dto.UnassignedDeviceList) {
 		ids := c.publishUnassignedEntities(devTopic, fmt.Sprintf("unassigned_%s", devID), displayName, dev)
 		currentIDs = append(currentIDs, ids...)
 	}
-	shareSources := make(map[string]string)
+	c.setRemoteShareSources(indexRemoteShareSources(list.RemoteShares))
 	for _, share := range list.RemoteShares {
 		if share.MountPoint == "" {
 			continue
 		}
 		shareID := sanitizeID(share.MountPoint)
-		// Record the ID→source mapping so MQTT switch commands can be routed
-		// back to the controller. Skip ISO mounts, which cannot be toggled.
-		if share.Source != "" && share.Type != "iso" {
-			shareSources[shareID] = share.Source
-		}
 		shareTopic := c.buildTopic(fmt.Sprintf("unassigned/remote/%s", shareID))
 		if err := c.publishJSON(shareTopic, share); err != nil {
 			logger.Debug("MQTT: Failed to publish remote share %s: %v", shareID, err)
@@ -1781,7 +1787,6 @@ func (c *Client) publishUnassignedDiscovery(list *dto.UnassignedDeviceList) {
 		ids := c.publishRemoteShareEntities(shareTopic, fmt.Sprintf("remote_share_%s", shareID), remoteShareDisplayName(share), shareID, share.Type)
 		currentIDs = append(currentIDs, ids...)
 	}
-	c.setRemoteShareSources(shareSources)
 	removed := c.tracker.update("unassigned", currentIDs)
 	for _, id := range removed {
 		c.removeHAEntities(id)

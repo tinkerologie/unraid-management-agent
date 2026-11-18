@@ -29,7 +29,8 @@ if (isset($_POST['MQTT_DISABLED_TOPICS'])) {
     $posted = $_POST['MQTT_DISABLED_TOPICS'];
     if (!is_string($posted) || ($posted !== '' && array_diff(explode(',', $posted), $allowed))) {
         $existing = is_file($cfg_path) ? (parse_ini_file($cfg_path, false, INI_SCANNER_RAW)['MQTT_DISABLED_TOPICS'] ?? '') : '';
-        $_POST['MQTT_DISABLED_TOPICS'] = implode(',', array_intersect($allowed, explode(',', $existing)));
+        $values = array_map('trim', explode(',', trim($existing, " \t\r\n'\"")));
+        $_POST['MQTT_DISABLED_TOPICS'] = implode(',', array_intersect($allowed, $values));
     }
 }
 unset($_POST['MQTT_DISABLE_COMMANDS_CB'], $_POST['MQTT_DISABLED_TOPICS_CB']);

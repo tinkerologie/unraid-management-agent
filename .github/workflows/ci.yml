@@ -65,9 +65,11 @@ jobs:
             --junitfile junit.xml \
             --format standard-quiet \
             -- -covermode=atomic -coverprofile=coverage.out ./...
+          # The takeover fixture has the same ID and a 30s keepalive. Count
+          # only the two real agent sessions, which use a 60s keepalive.
           awk '
             /New client connected.* as uma356-[0-9]+-disabled .*k60/ { disabled_connections++ }
-            $2 ~ /^uma356-[0-9]+-disabled$/ && $4 ~ /\/cmd\/#$/ { disabled_subscriptions++ }
+            $2 ~ /^uma356-[0-9]+-disabled$/ && $4 ~ /\/cmd\// { disabled_subscriptions++ }
             $2 ~ /^uma356-[0-9]+$/ && $4 ~ /\/cmd\/#$/ { enabled_subscriptions++ }
             END {
               printf "Disabled agent connections: %d, disabled subscriptions: %d, enabled subscriptions: %d\n", disabled_connections, disabled_subscriptions, enabled_subscriptions

@@ -72,8 +72,10 @@ $mqtt_username = $config['MQTT_USERNAME'] ?? '';
 $mqtt_password = $config['MQTT_PASSWORD'] ?? '';
 $mqtt_topic_prefix = $config['MQTT_TOPIC_PREFIX'] ?? 'unraid';
 $mqtt_ha_enabled = $config['MQTT_HOME_ASSISTANT'] ?? 'false';
-$mqtt_disable_commands = ($config['MQTT_DISABLE_COMMANDS'] ?? 'false') === 'true';
-$mqtt_disabled_topics = explode(',', $config['MQTT_DISABLED_TOPICS'] ?? '');
+$mqtt_has_command_override = isset($config['MQTT_DISABLE_COMMANDS']);
+$mqtt_has_topic_override = isset($config['MQTT_DISABLED_TOPICS']);
+$mqtt_disable_commands = trim($config['MQTT_DISABLE_COMMANDS'] ?? 'false', " \t\r\n'\"") === 'true';
+$mqtt_disabled_topics = array_map('trim', explode(',', trim($config['MQTT_DISABLED_TOPICS'] ?? '', " \t\r\n'\"")));
 $mqtt_topics_file = "/usr/local/emhttp/plugins/$plugin/include/mqtt-topics.php";
 $mqtt_topics = require $mqtt_topics_file;
 $mqtt_disabled_topics = array_intersect(array_keys($mqtt_topics), $mqtt_disabled_topics);
@@ -831,10 +833,10 @@ Enable publishing system data to an MQTT broker.
   <dt><label for="mqtt_disable_commands">_(Disable MQTT Commands)_</label></dt>
   <dd>
       <span class="uma-switch">
-        <input type="checkbox" role="switch" id="mqtt_disable_commands" <?= $mqtt_disable_commands ? 'checked' : '' ?> onchange="updateMQTTGranularity()">
+        <input type="checkbox" role="switch" id="mqtt_disable_commands" <?= $mqtt_disable_commands ? 'checked' : '' ?> onchange="updateMQTTCommands()">
         <span class="uma-switch-track" aria-hidden="true"></span>
       </span>
-      <input type="hidden" name="MQTT_DISABLE_COMMANDS" id="mqtt_disable_commands_val" value="<?= $mqtt_disable_commands ? 'true' : 'false' ?>">
+      <input type="hidden" name="MQTT_DISABLE_COMMANDS" id="mqtt_disable_commands_val" value="<?= $mqtt_disable_commands ? 'true' : 'false' ?>" <?= $mqtt_has_command_override ? '' : 'disabled' ?>>
       <blockquote class="inline_help">Keep monitoring through MQTT and remove Home Assistant command controls.</blockquote>
   </dd>
 
@@ -842,7 +844,7 @@ Enable publishing system data to an MQTT broker.
   <dd>
       <details open>
         <summary>Choose published topics</summary>
-        <div id="mqtt_topics" class="uma-mqtt-topic-options" role="group" aria-labelledby="uma-mqtt-telemetry-label" onchange="updateMQTTGranularity()">
+        <div id="mqtt_topics" class="uma-mqtt-topic-options" role="group" aria-labelledby="uma-mqtt-telemetry-label" onchange="updateMQTTTopics()">
           <?php foreach ($mqtt_topics as $topic => $label): ?>
             <label>
               <input type="checkbox" value="<?= htmlspecialchars($topic) ?>" <?= in_array($topic, $mqtt_disabled_topics, true) ? '' : 'checked' ?>>
@@ -851,7 +853,7 @@ Enable publishing system data to an MQTT broker.
           <?php endforeach; ?>
         </div>
       </details>
-      <input type="hidden" name="MQTT_DISABLED_TOPICS" id="mqtt_disabled_topics_val" value="<?= htmlspecialchars(implode(',', $mqtt_disabled_topics)) ?>">
+      <input type="hidden" name="MQTT_DISABLED_TOPICS" id="mqtt_disabled_topics_val" value="<?= htmlspecialchars(implode(',', $mqtt_disabled_topics)) ?>" <?= $mqtt_has_topic_override ? '' : 'disabled' ?>>
       <blockquote class="inline_help">Clearing a topic stops its MQTT updates and removes its retained data and discovery records. Availability stays active.</blockquote>
   </dd>
 </dl>
@@ -1252,13 +1254,19 @@ function updateMQTTHA() {
     document.getElementById('mqtt_ha_val').value = enabled ? 'true' : 'false';
 }
 
-function updateMQTTGranularity() {
-    var disableCommands = document.getElementById('mqtt_disable_commands').checked;
-    document.getElementById('mqtt_disable_commands_val').value = disableCommands ? 'true' : 'false';
+function updateMQTTCommands() {
+    var field = document.getElementById('mqtt_disable_commands_val');
+    field.value = document.getElementById('mqtt_disable_commands').checked ? 'true' : 'false';
+    field.disabled = false;
+}
+
+function updateMQTTTopics() {
+    var field = document.getElementById('mqtt_disabled_topics_val');
     var topics = document.querySelectorAll('#mqtt_topics input:not(:checked)');
-    document.getElementById('mqtt_disabled_topics_val').value = Array.from(topics, function(topic) {
+    field.value = Array.from(topics, function(topic) {
         return topic.value;
     }).join(',');
+    field.disabled = false;
 }
 
 // Placeholder for an empty token field, matching what the daemon will do

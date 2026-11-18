@@ -155,3 +155,24 @@ test('MQTT command and telemetry controls round-trip independently', async ({ pa
   expect(fields.MQTT_DISABLED_TOPICS).toBe('psu,zfs/datasets');
   expect(fields.MQTT_HOME_ASSISTANT).toBe('true');
 });
+
+test('unrelated Apply preserves absent MQTT overrides and each edit saves independently', async ({ page }) => {
+  await openPage(page, 'page.html');
+  await page.locator('#uma_port_input').fill('8044');
+  let fields = await formFields(page);
+  expect(fields.MQTT_DISABLE_COMMANDS).toBeUndefined();
+  expect(fields.MQTT_DISABLED_TOPICS).toBeUndefined();
+
+  await page.getByRole('switch', { name: 'Enable MQTT', exact: true }).press('Space');
+  const powerSupply = page.getByRole('checkbox', { name: 'Power supply' });
+  await powerSupply.uncheck();
+  fields = await formFields(page);
+  expect(fields.MQTT_DISABLED_TOPICS).toBe('psu');
+  expect(fields.MQTT_DISABLE_COMMANDS).toBeUndefined();
+
+  await powerSupply.check();
+  await page.getByRole('switch', { name: 'Disable MQTT Commands' }).press('Space');
+  fields = await formFields(page);
+  expect(fields.MQTT_DISABLED_TOPICS).toBe('');
+  expect(fields.MQTT_DISABLE_COMMANDS).toBe('true');
+});

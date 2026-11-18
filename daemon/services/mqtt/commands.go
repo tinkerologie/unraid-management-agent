@@ -8,6 +8,7 @@ import (
 
 	pahomqtt "github.com/eclipse/paho.mqtt.golang"
 
+	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/collectors"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/controllers"
@@ -309,17 +310,29 @@ func (c *Client) execServiceSwitch(nameID, payload string) error {
 
 // --- Remote shares ---
 
+func indexRemoteShareSources(shares []dto.UnassignedRemoteShare) map[string]string {
+	sources := make(map[string]string, len(shares))
+	for _, share := range shares {
+		if share.MountPoint == "" || share.Source == "" || share.Type == "iso" {
+			continue
+		}
+		id := sanitizeID(share.MountPoint)
+		if prior, exists := sources[id]; exists && prior != share.Source {
+			sources[id] = "" // An ambiguous ID must never reach the controller.
+			continue
+		}
+		sources[id] = share.Source
+	}
+	return sources
+}
+
 func (c *Client) execRemoteShareSwitch(shareID, payload string) error {
 	source := c.lookupRemoteShareSource(shareID)
 	if source == "" && c.domainCtx != nil && !c.TelemetryEnabled(TopicUnassigned) {
 		// The MQTT collector binding is off, so resolve a direct command
 		// against the current mounts instead of relying on discovery's cache.
-		for _, share := range collectors.NewUnassignedCollector(c.domainCtx).CollectRemoteShares() {
-			if share.MountPoint != "" && share.Type != "iso" && sanitizeID(share.MountPoint) == shareID {
-				source = share.Source
-				break
-			}
-		}
+		shares := collectors.NewUnassignedCollector(c.domainCtx).CollectRemoteShares()
+		source = indexRemoteShareSources(shares)[shareID]
 	}
 	if source == "" {
 		return fmt.Errorf("unknown remote share id: %s", shareID)
