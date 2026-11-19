@@ -110,7 +110,7 @@ func (s *Service) saveReceipt(receipt installReceipt, exclusive bool) error {
 		if errors.Is(err, errReceiptSync) {
 			s.receiptSyncNeeded = true
 		}
-		if exclusive {
+		if exclusive || s.receiptSyncNeeded {
 			s.receiptsLoaded = false
 		}
 		return ErrAttemptStorage

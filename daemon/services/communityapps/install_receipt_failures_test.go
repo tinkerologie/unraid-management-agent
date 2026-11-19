@@ -120,6 +120,43 @@ func TestReceiptSetupRefusesInaccessibleFlashPaths(t *testing.T) {
 	}
 }
 
+func TestProgressIndexReloadsAfterDirectorySyncFailure(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root can read and sync a directory without read permission")
+	}
+	service := NewService(nil, ServiceOptions{HostRoot: t.TempDir()})
+	t.Cleanup(service.Close)
+	receipt := installFixtureReceipt("creating_container", AttemptRunning)
+	if err := service.saveReceipt(receipt, true); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := service.GetAttempt(receipt.Attempt.ID); err != nil || got.Problem == nil || got.Problem.Code != ErrCreateUnverified.Code {
+		t.Fatalf("initial receipt returned %+v, %v", got, err)
+	}
+	dir := filepath.Join(service.hostRoot, attemptDirectory)
+	if err := os.Chmod(dir, 0o300); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+
+	receipt.EngineRejected = true
+	receipt.Attempt.Problem = ErrContainerCreate
+	if err := service.persistProgress(receipt); !errors.Is(err, ErrAttemptStorage) || !service.receiptSyncNeeded {
+		t.Fatalf("failed progress did not retain its pending directory sync: %v", err)
+	}
+	if _, err := service.GetAttempt(receipt.Attempt.ID); !errors.Is(err, ErrAttemptStorage) {
+		t.Fatalf("read returned stale cached progress while the rename was still unsynced: %v", err)
+	}
+	if err := os.Chmod(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	got, err := service.GetAttempt(receipt.Attempt.ID)
+	if err != nil || got.Problem == nil || got.Problem.Code != ErrContainerCreate.Code ||
+		service.receiptSyncNeeded || !service.receipts[receipt.PlanID].EngineRejected {
+		t.Fatalf("read did not recover the renamed receipt after sync returned: %+v, %v", got, err)
+	}
+}
+
 func TestReceiptRejectsStaleWorkerProgressAfterTerminalOutcome(t *testing.T) {
 	service := NewService(nil, ServiceOptions{HostRoot: t.TempDir()})
 	t.Cleanup(service.Close)
