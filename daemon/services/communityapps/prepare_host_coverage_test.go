@@ -122,27 +122,27 @@ func TestPrepareFailsClosedOnUnsafeHostStorageState(t *testing.T) {
 	}
 }
 
-func TestPrepareRecognizesMountedZFSDatasetAndIndependentRemoteStorage(t *testing.T) {
+func TestPrepareRecognizesMountedZFSDatasetAndIndependentLocalDevice(t *testing.T) {
 	root := communityappstest.CopyHeimdallHost(t)
 	communityappstest.WriteFile(t, root, "proc/self/mountinfo",
 		"1 0 8:1 / / rw - ext4 /dev/sda rw\n"+
 			"2 1 9:0 / /mnt/user rw - fuse.shfs shfs rw\n"+
 			"3 1 9:1 / /mnt/data rw - zfs data rw\n"+
 			"4 3 9:2 / /mnt/data/child rw - zfs data/child rw\n"+
-			"5 1 9:3 / /mnt/remotes/file-share rw - cifs //fixture/remote rw\n"+
+			"5 1 9:3 / /mnt/disks/independent rw - btrfs /dev/sdd rw\n"+
 			"6 1 9:4 / /mnt/remotes rw - cifs //fixture/remote rw\n"+
 			"7 1 9:5 / /mnt/cache/nested rw - btrfs /dev/sdc rw\n"+
 			"8 1 9:6 / /mnt/ephemeral rw - tmpfs tmpfs rw\n")
 	communityappstest.WriteFile(t, root, recoveryTemplateDir+"/retained.xml",
-		`<Container><Name>retained</Name><Config Type="Path" Mode="rw" Default="/mnt/remotes/file-share/shared"></Config></Container>`)
-	for _, path := range []string{"mnt/data/child", "mnt/user/shared", "mnt/remotes/file-share/shared"} {
+		`<Container><Name>retained</Name><Config Type="Path" Mode="rw" Default="/mnt/user/shared"></Config></Container>`)
+	for _, path := range []string{"mnt/data/child", "mnt/user/shared", "mnt/disks/independent/shared"} {
 		if err := os.MkdirAll(filepath.Join(root, path), 0o700); err != nil {
 			t.Fatal(err)
 		}
 	}
 	service := newPlanningService(t, root, &communityappstest.Docker{}, nil)
 	t.Cleanup(service.Close)
-	for _, source := range []string{"/mnt/data/child/export", "/mnt/user/shared"} {
+	for _, source := range []string{"/mnt/data/child/export", "/mnt/disks/independent/shared"} {
 		req := communityapps.PrepareRequest{
 			Reference: communityappstest.HeimdallReference,
 			Paths:     map[string]communityapps.PathOverride{"/config": {Source: source}},
