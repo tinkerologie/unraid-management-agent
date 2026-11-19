@@ -23,6 +23,7 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/agent"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/alerting"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/collectors"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/communityapps"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/controllers"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/watchdog"
 )
@@ -80,6 +81,9 @@ type Server struct {
 	agentSvc            *agent.Service
 	toolPolicyStore     *domain.ToolPolicyStore
 
+	communityAppsCatalog *communityapps.Catalog
+	communityAppsService *communityapps.Service
+
 	// diskSpinFn replaces the array controller's spin calls in tests.
 	diskSpinFn func(diskID string, up bool) error
 
@@ -100,6 +104,7 @@ func NewServer(ctx *domain.Context) *Server {
 // NewServerWithCollectorManager creates a new API server with a collector manager for runtime control.
 func NewServerWithCollectorManager(ctx *domain.Context, cm CollectorManagerInterface) *Server {
 	cancelCtx, cancelFunc := context.WithCancel(context.Background())
+	communityCatalog := communityapps.NewHostCatalog()
 	s := &Server{
 		ctx:              ctx,
 		router:           mux.NewRouter(),
@@ -109,6 +114,9 @@ func NewServerWithCollectorManager(ctx *domain.Context, cm CollectorManagerInter
 		collectorManager: cm,
 		CacheStore:       &CacheStore{registry: ctx.Platform},
 		networkAccess:    collectors.NewNetworkAccessDiscovery(ctx.WANIPLookup),
+
+		communityAppsCatalog: communityCatalog,
+		communityAppsService: communityapps.NewHostService(communityCatalog),
 	}
 
 	if !ctx.WebSocketDisabled {
@@ -178,6 +186,11 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/disks/{id}", s.handleDisk).Methods("GET")
 	api.HandleFunc("/shares", s.handleShares).Methods("GET")
 	api.HandleFunc("/docker", s.handleDockerList).Methods("GET")
+	api.HandleFunc("/community-applications", s.handleCommunityAppsSearch).Methods(http.MethodGet)
+	api.HandleFunc("/community-applications/install-plans", s.handleCommunityAppsPrepare).Methods(http.MethodPost)
+	api.HandleFunc("/community-applications/install-plans/{id}/confirm", s.handleCommunityAppsConfirm).Methods(http.MethodPost)
+	api.HandleFunc("/community-applications/install-attempts/{id}", s.handleCommunityAppsAttempt).Methods(http.MethodGet)
+	api.HandleFunc("/community-applications/{reference}", s.handleCommunityAppInspection).Methods(http.MethodGet)
 	api.HandleFunc("/docker/networks", s.handleDockerNetworks).Methods("GET")
 	api.HandleFunc("/docker/port-conflicts", s.handleDockerPortConflicts).Methods("GET")
 	api.HandleFunc("/docker/updates", s.handleDockerCheckUpdates).Methods("GET")
@@ -420,6 +433,7 @@ func (s *Server) RegisterMCPRoutes(handler http.Handler) {
 	if handler == nil {
 		return
 	}
+	handler = withMCPRequestCredential(handler)
 	s.router.Handle("/mcp", handler)
 	s.router.Handle("/mcp/", handler)
 	if secret := strings.TrimSpace(s.ctx.MCPConnectSecret); secret != "" {
@@ -433,7 +447,7 @@ const mcpStatelessPath = "/mcp-stateless"
 // connect-secret path. The router applies its normal bearer authentication.
 func (s *Server) RegisterMCPStatelessRoute(handler http.Handler) {
 	if handler != nil {
-		s.router.Handle(mcpStatelessPath, handler)
+		s.router.Handle(mcpStatelessPath, withMCPRequestCredential(handler))
 	}
 }
 
@@ -501,6 +515,9 @@ func (s *Server) Ready() <-chan struct{} {
 
 // StartHTTP starts the HTTP server
 func (s *Server) StartHTTP() error {
+	// Recover interrupted installs before accepting new confirmations.
+	s.communityAppsService.StartRecovery(s.cancelCtx)
+
 	// JoinHostPort brackets IPv6 addresses; an empty BindAddress yields
 	// ":port", which preserves the bind-to-all-interfaces default.
 	s.httpServer = &http.Server{
@@ -542,6 +559,7 @@ func (s *Server) Stop() {
 			logger.Error("Server shutdown error: %v", err)
 		}
 	}
+	s.communityAppsService.Close()
 }
 
 func (s *Server) subscribeToEvents(ctx context.Context, readyWg *sync.WaitGroup) {

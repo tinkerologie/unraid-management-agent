@@ -250,29 +250,31 @@ func (s *Server) handleDockerList(w http.ResponseWriter, _ *http.Request) {
 // handleDockerInfo godoc
 //
 //	@Summary		Get specific Docker container
-//	@Description	Read information about a specific Docker container by ID or name
+//	@Description	Resolve the live Docker container by ID or name and show its native catalog link when available
 //	@Tags			Docker
 //	@Produce		json
 //	@Param			id	path		string	true	"Container ID or name"
-//	@Success		200	{object}	dto.ContainerInfo	"Container information"
+//	@Success		200	{object}	dto.ContainerDetail	"Container information"
 //	@Failure		404	{object}	dto.Response		"Container not found"
+//	@Failure		503	{object}	dto.Response		"Docker container information unavailable"
 //	@Router			/docker/{id} [get]
 func (s *Server) handleDockerInfo(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	containerID := vars["id"]
 	logger.Debug("API: Getting container info for %s", containerID)
 
-	containers := s.GetDockerCache()
-
-	// Find container by ID or name
-	for _, container := range containers {
-		if container.ID == containerID || container.Name == containerID {
-			respondJSON(w, http.StatusOK, container)
-			return
-		}
+	detail, err := s.GetDockerContainer(r.Context(), containerID)
+	if err != nil {
+		respondJSON(w, http.StatusServiceUnavailable, dto.Response{
+			Success: false, Message: "Docker container information unavailable", Timestamp: time.Now(),
+		})
+		return
+	}
+	if detail != nil {
+		respondJSON(w, http.StatusOK, detail)
+		return
 	}
 
-	// Container not found
 	respondJSON(w, http.StatusNotFound, dto.Response{
 		Success:   false,
 		Message:   fmt.Sprintf("Container not found: %s", containerID),

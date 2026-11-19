@@ -694,6 +694,10 @@ func TestHandleCollectorsStatus_LegacyFallbackMode(t *testing.T) {
 // routesWithoutCollectors are the GET routes that serve no cached collector
 // data, so reads neither refresh nor record demand.
 var routesWithoutCollectors = map[string]bool{
+	"/api/v1/community-applications":                       true,
+	"/api/v1/community-applications/{reference}":           true,
+	"/api/v1/community-applications/install-attempts/{id}": true,
+
 	"/api/v1/health":                      true,
 	"/api/v1/diagnostics/self-test":       true,
 	"/api/v1/capabilities":                true,

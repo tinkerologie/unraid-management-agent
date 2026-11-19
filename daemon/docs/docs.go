@@ -1258,6 +1258,327 @@ const docTemplate = `{
                 }
             }
         },
+        "/community-applications": {
+            "get": {
+                "description": "Search the host's filtered Community Applications Docker catalog",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Community Applications"
+                ],
+                "summary": "Search Community Applications",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search term (maximum 256 bytes)",
+                        "name": "q",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.SearchResult"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/community-applications/install-attempts/{id}": {
+            "get": {
+                "description": "Return durable progress or the final install result, including any cleanup details after recovery.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Community Applications"
+                ],
+                "summary": "Get a Community Applications install attempt",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Install attempt ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Attempt"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/community-applications/install-plans": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Resolve exact effective settings and an image digest without installing",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Community Applications"
+                ],
+                "summary": "Prepare a Community Applications install",
+                "parameters": [
+                    {
+                        "description": "Listing and declared overrides",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.PrepareRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Preview"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/community-applications/install-plans/{id}/confirm": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Claim one approved plan and return its durable attempt. Repeat the same approval to retrieve the original attempt.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Community Applications"
+                ],
+                "summary": "Confirm a Community Applications install",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pending install plan ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Exact approval token from the reviewed preview",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.ConfirmRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Attempt"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "410": {
+                        "description": "Gone",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/community-applications/{reference}": {
+            "get": {
+                "description": "Show the exact listing's editable fields and known install eligibility issues",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Community Applications"
+                ],
+                "summary": "Inspect a Community Applications listing",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Listing reference from search",
+                        "name": "reference",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Inspection"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/communityapps.Problem"
+                        }
+                    }
+                }
+            }
+        },
         "/cpu/governor": {
             "post": {
                 "description": "Set the CPU scaling governor for all cores (e.g. performance, powersave)",
@@ -1662,7 +1983,7 @@ const docTemplate = `{
         },
         "/docker/{id}": {
             "get": {
-                "description": "Read information about a specific Docker container by ID or name",
+                "description": "Resolve the live Docker container by ID or name and show its native catalog link when available",
                 "produces": [
                     "application/json"
                 ],
@@ -1683,11 +2004,17 @@ const docTemplate = `{
                     "200": {
                         "description": "Container information",
                         "schema": {
-                            "$ref": "#/definitions/dto.ContainerInfo"
+                            "$ref": "#/definitions/dto.ContainerDetail"
                         }
                     },
                     "404": {
                         "description": "Container not found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "503": {
+                        "description": "Docker container information unavailable",
                         "schema": {
                             "$ref": "#/definitions/dto.Response"
                         }
@@ -5908,6 +6235,440 @@ const docTemplate = `{
                 }
             }
         },
+        "communityapps.Attempt": {
+            "type": "object",
+            "properties": {
+                "attempt_id": {
+                    "type": "string"
+                },
+                "cleanup_details": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/communityapps.CleanupIssue"
+                    }
+                },
+                "cleanup_failures": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "configuration": {
+                    "$ref": "#/definitions/communityapps.Configuration"
+                },
+                "container_id": {
+                    "type": "string"
+                },
+                "phase": {
+                    "type": "string"
+                },
+                "problem": {
+                    "$ref": "#/definitions/communityapps.Problem"
+                },
+                "state": {
+                    "$ref": "#/definitions/communityapps.AttemptState"
+                }
+            }
+        },
+        "communityapps.AttemptState": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "running",
+                "succeeded",
+                "failed"
+            ],
+            "x-enum-varnames": [
+                "AttemptPending",
+                "AttemptRunning",
+                "AttemptSucceeded",
+                "AttemptFailed"
+            ]
+        },
+        "communityapps.Bridge": {
+            "type": "object",
+            "properties": {
+                "driver": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "internal": {
+                    "type": "boolean"
+                },
+                "ipv4": {
+                    "type": "boolean"
+                },
+                "ipv6": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "communityapps.CleanupIssue": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "container_id": {
+                    "type": "string"
+                },
+                "ownership_verified": {
+                    "type": "boolean"
+                },
+                "resource": {
+                    "type": "string"
+                },
+                "template_file": {
+                    "type": "string"
+                }
+            }
+        },
+        "communityapps.ConfigKind": {
+            "type": "string",
+            "enum": [
+                "port",
+                "path",
+                "environment"
+            ],
+            "x-enum-varnames": [
+                "ConfigPort",
+                "ConfigPath",
+                "ConfigEnvironment"
+            ]
+        },
+        "communityapps.Configuration": {
+            "type": "object",
+            "properties": {
+                "digest": {
+                    "type": "string"
+                },
+                "environment": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/communityapps.EnvironmentField"
+                    }
+                },
+                "image": {
+                    "type": "string"
+                },
+                "listing": {
+                    "$ref": "#/definitions/communityapps.Listing"
+                },
+                "mounts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/communityapps.Mount"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "network": {
+                    "$ref": "#/definitions/communityapps.Bridge"
+                },
+                "pids_limit": {
+                    "type": "integer"
+                },
+                "ports": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/communityapps.PortBinding"
+                    }
+                },
+                "privileged": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "communityapps.ConfirmRequest": {
+            "type": "object",
+            "properties": {
+                "approval_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "communityapps.EnvironmentField": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "set": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "communityapps.Inspection": {
+            "type": "object",
+            "properties": {
+                "ca_version": {
+                    "type": "string"
+                },
+                "eligibility_issues": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "fields": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/communityapps.TemplateField"
+                    }
+                },
+                "listing": {
+                    "$ref": "#/definitions/communityapps.Listing"
+                },
+                "network": {
+                    "type": "string"
+                },
+                "onboarding_accepted": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "communityapps.Listing": {
+            "type": "object",
+            "properties": {
+                "image": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "publisher": {
+                    "type": "string"
+                },
+                "reference": {
+                    "type": "string"
+                },
+                "variant": {
+                    "type": "string"
+                }
+            }
+        },
+        "communityapps.Mount": {
+            "type": "object",
+            "properties": {
+                "create_directory": {
+                    "type": "boolean"
+                },
+                "mode": {
+                    "type": "string"
+                },
+                "shared": {
+                    "type": "boolean"
+                },
+                "source": {
+                    "type": "string"
+                },
+                "target": {
+                    "type": "string"
+                }
+            }
+        },
+        "communityapps.PathOverride": {
+            "type": "object",
+            "properties": {
+                "allow_shared": {
+                    "type": "boolean"
+                },
+                "source": {
+                    "type": "string"
+                }
+            }
+        },
+        "communityapps.PortBinding": {
+            "type": "object",
+            "properties": {
+                "bind_address": {
+                    "type": "string"
+                },
+                "container_port": {
+                    "type": "integer"
+                },
+                "host_port": {
+                    "type": "integer"
+                },
+                "protocol": {
+                    "type": "string"
+                }
+            }
+        },
+        "communityapps.PortOverride": {
+            "type": "object",
+            "properties": {
+                "bind_address": {
+                    "type": "string"
+                },
+                "host_port": {
+                    "type": "integer"
+                }
+            }
+        },
+        "communityapps.PrepareRequest": {
+            "type": "object",
+            "properties": {
+                "environment": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "network": {
+                    "type": "string"
+                },
+                "paths": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/communityapps.PathOverride"
+                    }
+                },
+                "ports": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/communityapps.PortOverride"
+                    }
+                },
+                "reference": {
+                    "type": "string"
+                }
+            }
+        },
+        "communityapps.Preview": {
+            "type": "object",
+            "properties": {
+                "approval_token": {
+                    "type": "string"
+                },
+                "digest": {
+                    "type": "string"
+                },
+                "eligible": {
+                    "type": "boolean"
+                },
+                "environment": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/communityapps.EnvironmentField"
+                    }
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "image": {
+                    "type": "string"
+                },
+                "issues": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "listing": {
+                    "$ref": "#/definitions/communityapps.Listing"
+                },
+                "mounts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/communityapps.Mount"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "network": {
+                    "$ref": "#/definitions/communityapps.Bridge"
+                },
+                "pids_limit": {
+                    "type": "integer"
+                },
+                "plan_id": {
+                    "type": "string"
+                },
+                "ports": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/communityapps.PortBinding"
+                    }
+                },
+                "privileged": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "communityapps.Problem": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "communityapps.SearchResult": {
+            "type": "object",
+            "properties": {
+                "ca_version": {
+                    "type": "string"
+                },
+                "listings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/communityapps.Listing"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "communityapps.TemplateField": {
+            "type": "object",
+            "properties": {
+                "default": {
+                    "type": "string"
+                },
+                "has_default": {
+                    "type": "boolean"
+                },
+                "has_value": {
+                    "type": "boolean"
+                },
+                "kind": {
+                    "$ref": "#/definitions/communityapps.ConfigKind"
+                },
+                "masked": {
+                    "type": "boolean"
+                },
+                "mode": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "required": {
+                    "type": "boolean"
+                },
+                "target": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.AccessURL": {
             "type": "object",
             "properties": {
@@ -6892,6 +7653,153 @@ const docTemplate = `{
                 },
                 "timestamp": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.ContainerDetail": {
+            "type": "object",
+            "properties": {
+                "catalog_link": {
+                    "description": "CatalogLink comes from the native Unraid user template. Omitted means unknown.",
+                    "type": "string",
+                    "example": "https://example.com/templates/plex.xml"
+                },
+                "configured_memory_limit_bytes": {
+                    "description": "ConfiguredMemoryLimit is the Docker hard cap in bytes. Zero means unlimited.\nOmitted means unavailable. MemoryLimit remains the live statistics denominator.",
+                    "type": "integer",
+                    "example": 536870912
+                },
+                "cpu_percent": {
+                    "type": "number",
+                    "example": 5.2
+                },
+                "id": {
+                    "type": "string",
+                    "example": "abc123def456"
+                },
+                "image": {
+                    "type": "string",
+                    "example": "plexinc/pms-docker:latest"
+                },
+                "ip_address": {
+                    "type": "string",
+                    "example": "172.17.0.2"
+                },
+                "mac_address": {
+                    "description": "Container MAC (Docker 29 / Unraid 7.3 fixed-MAC support)",
+                    "type": "string",
+                    "example": "02:42:ac:11:00:02"
+                },
+                "memory_display": {
+                    "type": "string",
+                    "example": "1 GiB / 8 GiB"
+                },
+                "memory_limit_bytes": {
+                    "type": "integer",
+                    "example": 8589934592
+                },
+                "memory_percent": {
+                    "type": "number",
+                    "example": 12.5
+                },
+                "memory_usage_bytes": {
+                    "type": "integer",
+                    "example": 1073741824
+                },
+                "memory_usage_mb": {
+                    "type": "number",
+                    "example": 1024
+                },
+                "name": {
+                    "type": "string",
+                    "example": "plex"
+                },
+                "network_mode": {
+                    "type": "string",
+                    "example": "bridge"
+                },
+                "network_rx_bytes": {
+                    "type": "integer",
+                    "example": 104857600
+                },
+                "network_rx_bytes_per_sec": {
+                    "type": "number",
+                    "example": 1024
+                },
+                "network_tx_bytes": {
+                    "type": "integer",
+                    "example": 52428800
+                },
+                "network_tx_bytes_per_sec": {
+                    "type": "number",
+                    "example": 512
+                },
+                "networks": {
+                    "description": "Networks lists running-container attachments in network-name order.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.ContainerNetworkAttachment"
+                    }
+                },
+                "port_mappings": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "ports": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.PortMapping"
+                    }
+                },
+                "restart_count": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "restart_policy": {
+                    "type": "string",
+                    "example": "unless-stopped"
+                },
+                "source_status": {
+                    "$ref": "#/definitions/dto.SourceStatus"
+                },
+                "state": {
+                    "type": "string",
+                    "example": "running"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "Up 2 days"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "update_available": {
+                    "description": "null when not yet checked / registry unreachable (field omitted in JSON)",
+                    "type": "boolean"
+                },
+                "update_checked": {
+                    "type": "string"
+                },
+                "update_status": {
+                    "description": "Update status — populated by merging the DockerUpdate collector's cache at read time.",
+                    "type": "string",
+                    "example": "up_to_date"
+                },
+                "uptime": {
+                    "type": "string",
+                    "example": "2 days"
+                },
+                "version": {
+                    "type": "string",
+                    "example": "1.40.1"
+                },
+                "volume_mappings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.VolumeMapping"
+                    }
                 }
             }
         },

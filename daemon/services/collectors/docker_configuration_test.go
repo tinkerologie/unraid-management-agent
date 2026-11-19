@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -18,6 +19,43 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
 	"github.com/tinkerologie/unraid-management-agent/daemon/dto"
 )
+
+func TestDockerContainerInfoFromInspectBeforeCollection(t *testing.T) {
+	var inspected container.InspectResponse
+	err := json.Unmarshal([]byte(`{
+		"Id":"0123456789abcdef","Name":"/fresh-install","RestartCount":2,
+		"Config":{"Image":"example/app:1.2"},
+		"State":{"Status":"running","StartedAt":"2026-01-01T00:00:00Z"},
+		"HostConfig":{"NetworkMode":"bridge","Memory":268435456,
+			"PortBindings":{"80/tcp":[{"HostPort":"8080"}]},
+			"RestartPolicy":{"Name":"unless-stopped"}},
+		"NetworkSettings":{
+			"Ports":{"80/tcp":[{"HostIp":"0.0.0.0","HostPort":"8080"}],"53/udp":null},
+			"Networks":{"bridge":{"IPAddress":"192.0.2.2","MacAddress":"02:42:00:00:00:02"}}
+		},
+		"Mounts":[{"Source":"/mnt/user/appdata/fresh-install","Destination":"/data","Mode":"rw"}]
+	}`), &inspected)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := DockerContainerInfoFromInspect(inspected)
+	if got.FullID != "0123456789abcdef" || got.ID != "0123456789ab" || got.Name != "fresh-install" ||
+		got.Image != "example/app:1.2" || got.Version != "1.2" || got.State != "running" || got.Status != "running" ||
+		got.UpdateStatus != dto.UpdateStatusUnknown || got.Timestamp.IsZero() {
+		t.Fatalf("unexpected identity for the newly installed container: %+v", got)
+	}
+	if got.ConfiguredMemoryLimit == nil || *got.ConfiguredMemoryLimit != 268435456 ||
+		got.RestartPolicy != "unless-stopped" || got.RestartCount != 2 || got.Uptime == "" ||
+		got.NetworkMode != "bridge" || got.IPAddress != "192.0.2.2" || got.MACAddress != "02:42:00:00:00:02" ||
+		!slices.Equal(got.PortMappings, []string{"8080:80/tcp"}) ||
+		!slices.Equal(got.VolumeMappings, []dto.VolumeMapping{{HostPath: "/mnt/user/appdata/fresh-install", ContainerPath: "/data", Mode: "rw"}}) {
+		t.Fatalf("unexpected configuration before collection: %+v", got)
+	}
+	if len(got.Ports) != 2 || !slices.Contains(got.Ports, dto.PortMapping{PrivatePort: 80, PublicPort: 8080, Type: "tcp"}) ||
+		!slices.Contains(got.Ports, dto.PortMapping{PrivatePort: 53, Type: "udp"}) {
+		t.Fatalf("unexpected exposed and bound ports: %+v", got.Ports)
+	}
+}
 
 func TestDockerPublishesConfiguredMemoryForStoppedContainers(t *testing.T) {
 	const list = `[

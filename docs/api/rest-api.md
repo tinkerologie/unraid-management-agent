@@ -1662,6 +1662,193 @@ curl -X POST http://192.168.20.21:8043/api/v1/shares/appdata/config \
 
 ---
 
+## Community Applications
+
+The read endpoints use the host’s Community Applications (CA) catalog. The supported CA build is
+**2026.07.21**, verified on **Unraid 7.4.0**. The Management Agent’s minimum Unraid version is 7.2.
+The adapter reads the cache written by the verified CA release. Open the Unraid Apps tab to load
+the cache after a reboot and to accept CA’s first-run warning before planning an installation.
+[Verified CA release artifact](https://github.com/unraid/community.applications/blob/ec8657092da8c444e6ca7b9f68cdd960cbef8d70/archive/community.applications-2026.07.21-x86_64-1.txz)
+
+### GET /community-applications
+
+Search Docker listings using the optional `q` query parameter (up to 256 bytes). Matching is case
+insensitive and covers app names, images, publishers, repository names, and variant names. Results
+follow CA’s visibility settings for deprecated and incompatible apps and exclude blacklisted
+listings. Variants available from a visible app are separate results. An app can appear in search
+while its settings prevent installation.
+
+The response contains `ca_version`, `listings`, and `total`. It returns up to 100 listings and
+`total` counts all matches. Refine the query if there are more matches. Use each listing’s opaque
+`reference` to select the published template and variant, including when several use the same
+Docker image. A successful query with zero matches returns HTTP 200 with `listings: []`.
+
+### GET /community-applications/{reference}
+
+Inspect the exact listing selected by search. The response includes the listing, configured
+`network`, editable `fields`, `onboarding_accepted`, and `eligibility_issues`. Fields describe declared
+ports, paths, and environment variables. Environment fields give the variable name and the
+`has_value` and `has_default` flags. The values and defaults are redacted. Inspection reports blockers
+it can determine from the catalog, including unresolved publisher requirements and unsupported
+runtime settings. Installation planning additionally verifies the host’s network, storage, and
+port state.
+
+Both endpoints follow the regular API read authentication settings. Errors include a stable
+`code` and an actionable `message`.
+
+| HTTP status | Code                  | Action                                                        |
+| ----------- | --------------------- | ------------------------------------------------------------- |
+| 400         | `invalid_search`      | Use a query of at most 256 bytes without null bytes.          |
+| 400         | `invalid_reference`   | Copy a listing reference from a search result.                |
+| 404         | `listing_unavailable` | Search again to find listings allowed by current host policy. |
+| 501         | `catalog_unsupported` | Check the installed CA build and supported catalog layout.    |
+| 503         | `catalog_unavailable` | Open the Unraid Apps tab to load the catalog, then retry.     |
+
+### POST /community-applications/install-plans
+
+Prepare an exact install preview from a listing reference. Send the configured API bearer token.
+The agent requires authenticated write access and refuses preparation in read-only mode. Enabling
+tokenless writes for other operations does not authorize this endpoint.
+
+```json
+{
+  "reference": "<listing reference>",
+  "name": "heimdall-secondary",
+  "network": "bridge",
+  "ports": {
+    "80/tcp": { "host_port": 18080, "bind_address": "127.0.0.1" },
+    "443/tcp": { "host_port": 18443, "bind_address": "127.0.0.1" }
+  },
+  "paths": {
+    "/config": { "source": "/mnt/cache/managed-appdata/heimdall-secondary", "allow_shared": false }
+  },
+  "environment": { "PUID": "99", "PGID": "100" }
+}
+```
+
+Only `reference` is required. Override keys must match declared container ports and protocols, path
+targets, or environment variable names. Choose Docker’s default bridge or an existing local bridge.
+Published ports must be fixed TCP or UDP bindings. With no declared or requested IP address the
+preview uses the bridge’s configured binding address, or explicit all-IPv4 binding `0.0.0.0`.
+
+The response includes the configured image, registry digest, container name, Docker network
+identity, exact port bindings, canonical host mount sources and targets, planned directory creation,
+PID limit, and environment variable names with `set` flags. Environment values are redacted. Host mount
+sources must resolve to a local Unraid disk or pool with Unix ownership and permissions. Every
+ancestor of the source must be root-owned and writable only by root. The leaf itself can be
+writable by the app. If the host default uses a user-share alias such as `/mnt/user/appdata` or
+has a writable parent, the preview reports `unprotected_mount_source`. Use a protected
+direct disk or pool path in the override. Supported bind modes are `ro` and `rw`. Privileged
+mode, Docker socket and device mounts, raw Docker arguments, and other effective unsupported
+settings make the preview ineligible. An ineligible HTTP 200 preview returns `eligible: false` and
+specific codes in `issues`.
+
+An eligible preview has an opaque `plan_id`, `approval_token`, and `expires_at` 15 minutes after
+preparation. Present the effective configuration to the operator for approval. Preparing a plan
+leaves Docker containers, native templates, and appdata unchanged.
+
+| HTTP status | Code                                        | Action                                                                          |
+| ----------- | ------------------------------------------- | ------------------------------------------------------------------------------- |
+| 400         | `invalid_plan_request`                      | Send typed overrides for declared settings.                                     |
+| 401         | `credential_required`                       | Supply the configured API bearer token.                                         |
+| 403         | `read_only`                                 | Request preparation from a write-enabled installation.                          |
+| 409         | `onboarding_required`                       | Accept the first-run warning in the Unraid Apps tab.                            |
+| 409         | `name_conflict`                             | Choose a name unused by containers or saved Unraid user templates.              |
+| 409         | `port_conflict`                             | Choose distinct available port bindings.                                        |
+| 409         | `shared_appdata`                            | Select a distinct path or supply the intended source with `allow_shared: true`. |
+| 409         | `exposed_mount_parent`                      | Select a path whose ancestors are outside writable Docker binds.                |
+| 429         | `plan_capacity`                             | Retry after an outstanding preview expires.                                     |
+| 503         | `image_digest_unavailable`                  | Verify that Docker can resolve the configured image in its registry.            |
+| 503         | `docker_unavailable`, `storage_unavailable` | Verify Docker and Unraid storage are available.                                 |
+
+The appdata conflict check examines existing containers, saved templates, and user-share aliases
+for array and pool paths. A writable bind that exposes a parent blocks the plan even with
+`allow_shared: true`. Sharing a protected leaf or its contents still requires explicit approval.
+Installation uses the local Docker Unix socket. New intermediate directories are root-owned.
+New appdata leaf directories are owned by Unraid's `nobody:users` (UID 99, GID 100).
+
+### POST /community-applications/install-plans/{id}/confirm
+
+After the operator has approved the exact preview, send its `plan_id` in the path and its
+`approval_token` in the JSON body. This endpoint has the same authenticated write requirements
+as preparation. The service rechecks current CA eligibility, native settings and Docker conflicts
+before accepting the plan.
+
+```json
+{ "approval_token": "<exact approval token from the reviewed preview>" }
+```
+
+HTTP 202 returns the accepted attempt, including its `attempt_id`. The `Location` header points to
+the status resource. Installation continues after the client disconnects. If the confirmation
+response is lost, resend the same plan ID and token to retrieve the original attempt. An expired
+or changed pending plan requires a new preview and approval. After an attempt fails, prepare and
+approve a fresh plan to try another installation.
+
+| HTTP status | Code                          | Action                                                           |
+| ----------- | ----------------------------- | ---------------------------------------------------------------- |
+| 400         | `invalid_plan_approval`       | Supply the exact token from the reviewed preview.                |
+| 400         | `install_plan_too_large`      | Install through Unraid Docker Manager.                           |
+| 409         | `plan_changed`                | Prepare and review a new preview.                                |
+| 409         | `install_recovery_pending`    | Poll the existing attempt for that installation name.            |
+| 410         | `plan_expired`                | Prepare and review a new preview.                                |
+| 429         | `install_capacity`            | Retry when an active attempt settles.                            |
+| 503         | `attempt_storage_unavailable` | Verify that the agent can write to its persistent configuration. |
+
+### GET /community-applications/install-attempts/{id}
+
+Use the returned `attempt_id` to poll under the regular API read policy. The response includes
+`state` (`pending`, `running`, `succeeded`, or `failed`), `phase`, and redacted `configuration`.
+A successful attempt returns `container_id`, with the installed name and CA listing reference in
+`configuration`. Success means that Docker started the approved image and the native user template
+was saved. Check readiness in the application separately.
+
+The daemon reconciles interrupted attempts in the background. Poll or resend the original
+confirmation to retrieve the same attempt ID after a restart. While verification is pending, the
+attempt may report `install_recovery_pending`. Check that Docker and the Unraid flash are
+available. If Docker lost the create response and has no conclusive result, the attempt
+reports `container_create_unverified`. If Docker has an approved container but cannot confirm its start
+or a definitive rejection, the attempt reports `container_start_unverified`. Check Docker Manager
+and keep polling the same attempt. Its name stays reserved while the result is ambiguous.
+A host reboot proves that an earlier in-flight request can no longer complete. After a reboot,
+recovery can settle an unresolved attempt while retaining any existing container and template
+for operator review. It still recovers a verified late success. Receipts without saved boot
+evidence record the first boot on which recovery sees them. Status requests only read the receipt.
+
+The daemon records start intent after saving the native template. On restart, a start for the
+exact owned Docker ID and approved image can recover success, including after a native template
+edit or if the container has since exited. If the native template is missing, the attempt reports
+`started_template_missing` and includes the preserved container ID. Check Docker Manager and
+restore the template if needed. If the exact container was removed or replaced before completion
+could be confirmed, recovery preserves the native template. When the daemon can establish a partial
+install, it cleans up only the container and template files whose ownership it can verify. It preserves appdata,
+volumes, images, unrelated containers, and replaced templates. Completed receipts remain available
+after later container or template changes.
+
+A failed attempt returns a `problem` with a stable code. For `install_interrupted`, review any
+remaining resources, then prepare and approve a fresh plan. For `install_receipt_unverified`,
+inspect the installation in Docker Manager and the Unraid user templates before preparing another
+plan. The existing `cleanup_failures` array lists safe failure codes. When available,
+`cleanup_details` identifies the resource, an original full Docker ID or template basename, and
+whether ownership could be verified. Review those resources before retrying. The native user
+template stores effective environment values for Unraid’s editing and update workflow.
+
+### Manage an installed application
+
+Use **Edit** and **Update** in Unraid’s Docker tab to apply changes from the saved user template.
+The Management Agent’s existing Docker operations start, stop, restart, update, and remove these
+containers. A running agent update uses the configured image reference and the current Docker
+settings. The replacement uses the same mounted data, and the agent restores the original
+container if replacement fails and recovery succeeds.
+
+After a replacement, look up the container by name to get its current Docker ID. The install
+attempt retains the ID reported at completion. To install the same listing twice, choose
+different names and free host ports. Use separate appdata paths for independent instances.
+
+Ordinary agent removal keeps the native user template and appdata. Open **Apps → Previous Apps**
+to reinstall with the saved settings.
+
+---
+
 ## Docker Containers
 
 ### GET /docker
@@ -1735,7 +1922,14 @@ clamped at zero; if `memory.stat` is missing, unreadable or lacks a valid `inact
 
 ### GET /docker/{id}
 
-Get a single container by ID or name.
+Get a single container by ID or name. The agent resolves the current identity against Docker.
+During recreation, look up the container by name for the replacement’s 12-character ID.
+The old ID returns 404 once Docker removes that container. Live statistics appear after the
+collector samples the replacement. An unavailable Docker engine returns HTTP 503.
+
+For a container managed by Docker Manager on this Unraid host, `catalog_link` shows the public
+`TemplateURL` from its saved native user template. A missing, ambiguous, or invalid link leaves
+the origin unknown and the field is omitted.
 
 **Path Parameters**:
 

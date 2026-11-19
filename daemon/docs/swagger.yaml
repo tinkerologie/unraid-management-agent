@@ -15,6 +15,293 @@ definitions:
       unraid_version:
         type: string
     type: object
+  communityapps.Attempt:
+    properties:
+      attempt_id:
+        type: string
+      cleanup_details:
+        items:
+          $ref: '#/definitions/communityapps.CleanupIssue'
+        type: array
+      cleanup_failures:
+        items:
+          type: string
+        type: array
+      configuration:
+        $ref: '#/definitions/communityapps.Configuration'
+      container_id:
+        type: string
+      phase:
+        type: string
+      problem:
+        $ref: '#/definitions/communityapps.Problem'
+      state:
+        $ref: '#/definitions/communityapps.AttemptState'
+    type: object
+  communityapps.AttemptState:
+    enum:
+    - pending
+    - running
+    - succeeded
+    - failed
+    type: string
+    x-enum-varnames:
+    - AttemptPending
+    - AttemptRunning
+    - AttemptSucceeded
+    - AttemptFailed
+  communityapps.Bridge:
+    properties:
+      driver:
+        type: string
+      id:
+        type: string
+      internal:
+        type: boolean
+      ipv4:
+        type: boolean
+      ipv6:
+        type: boolean
+      name:
+        type: string
+    type: object
+  communityapps.CleanupIssue:
+    properties:
+      code:
+        type: string
+      container_id:
+        type: string
+      ownership_verified:
+        type: boolean
+      resource:
+        type: string
+      template_file:
+        type: string
+    type: object
+  communityapps.ConfigKind:
+    enum:
+    - port
+    - path
+    - environment
+    type: string
+    x-enum-varnames:
+    - ConfigPort
+    - ConfigPath
+    - ConfigEnvironment
+  communityapps.Configuration:
+    properties:
+      digest:
+        type: string
+      environment:
+        items:
+          $ref: '#/definitions/communityapps.EnvironmentField'
+        type: array
+      image:
+        type: string
+      listing:
+        $ref: '#/definitions/communityapps.Listing'
+      mounts:
+        items:
+          $ref: '#/definitions/communityapps.Mount'
+        type: array
+      name:
+        type: string
+      network:
+        $ref: '#/definitions/communityapps.Bridge'
+      pids_limit:
+        type: integer
+      ports:
+        items:
+          $ref: '#/definitions/communityapps.PortBinding'
+        type: array
+      privileged:
+        type: boolean
+    type: object
+  communityapps.ConfirmRequest:
+    properties:
+      approval_token:
+        type: string
+    type: object
+  communityapps.EnvironmentField:
+    properties:
+      name:
+        type: string
+      set:
+        type: boolean
+    type: object
+  communityapps.Inspection:
+    properties:
+      ca_version:
+        type: string
+      eligibility_issues:
+        items:
+          type: string
+        type: array
+      fields:
+        items:
+          $ref: '#/definitions/communityapps.TemplateField'
+        type: array
+      listing:
+        $ref: '#/definitions/communityapps.Listing'
+      network:
+        type: string
+      onboarding_accepted:
+        type: boolean
+    type: object
+  communityapps.Listing:
+    properties:
+      image:
+        type: string
+      name:
+        type: string
+      publisher:
+        type: string
+      reference:
+        type: string
+      variant:
+        type: string
+    type: object
+  communityapps.Mount:
+    properties:
+      create_directory:
+        type: boolean
+      mode:
+        type: string
+      shared:
+        type: boolean
+      source:
+        type: string
+      target:
+        type: string
+    type: object
+  communityapps.PathOverride:
+    properties:
+      allow_shared:
+        type: boolean
+      source:
+        type: string
+    type: object
+  communityapps.PortBinding:
+    properties:
+      bind_address:
+        type: string
+      container_port:
+        type: integer
+      host_port:
+        type: integer
+      protocol:
+        type: string
+    type: object
+  communityapps.PortOverride:
+    properties:
+      bind_address:
+        type: string
+      host_port:
+        type: integer
+    type: object
+  communityapps.PrepareRequest:
+    properties:
+      environment:
+        additionalProperties:
+          type: string
+        type: object
+      name:
+        type: string
+      network:
+        type: string
+      paths:
+        additionalProperties:
+          $ref: '#/definitions/communityapps.PathOverride'
+        type: object
+      ports:
+        additionalProperties:
+          $ref: '#/definitions/communityapps.PortOverride'
+        type: object
+      reference:
+        type: string
+    type: object
+  communityapps.Preview:
+    properties:
+      approval_token:
+        type: string
+      digest:
+        type: string
+      eligible:
+        type: boolean
+      environment:
+        items:
+          $ref: '#/definitions/communityapps.EnvironmentField'
+        type: array
+      expires_at:
+        type: string
+      image:
+        type: string
+      issues:
+        items:
+          type: string
+        type: array
+      listing:
+        $ref: '#/definitions/communityapps.Listing'
+      mounts:
+        items:
+          $ref: '#/definitions/communityapps.Mount'
+        type: array
+      name:
+        type: string
+      network:
+        $ref: '#/definitions/communityapps.Bridge'
+      pids_limit:
+        type: integer
+      plan_id:
+        type: string
+      ports:
+        items:
+          $ref: '#/definitions/communityapps.PortBinding'
+        type: array
+      privileged:
+        type: boolean
+    type: object
+  communityapps.Problem:
+    properties:
+      code:
+        type: string
+      message:
+        type: string
+    type: object
+  communityapps.SearchResult:
+    properties:
+      ca_version:
+        type: string
+      listings:
+        items:
+          $ref: '#/definitions/communityapps.Listing'
+        type: array
+      total:
+        type: integer
+    type: object
+  communityapps.TemplateField:
+    properties:
+      default:
+        type: string
+      has_default:
+        type: boolean
+      has_value:
+        type: boolean
+      kind:
+        $ref: '#/definitions/communityapps.ConfigKind'
+      masked:
+        type: boolean
+      mode:
+        type: string
+      name:
+        type: string
+      required:
+        type: boolean
+      target:
+        type: string
+      value:
+        type: string
+    type: object
   dto.AccessURL:
     properties:
       ipv4:
@@ -713,6 +1000,120 @@ definitions:
         type: integer
       timestamp:
         type: string
+    type: object
+  dto.ContainerDetail:
+    properties:
+      catalog_link:
+        description: CatalogLink comes from the native Unraid user template. Omitted
+          means unknown.
+        example: https://example.com/templates/plex.xml
+        type: string
+      configured_memory_limit_bytes:
+        description: |-
+          ConfiguredMemoryLimit is the Docker hard cap in bytes. Zero means unlimited.
+          Omitted means unavailable. MemoryLimit remains the live statistics denominator.
+        example: 536870912
+        type: integer
+      cpu_percent:
+        example: 5.2
+        type: number
+      id:
+        example: abc123def456
+        type: string
+      image:
+        example: plexinc/pms-docker:latest
+        type: string
+      ip_address:
+        example: 172.17.0.2
+        type: string
+      mac_address:
+        description: Container MAC (Docker 29 / Unraid 7.3 fixed-MAC support)
+        example: 02:42:ac:11:00:02
+        type: string
+      memory_display:
+        example: 1 GiB / 8 GiB
+        type: string
+      memory_limit_bytes:
+        example: 8589934592
+        type: integer
+      memory_percent:
+        example: 12.5
+        type: number
+      memory_usage_bytes:
+        example: 1073741824
+        type: integer
+      memory_usage_mb:
+        example: 1024
+        type: number
+      name:
+        example: plex
+        type: string
+      network_mode:
+        example: bridge
+        type: string
+      network_rx_bytes:
+        example: 104857600
+        type: integer
+      network_rx_bytes_per_sec:
+        example: 1024
+        type: number
+      network_tx_bytes:
+        example: 52428800
+        type: integer
+      network_tx_bytes_per_sec:
+        example: 512
+        type: number
+      networks:
+        description: Networks lists running-container attachments in network-name
+          order.
+        items:
+          $ref: '#/definitions/dto.ContainerNetworkAttachment'
+        type: array
+      port_mappings:
+        items:
+          type: string
+        type: array
+      ports:
+        items:
+          $ref: '#/definitions/dto.PortMapping'
+        type: array
+      restart_count:
+        example: 0
+        type: integer
+      restart_policy:
+        example: unless-stopped
+        type: string
+      source_status:
+        $ref: '#/definitions/dto.SourceStatus'
+      state:
+        example: running
+        type: string
+      status:
+        example: Up 2 days
+        type: string
+      timestamp:
+        type: string
+      update_available:
+        description: null when not yet checked / registry unreachable (field omitted
+          in JSON)
+        type: boolean
+      update_checked:
+        type: string
+      update_status:
+        description: Update status — populated by merging the DockerUpdate collector's
+          cache at read time.
+        example: up_to_date
+        type: string
+      uptime:
+        example: 2 days
+        type: string
+      version:
+        example: 1.40.1
+        type: string
+      volume_mappings:
+        items:
+          $ref: '#/definitions/dto.VolumeMapping'
+        type: array
     type: object
   dto.ContainerInfo:
     properties:
@@ -6761,6 +7162,218 @@ paths:
       summary: Get all collectors status
       tags:
       - Collectors
+  /community-applications:
+    get:
+      description: Search the host's filtered Community Applications Docker catalog
+      parameters:
+      - description: Search term (maximum 256 bytes)
+        in: query
+        name: q
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/communityapps.SearchResult'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "501":
+          description: Not Implemented
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+      summary: Search Community Applications
+      tags:
+      - Community Applications
+  /community-applications/{reference}:
+    get:
+      description: Show the exact listing's editable fields and known install eligibility
+        issues
+      parameters:
+      - description: Listing reference from search
+        in: path
+        name: reference
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/communityapps.Inspection'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "501":
+          description: Not Implemented
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+      summary: Inspect a Community Applications listing
+      tags:
+      - Community Applications
+  /community-applications/install-attempts/{id}:
+    get:
+      description: Return durable progress or the final install result, including
+        any cleanup details after recovery.
+      parameters:
+      - description: Install attempt ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/communityapps.Attempt'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+      summary: Get a Community Applications install attempt
+      tags:
+      - Community Applications
+  /community-applications/install-plans:
+    post:
+      consumes:
+      - application/json
+      description: Resolve exact effective settings and an image digest without installing
+      parameters:
+      - description: Listing and declared overrides
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/communityapps.PrepareRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/communityapps.Preview'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "501":
+          description: Not Implemented
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+      security:
+      - BearerAuth: []
+      summary: Prepare a Community Applications install
+      tags:
+      - Community Applications
+  /community-applications/install-plans/{id}/confirm:
+    post:
+      consumes:
+      - application/json
+      description: Claim one approved plan and return its durable attempt. Repeat
+        the same approval to retrieve the original attempt.
+      parameters:
+      - description: Pending install plan ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Exact approval token from the reviewed preview
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/communityapps.ConfirmRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/communityapps.Attempt'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "410":
+          description: Gone
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/communityapps.Problem'
+      security:
+      - BearerAuth: []
+      summary: Confirm a Community Applications install
+      tags:
+      - Community Applications
   /cpu/governor:
     post:
       consumes:
@@ -6938,7 +7551,8 @@ paths:
       - Docker
   /docker/{id}:
     get:
-      description: Read information about a specific Docker container by ID or name
+      description: Resolve the live Docker container by ID or name and show its native
+        catalog link when available
       parameters:
       - description: Container ID or name
         in: path
@@ -6951,9 +7565,13 @@ paths:
         "200":
           description: Container information
           schema:
-            $ref: '#/definitions/dto.ContainerInfo'
+            $ref: '#/definitions/dto.ContainerDetail'
         "404":
           description: Container not found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Docker container information unavailable
           schema:
             $ref: '#/definitions/dto.Response'
       summary: Get specific Docker container

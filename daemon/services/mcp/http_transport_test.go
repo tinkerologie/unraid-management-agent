@@ -18,6 +18,7 @@ import (
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/api"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/communityapps"
 )
 
 func newMountedMCPTestServer(t *testing.T, apiToken, mcpSecret string) (*httptest.Server, *api.Server) {
@@ -28,6 +29,11 @@ func newMountedMCPTestServer(t *testing.T, apiToken, mcpSecret string) (*httptes
 
 func mountMCPTestServer(t *testing.T, config domain.Config, policies *domain.ToolPolicyStore) (*httptest.Server, *api.Server) {
 	t.Helper()
+	return mountMCPTestServerWithCommunityApps(t, config, policies, nil)
+}
+
+func mountMCPTestServerWithCommunityApps(t *testing.T, config domain.Config, policies *domain.ToolPolicyStore, service *communityapps.Service) (*httptest.Server, *api.Server) {
+	t.Helper()
 	config.Version = "test-1.0.0"
 	config.Port = 8043
 	ctx := &domain.Context{Config: config, Hub: domain.NewEventBus(64)}
@@ -36,6 +42,9 @@ func mountMCPTestServer(t *testing.T, config domain.Config, policies *domain.Too
 	mcpServer := NewServer(ctx, newMockCacheProvider())
 	mcpServer.SetNetworkWriteLock(ctx.WritesLocked())
 	mcpServer.SetToolPolicyStore(policies)
+	if service != nil {
+		mcpServer.SetCommunityAppsService(service)
+	}
 	if err := mcpServer.Initialize(); err != nil {
 		t.Fatalf("Initialize() failed: %v", err)
 	}

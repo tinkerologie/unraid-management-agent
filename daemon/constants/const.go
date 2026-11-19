@@ -3,6 +3,9 @@ package constants
 
 import "time"
 
+// DockerUpdateAttemptLabel identifies a container created during an Agent update.
+const DockerUpdateAttemptLabel = "io.tinkerologie.uma.update-attempt"
+
 const (
 	// VarIni is the path to the Unraid var.ini configuration file.
 	VarIni        = "/var/local/emhttp/var.ini"

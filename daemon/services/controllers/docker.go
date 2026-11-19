@@ -170,7 +170,7 @@ func (dc *DockerController) Remove(containerID string, removeImage bool) error {
 	// Capture image reference before removal so we can optionally clean it up.
 	var imageRef string
 	if removeImage {
-		if inspectResult, err := dc.client.ContainerInspect(ctx, containerID, client.ContainerInspectOptions{}); err == nil {
+		if inspectResult, err := dc.client.ContainerInspect(ctx, containerID, client.ContainerInspectOptions{}); err == nil && inspectResult.Container.Config != nil {
 			imageRef = inspectResult.Container.Config.Image
 		}
 	}

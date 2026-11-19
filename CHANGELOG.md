@@ -11,6 +11,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Resolve the current Docker container ID by name after native replacement and show the saved Community Applications catalog link in Docker details (#366).
+
+- Recover interrupted Community Applications installs after a daemon restart and return the same attempt through REST and MCP (#365).
+  Recovery keeps uncertain Docker creates and starts available for polling and preserves started containers after native template edits.
+  Cleanup preserves appdata and containers that have started. Recovery checks the current native template's
+  container name and restores an owned template left in quarantine when a verified start or active replacement needs it.
+  Recovery syncs the native template directory before confirming a successful start.
+  Cleanup waits for Docker to confirm the original container's state after a failed removal.
+
+- Confirm an approved Community Applications install through REST or Streamable HTTP MCP and follow its durable attempt (#364).
+  A successful attempt starts the verified image and saves an Unraid user template for native editing and updates.
+
+- Preview an exact Community Applications Docker install through REST or Streamable HTTP MCP (#363).
+  The preview pins the registry digest, network, fixed port bindings and resolved appdata paths for 15 minutes,
+  and shows which environment variables are set with values redacted.
+
+- Search the host Community Applications Docker catalog and inspect a listing’s redacted template through REST and MCP (#362).
+
 - Select MQTT telemetry topics independently and disable MQTT commands while keeping Home Assistant monitoring.
   Applying the new settings clears retained records for disabled topics and command controls (#356).
   Home Assistant receives read-only service status once a minute while MQTT is connected and commands are disabled.
@@ -19,12 +37,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Measure Go coverage across packages so CI records code exercised by shared tests.
+- Require protected local bind paths for Community Applications installs. Reject writable bind ancestors and report ineligible user-share or remote sources before approval.
+- Settle unresolved Docker requests after a verified host reboot and keep intact install receipts readable if another receipt is damaged.
+
 - Use Dynamix settings rows and theme colors with the plugin’s compact left-aligned layout and switches.
   Improve helper text contrast in light and dark themes, and preserve saved collection intervals
   outside the displayed presets (#358).
 - Require aggregate CI validation and align automation with free-tier governance.
 
 ### Fixed
+
+- Community Applications checks writable Docker named volumes backed by local bind mounts for appdata overlap and exposed parent directories before approval and before starting a container.
 
 - The Prometheus references `docs/api/rest-api.md` and `docs/api/prometheus.md` now list the 62 metric families
   that `/metrics` exports, with the correct names, types and labels. They no longer list names that the agent does

@@ -138,7 +138,7 @@ func authMiddlewareWithMCPSecret(token, mcpConnectSecret string) mux.MiddlewareF
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.URL != nil && strings.HasPrefix(r.URL.Path, "/mcp/") && r.URL.Path != "/mcp/" {
 				if isMCPConnectSecretExempt(r.URL, expectedSecret) {
-					next.ServeHTTP(w, r)
+					next.ServeHTTP(w, markVerifiedCredential(r))
 					return
 				}
 				RecordMCPConnectionEvent("not_found")
@@ -174,7 +174,7 @@ func authMiddlewareWithMCPSecret(token, mcpConnectSecret string) mux.MiddlewareF
 				return
 			}
 
-			next.ServeHTTP(w, r)
+			next.ServeHTTP(w, markVerifiedCredential(r))
 		})
 	}
 }

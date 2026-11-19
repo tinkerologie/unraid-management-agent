@@ -83,6 +83,11 @@ type updateTestEngine struct {
 	replacementRunning bool
 	failure            string
 	created            map[string]any
+	caAppdata          string
+	caNativeEdit       bool
+	caPull             string
+	caReplacementName  string
+	caActions          []string
 }
 
 const (
@@ -99,6 +104,7 @@ func (e *updateTestEngine) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case path == "/_ping":
 		w.Header().Set("API-Version", "1.56")
 	case path == "/images/create":
+		e.caPull = r.URL.Query().Get("fromImage") + ":" + r.URL.Query().Get("tag")
 		if e.failure == "pull" {
 			_, _ = fmt.Fprintln(w, `{"errorDetail":{"message":"registry pull failed"},"error":"registry pull failed"}`)
 			return
@@ -107,6 +113,8 @@ func (e *updateTestEngine) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case strings.HasPrefix(path, "/images/") && strings.HasSuffix(path, "/json"):
 		_, _ = fmt.Fprint(w, `{"Id":"sha256:new"}`)
 	case path == "/containers/create":
+		e.caReplacementName = r.URL.Query().Get("name")
+		e.caActions = append(e.caActions, "create replacement")
 		e.create(w, r)
 	case strings.HasSuffix(path, "/json"):
 		e.inspect(w, strings.TrimSuffix(strings.TrimPrefix(path, "/containers/"), "/json"))
@@ -123,38 +131,60 @@ func (e *updateTestEngine) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		e.restartPolicy = string(payload.RestartPolicy.Name)
 		_, _ = fmt.Fprint(w, `{"Warnings":[]}`)
 	case path == "/containers/"+updateOriginalID+"/stop":
+		e.caActions = append(e.caActions, "stop original")
 		e.originalRunning = false
 		if e.failure == "stop" {
 			writeUpdateTestError(w, 500)
 		}
 	case path == "/containers/"+updateOriginalID+"/rename":
 		name := r.URL.Query().Get("name")
+		if name == "fixture" {
+			e.caActions = append(e.caActions, "restore original")
+		} else {
+			e.caActions = append(e.caActions, "retain original")
+		}
 		if e.failure == "rename" || (name == "fixture" && (e.replacement || e.failure == "restore-name")) {
 			writeUpdateTestError(w, 409)
 			return
 		}
 		e.originalName = name
+	case path == "/containers/"+updateOriginalID+"/restart":
+		e.caActions = append(e.caActions, "restart original")
+		e.originalRunning = true
 	case path == "/containers/"+updateOriginalID+"/start":
+		e.caActions = append(e.caActions, "start original")
 		if e.failure == "restart" {
 			writeUpdateTestError(w, 500)
 			return
 		}
 		e.originalRunning = true
 	case path == "/containers/"+updateReplacementID+"/start":
+		e.caActions = append(e.caActions, "start replacement")
 		if e.failure == "start" {
 			writeUpdateTestError(w, 500)
 			return
 		}
 		e.replacementRunning = true
 	case r.Method == http.MethodDelete && path == "/containers/"+updateOriginalID:
+		if r.URL.RawQuery != "" && e.caAppdata != "" {
+			writeUpdateTestError(w, 400)
+			return
+		}
+		e.caActions = append(e.caActions, "remove original")
 		if e.failure == "cleanup" {
 			writeUpdateTestError(w, 500)
 			return
 		}
 		e.originalRemoved = true
 	case r.Method == http.MethodDelete && path == "/containers/"+updateReplacementID:
+		if r.URL.RawQuery != "force=1" && e.caAppdata != "" {
+			writeUpdateTestError(w, 400)
+			return
+		}
+		e.caActions = append(e.caActions, "force-remove replacement")
 		e.replacement = false
 	default:
+		e.caActions = append(e.caActions, r.Method+" "+path)
 		writeUpdateTestError(w, 404)
 	}
 }
@@ -194,6 +224,10 @@ func (e *updateTestEngine) inspect(w http.ResponseWriter, ref string) {
 		return
 	}
 	if !e.originalRemoved && (ref == updateOriginalID || ref == e.originalName) {
+		if e.caAppdata != "" {
+			_, _ = fmt.Fprint(w, e.caInspectResponse(e.originalName))
+			return
+		}
 		_, _ = fmt.Fprintf(w, `{
 			"Id":%q,"Name":%q,"Image":"sha256:old","Config":{"Image":"fixture:latest"},
 			"State":{"Running":%t},"HostConfig":{"Memory":268435456,"MemorySwap":536870912,"NetworkMode":"static","RestartPolicy":{"Name":%q}},

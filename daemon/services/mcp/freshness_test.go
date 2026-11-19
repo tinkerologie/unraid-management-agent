@@ -196,6 +196,10 @@ func TestToolUpdateCollectorInterval_DynamicModeConflict(t *testing.T) {
 // toolsWithoutCollectors are the read-only tools that serve no cached
 // collector data, so calls neither refresh nor record demand.
 var toolsWithoutCollectors = map[string]bool{
+	"search_community_applications":     true,
+	"inspect_community_application":     true,
+	"get_community_app_install_attempt": true,
+
 	"agent_get_memory":         true,
 	"agent_get_session":        true,
 	"agent_list_sessions":      true,

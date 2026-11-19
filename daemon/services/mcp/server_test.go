@@ -51,11 +51,20 @@ type MockCacheProvider struct {
 	collectorIntervals map[string]int
 }
 
-func (m *MockCacheProvider) GetSystemCache() *dto.SystemInfo                { return m.systemInfo }
-func (m *MockCacheProvider) GetArrayCache() *dto.ArrayStatus                { return m.arrayStatus }
-func (m *MockCacheProvider) GetDisksCache() []dto.DiskInfo                  { return m.disks }
-func (m *MockCacheProvider) GetSharesCache() []dto.ShareInfo                { return m.shares }
-func (m *MockCacheProvider) GetDockerCache() []dto.ContainerInfo            { return m.containers }
+func (m *MockCacheProvider) GetSystemCache() *dto.SystemInfo     { return m.systemInfo }
+func (m *MockCacheProvider) GetArrayCache() *dto.ArrayStatus     { return m.arrayStatus }
+func (m *MockCacheProvider) GetDisksCache() []dto.DiskInfo       { return m.disks }
+func (m *MockCacheProvider) GetSharesCache() []dto.ShareInfo     { return m.shares }
+func (m *MockCacheProvider) GetDockerCache() []dto.ContainerInfo { return m.containers }
+func (m *MockCacheProvider) GetDockerContainer(_ context.Context, ref string) (*dto.ContainerDetail, error) {
+	for _, info := range m.containers {
+		if info.ID == ref || info.Name == ref {
+			return &dto.ContainerDetail{ContainerInfo: info}, nil
+		}
+	}
+	return nil, nil
+}
+
 func (m *MockCacheProvider) GetVMsCache() []dto.VMInfo                      { return m.vms }
 func (m *MockCacheProvider) GetUPSCache() *dto.UPSStatus                    { return m.ups }
 func (m *MockCacheProvider) GetGPUCache() []*dto.GPUMetrics                 { return m.gpus }

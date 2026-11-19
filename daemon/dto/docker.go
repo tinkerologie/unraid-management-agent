@@ -11,6 +11,8 @@ const (
 
 // ContainerInfo contains Docker container information
 type ContainerInfo struct {
+	// FullID identifies the collected container across replacements. Public responses use ID.
+	FullID      string `json:"-"`
 	ID          string `json:"id" example:"abc123def456"`
 	Name        string `json:"name" example:"plex"`
 	Image       string `json:"image" example:"plexinc/pms-docker:latest"`
@@ -48,6 +50,13 @@ type ContainerInfo struct {
 	Timestamp       time.Time  `json:"timestamp"`
 
 	SourceStatus *SourceStatus `json:"source_status,omitempty"`
+}
+
+// ContainerDetail describes an individual container after resolving its live identity.
+type ContainerDetail struct {
+	ContainerInfo
+	// CatalogLink comes from the native Unraid user template. Omitted means unknown.
+	CatalogLink string `json:"catalog_link,omitempty" example:"https://example.com/templates/plex.xml"`
 }
 
 // ContainerNetworkAttachment describes one Docker network endpoint.

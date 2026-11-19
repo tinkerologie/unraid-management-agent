@@ -38,18 +38,20 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/agent"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/alerting"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/api"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/communityapps"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/controllers"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/remediation"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/watchdog"
 )
 
-// CacheProvider defines the interface for accessing cached data from the API server.
+// CacheProvider provides monitoring data from the API server.
 type CacheProvider interface {
 	GetSystemCache() *dto.SystemInfo
 	GetArrayCache() *dto.ArrayStatus
 	GetDisksCache() []dto.DiskInfo
 	GetSharesCache() []dto.ShareInfo
 	GetDockerCache() []dto.ContainerInfo
+	GetDockerContainer(context.Context, string) (*dto.ContainerDetail, error)
 	GetVMsCache() []dto.VMInfo
 	GetUPSCache() *dto.UPSStatus
 	GetGPUCache() []*dto.GPUMetrics
@@ -116,6 +118,8 @@ type Server struct {
 	tuningController        *controllers.TuningController
 	agentSvc                *agent.Service
 	toolPolicyStore         *ToolPolicyStore
+	communityAppsCatalog    *communityapps.Catalog
+	communityAppsService    *communityapps.Service
 	toolsListLoggedSessions sync.Map
 	// networkWriteLock makes every write tool read-only for network (HTTP)
 	// clients while no API token is configured (#245). STDIO never sets it.
@@ -128,11 +132,18 @@ func NewServer(ctx *domain.Context, cacheProvider CacheProvider) *Server {
 	if ctx != nil {
 		initialPolicies = ctx.ToolPolicy
 	}
-	return &Server{
+	s := &Server{
 		ctx:             ctx,
 		cacheProvider:   cacheProvider,
 		toolPolicyStore: NewToolPolicyStore("", initialPolicies),
 	}
+	if apiServer, ok := cacheProvider.(*api.Server); ok {
+		s.communityAppsCatalog, s.communityAppsService = apiServer.CommunityApps()
+	} else {
+		s.communityAppsCatalog = communityapps.NewHostCatalog()
+		s.communityAppsService = communityapps.NewHostService(s.communityAppsCatalog)
+	}
+	return s
 }
 
 // SetToolPolicyStore sets the tool policy store for per-tool access control.
@@ -319,6 +330,7 @@ func (s *Server) Initialize() error {
 
 	// Register all tools, resources, and prompts
 	s.registerMonitoringTools()
+	s.registerCommunityAppsTools()
 	s.registerNewMonitoringTools()
 	s.registerControlTools()
 	s.registerNewControlTools()
@@ -553,19 +565,17 @@ func (s *Server) registerMonitoringTools() {
 	// Get specific container info tool
 	addToolDirect(s, &mcp.Tool{
 		Name:        "get_container_info",
-		Description: "Get detailed information about a specific Docker container",
+		Description: "Get a Docker container by its current ID or name, including its native catalog link when available",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args dto.MCPContainerArgs) (*mcp.CallToolResult, any, error) {
-		containers := s.cacheProvider.GetDockerCache()
-		if containers == nil {
-			return textResult("Container information not available yet"), nil, nil
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, args dto.MCPContainerArgs) (*mcp.CallToolResult, any, error) {
+		detail, err := s.cacheProvider.GetDockerContainer(ctx, args.ContainerID)
+		if err != nil {
+			return textResult("Docker container information unavailable"), nil, nil
 		}
-		for _, c := range containers {
-			if c.ID == args.ContainerID || c.Name == args.ContainerID {
-				return jsonResult(c)
-			}
+		if detail == nil {
+			return textResult(fmt.Sprintf("Container '%s' not found", args.ContainerID)), nil, nil
 		}
-		return textResult(fmt.Sprintf("Container '%s' not found", args.ContainerID)), nil, nil
+		return jsonResult(detail)
 	})
 
 	// List Docker networks tool

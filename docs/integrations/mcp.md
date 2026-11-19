@@ -234,6 +234,63 @@ Thus, the sum of the counts can be less than the number of disk entries.
 >
 > Use `refresh_container_updates` to force a fresh registry check and push results to the cache, WebSocket hub, and alerting engine. Use `check_container_updates` / `check_container_update` for synchronous on-demand checks that return results directly without publishing.
 
+After a container is recreated, use its name as `container_id` in `get_container_info`
+to get the current Docker ID. A Docker Manager container can include `catalog_link`, the public
+link saved in its native Unraid user template. When the field is absent, the origin is unknown.
+Ordinary removal keeps the template and appdata for **Apps → Previous Apps**.
+
+### Community Applications Tools
+
+| Tool                                | Arguments                                                                   | Description                                                             |
+| ----------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `search_community_applications`     | Optional `query` string                                                     | Find Docker listings in the host’s filtered CA catalog.                 |
+| `inspect_community_application`     | `reference` string from search                                              | Read the exact variant’s editable fields and known blockers.            |
+| `prepare_community_app_install`     | `reference` and optional `name`, `network`, `ports`, `paths`, `environment` | Preview an exact Docker install and receive a 15-minute approval token. |
+| `confirm_community_app_install`     | `plan_id`, `approval_token`, and `confirm` when policy requires             | Confirm the operator-approved preview and return the durable attempt.   |
+| `get_community_app_install_attempt` | `attempt_id` from confirmation                                              | Read progress or the redacted terminal result.                          |
+
+Search and inspection are read-only. Search returns up to 100 listings and a total match count. A successful
+search with no matches returns an empty `listings` array. An unavailable catalog returns a tool
+error with code `catalog_unavailable`. Open the Unraid Apps tab to load the cache, then retry.
+`catalog_unsupported` identifies an unsupported build or layout. When a template is withdrawn or
+hidden, inspection returns `listing_unavailable`. Search again to select a visible listing.
+
+Inspection shows environment variable names with flags for the presence of values or defaults.
+The values and defaults are redacted. If `onboarding_accepted` is false, accept the CA warning in
+the Unraid Apps tab before planning an installation.
+Preparation uses Streamable HTTP MCP with a valid API bearer token or the configured MCP
+connect-secret URL. Supply credentials on every request, including within an established session.
+Ordinary network write access and MCP tool policy also apply. When the prepare tool policy is
+`ask`, obtain operator consent and set `confirm: true` to prepare the preview. Present the exact
+result for separate install approval. The preparation arguments and response match the REST
+contract. To prepare from an MCP client using STDIO, connect that client over Streamable HTTP.
+
+Use a direct local disk or pool path for appdata. Its ancestors must be root-owned and writable
+only by root. If the preview reports `unprotected_mount_source`, override the mount with a
+protected path. If it reports `exposed_mount_parent`, choose a path outside writable ancestor
+binds. See the [REST preparation contract](../api/rest-api.md#post-community-applicationsinstall-plans).
+
+After the operator approves the preview, confirm using the exact `plan_id` and `approval_token`.
+Confirmation requires the same authenticated write access as preparation. The confirmation tool
+also requires `confirm: true` when its policy is `ask`. Every policy that allows confirmation still
+requires the exact approval token.
+
+Use the returned `attempt_id` to check status. The installation continues across request disconnects,
+and any MCP session can call the read-only status tool under the normal read policy. If a response is
+lost, resend the exact confirmation to recover the original attempt ID. Prepare and approve a
+fresh plan after a failed installation. After a daemon restart, poll the same attempt ID. If the
+attempt is awaiting verification, check that Docker and the Unraid flash are available.
+For `container_create_unverified` or `container_start_unverified`, check Docker Manager and keep
+polling while the attempt's name is reserved. A host reboot lets recovery settle unresolved
+requests while retaining any existing container and template for inspection. For
+`started_template_missing`, use the returned container ID to find the
+preserved container and restore the native template if needed. A failed attempt can include a
+Docker ID or template basename in `cleanup_details` for
+operator review. Success means Docker started the approved container and the agent saved its
+native Unraid user template. Verify application readiness separately.
+
+[Supported CA builds and response fields](../api/rest-api.md#community-applications)
+
 ### VM Tools
 
 | Tool                | Description                              |
