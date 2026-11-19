@@ -161,9 +161,13 @@ func (s *Service) settleInstall(ctx context.Context, docker InstallDocker, recei
 		case startVerified, startTemplateMissing:
 			return s.finishObservedStart(receipt, observed)
 		case startContainerMissing:
-			if !receipt.EngineRejected {
-				// The native template was published before start intent. It
-				// may be retained from an ordinary removal or replacement.
+			if uncertainStart(*receipt) {
+				// Preserve the native template after ordinary removal or
+				// replacement, including one quarantined by older cleanup.
+				if issue := s.restoreRetainedNativeTemplate(*receipt); issue.Code != "" {
+					receipt.Attempt.CleanupDetails = append(receipt.Attempt.CleanupDetails, issue)
+					receipt.Attempt.CleanupFailures = append(receipt.Attempt.CleanupFailures, issue.Code)
+				}
 				return s.finishInstall(receipt, ErrInstallInterrupted)
 			}
 		}

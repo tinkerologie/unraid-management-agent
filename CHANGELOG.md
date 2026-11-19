@@ -15,7 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Recover interrupted Community Applications installs after a daemon restart and return the same attempt through REST and MCP (#365).
   Recovery keeps uncertain Docker creates and starts available for polling and preserves started containers after native template edits.
-  Cleanup preserves appdata and identifies any resources that need operator review.
+  Cleanup preserves appdata and containers that have started. Recovery checks the current native template's
+  container name and restores an owned template left in quarantine when an active replacement needs it.
 
 - Confirm an approved Community Applications install through REST or Streamable HTTP MCP and follow its durable attempt (#364).
   A successful attempt starts the verified image and saves an Unraid user template for native editing and updates.

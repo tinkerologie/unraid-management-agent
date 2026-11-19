@@ -330,30 +330,37 @@ func TestCleanupKeepsUnverifiedStartAndUnexpectedStartedImage(t *testing.T) {
 		return nil
 	}
 	issue, observed, retry := service.removeOwnedContainer(t.Context(), engine, &receipt)
-	if issue.Code != errContainerIdentity.Code || issue.OwnershipVerified || observed != startUnobserved ||
+	if issue.Code != cleanupContainerStarted || !issue.OwnershipVerified || observed != startUnobserved ||
 		retry || len(engine.RemoveRequests()) != 0 {
 		t.Fatalf("cleanup acted on a started container with a different image: %+v", issue)
 	}
 }
 
-func TestPartialInstallCleanupDoesNotForceRemoveWithoutDockerState(t *testing.T) {
-	service, engine, receipt := newInstallRecoveryFixture(t, "cleaning_up")
-	receipt.CleanupPhase = "creating_container"
-	createRecoveryContainer(t, engine, &receipt, receipt.Owner)
-	if err := service.persistProgress(receipt); err != nil {
-		t.Fatal(err)
-	}
-	engine.BeforeContainerInspect = func(_ string, c *container.InspectResponse) error {
-		if c != nil {
-			c.State = nil
-		}
-		return nil
-	}
-	if !service.reconcileInstall(t.Context(), receipt) {
-		t.Fatal("cleanup could not settle before any Start intent")
-	}
-	if removes := engine.RemoveRequests(); len(removes) != 1 || removes[0].Options.Force {
-		t.Fatalf("cleanup forced removal without Docker state: %+v", removes)
+func TestPartialInstallCleanupWaitsForVerifiedDockerStartState(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*container.InspectResponse)
+	}{
+		{name: "missing Docker state", mutate: func(c *container.InspectResponse) { c.State = nil }},
+		{name: "contradictory state with a zero timestamp", mutate: func(c *container.InspectResponse) { c.State.Status = "exited" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			service, engine, receipt := newInstallRecoveryFixture(t, "cleaning_up")
+			receipt.CleanupPhase = "creating_container"
+			createRecoveryContainer(t, engine, &receipt, receipt.Owner)
+			if err := service.persistProgress(receipt); err != nil {
+				t.Fatal(err)
+			}
+			engine.BeforeContainerInspect = func(_ string, c *container.InspectResponse) error {
+				if c != nil {
+					tc.mutate(c)
+				}
+				return nil
+			}
+			if service.reconcileInstall(t.Context(), receipt) || len(engine.RemoveRequests()) != 0 {
+				t.Fatal("cleanup removed an owned container without verifying Docker start state")
+			}
+		})
 	}
 }
 
@@ -364,7 +371,7 @@ func TestStartedContainerRemainsUnverifiedWhenNativeTemplateStatFails(t *testing
 			t.Fatalf("verification looked up a different native template: %q", path)
 		}
 		return nil, fs.ErrPermission
-	}, name)
+	}, nil, name, "recovery-fixture")
 	if got != startUnobserved || !errors.Is(err, ErrNativeTemplate) {
 		t.Fatalf("unreadable native template was treated as absent: %v, %v", got, err)
 	}

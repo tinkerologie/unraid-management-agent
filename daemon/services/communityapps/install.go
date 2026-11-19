@@ -33,7 +33,7 @@ var (
 	ErrImagePull              = &Problem{Code: "image_pull_failed", Message: "Docker could not pull the approved image or prove its digest."}
 	ErrContainerCreate        = &Problem{Code: "container_create_failed", Message: "Docker could not create the planned container."}
 	ErrContainerStart         = &Problem{Code: "container_start_failed", Message: "Docker could not verify that the planned container started."}
-	ErrStartedTemplateMissing = &Problem{Code: "started_template_missing", Message: "Docker started the installed container, but its native user template is missing or is no longer a regular file. The container was preserved. Check Docker Manager and restore the user template if needed."}
+	ErrStartedTemplateMissing = &Problem{Code: "started_template_missing", Message: "Docker started the installed container, but the native user template is missing or does not identify the installed container. The container was preserved. Check Docker Manager and restore the user template if needed."}
 	ErrNativeTemplate         = &Problem{Code: "native_template_failed", Message: "The Unraid user template could not be saved."}
 
 	opaqueID = regexp.MustCompile(`^[A-Z2-7]{26}$`)

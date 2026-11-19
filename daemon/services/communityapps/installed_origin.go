@@ -40,7 +40,7 @@ func (s *Service) InstalledCatalogLink(ctx context.Context, name string, labels 
 		}
 
 		template, err := readCatalogLinkTemplate(filename)
-		if err != nil || len(template.Names) != 1 || template.Names[0] != name {
+		if err != nil || !template.matchesName(name) {
 			return nil
 		}
 		if matched {
@@ -60,40 +60,51 @@ func (s *Service) InstalledCatalogLink(ctx context.Context, name string, labels 
 
 type catalogLinkTemplate struct {
 	XMLName xml.Name `xml:"Container"`
-	Names   []string `xml:"Name"`
-	Links   []string `xml:"TemplateURL"`
+	Names   []struct {
+		XMLName xml.Name
+		Text    string `xml:",chardata"`
+	} `xml:"Name"`
+	Links []string `xml:"TemplateURL"`
+}
+
+func (template catalogLinkTemplate) matchesName(name string) bool {
+	return len(template.Names) == 1 && template.Names[0].XMLName.Space == "" && template.Names[0].Text == name
 }
 
 func readCatalogLinkTemplate(filename string) (catalogLinkTemplate, error) {
 	var template catalogLinkTemplate
 	err := readInstallFile(filename, 1<<20, func(reader io.Reader) error {
-		decoder := xml.NewDecoder(reader)
-		for {
-			token, err := decoder.Token()
-			if errors.Is(err, io.EOF) {
-				return nil
-			}
-			if err != nil {
-				return err
-			}
-			switch value := token.(type) {
-			case xml.Directive:
-				return fs.ErrInvalid
-			case xml.StartElement:
-				if template.XMLName.Local != "" || value.Name.Space != "" {
-					return fs.ErrInvalid
-				}
-				if err := decoder.DecodeElement(&template, &value); err != nil {
-					return err
-				}
-			case xml.CharData:
-				if strings.TrimSpace(string(value)) != "" {
-					return fs.ErrInvalid
-				}
-			}
-		}
+		return decodeCatalogLinkTemplate(reader, &template)
 	})
 	return template, err
+}
+
+func decodeCatalogLinkTemplate(reader io.Reader, template *catalogLinkTemplate) error {
+	decoder := xml.NewDecoder(reader)
+	for {
+		token, err := decoder.Token()
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		switch value := token.(type) {
+		case xml.Directive:
+			return fs.ErrInvalid
+		case xml.StartElement:
+			if template.XMLName.Local != "" || value.Name.Space != "" {
+				return fs.ErrInvalid
+			}
+			if err := decoder.DecodeElement(template, &value); err != nil {
+				return err
+			}
+		case xml.CharData:
+			if strings.TrimSpace(string(value)) != "" {
+				return fs.ErrInvalid
+			}
+		}
+	}
 }
 
 func publicCatalogLink(value string) string {
