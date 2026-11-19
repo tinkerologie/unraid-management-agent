@@ -17,6 +17,14 @@ import (
 )
 
 func (s *Service) prepareInstallStorage(settings installSettings) ([]mountIdentity, error) {
+	return s.prepareStorage(settings, os.OpenRoot, s.createAppdata)
+}
+
+func (s *Service) prepareStorage(
+	settings installSettings,
+	openRoot func(string) (*os.Root, error),
+	create func(*os.Root, mountIdentity, string, map[string]mountIdentity) (mountIdentity, error),
+) ([]mountIdentity, error) {
 	host, err := readInstallHost(s.hostRoot)
 	if err != nil {
 		return nil, err
@@ -29,8 +37,7 @@ func (s *Service) prepareInstallStorage(settings installSettings) ([]mountIdenti
 			return nil, ErrPlanChanged
 		}
 	}
-	// #nosec G304 -- The configured host root and all anchors are validated against the host's storage mounts.
-	root, err := os.OpenRoot(s.hostRoot)
+	root, err := openRoot(s.hostRoot)
 	if err != nil {
 		return nil, ErrStorageState
 	}
@@ -40,7 +47,7 @@ func (s *Service) prepareInstallStorage(settings installSettings) ([]mountIdenti
 	for i, m := range mounts {
 		expected := before[i]
 		if m.CreateDirectory {
-			expected, err = s.createAppdata(root, expected, m.Source, created)
+			expected, err = create(root, expected, m.Source, created)
 			if err != nil {
 				return nil, err
 			}
@@ -55,6 +62,13 @@ func (s *Service) prepareInstallStorage(settings installSettings) ([]mountIdenti
 }
 
 func (s *Service) createAppdata(root *os.Root, identity mountIdentity, source string, created map[string]mountIdentity) (mountIdentity, error) {
+	return s.createAppdataWithOwnership(root, identity, source, created, (*os.File).Chown)
+}
+
+func (s *Service) createAppdataWithOwnership(
+	root *os.Root, identity mountIdentity, source string, created map[string]mountIdentity,
+	chown func(*os.File, int, int) error,
+) (mountIdentity, error) {
 	// Open the approved existing ancestor separately so a symlink introduced
 	// during creation cannot redirect Mkdir outside that directory.
 	dir, err := root.OpenFile(strings.TrimPrefix(identity.anchor, "/"), unix.O_DIRECTORY|unix.O_NOFOLLOW, 0)
@@ -97,7 +111,7 @@ func (s *Service) createAppdata(root *os.Root, identity mountIdentity, source st
 			// All ancestors are protected. Change only the newly created
 			// leaf by descriptor to preserve native appdata ownership.
 			uid, gid := appdataOwnership(s.hostRoot)
-			if err := dir.Chown(uid, gid); err != nil {
+			if err := chown(dir, uid, gid); err != nil {
 				return mountIdentity{}, ErrStorageState
 			}
 		}
@@ -106,25 +120,37 @@ func (s *Service) createAppdata(root *os.Root, identity mountIdentity, source st
 }
 
 func stageAppdataComponent(parent *os.File, name, source string, storage hostMount) (*os.File, mountIdentity, error) {
+	return stageAppdataWith(parent, name, source, storage, appdataStageOperations{
+		open: unix.Openat, stat: unix.Fstat, publish: renameExclusiveAt,
+	})
+}
+
+type appdataStageOperations struct {
+	open    func(int, string, int, uint32) (int, error)
+	stat    func(int, *unix.Stat_t) error
+	publish func(int, string, string) error
+}
+
+func stageAppdataWith(parent *os.File, name, source string, storage hostMount, ops appdataStageOperations) (*os.File, mountIdentity, error) {
 	dir := int(parent.Fd())
 	temporary := ".uma-ca-appdata-" + rand.Text()
 	if err := unix.Mkdirat(dir, temporary, 0o755); err != nil {
 		return nil, mountIdentity{}, ErrStorageState
 	}
 	defer func() { _ = unix.Unlinkat(dir, temporary, unix.AT_REMOVEDIR) }()
-	fd, err := unix.Openat(dir, temporary, unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
+	fd, err := ops.open(dir, temporary, unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
 	if err != nil {
 		return nil, mountIdentity{}, ErrStorageState
 	}
 	var stat unix.Stat_t
-	if err := unix.Fstat(fd, &stat); err != nil {
+	if err := ops.stat(fd, &stat); err != nil {
 		_ = unix.Close(fd)
 		return nil, mountIdentity{}, ErrStorageState
 	}
 	// The identity is observed before the directory is published. An
 	// independent directory at the approved path cannot become our leaf.
 	id := mountIdentity{anchor: source, mount: storage, device: fmt.Sprint(stat.Dev), inode: stat.Ino}
-	if err := renameExclusiveAt(dir, temporary, name); err != nil {
+	if err := ops.publish(dir, temporary, name); err != nil {
 		_ = unix.Close(fd)
 		if errors.Is(err, fs.ErrExist) {
 			return nil, mountIdentity{}, ErrPlanChanged
