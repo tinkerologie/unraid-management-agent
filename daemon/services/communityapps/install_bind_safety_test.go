@@ -133,6 +133,39 @@ func TestBindSourceRejectsAmbiguousSymlinkTargets(t *testing.T) {
 	}
 }
 
+func TestBindSourceAcceptsOrdinarySymlinkTargets(t *testing.T) {
+	root := communityappstest.CopyHeimdallHost(t)
+	host, err := readInstallHost(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const expected = "/mnt/cache/application-data"
+	for i, target := range []string{
+		"./application-data", "application-data/", "application-data/.",
+		"/mnt//cache/./application-data", "../cache/application-data",
+	} {
+		alias := fmt.Sprintf("/mnt/cache/alias-%d", i)
+		if err := os.Symlink(target, filepath.Join(root, alias)); err != nil {
+			t.Fatal(err)
+		}
+		if mount, _, issue := host.resolveSource(alias); issue != "" || mount.Source != expected {
+			t.Fatalf("ordinary link %q returned %+v, issue %q", target, mount, issue)
+		}
+		if canonical, err := host.canonicalBindSource(alias); err != nil || canonical != expected {
+			t.Fatalf("existing writable alias %q returned %q, %v", target, canonical, err)
+		}
+	}
+	communityappstest.WriteFile(t, root, "mnt/cache/regular", "fixture data")
+	for alias, target := range map[string]string{"leaf-link": "regular", "directory-link": "leaf-link/"} {
+		if err := os.Symlink(target, filepath.Join(root, "mnt/cache", alias)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, _, issue := host.resolveSource("/mnt/cache/directory-link"); issue != "unsafe_mount_source" {
+		t.Fatalf("a link requiring a directory accepted a regular file: %q", issue)
+	}
+}
+
 func TestBindLookupFailsClosedWhenFilesystemChanges(t *testing.T) {
 	root := communityappstest.CopyHeimdallHost(t)
 	host, err := readInstallHost(root)

@@ -393,21 +393,29 @@ func (host installHost) lookupAncestor(source string, ops bindLookupOps) (string
 				return "", "", stat, ErrStorageState
 			}
 			target := string(buffer[:size])
-			// Cleaning a target containing an internal ".." can skip a
-			// symlink before it and select a different directory. Walk
-			// unambiguous targets without rewriting their components.
-			if path.Clean(target) != target {
+			// Cleaning an internal ".." could skip an earlier link and
+			// select a different directory. Ordinary separators and
+			// current-directory components have no such ambiguity.
+			if hasAmbiguousParentTraversal(target) {
 				return "", "", stat, errAmbiguousBindPath
 			}
+			requireDirectory := tail == "." || tail == "" &&
+				(strings.HasSuffix(target, "/") || strings.HasSuffix(target, "/."))
 			if !path.IsAbs(target) {
-				target = path.Join(anchor, target)
+				target = anchor + "/" + target
 			}
+			target = path.Clean(target)
 			// A link must resolve to an existing target. Only the
 			// trailing path beneath that target may require creation.
 			if target != "/" {
 				required += 1 + strings.Count(strings.TrimPrefix(target, "/"), "/")
 			}
 			remaining = strings.TrimPrefix(path.Join(target, tail), "/")
+			if requireDirectory && remaining != "" {
+				// Preserve the final directory requirement through
+				// additional links without changing the approved path.
+				remaining += "/."
+			}
 			if dir != rootFD {
 				_ = unix.Close(dir)
 				dir = rootFD
@@ -432,6 +440,22 @@ func (host installHost) lookupAncestor(source string, ops bindLookupOps) (string
 		anchor, info, remaining = next, entry, tail
 	}
 	return anchor, anchor, info, nil
+}
+
+func hasAmbiguousParentTraversal(filename string) bool {
+	seenName := false
+	for component := range strings.SplitSeq(filename, "/") {
+		switch component {
+		case "", ".":
+		case "..":
+			if seenName {
+				return true
+			}
+		default:
+			seenName = true
+		}
+	}
+	return false
 }
 
 func (host installHost) defaultSource(target, name, value string) string {
@@ -583,7 +607,7 @@ func (host installHost) checkConflictsExcept(config *Configuration, request Prep
 }
 
 func (host installHost) canonicalBindSource(source string) (string, error) {
-	if strings.Contains(source, "/../") || strings.HasSuffix(source, "/..") {
+	if hasAmbiguousParentTraversal(source) {
 		return "", ErrStorageState
 	}
 	existing := path.Clean(source)
