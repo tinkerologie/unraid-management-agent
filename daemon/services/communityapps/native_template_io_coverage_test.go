@@ -23,7 +23,7 @@ func TestNativeTemplatePublicationKeepsStageAndFinalPathsConsistentOnIOErrors(t 
 			const staged = "install.tmp"
 			const final = "my-existing.xml"
 			publisher := templatePublisher{
-				openStaging: func(name string) (nativeTemplateWriter, error) {
+				openStaging: func(name string) (durableFileWriter, error) {
 					var err error
 					state.file, err = openNativeStaging(name)
 					return state, err
@@ -71,7 +71,7 @@ func TestNativeTemplatePublicationKeepsStageAndFinalPathsConsistentOnIOErrors(t 
 }
 
 type publishFileFixture struct {
-	file       nativeTemplateWriter
+	file       durableFileWriter
 	failure    string
 	closeCount int
 }

@@ -142,13 +142,8 @@ func nativeTemplateMAC(key string, body []byte) [sha256.Size]byte {
 	return result
 }
 
-type nativeTemplateWriter interface {
-	io.WriteCloser
-	Sync() error
-}
-
 type templatePublisher struct {
-	openStaging func(string) (nativeTemplateWriter, error)
+	openStaging func(string) (durableFileWriter, error)
 	syncDir     func(string) error
 	move        func(string, string) error
 }
@@ -166,7 +161,7 @@ func (s *Service) publishNativeTemplate(template []byte, receipt installReceipt)
 	return publisher.publish(dir, s.stagedTemplateName(receipt), s.finalTemplateName(receipt), template)
 }
 
-func openNativeStaging(filename string) (nativeTemplateWriter, error) {
+func openNativeStaging(filename string) (durableFileWriter, error) {
 	// #nosec G304 -- Staging name is a random, validated owner identifier in the fixed native templates directory.
 	return os.OpenFile(filename, os.O_CREATE|os.O_EXCL|os.O_WRONLY|syscall.O_NOFOLLOW, 0o600)
 }
@@ -177,14 +172,7 @@ func (p templatePublisher) publish(dir, staged, final string, template []byte) e
 	if err != nil {
 		return ErrNativeTemplate
 	}
-	_, err = file.Write(template)
-	if err == nil {
-		err = file.Sync()
-	}
-	if closeErr := file.Close(); err == nil {
-		err = closeErr
-	}
-	if err != nil {
+	if err := writeAndSyncInstallFile(file, template); err != nil {
 		return ErrNativeTemplate
 	}
 	// Durably name the staging file before attempting exclusive publication.
