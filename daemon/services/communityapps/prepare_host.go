@@ -363,6 +363,7 @@ func (host installHost) lookupAncestor(source string, ops bindLookupOps) (string
 	anchor, info := "/", stat
 	remaining := strings.TrimPrefix(source, "/")
 	required := 0
+	requireDirectory := false
 	for links := 0; remaining != ""; {
 		component, tail, _ := strings.Cut(remaining, "/")
 		next := path.Join(anchor, component)
@@ -399,8 +400,11 @@ func (host installHost) lookupAncestor(source string, ops bindLookupOps) (string
 			if hasAmbiguousParentTraversal(target) {
 				return "", "", stat, errAmbiguousBindPath
 			}
-			requireDirectory := tail == "." || tail == "" &&
-				(strings.HasSuffix(target, "/") || strings.HasSuffix(target, "/."))
+			if tail == "" && (strings.HasSuffix(target, "/") || strings.HasSuffix(target, "/.")) {
+				// A trailing slash must still require a directory after
+				// resolving any other links in this target.
+				requireDirectory = true
+			}
 			if !path.IsAbs(target) {
 				target = anchor + "/" + target
 			}
@@ -411,11 +415,6 @@ func (host installHost) lookupAncestor(source string, ops bindLookupOps) (string
 				required += 1 + strings.Count(strings.TrimPrefix(target, "/"), "/")
 			}
 			remaining = strings.TrimPrefix(path.Join(target, tail), "/")
-			if requireDirectory && remaining != "" {
-				// Preserve the final directory requirement through
-				// additional links without changing the approved path.
-				remaining += "/."
-			}
 			if dir != rootFD {
 				_ = unix.Close(dir)
 				dir = rootFD
@@ -423,7 +422,7 @@ func (host installHost) lookupAncestor(source string, ops bindLookupOps) (string
 			anchor, info = "/", stat
 			continue
 		}
-		if tail == "" && (kind == unix.S_IFDIR || kind == unix.S_IFREG) {
+		if tail == "" && (kind == unix.S_IFDIR || !requireDirectory && kind == unix.S_IFREG) {
 			return next, next, entry, nil
 		}
 		if kind != unix.S_IFDIR {

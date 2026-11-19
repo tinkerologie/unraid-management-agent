@@ -156,13 +156,21 @@ func TestBindSourceAcceptsOrdinarySymlinkTargets(t *testing.T) {
 		}
 	}
 	communityappstest.WriteFile(t, root, "mnt/cache/regular", "fixture data")
-	for alias, target := range map[string]string{"leaf-link": "regular", "directory-link": "leaf-link/"} {
+	communityappstest.WriteFile(t, root, "mnt/cache/application-data/regular", "fixture data")
+	for alias, target := range map[string]string{
+		"leaf-link":             "regular",
+		"directory-link":        "leaf-link/",
+		"intermediate":          "application-data",
+		"intermediate-file-dir": "intermediate/regular/",
+	} {
 		if err := os.Symlink(target, filepath.Join(root, "mnt/cache", alias)); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, _, issue := host.resolveSource("/mnt/cache/directory-link"); issue != "unsafe_mount_source" {
-		t.Fatalf("a link requiring a directory accepted a regular file: %q", issue)
+	for _, alias := range []string{"directory-link", "intermediate-file-dir"} {
+		if _, _, issue := host.resolveSource("/mnt/cache/" + alias); issue != "unsafe_mount_source" {
+			t.Fatalf("link %q requiring a directory accepted a regular file: %q", alias, issue)
+		}
 	}
 }
 
