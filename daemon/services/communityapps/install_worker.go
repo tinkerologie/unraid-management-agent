@@ -147,6 +147,7 @@ func (s *Service) executeInstall(ctx context.Context, docker InstallDocker, rece
 	if err != nil {
 		return err
 	}
+	receipt.EngineBootID = s.readEngineBootID()
 	if err := s.advanceInstall(receipt, "creating_container"); err != nil {
 		return err
 	}
@@ -530,7 +531,7 @@ func (s *Service) removeOwnedContainer(ctx context.Context, docker InstallDocker
 		if observed, err := s.observeStartedContainer(c, *receipt); observed != startUnobserved || err != nil {
 			return CleanupIssue{}, observed, err != nil
 		}
-		if !receipt.EngineRejected {
+		if uncertainStart(*receipt) {
 			return CleanupIssue{}, startUnobserved, true
 		}
 		if hasStarted(c) {

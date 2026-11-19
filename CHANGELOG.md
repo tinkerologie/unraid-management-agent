@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Measure Go coverage across packages so CI records code exercised by shared tests.
 - Require protected local bind paths for Community Applications installs. Reject writable bind ancestors and report ineligible user-share or remote sources before approval.
+- Settle unresolved Docker requests after a verified host reboot and keep intact install receipts readable if another receipt is damaged.
 
 - Use Dynamix settings rows and theme colors with the plugin’s compact left-aligned layout and switches.
   Improve helper text contrast in light and dark themes, and preserve saved collection intervals

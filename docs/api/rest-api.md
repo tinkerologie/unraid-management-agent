@@ -1756,7 +1756,7 @@ leaves Docker containers, native templates, and appdata unchanged.
 | 409         | `name_conflict`                             | Choose a name unused by containers or saved Unraid user templates.              |
 | 409         | `port_conflict`                             | Choose distinct available port bindings.                                        |
 | 409         | `shared_appdata`                            | Select a distinct path or supply the intended source with `allow_shared: true`. |
-| 409         | `exposed_mount_parent`                      | Select a path whose ancestors are outside writable Docker binds.               |
+| 409         | `exposed_mount_parent`                      | Select a path whose ancestors are outside writable Docker binds.                |
 | 429         | `plan_capacity`                             | Retry after an outstanding preview expires.                                     |
 | 503         | `image_digest_unavailable`                  | Verify that Docker can resolve the configured image in its registry.            |
 | 503         | `docker_unavailable`, `storage_unavailable` | Verify Docker and Unraid storage are available.                                 |
@@ -1809,7 +1809,10 @@ available. If Docker lost the create response and has no conclusive result, the 
 reports `container_create_unverified`. If Docker has an approved container but cannot confirm its start
 or a definitive rejection, the attempt reports `container_start_unverified`. Check Docker Manager
 and keep polling the same attempt. Its name stays reserved while the result is ambiguous.
-Status requests only read the receipt.
+A host reboot proves that an earlier in-flight request can no longer complete. After a reboot,
+recovery settles unresolved attempts when Docker confirms the container is absent or never started.
+It will also recover a verified late success. Receipts without saved boot evidence record the
+first boot on which recovery sees them. Status requests only read the receipt.
 
 The daemon records start intent after saving the native template. On restart, a start for the
 exact owned Docker ID and approved image can recover success, including after a native template

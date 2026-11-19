@@ -83,8 +83,8 @@ func TestAppdataCreationRejectsSymlinkAtPreviouslyCreatedPrefix(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = dir.Close() })
-	created := map[string]bool{"/mnt/appdata/missing": true}
-	err = service.createAppdata(dir, identity, "/mnt/appdata/missing/nested", created)
+	created := map[string]mountIdentity{"/mnt/appdata/missing": {}}
+	_, err = service.createAppdata(dir, identity, "/mnt/appdata/missing/nested", created)
 	if !errors.Is(err, ErrPlanChanged) {
 		t.Fatalf("appdata creation did not refuse a substituted prefix: %v", err)
 	}

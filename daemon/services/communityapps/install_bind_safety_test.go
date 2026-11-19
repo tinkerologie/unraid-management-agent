@@ -60,6 +60,43 @@ func TestBindSourceRequiresProtectedAncestors(t *testing.T) {
 	}
 }
 
+func TestMountLookupStopsAtRemoteFilesystems(t *testing.T) {
+	root, err := filepath.EvalSymlinks(communityappstest.CopyHeimdallHost(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	communityappstest.WriteFile(t, root, "proc/self/mountinfo",
+		"1 0 8:1 / /mnt/cache rw - btrfs /dev/sdb1 rw\n"+
+			"2 0 0:12 / /mnt/remotes/server rw - nfs4 example.invalid:/export rw\n")
+	host, err := readInstallHost(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const remote = "/mnt/remotes/server"
+	if _, _, issue := host.resolveSource(remote + "/data"); issue != "unprotected_mount_source" {
+		t.Fatalf("a hard remote mount returned %q", issue)
+	}
+	if err := os.MkdirAll(filepath.Join(root, remote), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := "/mnt/cache/application-data/linked"
+	if err := os.Symlink(remote, filepath.Join(root, link)); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := host.existingAncestor(link + "/data"); !errors.Is(err, ErrStorageState) {
+		t.Fatalf("local symlink allowed a remote lookup: %v", err)
+	}
+	if source := host.canonicalBindSource(remote + "/data"); source != remote+"/data" {
+		t.Fatalf("blocked lookup did not preserve the recorded Docker source: %q", source)
+	}
+	if err := os.Symlink("loop", filepath.Join(root, "mnt/cache/application-data/loop")); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := host.existingAncestor("/mnt/cache/application-data/loop"); !errors.Is(err, ErrStorageState) {
+		t.Fatalf("symlink cycle was not bounded: %v", err)
+	}
+}
+
 func TestBindConflictsRejectParentSharingEvenWhenAcknowledged(t *testing.T) {
 	root := communityappstest.CopyHeimdallHost(t)
 	host, err := readInstallHost(root)
@@ -123,16 +160,17 @@ func TestAppdataCreatesProtectedParentsAndWritableLeaf(t *testing.T) {
 	t.Cleanup(func() { _ = dir.Close() })
 	service := NewService(nil, ServiceOptions{HostRoot: root})
 	t.Cleanup(service.Close)
-	created := make(map[string]bool)
+	created := make(map[string]mountIdentity)
 	for _, source := range []string{parent + "/shared/first", parent + "/shared/second"} {
-		if err := service.createAppdata(dir, identity, source, created); err != nil {
+		id, err := service.createAppdata(dir, identity, source, created)
+		if err != nil {
 			t.Fatal(err)
 		}
 		if !protectedBindParents(root, filepath.Dir(source)) {
 			t.Fatalf("new parent of %q is not protected", source)
 		}
 		info, err := dir.Stat(strings.TrimPrefix(source, "/"))
-		if err != nil || !info.IsDir() || info.Mode().Perm()&0o200 == 0 {
+		if err != nil || !info.IsDir() || info.Mode().Perm()&0o200 == 0 || !hasMountIdentity(info, id) {
 			t.Fatalf("new directory %q is not owner-writable: %v", source, err)
 		}
 	}
@@ -142,7 +180,7 @@ func TestAppdataCreatesProtectedParentsAndWritableLeaf(t *testing.T) {
 	if err := os.Chmod(filepath.Join(root, parent, "shared"), 0o777); err != nil {
 		t.Fatal(err)
 	}
-	if err := service.createAppdata(dir, identity, parent+"/shared/third", created); !errors.Is(err, ErrPlanChanged) {
+	if _, err := service.createAppdata(dir, identity, parent+"/shared/third", created); !errors.Is(err, ErrPlanChanged) {
 		t.Fatalf("appdata creation accepted an unprotected intermediate directory: %v", err)
 	}
 }
@@ -157,5 +195,26 @@ func TestNativeNameUsesDockerValidationAndTemplateLength(t *testing.T) {
 		if validNativeName(name) {
 			t.Errorf("accepted invalid native container name %q", name)
 		}
+	}
+}
+
+func TestAppdataPublishPreservesAnExistingDirectory(t *testing.T) {
+	root := t.TempDir()
+	communityappstest.WriteFile(t, root, "prepared/keep", "appdata")
+	parent, err := os.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = parent.Close() })
+	file, _, err := stageAppdataComponent(parent, "prepared", "/mnt/cache/prepared", hostMount{})
+	if file != nil || !errors.Is(err, ErrPlanChanged) {
+		t.Fatalf("publication accepted an existing directory: %v", err)
+	}
+	entries, err := os.ReadDir(root)
+	if err != nil || len(entries) != 1 || entries[0].Name() != "prepared" {
+		t.Fatalf("lost the original directory or leaked the staging directory: %+v, %v", entries, err)
+	}
+	if data, err := os.ReadFile(filepath.Join(root, "prepared/keep")); err != nil || string(data) != "appdata" {
+		t.Fatalf("publication changed existing contents: %v", err)
 	}
 }

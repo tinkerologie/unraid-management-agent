@@ -281,7 +281,9 @@ lost, resend the exact confirmation to recover the original attempt ID. Prepare 
 fresh plan after a failed installation. After a daemon restart, poll the same attempt ID. If the
 attempt is awaiting verification, check that Docker and the Unraid flash are available.
 For `container_create_unverified` or `container_start_unverified`, check Docker Manager and keep
-polling while the attempt's name is reserved. For `started_template_missing`, use the returned container ID to find the
+polling while the attempt's name is reserved. A host reboot lets recovery settle unresolved
+requests when Docker confirms the container is absent or never started. For
+`started_template_missing`, use the returned container ID to find the
 preserved container and restore the native template if needed. A failed attempt can include a
 Docker ID or template basename in `cleanup_details` for
 operator review. Success means Docker started the approved container and the agent saved its

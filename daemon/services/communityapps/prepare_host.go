@@ -20,6 +20,7 @@ import (
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/mount"
+	"golang.org/x/sys/unix"
 	"gopkg.in/ini.v1"
 )
 
@@ -41,13 +42,14 @@ type mountIdentity struct {
 }
 
 type installHost struct {
-	root       string
-	appdata    string
-	unraidPath string
-	hostname   string
-	timezone   string
-	pidsLimit  int64
-	mounts     []hostMount
+	root          string
+	appdata       string
+	unraidPath    string
+	hostname      string
+	timezone      string
+	pidsLimit     int64
+	mounts        []hostMount
+	blockedLookup map[string]bool
 }
 
 func readInstallHost(root string) (installHost, error) {
@@ -75,6 +77,12 @@ func readInstallHost(root string) (installHost, error) {
 		return installHost{}, ErrStorageState
 	}
 	host.mounts, err = readMountInfo(root)
+	host.blockedLookup = make(map[string]bool)
+	for _, mount := range host.mounts {
+		if !localLookupFilesystem(mount.fsType) {
+			host.blockedLookup[mount.point] = true
+		}
+	}
 	return host, err
 }
 
@@ -129,9 +137,6 @@ func readMountInfo(root string) ([]hostMount, error) {
 				return ErrStorageState
 			}
 			point := unescapeMountInfo.Replace(left[4])
-			if !beneath("/mnt", point) {
-				continue
-			}
 			m := hostMount{
 				point: point, id: left[0] + ":" + left[2], fsType: right[0],
 				source: unescapeMountInfo.Replace(right[1]), root: unescapeMountInfo.Replace(left[3]),
@@ -164,7 +169,7 @@ func readMountInfo(root string) ([]hostMount, error) {
 }
 
 func isStorageMount(m hostMount) bool {
-	if m.point == "/mnt" || m.root != "/" {
+	if m.point == "/mnt" || !beneath("/mnt", m.point) || m.root != "/" {
 		// Whole datasets, including child ZFS datasets, have / as their root.
 		// Reject arbitrary bind mounts imported into an allowed-looking location.
 		return false
@@ -239,8 +244,12 @@ func (host installHost) resolveSource(source string) (Mount, mountIdentity, stri
 		return Mount{}, mountIdentity{}, "unsafe_mount_source"
 	}
 	source = path.Clean(source)
-	if _, allowed := host.findMount(source); !allowed {
+	originalMount, allowed := host.findMount(source)
+	if !allowed {
 		return Mount{}, mountIdentity{}, "unsafe_mount_source"
+	}
+	if !localBindFilesystem(originalMount.fsType) {
+		return Mount{}, mountIdentity{}, "unprotected_mount_source"
 	}
 	resolved, anchor, info, err := host.existingAncestor(source)
 	if err != nil || !validBindPath(resolved) {
@@ -250,8 +259,7 @@ func (host installHost) resolveSource(source string) (Mount, mountIdentity, stri
 		return Mount{}, mountIdentity{}, "docker_socket_mount"
 	}
 	m, allowed := host.findMount(resolved)
-	stat, ok := info.Sys().(*syscall.Stat_t)
-	if !allowed || !ok || !beneath(m.point, anchor) {
+	if !allowed || !beneath(m.point, anchor) {
 		return Mount{}, mountIdentity{}, "unsafe_mount_source"
 	}
 	// Docker stores and reopens path strings during startup and restart.
@@ -273,7 +281,7 @@ func (host installHost) resolveSource(source string) (Mount, mountIdentity, stri
 		}
 	}
 	return Mount{Source: resolved, CreateDirectory: resolved != anchor}, mountIdentity{
-		anchor: anchor, mount: m, device: fmt.Sprint(stat.Dev), inode: stat.Ino,
+		anchor: anchor, mount: m, device: fmt.Sprint(info.Dev), inode: info.Ino,
 	}, ""
 }
 
@@ -283,6 +291,15 @@ func localBindFilesystem(fsType string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func localLookupFilesystem(fsType string) bool {
+	switch fsType {
+	case "rootfs", "overlay", "ramfs", "tmpfs", "proc", "sysfs", "devtmpfs", "vfat", "ntfs3", "exfat", "squashfs":
+		return true
+	default:
+		return localBindFilesystem(fsType)
 	}
 }
 
@@ -306,41 +323,83 @@ func protectedBindDirectory(info fs.FileInfo) bool {
 	return ok && info.IsDir() && int(stat.Uid) == os.Geteuid() && info.Mode().Perm()&0o022 == 0
 }
 
-func (host installHost) existingAncestor(source string) (string, string, fs.FileInfo, error) {
-	current := filepath.Join(host.root, source)
-	var missing []string
-	for {
-		info, err := os.Lstat(current)
-		if errors.Is(err, fs.ErrNotExist) && current != host.root {
-			missing = append(missing, filepath.Base(current))
-			current = filepath.Dir(current)
+func (host installHost) existingAncestor(source string) (string, string, unix.Stat_t, error) {
+	var stat unix.Stat_t
+	if !path.IsAbs(source) || host.blockedLookup["/"] {
+		return "", "", stat, ErrStorageState
+	}
+	// #nosec G304 -- The service uses the configured host root.
+	root, err := os.Open(host.root)
+	if err != nil {
+		return "", "", stat, err
+	}
+	defer func() { _ = root.Close() }()
+	rootFD := int(root.Fd())
+	if err := unix.Fstat(rootFD, &stat); err != nil {
+		return "", "", stat, err
+	}
+	dir := rootFD
+	defer func() {
+		if dir != rootFD {
+			_ = unix.Close(dir)
+		}
+	}()
+	anchor, info := "/", stat
+	remaining := strings.TrimPrefix(source, "/")
+	for links := 0; remaining != ""; {
+		component, tail, _ := strings.Cut(remaining, "/")
+		next := path.Join(anchor, component)
+		// A lookup below an NFS, FUSE or automount point can block even
+		// after a request deadline. Consult mountinfo before each lookup,
+		// including after following a symlink out of the original mount.
+		if host.blockedLookup[next] {
+			return "", "", stat, ErrStorageState
+		}
+		var entry unix.Stat_t
+		err := unix.Fstatat(dir, component, &entry, unix.AT_SYMLINK_NOFOLLOW)
+		if errors.Is(err, fs.ErrNotExist) {
+			return path.Join(anchor, remaining), anchor, info, nil
+		}
+		if err != nil {
+			return "", "", stat, err
+		}
+		kind := entry.Mode & unix.S_IFMT
+		if kind == unix.S_IFLNK {
+			links++
+			var buffer [4096]byte
+			size, err := unix.Readlinkat(dir, component, buffer[:])
+			if err != nil || links > 40 || size == len(buffer) {
+				return "", "", stat, ErrStorageState
+			}
+			target := string(buffer[:size])
+			if !path.IsAbs(target) {
+				target = path.Join(anchor, target)
+			}
+			remaining = strings.TrimPrefix(path.Join(target, tail), "/")
+			if dir != rootFD {
+				_ = unix.Close(dir)
+				dir = rootFD
+			}
+			anchor, info = "/", stat
 			continue
 		}
+		if tail == "" && (kind == unix.S_IFDIR || kind == unix.S_IFREG) {
+			return next, next, entry, nil
+		}
+		if kind != unix.S_IFDIR {
+			return "", "", stat, ErrStorageState
+		}
+		child, err := unix.Openat(dir, component, unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
 		if err != nil {
-			return "", "", nil, err
+			return "", "", stat, err
 		}
-		canonical, err := filepath.EvalSymlinks(current)
-		if err != nil {
-			return "", "", nil, err
+		if dir != rootFD {
+			_ = unix.Close(dir)
 		}
-		relative, err := filepath.Rel(host.root, canonical)
-		if err != nil || relative == ".." || strings.HasPrefix(relative, "../") {
-			return "", "", nil, ErrStorageState
-		}
-		if info.Mode()&fs.ModeSymlink != 0 {
-			info, err = os.Stat(canonical)
-			if err != nil {
-				return "", "", nil, err
-			}
-		}
-		if !info.IsDir() && (len(missing) != 0 || !info.Mode().IsRegular()) {
-			return "", "", nil, ErrStorageState
-		}
-		anchor := path.Join("/", filepath.ToSlash(relative))
-		slices.Reverse(missing)
-		resolved := path.Join(append([]string{anchor}, missing...)...)
-		return resolved, anchor, info, nil
+		dir = child
+		anchor, info, remaining = next, entry, tail
 	}
+	return anchor, anchor, info, nil
 }
 
 func (host installHost) defaultSource(target, name, value string) string {
