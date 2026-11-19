@@ -87,14 +87,45 @@ func TestMountLookupStopsAtRemoteFilesystems(t *testing.T) {
 	if _, _, _, err := host.existingAncestor(link + "/data"); !errors.Is(err, ErrStorageState) {
 		t.Fatalf("local symlink allowed a remote lookup: %v", err)
 	}
-	if source := host.canonicalBindSource(remote + "/data"); source != remote+"/data" {
-		t.Fatalf("blocked lookup did not preserve the recorded Docker source: %q", source)
+	if source, err := host.canonicalBindSource(remote + "/data"); err != nil || source != remote+"/data" {
+		t.Fatalf("blocked lookup did not preserve the recorded Docker source: %q, %v", source, err)
 	}
 	if err := os.Symlink("loop", filepath.Join(root, "mnt/cache/application-data/loop")); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, _, err := host.existingAncestor("/mnt/cache/application-data/loop"); !errors.Is(err, ErrStorageState) {
 		t.Fatalf("symlink cycle was not bounded: %v", err)
+	}
+}
+
+func TestBindSourceRejectsAmbiguousSymlinkTargets(t *testing.T) {
+	root := communityappstest.CopyHeimdallHost(t)
+	for _, name := range []string{"mnt/cache/data", "mnt/cache/real/data", "mnt/cache/real/sub"} {
+		if err := os.MkdirAll(filepath.Join(root, name), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for name, target := range map[string]string{
+		"alias": "real/sub",
+		"app":   "alias/../data",
+	} {
+		if err := os.Symlink(target, filepath.Join(root, "mnt/cache", name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	host, err := readInstallHost(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, issue := host.resolveSource("/mnt/cache/app"); issue != "unsafe_mount_source" {
+		t.Fatalf("a link that must follow another link before traversing its parent returned %q", issue)
+	}
+	for _, source := range []string{"/mnt/cache/app", "/mnt/cache/alias/../data", "/mnt/cache/alias/.."} {
+		existing := []container.Summary{{Mounts: []container.MountPoint{{Type: mount.TypeBind, RW: true, Source: source}}}}
+		config := Configuration{Name: "fixture", Mounts: []Mount{{Source: "/mnt/cache/real/data/fixture", Mode: "rw"}}}
+		if err := host.checkConflicts(&config, PrepareRequest{}, existing); !errors.Is(err, ErrStorageState) {
+			t.Fatalf("ambiguous existing writable bind %q returned %v", source, err)
+		}
 	}
 }
 

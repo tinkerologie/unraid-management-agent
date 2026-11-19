@@ -125,6 +125,7 @@ func readInstallFile(filename string, limit int64, read func(io.Reader) error) e
 }
 
 var unescapeMountInfo = strings.NewReplacer(`\040`, " ", `\011`, "\t", `\012`, "\n", `\134`, "\\")
+var errAmbiguousBindPath = errors.New("bind path needs ambiguous link resolution")
 
 func readMountInfo(root string) ([]hostMount, error) {
 	var mounts []hostMount
@@ -392,10 +393,15 @@ func (host installHost) lookupAncestor(source string, ops bindLookupOps) (string
 				return "", "", stat, ErrStorageState
 			}
 			target := string(buffer[:size])
+			// Cleaning a target containing an internal ".." can skip a
+			// symlink before it and select a different directory. Walk
+			// unambiguous targets without rewriting their components.
+			if path.Clean(target) != target {
+				return "", "", stat, errAmbiguousBindPath
+			}
 			if !path.IsAbs(target) {
 				target = path.Join(anchor, target)
 			}
-			target = path.Clean(target)
 			// A link must resolve to an existing target. Only the
 			// trailing path beneath that target may require creation.
 			if target != "/" {
@@ -543,7 +549,11 @@ func (host installHost) checkConflictsExcept(config *Configuration, request Prep
 		}
 	}
 	for i, source := range existing {
-		existing[i] = host.canonicalBindSource(source)
+		canonical, err := host.canonicalBindSource(source)
+		if err != nil {
+			return err
+		}
+		existing[i] = canonical
 	}
 	for i, wanted := range config.Mounts {
 		for _, other := range config.Mounts {
@@ -569,12 +579,21 @@ func (host installHost) checkConflictsExcept(config *Configuration, request Prep
 	return nil
 }
 
-func (host installHost) canonicalBindSource(source string) string {
-	existing := path.Clean(source)
-	if resolved, _, _, err := host.existingAncestor(existing); err == nil {
-		existing = resolved
+func (host installHost) canonicalBindSource(source string) (string, error) {
+	if strings.Contains(source, "/../") || strings.HasSuffix(source, "/..") {
+		return "", ErrStorageState
 	}
-	return existing
+	existing := path.Clean(source)
+	resolved, _, _, err := host.existingAncestor(existing)
+	if errors.Is(err, errAmbiguousBindPath) {
+		// A lexical fallback could hide a writable alias to this
+		// install's parent, so refuse confirmation until it is resolved.
+		return "", ErrStorageState
+	}
+	if err == nil {
+		return resolved, nil
+	}
+	return existing, nil
 }
 
 // A writable ancestor exposes directory entries to the other workload.
