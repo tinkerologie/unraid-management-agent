@@ -420,6 +420,10 @@ func (s *Service) observeStartedContainer(c container.InspectResponse, receipt i
 	if started.IsZero() {
 		return startUnobserved, nil
 	}
+	return s.observeStartedNativeTemplate(receipt)
+}
+
+func (s *Service) observeStartedNativeTemplate(receipt installReceipt) (startObservation, error) {
 	// The durable start intent was written after synced publication and
 	// verification. A later WebGUI edit can legitimately change the XML.
 	dir, err := s.openNativeTemplates()
@@ -437,7 +441,18 @@ func (s *Service) observeStartedContainer(c container.InspectResponse, receipt i
 
 func (s *Service) finishObservedStart(receipt *installReceipt, observed startObservation) bool {
 	if observed == startTemplateMissing {
-		return s.finishInstall(receipt, ErrStartedTemplateMissing)
+		issue := s.restoreRetainedNativeTemplate(*receipt)
+		current, err := s.observeStartedNativeTemplate(*receipt)
+		if err != nil {
+			return false
+		}
+		if issue.Code != "" {
+			receipt.Attempt.CleanupDetails = append(receipt.Attempt.CleanupDetails, issue)
+			receipt.Attempt.CleanupFailures = append(receipt.Attempt.CleanupFailures, issue.Code)
+		}
+		if current == startTemplateMissing {
+			return s.finishInstall(receipt, ErrStartedTemplateMissing)
+		}
 	}
 	return s.finishInstall(receipt, nil)
 }
@@ -548,21 +563,23 @@ func (s *Service) removeOwnedContainer(ctx context.Context, docker InstallDocker
 		return CleanupIssue{}, startUnobserved, false
 	}
 	after, stillOwned, inspectErr := ownedContainer(ctx, docker, *receipt)
-	if inspectErr == nil && !stillOwned {
+	if inspectErr != nil {
+		// Docker may have refused removal because this container started.
+		// Keep the template until another inspection confirms its state.
+		return CleanupIssue{}, startUnobserved, true
+	}
+	if !stillOwned {
 		return CleanupIssue{}, startUnobserved, false
 	}
-	if stillOwned {
-		if startIntent {
-			if observed, err := s.observeStartedContainer(after, *receipt); observed != startUnobserved || err != nil {
-				return CleanupIssue{}, observed, err != nil
-			}
-		}
-		if hasStarted(after) {
-			issue.Code = cleanupContainerStarted
-			return issue, startUnobserved, false
+	if startIntent {
+		if observed, err := s.observeStartedContainer(after, *receipt); observed != startUnobserved || err != nil {
+			return CleanupIssue{}, observed, err != nil
 		}
 	}
+	if hasStarted(after) {
+		issue.Code = cleanupContainerStarted
+		return issue, startUnobserved, false
+	}
 	issue.Code = "remove_container"
-	issue.OwnershipVerified = stillOwned
 	return issue, startUnobserved, false
 }
