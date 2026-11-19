@@ -1720,7 +1720,7 @@ tokenless writes for other operations does not authorize this endpoint.
     "443/tcp": { "host_port": 18443, "bind_address": "127.0.0.1" }
   },
   "paths": {
-    "/config": { "source": "/mnt/user/appdata/heimdall-secondary", "allow_shared": false }
+    "/config": { "source": "/mnt/cache/managed-appdata/heimdall-secondary", "allow_shared": false }
   },
   "environment": { "PUID": "99", "PGID": "100" }
 }
@@ -1734,7 +1734,11 @@ preview uses the bridge’s configured binding address, or explicit all-IPv4 bin
 The response includes the configured image, registry digest, container name, Docker network
 identity, exact port bindings, canonical host mount sources and targets, planned directory creation,
 PID limit, and environment variable names with `set` flags. Environment values are redacted. Host mount
-sources must resolve to mounted Unraid storage. Supported bind modes are `ro` and `rw`. Privileged
+sources must resolve to a local Unraid disk or pool with Unix ownership and permissions. Every
+ancestor of the source must be root-owned and writable only by root. The leaf itself can be
+writable by the app. If the host default uses a user-share alias such as `/mnt/user/appdata` or
+has a writable parent, the preview reports `unprotected_mount_source`. Use a protected
+direct disk or pool path in the override. Supported bind modes are `ro` and `rw`. Privileged
 mode, Docker socket and device mounts, raw Docker arguments, and other effective unsupported
 settings make the preview ineligible. An ineligible HTTP 200 preview returns `eligible: false` and
 specific codes in `issues`.
@@ -1752,15 +1756,16 @@ leaves Docker containers, native templates, and appdata unchanged.
 | 409         | `name_conflict`                             | Choose a name unused by containers or saved Unraid user templates.              |
 | 409         | `port_conflict`                             | Choose distinct available port bindings.                                        |
 | 409         | `shared_appdata`                            | Select a distinct path or supply the intended source with `allow_shared: true`. |
+| 409         | `exposed_mount_parent`                      | Select a path whose ancestors are outside writable Docker binds.               |
 | 429         | `plan_capacity`                             | Retry after an outstanding preview expires.                                     |
 | 503         | `image_digest_unavailable`                  | Verify that Docker can resolve the configured image in its registry.            |
 | 503         | `docker_unavailable`, `storage_unavailable` | Verify Docker and Unraid storage are available.                                 |
 
-The appdata conflict check includes writable overlaps with a parent path in an existing
-container or retained template. It also checks user-share aliases for array and pool paths.
-Installation uses the local Docker Unix socket. Planned directories are created as Unraid's
-`nobody:users` (UID 99, GID 100). If that account cannot create the directory, create it
-through your normal storage workflow and prepare a fresh plan.
+The appdata conflict check examines existing containers, saved templates, and user-share aliases
+for array and pool paths. A writable bind that exposes a parent blocks the plan even with
+`allow_shared: true`. Sharing a protected leaf or its contents still requires explicit approval.
+Installation uses the local Docker Unix socket. New intermediate directories are root-owned.
+New appdata leaf directories are owned by Unraid's `nobody:users` (UID 99, GID 100).
 
 ### POST /community-applications/install-plans/{id}/confirm
 

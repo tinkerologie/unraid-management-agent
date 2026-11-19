@@ -19,6 +19,8 @@ import (
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 	digest "github.com/opencontainers/go-digest"
+
+	"github.com/tinkerologie/unraid-management-agent/daemon/lib"
 )
 
 const (
@@ -32,6 +34,7 @@ var (
 	ErrNameConflict       = &Problem{Code: "name_conflict", Message: "A Docker container or saved Unraid user template already uses this name."}
 	ErrPortConflict       = &Problem{Code: "port_conflict", Message: "A fixed port binding is already in use, duplicated, or unavailable on this host."}
 	ErrSharedAppdata      = &Problem{Code: "shared_appdata", Message: "An existing installation overlaps a writable source. Specify a distinct path or explicitly allow the shared path for this mount."}
+	ErrExposedMountParent = &Problem{Code: "exposed_mount_parent", Message: "A writable Docker bind exposes a parent of another approved source. Choose a different storage path."}
 	ErrDockerState        = &Problem{Code: "docker_unavailable", Message: "Current Docker daemon state could not be checked."}
 	ErrStorageState       = &Problem{Code: "storage_unavailable", Message: "Current Unraid storage or native Docker settings could not be verified."}
 	ErrImageDigest        = &Problem{Code: "image_digest_unavailable", Message: "Docker could not verify the configured image's registry digest."}
@@ -41,7 +44,6 @@ var (
 	ErrPlanChanged        = &Problem{Code: "plan_changed", Message: "The listing or approved settings changed. Prepare and review a new install plan."}
 	ErrPlanCredential     = &Problem{Code: "credential_required", Message: "Provide a valid transport credential to request a Community Applications install."}
 
-	nativeName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$`)
 	bridgeName = regexp.MustCompile(`^[a-z0-9][a-z0-9_.-]{0,127}$`)
 	envName    = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]{0,127}$`)
 	fullID     = regexp.MustCompile(`^[a-f0-9]{64}$`)
@@ -377,7 +379,7 @@ func (s *Service) resolve(ctx context.Context, request PrepareRequest, approvedD
 		return installSettings{}, nil, ErrCAOnboarding
 	}
 	settings := newInstallSettings(result, request)
-	if !nativeName.MatchString(settings.configuration.Name) || strings.Contains(settings.configuration.Name, "..") {
+	if !validNativeName(settings.configuration.Name) {
 		return installSettings{}, nil, ErrInvalidPlanRequest
 	}
 	issues := append(append([]string{}, result.PolicyIssues...), result.Template.RuntimeIssues...)
@@ -411,6 +413,10 @@ func (s *Service) resolve(ctx context.Context, request PrepareRequest, approvedD
 		return settings, issues, nil
 	}
 	return s.resolveDocker(ctx, settings, host, request, approvedDigest)
+}
+
+func validNativeName(name string) bool {
+	return len(name) <= 128 && lib.ValidateContainerRef(name) == nil
 }
 
 func newInstallSettings(result ResolvedTemplate, request PrepareRequest) installSettings {

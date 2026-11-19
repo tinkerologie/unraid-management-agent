@@ -60,15 +60,16 @@ func (s *Service) createAppdata(root *os.Root, identity mountIdentity, source st
 	}
 	defer func() { _ = dir.Close() }()
 	anchor, err := dir.Stat()
-	if err != nil || !anchor.IsDir() || !hasMountIdentity(anchor, identity) {
+	if err != nil || !protectedBindDirectory(anchor) || !hasMountIdentity(anchor, identity) {
 		return ErrPlanChanged
 	}
 	relative := strings.TrimPrefix(strings.TrimPrefix(source, identity.anchor), "/")
 	absolute := identity.anchor
 	for component := range strings.SplitSeq(relative, "/") {
 		absolute = path.Join(absolute, component)
-		if !created[absolute] {
-			if err := mkdirInstallDirectory(dir, component, s.hostRoot == "/"); err != nil {
+		newDirectory := !created[absolute]
+		if newDirectory {
+			if err := unix.Mkdirat(int(dir.Fd()), component, 0o755); err != nil {
 				if errors.Is(err, fs.ErrExist) {
 					return ErrPlanChanged
 				}
@@ -85,8 +86,28 @@ func (s *Service) createAppdata(root *os.Root, identity mountIdentity, source st
 		child := os.NewFile(uintptr(fd), component)
 		_ = dir.Close()
 		dir = child
+		if absolute != source {
+			info, err := dir.Stat()
+			if err != nil || !protectedBindDirectory(info) {
+				return ErrPlanChanged
+			}
+		} else if newDirectory {
+			// All ancestors are protected. Change only the newly created
+			// leaf by descriptor to preserve native appdata ownership.
+			uid, gid := appdataOwnership(s.hostRoot)
+			if err := dir.Chown(uid, gid); err != nil {
+				return ErrStorageState
+			}
+		}
 	}
 	return nil
+}
+
+func appdataOwnership(root string) (int, int) {
+	if root == "/" {
+		return 99, 100 // Unraid's nobody:users
+	}
+	return os.Geteuid(), os.Getegid()
 }
 
 func (s *Service) checkBeforeStart(ctx context.Context, docker InstallDocker, receipt installReceipt, plan *pendingPlan, mounts []mountIdentity) error {

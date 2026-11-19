@@ -72,7 +72,7 @@ func respondCatalogError(w http.ResponseWriter, err error) {
 		status = http.StatusUnauthorized
 	case "read_only":
 		status = http.StatusForbidden
-	case "name_conflict", "port_conflict", "shared_appdata", "onboarding_required", "plan_changed", "install_recovery_pending":
+	case "name_conflict", "port_conflict", "shared_appdata", "exposed_mount_parent", "onboarding_required", "plan_changed", "install_recovery_pending":
 		status = http.StatusConflict
 	case "plan_expired":
 		status = http.StatusGone

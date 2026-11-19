@@ -265,6 +265,11 @@ Ordinary network write access and MCP tool policy also apply. When the prepare t
 result for separate install approval. The preparation arguments and response match the REST
 contract. To prepare from an MCP client using STDIO, connect that client over Streamable HTTP.
 
+Use a direct local disk or pool path for appdata. Its ancestors must be root-owned and writable
+only by root. If the preview reports `unprotected_mount_source`, override the mount with a
+protected path. If it reports `exposed_mount_parent`, choose a path outside writable ancestor
+binds. See the [REST preparation contract](../api/rest-api.md#post-community-applicationsinstall-plans).
+
 After the operator approves the preview, confirm using the exact `plan_id` and `approval_token`.
 Confirmation requires the same authenticated write access as preparation. The confirmation tool
 also requires `confirm: true` when its policy is `ask`. Every policy that allows confirmation still

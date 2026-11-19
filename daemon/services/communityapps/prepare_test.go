@@ -157,7 +157,7 @@ func TestPrepareRequiresExplicitMountSharingAcrossUserAndPoolAliases(t *testing.
 	root := communityappstest.CopyHeimdallHost(t)
 	communityappstest.WriteFile(t, root, "proc/self/mountinfo", "1 0 8:1 / /mnt/cache rw - zfs cache rw\n2 1 0:15 / /mnt/cache/application-data rw - zfs cache/application-data rw\n3 0 0:10 / /mnt/user rw - fuse.shfs shfs rw\n")
 	communityappstest.WriteFile(t, root, "boot/config/plugins/dockerMan/templates-user/my-old.xml",
-		`<Container><Name>old</Name><Config Type="Path" Mode="rw">/mnt/user/application-data</Config></Container>`)
+		`<Container><Name>old</Name><Config Type="Path" Mode="rw">/mnt/user/application-data/heimdall</Config></Container>`)
 	service := newPlanningService(t, root, &communityappstest.Docker{}, nil)
 	req := communityapps.PrepareRequest{Reference: communityappstest.HeimdallReference}
 	if _, err := service.Prepare(t.Context(), req); !errors.Is(err, communityapps.ErrSharedAppdata) {
@@ -431,8 +431,8 @@ func TestPrepareRebasesPublisherAppdataAcrossRealMountedStorage(t *testing.T) {
 	}}}}
 	req.Paths = map[string]communityapps.PathOverride{"/data": {Source: "/mnt/disks/external-drive/appdata/existing-data", AllowShared: true}}
 	preview, err = newPlanningService(t, root, docker, nil).Prepare(t.Context(), req)
-	if err != nil || !preview.Eligible || !preview.Mounts[0].Shared || preview.Mounts[0].CreateDirectory {
-		t.Fatalf("expected approved existing file with shared parent, got %+v %v", preview, err)
+	if !errors.Is(err, communityapps.ErrExposedMountParent) || preview.Eligible {
+		t.Fatalf("expected the writable parent bind to block approval, got %+v %v", preview, err)
 	}
 }
 
@@ -443,7 +443,7 @@ func TestPrepareChecksLegacySavedTemplateAndUnavailableTemplateState(t *testing.
 		"<Container><Name>old</Name><Data><Volume><HostDir>/mnt/cache/application-data</HostDir><Mode>rw</Mode></Volume></Data></Container>")
 	service := newPlanningService(t, root, &communityappstest.Docker{}, nil)
 	req := communityapps.PrepareRequest{Reference: communityappstest.HeimdallReference}
-	if _, err := service.Prepare(t.Context(), req); !errors.Is(err, communityapps.ErrSharedAppdata) {
+	if _, err := service.Prepare(t.Context(), req); !errors.Is(err, communityapps.ErrExposedMountParent) {
 		t.Fatalf("overlapping retained legacy template returned %v", err)
 	}
 	communityappstest.WriteFile(t, root, retained, "<Malformed")

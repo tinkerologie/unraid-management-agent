@@ -254,6 +254,17 @@ func (host installHost) resolveSource(source string) (Mount, mountIdentity, stri
 	if !allowed || !ok || !beneath(m.point, anchor) {
 		return Mount{}, mountIdentity{}, "unsafe_mount_source"
 	}
+	// Docker stores and reopens path strings during startup and restart.
+	// Only accept local filesystems with meaningful Unix ownership and a
+	// path whose entries unprivileged processes cannot replace. Pooled
+	// shfs and network paths can change through another backing location.
+	parent := path.Dir(resolved)
+	if resolved != anchor {
+		parent = anchor
+	}
+	if !localBindFilesystem(m.fsType) || !protectedBindParents(host.root, parent) {
+		return Mount{}, mountIdentity{}, "unprotected_mount_source"
+	}
 	for _, other := range host.mounts {
 		// Bind mounts carry nested mounts. Reject a source that would include
 		// another mount the operator did not independently review.
@@ -264,6 +275,35 @@ func (host installHost) resolveSource(source string) (Mount, mountIdentity, stri
 	return Mount{Source: resolved, CreateDirectory: resolved != anchor}, mountIdentity{
 		anchor: anchor, mount: m, device: fmt.Sprint(stat.Dev), inode: stat.Ino,
 	}, ""
+}
+
+func localBindFilesystem(fsType string) bool {
+	switch fsType {
+	case "xfs", "btrfs", "zfs", "ext4", "ext3", "ext2", "reiserfs":
+		return true
+	default:
+		return false
+	}
+}
+
+// Check from the trusted root down, so every verified directory entry is
+// protected by its own parent. The source itself can remain app-writable.
+func protectedBindParents(root, parent string) bool {
+	current := root
+	for component := range strings.SplitSeq(strings.TrimPrefix(parent, "/"), "/") {
+		info, err := os.Lstat(current)
+		if err != nil || !protectedBindDirectory(info) {
+			return false
+		}
+		current = filepath.Join(current, component)
+	}
+	info, err := os.Lstat(current)
+	return err == nil && protectedBindDirectory(info)
+}
+
+func protectedBindDirectory(info fs.FileInfo) bool {
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	return ok && info.IsDir() && int(stat.Uid) == os.Geteuid() && info.Mode().Perm()&0o022 == 0
 }
 
 func (host installHost) existingAncestor(source string) (string, string, fs.FileInfo, error) {
@@ -417,31 +457,49 @@ func (host installHost) checkConflictsExcept(config *Configuration, request Prep
 			}
 		}
 	}
+	for i, source := range existing {
+		existing[i] = host.canonicalBindSource(source)
+	}
 	for i, wanted := range config.Mounts {
-		if readOnlyMode(wanted.Mode) {
-			continue
-		}
-		for _, source := range existing {
-			if !host.bindsOverlap(wanted.Source, source) {
-				continue
+		for _, other := range config.Mounts {
+			if (!readOnlyMode(other.Mode) || other.CreateDirectory) && other.Source != wanted.Source && beneath(other.Source, wanted.Source) {
+				return ErrExposedMountParent
 			}
+		}
+		shared := false
+		for _, source := range existing {
+			overlap, parent := host.bindOverlap(wanted.Source, source)
+			if parent {
+				return ErrExposedMountParent
+			}
+			shared = shared || overlap
+		}
+		if shared && !readOnlyMode(wanted.Mode) {
 			if !request.Paths[wanted.Target].AllowShared {
 				return ErrSharedAppdata
 			}
 			config.Mounts[i].Shared = true
-			break
 		}
 	}
 	return nil
 }
 
-func (host installHost) bindsOverlap(wanted, source string) bool {
+func (host installHost) canonicalBindSource(source string) string {
 	existing := path.Clean(source)
 	if resolved, _, _, err := host.existingAncestor(existing); err == nil {
 		existing = resolved
 	}
-	if beneath(existing, wanted) || beneath(wanted, existing) {
-		return true
+	return existing
+}
+
+// A writable ancestor exposes directory entries to the other workload.
+// Keeping the same source or mounting its children shares contents only.
+func (host installHost) bindOverlap(wanted, existing string) (overlap, parent bool) {
+	if beneath(existing, wanted) {
+		return true, existing != wanted
+	}
+	if beneath(wanted, existing) {
+		return true, false
 	}
 	// User shares aggregate matching relative paths on pools/array disks
 	// through shfs, so equivalent aliases need not have matching inodes.
@@ -449,11 +507,17 @@ func (host installHost) bindsOverlap(wanted, source string) bool {
 	right, rightOK := host.findMount(existing)
 	if !leftOK || !rightOK || left.point == right.point ||
 		(left.fsType != "fuse.shfs" && right.fsType != "fuse.shfs") {
-		return false
+		return false, false
 	}
 	leftPath, leftOK := shareRelativePath(wanted)
 	rightPath, rightOK := shareRelativePath(existing)
-	return leftOK && rightOK && (beneath(leftPath, rightPath) || beneath(rightPath, leftPath))
+	if !leftOK || !rightOK {
+		return false, false
+	}
+	if beneath(rightPath, leftPath) {
+		return true, rightPath != leftPath
+	}
+	return beneath(leftPath, rightPath), false
 }
 
 func shareRelativePath(filename string) (string, bool) {

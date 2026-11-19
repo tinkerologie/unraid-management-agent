@@ -73,7 +73,7 @@ func (s *Service) loadReceipts() error {
 		})
 		if err != nil || (receipt.Version != 1 && receipt.Version != installReceiptVersion) || receipt.PlanID != planID ||
 			!opaqueID.MatchString(receipt.Attempt.ID) || !opaqueID.MatchString(receipt.Owner) ||
-			!nativeName.MatchString(receipt.Attempt.Configuration.Name) ||
+			!validNativeName(receipt.Attempt.Configuration.Name) ||
 			s.attemptIDs[receipt.Attempt.ID] != "" {
 			return ErrAttemptStorage
 		}
