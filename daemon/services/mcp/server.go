@@ -132,14 +132,18 @@ func NewServer(ctx *domain.Context, cacheProvider CacheProvider) *Server {
 	if ctx != nil {
 		initialPolicies = ctx.ToolPolicy
 	}
-	communityCatalog := communityapps.NewHostCatalog()
-	return &Server{
-		ctx:                  ctx,
-		cacheProvider:        cacheProvider,
-		toolPolicyStore:      NewToolPolicyStore("", initialPolicies),
-		communityAppsCatalog: communityCatalog,
-		communityAppsService: communityapps.NewHostService(communityCatalog),
+	s := &Server{
+		ctx:             ctx,
+		cacheProvider:   cacheProvider,
+		toolPolicyStore: NewToolPolicyStore("", initialPolicies),
 	}
+	if apiServer, ok := cacheProvider.(*api.Server); ok {
+		s.communityAppsCatalog, s.communityAppsService = apiServer.CommunityApps()
+	} else {
+		s.communityAppsCatalog = communityapps.NewHostCatalog()
+		s.communityAppsService = communityapps.NewHostService(s.communityAppsCatalog)
+	}
+	return s
 }
 
 // SetToolPolicyStore sets the tool policy store for per-tool access control.

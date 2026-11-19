@@ -82,7 +82,13 @@ func respondCatalogError(w http.ResponseWriter, err error) {
 	respondJSON(w, status, problem)
 }
 
-// SetCommunityAppsService wires the install service shared by REST and MCP.
+// CommunityApps returns the catalog and install service shared with HTTP MCP.
+func (s *Server) CommunityApps() (*communityapps.Catalog, *communityapps.Service) {
+	return s.communityAppsCatalog, s.communityAppsService
+}
+
+// SetCommunityAppsService replaces the install service before the API starts.
+// Stop closes the attached service.
 func (s *Server) SetCommunityAppsService(service *communityapps.Service) {
 	s.communityAppsService = service
 }

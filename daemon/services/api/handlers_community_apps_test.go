@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/mount"
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/communityapps"
@@ -82,13 +83,6 @@ func checkCatalogProblem(t *testing.T, resp *httptest.ResponseRecorder, status i
 
 func TestPrepareCommunityAppRESTRequiresVerifiedBearer(t *testing.T) {
 	root := communityappstest.CopyHeimdallHost(t)
-	service := communityapps.NewService(communityapps.NewCatalog(os.DirFS(root)), communityapps.ServiceOptions{
-		HostRoot: root,
-		OpenDocker: func() (communityapps.PlanningDocker, error) {
-			return &communityappstest.Docker{Containers: []container.Summary{{Names: []string{"/already-installed"}}}}, nil
-		},
-		PortAvailable: func(context.Context, communityapps.PortBinding) error { return nil },
-	})
 	const path = "/api/v1/community-applications/install-plans"
 	const body = `{"reference":"` + communityappstest.HeimdallReference + `","environment":{"PUID":"private-preview-sentinel"}}`
 	for _, tc := range []struct {
@@ -103,9 +97,21 @@ func TestPrepareCommunityAppRESTRequiresVerifiedBearer(t *testing.T) {
 		{name: "read-only refuses prepare", token: "real-token", presented: "real-token", body: body, readOnly: true, status: http.StatusForbidden, code: "read_only"},
 		{name: "malformed secret input", token: "real-token", presented: "real-token", body: `{"environment":{"private-preview-sentinel":{}}}`, status: http.StatusBadRequest, code: "invalid_plan_request"},
 		{name: "current host name conflict", token: "real-token", presented: "real-token", body: `{"reference":"` + communityappstest.HeimdallReference + `","name":"already-installed"}`, status: http.StatusConflict, code: "name_conflict"},
+		{name: "writable mount parent conflict", token: "real-token", presented: "real-token", body: body, status: http.StatusConflict, code: "exposed_mount_parent"},
 		{name: "authenticated redacted preview", token: "real-token", presented: "real-token", body: body, status: http.StatusOK},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			other := container.Summary{Names: []string{"/already-installed"}}
+			if tc.code == "exposed_mount_parent" {
+				other.Mounts = []container.MountPoint{{Type: mount.TypeBind, RW: true, Source: "/mnt/cache/application-data"}}
+			}
+			service := communityapps.NewService(communityapps.NewCatalog(os.DirFS(root)), communityapps.ServiceOptions{
+				HostRoot: root,
+				OpenDocker: func() (communityapps.PlanningDocker, error) {
+					return &communityappstest.Docker{Containers: []container.Summary{other}}, nil
+				},
+				PortAvailable: func(context.Context, communityapps.PortBinding) error { return nil },
+			})
 			server := NewServer(&domain.Context{Config: domain.Config{
 				APIToken: tc.token, AllowUnauthenticatedWrites: tc.tokenless, WebSocketDisabled: true, ReadOnly: tc.readOnly,
 			}})
@@ -282,10 +288,14 @@ func TestCommunityAppRESTReportsRecoveredAttempt(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			service, claim := recovery.InterruptedStart(t, environment, started)
-			server := NewServer(&domain.Context{Config: domain.Config{WebSocketDisabled: true}})
+			server := NewServer(&domain.Context{Config: domain.Config{WebSocketDisabled: true, Port: -1}})
 			t.Cleanup(server.Stop)
 			server.SetCommunityAppsService(service)
-			service.StartRecovery(t.Context())
+			// Reject the listener at startup while exercising real recovery
+			// wiring with a fixture service owned by the API server.
+			if err := server.StartHTTP(); err == nil {
+				t.Fatal("invalid test listen port was accepted")
+			}
 
 			for deadline := time.Now().Add(5 * time.Second); ; {
 				req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/community-applications/install-attempts/"+claim.ID, nil)

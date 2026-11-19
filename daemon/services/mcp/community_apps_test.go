@@ -16,10 +16,22 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/domain"
+	"github.com/tinkerologie/unraid-management-agent/daemon/services/api"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/communityapps"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/internal/communityappstest"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/internal/communityappstest/recovery"
 )
+
+func TestCommunityAppsMCPUsesTheAPICatalogAndInstallService(t *testing.T) {
+	ctx := &domain.Context{Config: domain.Config{WebSocketDisabled: true}}
+	apiServer := api.NewServer(ctx)
+	t.Cleanup(apiServer.Stop)
+	catalog, service := apiServer.CommunityApps()
+	server := NewServer(ctx, apiServer)
+	if catalog == nil || service == nil || server.communityAppsCatalog != catalog || server.communityAppsService != service {
+		t.Fatal("REST and MCP do not use the same Community Applications state")
+	}
+}
 
 func TestCommunityAppsMCPRemainsReadableWithWritesLocked(t *testing.T) {
 	server := NewServer(&domain.Context{ReadOnly: true}, newMockCacheProvider())

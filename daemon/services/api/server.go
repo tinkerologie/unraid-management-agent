@@ -515,6 +515,9 @@ func (s *Server) Ready() <-chan struct{} {
 
 // StartHTTP starts the HTTP server
 func (s *Server) StartHTTP() error {
+	// Recover interrupted installs before accepting new confirmations.
+	s.communityAppsService.StartRecovery(s.cancelCtx)
+
 	// JoinHostPort brackets IPv6 addresses; an empty BindAddress yields
 	// ":port", which preserves the bind-to-all-interfaces default.
 	s.httpServer = &http.Server{
@@ -556,6 +559,7 @@ func (s *Server) Stop() {
 			logger.Error("Server shutdown error: %v", err)
 		}
 	}
+	s.communityAppsService.Close()
 }
 
 func (s *Server) subscribeToEvents(ctx context.Context, readyWg *sync.WaitGroup) {

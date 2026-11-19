@@ -20,7 +20,6 @@ import (
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/agent"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/alerting"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/api"
-	"github.com/tinkerologie/unraid-management-agent/daemon/services/communityapps"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/controllers"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/discovery"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/mcp"
@@ -80,11 +79,6 @@ func (o *Orchestrator) Run() error {
 	// Initialize API server FIRST so subscriptions are ready
 	// Pass the collector manager for runtime control
 	apiServer := api.NewServerWithCollectorManager(o.ctx, o.collectorManager)
-	communityCatalog := communityapps.NewHostCatalog()
-	communityInstall := communityapps.NewHostService(communityCatalog)
-	defer communityInstall.Close()
-	apiServer.SetCommunityAppsCatalog(communityCatalog)
-	apiServer.SetCommunityAppsService(communityInstall)
 
 	// Start API server subscriptions and WebSocket hub
 	apiServer.StartSubscriptions()
@@ -114,8 +108,6 @@ func (o *Orchestrator) Run() error {
 	apiServer.SetToolPolicyStore(toolPolicyStore)
 
 	mcpServer := mcp.NewServer(o.ctx, apiServer)
-	mcpServer.SetCommunityAppsCatalog(communityCatalog)
-	mcpServer.SetCommunityAppsService(communityInstall)
 	mcpServer.SetToolPolicyStore(toolPolicyStore)
 	mcpServer.SetNetworkWriteLock(o.ctx.WritesLocked())
 	if err := mcpServer.Initialize(); err != nil {
@@ -242,9 +234,6 @@ func (o *Orchestrator) Run() error {
 		}
 		logger.Info("Disabled collectors: %v", disabledNames)
 	}
-
-	// Reconcile prior CA installs in the background before accepting new confirmations.
-	communityInstall.StartRecovery(ctx)
 
 	// Start HTTP server
 	wg.Go(func() {
@@ -459,8 +448,6 @@ func (o *Orchestrator) RunMCPStdio() error {
 
 	// Initialize API server for cache/subscriptions only (no HTTP)
 	apiServer := api.NewServerWithCollectorManager(o.ctx, o.collectorManager)
-	communityCatalog := communityapps.NewHostCatalog()
-	apiServer.SetCommunityAppsCatalog(communityCatalog)
 	apiServer.StartSubscriptions()
 
 	// Wait for subscriptions to be fully wired (deterministic, replaces time.Sleep)
@@ -485,7 +472,6 @@ func (o *Orchestrator) RunMCPStdio() error {
 	apiServer.SetToolPolicyStore(toolPolicyStore)
 
 	mcpServer := mcp.NewServer(o.ctx, apiServer)
-	mcpServer.SetCommunityAppsCatalog(communityCatalog)
 	mcpServer.SetToolPolicyStore(toolPolicyStore)
 	if err := mcpServer.Initialize(); err != nil {
 		cancel()
