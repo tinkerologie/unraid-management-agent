@@ -25,6 +25,14 @@ func TestSearchWithNoHostCatalog(t *testing.T) {
 	}
 }
 
+func TestResolveReturnsCatalogLoadFailure(t *testing.T) {
+	catalog := communityapps.NewCatalog(fstest.MapFS{})
+	_, err := catalog.Resolve(t.Context(), communityappstest.HeimdallReference)
+	if !errors.Is(err, communityapps.ErrCatalogUnavailable) {
+		t.Fatalf("Resolve returned %v, want catalog unavailable", err)
+	}
+}
+
 func TestSearchSelectsExactVisibleVariant(t *testing.T) {
 	catalog := fixtureCatalog(t)
 	result, err := catalog.Search(t.Context(), "fixture")
