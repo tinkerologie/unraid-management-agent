@@ -33,7 +33,6 @@ func (s *Service) oldEngineCallsDrained(receipt *installReceipt) bool {
 		return false
 	}
 	if engineBootIDPattern.MatchString(receipt.EngineBootID) {
-		receipt.EngineBootEnded = true
 		return true
 	}
 	next := *receipt

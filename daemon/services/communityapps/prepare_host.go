@@ -221,6 +221,11 @@ func nativeValue(value string) bool {
 }
 
 func (host installHost) findMount(filename string) (hostMount, bool) {
+	mount, found := host.closestMount(filename)
+	return mount, found && mount.storage
+}
+
+func (host installHost) closestMount(filename string) (hostMount, bool) {
 	var closest hostMount
 	ambiguous := false
 	for _, m := range host.mounts {
@@ -233,7 +238,7 @@ func (host installHost) findMount(filename string) (hostMount, bool) {
 			ambiguous = true
 		}
 	}
-	return closest, closest.storage && !ambiguous
+	return closest, closest.point != "" && !ambiguous
 }
 
 func (host installHost) resolveSource(source string) (Mount, mountIdentity, string) {
@@ -346,6 +351,7 @@ func (host installHost) existingAncestor(source string) (string, string, unix.St
 	}()
 	anchor, info := "/", stat
 	remaining := strings.TrimPrefix(source, "/")
+	required := 0
 	for links := 0; remaining != ""; {
 		component, tail, _ := strings.Cut(remaining, "/")
 		next := path.Join(anchor, component)
@@ -358,12 +364,16 @@ func (host installHost) existingAncestor(source string) (string, string, unix.St
 		var entry unix.Stat_t
 		err := unix.Fstatat(dir, component, &entry, unix.AT_SYMLINK_NOFOLLOW)
 		if errors.Is(err, fs.ErrNotExist) {
+			if required > 0 {
+				return "", "", stat, ErrStorageState
+			}
 			return path.Join(anchor, remaining), anchor, info, nil
 		}
 		if err != nil {
 			return "", "", stat, err
 		}
 		kind := entry.Mode & unix.S_IFMT
+		required = max(0, required-1)
 		if kind == unix.S_IFLNK {
 			links++
 			var buffer [4096]byte
@@ -374,6 +384,12 @@ func (host installHost) existingAncestor(source string) (string, string, unix.St
 			target := string(buffer[:size])
 			if !path.IsAbs(target) {
 				target = path.Join(anchor, target)
+			}
+			target = path.Clean(target)
+			// A link must resolve to an existing target. Only the
+			// trailing path beneath that target may require creation.
+			if target != "/" {
+				required += 1 + strings.Count(strings.TrimPrefix(target, "/"), "/")
 			}
 			remaining = strings.TrimPrefix(path.Join(target, tail), "/")
 			if dir != rootFD {
@@ -560,11 +576,27 @@ func (host installHost) bindOverlap(wanted, existing string) (overlap, parent bo
 	if beneath(wanted, existing) {
 		return true, false
 	}
+	// A second mount can expose the same directory tree outside /mnt.
+	// Compare paths relative to each mount's filesystem root.
+	left, leftFound := host.closestMount(wanted)
+	right, rightFound := host.closestMount(existing)
+	if leftFound && rightFound && left.point != right.point {
+		_, leftDevice, leftOK := strings.Cut(left.id, ":")
+		_, rightDevice, rightOK := strings.Cut(right.id, ":")
+		if leftOK && rightOK && leftDevice == rightDevice {
+			leftPath := path.Join(left.root, strings.TrimPrefix(wanted, left.point))
+			rightPath := path.Join(right.root, strings.TrimPrefix(existing, right.point))
+			if beneath(rightPath, leftPath) {
+				return true, rightPath != leftPath
+			}
+			if beneath(leftPath, rightPath) {
+				return true, false
+			}
+		}
+	}
 	// User shares aggregate matching relative paths on pools/array disks
 	// through shfs, so equivalent aliases need not have matching inodes.
-	left, leftOK := host.findMount(wanted)
-	right, rightOK := host.findMount(existing)
-	if !leftOK || !rightOK || left.point == right.point ||
+	if !leftFound || !rightFound || !left.storage || !right.storage || left.point == right.point ||
 		(left.fsType != "fuse.shfs" && right.fsType != "fuse.shfs") {
 		return false, false
 	}

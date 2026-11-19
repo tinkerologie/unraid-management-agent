@@ -1810,9 +1810,9 @@ reports `container_create_unverified`. If Docker has an approved container but c
 or a definitive rejection, the attempt reports `container_start_unverified`. Check Docker Manager
 and keep polling the same attempt. Its name stays reserved while the result is ambiguous.
 A host reboot proves that an earlier in-flight request can no longer complete. After a reboot,
-recovery settles unresolved attempts when Docker confirms the container is absent or never started.
-It will also recover a verified late success. Receipts without saved boot evidence record the
-first boot on which recovery sees them. Status requests only read the receipt.
+recovery can settle an unresolved attempt while retaining any existing container and template
+for operator review. It still recovers a verified late success. Receipts without saved boot
+evidence record the first boot on which recovery sees them. Status requests only read the receipt.
 
 The daemon records start intent after saving the native template. On restart, a start for the
 exact owned Docker ID and approved image can recover success, including after a native template

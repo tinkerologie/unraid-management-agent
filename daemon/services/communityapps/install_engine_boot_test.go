@@ -40,11 +40,7 @@ func TestLegacyRecoveryEstablishesItsFirstKnownBoot(t *testing.T) {
 		t.Fatal("lack of a boot change released a pending intent")
 	}
 	communityappstest.WriteFile(t, root, engineBootIDPath, "22222222-2222-2222-2222-222222222222\n")
-	if !fresh.oldEngineCallsDrained(&durable) || !durable.EngineBootEnded {
+	if !fresh.oldEngineCallsDrained(&durable) {
 		t.Fatal("a boot change did not drain the old Engine call")
-	}
-	durable.EngineBootID = "invalid-boot-evidence"
-	if validRecoveryReceipt(durable) {
-		t.Fatal("receipt with invalid terminal boot evidence was treated as valid")
 	}
 }

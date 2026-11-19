@@ -144,6 +144,29 @@ func TestBindOverlapRecognizesWritableUserShareParents(t *testing.T) {
 	}
 }
 
+func TestBindOverlapRecognizesAlternateLinuxMountRoots(t *testing.T) {
+	host := installHost{mounts: []hostMount{
+		{point: "/mnt/cache", fsType: "btrfs", id: "1:8:1", root: "/", storage: true},
+		{point: "/srv/alias", fsType: "btrfs", id: "2:8:1", root: "/appdata"},
+		{point: "/srv/other", fsType: "btrfs", id: "3:8:2", root: "/appdata"},
+	}}
+	const source = "/mnt/cache/appdata/fixture"
+	for _, tc := range []struct {
+		existing        string
+		overlap, parent bool
+	}{
+		{"/srv/alias", true, true},
+		{"/srv/alias/fixture", true, false},
+		{"/srv/alias/fixture/child", true, false},
+		{"/srv/alias/unrelated", false, false},
+		{"/srv/other", false, false},
+	} {
+		if overlap, parent := host.bindOverlap(source, tc.existing); overlap != tc.overlap || parent != tc.parent {
+			t.Errorf("alias %q gave overlap=%t parent=%t", tc.existing, overlap, parent)
+		}
+	}
+}
+
 func TestAppdataCreatesProtectedParentsAndWritableLeaf(t *testing.T) {
 	root := communityappstest.CopyHeimdallHost(t)
 	const parent = "/mnt/cache/application-data"

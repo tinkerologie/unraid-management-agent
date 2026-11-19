@@ -61,8 +61,7 @@ func TestRecoverySettlesUndispatchedOperationsAfterHostBoot(t *testing.T) {
 			rebooted := newInstallService(t, root, engine)
 			rebooted.StartRecovery(t.Context())
 			done := waitForAttempt(t, rebooted, claim.ID)
-			if done.State != communityapps.AttemptFailed || done.Problem == nil ||
-				(done.Problem.Code != "container_"+operation+"_failed" && done.Problem.Code != "install_interrupted") {
+			if done.State != communityapps.AttemptFailed || done.Problem == nil || done.Problem.Code != "install_interrupted" {
 				t.Fatalf("boot proof did not release %s attempt: %+v", operation, done)
 			}
 			creates, present, starts, _, _ := engine.Observation()
@@ -70,15 +69,18 @@ func TestRecoverySettlesUndispatchedOperationsAfterHostBoot(t *testing.T) {
 			if operation == "start" {
 				expectedStarts = 1
 			}
-			if creates > 1 || present != 0 || len(starts) != expectedStarts {
-				t.Fatal("boot recovery replayed a Docker operation or left the never-started fixture")
+			if creates > 1 || present != expectedStarts || len(starts) != expectedStarts || len(engine.RemoveRequests()) != 0 {
+				t.Fatal("boot recovery replayed a Docker operation or removed an existing container")
 			}
-			for _, removal := range engine.RemoveRequests() {
-				if removal.Options.Force || removal.Options.RemoveVolumes {
-					t.Fatal("boot recovery requested force or volume removal")
+			name := "heimdall"
+			if operation == "start" {
+				if done.ContainerID != communityappstest.ContainerID {
+					t.Fatal("interrupted result did not identify the retained container")
 				}
+				_ = readNativeInstall(t, root, name)
+				name = "heimdall-next"
 			}
-			if next, err := rebooted.Prepare(t.Context(), communityapps.PrepareRequest{Reference: communityappstest.HeimdallReference}); err != nil || !next.Eligible {
+			if next, err := rebooted.Prepare(t.Context(), communityapps.PrepareRequest{Reference: communityappstest.HeimdallReference, Name: name}); err != nil || !next.Eligible {
 				t.Fatalf("drained attempt did not release the name: %+v, %v", next, err)
 			}
 		})

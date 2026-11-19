@@ -149,7 +149,6 @@ func (s *Service) reconcileInstall(ctx context.Context, receipt installReceipt) 
 }
 
 func (s *Service) settleInstall(ctx context.Context, docker InstallDocker, receipt *installReceipt, cause error) bool {
-	phase := receipt.Attempt.Phase
 	if mutationPhase(*receipt) == "starting_container" {
 		observed, err := s.observeInstallStart(ctx, docker, *receipt)
 		if err == errContainerIdentity {
@@ -170,21 +169,34 @@ func (s *Service) settleInstall(ctx context.Context, docker InstallDocker, recei
 		}
 		// A short-lived app can start and exit after Inspect reports a
 		// zero start time. Even non-force removal would then delete it.
-		if uncertainStart(*receipt) && !s.oldEngineCallsDrained(receipt) {
-			return false
+		if uncertainStart(*receipt) {
+			if !s.oldEngineCallsDrained(receipt) {
+				return false
+			}
+			// A new boot drains the request, but Docker's last start
+			// timestamp might not have survived it. Preserve the result.
+			receipt.Attempt.ContainerID = receipt.OwnedContainerID
+			return s.finishInstall(receipt, ErrInstallInterrupted)
 		}
 	}
-	if phase == "creating_container" && uncertainCreate(*receipt) && cause != ErrNameConflict {
+	if uncertainCreate(*receipt) && cause != ErrNameConflict {
 		created, found, err := ownedContainer(ctx, docker, *receipt)
 		switch {
 		case found:
 			next := *receipt
 			next.OwnedContainerID = created.ID
+			if s.oldEngineCallsDrained(&next) {
+				next.Attempt.ContainerID = created.ID
+				return s.finishInstall(&next, ErrInstallInterrupted)
+			}
 			if s.persistProgress(next) != nil {
 				return false
 			}
 			*receipt = next
-		case err != errContainerIdentity && (err != nil || !s.oldEngineCallsDrained(receipt)):
+		case err != errContainerIdentity:
+			if err == nil && s.oldEngineCallsDrained(receipt) {
+				return s.finishInstall(receipt, ErrInstallInterrupted)
+			}
 			if receipt.Attempt.Problem == nil && cause != ErrInstallInterrupted {
 				receipt.Attempt.Problem = ProblemForError(cause)
 				_ = s.persistProgress(*receipt)
@@ -207,12 +219,12 @@ func (s *Service) settleInstall(ctx context.Context, docker InstallDocker, recei
 
 func uncertainCreate(receipt installReceipt) bool {
 	return receipt.OwnedContainerID == "" && mutationPhase(receipt) == "creating_container" &&
-		!receipt.EngineRejected && !receipt.EngineBootEnded &&
+		!receipt.EngineRejected &&
 		(receipt.Attempt.Problem == nil || receipt.Attempt.Problem.Code != ErrNameConflict.Code)
 }
 
 func uncertainStart(receipt installReceipt) bool {
-	return mutationPhase(receipt) == "starting_container" && !receipt.EngineRejected && !receipt.EngineBootEnded
+	return mutationPhase(receipt) == "starting_container" && !receipt.EngineRejected
 }
 
 func mutationPhase(receipt installReceipt) string {
@@ -232,9 +244,6 @@ func mutationPhase(receipt installReceipt) string {
 
 func validRecoveryReceipt(r installReceipt) bool {
 	phase := r.Attempt.Phase
-	if r.EngineBootEnded && !engineBootIDPattern.MatchString(r.EngineBootID) {
-		return false
-	}
 	if phase == "queued" {
 		return r.Attempt.State == AttemptPending
 	}
