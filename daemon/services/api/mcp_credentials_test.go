@@ -50,3 +50,18 @@ func TestMCPRoutePassesAuthenticationProofWithoutRetainingTheCredential(t *testi
 		t.Error("manually constructed metadata must not substitute for verified HTTP credentials")
 	}
 }
+
+func TestMCPVerifierRejectsPlaceholderWithoutTransportProof(t *testing.T) {
+	handler := auth.RequireBearerToken(verifyMCPRequestCredential, &auth.RequireBearerTokenOptions{AllowMissingExpiration: true})(
+		http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			t.Fatal("a caller-supplied placeholder passed authentication")
+		}),
+	)
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/mcp-stateless", nil)
+	request.Header.Set("Authorization", "Bearer verified")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("placeholder bearer returned %d: %s", response.Code, response.Body)
+	}
+}

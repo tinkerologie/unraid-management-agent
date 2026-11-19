@@ -60,6 +60,29 @@ func TestCommunityAppsMCPRemainsReadableWithWritesLocked(t *testing.T) {
 	if err := json.Unmarshal([]byte(content), &problem); err != nil || !result.IsError || problem.Code != "listing_unavailable" {
 		t.Fatalf("missing listing did not produce an actionable tool error: %s", content)
 	}
+	result, content = callToolJSON(t, cs, "search_community_applications", map[string]any{"query": strings.Repeat("a", 257)})
+	if err := json.Unmarshal([]byte(content), &problem); err != nil || !result.IsError || problem.Code != "invalid_search" {
+		t.Fatalf("oversized search did not produce an actionable tool error: %s", content)
+	}
+}
+
+func TestCommunityAppWriteToolRejectsUnsupportedArgumentSchema(t *testing.T) {
+	server := NewServer(&domain.Context{}, newMockCacheProvider())
+	if err := server.Initialize(); err != nil {
+		t.Fatal(err)
+	}
+	type unsupportedArgs struct {
+		Stream chan string
+	}
+	defer func() {
+		err, ok := recover().(error)
+		if !ok || !strings.Contains(err.Error(), "chan string") {
+			t.Fatalf("expected a schema error for the unsupported argument type, got %v", err)
+		}
+	}()
+	addCommunityAppsWriteTool(server, &mcp.Tool{Name: "unsupported_install_fixture"}, func(context.Context, unsupportedArgs) (*mcp.CallToolResult, any, error) {
+		return nil, nil, nil
+	})
 }
 
 func TestPrepareCommunityAppMCPRequiresPerRequestCredentialAndPolicy(t *testing.T) {

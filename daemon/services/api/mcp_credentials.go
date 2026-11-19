@@ -20,17 +20,18 @@ func hasVerifiedCredential(ctx context.Context) bool {
 	return verified
 }
 
+func verifyMCPRequestCredential(ctx context.Context, _ string, _ *http.Request) (*auth.TokenInfo, error) {
+	if !hasVerifiedCredential(ctx) {
+		return nil, auth.ErrInvalidToken
+	}
+	return &auth.TokenInfo{Extra: map[string]any{"verified": verifiedCredential{}}}, nil
+}
+
 // withMCPRequestCredential bridges our HTTP middleware into the SDK's
 // per-message TokenInfo. A session may outlive its initializing request, so
 // the MCP tools must read CallToolRequest.Extra, not the session context.
 func withMCPRequestCredential(next http.Handler) http.Handler {
-	verified := auth.RequireBearerToken(
-		func(ctx context.Context, _ string, _ *http.Request) (*auth.TokenInfo, error) {
-			if !hasVerifiedCredential(ctx) {
-				return nil, auth.ErrInvalidToken
-			}
-			return &auth.TokenInfo{Extra: map[string]any{"verified": verifiedCredential{}}}, nil
-		},
+	verified := auth.RequireBearerToken(verifyMCPRequestCredential,
 		&auth.RequireBearerTokenOptions{AllowMissingExpiration: true},
 	)(next)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

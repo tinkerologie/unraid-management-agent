@@ -159,6 +159,9 @@ func TestDockerDetailDoesNotReturnStaleIdentityOnEngineFailure(t *testing.T) {
 		{name: "unavailable Docker", setup: func(t *testing.T) {
 			t.Setenv("DOCKER_HOST", "unix://"+filepath.Join(t.TempDir(), "missing.sock"))
 		}},
+		{name: "malformed Docker response", setup: func(t *testing.T) {
+			communityappstest.UseDockerInspectEngine(t, map[string]string{"heimdall": `{"Id":`})
+		}},
 		{name: "incomplete response", setup: func(t *testing.T) {
 			communityappstest.UseDockerInspectEngine(t, map[string]string{"heimdall": `{"Id":"2222222222220001","Name":"/heimdall"}`})
 		}},
@@ -173,6 +176,16 @@ func TestDockerDetailDoesNotReturnStaleIdentityOnEngineFailure(t *testing.T) {
 				t.Fatalf("expected live identity failure, got %d %s", response.Code, response.Body.String())
 			}
 		})
+	}
+}
+
+func TestDockerDetailRejectsInvalidReferenceBeforeOpeningEngine(t *testing.T) {
+	t.Setenv("DOCKER_HOST", "invalid")
+	server, _ := setupTestServer()
+	t.Cleanup(server.Stop)
+	response := dockerDetailRequest(server, "invalid!reference")
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("invalid container reference returned %d: %s", response.Code, response.Body)
 	}
 }
 

@@ -15,7 +15,8 @@ import (
 func TestGetContainerInfoUsesLiveDockerIdentityAndNativeTemplate(t *testing.T) {
 	const link = "https://example.com/templates/heimdall.xml"
 	communityappstest.UseDockerInspectEngine(t, map[string]string{
-		"heimdall": `{"Id":"2222222222220001","Name":"/heimdall","State":{"Status":"running"},"Config":{"Image":"lscr.io/linuxserver/heimdall","Labels":{"net.unraid.docker.managed":"dockerman"}}}`,
+		"heimdall":   `{"Id":"2222222222220001","Name":"/heimdall","State":{"Status":"running"},"Config":{"Image":"lscr.io/linuxserver/heimdall","Labels":{"net.unraid.docker.managed":"dockerman"}}}`,
+		"unreadable": `{"Id":`,
 	})
 	root := t.TempDir()
 	const filename = "boot/config/plugins/dockerMan/templates-user/my-heimdall.xml"
@@ -45,5 +46,10 @@ func TestGetContainerInfoUsesLiveDockerIdentityAndNativeTemplate(t *testing.T) {
 	_, absent := callToolJSON(t, cs, "get_container_info", map[string]any{"container_id": "111111111111"})
 	if !strings.Contains(absent, "not found") {
 		t.Fatalf("MCP did not report the former ID as missing: %s", absent)
+	}
+
+	_, failed := callToolJSON(t, cs, "get_container_info", map[string]any{"container_id": "unreadable"})
+	if failed != "Docker container information unavailable" {
+		t.Fatalf("MCP did not report a Docker inspection failure: %s", failed)
 	}
 }

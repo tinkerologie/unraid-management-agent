@@ -137,6 +137,49 @@ func TestPrepareCommunityAppRESTRequiresVerifiedBearer(t *testing.T) {
 	}
 }
 
+func TestCommunityAppRESTReportsPlanCapacity(t *testing.T) {
+	root := communityappstest.CopyHeimdallHost(t)
+	service := communityapps.NewService(communityapps.NewCatalog(os.DirFS(root)), communityapps.ServiceOptions{
+		HostRoot:      root,
+		OpenDocker:    func() (communityapps.PlanningDocker, error) { return &communityappstest.Docker{}, nil },
+		PortAvailable: func(context.Context, communityapps.PortBinding) error { return nil },
+	})
+	t.Cleanup(service.Close)
+	const bearer = "fixture-capacity-auth"
+	server := NewServer(&domain.Context{Config: domain.Config{APIToken: bearer, WebSocketDisabled: true}})
+	t.Cleanup(server.Stop)
+	server.SetCommunityAppsService(service)
+
+	for i := range 100 {
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/community-applications/install-plans",
+			strings.NewReader(`{"reference":"`+communityappstest.HeimdallReference+`"}`))
+		req.Header.Set("Authorization", "Bearer "+bearer)
+		resp := httptest.NewRecorder()
+		server.GetRouter().ServeHTTP(resp, req)
+		if i > 0 && resp.Code == http.StatusTooManyRequests {
+			checkCatalogProblem(t, resp, http.StatusTooManyRequests, "plan_capacity")
+			return
+		}
+		if resp.Code != http.StatusOK {
+			t.Fatalf("preparing plan %d returned %d: %s", i, resp.Code, resp.Body)
+		}
+	}
+	t.Fatal("preparation did not report a limit on outstanding plans")
+}
+
+func TestCommunityAppRESTConfirmationRequiresVerifiedCredentialWithTokenlessWrites(t *testing.T) {
+	server := NewServer(&domain.Context{Config: domain.Config{AllowUnauthenticatedWrites: true, WebSocketDisabled: true}})
+	t.Cleanup(server.Stop)
+	path := "/api/v1/community-applications/install-plans/" + strings.Repeat("A", 26) + "/confirm"
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodPost, path, strings.NewReader(`{"approval_token":42}`))
+	response := httptest.NewRecorder()
+	server.GetRouter().ServeHTTP(response, request)
+	checkCatalogProblem(t, response, http.StatusUnauthorized, "credential_required")
+	if response.Header().Get("Cache-Control") != "no-store" || response.Header().Get("WWW-Authenticate") == "" {
+		t.Fatalf("confirmation refusal did not set privacy and authentication headers: %v", response.Header())
+	}
+}
+
 func TestCommunityAppRESTConfirmAndPoll(t *testing.T) {
 	root := communityappstest.CopyHeimdallHost(t)
 	unblock := make(chan struct{})
