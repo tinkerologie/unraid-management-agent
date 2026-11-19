@@ -328,7 +328,17 @@ func protectedBindDirectory(info fs.FileInfo) bool {
 	return ok && info.IsDir() && int(stat.Uid) == os.Geteuid() && info.Mode().Perm()&0o022 == 0
 }
 
+type bindLookupOps struct {
+	statRoot func(int, *unix.Stat_t) error
+	statAt   func(int, string, *unix.Stat_t, int) error
+	openAt   func(int, string, int, uint32) (int, error)
+}
+
 func (host installHost) existingAncestor(source string) (string, string, unix.Stat_t, error) {
+	return host.lookupAncestor(source, bindLookupOps{statRoot: unix.Fstat, statAt: unix.Fstatat, openAt: unix.Openat})
+}
+
+func (host installHost) lookupAncestor(source string, ops bindLookupOps) (string, string, unix.Stat_t, error) {
 	var stat unix.Stat_t
 	if !path.IsAbs(source) || host.blockedLookup["/"] {
 		return "", "", stat, ErrStorageState
@@ -340,7 +350,7 @@ func (host installHost) existingAncestor(source string) (string, string, unix.St
 	}
 	defer func() { _ = root.Close() }()
 	rootFD := int(root.Fd())
-	if err := unix.Fstat(rootFD, &stat); err != nil {
+	if err := ops.statRoot(rootFD, &stat); err != nil {
 		return "", "", stat, err
 	}
 	dir := rootFD
@@ -362,7 +372,7 @@ func (host installHost) existingAncestor(source string) (string, string, unix.St
 			return "", "", stat, ErrStorageState
 		}
 		var entry unix.Stat_t
-		err := unix.Fstatat(dir, component, &entry, unix.AT_SYMLINK_NOFOLLOW)
+		err := ops.statAt(dir, component, &entry, unix.AT_SYMLINK_NOFOLLOW)
 		if errors.Is(err, fs.ErrNotExist) {
 			if required > 0 {
 				return "", "", stat, ErrStorageState
@@ -405,7 +415,7 @@ func (host installHost) existingAncestor(source string) (string, string, unix.St
 		if kind != unix.S_IFDIR {
 			return "", "", stat, ErrStorageState
 		}
-		child, err := unix.Openat(dir, component, unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
+		child, err := ops.openAt(dir, component, unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
 		if err != nil {
 			return "", "", stat, err
 		}

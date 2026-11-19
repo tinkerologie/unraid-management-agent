@@ -11,6 +11,7 @@ import (
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/mount"
+	"golang.org/x/sys/unix"
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/internal/communityappstest"
 )
@@ -94,6 +95,56 @@ func TestMountLookupStopsAtRemoteFilesystems(t *testing.T) {
 	}
 	if _, _, _, err := host.existingAncestor("/mnt/cache/application-data/loop"); !errors.Is(err, ErrStorageState) {
 		t.Fatalf("symlink cycle was not bounded: %v", err)
+	}
+}
+
+func TestBindLookupFailsClosedWhenFilesystemChanges(t *testing.T) {
+	root := communityappstest.CopyHeimdallHost(t)
+	host, err := readInstallHost(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	communityappstest.WriteFile(t, root, "outside/fixture", "existing data")
+	alias := filepath.Join(root, "mnt/cache/application-data/alias")
+	if err := os.Symlink("/outside/fixture", alias); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, issue := host.resolveSource("/mnt/cache/application-data/alias"); issue != "unsafe_mount_source" {
+		t.Fatalf("a link to a regular file outside storage returned %q", issue)
+	}
+	protected := filepath.Join(root, "mnt/cache/application-data")
+	if err := os.Chmod(protected, 0o777); err != nil {
+		t.Fatal(err)
+	}
+	if protectedBindParents(root, "/mnt/cache/application-data/subdirectory") {
+		t.Fatal("an unprotected intermediate directory passed the ancestor check")
+	}
+	if _, _, _, err := host.existingAncestor("relative"); !errors.Is(err, ErrStorageState) {
+		t.Fatalf("relative path returned %v", err)
+	}
+	if got, anchor, _, err := host.existingAncestor("/"); got != "/" || anchor != "/" || err != nil {
+		t.Fatalf("root lookup returned %q, %q, %v", got, anchor, err)
+	}
+	missingRoot := installHost{root: filepath.Join(root, "missing")}
+	if _, _, _, err := missingRoot.existingAncestor("/"); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("missing root returned %v", err)
+	}
+
+	for _, fault := range []string{"root metadata", "entry metadata", "entry open"} {
+		t.Run(fault, func(t *testing.T) {
+			ops := bindLookupOps{statRoot: unix.Fstat, statAt: unix.Fstatat, openAt: unix.Openat}
+			switch fault {
+			case "root metadata":
+				ops.statRoot = func(int, *unix.Stat_t) error { return unix.EIO }
+			case "entry metadata":
+				ops.statAt = func(int, string, *unix.Stat_t, int) error { return unix.EIO }
+			case "entry open":
+				ops.openAt = func(int, string, int, uint32) (int, error) { return -1, unix.ELOOP }
+			}
+			if _, _, _, err := host.lookupAncestor("/mnt/cache/application-data", ops); err == nil {
+				t.Fatalf("bind lookup accepted %s failure", fault)
+			}
+		})
 	}
 }
 
