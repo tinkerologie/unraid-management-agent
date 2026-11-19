@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/errdefs"
+
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/communityapps"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/internal/communityappstest"
 )
@@ -20,8 +22,10 @@ func InterruptedStart(t *testing.T, environment string, started bool) (*communit
 	root := communityappstest.CopyHeimdallHost(t)
 	docker := &communityappstest.InstallEngine{
 		PostStartInspectError: errors.New(environment),
-		NoStartEffect:         !started,
 		BeforeRemove:          func() error { return errors.New(environment) },
+	}
+	if !started {
+		docker.BeforeStart = func() error { return errdefs.ErrInvalidArgument.WithMessage(environment) }
 	}
 	newService := func() *communityapps.Service {
 		service := communityapps.NewService(communityapps.NewCatalog(os.DirFS(root)), communityapps.ServiceOptions{

@@ -246,7 +246,7 @@ func TestCommunityAppRESTReportsRecoveredAttempt(t *testing.T) {
 						t.Fatalf("success was not recovered: %+v", attempt)
 					}
 					if !started && (attempt.State != communityapps.AttemptFailed || attempt.Problem == nil ||
-						attempt.Problem.Code != "install_interrupted" || len(attempt.CleanupDetails) != 1 ||
+						attempt.Problem.Code != "container_start_failed" || len(attempt.CleanupDetails) != 1 ||
 						attempt.CleanupDetails[0].ContainerID != communityappstest.ContainerID || !attempt.CleanupDetails[0].OwnershipVerified) {
 						t.Fatalf("cleanup details were not recovered: %+v", attempt)
 					}

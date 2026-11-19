@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 
@@ -70,7 +71,7 @@ func TestRestartRecoversStartedContainerWithPublishedTemplate(t *testing.T) {
 	}
 	during, err := after.Confirm(t.Context(), preview.PlanID, preview.ApprovalToken)
 	if err != nil || during.ID != claim.ID || during.State != communityapps.AttemptRunning ||
-		during.Problem == nil || during.Problem.Code != "install_recovery_pending" {
+		during.Problem == nil || during.Problem.Code != "container_start_unverified" {
 		t.Fatalf("unavailable Engine did not retain the original pending attempt: %+v, %v", during, err)
 	}
 	available.Store(true)
@@ -188,7 +189,9 @@ func checkpointPublishedInstall(root string, docker *communityappstest.InstallEn
 }
 
 func checkpointCleanupInstall(root string, docker *communityappstest.InstallEngine, r *receiptCheckpoint) {
-	docker.BeforeStart = func() error { return errors.New("bind: address already in use: private Engine diagnostic") }
+	docker.BeforeStart = func() error {
+		return errdefs.ErrInvalidArgument.WithMessage("bind: address already in use: private Engine diagnostic")
+	}
 	docker.BeforeRemove = func() error {
 		if r.Raw == "" {
 			if err := captureReceipt(root, r); err != nil {
@@ -248,21 +251,12 @@ func TestRestartReconcilesCheckpointedInstall(t *testing.T) {
 			wantProblem:     "install_receipt_unverified",
 			wrongID:         true,
 		}, {
-			name:  "edited published template is preserved",
-			phase: "starting_container",
-			setup: func(root string, docker *communityappstest.InstallEngine, r *receiptCheckpoint) {
-				docker.NoStartEffect = true
-				docker.BeforeStart = func() error { return captureReceipt(root, r) }
-			},
+			name:          "edited published template is preserved",
+			phase:         "cleaning_up",
+			setup:         checkpointCleanupInstall,
+			wantProblem:   "port_conflict",
 			wantCleanup:   "remove_template",
 			editPublished: true,
-		}, {
-			name:  "start had no effect",
-			phase: "starting_container",
-			setup: func(root string, docker *communityappstest.InstallEngine, r *receiptCheckpoint) {
-				docker.NoStartEffect = true
-				docker.BeforeStart = func() error { return captureReceipt(root, r) }
-			},
 		}, {
 			name:            "container cleanup fails after restart",
 			phase:           "cleaning_up",
@@ -271,12 +265,6 @@ func TestRestartReconcilesCheckpointedInstall(t *testing.T) {
 			wantProblem:     "port_conflict",
 			wantCleanup:     "remove_container",
 			wantVerified:    true,
-		}, {
-			name:          "legacy cleanup intent without previous phase",
-			phase:         "cleaning_up",
-			setup:         checkpointCleanupInstall,
-			legacyReceipt: true,
-			wantProblem:   "port_conflict",
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -466,6 +454,15 @@ func TestRecoveryDoesNotInterruptActiveWorkerOrProbeDockerForEarlyPhase(t *testi
 }
 
 func TestRecoveryReservesUnresolvedNameAndRetries(t *testing.T) {
+	for _, legacy := range []bool{false, true} {
+		t.Run(fmt.Sprintf("legacy cleanup checkpoint %v", legacy), func(t *testing.T) {
+			checkUnresolvedNameRecovery(t, legacy)
+		})
+	}
+}
+
+func checkUnresolvedNameRecovery(t *testing.T, legacy bool) {
+	t.Helper()
 	root := communityappstest.CopyHeimdallHost(t)
 	var createOptions client.ContainerCreateOptions
 	issued := make(chan struct{})
@@ -494,6 +491,15 @@ func TestRecoveryReservesUnresolvedNameAndRetries(t *testing.T) {
 		t.Fatal("Docker create was never issued")
 	}
 	before.Close()
+	if legacy {
+		var saved receiptCheckpoint
+		if err := captureReceipt(root, &saved); err != nil {
+			t.Fatal(err)
+		}
+		saved.Raw = strings.Replace(saved.Raw, `"version":2`, `"version":1`, 1)
+		saved.Raw = strings.Replace(saved.Raw, `"phase":"creating_container"`, `"phase":"cleaning_up"`, 1)
+		saved.restore(t, root, "creating_container")
+	}
 
 	var available atomic.Bool
 	after := newRestartService(t, root, engine, func() (communityapps.InstallDocker, error) {
@@ -770,38 +776,52 @@ func checkpointUnverifiedStart(t *testing.T, engine *communityappstest.InstallEn
 	return root, claim
 }
 
-func TestRecoveryAcceptsLateStartBeforeOrDuringCleanup(t *testing.T) {
-	for _, becomeStartedOn := range []int{2, 3, 4} {
-		t.Run(fmt.Sprintf("inspect %d", becomeStartedOn), func(t *testing.T) {
-			engine := &communityappstest.InstallEngine{NoStartEffect: true}
-			root, claim := checkpointUnverifiedStart(t, engine)
-			var observations int
-			engine.BeforeContainerInspect = func(_ string, c *container.InspectResponse) error {
-				observations++
-				if observations >= becomeStartedOn && c != nil {
-					c.State.Status = "exited"
-					c.State.StartedAt = "2026-11-18T23:00:00Z"
-				}
-				return nil
-			}
-			engine.BeforeRemove = func() error { return errors.New("container started concurrently") }
-			after := newInstallService(t, root, engine)
-			after.StartRecovery(t.Context())
-			exact := waitForAttempt(t, after, claim.ID)
-			if exact.State != communityapps.AttemptSucceeded || exact.ContainerID != communityappstest.ContainerID ||
-				exact.Problem != nil || len(exact.CleanupFailures) != 0 {
-				t.Fatalf("late verified start was treated as failure: %+v", exact)
-			}
-			create, present, start, _, _ := engine.Observation()
-			if create != 1 || present != 1 || len(start) != 1 {
-				t.Fatal("recovery mutated a late-started install")
-			}
-			if calls := engine.RemoveRequests(); len(calls) > 1 || len(calls) == 1 && calls[0].Options.Force {
-				t.Fatalf("cleanup of a possibly starting container was unsafe: %+v", calls)
-			}
-			_ = readNativeInstall(t, root, "heimdall")
-		})
+func TestRecoveryKeepsPendingStartUntilDockerReportsFastExit(t *testing.T) {
+	engine := &communityappstest.InstallEngine{
+		NoStartEffect: true,
+		AfterStart:    func() error { return errors.New("lost Start response") },
 	}
+	root, claim := checkpointUnverifiedStart(t, engine)
+	thirdMiss := make(chan struct{})
+	var observations int
+	engine.BeforeContainerInspect = func(key string, c *container.InspectResponse) error {
+		if key == communityappstest.ContainerID && c != nil {
+			observations++
+			if observations == 3 {
+				close(thirdMiss)
+			}
+		}
+		return nil
+	}
+	after := newInstallService(t, root, engine)
+	after.StartRecovery(t.Context())
+	select {
+	case <-thirdMiss:
+	case <-time.After(8 * time.Second):
+		t.Fatal("recovery did not keep observing the lost Start")
+	}
+
+	pending, err := after.GetAttempt(claim.ID)
+	if err != nil || pending.State != communityapps.AttemptRunning || pending.Problem == nil ||
+		pending.Problem.Code != "container_start_unverified" || len(engine.RemoveRequests()) != 0 {
+		t.Fatalf("recovery attempted cleanup while Docker Start could still finish: %+v, %v", pending, err)
+	}
+
+	// A late start followed by an immediate exit can be removed without Force.
+	// Model the original request taking effect without issuing a new request.
+	engine.CompletePendingStart(t)
+	fresh := newInstallService(t, root, engine)
+	after.Close()
+	fresh.StartRecovery(t.Context())
+	exact := waitForAttempt(t, fresh, claim.ID)
+	if exact.State != communityapps.AttemptSucceeded || exact.ContainerID != communityappstest.ContainerID ||
+		exact.Problem != nil || len(engine.RemoveRequests()) != 0 {
+		t.Fatalf("late verified start was not preserved: %+v", exact)
+	}
+	if creates, present, starts, _, _ := engine.Observation(); creates != 1 || present != 1 || len(starts) != 1 {
+		t.Fatal("recovery replayed Docker commands or removed the completed install")
+	}
+	_ = readNativeInstall(t, root, "heimdall")
 }
 
 func TestRecoveryProtectsPendingStartWhenDaemonStops(t *testing.T) {
@@ -1045,7 +1065,11 @@ func TestRecoveryWaitsForReadableReceipt(t *testing.T) {
 }
 
 func TestRecoveryResumesIfDockerDisappearsAfterContainerRemoval(t *testing.T) {
-	engine := &communityappstest.InstallEngine{NoStartEffect: true}
+	engine := &communityappstest.InstallEngine{
+		BeforeStart: func() error {
+			return errdefs.ErrInvalidArgument.WithMessage("start fixture was rejected")
+		},
+	}
 	root, claim := checkpointUnverifiedStart(t, engine)
 	unavailable := make(chan struct{})
 	var resolved atomic.Bool

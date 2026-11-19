@@ -31,6 +31,7 @@ type installReceipt struct {
 	ImageID          string            `json:"image_id,omitempty"`
 	TemplateKeyHash  [sha256.Size]byte `json:"template_key_hash"`
 	CleanupPhase     string            `json:"cleanup_phase,omitempty"`
+	EngineRejected   bool              `json:"engine_rejected,omitempty"`
 	TemplateMAC      [sha256.Size]byte `json:"template_mac"`
 	Attempt          Attempt           `json:"attempt"`
 }

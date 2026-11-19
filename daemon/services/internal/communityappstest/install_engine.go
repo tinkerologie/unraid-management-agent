@@ -208,6 +208,18 @@ func (d *InstallEngine) ContainerStart(_ context.Context, id string, _ client.Co
 	return client.ContainerStartResult{}, nil
 }
 
+func (d *InstallEngine) CompletePendingStart(t testing.TB) {
+	t.Helper()
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	c, ok := d.created[ContainerID]
+	if !ok || len(d.started) != 1 {
+		t.Fatal("fixture has no pending container start to complete")
+	}
+	c.State.Status = "exited"
+	c.State.StartedAt = time.Unix(1, 0).UTC().Format(time.RFC3339Nano)
+}
+
 func (d *InstallEngine) ContainerRemove(_ context.Context, id string, opts client.ContainerRemoveOptions) (client.ContainerRemoveResult, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()

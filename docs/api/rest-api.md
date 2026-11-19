@@ -1801,15 +1801,18 @@ The daemon reconciles interrupted attempts in the background. Poll or resend the
 confirmation to retrieve the same attempt ID after a restart. While verification is pending, the
 attempt may report `install_recovery_pending`. Check that Docker and the Unraid flash are
 available. If Docker lost the create response and has no conclusive result, the attempt
-reports `container_create_unverified`. Check Docker Manager and keep polling the same attempt.
-The name stays reserved while that attempt remains pending. Status requests only read the receipt.
+reports `container_create_unverified`. If Docker has an approved container but cannot confirm its start
+or a definitive rejection, the attempt reports `container_start_unverified`. Check Docker Manager
+and keep polling the same attempt. Its name stays reserved while the result is ambiguous.
+Status requests only read the receipt.
 
 The daemon records start intent after saving the native template. On restart, a start for the
 exact owned Docker ID and approved image can recover success, including after a native template
 edit or if the container has since exited. If the native template is missing, the attempt reports
 `started_template_missing` and includes the preserved container ID. Check Docker Manager and
-restore the template if needed. When the daemon can establish a partial install, it cleans up
-only the container and template files whose ownership it can verify. It preserves appdata,
+restore the template if needed. If the exact container was removed or replaced before completion
+could be confirmed, recovery preserves the native template. When the daemon can establish a partial
+install, it cleans up only the container and template files whose ownership it can verify. It preserves appdata,
 volumes, images, unrelated containers, and replaced templates. Completed receipts remain available
 after later container or template changes.
 

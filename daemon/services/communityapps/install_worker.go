@@ -152,7 +152,7 @@ func (s *Service) executeInstall(ctx context.Context, docker InstallDocker, rece
 	}
 	created, err := docker.ContainerCreate(ctx, containerOptions(plan.effective, receipt.Owner))
 	if err != nil {
-		return engineInstallError(err, ErrContainerCreate)
+		return s.recordEngineInstallError(receipt, err, ErrContainerCreate)
 	}
 	if !fullID.MatchString(created.ID) {
 		return ErrContainerCreate
@@ -183,7 +183,7 @@ func (s *Service) executeInstall(ctx context.Context, docker InstallDocker, rece
 		return err
 	}
 	if _, err := docker.ContainerStart(ctx, receipt.OwnedContainerID, client.ContainerStartOptions{}); err != nil {
-		return engineInstallError(err, ErrContainerStart)
+		return s.recordEngineInstallError(receipt, err, ErrContainerStart)
 	}
 	return nil
 }
@@ -286,6 +286,19 @@ func containerOptions(settings installSettings, owner string) client.ContainerCr
 	}
 }
 
+func (s *Service) recordEngineInstallError(receipt *installReceipt, err error, fallback *Problem) error {
+	problem := engineInstallError(err, fallback)
+	// A typed Engine rejection establishes that the operation did not
+	// proceed. Transport errors and generic server failures are ambiguous.
+	if errdefs.IsInvalidArgument(err) || errdefs.IsUnauthorized(err) || errdefs.IsPermissionDenied(err) ||
+		errdefs.IsNotFound(err) || fallback == ErrContainerCreate && problem == ErrNameConflict {
+		receipt.EngineRejected = true
+		receipt.Attempt.Problem = ProblemForError(problem)
+		_ = s.persistProgress(*receipt)
+	}
+	return problem
+}
+
 func engineInstallError(err error, fallback *Problem) error {
 	// Only fixed, allowlisted diagnostics cross the boundary. Docker errors
 	// and warnings can echo container configuration, including secrets.
@@ -372,6 +385,7 @@ type startObservation uint8
 
 const (
 	startUnobserved startObservation = iota
+	startContainerMissing
 	startVerified
 	startTemplateMissing
 )
@@ -381,11 +395,11 @@ func (s *Service) observeInstallStart(ctx context.Context, docker InstallDocker,
 		return startUnobserved, nil
 	}
 	c, owned, err := ownedContainer(ctx, docker, receipt)
-	if err == errContainerIdentity {
-		return startUnobserved, nil
-	}
-	if err != nil || !owned {
+	if err != nil {
 		return startUnobserved, err
+	}
+	if !owned {
+		return startContainerMissing, nil
 	}
 	return s.observeStartedContainer(c, receipt)
 }
@@ -445,7 +459,7 @@ func (s *Service) cleanupInstall(ctx context.Context, docker InstallDocker, rece
 	if observedStart != startUnobserved {
 		return true, observedStart
 	}
-	provenTemplate := receipt.CleanupPhase != "creating_container" && hasTemplateProof(*receipt)
+	provenTemplate := mutationPhase(*receipt) != "creating_container" && hasTemplateProof(*receipt)
 	var preserveFinal bool
 	if provenTemplate {
 		// The native template may now be in use by a replacement. A lookup
@@ -511,13 +525,20 @@ func (s *Service) removeOwnedContainer(ctx context.Context, docker InstallDocker
 		}
 		*receipt = next
 	}
-	if receipt.CleanupPhase == "starting_container" {
+	startIntent := mutationPhase(*receipt) == "starting_container"
+	if startIntent {
 		if observed, err := s.observeStartedContainer(c, *receipt); observed != startUnobserved || err != nil {
 			return CleanupIssue{}, observed, err != nil
 		}
+		if !receipt.EngineRejected {
+			return CleanupIssue{}, startUnobserved, true
+		}
+		if hasStarted(c) {
+			issue.Code = errContainerIdentity.Code
+			issue.OwnershipVerified = false
+			return issue, startUnobserved, false
+		}
 	}
-	// Refuse a force-removal when Docker has no evidence of a start.
-	// A concurrently running Start can then fail removal safely.
 	_, err = docker.ContainerRemove(ctx, c.ID, client.ContainerRemoveOptions{Force: hasStarted(c)})
 	if err == nil || errdefs.IsNotFound(err) {
 		return CleanupIssue{}, startUnobserved, false
@@ -526,7 +547,7 @@ func (s *Service) removeOwnedContainer(ctx context.Context, docker InstallDocker
 	if inspectErr == nil && !stillOwned {
 		return CleanupIssue{}, startUnobserved, false
 	}
-	if receipt.CleanupPhase == "starting_container" && stillOwned {
+	if startIntent && stillOwned {
 		if observed, err := s.observeStartedContainer(after, *receipt); observed != startUnobserved || err != nil {
 			return CleanupIssue{}, observed, err != nil
 		}

@@ -8,6 +8,7 @@ import (
 
 var (
 	ErrCreateUnverified    = &Problem{Code: "container_create_unverified", Message: "Docker has not confirmed whether it created this container. Check Docker Manager and keep polling this attempt. Its name stays reserved until the outcome can be verified."}
+	ErrStartUnverified     = &Problem{Code: "container_start_unverified", Message: "Docker has not confirmed whether the installed container started. Check Docker Manager and keep polling this attempt. Its name stays reserved while the outcome is unresolved."}
 	ErrInstallInterrupted  = &Problem{Code: "install_interrupted", Message: "The install was interrupted. Prepare and approve a new plan after reviewing any remaining resources."}
 	ErrInstallRecovery     = &Problem{Code: "install_recovery_pending", Message: "An install for this name is still in progress or awaiting verification. Check that Docker and the Unraid flash are available, then poll the original attempt."}
 	ErrInstallReceiptProof = &Problem{Code: "install_receipt_unverified", Message: "The interrupted attempt lacks valid ownership evidence. Check Docker and the Unraid user templates for this install before preparing a new plan."}
@@ -101,6 +102,8 @@ func (s *Service) attemptStatusLocked(receipt installReceipt) Attempt {
 	if s.active[receipt.PlanID] == nil && !isTerminal(result.State) {
 		if uncertainCreate(receipt) {
 			result.Problem = ProblemForError(ErrCreateUnverified)
+		} else if uncertainStart(receipt) && !isTerminal(s.pendingCommit[receipt.PlanID].Attempt.State) {
+			result.Problem = ProblemForError(ErrStartUnverified)
 		} else if s.recoveryWake != nil && result.Problem == nil {
 			result.Problem = ProblemForError(ErrInstallRecovery)
 		}
@@ -138,36 +141,33 @@ func (s *Service) reconcileInstall(ctx context.Context, receipt installReceipt) 
 	if receipt.Attempt.Problem != nil {
 		cause = receipt.Attempt.Problem
 	}
-	if receipt.Attempt.Phase == "cleaning_up" {
-		// Version 1 did not save the phase that triggered cleanup.
-		// Continue to protect a late verified start when it has complete proof.
-		if receipt.CleanupPhase == "" && receipt.OwnedContainerID != "" && hasTemplateProof(receipt) {
-			receipt.CleanupPhase = "starting_container"
-		}
-	}
 	return s.settleInstall(ctx, docker, &receipt, cause)
 }
 
 func (s *Service) settleInstall(ctx context.Context, docker InstallDocker, receipt *installReceipt, cause error) bool {
 	phase := receipt.Attempt.Phase
-	if phase == "starting_container" {
+	if mutationPhase(*receipt) == "starting_container" {
 		observed, err := s.observeInstallStart(ctx, docker, *receipt)
+		if err == errContainerIdentity {
+			return s.finishInstall(receipt, err)
+		}
 		if err != nil {
 			return false
 		}
-		if observed == startUnobserved {
-			// A lost acknowledgement may leave the Engine call in flight.
-			// Give it another observation before making a cleanup decision.
-			if !waitForEngineObservation(ctx) {
-				return false
-			}
-			observed, err = s.observeInstallStart(ctx, docker, *receipt)
-			if err != nil {
-				return false
+		switch observed {
+		case startVerified, startTemplateMissing:
+			return s.finishObservedStart(receipt, observed)
+		case startContainerMissing:
+			if !receipt.EngineRejected {
+				// The native template was published before start intent. It
+				// may be retained from an ordinary removal or replacement.
+				return s.finishInstall(receipt, ErrInstallInterrupted)
 			}
 		}
-		if observed != startUnobserved {
-			return s.finishObservedStart(receipt, observed)
+		// A short-lived app can start and exit after Inspect reports a
+		// zero start time. Even non-force removal would then delete it.
+		if !receipt.EngineRejected {
+			return false
 		}
 		if cause == nil {
 			cause = ErrContainerStart
@@ -205,20 +205,27 @@ func (s *Service) settleInstall(ctx context.Context, docker InstallDocker, recei
 }
 
 func uncertainCreate(receipt installReceipt) bool {
-	return receipt.OwnedContainerID == "" &&
-		(receipt.Attempt.Phase == "creating_container" || receipt.CleanupPhase == "creating_container") &&
-		(receipt.Attempt.Problem == nil || receipt.Attempt.Problem.Code != ErrNameConflict.Code)
+	return receipt.OwnedContainerID == "" && mutationPhase(receipt) == "creating_container" &&
+		!receipt.EngineRejected && (receipt.Attempt.Problem == nil || receipt.Attempt.Problem.Code != ErrNameConflict.Code)
 }
 
-func waitForEngineObservation(ctx context.Context) bool {
-	timer := time.NewTimer(250 * time.Millisecond)
-	defer timer.Stop()
-	select {
-	case <-ctx.Done():
-		return false
-	case <-timer.C:
-		return true
+func uncertainStart(receipt installReceipt) bool {
+	return mutationPhase(receipt) == "starting_container" && !receipt.EngineRejected
+}
+
+func mutationPhase(receipt installReceipt) string {
+	if receipt.Attempt.Phase != "cleaning_up" {
+		return receipt.Attempt.Phase
 	}
+	if receipt.CleanupPhase != "" || receipt.Version != 1 {
+		return receipt.CleanupPhase
+	}
+	// Version 1 cleanup did not persist the preceding phase. Treat a
+	// possible start or unacknowledged create as unresolved.
+	if receipt.OwnedContainerID != "" && hasTemplateProof(receipt) {
+		return "starting_container"
+	}
+	return "creating_container"
 }
 
 func validRecoveryReceipt(r installReceipt) bool {

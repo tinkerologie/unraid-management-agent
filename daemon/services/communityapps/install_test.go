@@ -353,6 +353,15 @@ func TestInstallFailurePreservesAppdataAndOnlyCleansOwnedResources(t *testing.T)
 			wantProblem: "name_conflict",
 		},
 		{
+			name: "Docker rejected create before allocating a container",
+			configure: func(_ *testing.T, _ string, d *communityappstest.InstallEngine) {
+				d.BeforeCreate = func(client.ContainerCreateOptions) error {
+					return errdefs.ErrInvalidArgument.WithMessage("invalid Docker options: " + private)
+				}
+			},
+			wantProblem: "container_create_failed",
+		},
+		{
 			name: "Docker create returned failure after persisting container",
 			configure: func(_ *testing.T, _ string, d *communityappstest.InstallEngine) {
 				d.AfterCreate = func() error { return failure }
@@ -479,16 +488,11 @@ func TestInstallFailurePreservesAppdataAndOnlyCleansOwnedResources(t *testing.T)
 		{
 			name: "Docker port allocation races with start",
 			configure: func(_ *testing.T, _ string, d *communityappstest.InstallEngine) {
-				d.BeforeStart = func() error { return errors.New("bind: address already in use: " + private) }
+				d.BeforeStart = func() error {
+					return errdefs.ErrInvalidArgument.WithMessage("bind: address already in use: " + private)
+				}
 			},
 			wantProblem: "port_conflict", wantCreate: 1, wantStart: 1,
-		},
-		{
-			name: "Docker start returned success without starting",
-			configure: func(_ *testing.T, _ string, d *communityappstest.InstallEngine) {
-				d.NoStartEffect = true
-			},
-			wantProblem: "container_start_failed", wantCreate: 1, wantStart: 1,
 		},
 		{
 			name: "Docker start failed and native XML was replaced",
@@ -497,7 +501,7 @@ func TestInstallFailurePreservesAppdataAndOnlyCleansOwnedResources(t *testing.T)
 					if err := os.WriteFile(pathForTemplate(root), []byte("<Container><Name>edited</Name></Container>"), 0o600); err != nil {
 						return err
 					}
-					return failure
+					return errdefs.ErrInvalidArgument.WithMessage(failure.Error())
 				}
 			},
 			wantProblem: "container_start_failed", wantCreate: 1, wantStart: 1, wantSentinel: true,
@@ -512,7 +516,7 @@ func TestInstallFailurePreservesAppdataAndOnlyCleansOwnedResources(t *testing.T)
 							return err
 						}
 					}
-					return failure
+					return errdefs.ErrInvalidArgument.WithMessage(failure.Error())
 				}
 			},
 			wantProblem: "container_start_failed", wantCreate: 1, wantStart: 1, wantSentinel: true, wantCleanup: []string{"remove_template"},
@@ -520,7 +524,7 @@ func TestInstallFailurePreservesAppdataAndOnlyCleansOwnedResources(t *testing.T)
 		{
 			name: "Docker removal returned an error after removing the container",
 			configure: func(_ *testing.T, _ string, d *communityappstest.InstallEngine) {
-				d.BeforeStart = func() error { return failure }
+				d.BeforeStart = func() error { return errdefs.ErrInvalidArgument.WithMessage(failure.Error()) }
 				d.AfterRemove = func() error { return failure }
 			},
 			wantProblem: "container_start_failed", wantCreate: 1, wantStart: 1,
@@ -528,7 +532,7 @@ func TestInstallFailurePreservesAppdataAndOnlyCleansOwnedResources(t *testing.T)
 		{
 			name: "Docker start and cleanup both failed",
 			configure: func(_ *testing.T, _ string, d *communityappstest.InstallEngine) {
-				d.BeforeStart = func() error { return failure }
+				d.BeforeStart = func() error { return errdefs.ErrInvalidArgument.WithMessage(failure.Error()) }
 				d.BeforeRemove = func() error { return failure }
 			},
 			wantProblem: "container_start_failed", wantCreate: 1, wantStart: 1, wantRemaining: 1, wantCleanup: []string{"remove_container"},
@@ -992,7 +996,7 @@ func TestInstallCleanupVerifiesQuarantinedTemplate(t *testing.T) {
 					if err := os.WriteFile(writer, []byte("unrelated native record sentinel"), 0o600); err != nil {
 						return err
 					}
-					return errors.New("Docker did not start")
+					return errdefs.ErrInvalidArgument.WithMessage("Docker rejected the start")
 				},
 			}
 			service := newInstallService(t, root, docker)
