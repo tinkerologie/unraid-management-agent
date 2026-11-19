@@ -14,6 +14,10 @@ import (
 const (
 	attemptDirectory      = "boot/config/plugins/unraid-management-agent/community-app-attempts"
 	installReceiptVersion = 2
+	maxInstallReceipt     = 256 << 10
+	// Leave space for the fixed-size ownership, failure and cleanup data
+	// written after acceptance.
+	maxReceiptProgress = 4 << 10
 )
 
 var errReceiptSync = errors.New("receipt rename was not synced")
@@ -56,7 +60,7 @@ func (s *Service) loadReceipts() error {
 			continue
 		}
 		var receipt installReceipt
-		err := readInstallFile(filepath.Join(dir, entry.Name()), 256<<10, func(reader io.Reader) error {
+		err := readInstallFile(filepath.Join(dir, entry.Name()), maxInstallReceipt, func(reader io.Reader) error {
 			decoder := json.NewDecoder(reader)
 			if err := decoder.Decode(&receipt); err != nil {
 				return err
@@ -87,6 +91,9 @@ func (s *Service) saveReceipt(receipt installReceipt, exclusive bool) error {
 	dir := filepath.Join(s.hostRoot, attemptDirectory)
 	err := s.writeReceipt(dir, receipt, exclusive)
 	if err != nil {
+		if err == ErrInstallPlanTooLarge {
+			return err
+		}
 		if errors.Is(err, errReceiptSync) {
 			s.receiptSyncNeeded = true
 		}
@@ -99,6 +106,16 @@ func (s *Service) saveReceipt(receipt installReceipt, exclusive bool) error {
 }
 
 func (s *Service) writeReceipt(dir string, receipt installReceipt, exclusive bool) error {
+	data, err := json.Marshal(receipt)
+	if err != nil {
+		return err
+	}
+	if exclusive && len(data) > maxInstallReceipt-maxReceiptProgress {
+		return ErrInstallPlanTooLarge
+	}
+	if len(data) > maxInstallReceipt {
+		return ErrAttemptStorage
+	}
 	if err := ensureInstallDirectory(s.hostRoot, attemptDirectory, 0o700); err != nil {
 		return err
 	}
@@ -107,7 +124,7 @@ func (s *Service) writeReceipt(dir string, receipt installReceipt, exclusive boo
 		return err
 	}
 	defer func() { _ = os.Remove(file.Name()) }()
-	err = json.NewEncoder(file).Encode(receipt)
+	_, err = file.Write(data)
 	if err == nil {
 		err = file.Sync()
 	}
@@ -132,8 +149,8 @@ func (s *Service) writeReceipt(dir string, receipt installReceipt, exclusive boo
 	return nil
 }
 
-// ensureInstallDirectory syncs newly-created directory entries in their
-// parents. This also refuses symlink components in native flash paths.
+// ensureInstallDirectory syncs each parent before relying on its child.
+// A retry must sync entries left by a prior mkdir with a failed sync.
 func ensureInstallDirectory(root, relative string, perm fs.FileMode) error {
 	parent := root
 	for component := range strings.SplitSeq(relative, string(filepath.Separator)) {
@@ -144,13 +161,13 @@ func ensureInstallDirectory(root, relative string, perm fs.FileMode) error {
 			if err := os.Mkdir(child, perm); err != nil {
 				return err
 			}
-			if err := syncDirectory(parent); err != nil {
-				return err
-			}
 		case err != nil:
 			return err
 		case !info.IsDir():
 			return ErrStorageState
+		}
+		if err := syncDirectory(parent); err != nil {
+			return err
 		}
 		parent = child
 	}

@@ -1758,6 +1758,9 @@ leaves Docker containers, native templates, and appdata unchanged.
 
 The appdata conflict check includes writable overlaps with a parent path in an existing
 container or retained template. It also checks user-share aliases for array and pool paths.
+Installation uses the local Docker Unix socket. Planned directories are created as Unraid's
+`nobody:users` (UID 99, GID 100). If that account cannot create the directory, create it
+through your normal storage workflow and prepare a fresh plan.
 
 ### POST /community-applications/install-plans/{id}/confirm
 
@@ -1779,6 +1782,7 @@ approve a fresh plan to try another installation.
 | HTTP status | Code                          | Action                                                           |
 | ----------- | ----------------------------- | ---------------------------------------------------------------- |
 | 400         | `invalid_plan_approval`       | Supply the exact token from the reviewed preview.                |
+| 400         | `install_plan_too_large`      | Install through Unraid Docker Manager.                           |
 | 409         | `plan_changed`                | Prepare and review a new preview.                                |
 | 409         | `install_recovery_pending`    | Poll the existing attempt for that installation name.            |
 | 410         | `plan_expired`                | Prepare and review a new preview.                                |
@@ -1796,15 +1800,18 @@ was saved. Check readiness in the application separately.
 The daemon reconciles interrupted attempts in the background. Poll or resend the original
 confirmation to retrieve the same attempt ID after a restart. While verification is pending, the
 attempt may report `install_recovery_pending`. Check that Docker and the Unraid flash are
-available. A new confirmation for the same installation name waits for the interrupted attempt
-to settle. Status requests only read the receipt.
+available. If Docker lost the create response and has no conclusive result, the attempt
+reports `container_create_unverified`. Check Docker Manager and keep polling the same attempt.
+The name stays reserved while that attempt remains pending. Status requests only read the receipt.
 
-The daemon can recover success when Docker reports a start for the exact owned container with
-the approved image and the complete saved template still matches. A container that started and
-exited qualifies. If the daemon can establish that the install is partial, it cleans up the
-container and any template files whose ownership it can verify. It preserves appdata, volumes,
-images, unrelated containers, and replaced templates. Completed receipts remain available even if
-the container or template later changes.
+The daemon records start intent after saving the native template. On restart, a start for the
+exact owned Docker ID and approved image can recover success, including after a native template
+edit or if the container has since exited. If the native template is missing, the attempt reports
+`started_template_missing` and includes the preserved container ID. Check Docker Manager and
+restore the template if needed. When the daemon can establish a partial install, it cleans up
+only the container and template files whose ownership it can verify. It preserves appdata,
+volumes, images, unrelated containers, and replaced templates. Completed receipts remain available
+after later container or template changes.
 
 A failed attempt returns a `problem` with a stable code. For `install_interrupted`, review any
 remaining resources, then prepare and approve a fresh plan. For `install_receipt_unverified`,

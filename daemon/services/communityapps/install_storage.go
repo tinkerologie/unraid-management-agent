@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/moby/moby/client"
+	"golang.org/x/sys/unix"
 )
 
 func (s *Service) prepareInstallStorage(settings installSettings) ([]mountIdentity, error) {
@@ -53,42 +54,37 @@ func (s *Service) prepareInstallStorage(settings installSettings) ([]mountIdenti
 func (s *Service) createAppdata(root *os.Root, identity mountIdentity, source string, created map[string]bool) error {
 	// Open the approved existing ancestor separately so a symlink introduced
 	// during creation cannot redirect Mkdir outside that directory.
-	dir, err := root.OpenRoot(strings.TrimPrefix(identity.anchor, "/"))
+	dir, err := root.OpenFile(strings.TrimPrefix(identity.anchor, "/"), unix.O_DIRECTORY|unix.O_NOFOLLOW, 0)
 	if err != nil {
 		return ErrPlanChanged
 	}
 	defer func() { _ = dir.Close() }()
-	anchor, err := dir.Stat(".")
-	if err != nil || !hasMountIdentity(anchor, identity) {
+	anchor, err := dir.Stat()
+	if err != nil || !anchor.IsDir() || !hasMountIdentity(anchor, identity) {
 		return ErrPlanChanged
 	}
 	relative := strings.TrimPrefix(strings.TrimPrefix(source, identity.anchor), "/")
-	prefix := ""
+	absolute := identity.anchor
 	for component := range strings.SplitSeq(relative, "/") {
-		prefix = path.Join(prefix, component)
-		absolute := path.Join(identity.anchor, prefix)
-		if created[absolute] {
-			continue
-		}
-		if err := dir.Mkdir(prefix, 0o777); err != nil { // #nosec G301 -- Matches Docker Manager's appdata creation and obeys the daemon umask.
-			if errors.Is(err, fs.ErrExist) {
-				return ErrPlanChanged
+		absolute = path.Join(absolute, component)
+		if !created[absolute] {
+			if err := mkdirInstallDirectory(dir, component, s.hostRoot == "/"); err != nil {
+				if errors.Is(err, fs.ErrExist) {
+					return ErrPlanChanged
+				}
+				return ErrStorageState
 			}
-			return ErrStorageState
+			created[absolute] = true
 		}
-		created[absolute] = true
-	}
-	// Real Unraid runs as root and Docker Manager assigns the newly created
-	// leaf to nobody:users. Fixture roots use the test runner's ownership.
-	if s.hostRoot == "/" {
-		leaf, err := dir.Open(relative)
+		// A component may be renamed after Mkdir. A no-follow open
+		// anchors all subsequent mkdir calls at a directory descriptor.
+		fd, err := unix.Openat(int(dir.Fd()), component, unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
 		if err != nil {
-			return ErrStorageState
+			return ErrPlanChanged
 		}
-		defer func() { _ = leaf.Close() }()
-		if err := leaf.Chown(99, 100); err != nil {
-			return ErrStorageState
-		}
+		child := os.NewFile(uintptr(fd), component)
+		_ = dir.Close()
+		dir = child
 	}
 	return nil
 }

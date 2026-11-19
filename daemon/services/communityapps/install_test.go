@@ -23,6 +23,7 @@ import (
 	"github.com/moby/moby/client"
 	digest "github.com/opencontainers/go-digest"
 
+	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/communityapps"
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/internal/communityappstest"
 )
@@ -369,12 +370,12 @@ func TestInstallFailurePreservesAppdataAndOnlyCleansOwnedResources(t *testing.T)
 			name: "replacement container copying owner label survives lost create response",
 			configure: func(_ *testing.T, _ string, d *communityappstest.InstallEngine) {
 				d.BeforeCreate = func(opts client.ContainerCreateOptions) error {
-					opts.Config.Labels["io.tinkerologie.uma.update-attempt"] = "fixture replacement"
+					opts.Config.Labels[constants.DockerUpdateAttemptLabel] = "fixture replacement"
 					return nil
 				}
 				d.AfterCreate = func() error { return failure }
 			},
-			wantProblem: "container_create_failed", wantCreate: 1, wantRemaining: 1,
+			wantProblem: "container_create_failed", wantCreate: 1, wantRemaining: 1, wantCleanup: []string{"container_identity_unverified"},
 		},
 		{
 			name: "native template staging directory is unavailable",

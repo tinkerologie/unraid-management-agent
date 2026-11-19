@@ -230,7 +230,7 @@ func TestCommunityAppRESTReportsRecoveredAttempt(t *testing.T) {
 			server := NewServer(&domain.Context{Config: domain.Config{WebSocketDisabled: true}})
 			t.Cleanup(server.Stop)
 			server.SetCommunityAppsService(service)
-			service.StartRecovery()
+			service.StartRecovery(t.Context())
 
 			for deadline := time.Now().Add(5 * time.Second); ; {
 				req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/community-applications/install-attempts/"+claim.ID, nil)

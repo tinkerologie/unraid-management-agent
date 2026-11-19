@@ -81,7 +81,7 @@ func (o *Orchestrator) Run() error {
 	// Pass the collector manager for runtime control
 	apiServer := api.NewServerWithCollectorManager(o.ctx, o.collectorManager)
 	communityCatalog := communityapps.NewHostCatalog()
-	communityInstall := communityapps.NewService(communityCatalog, communityapps.ServiceOptions{Lifecycle: ctx})
+	communityInstall := communityapps.NewHostService(communityCatalog)
 	defer communityInstall.Close()
 	apiServer.SetCommunityAppsCatalog(communityCatalog)
 	apiServer.SetCommunityAppsService(communityInstall)
@@ -244,7 +244,7 @@ func (o *Orchestrator) Run() error {
 	}
 
 	// Reconcile prior CA installs in the background before accepting new confirmations.
-	communityInstall.StartRecovery()
+	communityInstall.StartRecovery(ctx)
 
 	// Start HTTP server
 	wg.Go(func() {

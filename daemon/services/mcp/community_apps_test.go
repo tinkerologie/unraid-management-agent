@@ -269,7 +269,7 @@ func TestCommunityAppMCPReportsRecoveredAttempt(t *testing.T) {
 			service, claim := recovery.InterruptedStart(t, environment, started)
 			server, _ := mountMCPTestServerWithCommunityApps(t, domain.Config{}, nil, service)
 			session := connectMCPHTTP(t, server, "/mcp-stateless", "", "2026-07-28")
-			service.StartRecovery()
+			service.StartRecovery(t.Context())
 
 			for deadline := time.Now().Add(5 * time.Second); ; {
 				result, reply := callToolJSON(t, session, "get_community_app_install_attempt", map[string]any{"attempt_id": claim.ID})

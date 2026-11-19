@@ -15,6 +15,7 @@ import (
 	"github.com/moby/moby/api/types/mount"
 	"github.com/moby/moby/client"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
 )
 
 const ContainerID = "2a0686c9ded09699be089748236184e2b5563269a1759710edf66f8b302d2982" // pragma: allowlist secret (synthetic Docker identifier)
@@ -245,7 +246,7 @@ func (d *InstallEngine) ReplaceForUpdate(t testing.TB, replacementID string) {
 	}
 	delete(d.created, ContainerID)
 	c.ID = replacementID
-	c.Config.Labels["io.tinkerologie.uma.update-attempt"] = "fixture updater marker"
+	c.Config.Labels[constants.DockerUpdateAttemptLabel] = "fixture updater marker"
 	d.created[replacementID] = c
 }
 

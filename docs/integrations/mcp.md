@@ -275,7 +275,10 @@ and any MCP session can call the read-only status tool under the normal read pol
 lost, resend the exact confirmation to recover the original attempt ID. Prepare and approve a
 fresh plan after a failed installation. After a daemon restart, poll the same attempt ID. If the
 attempt is awaiting verification, check that Docker and the Unraid flash are available.
-A failed attempt can include a Docker ID or template basename in `cleanup_details` for
+For `container_create_unverified`, check Docker Manager and keep polling while the attempt's
+name is reserved. For `started_template_missing`, use the returned container ID to find the
+preserved container and restore the native template if needed. A failed attempt can include a
+Docker ID or template basename in `cleanup_details` for
 operator review. Success means Docker started the approved container and the agent saved its
 native Unraid user template. Verify application readiness separately.
 

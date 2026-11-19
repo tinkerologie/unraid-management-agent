@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Resolve the current Docker container ID by name after native replacement and show the saved Community Applications catalog link in Docker details (#366).
 
 - Recover interrupted Community Applications installs after a daemon restart and return the same attempt through REST and MCP (#365).
+  Recovery keeps uncertain creates available for polling and preserves started containers after native template edits.
   Cleanup preserves appdata and identifies any resources that need operator review.
 
 - Confirm an approved Community Applications install through REST or Streamable HTTP MCP and follow its durable attempt (#364).

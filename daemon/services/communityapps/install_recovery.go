@@ -7,6 +7,7 @@ import (
 )
 
 var (
+	ErrCreateUnverified    = &Problem{Code: "container_create_unverified", Message: "Docker has not confirmed whether it created this container. Check Docker Manager and keep polling this attempt. Its name stays reserved until the outcome can be verified."}
 	ErrInstallInterrupted  = &Problem{Code: "install_interrupted", Message: "The install was interrupted. Prepare and approve a new plan after reviewing any remaining resources."}
 	ErrInstallRecovery     = &Problem{Code: "install_recovery_pending", Message: "An install for this name is still in progress or awaiting verification. Check that Docker and the Unraid flash are available, then poll the original attempt."}
 	ErrInstallReceiptProof = &Problem{Code: "install_receipt_unverified", Message: "The interrupted attempt lacks valid ownership evidence. Check Docker and the Unraid user templates for this install before preparing a new plan."}
@@ -14,14 +15,17 @@ var (
 
 // StartRecovery starts the daemon-owned recovery worker. Readers and
 // standalone service instances can access receipts without applying recovery.
-func (s *Service) StartRecovery() {
+func (s *Service) StartRecovery(ctx context.Context) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.recoveryWake != nil || s.lifecycle.Err() != nil {
+	if s.recoveryWake != nil || s.closed || ctx.Err() != nil {
 		return
 	}
+	recoveryCtx, cancel := context.WithCancel(ctx)
+	s.recoveryStop = cancel
+	context.AfterFunc(recoveryCtx, s.stopWork)
 	s.recoveryWake = make(chan struct{}, 1)
-	s.workers.Go(s.recoverInstalls)
+	s.workers.Go(func() { s.recoverInstalls(recoveryCtx) })
 }
 
 func (s *Service) wakeRecoveryLocked() {
@@ -31,13 +35,13 @@ func (s *Service) wakeRecoveryLocked() {
 	}
 }
 
-func (s *Service) recoverInstalls() {
+func (s *Service) recoverInstalls(ctx context.Context) {
 	delay := time.Second
-	for s.lifecycle.Err() == nil {
+	for ctx.Err() == nil {
 		pending, err := s.interruptedInstalls()
 		retry := err != nil
 		for _, receipt := range pending {
-			if !s.reconcileInstall(receipt) {
+			if !s.reconcileInstall(ctx, receipt) {
 				retry = true
 			}
 		}
@@ -48,7 +52,7 @@ func (s *Service) recoverInstalls() {
 			next = timer.C
 		}
 		select {
-		case <-s.lifecycle.Done():
+		case <-ctx.Done():
 		case <-s.recoveryWake:
 			delay = time.Second
 		case <-next:
@@ -68,7 +72,7 @@ func (s *Service) interruptedInstalls() ([]installReceipt, error) {
 	}
 	var pending []installReceipt
 	for id, receipt := range s.receipts {
-		if isTerminal(receipt.Attempt.State) || s.active[id] {
+		if isTerminal(receipt.Attempt.State) || s.active[id] != nil {
 			continue
 		}
 		if result, ready := s.pendingCommit[id]; ready {
@@ -94,19 +98,23 @@ func (s *Service) installNameReserved(name string) bool {
 
 func (s *Service) attemptStatusLocked(receipt installReceipt) Attempt {
 	result := cloneAttempt(receipt.Attempt)
-	if s.recoveryWake != nil && !s.active[receipt.PlanID] && !isTerminal(result.State) && result.Problem == nil {
-		result.Problem = ProblemForError(ErrInstallRecovery)
+	if s.active[receipt.PlanID] == nil && !isTerminal(result.State) {
+		if uncertainCreate(receipt) {
+			result.Problem = ProblemForError(ErrCreateUnverified)
+		} else if s.recoveryWake != nil && result.Problem == nil {
+			result.Problem = ProblemForError(ErrInstallRecovery)
+		}
 	}
 	return result
 }
 
 // reconcileInstall never replays Create or Start. Its return value indicates
 // whether the attempt is settled and has no work left to retry.
-func (s *Service) reconcileInstall(receipt installReceipt) bool {
+func (s *Service) reconcileInstall(ctx context.Context, receipt installReceipt) bool {
 	s.applyMu.Lock()
 	defer s.applyMu.Unlock()
 
-	ctx, cancel := context.WithTimeout(s.lifecycle, 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	if ctx.Err() != nil {
 		return false
@@ -127,10 +135,10 @@ func (s *Service) reconcileInstall(receipt installReceipt) bool {
 	defer func() { _ = docker.Close() }()
 
 	var cause error = ErrInstallInterrupted
+	if receipt.Attempt.Problem != nil {
+		cause = receipt.Attempt.Problem
+	}
 	if receipt.Attempt.Phase == "cleaning_up" {
-		if receipt.Attempt.Problem != nil {
-			cause = receipt.Attempt.Problem
-		}
 		// Version 1 did not save the phase that triggered cleanup.
 		// Continue to protect a late verified start when it has complete proof.
 		if receipt.CleanupPhase == "" && receipt.OwnedContainerID != "" && hasTemplateProof(receipt) {
@@ -143,45 +151,63 @@ func (s *Service) reconcileInstall(receipt installReceipt) bool {
 func (s *Service) settleInstall(ctx context.Context, docker InstallDocker, receipt *installReceipt, cause error) bool {
 	phase := receipt.Attempt.Phase
 	if phase == "starting_container" {
-		complete, err := s.completedInstall(ctx, docker, *receipt)
+		observed, err := s.observeInstallStart(ctx, docker, *receipt)
 		if err != nil {
 			return false
 		}
-		if !complete {
+		if observed == startUnobserved {
 			// A lost acknowledgement may leave the Engine call in flight.
 			// Give it another observation before making a cleanup decision.
 			if !waitForEngineObservation(ctx) {
 				return false
 			}
-			complete, err = s.completedInstall(ctx, docker, *receipt)
+			observed, err = s.observeInstallStart(ctx, docker, *receipt)
 			if err != nil {
 				return false
 			}
 		}
-		if complete {
-			return s.finishInstall(receipt, nil)
+		if observed != startUnobserved {
+			return s.finishObservedStart(receipt, observed)
 		}
 		if cause == nil {
 			cause = ErrContainerStart
 		}
 	}
-	if phase == "creating_container" && receipt.OwnedContainerID == "" {
-		_, found, err := ownedContainer(ctx, docker, *receipt)
-		if err == ErrDockerState || (err == nil && !found && !waitForEngineObservation(ctx)) {
+	if phase == "creating_container" && uncertainCreate(*receipt) && cause != ErrNameConflict {
+		created, found, err := ownedContainer(ctx, docker, *receipt)
+		switch {
+		case found:
+			next := *receipt
+			next.OwnedContainerID = created.ID
+			if s.persistProgress(next) != nil {
+				return false
+			}
+			*receipt = next
+		case err != errContainerIdentity:
+			if receipt.Attempt.Problem == nil && cause != ErrInstallInterrupted {
+				receipt.Attempt.Problem = ProblemForError(cause)
+				_ = s.persistProgress(*receipt)
+			}
 			return false
 		}
 	}
 	if err := s.beginInstallCleanup(receipt, cause); err != nil {
 		return false
 	}
-	ready, completed := s.cleanupInstall(ctx, docker, receipt)
+	ready, observed := s.cleanupInstall(ctx, docker, receipt)
 	if !ready {
 		return false
 	}
-	if completed {
-		cause = nil
+	if observed != startUnobserved {
+		return s.finishObservedStart(receipt, observed)
 	}
 	return s.finishInstall(receipt, cause)
+}
+
+func uncertainCreate(receipt installReceipt) bool {
+	return receipt.OwnedContainerID == "" &&
+		(receipt.Attempt.Phase == "creating_container" || receipt.CleanupPhase == "creating_container") &&
+		(receipt.Attempt.Problem == nil || receipt.Attempt.Problem.Code != ErrNameConflict.Code)
 }
 
 func waitForEngineObservation(ctx context.Context) bool {

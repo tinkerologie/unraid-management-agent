@@ -17,10 +17,9 @@ import (
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
 
+	"github.com/tinkerologie/unraid-management-agent/daemon/constants"
 	"github.com/tinkerologie/unraid-management-agent/daemon/logger"
 )
-
-const dockerUpdateAttemptLabel = "io.tinkerologie.uma.update-attempt"
 
 // Updates can enter through different controllers and use either a name or an
 // ID. Keep both reserved until cleanup or rollback finishes.
@@ -88,7 +87,7 @@ func (dc *DockerController) recreateDockerContainer(ctx context.Context, origina
 		cfg.Labels = make(map[string]string, 1)
 	}
 	// On a lost create response, the name alone cannot identify our replacement.
-	cfg.Labels[dockerUpdateAttemptLabel] = change.attempt
+	cfg.Labels[constants.DockerUpdateAttemptLabel] = change.attempt
 	result, err := dc.client.ContainerCreate(ctx, client.ContainerCreateOptions{
 		Config: &cfg, HostConfig: dockerReplacementHostConfig(original), Name: change.name,
 		NetworkingConfig: dockerReplacementNetworks(original.NetworkSettings, shortID(original.ID), macs),
@@ -254,7 +253,7 @@ func (dc *DockerController) removeFailedDockerReplacement(ctx context.Context, c
 			return fmt.Errorf("check for a partial replacement: %w", err)
 		}
 		candidate := result.Container
-		if candidate.Config == nil || candidate.Config.Labels[dockerUpdateAttemptLabel] != change.attempt {
+		if candidate.Config == nil || candidate.Config.Labels[constants.DockerUpdateAttemptLabel] != change.attempt {
 			return fmt.Errorf("name %q is occupied by a container outside this update", change.name)
 		}
 		id = candidate.ID

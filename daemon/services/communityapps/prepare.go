@@ -144,6 +144,7 @@ type pendingPlan struct {
 	request   PrepareRequest
 	preview   Preview
 	effective installSettings
+	expiry    *time.Timer
 }
 
 // PlanningDocker is the read-only Docker Engine surface used to prepare plans.
@@ -157,7 +158,6 @@ type PlanningDocker interface {
 // ServiceOptions supplies the host filesystem and system boundaries for planning.
 type ServiceOptions struct {
 	HostRoot          string
-	Lifecycle         context.Context
 	OpenInstallDocker func() (InstallDocker, error)
 	OpenDocker        func() (PlanningDocker, error)
 	PortAvailable     func(context.Context, PortBinding) error
@@ -174,11 +174,11 @@ type Service struct {
 	mu                sync.Mutex
 	plans             map[string]*pendingPlan
 	openInstaller     func() (InstallDocker, error)
-	lifecycle         context.Context
-	stop              context.CancelFunc
+	closed            bool
+	recoveryStop      context.CancelFunc
 	workers           sync.WaitGroup
 	applyMu           sync.Mutex
-	active            map[string]bool
+	active            map[string]context.CancelFunc
 	recoveryWake      chan struct{}
 	receiptsLoaded    bool
 	receiptSyncNeeded bool
@@ -196,15 +196,11 @@ func NewService(catalog *Catalog, options ServiceOptions) *Service {
 		options.HostRoot = root
 	}
 	if options.OpenDocker == nil {
-		options.OpenDocker = func() (PlanningDocker, error) { return client.New(client.FromEnv) }
+		options.OpenDocker = func() (PlanningDocker, error) { return openLocalInstallDocker() }
 	}
 	if options.OpenInstallDocker == nil {
-		options.OpenInstallDocker = func() (InstallDocker, error) { return client.New(client.FromEnv) }
+		options.OpenInstallDocker = func() (InstallDocker, error) { return openLocalInstallDocker() }
 	}
-	if options.Lifecycle == nil {
-		options.Lifecycle = context.Background()
-	}
-	lifecycle, stop := context.WithCancel(options.Lifecycle)
 	if options.PortAvailable == nil {
 		options.PortAvailable = probePort
 	}
@@ -213,10 +209,23 @@ func NewService(catalog *Catalog, options ServiceOptions) *Service {
 	}
 	return &Service{
 		catalog: catalog, hostRoot: options.HostRoot, openDocker: options.OpenDocker,
-		openInstaller: options.OpenInstallDocker, lifecycle: lifecycle, stop: stop,
+		openInstaller: options.OpenInstallDocker,
 		portAvailable: options.PortAvailable, now: options.Now, plans: make(map[string]*pendingPlan),
-		active: make(map[string]bool), pendingCommit: make(map[string]installReceipt),
+		active: make(map[string]context.CancelFunc), pendingCommit: make(map[string]installReceipt),
 	}
+}
+
+func openLocalInstallDocker() (*client.Client, error) {
+	docker, err := client.New(client.FromEnv)
+	if err != nil {
+		return nil, ErrDockerState
+	}
+	socket, local := strings.CutPrefix(docker.DaemonHost(), "unix://")
+	if !local || !filepath.IsAbs(socket) {
+		_ = docker.Close()
+		return nil, ErrDockerState
+	}
+	return docker, nil
 }
 
 // NewHostService prepares plans using the local Unraid host and Docker Engine.
@@ -244,10 +253,13 @@ func (s *Service) Prepare(ctx context.Context, request PrepareRequest) (Preview,
 func (s *Service) storePending(request PrepareRequest, preview *Preview, effective installSettings) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.closed {
+		return ErrInstallStopped
+	}
 	now := s.now().UTC()
 	for id, plan := range s.plans {
 		if !now.Before(*plan.preview.ExpiresAt) {
-			delete(s.plans, id)
+			s.dropPendingLocked(id)
 		}
 	}
 	if len(s.plans) >= maxPlans {
@@ -261,12 +273,19 @@ func (s *Service) storePending(request PrepareRequest, preview *Preview, effecti
 	plan := &pendingPlan{request: request, preview: *preview, effective: effective}
 	s.plans[preview.PlanID] = plan
 	id := preview.PlanID
-	time.AfterFunc(planLifetime, func() {
+	plan.expiry = time.AfterFunc(planLifetime, func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		delete(s.plans, id)
+		s.dropPendingLocked(id)
 	})
 	return nil
+}
+
+func (s *Service) dropPendingLocked(id string) {
+	if plan := s.plans[id]; plan != nil {
+		plan.expiry.Stop()
+		delete(s.plans, id)
+	}
 }
 
 func clonePreview(preview Preview) Preview {
@@ -300,8 +319,12 @@ func (s *Service) ValidateApproval(ctx context.Context, planID, approvalToken st
 func (s *Service) lookupPending(planID, approvalToken string) (*pendingPlan, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.closed {
+		return nil, ErrInstallStopped
+	}
 	plan := s.plans[planID]
 	if plan == nil || !s.now().Before(*plan.preview.ExpiresAt) {
+		s.dropPendingLocked(planID)
 		return nil, ErrPlanExpired
 	}
 	if subtle.ConstantTimeCompare([]byte(approvalToken), []byte(plan.preview.ApprovalToken)) != 1 {

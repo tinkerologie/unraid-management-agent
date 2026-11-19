@@ -24,15 +24,17 @@ const (
 )
 
 var (
-	ErrAttemptNotFound = &Problem{Code: "attempt_not_found", Message: "The requested Community Applications install attempt was not found."}
-	ErrAttemptStorage  = &Problem{Code: "attempt_storage_unavailable", Message: "The durable install receipt could not be read or saved."}
-	ErrInstallCapacity = &Problem{Code: "install_capacity", Message: "Too many active Community Applications install attempts. Retry shortly."}
-	ErrInstallStopped  = &Problem{Code: "install_worker_unavailable", Message: "The Community Applications install worker is stopping."}
-	ErrDigestChanged   = &Problem{Code: "image_digest_changed", Message: "The configured image no longer resolves to the approved digest. Prepare and review a new install plan."}
-	ErrImagePull       = &Problem{Code: "image_pull_failed", Message: "Docker could not pull the approved image or prove its digest."}
-	ErrContainerCreate = &Problem{Code: "container_create_failed", Message: "Docker could not create the planned container."}
-	ErrContainerStart  = &Problem{Code: "container_start_failed", Message: "Docker could not verify that the planned container started."}
-	ErrNativeTemplate  = &Problem{Code: "native_template_failed", Message: "The Unraid user template could not be saved."}
+	ErrAttemptNotFound        = &Problem{Code: "attempt_not_found", Message: "The requested Community Applications install attempt was not found."}
+	ErrAttemptStorage         = &Problem{Code: "attempt_storage_unavailable", Message: "The durable install receipt could not be read or saved."}
+	ErrInstallPlanTooLarge    = &Problem{Code: "install_plan_too_large", Message: "The approved configuration is too large to track durably. Use Unraid Docker Manager to install this application."}
+	ErrInstallCapacity        = &Problem{Code: "install_capacity", Message: "Too many active Community Applications install attempts. Retry shortly."}
+	ErrInstallStopped         = &Problem{Code: "install_worker_unavailable", Message: "The Community Applications install worker is stopping."}
+	ErrDigestChanged          = &Problem{Code: "image_digest_changed", Message: "The configured image no longer resolves to the approved digest. Prepare and review a new install plan."}
+	ErrImagePull              = &Problem{Code: "image_pull_failed", Message: "Docker could not pull the approved image or prove its digest."}
+	ErrContainerCreate        = &Problem{Code: "container_create_failed", Message: "Docker could not create the planned container."}
+	ErrContainerStart         = &Problem{Code: "container_start_failed", Message: "Docker could not verify that the planned container started."}
+	ErrStartedTemplateMissing = &Problem{Code: "started_template_missing", Message: "Docker started the installed container, but its native user template is missing or is no longer a regular file. The container was preserved. Check Docker Manager and restore the user template if needed."}
+	ErrNativeTemplate         = &Problem{Code: "native_template_failed", Message: "The Unraid user template could not be saved."}
 
 	opaqueID = regexp.MustCompile(`^[A-Z2-7]{26}$`)
 )
@@ -102,11 +104,11 @@ func (s *Service) Confirm(ctx context.Context, planID, approvalToken string) (At
 	if err != nil {
 		return Attempt{}, err
 	}
+	if s.closed {
+		return Attempt{}, ErrInstallStopped
+	}
 	if current := s.plans[planID]; current != plan || !s.now().Before(*plan.preview.ExpiresAt) {
 		return Attempt{}, ErrPlanExpired
-	}
-	if s.lifecycle.Err() != nil {
-		return Attempt{}, ErrInstallStopped
 	}
 	if len(s.active) >= maxActiveAttempts {
 		return Attempt{}, ErrInstallCapacity
@@ -132,9 +134,13 @@ func (s *Service) Confirm(ctx context.Context, planID, approvalToken string) (At
 		return Attempt{}, err
 	}
 	s.indexReceipt(receipt)
-	delete(s.plans, planID)
-	s.active[planID] = true
-	s.workers.Go(func() { s.runInstall(receipt, plan) })
+	s.dropPendingLocked(planID)
+	workCtx, cancel := context.WithCancel(context.Background())
+	s.active[planID] = cancel
+	s.workers.Go(func() {
+		defer cancel()
+		s.runInstall(workCtx, receipt, plan)
+	})
 	return s.attemptStatusLocked(receipt), nil
 }
 
@@ -191,8 +197,24 @@ func cloneAttempt(attempt Attempt) Attempt {
 
 // Close cancels the worker lifecycle and waits for accepted work to settle.
 func (s *Service) Close() {
-	s.mu.Lock()
-	s.stop()
-	s.mu.Unlock()
+	s.stopWork()
 	s.workers.Wait()
+}
+
+func (s *Service) stopWork() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return
+	}
+	s.closed = true
+	if s.recoveryStop != nil {
+		s.recoveryStop()
+	}
+	for _, cancel := range s.active {
+		cancel()
+	}
+	for id := range s.plans {
+		s.dropPendingLocked(id)
+	}
 }

@@ -61,8 +61,8 @@ func TestRestartRecoversStartedContainerWithPublishedTemplate(t *testing.T) {
 		}
 		return engine, nil
 	})
-	after.StartRecovery()
-	after.StartRecovery()
+	after.StartRecovery(t.Context())
+	after.StartRecovery(t.Context())
 	select {
 	case <-attempted:
 	case <-time.After(5 * time.Second):
@@ -90,7 +90,7 @@ func TestRestartRecoversStartedContainerWithPublishedTemplate(t *testing.T) {
 		t.Fatal(err)
 	}
 	restarted := newInstallService(t, root, engine)
-	restarted.StartRecovery()
+	restarted.StartRecovery(t.Context())
 	stored, err := restarted.GetAttempt(claim.ID)
 	if err != nil || !reflect.DeepEqual(recovered, stored) {
 		t.Fatalf("a later container removal changed original receipt: %+v, %v", stored, err)
@@ -342,17 +342,8 @@ func TestRestartReconcilesCheckpointedInstall(t *testing.T) {
 				}
 			}
 
-			if tt.editPublished {
-				engine.BeforeContainerInspect = func(_ string, c *container.InspectResponse) error {
-					if c != nil {
-						c.State.Status = "exited"
-						c.State.StartedAt = "2026-11-18T23:00:00Z"
-					}
-					return nil
-				}
-			}
 			after := newInstallService(t, root, engine)
-			after.StartRecovery()
+			after.StartRecovery(t.Context())
 			recovered := waitForAttempt(t, after, claim.ID)
 			wantProblem := tt.wantProblem
 			if wantProblem == "" {
@@ -453,7 +444,7 @@ func TestRecoveryDoesNotInterruptActiveWorkerOrProbeDockerForEarlyPhase(t *testi
 	if err := captureReceipt(root, &checkpoint); err != nil {
 		t.Fatal(err)
 	}
-	service.StartRecovery()
+	service.StartRecovery(t.Context())
 	active, err := service.GetAttempt(first.ID)
 	if err != nil || active.Phase != "pulling_image" || active.Problem != nil {
 		t.Fatalf("active request treated as interrupted: %+v, %v", active, err)
@@ -466,7 +457,7 @@ func TestRecoveryDoesNotInterruptActiveWorkerOrProbeDockerForEarlyPhase(t *testi
 		opened.Store(true)
 		return nil, errors.New("Docker disabled")
 	})
-	after.StartRecovery()
+	after.StartRecovery(t.Context())
 	failed := waitForAttempt(t, after, first.ID)
 	if failed.State != communityapps.AttemptFailed || failed.Problem == nil || failed.Problem.Code != "install_interrupted" ||
 		opened.Load() {
@@ -476,12 +467,16 @@ func TestRecoveryDoesNotInterruptActiveWorkerOrProbeDockerForEarlyPhase(t *testi
 
 func TestRecoveryReservesUnresolvedNameAndRetries(t *testing.T) {
 	root := communityappstest.CopyHeimdallHost(t)
-	var checkpoint receiptCheckpoint
-	engine := &communityappstest.InstallEngine{BeforeCreate: func(client.ContainerCreateOptions) error {
-		if err := captureReceipt(root, &checkpoint); err != nil {
-			return err
+	var createOptions client.ContainerCreateOptions
+	issued := make(chan struct{})
+	var dispatched atomic.Bool
+	engine := &communityappstest.InstallEngine{BeforeCreate: func(opts client.ContainerCreateOptions) error {
+		if dispatched.CompareAndSwap(false, true) {
+			createOptions = opts
+			close(issued)
+			return errors.New("create acknowledgement lost before the Engine made it visible")
 		}
-		return errors.New("response lost before creation")
+		return nil
 	}}
 	before := newInstallService(t, root, engine)
 	req := communityapps.PrepareRequest{Reference: communityappstest.HeimdallReference}
@@ -493,9 +488,12 @@ func TestRecoveryReservesUnresolvedNameAndRetries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_ = waitForAttempt(t, before, first.ID)
+	select {
+	case <-issued:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Docker create was never issued")
+	}
 	before.Close()
-	checkpoint.restore(t, root, "creating_container")
 
 	var available atomic.Bool
 	after := newRestartService(t, root, engine, func() (communityapps.InstallDocker, error) {
@@ -504,7 +502,7 @@ func TestRecoveryReservesUnresolvedNameAndRetries(t *testing.T) {
 		}
 		return engine, nil
 	})
-	after.StartRecovery()
+	after.StartRecovery(t.Context())
 	next, err := after.Prepare(t.Context(), req)
 	if err != nil || !next.Eligible {
 		t.Fatalf("read-only preview: %v (%+v)", err, next.Issues)
@@ -524,11 +522,27 @@ func TestRecoveryReservesUnresolvedNameAndRetries(t *testing.T) {
 		t.Fatalf("fixture cannot access Docker: %+v", outcome)
 	}
 	available.Store(true)
-	failed := waitForAttempt(t, after, first.ID)
-	if failed.State != communityapps.AttemptFailed || failed.Problem == nil || failed.Problem.Code != "install_interrupted" {
-		t.Fatalf("ambiguous create did not settle as interrupted: %+v", failed)
+	time.Sleep(1500 * time.Millisecond)
+	pending, err := after.GetAttempt(first.ID)
+	if err != nil || pending.State != communityapps.AttemptRunning || pending.Problem == nil ||
+		pending.Problem.Code != "container_create_unverified" {
+		t.Fatalf("Docker absence prematurely settled a lost response: %+v, %v", pending, err)
 	}
-	engine.BeforeCreate = nil
+	replayed, err := after.Confirm(t.Context(), original.PlanID, original.ApprovalToken)
+	if err != nil || replayed.ID != first.ID {
+		t.Fatalf("pending attempt could not be replayed: %+v, %v", replayed, err)
+	}
+	if _, err := engine.ContainerCreate(t.Context(), createOptions); err != nil {
+		t.Fatalf("fixture could not make the original create visible: %v", err)
+	}
+	failed := waitForAttempt(t, after, first.ID)
+	if failed.State != communityapps.AttemptFailed || failed.Problem == nil ||
+		failed.Problem.Code != "container_create_failed" || len(failed.CleanupFailures) != 0 {
+		t.Fatalf("late create did not settle and clean up: %+v", failed)
+	}
+	if removes := engine.RemoveRequests(); len(removes) != 1 || removes[0].ID != communityappstest.ContainerID || removes[0].Options.Force {
+		t.Fatalf("recovery did not remove only the stopped late container: %+v", removes)
+	}
 	claim, err := after.Confirm(t.Context(), next.PlanID, next.ApprovalToken)
 	if err != nil || claim.ID == first.ID {
 		t.Fatalf("approved new plan could not retry by the original name: %+v, %v", claim, err)
@@ -551,7 +565,7 @@ func TestRecoveryRetriesTerminalWriteWithoutReprobingDocker(t *testing.T) {
 		return os.WriteFile(store, []byte("flash temporarily unavailable"), 0600)
 	}}
 	service := newInstallService(t, root, docker)
-	service.StartRecovery()
+	service.StartRecovery(t.Context())
 	preview, err := service.Prepare(t.Context(), communityapps.PrepareRequest{Reference: communityappstest.HeimdallReference})
 	if err != nil || !preview.Eligible {
 		t.Fatalf("prepare: %v (%+v)", err, preview.Issues)
@@ -631,10 +645,14 @@ func TestRestartPreservesReplacementAndNativeTemplate(t *testing.T) {
 			engine.ReplaceForUpdate(t, replacement)
 			beforeRemovals := len(engine.RemoveRequests())
 			after := newInstallService(t, root, engine)
-			after.StartRecovery()
+			after.StartRecovery(t.Context())
 			outcome := waitForAttempt(t, after, claim.ID)
+			var wantCleanup []string
+			if phase == "creating_container" {
+				wantCleanup = []string{"container_identity_unverified"}
+			}
 			if outcome.State != communityapps.AttemptFailed || outcome.Problem == nil || outcome.Problem.Code != "install_interrupted" ||
-				len(outcome.CleanupFailures) != 0 {
+				!reflect.DeepEqual(outcome.CleanupFailures, wantCleanup) {
 				t.Fatalf("replacement changed historical recovery: %+v", outcome)
 			}
 			if len(engine.RemoveRequests()) != beforeRemovals {
@@ -712,7 +730,7 @@ func TestRecoveryPreservesNativeTemplateUntilProofIsReadable(t *testing.T) {
 				}
 			}
 			after := newInstallService(t, root, engine)
-			after.StartRecovery()
+			after.StartRecovery(t.Context())
 			select {
 			case <-inspected:
 			case <-time.After(5 * time.Second):
@@ -768,7 +786,7 @@ func TestRecoveryAcceptsLateStartBeforeOrDuringCleanup(t *testing.T) {
 			}
 			engine.BeforeRemove = func() error { return errors.New("container started concurrently") }
 			after := newInstallService(t, root, engine)
-			after.StartRecovery()
+			after.StartRecovery(t.Context())
 			exact := waitForAttempt(t, after, claim.ID)
 			if exact.State != communityapps.AttemptSucceeded || exact.ContainerID != communityappstest.ContainerID ||
 				exact.Problem != nil || len(exact.CleanupFailures) != 0 {
@@ -796,7 +814,7 @@ func TestRecoveryProtectsPendingStartWhenDaemonStops(t *testing.T) {
 		return nil
 	}
 	after := newInstallService(t, root, engine)
-	after.StartRecovery()
+	after.StartRecovery(t.Context())
 	select {
 	case <-observed:
 	case <-time.After(5 * time.Second):
@@ -810,26 +828,56 @@ func TestRecoveryProtectsPendingStartWhenDaemonStops(t *testing.T) {
 	}
 }
 
-func TestRecoveryCleansStartedContainerWhenNativePublicationIsMissing(t *testing.T) {
-	engine := &communityappstest.InstallEngine{}
-	root, claim := checkpointUnverifiedStart(t, engine)
-	native := filepath.Join(root, recoveryTemplateDir)
-	if err := os.RemoveAll(native); err != nil {
-		t.Fatal(err)
+func TestRecoveryPreservesStartedContainerAfterNativeTemplateChange(t *testing.T) {
+	for _, change := range []string{"edited", "replaced", "missing"} {
+		t.Run(change, func(t *testing.T) {
+			engine := &communityappstest.InstallEngine{}
+			root, claim := checkpointUnverifiedStart(t, engine)
+			native := filepath.Join(root, recoveryTemplateDir, "my-heimdall.xml")
+			var expected string
+			switch change {
+			case "edited":
+				content, err := os.ReadFile(native)
+				if err != nil {
+					t.Fatal(err)
+				}
+				expected = strings.Replace(string(content), "<Shell>sh</Shell>", "<Shell>bash</Shell>", 1)
+				if expected == string(content) {
+					t.Fatal("fixture native template did not contain the editable shell")
+				}
+			case "replaced":
+				expected = "<Container><Name>heimdall</Name><Shell>bash</Shell></Container>"
+			case "missing":
+				if err := os.Remove(native); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if expected != "" {
+				if err := os.WriteFile(native, []byte(expected), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			communityappstest.WriteFile(t, root, recoveryAppdata, "protected appdata sentinel")
+			after := newInstallService(t, root, engine)
+			after.StartRecovery(t.Context())
+			outcome := waitForAttempt(t, after, claim.ID)
+			if outcome.ContainerID != communityappstest.ContainerID || len(outcome.CleanupFailures) != 0 ||
+				len(engine.RemoveRequests()) != 0 {
+				t.Fatalf("recovery did not preserve the original install: %+v", outcome)
+			}
+			if expected == "" {
+				if outcome.State != communityapps.AttemptFailed || outcome.Problem == nil || outcome.Problem.Code != "started_template_missing" {
+					t.Fatalf("recovery did not report the missing native template: %+v", outcome)
+				}
+			} else {
+				if outcome.State != communityapps.AttemptSucceeded || outcome.Problem != nil {
+					t.Fatalf("native edit changed the completed install outcome: %+v", outcome)
+				}
+				assertRecoveryFile(t, root, recoveryTemplateDir+"/my-heimdall.xml", expected)
+			}
+			assertRecoveryFile(t, root, recoveryAppdata, "protected appdata sentinel")
+		})
 	}
-	communityappstest.WriteFile(t, root, recoveryAppdata, "protected appdata sentinel")
-	after := newInstallService(t, root, engine)
-	after.StartRecovery()
-	outcome := waitForAttempt(t, after, claim.ID)
-	if outcome.State != communityapps.AttemptFailed || outcome.Problem == nil ||
-		outcome.Problem.Code != "install_interrupted" || len(outcome.CleanupFailures) != 0 {
-		t.Fatalf("started container without a template was treated as installed: %+v", outcome)
-	}
-	calls := engine.RemoveRequests()
-	if len(calls) != 1 || calls[0].ID != communityappstest.ContainerID || calls[0].Options.RemoveVolumes {
-		t.Fatalf("cleanup targeted the wrong Docker resource: %+v", calls)
-	}
-	assertRecoveryFile(t, root, recoveryAppdata, "protected appdata sentinel")
 }
 
 func TestRecoveryPreservesRenamedOrAmbiguousLostCreate(t *testing.T) {
@@ -882,7 +930,7 @@ func TestRecoveryPreservesRenamedOrAmbiguousLostCreate(t *testing.T) {
 				}
 			}
 			after := newInstallService(t, root, engine)
-			after.StartRecovery()
+			after.StartRecovery(t.Context())
 			settled := waitForAttempt(t, after, claim.ID)
 			if settled.State != communityapps.AttemptFailed || len(settled.CleanupDetails) != 1 ||
 				settled.CleanupDetails[0].Code != "container_identity_unverified" ||
@@ -944,13 +992,13 @@ func TestRecoveryRequiresDurableCleanupAndFullIDBeforeRemoval(t *testing.T) {
 	duringCleanup := make(chan error, 1)
 	engine.BeforeContainerInspect = func(_ string, _ *container.InspectResponse) error {
 		observed++
-		if observed == 2 {
+		if observed == 1 {
 			duringCleanup <- blockStorage()
 		}
 		return nil
 	}
 	after := newInstallService(t, root, engine)
-	after.StartRecovery()
+	after.StartRecovery(t.Context())
 	select {
 	case err := <-duringCleanup:
 		if err != nil {
@@ -959,11 +1007,11 @@ func TestRecoveryRequiresDurableCleanupAndFullIDBeforeRemoval(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("cleanup never tried to find the full container ID")
 	}
-	// Fake Docker requests are serialized. After a completed first pass the
-	// attempt remains at durable cleanup intent, before ownership was saved.
+	// Recovery records the exact ID before leaving create intent.
+	// Refuse cleanup while that progress record cannot be saved.
 	time.Sleep(100 * time.Millisecond)
 	pending, err := after.GetAttempt(claim.ID)
-	if err != nil || pending.Phase != "cleaning_up" || len(engine.RemoveRequests()) != 0 {
+	if err != nil || pending.Phase != "creating_container" || len(engine.RemoveRequests()) != 0 {
 		t.Fatalf("cleanup continued without durable exact ID: %+v, %v", pending, err)
 	}
 	restoreStorage()
@@ -985,7 +1033,7 @@ func TestRecoveryWaitsForReadableReceipt(t *testing.T) {
 	path := recoveryReceiptDir + "/" + saved.PlanID + ".json"
 	communityappstest.WriteFile(t, root, path, saved.Raw+"true")
 	after := newInstallService(t, root, engine)
-	after.StartRecovery()
+	after.StartRecovery(t.Context())
 	if _, err := after.GetAttempt(claim.ID); !errors.Is(err, communityapps.ErrAttemptStorage) {
 		t.Fatalf("invalid receipt was accepted: %v", err)
 	}
@@ -1010,7 +1058,7 @@ func TestRecoveryResumesIfDockerDisappearsAfterContainerRemoval(t *testing.T) {
 		return nil
 	}
 	after := newInstallService(t, root, engine)
-	after.StartRecovery()
+	after.StartRecovery(t.Context())
 	select {
 	case <-unavailable:
 	case <-time.After(5 * time.Second):
