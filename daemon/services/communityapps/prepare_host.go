@@ -548,6 +548,9 @@ func (host installHost) checkConflictsExcept(config *Configuration, request Prep
 			}
 		}
 	}
+	if len(config.Mounts) == 0 {
+		return nil
+	}
 	for i, source := range existing {
 		canonical, err := host.canonicalBindSource(source)
 		if err != nil {

@@ -126,6 +126,10 @@ func TestBindSourceRejectsAmbiguousSymlinkTargets(t *testing.T) {
 		if err := host.checkConflicts(&config, PrepareRequest{}, existing); !errors.Is(err, ErrStorageState) {
 			t.Fatalf("ambiguous existing writable bind %q returned %v", source, err)
 		}
+		config.Mounts = nil
+		if err := host.checkConflicts(&config, PrepareRequest{}, existing); err != nil {
+			t.Fatalf("app without mounts was blocked by unrelated bind %q: %v", source, err)
+		}
 	}
 }
 
