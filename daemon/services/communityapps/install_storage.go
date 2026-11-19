@@ -182,7 +182,11 @@ func (s *Service) checkBeforeStart(ctx context.Context, docker InstallDocker, re
 	for i := range config.Mounts {
 		config.Mounts[i].Shared = false
 	}
-	if err := host.checkConflictsExcept(&config, plan.request, containers.Items, filepath.Join(s.hostRoot, userTemplatesDir, s.finalTemplateName(receipt))); err != nil {
+	items, err := withNamedVolumeBinds(ctx, docker, config.Mounts, containers.Items)
+	if err != nil {
+		return err
+	}
+	if err := host.checkConflictsExcept(&config, plan.request, items, filepath.Join(s.hostRoot, userTemplatesDir, s.finalTemplateName(receipt))); err != nil {
 		return err
 	}
 	if !slices.Equal(config.Mounts, plan.effective.configuration.Mounts) {

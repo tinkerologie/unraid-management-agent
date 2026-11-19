@@ -465,7 +465,11 @@ func (s *Service) resolveDocker(ctx context.Context, settings installSettings, h
 	if err != nil {
 		return installSettings{}, nil, ErrDockerState
 	}
-	if err := host.checkConflicts(config, request, containers.Items); err != nil {
+	items, err := withNamedVolumeBinds(ctx, docker, config.Mounts, containers.Items)
+	if err != nil {
+		return installSettings{}, nil, err
+	}
+	if err := host.checkConflicts(config, request, items); err != nil {
 		return installSettings{}, nil, err
 	}
 	if err := s.checkApprovedPorts(ctx, *config); err != nil {

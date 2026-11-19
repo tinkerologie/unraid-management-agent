@@ -45,6 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Community Applications checks writable Docker named volumes backed by local bind mounts for appdata overlap and exposed parent directories before approval and before starting a container.
+
 - The Prometheus references `docs/api/rest-api.md` and `docs/api/prometheus.md` now list the 62 metric families
   that `/metrics` exports, with the correct names, types and labels. They no longer list names that the agent does
   not export, for example `unraid_memory_free_bytes` and `unraid_parity_check_errors`. The value descriptions,
