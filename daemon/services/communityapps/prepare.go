@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"maps"
 	"net/netip"
+	"os"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -176,6 +177,7 @@ type Service struct {
 	mu                sync.Mutex
 	plans             map[string]*pendingPlan
 	openInstaller     func() (InstallDocker, error)
+	createReceiptTemp func(string, string) (*os.File, error)
 	closed            bool
 	recoveryStop      context.CancelFunc
 	workers           sync.WaitGroup
@@ -211,7 +213,7 @@ func NewService(catalog *Catalog, options ServiceOptions) *Service {
 	}
 	return &Service{
 		catalog: catalog, hostRoot: options.HostRoot, openDocker: options.OpenDocker,
-		openInstaller: options.OpenInstallDocker,
+		openInstaller: options.OpenInstallDocker, createReceiptTemp: os.CreateTemp,
 		portAvailable: options.PortAvailable, now: options.Now, plans: make(map[string]*pendingPlan),
 		active: make(map[string]context.CancelFunc), pendingCommit: make(map[string]installReceipt),
 	}
@@ -470,7 +472,7 @@ func (s *Service) resolveDocker(ctx context.Context, settings installSettings, h
 	}
 	config.Digest = approvedDigest
 	if approvedDigest == "" {
-		config.Digest, err = resolveImageDigest(ctx, docker, config.Image)
+		_, config.Digest, err = resolveImageDigest(ctx, docker, config.Image)
 	}
 	if err != nil {
 		return installSettings{}, nil, err
@@ -495,22 +497,22 @@ func inspectBridge(ctx context.Context, docker PlanningDocker, name string, port
 	}, nil
 }
 
-func resolveImageDigest(ctx context.Context, docker PlanningDocker, image string) (digest.Digest, error) {
+func resolveImageDigest(ctx context.Context, docker PlanningDocker, image string) (reference.Named, digest.Digest, error) {
 	if len(image) > 512 {
-		return "", ErrImageDigest
+		return nil, "", ErrImageDigest
 	}
 	normalized, err := reference.ParseNormalizedNamed(image)
 	if err != nil {
-		return "", ErrImageDigest
+		return nil, "", ErrImageDigest
 	}
 	info, err := docker.DistributionInspect(ctx, image, client.DistributionInspectOptions{})
 	if err != nil || info.Descriptor.Digest.Validate() != nil || info.Descriptor.Digest.Algorithm() != digest.SHA256 {
-		return "", ErrImageDigest
+		return nil, "", ErrImageDigest
 	}
 	if pinned, ok := normalized.(reference.Digested); ok && pinned.Digest() != info.Descriptor.Digest {
-		return "", ErrImageDigest
+		return nil, "", ErrImageDigest
 	}
-	return info.Descriptor.Digest, nil
+	return normalized, info.Descriptor.Digest, nil
 }
 
 func checkDockerName(containers []container.Summary, wanted string) error {

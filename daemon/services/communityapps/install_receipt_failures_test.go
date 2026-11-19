@@ -149,3 +149,41 @@ func TestReceiptRejectsStaleWorkerProgressAfterTerminalOutcome(t *testing.T) {
 		t.Fatalf("stale progress changed terminal attempt: %+v, %v", got, err)
 	}
 }
+
+func createReadOnlyReceiptTemp(dir, pattern string) (*os.File, error) {
+	file, err := os.CreateTemp(dir, pattern)
+	if err != nil {
+		return nil, err
+	}
+	if err := file.Close(); err != nil {
+		return nil, err
+	}
+	return os.Open(file.Name())
+}
+
+func TestReceiptNeverPublishesAfterTemporaryFileWriteFails(t *testing.T) {
+	service := NewService(nil, ServiceOptions{HostRoot: t.TempDir()})
+	t.Cleanup(service.Close)
+	var staged *os.File
+	service.createReceiptTemp = func(dir, pattern string) (*os.File, error) {
+		var err error
+		staged, err = createReadOnlyReceiptTemp(dir, pattern)
+		return staged, err
+	}
+	receipt := installFixtureReceipt("queued", AttemptPending)
+	if err := service.saveReceipt(receipt, true); !errors.Is(err, ErrAttemptStorage) {
+		t.Fatalf("temporary file write failure was acknowledged: %v", err)
+	}
+	if staged == nil {
+		t.Fatal("fixture did not reach the temporary receipt write")
+	}
+	if _, err := staged.Stat(); !errors.Is(err, os.ErrClosed) {
+		t.Fatalf("a failed write left its file open: %v", err)
+	}
+	if _, err := os.Lstat(staged.Name()); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("a failed write left its temporary file on flash: %v", err)
+	}
+	if _, err := service.GetAttempt(receipt.Attempt.ID); !errors.Is(err, ErrAttemptNotFound) {
+		t.Fatalf("a failed write left a durable attempt: %v", err)
+	}
+}

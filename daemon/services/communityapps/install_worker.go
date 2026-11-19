@@ -190,7 +190,7 @@ func (s *Service) executeInstall(ctx context.Context, docker InstallDocker, rece
 }
 
 func pullApprovedImage(ctx context.Context, docker InstallDocker, config Configuration) (string, error) {
-	current, err := resolveImageDigest(ctx, docker, config.Image)
+	name, current, err := resolveImageDigest(ctx, docker, config.Image)
 	if err != nil {
 		return "", err
 	}
@@ -218,15 +218,11 @@ func pullApprovedImage(ctx context.Context, docker InstallDocker, config Configu
 		return "", ErrImagePull
 	}
 
-	name, err := reference.ParseNormalizedNamed(config.Image)
-	if err != nil {
-		return "", ErrImagePull
+	var result client.ImageInspectResult
+	canonical, err := reference.WithDigest(reference.TrimNamed(name), current)
+	if err == nil {
+		result, err = docker.ImageInspect(ctx, canonical.String())
 	}
-	canonical, err := reference.WithDigest(reference.TrimNamed(name), config.Digest)
-	if err != nil {
-		return "", ErrImagePull
-	}
-	result, err := docker.ImageInspect(ctx, canonical.String())
 	if err != nil || !validImageID(result.ID) {
 		return "", ErrImagePull
 	}
@@ -392,9 +388,6 @@ const (
 )
 
 func (s *Service) observeInstallStart(ctx context.Context, docker InstallDocker, receipt installReceipt) (startObservation, error) {
-	if receipt.OwnedContainerID == "" || !validImageID(receipt.ImageID) {
-		return startUnobserved, nil
-	}
 	c, owned, err := ownedContainer(ctx, docker, receipt)
 	if err != nil {
 		return startUnobserved, err
@@ -429,7 +422,11 @@ func (s *Service) observeStartedContainer(c container.InspectResponse, receipt i
 		return startUnobserved, ErrNativeTemplate
 	}
 	defer func() { _ = dir.Close() }()
-	info, err := dir.Lstat(s.finalTemplateName(receipt))
+	return observePublishedNativeTemplate(dir.Lstat, s.finalTemplateName(receipt))
+}
+
+func observePublishedNativeTemplate(stat func(string) (fs.FileInfo, error), filename string) (startObservation, error) {
+	info, err := stat(filename)
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
 		return startTemplateMissing, nil

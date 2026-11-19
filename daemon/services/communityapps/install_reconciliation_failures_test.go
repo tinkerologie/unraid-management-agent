@@ -3,6 +3,7 @@ package communityapps
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -353,5 +354,18 @@ func TestPartialInstallCleanupDoesNotForceRemoveWithoutDockerState(t *testing.T)
 	}
 	if removes := engine.RemoveRequests(); len(removes) != 1 || removes[0].Options.Force {
 		t.Fatalf("cleanup forced removal without Docker state: %+v", removes)
+	}
+}
+
+func TestStartedContainerRemainsUnverifiedWhenNativeTemplateStatFails(t *testing.T) {
+	const name = "my-recovery-fixture.xml"
+	got, err := observePublishedNativeTemplate(func(path string) (fs.FileInfo, error) {
+		if path != name {
+			t.Fatalf("verification looked up a different native template: %q", path)
+		}
+		return nil, fs.ErrPermission
+	}, name)
+	if got != startUnobserved || !errors.Is(err, ErrNativeTemplate) {
+		t.Fatalf("unreadable native template was treated as absent: %v, %v", got, err)
 	}
 }

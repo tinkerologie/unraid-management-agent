@@ -2,6 +2,7 @@ package communityapps
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -166,5 +167,50 @@ func TestWorkerStopsWhenSettingsOrNativeTemplateCannotBeVerified(t *testing.T) {
 				t.Fatalf("worker left an unexpected Docker resource: creates %d, remaining %d, starts %v", created, present, started)
 			}
 		})
+	}
+}
+
+func TestWorkerDoesNotCreateWhenIntentReceiptCannotBeWritten(t *testing.T) {
+	service, engine, preview := newWorkerFixture(t)
+	plan, err := service.lookupPending(preview.PlanID, preview.ApprovalToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	receipt := installFixtureReceipt("queued", AttemptPending)
+	receipt.Attempt.Configuration = plan.effective.configuration
+	if err := service.loadReceipts(); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.persistProgress(receipt); err != nil {
+		t.Fatal(err)
+	}
+	var failedCreateIntentWrite bool
+	service.createReceiptTemp = func(dir, pattern string) (*os.File, error) {
+		if !failedCreateIntentWrite {
+			raw, err := os.ReadFile(filepath.Join(dir, receipt.PlanID+".json"))
+			if err != nil {
+				return nil, err
+			}
+			var last installReceipt
+			if err := json.Unmarshal(raw, &last); err != nil {
+				return nil, err
+			}
+			if last.Attempt.Phase == "preparing_storage" {
+				failedCreateIntentWrite = true
+				return createReadOnlyReceiptTemp(dir, pattern)
+			}
+		}
+		return os.CreateTemp(dir, pattern)
+	}
+	service.runInstall(t.Context(), receipt, plan)
+	got, err := service.GetAttempt(receipt.Attempt.ID)
+	if err != nil || got.State != AttemptFailed || got.Problem == nil || got.Problem.Code != ErrAttemptStorage.Code {
+		t.Fatalf("failed create-intent write did not settle as a storage error: %+v, %v", got, err)
+	}
+	if !failedCreateIntentWrite {
+		t.Fatal("fixture never reached the write after durable storage preparation")
+	}
+	if creates, _, starts, _, _ := engine.Observation(); creates != 0 || len(starts) != 0 {
+		t.Fatal("worker mutated Docker without a durable create intent")
 	}
 }

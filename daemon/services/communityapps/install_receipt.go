@@ -110,31 +110,21 @@ func (s *Service) saveReceipt(receipt installReceipt, exclusive bool) error {
 
 func (s *Service) writeReceipt(dir string, receipt installReceipt, exclusive bool) error {
 	data, err := json.Marshal(receipt)
-	if err != nil {
-		return err
-	}
 	if exclusive && len(data) > maxInstallReceipt-maxReceiptProgress {
 		return ErrInstallPlanTooLarge
 	}
-	if len(data) > maxInstallReceipt {
+	if err != nil || len(data) > maxInstallReceipt {
 		return ErrAttemptStorage
 	}
 	if err := ensureInstallDirectory(s.hostRoot, attemptDirectory, 0o700); err != nil {
 		return err
 	}
-	file, err := os.CreateTemp(dir, ".receipt-*")
+	file, err := s.createReceiptTemp(dir, ".receipt-*")
 	if err != nil {
 		return err
 	}
 	defer func() { _ = os.Remove(file.Name()) }()
-	_, err = file.Write(data)
-	if err == nil {
-		err = file.Sync()
-	}
-	if closeErr := file.Close(); err == nil {
-		err = closeErr
-	}
-	if err != nil {
+	if err := writeAndSyncInstallFile(file, data); err != nil {
 		return err
 	}
 	target := filepath.Join(dir, receipt.PlanID+".json")

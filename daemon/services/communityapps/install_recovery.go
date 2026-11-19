@@ -169,9 +169,6 @@ func (s *Service) settleInstall(ctx context.Context, docker InstallDocker, recei
 		if uncertainStart(*receipt) && !s.oldEngineCallsDrained(receipt) {
 			return false
 		}
-		if cause == nil {
-			cause = ErrContainerStart
-		}
 	}
 	if phase == "creating_container" && uncertainCreate(*receipt) && cause != ErrNameConflict {
 		created, found, err := ownedContainer(ctx, docker, *receipt)
