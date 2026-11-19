@@ -30,15 +30,11 @@ func UseDockerInspectEngine(t *testing.T, containers map[string]string) {
 		http.Error(w, `{"message":"No such container"}`, http.StatusNotFound)
 	})
 	socketDir, err := os.MkdirTemp("", "uma-detail-")
-	if err != nil {
-		t.Fatal(err)
-	}
+	Require(t, err == nil, "create fixture Docker socket directory: %v", err)
 	t.Cleanup(func() { _ = os.RemoveAll(socketDir) })
 	socket := filepath.Join(socketDir, "docker.sock")
 	listener, err := net.Listen("unix", socket)
-	if err != nil {
-		t.Fatal(err)
-	}
+	Require(t, err == nil, "listen on fixture Docker socket: %v", err)
 	engine := &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second}
 	go func() { _ = engine.Serve(listener) }()
 	t.Cleanup(func() { _ = engine.Close() })

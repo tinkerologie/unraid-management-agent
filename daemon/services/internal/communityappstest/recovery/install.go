@@ -20,12 +20,17 @@ import (
 func InterruptedStart(t *testing.T, environment string, started bool) (*communityapps.Service, communityapps.Attempt) {
 	t.Helper()
 	root := communityappstest.CopyHeimdallHost(t)
+	startIssued := make(chan struct{})
 	docker := &communityappstest.InstallEngine{
 		PostStartInspectError: errors.New(environment),
 		BeforeRemove:          func() error { return errors.New(environment) },
-	}
-	if !started {
-		docker.BeforeStart = func() error { return errdefs.ErrInvalidArgument.WithMessage(environment) }
+		BeforeStart: func() error {
+			close(startIssued)
+			if !started {
+				return errdefs.ErrInvalidArgument.WithMessage(environment)
+			}
+			return nil
+		},
 	}
 	newService := func() *communityapps.Service {
 		service := communityapps.NewService(communityapps.NewCatalog(os.DirFS(root)), communityapps.ServiceOptions{
@@ -41,27 +46,25 @@ func InterruptedStart(t *testing.T, environment string, started bool) (*communit
 	preview, err := before.Prepare(t.Context(), communityapps.PrepareRequest{
 		Reference: communityappstest.HeimdallReference, Environment: map[string]string{"PUID": environment},
 	})
-	if err != nil || !preview.Eligible {
-		t.Fatalf("fixture prepare returned %v (%+v)", err, preview.Issues)
-	}
+	communityappstest.Require(t, err == nil && preview.Eligible, "fixture prepare returned %v (%+v)", err, preview.Issues)
 	attempt, err := before.Confirm(t.Context(), preview.PlanID, preview.ApprovalToken)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for deadline := time.Now().Add(5 * time.Second); ; {
-		if _, _, starts, _, _ := docker.Observation(); len(starts) != 0 {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("fixture Docker start was never issued")
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
+	communityappstest.Require(t, err == nil, "confirm fixture install: %v", err)
+	startCtx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	err = waitForStartRequest(startCtx, startIssued)
+	communityappstest.Require(t, err == nil, "wait for fixture Docker start: %v", err)
 	before.Close()
 	pending, err := before.GetAttempt(attempt.ID)
-	if err != nil || pending.Phase != "starting_container" {
-		t.Fatalf("fixture start intent was not retained: %+v, %v", pending, err)
-	}
+	communityappstest.Require(t, err == nil && pending.Phase == "starting_container", "fixture start intent was not retained: %+v, %v", pending, err)
 	docker.PostStartInspectError = nil
 	return newService(), attempt
+}
+
+func waitForStartRequest(ctx context.Context, startIssued <-chan struct{}) error {
+	select {
+	case <-startIssued:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }

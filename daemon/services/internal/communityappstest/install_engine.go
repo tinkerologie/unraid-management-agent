@@ -213,9 +213,7 @@ func (d *InstallEngine) CompletePendingStart(t testing.TB) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	c, ok := d.created[ContainerID]
-	if !ok || len(d.started) != 1 {
-		t.Fatal("fixture has no pending container start to complete")
-	}
+	Require(t, ok && len(d.started) == 1, "fixture has no pending container start to complete")
 	c.State.Status = "exited"
 	c.State.StartedAt = time.Unix(1, 0).UTC().Format(time.RFC3339Nano)
 }
@@ -253,9 +251,7 @@ func (d *InstallEngine) ReplaceForUpdate(t testing.TB, replacementID string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	c, ok := d.created[ContainerID]
-	if !ok {
-		t.Fatal("cannot replace missing initial container")
-	}
+	Require(t, ok, "cannot replace missing initial container")
 	delete(d.created, ContainerID)
 	c.ID = replacementID
 	c.Config.Labels[constants.DockerUpdateAttemptLabel] = "fixture updater marker"
