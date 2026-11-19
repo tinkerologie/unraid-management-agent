@@ -81,6 +81,10 @@ func (s *Service) interruptedInstalls() ([]installReceipt, error) {
 		}
 		pending = append(pending, receipt)
 	}
+	if len(s.unreadableClaims) != 0 {
+		// Retry unreadable claims without delaying independently verified ones.
+		return pending, ErrAttemptStorage
+	}
 	return pending, nil
 }
 

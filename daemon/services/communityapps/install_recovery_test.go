@@ -1064,6 +1064,68 @@ func TestRecoveryWaitsForReadableReceipt(t *testing.T) {
 	}
 }
 
+func TestDamagedReceiptDoesNotBlockIntactRecoveryOrReplay(t *testing.T) {
+	for _, damage := range []string{"truncated file", "symbolic link"} {
+		t.Run(damage, func(t *testing.T) {
+			root := communityappstest.CopyHeimdallHost(t)
+			engine := &communityappstest.InstallEngine{PostStartInspectError: errors.New("Docker unavailable after start")}
+			before := newInstallService(t, root, engine)
+			preview, err := before.Prepare(t.Context(), communityapps.PrepareRequest{Reference: communityappstest.HeimdallReference})
+			if err != nil || !preview.Eligible {
+				t.Fatalf("prepare: %+v, %v", preview.Issues, err)
+			}
+			claim, err := before.Confirm(t.Context(), preview.PlanID, preview.ApprovalToken)
+			if err != nil {
+				t.Fatal(err)
+			}
+			waitForDockerStart(t, engine)
+			before.Close()
+			engine.PostStartInspectError = nil
+
+			const truncated = `{"version":2,"attempt":`
+			badEntry := recoveryReceiptDir + "/" + strings.Repeat("A", 26) + ".json"
+			linkTarget := preview.PlanID + ".json"
+			if damage == "truncated file" {
+				communityappstest.WriteFile(t, root, badEntry, truncated)
+			} else if err := os.Symlink(linkTarget, filepath.Join(root, badEntry)); err != nil {
+				t.Fatal(err)
+			}
+			after := newInstallService(t, root, engine)
+			if got, err := after.GetAttempt(claim.ID); err != nil || got.ID != claim.ID || got.State != communityapps.AttemptRunning {
+				t.Fatalf("unrelated damaged receipt hid the intact attempt: %+v, %v", got, err)
+			}
+			if _, err := after.GetAttempt(strings.Repeat("Z", 26)); !errors.Is(err, communityapps.ErrAttemptStorage) {
+				t.Fatalf("incomplete index gave a conclusive status for an unknown attempt: %v", err)
+			}
+			newPreview, err := after.Prepare(t.Context(), communityapps.PrepareRequest{
+				Reference: communityappstest.HeimdallReference, Name: "new-install",
+				Ports: map[string]communityapps.PortOverride{"80/tcp": {HostPort: 18080}, "443/tcp": {HostPort: 18443}},
+			})
+			if err != nil || !newPreview.Eligible {
+				t.Fatalf("read-only preview: %+v, %v", newPreview.Issues, err)
+			}
+			if _, err := after.Confirm(t.Context(), newPreview.PlanID, newPreview.ApprovalToken); !errors.Is(err, communityapps.ErrAttemptStorage) {
+				t.Fatalf("confirmation ignored an unreadable claim: %v", err)
+			}
+			after.StartRecovery(t.Context())
+			if got := waitForAttempt(t, after, claim.ID); got.State != communityapps.AttemptSucceeded || got.ContainerID != communityappstest.ContainerID {
+				t.Fatalf("did not reconcile the intact receipt: %+v", got)
+			}
+			if got, err := after.Confirm(t.Context(), preview.PlanID, preview.ApprovalToken); err != nil || got.ID != claim.ID || got.State != communityapps.AttemptSucceeded {
+				t.Fatalf("exact confirmation replay was not preserved: %+v, %v", got, err)
+			}
+			if damage == "truncated file" {
+				assertRecoveryFile(t, root, badEntry, truncated)
+			} else if got, err := os.Readlink(filepath.Join(root, badEntry)); err != nil || got != linkTarget {
+				t.Fatalf("recovery changed the damaged receipt link: %q, %v", got, err)
+			}
+			if creates, _, starts, _, _ := engine.Observation(); creates != 1 || len(starts) != 1 || len(engine.RemoveRequests()) != 0 {
+				t.Fatalf("recovery or replay changed Docker resources: %d creates, %d starts, %d removals", creates, len(starts), len(engine.RemoveRequests()))
+			}
+		})
+	}
+}
+
 func TestRecoveryResumesIfDockerDisappearsAfterContainerRemoval(t *testing.T) {
 	engine := &communityappstest.InstallEngine{
 		BeforeStart: func() error {

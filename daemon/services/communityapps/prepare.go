@@ -189,6 +189,7 @@ type Service struct {
 	pendingCommit     map[string]installReceipt
 	receipts          map[string]installReceipt
 	attemptIDs        map[string]string
+	unreadableClaims  map[string]struct{}
 }
 
 // NewService creates an install service using the supplied host dependencies.

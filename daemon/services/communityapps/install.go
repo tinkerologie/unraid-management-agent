@@ -156,6 +156,9 @@ func (s *Service) replayConfirmationLocked(planID, token string) (Attempt, bool,
 	}
 	receipt, exists := s.receipts[planID]
 	if !exists {
+		if len(s.unreadableClaims) != 0 {
+			return Attempt{}, false, ErrAttemptStorage
+		}
 		return Attempt{}, false, nil
 	}
 	hash := sha256.Sum256([]byte(token))
@@ -177,6 +180,9 @@ func (s *Service) GetAttempt(id string) (Attempt, error) {
 	}
 	receipt, found := s.receipts[s.attemptIDs[id]]
 	if !found {
+		if len(s.unreadableClaims) != 0 {
+			return Attempt{}, ErrAttemptStorage
+		}
 		return Attempt{}, ErrAttemptNotFound
 	}
 	return s.attemptStatusLocked(receipt), nil

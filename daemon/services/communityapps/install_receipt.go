@@ -38,8 +38,8 @@ type installReceipt struct {
 	Attempt          Attempt           `json:"attempt"`
 }
 
-// loadReceipts and indexReceipt run under the service mutex. Clear the loaded
-// flag on an uncertain write so a retry reloads the durable plan claim.
+// loadReceipts and indexReceipt run under the service mutex. Keep validated
+// receipts available during a partial load and retry the scan until complete.
 func (s *Service) loadReceipts() error {
 	if s.receiptsLoaded {
 		return nil
@@ -57,6 +57,7 @@ func (s *Service) loadReceipts() error {
 	}
 	s.receipts = make(map[string]installReceipt, len(entries))
 	s.attemptIDs = make(map[string]string, len(entries))
+	s.unreadableClaims = make(map[string]struct{})
 	for _, entry := range entries {
 		planID, valid := strings.CutSuffix(entry.Name(), ".json")
 		if !valid || !opaqueID.MatchString(planID) {
@@ -75,13 +76,23 @@ func (s *Service) loadReceipts() error {
 		})
 		if err != nil || (receipt.Version != 1 && receipt.Version != installReceiptVersion) || receipt.PlanID != planID ||
 			!opaqueID.MatchString(receipt.Attempt.ID) || !opaqueID.MatchString(receipt.Owner) ||
-			!validNativeName(receipt.Attempt.Configuration.Name) ||
-			s.attemptIDs[receipt.Attempt.ID] != "" {
-			return ErrAttemptStorage
+			!validNativeName(receipt.Attempt.Configuration.Name) {
+			s.unreadableClaims[planID] = struct{}{}
+			continue
+		}
+		if previous, duplicate := s.attemptIDs[receipt.Attempt.ID]; duplicate {
+			s.unreadableClaims[planID] = struct{}{}
+			if previous != "" {
+				s.unreadableClaims[previous] = struct{}{}
+				delete(s.receipts, previous)
+			}
+			// Keep the ID ambiguous for any further colliding receipt.
+			s.attemptIDs[receipt.Attempt.ID] = ""
+			continue
 		}
 		s.indexReceipt(receipt)
 	}
-	s.receiptsLoaded = true
+	s.receiptsLoaded = len(s.unreadableClaims) == 0
 	return nil
 }
 
@@ -180,6 +191,9 @@ func syncDirectory(path string) error {
 func (s *Service) persistProgress(receipt installReceipt) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if _, unreadable := s.unreadableClaims[receipt.PlanID]; unreadable {
+		return ErrAttemptStorage
+	}
 	if current, exists := s.receipts[receipt.PlanID]; exists && isTerminal(current.Attempt.State) {
 		delete(s.pendingCommit, receipt.PlanID)
 		return nil
