@@ -34,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Measure Go coverage across packages so CI records code exercised by shared tests.
+
 - Use Dynamix settings rows and theme colors with the plugin’s compact left-aligned layout and switches.
   Improve helper text contrast in light and dark themes, and preserve saved collection intervals
   outside the displayed presets (#358).

@@ -61,10 +61,11 @@ jobs:
             exit 1
           fi
 
+          # Record shared fixture and application code exercised by tests in other packages.
           "$(go env GOPATH)/bin/gotestsum" \
             --junitfile junit.xml \
             --format standard-quiet \
-            -- -covermode=atomic -coverprofile=coverage.out ./...
+            -- -coverpkg=./... -covermode=atomic -coverprofile=coverage.out ./...
           # The takeover fixture has the same ID and a 30s keepalive. Count
           # only the two real agent sessions, which use a 60s keepalive.
           awk '
