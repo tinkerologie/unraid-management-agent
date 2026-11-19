@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.11.07] - 2026-11-19
+
 ### Added
 
 - Resolve the current Docker container ID by name after native replacement and show the saved Community Applications catalog link in Docker details (#366).
