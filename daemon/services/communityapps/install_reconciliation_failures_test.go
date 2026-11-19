@@ -371,7 +371,7 @@ func TestStartedContainerRemainsUnverifiedWhenNativeTemplateStatFails(t *testing
 			t.Fatalf("verification looked up a different native template: %q", path)
 		}
 		return nil, fs.ErrPermission
-	}, nil, name, "recovery-fixture")
+	}, nil, nil, name, "recovery-fixture")
 	if got != startUnobserved || !errors.Is(err, ErrNativeTemplate) {
 		t.Fatalf("unreadable native template was treated as absent: %v, %v", got, err)
 	}

@@ -18,6 +18,7 @@ func openPublishedNativeTemplate(dir *os.Root, name string) (*os.File, error) {
 func observePublishedNativeTemplate(
 	stat func(string) (fs.FileInfo, error),
 	open func(string) (fs.File, error),
+	openDirectory func() (nativeRestoreAnchor, error),
 	filename, installedName string,
 ) (startObservation, error) {
 	info, err := stat(filename)
@@ -47,6 +48,17 @@ func observePublishedNativeTemplate(
 	if len(data) > maxStartedTemplateRead || decodeCatalogLinkTemplate(bytes.NewReader(data), &template) != nil ||
 		!template.matchesName(installedName) {
 		return startTemplateMissing, nil
+	}
+	// A previous restore may have renamed the template and then lost its
+	// directory sync before committing the receipt. Visibility is not proof
+	// of durability, even on a later recovery pass.
+	directory, err := openDirectory()
+	if err != nil {
+		return startUnobserved, ErrNativeTemplate
+	}
+	defer func() { _ = directory.Close() }()
+	if err := directory.Sync(); err != nil {
+		return startUnobserved, ErrNativeTemplate
 	}
 	return startVerified, nil
 }

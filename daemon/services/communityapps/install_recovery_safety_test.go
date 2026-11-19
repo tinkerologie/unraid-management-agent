@@ -221,7 +221,7 @@ func TestRecoveredNativeTemplateRequiresReadableStableFile(t *testing.T) {
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := observePublishedNativeTemplate(os.Lstat, tc.open, filename, "recovery-fixture")
+			got, err := observePublishedNativeTemplate(os.Lstat, tc.open, nil, filename, "recovery-fixture")
 			if got != startUnobserved || !errors.Is(err, ErrNativeTemplate) {
 				t.Fatalf("unreadable native template derived a terminal proof: %v, %v", got, err)
 			}
@@ -265,6 +265,36 @@ func TestRetainedTemplateRestoreReportsUncertainPublicationPath(t *testing.T) {
 	}
 	if _, err := os.Stat(final); err != nil {
 		t.Fatalf("sync failure did not preserve the moved file: %v", err)
+	}
+
+	openFile := func(name string) (fs.File, error) {
+		return openPublishedNativeTemplate(dir, name)
+	}
+	for _, tc := range []struct {
+		name string
+		open func() (nativeRestoreAnchor, error)
+	}{
+		{name: "directory cannot be opened for sync", open: func() (nativeRestoreAnchor, error) {
+			return nil, fs.ErrPermission
+		}},
+		{name: "directory sync still fails", open: func() (nativeRestoreAnchor, error) {
+			file, err := dir.Open(".")
+			return failedNativeRestoreSync{file}, err
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			observed, err := observePublishedNativeTemplate(dir.Lstat, openFile, tc.open, filepath.Base(final), receipt.Attempt.Configuration.Name)
+			if observed != startUnobserved || !errors.Is(err, ErrNativeTemplate) {
+				t.Fatalf("visible XML was treated as durable before directory sync: %v, %v", observed, err)
+			}
+		})
+	}
+
+	observed, err := observePublishedNativeTemplate(dir.Lstat, openFile, func() (nativeRestoreAnchor, error) {
+		return dir.Open(".")
+	}, filepath.Base(final), receipt.Attempt.Configuration.Name)
+	if err != nil || observed != startVerified {
+		t.Fatalf("restored XML was not eligible after a successful directory sync: %v, %v", observed, err)
 	}
 }
 

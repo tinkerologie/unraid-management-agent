@@ -436,6 +436,8 @@ func (s *Service) observeStartedNativeTemplate(receipt installReceipt) (startObs
 	defer func() { _ = dir.Close() }()
 	return observePublishedNativeTemplate(dir.Lstat, func(name string) (fs.File, error) {
 		return openPublishedNativeTemplate(dir, name)
+	}, func() (nativeRestoreAnchor, error) {
+		return dir.Open(".")
 	}, s.finalTemplateName(receipt), receipt.Attempt.Configuration.Name)
 }
 

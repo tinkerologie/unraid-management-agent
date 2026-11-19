@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Recovery keeps uncertain Docker creates and starts available for polling and preserves started containers after native template edits.
   Cleanup preserves appdata and containers that have started. Recovery checks the current native template's
   container name and restores an owned template left in quarantine when a verified start or active replacement needs it.
+  Recovery syncs the native template directory before confirming a successful start.
   Cleanup waits for Docker to confirm the original container's state after a failed removal.
 
 - Confirm an approved Community Applications install through REST or Streamable HTTP MCP and follow its durable attempt (#364).
