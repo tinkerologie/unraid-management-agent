@@ -254,6 +254,8 @@ func TestCategorizeMCPTool(t *testing.T) {
 	}{
 		{"container_start", "docker"},
 		{"get_docker_info", "docker"},
+		{"search_community_applications", "docker"},
+		{"inspect_community_application", "docker"},
 		{"vm_start", "vm"},
 		{"array_start", "array"},
 		{"parity_check", "array"},

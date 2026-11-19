@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -46,6 +47,33 @@ func TestSearchSelectsExactVisibleVariant(t *testing.T) {
 	}
 }
 
+func TestSearchCapsListingsAndCountsAllMatches(t *testing.T) {
+	const matchCount = 101
+	var cache strings.Builder
+	fmt.Fprintf(&cache, "a:%d:{", matchCount)
+	for index := range matchCount {
+		name := fmt.Sprintf("Fixture %03d", index)
+		fmt.Fprintf(&cache, `i:%d;a:6:{s:4:"Name";s:%d:"%s";s:10:"Repository";s:12:"fixture/demo";s:11:"Displayable";b:1;s:10:"Compatible";b:1;s:9:"Blacklist";b:0;s:10:"Deprecated";b:0;}`, index, len(name), name)
+	}
+	cache.WriteString("}")
+	root := communityappstest.CopyHost(t)
+	communityappstest.WriteFile(t, root, cacheFile, cache.String())
+	result, err := communityapps.NewCatalog(os.DirFS(root)).Search(t.Context(), "fixture")
+	if err != nil || result.Total != matchCount || len(result.Listings) != 100 {
+		t.Fatalf("search found %d and returned %d, want %d and 100: %v", result.Total, len(result.Listings), matchCount, err)
+	}
+	if first, last := result.Listings[0].Name, result.Listings[99].Name; first != "Fixture 000" || last != "Fixture 099" {
+		t.Fatalf("unexpected first page boundaries: %q to %q", first, last)
+	}
+}
+
+func TestProblemForErrorHidesUnexpectedDetails(t *testing.T) {
+	problem := communityapps.ProblemForError(errors.New("private-internal-catalog-error"))
+	if problem.Code != "catalog_request_failed" || problem.Message != "Community Applications request failed." {
+		t.Fatalf("unexpected public problem: %+v", problem)
+	}
+}
+
 func fixtureCatalog(t *testing.T) *communityapps.Catalog {
 	t.Helper()
 	return communityapps.NewCatalog(os.DirFS(communityappstest.CopyHost(t)))
@@ -75,6 +103,10 @@ func TestSearchCatalogStates(t *testing.T) {
 			if err := os.Remove(filepath.Join(root, cacheFile)); err != nil {
 				t.Fatal(err)
 			}
+		}, communityapps.ErrCatalogUnavailable},
+		{"empty cache", func(t *testing.T, root string) {
+			t.Helper()
+			writeFixtureFile(t, root, cacheFile, nil)
 		}, communityapps.ErrCatalogUnavailable},
 		{"unsupported build", func(t *testing.T, root string) {
 			t.Helper()
@@ -183,6 +215,34 @@ func TestResolveUsesCurrentCatalogAndPolicy(t *testing.T) {
 	writeFixtureFile(t, root, cacheFile, hidden)
 	if _, err := catalog.Resolve(t.Context(), edge.Reference); !errors.Is(err, communityapps.ErrListingUnavailable) {
 		t.Fatalf("Resolve returned %v for a newly blacklisted listing", err)
+	}
+}
+
+func TestCatalogNeverReturnsHideFromCAListings(t *testing.T) {
+	root := communityappstest.CopyHost(t)
+	catalog := communityapps.NewCatalog(os.DirFS(root))
+	search, err := catalog.Search(t.Context(), "fixture")
+	if err != nil || len(search.Listings) != 2 {
+		t.Fatalf("expected a visible parent and variant: %+v, %v", search, err)
+	}
+	cache, err := os.ReadFile(filepath.Join(root, cacheFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent := []byte(`i:2;a:14:{s:2:"ID";i:10;`)
+	if !bytes.Contains(cache, parent) {
+		t.Fatal("fixture parent row missing")
+	}
+	hidden := bytes.Replace(cache, parent, []byte(`i:2;a:15:{s:2:"ID";i:10;s:10:"hideFromCA";b:1;`), 1)
+	writeFixtureFile(t, root, cacheFile, hidden)
+	filtered, err := catalog.Search(t.Context(), "fixture")
+	if err != nil || filtered.Total != 0 || len(filtered.Listings) != 0 {
+		t.Fatalf("hidden parent or variant was searchable: %+v, %v", filtered, err)
+	}
+	for _, listing := range search.Listings {
+		if _, err := catalog.Resolve(t.Context(), listing.Reference); !errors.Is(err, communityapps.ErrListingUnavailable) {
+			t.Fatalf("hidden listing %q returned %v", listing.Name, err)
+		}
 	}
 }
 

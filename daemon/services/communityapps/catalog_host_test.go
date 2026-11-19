@@ -5,9 +5,33 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"testing/fstest"
 
 	"github.com/tinkerologie/unraid-management-agent/daemon/services/internal/communityappstest"
 )
+
+func TestSearchRejectsOversizeHostCache(t *testing.T) {
+	root := communityappstest.CopyHost(t)
+	if err := os.Truncate(filepath.Join(root, catalogPath), maxCatalogBytes+1); err != nil {
+		t.Fatal(err)
+	}
+	catalog := NewCatalog(hostFiles{root: root, owner: os.Getuid()})
+	if _, err := catalog.Search(t.Context(), ""); !errors.Is(err, ErrCatalogUnsupported) {
+		t.Fatalf("oversize cache returned %v, want unsupported", err)
+	}
+}
+
+func TestReadBoundedRejectsLimitOverrun(t *testing.T) {
+	files := fstest.MapFS{"cache": {Data: []byte("12345")}}
+	file, err := files.Open("cache")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = file.Close() })
+	if data, err := readBounded(file, 4); data != nil || !errors.Is(err, errCacheEncoding) {
+		t.Fatalf("over-limit read returned %q, %v, want encoding error", data, err)
+	}
+}
 
 func TestSearchRejectsMutableAndLinkedHostCaches(t *testing.T) {
 	for _, mode := range []string{"world-writable", "symbolic-link"} {

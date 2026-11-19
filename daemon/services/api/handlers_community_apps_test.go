@@ -51,9 +51,21 @@ func TestCommunityAppsRESTUsesReadPolicy(t *testing.T) {
 	if strings.Contains(template.Body.String(), "sentinel") {
 		t.Fatal("template response disclosed a sensitive value")
 	}
-	if inspect := request(route+"/%2e%2e", "test-catalog-token"); inspect.Code == http.StatusOK {
-		t.Fatal("inspection accepted an invalid listing reference")
-	}
+	checkCatalogProblem(t, request(route+"/invalid-reference", "test-catalog-token"), http.StatusBadRequest, "invalid_reference")
+	checkCatalogProblem(t, request(route+"/"+strings.Repeat("0", 64), "test-catalog-token"), http.StatusNotFound, "listing_unavailable")
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	req := httptest.NewRequestWithContext(ctx, http.MethodGet, route, nil)
+	req.Header.Set("Authorization", "Bearer test-catalog-token")
+	failed := httptest.NewRecorder()
+	server.GetRouter().ServeHTTP(failed, req)
+	checkCatalogProblem(t, failed, http.StatusInternalServerError, "catalog_request_failed")
+
+	server.SetCommunityAppsCatalog(communityapps.NewCatalog(fstest.MapFS{
+		"boot/config/plugins/community.applications.plg": {Data: []byte(`<!ENTITY version "2000.01.01">`)},
+	}))
+	checkCatalogProblem(t, request(route, "test-catalog-token"), http.StatusNotImplemented, "catalog_unsupported")
 
 	server.SetCommunityAppsCatalog(communityapps.NewCatalog(fstest.MapFS{}))
 	cold := request(route, "test-catalog-token")
