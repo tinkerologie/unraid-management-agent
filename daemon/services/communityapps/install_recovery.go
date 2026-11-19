@@ -157,29 +157,26 @@ func (s *Service) settleInstall(ctx context.Context, docker InstallDocker, recei
 		if err != nil {
 			return false
 		}
-		switch observed {
-		case startVerified, startTemplateMissing:
+		if observed == startVerified || observed == startTemplateMissing {
 			return s.finishObservedStart(receipt, observed)
-		case startContainerMissing:
-			if uncertainStart(*receipt) {
-				// Preserve the native template after ordinary removal or
-				// replacement, including one quarantined by older cleanup.
-				if issue := s.restoreRetainedNativeTemplate(*receipt); issue.Code != "" {
-					receipt.Attempt.CleanupDetails = append(receipt.Attempt.CleanupDetails, issue)
-					receipt.Attempt.CleanupFailures = append(receipt.Attempt.CleanupFailures, issue.Code)
-				}
-				return s.finishInstall(receipt, ErrInstallInterrupted)
-			}
 		}
 		// A short-lived app can start and exit after Inspect reports a
 		// zero start time. Even non-force removal would then delete it.
 		if uncertainStart(*receipt) {
-			if !s.oldEngineCallsDrained(receipt) {
-				return false
+			if observed != startContainerMissing {
+				if !s.oldEngineCallsDrained(receipt) {
+					return false
+				}
+				// A new boot drains the request, but Docker's last start
+				// timestamp might not have survived it. Keep the container.
+				receipt.Attempt.ContainerID = receipt.OwnedContainerID
 			}
-			// A new boot drains the request, but Docker's last start
-			// timestamp might not have survived it. Preserve the result.
-			receipt.Attempt.ContainerID = receipt.OwnedContainerID
+			// Keep the native template, including when an older cleanup
+			// quarantined it before a reboot or ordinary Docker removal.
+			if issue := s.restoreRetainedNativeTemplate(*receipt); issue.Code != "" {
+				receipt.Attempt.CleanupDetails = append(receipt.Attempt.CleanupDetails, issue)
+				receipt.Attempt.CleanupFailures = append(receipt.Attempt.CleanupFailures, issue.Code)
+			}
 			return s.finishInstall(receipt, ErrInstallInterrupted)
 		}
 	}
